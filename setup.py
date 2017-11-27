@@ -17,7 +17,7 @@ tests_require = [
 ]
 
 setup(
-    name='DCIC Utils',
+    name='dcicutils',
     version='0.1',
     description='Utility modules shared amongst several repos in the 4dn-dcic organization',
     long_description=README,
