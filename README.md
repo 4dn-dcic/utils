@@ -1,3 +1,7 @@
+# utils
+various util modules shared amongst several projects in our organization
+
+
 ## quickstart
 
 ```
@@ -12,5 +16,3 @@ $ echo "git remote add origin https://github.com/hms-dbmi/<your_repo_name>.git"
 $ echo "git push -u origin master"
 ```
 
-# utils
-various util modules shared amongst several projects in our organization
