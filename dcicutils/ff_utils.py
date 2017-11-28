@@ -68,7 +68,7 @@ def create_ffmeta(sbg, workflow, input_files=None, parameters=None, title=None, 
         try:
             sbg.volume_list[0]['name']
             sbg_mounted_volume_ids = [x['name'] for x in sbg.volume_list]
-        except:
+        except:  # noqa: E722
             sbg_mounted_volume_ids = [x for x in sbg.volume_list]
 
     if not sbg_import_ids:
@@ -288,7 +288,7 @@ def delete_field(post_json, del_field, connection=None):
 
 def generate_rand_accession():
     rand_accession = ''
-    for i in xrange(7):
+    for i in range(7):
         r = random.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789')
         rand_accession += r
     accession = "4DNFI"+rand_accession
