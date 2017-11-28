@@ -6,6 +6,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.md')).read()
 
 requires = [
+    'pytest-runner',
     'Submit4DN',
     'boto3',
 ]
@@ -29,6 +30,7 @@ setup(
     url='https://data.4dnucleome.org',
     license='MIT',
     install_requires=requires,
+    setup_requires=requires,
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
