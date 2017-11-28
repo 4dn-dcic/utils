@@ -59,7 +59,7 @@ def clean(ctx):
 
 
 @task
-def deploy(ctx, version=None):
+def deploy(ctx, version=None, local=False):
     print("preparing for deploy...")
     print("first lets clean everythign up.")
     clean(ctx)
@@ -71,6 +71,8 @@ def deploy(ctx, version=None):
     git_tag(ctx, version, "new production release %s" % (version))
     print("Build is now triggered for production deployment of %s "
           "check travis for build status" % (version))
+    if local:
+        publish(ctx)
     print("Also follow these additional instructions here")
 
 
