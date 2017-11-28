@@ -1,0 +1,32 @@
+language: python
+sudo: false
+cache:
+  pip: true
+python:
+- '3.5'
+deploy:
+  provider: pypi
+  user:
+    secure: LyJOxK3WzN1mLLXI87KFREB47/0yhA5p/W2CjiO94ELi1l6rq3xXyDVWVIpt7kOeYWpJgIB5t5EX7wma82uuWWwmANYea0/mm2SxGZQRC2t4mPv4ZEObUfS/JIsqAtzJtfGltUrcS+n15DCWifr26fWfgCbHNKxis/paHnXkJIJnJc3eomxkY+unH0ApoRQPxn8dck9JVn2/RxF4IrMIeNANIZMQaAI4kJq7g4U7N/iSOAeiS9wNfwSyKtnCZBGgVZVSLRdDlhEy7eE2J7AZCcjioVj32lDR8CUZ8ckRmHu1w8L0jULKbp6HetDT9VbvBi9RLE5gb5AbrsVnZMcSMUMFqkU82Ik8ep7GHLZ/Of5KTyHTFn0bdZQrfiBPpN5O9YSqmhroIqTAG+5CRCAsF/6spKlvvijzf4WiEwva+ueWaU/akJYgn5SUNAiqE4qhLGDVZg+d4IHsjdmOFuoaeh+t5qJrNOw+1rON5rsH9BuzIAdm0NjhGNWnJOrZssieqnckrOiwPqHwqBoZKIvrn7xCOkdYBfflhRusFUMMwVzdgyzY0juB7gCnjSZ2uf2lsdwzTKTaN9bM6ykDUng4DDQ2mh/W2Lp4D5ONpLUf7lwxxDvlFQjXGX8tsFTW20m+DruME/g7qtfMWM1HOUHH4NYSy7zMzK6cgFc6iLfxNwg=
+  password:
+    secure: SuP/xox0WhHiKaI0KGBfNpAlfMy1qDxW1+EgyUXKAS2tJS413Pe1p9GzKf53iEJfYTQA7go/m3YTxrG4cQCMlrdS6v9q/1uJjW7VdLoSCP2V8e8oMw3XW8SS6Qq4wD+dIJUOKiWxVS3CWZiOui4+DVmnlsR/3YQhMxpLo7Kkmqo/jnqMg76uvNgtNCQcWGlzm10pySK8JQm+gzcQbYmEro6PvE6NLz1NsUJD6fRQC+ymBGGUjXBwj3aGp/gOm7KCdf8uH6QRlfu9aWoEuFmHlkAEEXARsIjQeOZkysev2Zu0NrHs/h5WPvx3qdZ7kHS7UVCRAvjJH0rDnRpbss2IdhrQvjD+xkcLT4Q+MSb+A/+QmRgEz35wQxFmlGm9HTCmzZ3aiqAx5XI2bUeGbzE1YbT09ysDeFl2XrALxbbR/LYckLIUuXdpn20KgVm0M1SJ5FuChihisQJlSE4DpmmOHSYeYJ0O2SOMvxgImEgRQR83wtKmqW0wE/dvgadsTNNgIIRy6SUEIzXdH3yHDCLHk/jcDuScyt2nxbd3Jw5MPz1hRp9uCspuLOHyp0KxexTHFJrxe7X8sontah9XREz5k6Okr3j8rg94ANvoGyrWELoY8khMNt7GFd/an3gsPrhlemE9kmrBr6Hhxkxi5fxNXk+APkfvmrHQlH2uOlGNU8k=
+  on:
+    tags: true
+  distributions: "sdist bdist_wheel"
+install:
+- pip install -U -r requirements-dev.txt
+- pip install -U -r requirements.txt
+- pip install coveralls
+- pip install codacy-coverage
+- pip install tox
+script:
+- invoke test
+- echo "finished running tests on repo"
+- echo " now install packaged and run tests again, on installed package"
+- python setup.py test
+after_success:
+- python-codacy-coverage -r coverage.xml
+- coveralls
+env:
+  global:
+    secure: x8IUUQIlfb/RYfdbMdNLy5Q2/WhRWhAmVZqhum1WPZq4DlhQh2o5ntDCavJ3j3iQ3vekYZPksgQicX0Z6NUz8wXH7+gsbgCHvhN4NdDI3sLMpXc95tzHWP5YY1XY9UDryjZjqAiz2FVnmth7Y++gsRnPk2vCzw0xTOpwYDZoA+qLsYWUMZWNZkwQS3HlpeIj1f869+htzgLy+BaeeCUXEdKJF5rxZZpqSOPNIAeribaEKYdGRTtxTu3Sf+pq5rVQ+LM/X/FwzJcGfxrS3yKZErr2tS/DclONGCx8hcY01mTH6+rCb/zYd8NHTU+ZEOI41vICPSWcaoHvajMmLOF8h+6FRYWAYt5yF+GfWVdnuEDMxB1/Czul7+oKI6yh3Uv0R5/Nlhu8gpZ2Qwr9zk9OyZd9X1cYtRTEpPiqH2mc4aylclR1/MD/nLs1bHB+K591duyyWPtUQE7BFT0gksLLT9S/mt2p8pPu7CF6ZTAViLD4yUArmjBF/acP/QfThaXuHWqGUxO2oRvcD/YYPwyGWw/I2qmvVSAAZwNkaMahN6SAb5vgu3yOMrsQt6xDN+dcoqNQNu1tno4naFUnYzxW0ozR4mCTycAvbh9BknxuE5gAj/mAn4ZP4et6nwXyYbqJbeAFdhlwxL8ttiqgwZLdXD9oxBYlptPORzQCrpS3U74=

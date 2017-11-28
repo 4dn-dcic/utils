@@ -187,3 +187,9 @@ class s3Utils(object):
                 self.s3_put(the_file, s3_file_name, acl=acl)
 
         return ret_files
+
+
+def find_file(name, zipstream):
+    for zipped_filename in zipstream.namelist():
+        if zipped_filename.endswith(name):
+            return zipped_filename
