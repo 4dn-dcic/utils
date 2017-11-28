@@ -2,6 +2,7 @@
 import os
 import sys
 import webbrowser
+from invoke.exceptions import UnexpectedExit
 
 from invoke import task, run
 
@@ -149,7 +150,7 @@ def browse_cov(ctx, norun=False):
     if not norun:
         try:
             test(ctx)
-        except:
+        except UnexpectedExit:
             pass
     webbrowser.open_new_tab('htmlcov/index.html')
 
