@@ -78,7 +78,7 @@ def deploy(ctx, version=None, local=False):
 
 @task
 def update_version(ctx, version=None):
-    from ._version import __version__
+    from _version import __version__
     print("Current version is ", __version__)
     if version is None:
         msg = "What version would you like to set for new release (please use x.x.x / semantic versioning): "
