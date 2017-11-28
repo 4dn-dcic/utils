@@ -304,7 +304,7 @@ def is_uuid(value):
     try:
         UUID(value, version=4)
         return True
-    except:
+    except ValueError:
         return False
 
 
@@ -396,7 +396,7 @@ def get_linked_items(connection, itemid, found_items={},
             try:
                 obj_type = fdnDCIC.get_FDN(itemid, connection=connection)['@type'][0]
                 found_items[itemid] = obj_type
-            except:
+            except AttributeError:
                 print("Can't find a type for item %s" % itemid)
             if obj_type not in no_children:
                 fields_to_check = copy.deepcopy(res)
