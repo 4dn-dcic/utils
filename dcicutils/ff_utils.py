@@ -3,6 +3,7 @@ import json
 import time
 from uuid import uuid4, UUID
 import random
+import copy
 
 from wranglertools import fdnDCIC
 
@@ -14,7 +15,7 @@ def convert_param(parameter_dict, vals_as_string=False):
     '''
     print(str(parameter_dict))
     metadata_parameters = []
-    for k, v in parameter_dict.iteritems():
+    for k, v in parameter_dict.items():
         # we need this to be a float or integer if it really is, else a string
         if not vals_as_string:
             try:
@@ -81,7 +82,7 @@ def create_ffmeta(sbg, workflow, input_files=None, parameters=None, title=None, 
         for of in output_files:
             for of2 in sbg.export_report:
                 if of['workflow_argument_name'] == of2['workflow_argument_name']:
-                    for k, v in of2.iteritems():
+                    for k, v in of2.items():
                         of[k] = v
 
     return WorkflowRunMetadata(workflow, sbg.app_name, input_files, parameters,
@@ -312,7 +313,7 @@ def find_uuids(val):
     vals = []
     if not val:
         return []
-    elif isinstance(val, basestring):
+    elif isinstance(val, str):
         if is_uuid(val):
             vals = [val]
         else:
@@ -331,9 +332,9 @@ def filter_dict_by_value(dictionary, values, include=True):
         else will remove items that don't match the given values
     """
     if include:
-        return {k: v for k, v in dictionary.iteritems() if v in values}
+        return {k: v for k, v in dictionary.items() if v in values}
     else:
-        return {k: v for k, v in dictionary.iteritems() if v not in values}
+        return {k: v for k, v in dictionary.items() if v not in values}
 
 
 def has_field_value(item_dict, field, value=None, val_is_item=False):
@@ -353,7 +354,7 @@ def has_field_value(item_dict, field, value=None, val_is_item=False):
     if isinstance(val_in_item, list):
         if value in val_in_item:
             return True
-    elif isinstance(val_in_item, basestring):
+    elif isinstance(val_in_item, str):
         if value == val_in_item:
             return True
 
@@ -373,13 +374,14 @@ def get_types_that_can_have_field(connection, field):
         even if there is currently no value for that field"""
     profiles = fdnDCIC.get_FDN('/profiles/', connection=connection, frame='raw')
     types_w_field = []
-    for t, j in profiles.iteritems():
+    for t, j in profiles.items():
         if j['properties'].get(field):
             types_w_field.append(t)
     return types_w_field
 
 
-def get_linked_items(connection, itemid, found_items, no_children=['Publication']):
+def get_linked_items(connection, itemid, found_items={},
+                     no_children=['Publication', 'Lab', 'User', 'Award']):
     """Given an ID for an item all descendant linked item uuids (as given in 'frame=raw')
         are stored in a dict with each item type as the value.
         All descendants are retrieved recursively except the children of the types indicated
@@ -395,11 +397,11 @@ def get_linked_items(connection, itemid, found_items, no_children=['Publication'
                 obj_type = fdnDCIC.get_FDN(itemid, connection=connection)['@type'][0]
                 found_items[itemid] = obj_type
             except:
-                print "Can't find a type for item %s" % itemid
+                print("Can't find a type for item %s" % itemid)
             if obj_type not in no_children:
                 fields_to_check = copy.deepcopy(res)
                 id_list = []
-                for key, val in fields_to_check.iteritems():
+                for key, val in fields_to_check.items():
                     # could be more than one item in a value
                     foundids = find_uuids(val)
                     if foundids:
