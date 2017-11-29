@@ -19,7 +19,7 @@ tests_require = [
 
 setup(
     name='dcicutils',
-    version=open("_version.py").readlines()[-1].split()[-1].strip("\"'"),
+    version=open("dcicutils/_version.py").readlines()[-1].split()[-1].strip("\"'"),
     description='Utility modules shared amongst several repos in the 4dn-dcic organization',
     long_description=README,
     packages=['dcicutils'],
