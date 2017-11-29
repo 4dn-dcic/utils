@@ -6,6 +6,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.md')).read()
 
 requires = [
+    'pytest-runner',
     'Submit4DN',
     'boto3',
 ]
@@ -18,7 +19,7 @@ tests_require = [
 
 setup(
     name='dcicutils',
-    version='0.1',
+    version=open("_version.py").readlines()[-1].split()[-1].strip("\"'"),
     description='Utility modules shared amongst several repos in the 4dn-dcic organization',
     long_description=README,
     packages=['dcicutils'],
@@ -29,6 +30,7 @@ setup(
     url='https://data.4dnucleome.org',
     license='MIT',
     install_requires=requires,
+    setup_requires=requires,
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
