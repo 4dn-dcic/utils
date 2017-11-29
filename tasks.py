@@ -78,7 +78,7 @@ def deploy(ctx, version=None, local=False):
 
 @task
 def update_version(ctx, version=None):
-    from _version import __version__
+    from dcicutils._version import __version__
     print("Current version is ", __version__)
     if version is None:
         msg = "What version would you like to set for new release (please use x.x.x / semantic versioning): "
@@ -89,15 +89,15 @@ def update_version(ctx, version=None):
 
     # read the versions file
     lines = []
-    with open("_version.py") as readfile:
+    with open("dcicutils/_version.py") as readfile:
         lines = readfile.readlines()
 
     if lines:
-        with open("_version.py", 'w') as writefile:
+        with open("dcicutils/_version.py", 'w') as writefile:
             lines[-1] = '__version__ = "%s"\n' % (version.strip())
             writefile.writelines(lines)
 
-    run("git add _version.py")
+    run("git add dcicutils/_version.py")
     run("git commit -m 'version bump'")
     print("version updated to", version)
     return version

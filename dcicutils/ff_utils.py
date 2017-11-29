@@ -148,6 +148,9 @@ class WorkflowRunMetadata(object):
         self.input_files = input_files
         if output_files:
             self.output_files = output_files
+        else:
+            self.output_files = []
+
         self.parameters = parameters
         self.award = award
         self.lab = lab
