@@ -387,7 +387,7 @@ def get_linked_items(connection, itemid, found_items={},
         All descendants are retrieved recursively except the children of the types indicated
         in the no_children argument.
         The relationships between descendant linked items are not preserved - i.e. you don't
-        know who are children, grandchildren, great grandchildren ..."""
+        know who are children, grandchildren, great grandchildren ... """
     # import pdb; pdb.set_trace()
     if not found_items.get(itemid):
         res = fdnDCIC.get_FDN(itemid, connection=connection, frame='raw')
