@@ -155,7 +155,7 @@ def test_has_field_value_check_for_field_w_item(bs_embed_json):
 
 def test_get_types_that_can_have_field(mocker, profiles):
     field = 'tags'
-    with mocker.patch('utils.dcicutils.ff_utils.fdnDCIC.get_FDN', return_value=profiles):
+    with mocker.patch('dcicutils.ff_utils.fdnDCIC.get_FDN', return_value=profiles):
         types_w_field = ff_utils.get_types_that_can_have_field('conn', field)
         assert 'ExperimentSetReplicate' in types_w_field
         assert 'TreatmentChemical' not in types_w_field
