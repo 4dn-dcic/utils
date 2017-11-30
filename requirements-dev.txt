@@ -16,4 +16,3 @@ flake8
 # Documentation builder
 # sphinx-autobuild
 # sphinx
-
