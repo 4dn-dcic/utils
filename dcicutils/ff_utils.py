@@ -346,9 +346,9 @@ def has_field_value(item_dict, field, value=None, val_is_item=False):
         the field value or one of the values if the field is an array
         How fancy do we want to make this?"""
     # 2 simple cases
-    if not item_dict.get(field):
+    if field not in item_dict:
         return False
-    if not value and item_dict.get(field):
+    if not value and field in item_dict:
         return True
 
     # now checking value
