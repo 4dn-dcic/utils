@@ -53,7 +53,9 @@ def flake(ctx):
 def clean(ctx):
     run("rm -rf build")
     run("rm -rf dist")
-    # run("rm -rf <name of your project>.egg-info")
+    run("rm -rf .eggs")
+    run("rm -rf dcicutils.egg-info")
+    run("rm -rf htmlcov")
     clean_docs(ctx)
     print("Cleaned up.")
 
