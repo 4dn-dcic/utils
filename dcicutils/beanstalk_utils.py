@@ -20,10 +20,11 @@ import requests
 from botocore.exceptions import ClientError
 from time import sleep
 
-
 logging.basicConfig()
 logger = logging.getLogger('logger')
 logger.setLevel(logging.INFO)
+
+FOURSIGHT_URL = 'https://foursight.4dnucleome.org/api/checks/'
 
 
 class WaitingForBoto3(Exception):
@@ -39,7 +40,7 @@ def delete_db(db_identifier, take_snapshot=True):
                 SkipFinalSnapshot=False,
                 FinalDBSnapshotIdentifier=db_identifier + "-final"
             )
-        except:  # noqa: E722
+        except:
             # try without the snapshot
             resp = client.delete_db_instance(
                 DBInstanceIdentifier=db_identifier,
@@ -51,6 +52,22 @@ def delete_db(db_identifier, take_snapshot=True):
             SkipFinalSnapshot=True,
         )
     print(resp)
+
+
+def get_health_page_info(bs_url):
+    if not bs_url.endswith('/'):
+        bs_url += "/"
+    if not bs_url.startswith('http'):
+        bs_url = 'http://' + bs_url
+
+    health_res = requests.get(bs_url + 'health?format=json')
+    return health_res.json()
+
+
+def get_es_from_health_page(bs_url):
+    health = get_health_page_info(bs_url)
+    es = health['elasticsearch'].strip(':80')
+    return es
 
 
 def is_indexing_finished(bs_url):
@@ -65,7 +82,7 @@ def is_indexing_finished(bs_url):
         bs_url += "/"
     # server not up yet
     try:
-        health_res = requests.get(bs_url + 'health?format=json')
+        health_res = requests.get(bs_url + 'counts?format=json')
         totals = health_res.json().get('db_es_total').split()
 
         # DB: 74048 ES: 74048 parse totals
@@ -76,7 +93,8 @@ def is_indexing_finished(bs_url):
             status = False
         else:
             status = True
-    except:  # noqa: E722
+    except Exception as e:
+        print(e)
         status = False
         totals = 0
 
@@ -110,6 +128,25 @@ def beanstalk_info(env):
     res = client.describe_environments(EnvironmentNames=[env])
 
     return res['Environments'][0]
+
+
+def get_beanstalk_real_url(env):
+    url = ''
+
+    if 'webprod' in env:
+        urls = {'staging': 'http://staging.4dnucleome.org',
+                'data': 'https://data.4dnucleome.org'}
+        data_env = whodaman()
+
+        if data_env == env:
+            url = urls['data']
+        else:
+            url = urls['staging']
+    else:
+        bs_info = beanstalk_info(env)
+        url = bs_info['CNAME']
+
+    return url
 
 
 def is_beanstalk_ready(env):
@@ -191,6 +228,32 @@ def create_db_from_snapshot(snapshot_name):
     return response['DBInstance']['DBInstanceArn']
 
 
+def is_travis_finished(build_id):
+    travis_key = os.environ.get('travis_key')
+    status = False
+    details = 'build not done or not found'
+    headers = {'Content-Type': 'application/json',
+               'Accept': 'application/json',
+               'Travis-API-Version': '3',
+               'User-Agent': 'tibanna/0.1.0',
+               'Authorization': 'token %s' % travis_key
+               }
+
+    url = 'https://api.travis-ci.org/build/%s' % build_id
+
+    logger.info("url: %s" % url)
+    resp = requests.get(url, headers=headers)
+    logger.info(resp.text)
+    state = resp.json()['state']
+    if resp.ok and state == 'failed':
+        raise Exception('Build Failed')
+    elif resp.ok and state == 'passed':
+        status = True
+        details = resp.json()
+
+    return status, details
+
+
 def snapshot_db(db_identifier, snapshot_name):
     client = boto3.client('rds')
     try:
@@ -248,15 +311,17 @@ def set_bs_env(envname, var, template=None):
         # add default environment from existing env
         # allowing them to be overwritten by var
         env_vars = get_bs_env(envname)
-        for var in env_vars:
-            k, v = var.split('=')
+        for evar in env_vars:
+            k, v = evar.split('=')
             if var.get(k, None) is None:
                 var[k] = v
-    except:  # noqa: E722
+    except:
         pass
 
     for key, val in var.iteritems():
         options.append(make_envvar_option(key, val))
+
+    logging.info("About to update beanstalk with options as %s" % str(options))
 
     if template:
         return client.update_environment(EnvironmentName=envname,
@@ -334,7 +399,23 @@ def clone_bs_env(old, new, load_prod, db_endpoint, es_url):
                            '--exact', '--nohang'])
 
 
-def create_foursight(dest_env, bs_url, es_url):
+def log_to_foursight(event, lambda_name, status='WARN', full_output=None):
+    fs = event.get('_foursight')
+    if not full_output:
+        full_output = '%s started to run' % lambda_name
+    if fs:
+        data = {'status': status,
+                'description': fs.get('log_desc'),
+                'full_output': full_output
+                }
+        headers = {'content-type': 'application/json'}
+        url = FOURSIGHT_URL + fs.get('check')
+        res = requests.put(url, data=json.dumps(data), headers=headers)
+        print(res.text)
+        return res
+
+
+def create_foursight(dest_env, bs_url, es_url, fs_url=None):
     '''
     creates a new environment on foursight to be used for monitoring
     '''
@@ -346,19 +427,22 @@ def create_foursight(dest_env, bs_url, es_url):
         bs_url += "/"
 
     es_url = es_url.rstrip(":80")
-    if not es_url.startswith("https://"):
+    if not es_url.startswith("http"):
         es_url = "https://" + es_url
     if not es_url.endswith("/"):
         es_url += "/"
 
     # environments on foursight don't include fourfront
-    if "-" in dest_env:
-        dest_env = dest_env.split("-")[1]
+    if not fs_url:
+        fs_url = dest_env
+    if "-" in fs_url:
+        fs_url = fs_url.split("-")[1]
 
-    foursight_url = "https://m1kj6dypu3.execute-api.us-east-1.amazonaws.com/api/build_env/"
-    foursight_url = foursight_url + dest_env
+    foursight_url = "https://foursight.4dnucleome.org/api/environments/"
+    foursight_url = foursight_url + fs_url
     payload = {"fourfront": bs_url,
                "es": es_url,
+               "ff_env": dest_env,
                }
     logging.info("Hitting up Foursight url %s with payload %s" %
                  (foursight_url, json.dumps(payload)))
@@ -367,7 +451,10 @@ def create_foursight(dest_env, bs_url, es_url):
     res = requests.put(foursight_url,
                        data=json.dumps(payload),
                        headers=headers)
-    return res.text
+    try:
+        return res.json()
+    except:
+        raise Exception(res.text)
 
 
 def create_s3_buckets(new):
@@ -399,7 +486,7 @@ def copy_s3_buckets(new, old):
     for bucket in new_buckets:
         try:
             s3.create_bucket(Bucket=bucket)
-        except:  # noqa: E722
+        except:
             print("bucket already created....")
 
     # now copy them
@@ -486,7 +573,7 @@ def add_es(new, force_new=False):
             fallback += "-a"
         try:
             resp = create_new_es(new)
-        except:  # noqa: E722
+        except:
             resp = create_new_es(fallback)
     else:
         try:
