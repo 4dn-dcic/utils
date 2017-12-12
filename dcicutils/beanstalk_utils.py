@@ -25,6 +25,7 @@ logger = logging.getLogger('logger')
 logger.setLevel(logging.INFO)
 
 FOURSIGHT_URL = 'https://foursight.4dnucleome.org/api/checks/'
+REGION = 'us-east-1'
 
 
 class WaitingForBoto3(Exception):
@@ -107,7 +108,7 @@ def whodaman():
     '''
     magic_cname = 'fourfront-webprod.9wzadzju3p.us-east-1.elasticbeanstalk.com'
 
-    client = boto3.client('elasticbeanstalk', region_name='us-east-1')
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = client.describe_environments(ApplicationName="4dn-web")
     logger.warn(res)
     for env in res['Environments']:
@@ -118,13 +119,13 @@ def whodaman():
 
 
 def beanstalk_config(env, appname='4dn-web'):
-    client = boto3.client('elasticbeanstalk', region_name='us-east-1')
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
     return client.describe_configuration_settings(EnvironmentName=env,
                                                   ApplicationName=appname)
 
 
 def beanstalk_info(env):
-    client = boto3.client('elasticbeanstalk', region_name='us-east-1')
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = client.describe_environments(EnvironmentNames=[env])
 
     return res['Environments'][0]
@@ -150,7 +151,7 @@ def get_beanstalk_real_url(env):
 
 
 def is_beanstalk_ready(env):
-    client = boto3.client('elasticbeanstalk', region_name='us-east-1')
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = client.describe_environments(EnvironmentNames=[env])
 
     status = res['Environments'][0]['Status']
