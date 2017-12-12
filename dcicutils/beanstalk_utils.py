@@ -1,4 +1,3 @@
-#!/usr/bin/python
 '''
 given and env in beanstalk do the follow
 2. backup database
