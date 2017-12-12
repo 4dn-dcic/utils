@@ -145,7 +145,7 @@ def get_beanstalk_real_url(env):
             url = urls['staging']
     else:
         bs_info = beanstalk_info(env)
-        url = bs_info['CNAME']
+        url = "http://" + bs_info['CNAME']
 
     return url
 
