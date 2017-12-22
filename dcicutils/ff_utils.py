@@ -376,7 +376,7 @@ def has_field_value(item_dict, field, value=None, val_is_item=False):
 def get_item_type(connection, item):
     try:
         return item['@type'].pop(0)
-    except KeyError:
+    except (TypeError, KeyError):
         res = fdnDCIC.get_FDN(item, connection)
         try:
             return res['@type'][0]
