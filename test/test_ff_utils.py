@@ -217,4 +217,4 @@ def test_get_item_type_from_dict(eset_json):
 def test_get_item_type_from_id(mocker, experiment_set, connection):
     with mocker.patch('fdnDCIC.get_FDN', return_value={'@type': ['ExperimentSetReplicate']}):
         result = ff_utils.get_item_type(connection, experiment_set['@id'])
-        assert result = 'ExperimentSetReplicate'
+        assert result == 'ExperimentSetReplicate'
