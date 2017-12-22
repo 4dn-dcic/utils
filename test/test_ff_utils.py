@@ -3,18 +3,6 @@ import pytest
 pytestmark = pytest.mark.working
 
 
-@pytest.fixture(scope="module")
-def testapp(app):
-    '''TestApp with JSON accept header.
-    '''
-    from webtest import TestApp
-    environ = {
-        'HTTP_ACCEPT': 'application/json',
-        'REMOTE_USER': 'TEST',
-    }
-    return TestApp(app, environ)
-
-
 @pytest.fixture
 def eset_json():
     return {
@@ -51,36 +39,6 @@ def eset_json():
             }
         ],
     }
-
-
-@pytest.fixture
-def lab(testapp, award):
-    item = {
-        'name': 'test-lab',
-        'title': 'test lab',
-        'status': 'current',
-        'awards': [award['@id']]
-    }
-    return testapp.post_json('/lab', item).json['@graph'][0]
-
-
-@pytest.fixture
-def award(testapp):
-    item = {
-        'name': 'test-award',
-        'description': 'test award',
-    }
-    return testapp.post_json('/award', item).json['@graph'][0]
-
-
-@pytest.fixture
-def experiment_set(testapp, lab, award):
-    item = {
-        'lab': lab['@id'],
-        'award': award['@id'],
-        'experimentset_type': 'replicates',
-    }
-    return testapp.post_json('/experiment_set', item).json['@graph'][0]
 
 
 @pytest.fixture
@@ -214,7 +172,7 @@ def test_get_item_type_from_dict(eset_json):
     assert es_ty == 'ExperimentSetReplicate'
 
 
-def test_get_item_type_from_id(mocker, experiment_set, connection):
+def test_get_item_type_from_id(mocker, connection):
     with mocker.patch('fdnDCIC.get_FDN', return_value={'@type': ['ExperimentSetReplicate']}):
-        result = ff_utils.get_item_type(connection, experiment_set['@id'])
+        result = ff_utils.get_item_type(connection, 'blah')
         assert result == 'ExperimentSetReplicate'
