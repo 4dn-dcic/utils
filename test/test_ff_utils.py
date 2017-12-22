@@ -3,6 +3,18 @@ import pytest
 pytestmark = pytest.mark.working
 
 
+@pytest.fixture(scope="module")
+def testapp(app):
+    '''TestApp with JSON accept header.
+    '''
+    from webtest import TestApp
+    environ = {
+        'HTTP_ACCEPT': 'application/json',
+        'REMOTE_USER': 'TEST',
+    }
+    return TestApp(app, environ)
+
+
 @pytest.fixture
 def eset_json():
     return {
@@ -37,8 +49,38 @@ def eset_json():
                 "bio_rep_no": 2,
                 "tec_rep_no": 1
             }
-        ]
+        ],
     }
+
+
+@pytest.fixture
+def lab(testapp, award):
+    item = {
+        'name': 'test-lab',
+        'title': 'test lab',
+        'status': 'current',
+        'awards': [award['@id']]
+    }
+    return testapp.post_json('/lab', item).json['@graph'][0]
+
+
+@pytest.fixture
+def award(testapp):
+    item = {
+        'name': 'test-award',
+        'description': 'test award',
+    }
+    return testapp.post_json('/award', item).json['@graph'][0]
+
+
+@pytest.fixture
+def experiment_set(testapp, lab, award):
+    item = {
+        'lab': lab['@id'],
+        'award': award['@id'],
+        'experimentset_type': 'replicates',
+    }
+    return testapp.post_json('/experiment_set', item).json['@graph'][0]
 
 
 @pytest.fixture
@@ -75,6 +117,11 @@ def profiles():
             }
         }
     }
+
+
+@pytest.fixture
+def connection(mocker):
+    return mocker.patch.object(t, 'FDN_Connection')
 
 
 def test_is_uuid():
@@ -159,3 +206,15 @@ def test_get_types_that_can_have_field(mocker, profiles):
         types_w_field = ff_utils.get_types_that_can_have_field('conn', field)
         assert 'ExperimentSetReplicate' in types_w_field
         assert 'TreatmentChemical' not in types_w_field
+
+
+def test_get_item_type_from_dict(eset_json):
+    eset_json['@type'] = ['ExperimentSetReplicate', 'ExperimentSet', 'Item']
+    es_ty = ff_utils.get_item_type('blah', eset_json)
+    assert es_ty == 'ExperimentSetReplicate'
+
+
+def test_get_item_type_from_id(mocker, experiment_set, connection):
+    with mocker.patch('fdnDCIC.get_FDN', return_value={'@type': ['ExperimentSetReplicate']}):
+        result = ff_utils.get_item_type(connection, experiment_set['@id'])
+        assert result = 'ExperimentSetReplicate'
