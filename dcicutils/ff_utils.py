@@ -336,7 +336,7 @@ def get_item_type(connection, item):
         try:
             return res['@type'][0]
         except AttributeError:  # noqa: E722
-            print("Can't find a type for item %s" % itemid)
+            print("Can't find a type for item %s" % item)
     return None
 
 
