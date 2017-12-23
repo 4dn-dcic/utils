@@ -201,13 +201,12 @@ class ProcessedFileMetadata(object):
         return post_to_metadata(self.as_dict(), "file_processed", key=key)
 
 
-def fdn_connection(key='', keyfile=None, connection=None):
+def fdn_connection(key='', connection=None):
     assert key or connection
-    if keyfile is None:
-        keyfile = 'default'
+
     if not connection:
         try:
-            fdn_key = fdnDCIC.FDN_Key(keyfile, key)
+            fdn_key = fdnDCIC.FDN_Key(key, 'default')
             connection = fdnDCIC.FDN_Connection(fdn_key)
         except Exception as e:
             raise Exception("Unable to connect to server with check keys : %s" % e)
@@ -373,18 +372,6 @@ def has_field_value(item_dict, field, value=None, val_is_item=False):
     return False
 
 
-def get_item_type(connection, item):
-    try:
-        return item['@type'].pop(0)
-    except (TypeError, KeyError):
-        res = fdnDCIC.get_FDN(item, connection)
-        try:
-            return res['@type'][0]
-        except AttributeError:  # noqa: E722
-            print("Can't find a type for item %s" % item)
-    return None
-
-
 def get_types_that_can_have_field(connection, field):
     """find items that have the passed in fieldname in their properties
         even if there is currently no value for that field"""
@@ -410,7 +397,7 @@ def get_linked_items(connection, itemid, found_items={},
         if 'error' not in res['status']:
             # create an entry for this item in found_items
             try:
-                obj_type = get_item_type(connection, itemid)
+                obj_type = fdnDCIC.get_FDN(itemid, connection=connection)['@type'][0]
                 found_items[itemid] = obj_type
             except AttributeError:  # noqa: E722
                 print("Can't find a type for item %s" % itemid)
@@ -423,9 +410,7 @@ def get_linked_items(connection, itemid, found_items={},
                     if foundids:
                         id_list.extend(foundids)
                 if id_list:
-                    # before we make recursive call add ExperimentSetReplicate to no_children
-                    new_no_children = no_children[:].append('ExperimentSetReplicate')
                     id_list = [i for i in list(set(id_list)) if i not in found_items]
                     for uid in id_list:
-                        found_items.update(get_linked_items(connection, uid, found_items, new_no_children))
+                        found_items.update(get_linked_items(connection, uid, found_items))
     return found_items
