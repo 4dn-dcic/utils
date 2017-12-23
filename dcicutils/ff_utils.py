@@ -331,7 +331,7 @@ def find_uuids(val):
 def get_item_type(connection, item):
     try:
         return item['@type'].pop(0)
-    except (KeyError):
+    except (KeyError, TypeError):
         res = fdnDCIC.get_FDN(item, connection)
         try:
             return res['@type'][0]
