@@ -37,7 +37,7 @@ def eset_json():
                 "bio_rep_no": 2,
                 "tec_rep_no": 1
             }
-        ]
+        ],
     }
 
 
@@ -75,6 +75,11 @@ def profiles():
             }
         }
     }
+
+
+@pytest.fixture
+def connection(mocker):
+    return mocker.patch.object(ff_utils.fdnDCIC, 'FDN_Connection')
 
 
 def test_is_uuid():
@@ -159,3 +164,16 @@ def test_get_types_that_can_have_field(mocker, profiles):
         types_w_field = ff_utils.get_types_that_can_have_field('conn', field)
         assert 'ExperimentSetReplicate' in types_w_field
         assert 'TreatmentChemical' not in types_w_field
+
+
+def test_get_item_type_from_dict(eset_json):
+    eset_json['@type'] = ['ExperimentSetReplicate', 'ExperimentSet', 'Item']
+    es_ty = ff_utils.get_item_type('blah', eset_json)
+    assert es_ty == 'ExperimentSetReplicate'
+
+
+def test_get_item_type_from_id(mocker, connection):
+
+    with mocker.patch('dcicutils.ff_utils.fdnDCIC.get_FDN', return_value={'@type': ['ExperimentSetReplicate']}):
+        result = ff_utils.get_item_type(connection, 'blah')
+        assert result == 'ExperimentSetReplicate'

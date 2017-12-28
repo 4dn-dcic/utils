@@ -328,6 +328,18 @@ def find_uuids(val):
     return vals
 
 
+def get_item_type(connection, item):
+    try:
+        return item['@type'].pop(0)
+    except (KeyError, TypeError):
+        res = fdnDCIC.get_FDN(item, connection)
+        try:
+            return res['@type'][0]
+        except AttributeError:  # noqa: E722
+            print("Can't find a type for item %s" % item)
+    return None
+
+
 def filter_dict_by_value(dictionary, values, include=True):
     """Will filter items from a dictionary based on values
         can be either an inclusive or exclusive filter
