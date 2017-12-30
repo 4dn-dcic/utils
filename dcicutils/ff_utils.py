@@ -201,7 +201,7 @@ class ProcessedFileMetadata(object):
         return post_to_metadata(self.as_dict(), "file_processed", key=key)
 
 
-def fdn_connection(key='', keyname='default', connection=None):
+def fdn_connection(key='', connection=None, keyname='default'):
     assert key or connection
 
     if not connection:
