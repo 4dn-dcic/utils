@@ -202,8 +202,10 @@ class ProcessedFileMetadata(object):
 
 
 def fdn_connection(key='', connection=None, keyname='default'):
-    assert key or connection
-
+    try:
+        assert key or connection
+    except AssertionError:
+        return None
     if not connection:
         try:
             fdn_key = fdnDCIC.FDN_Key(key, keyname)
