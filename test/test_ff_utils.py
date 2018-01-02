@@ -82,6 +82,52 @@ def connection(mocker):
     return mocker.patch.object(ff_utils.fdnDCIC, 'FDN_Connection')
 
 
+def test_fdn_connection_no_key_or_connection():
+    assert not ff_utils.fdn_connection()
+
+
+def test_fdn_connection_w_connection(connection):
+    conn = ff_utils.fdn_connection('', connection)
+    assert conn == connection
+
+
+def test_fdn_connection_w_key_dict(mocker):
+    keydict = {
+        'test_key': {
+            'server': 'https://data.4dnucleome.org',
+            'key': 'ABCDEFG',
+            'secret': 'so_so_secret'
+        }
+    }
+    with mocker.patch('dcicutils.ff_utils.fdnDCIC.FDN_Connection', return_value='test_connection'):
+        with mocker.patch('dcicutils.ff_utils.fdnDCIC.FDN_Key', return_value='test_key') as make_key:
+            conn = ff_utils.fdn_connection(keydict)
+            assert make_key.called_with(keydict, 'default')
+            assert conn == 'test_connection'
+
+
+def test_fdn_connection_w_keyfile_keyname(mocker):
+    keyfile = 'my_keyfile'
+    keyname = '4dnprod'
+    with mocker.patch('dcicutils.ff_utils.fdnDCIC.FDN_Connection', return_value='test_connection'):
+        with mocker.patch('dcicutils.ff_utils.fdnDCIC.FDN_Key', return_value='test_key') as make_key:
+            conn = ff_utils.fdn_connection(keyfile, keyname=keyname)
+            assert make_key.called_with(keyfile, keyname)
+            assert conn == 'test_connection'
+
+
+def test_fdn_connection_where_connection_trumps_key(mocker, connection):
+    keydict = {
+        'test_key': {
+            'server': 'https://data.4dnucleome.org',
+            'key': 'ABCDEFG',
+            'secret': 'so_so_secret'
+        }
+    }
+    conn = ff_utils.fdn_connection(keydict, connection)
+    assert conn == connection
+
+
 def test_is_uuid():
     uuids = [
         '231111bc-8535-4448-903e-854af460b254',

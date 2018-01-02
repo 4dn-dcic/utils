@@ -201,12 +201,14 @@ class ProcessedFileMetadata(object):
         return post_to_metadata(self.as_dict(), "file_processed", key=key)
 
 
-def fdn_connection(key='', connection=None):
-    assert key or connection
-
+def fdn_connection(key='', connection=None, keyname='default'):
+    try:
+        assert key or connection
+    except AssertionError:
+        return None
     if not connection:
         try:
-            fdn_key = fdnDCIC.FDN_Key(key, 'default')
+            fdn_key = fdnDCIC.FDN_Key(key, keyname)
             connection = fdnDCIC.FDN_Connection(fdn_key)
         except Exception as e:
             raise Exception("Unable to connect to server with check keys : %s" % e)
