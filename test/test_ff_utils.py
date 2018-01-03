@@ -223,3 +223,27 @@ def test_get_item_type_from_id(mocker, connection):
     with mocker.patch('dcicutils.ff_utils.fdnDCIC.get_FDN', return_value={'@type': ['ExperimentSetReplicate']}):
         result = ff_utils.get_item_type(connection, 'blah')
         assert result == 'ExperimentSetReplicate'
+
+
+@pytest.fixture
+def items_w_uuids():
+    return [
+        {'name': 'one', 'uuid': 'a'},
+        {'name': 'two', 'uuid': 'b'},
+        {'name': 'three', 'uuid': 'c'},
+    ]
+
+
+def test_get_item_ids_from_list(connection):
+    ids = ['a', 'b', 'c']
+    result = ff_utils.get_item_ids_from_args(ids, connection)
+    for a in [i in ids for i in result]:
+        assert a
+
+
+def test_get_item_ids_from_search(mocker, connection, items_w_uuids):
+    ids = ['a', 'b', 'c']
+    with mocker.patch('dcicutils.ff_utils.fdnDCIC.get_FDN', return_value=items_w_uuids):
+        result = ff_utils.get_item_ids_from_args('search', connection, True)
+        for a in [i in ids for i in result]:
+            assert a
