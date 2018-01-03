@@ -4,8 +4,49 @@ import time
 from uuid import uuid4, UUID
 import random
 import copy
+import argparse
 
 from wranglertools import fdnDCIC
+
+ff_arg_parser = argparse.ArgumentParser(add_help=False)
+ff_arg_parser.add_argument('--key',
+                           default='default',
+                           help="The keypair identifier from the keyfile.  \
+                           Default is --key=default")
+ff_arg_parser.add_argument('--keyfile',
+                           default=os.path.expanduser("~/keypairs.json"),
+                           help="The keypair file.  Default is --keyfile=%s" %
+                           (os.path.expanduser("~/keypairs.json")))
+ff_arg_parser.add_argument('--dbupdate',
+                           default=False,
+                           action='store_true',
+                           help="Do UPDATES on database objects.  Default is False \
+                           and will only UPDATE with user override")
+
+
+input_arg_parser = argparse.ArgumentParser(add_help=False)
+input_arg_parser.add_argument('input', nargs='+',
+                              help="a list of ids of top level objects, \
+                              a file containing said ids one per line or a search \
+                              string (with --search option)")
+input_arg_parser.add_argument('--search',
+                              default=False,
+                              action='store_true',
+                              help='Include if you are passing in a search string \
+                              eg. type=Biosource&biosource_type=primary cell&frame=raw')
+
+
+def get_item_ids_from_args(id_input, connection, is_search=False):
+    '''depending on the args passed return a list of item ids'''
+    if is_search:
+        urladdon = 'search/?limit=all&' + id_input
+        result = get_FDN(None, connection, None, urladdon)
+        return list(set([item.get('uuid') for item in result]))
+    try:
+        with open(id_input[0]) as inf:
+            return [l.strip() for l in inf]
+    except FileNotFoundError:
+        return id_input
 
 
 def convert_param(parameter_dict, vals_as_string=False):
