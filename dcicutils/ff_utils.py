@@ -40,7 +40,7 @@ def get_item_ids_from_args(id_input, connection, is_search=False):
     '''depending on the args passed return a list of item ids'''
     if is_search:
         urladdon = 'search/?limit=all&' + id_input[0]
-        result = get_FDN(None, connection, None, urladdon)
+        result = fdnDCIC.get_FDN(None, connection, None, urladdon)
         return list(set([item.get('uuid') for item in result]))
     try:
         with open(id_input[0]) as inf:
