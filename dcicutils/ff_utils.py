@@ -27,9 +27,8 @@ ff_arg_parser.add_argument('--dbupdate',
 
 input_arg_parser = argparse.ArgumentParser(add_help=False)
 input_arg_parser.add_argument('input', nargs='+',
-                              help="a list of ids of top level objects, \
-                              a file containing said ids one per line or a search \
-                              string (with --search option)")
+                              help="A list of item ids, a file with item ids one per line \
+                              or a search string (use with --search option)")
 input_arg_parser.add_argument('--search',
                               default=False,
                               action='store_true',
@@ -40,7 +39,7 @@ input_arg_parser.add_argument('--search',
 def get_item_ids_from_args(id_input, connection, is_search=False):
     '''depending on the args passed return a list of item ids'''
     if is_search:
-        urladdon = 'search/?limit=all&' + id_input
+        urladdon = 'search/?limit=all&' + id_input[0]
         result = get_FDN(None, connection, None, urladdon)
         return list(set([item.get('uuid') for item in result]))
     try:
