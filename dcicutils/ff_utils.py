@@ -33,7 +33,7 @@ input_arg_parser.add_argument('--search',
                               default=False,
                               action='store_true',
                               help='Include if you are passing in a search string \
-                              eg. type=Biosource&biosource_type=primary cell&frame=raw')
+                              eg. type=Biosource&biosource_type=primary cell')
 
 
 def get_item_ids_from_args(id_input, connection, is_search=False):
