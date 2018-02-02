@@ -215,6 +215,15 @@ def fdn_connection(key='', connection=None, keyname='default'):
     return connection
 
 
+def search_metadata(search_url, key='', connection=None, frame="object"):
+    """
+    Use get_FDN, but with url_addon instead of obj_id. Will return json,
+    specifically the @graph contents if available.
+    """
+    connection = fdn_connection(key, connection)
+    return fdnDCIC.get_FDN(None, connection, frame=frame, url_addon=search_url)
+
+
 def patch_metadata(patch_item, obj_id='', key='', connection=None):
     '''
     obj_id can be uuid or @id for most object
