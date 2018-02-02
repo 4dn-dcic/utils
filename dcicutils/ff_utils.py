@@ -217,17 +217,11 @@ def fdn_connection(key='', connection=None, keyname='default'):
 
 def search_metadata(search_url, key='', connection=None, frame="object"):
     """
-    Use get_FDN, but with url_addon instead of obj_id
+    Use get_FDN, but with url_addon instead of obj_id. Will return json,
+    specifically the @graph contents if available.
     """
     connection = fdn_connection(key, connection)
-    res = fdnDCIC.get_FDN(None, connection, frame=frame, url_addon=search_url)
-    retry = 1
-    sleep = [2, 4, 12]
-    while 'error' in res.get('@type', []) and retry < 3:
-        time.sleep(sleep[retry])
-        retry += 1
-        res = fdnDCIC.get_FDN(None, connection, frame=frame, url_addon=search_url)
-    return res
+    return fdnDCIC.get_FDN(None, connection, frame=frame, url_addon=search_url)
 
 
 def patch_metadata(patch_item, obj_id='', key='', connection=None):
