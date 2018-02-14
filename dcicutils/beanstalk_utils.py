@@ -25,6 +25,7 @@ logger.setLevel(logging.INFO)
 
 FOURSIGHT_URL = 'https://foursight.4dnucleome.org/api/'
 GOLDEN_DB = "fourfront-webprod.co3gwj7b7tpq.us-east-1.rds.amazonaws.com"
+REGION = 'us-east-1'
 
 # TODO: Maybe
 '''
@@ -157,7 +158,7 @@ def whodaman():
     '''
     magic_cname = 'fourfront-webprod.9wzadzju3p.us-east-1.elasticbeanstalk.com'
 
-    client = boto3.client('elasticbeanstalk')
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = client.describe_environments(ApplicationName="4dn-web")
     logger.warn(res)
     for env in res['Environments']:
