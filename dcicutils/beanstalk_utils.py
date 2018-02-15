@@ -75,7 +75,7 @@ def delete_db(db_identifier, take_snapshot=True):
                 SkipFinalSnapshot=False,
                 FinalDBSnapshotIdentifier=db_identifier + "-final"
             )
-        except:
+        except:  # noqa: E722
             # try without the snapshot
             resp = client.delete_db_instance(
                 DBInstanceIdentifier=db_identifier,
@@ -366,7 +366,7 @@ def set_bs_env(envname, var, template=None):
             k, v = evar.split('=')
             if var.get(k, None) is None:
                 var[k] = v
-    except:
+    except:  # noqa: E722
         pass
 
     for key, val in var.iteritems():
@@ -537,7 +537,7 @@ def create_foursight(dest_env, bs_url, es_url, fs_url=None):
                        headers=headers)
     try:
         return res.json()
-    except:
+    except:  # noqa: E722
         raise Exception(res.text)
 
 
@@ -570,7 +570,8 @@ def copy_s3_buckets(new, old):
     for bucket in new_buckets:
         try:
             s3.create_bucket(Bucket=bucket)
-        except:
+        except:  # noqa: E722
+
             print("bucket already created....")
 
     # now copy them
@@ -657,7 +658,7 @@ def add_es(new, force_new=False):
             fallback += "-a"
         try:
             resp = create_new_es(new)
-        except:
+        except:  # noqa: E722
             resp = create_new_es(fallback)
     else:
         try:
