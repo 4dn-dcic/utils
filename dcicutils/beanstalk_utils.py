@@ -16,7 +16,7 @@ import boto3
 import os
 import json
 import requests
-import ff_utils
+from . import ff_utils
 from botocore.exceptions import ClientError
 from time import sleep
 

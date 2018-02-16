@@ -4,7 +4,7 @@ import time
 from uuid import uuid4, UUID
 import random
 import copy
-import s3_utils
+from . import s3_utils
 import requests
 
 from wranglertools import fdnDCIC
@@ -228,6 +228,10 @@ def authorized_request(url, auth=None, **kwargs):
     timeout of 20 seconds used by default but can be overwritten as a kwarg
 
     ONLY FOR GET REQUESTS.
+    usage:
+    authorized_request('https://data.4dnucleome.org/<some path>', (<authId, authSecret))
+    OR
+    authorized_request('https://data.4dnucleome.org/<some path>', ff_env='fourfront-webprod')
     """
     # first see if key should be obtained from using ff_env
     if not auth and 'ff_env' in kwargs:
