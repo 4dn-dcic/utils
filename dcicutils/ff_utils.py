@@ -251,7 +251,7 @@ def authorized_request(url, auth=None, **kwargs):
     if not headers:
         headers = {'content-type': 'application/json', 'accept': 'application/json'}
     if 'timeout' not in kwargs:
-        kwargs['timeout'] = 20 # use a 20 second timeout by default
+        kwargs['timeout'] = 20  # use a 20 second timeout by default
     return requests.get(url, auth=use_auth, **kwargs)
 
 
