@@ -16,6 +16,7 @@ import boto3
 import os
 import json
 import requests
+import ff_utils
 from botocore.exceptions import ClientError
 from time import sleep
 
@@ -120,7 +121,7 @@ def is_indexing_finished(bs):
         bs_url += "/"
     # server not up yet
     try:
-        health_res = requests.get(bs_url + 'counts?format=json')
+        health_res = ff_utils.authorized_request(bs_url + 'counts?format=json', ff_env=bs)
         totals = health_res.json().get('db_es_total').split()
 
         # DB: 74048 ES: 74048 parse totals
