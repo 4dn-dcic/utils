@@ -4,6 +4,8 @@ import time
 from uuid import uuid4, UUID
 import random
 import copy
+from . import s3_utils
+import requests
 
 from wranglertools import fdnDCIC
 
@@ -213,6 +215,44 @@ def fdn_connection(key='', connection=None, keyname='default'):
         except Exception as e:
             raise Exception("Unable to connect to server with check keys : %s" % e)
     return connection
+
+
+def authorized_request(url, auth=None, **kwargs):
+    """
+    Generalized request that takes the same authorization info as fdn_connection
+    and is used to make request to FF.
+    Takes a required url and auth, and optional headers. Any other kwargs
+    provided are also past into the request.
+    auth should be obtained using s3Utils.get_key or in fdnDCIC tuple form.
+    If not provided, try to get the key using s3_utils if 'ff_env' in kwargs
+    timeout of 20 seconds used by default but can be overwritten as a kwarg
+
+    ONLY FOR GET REQUESTS.
+    usage:
+    authorized_request('https://data.4dnucleome.org/<some path>', (<authId, authSecret))
+    OR
+    authorized_request('https://data.4dnucleome.org/<some path>', ff_env='fourfront-webprod')
+    """
+    # first see if key should be obtained from using ff_env
+    if not auth and 'ff_env' in kwargs:
+        # webprod and webprod2 both use the fourfront-webprod bucket for keys
+        use_env = 'fourfront-webprod' if 'webprod' in kwargs['ff_env'] else kwargs['ff_env']
+        auth = s3_utils.s3Utils(env=use_env).get_key()
+        del kwargs['ff_env']
+    # see if auth is directly from get_key() or the tuple form used in fdnDCIC
+    use_auth = None
+    if isinstance(auth, dict) and isinstance(auth.get('default'), dict):
+        use_auth = (auth['default']['key'], auth['default']['secret'])
+    elif isinstance(auth, tuple) and len(auth) == 2:
+        use_auth = auth
+    if not use_auth:
+        raise Exception("ERROR!\nInvalid authoization key %s" % auth)
+    headers = kwargs.get('headers')
+    if not headers:
+        headers = {'content-type': 'application/json', 'accept': 'application/json'}
+    if 'timeout' not in kwargs:
+        kwargs['timeout'] = 20 # use a 20 second timeout by default
+    return requests.get(url, auth=use_auth, **kwargs)
 
 
 def search_metadata(search_url, key='', connection=None, frame="object"):
