@@ -262,7 +262,6 @@ def create_db_snapshot(db_identifier, snapshot_name):
     return response
 
 
-
 def create_db_from_snapshot(db_name, snapshot_name=None):
     if not snapshot_name:
         snapshot_name = db_name
