@@ -262,17 +262,20 @@ def create_db_snapshot(db_identifier, snapshot_name):
     return response
 
 
-def create_db_from_snapshot(snapshot_name):
+
+def create_db_from_snapshot(db_name, snapshot_name=None):
+    if not snapshot_name:
+        snapshot_name = db_name
     client = boto3.client('rds')
     try:
         response = client.restore_db_instance_from_db_snapshot(
-                DBInstanceIdentifier=snapshot_name,
+                DBInstanceIdentifier=db_name,
                 DBSnapshotIdentifier=snapshot_name,
                 DBInstanceClass='db.t2.medium')
     except ClientError:
         # drop target database no backup
         try:
-            delete_db(snapshot_name, True)
+            delete_db(db_name, True)
         except ClientError:
             pass
         return "Deleting"
