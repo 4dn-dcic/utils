@@ -11,7 +11,6 @@ import logging
 ###########################
 # Config
 ###########################
-s3 = boto3.client('s3')
 LOG = logging.getLogger(__name__)
 
 
@@ -27,6 +26,7 @@ class s3Utils(object):
             outfile_bucket = "elasticbeanstalk-%s-wfoutput" % env
             raw_file_bucket = "elasticbeanstalk-%s-files" % env
 
+        self.s3 = boto3.client('s3')
         self.sys_bucket = sys_bucket
         self.outfile_bucket = outfile_bucket
         self.raw_file_bucket = raw_file_bucket
@@ -38,7 +38,7 @@ class s3Utils(object):
 
     def get_key(self, keyfile_name='illnevertell'):
         # Share secret encrypted S3 File
-        response = s3.get_object(Bucket=self.sys_bucket,
+        response = self.s3.get_object(Bucket=self.sys_bucket,
                                  Key=keyfile_name,
                                  SSECustomerKey=os.environ.get("SECRET"),
                                  SSECustomerAlgorithm='AES256')
@@ -56,7 +56,7 @@ class s3Utils(object):
         return self.get_key('sbgs3key')
 
     def read_s3(self, filename):
-        response = s3.get_object(Bucket=self.outfile_bucket,
+        response = self.s3.get_object(Bucket=self.outfile_bucket,
                                  Key=filename)
         LOG.info(str(response))
         return response['Body'].read()
@@ -65,7 +65,7 @@ class s3Utils(object):
         if not bucket:
             bucket = self.outfile_bucket
         try:
-            file_metadata = s3.head_object(Bucket=bucket,
+            file_metadata = self.s3.head_object(Bucket=bucket,
                                            Key=key)
         except Exception as e:
             print(str(e))
@@ -91,7 +91,7 @@ class s3Utils(object):
     def delete_key(self, key, bucket=None):
         if not bucket:
             bucket = self.outfile_bucket
-        s3.delete_object(Bucket=bucket, Key=key)
+        self.s3.delete_object(Bucket=bucket, Key=key)
 
     def size(self, bucket):
         sbuck = boto3.resource('s3').Bucket(bucket)
@@ -107,26 +107,26 @@ class s3Utils(object):
             content_type = 'binary/octet-stream'
         if acl:
             # we use this to set some of the object as public
-            s3.put_object(Bucket=self.outfile_bucket,
+            self.s3.put_object(Bucket=self.outfile_bucket,
                           Key=upload_key,
                           Body=obj,
                           ContentType=content_type,
                           ACL=acl
                           )
         else:
-            s3.put_object(Bucket=self.outfile_bucket,
+            self.s3.put_object(Bucket=self.outfile_bucket,
                           Key=upload_key,
                           Body=obj,
                           ContentType=content_type
                           )
 
     def s3_read_dir(self, prefix):
-        return s3.list_objects(Bucket=self.outfile_bucket,
+        return self.s3.list_objects(Bucket=self.outfile_bucket,
                                Prefix=prefix)
 
     def s3_delete_dir(self, prefix):
         # one query get list of all the files we want to delete
-        obj_list = s3.list_objects(Bucket=self.outfile_bucket,
+        obj_list = self.s3.list_objects(Bucket=self.outfile_bucket,
                                    Prefix=prefix)
         files = obj_list.get('Contents', [])
 
@@ -137,7 +137,7 @@ class s3Utils(object):
 
         # second query deletes all the files, NOTE: Max 1000 files
         if delete_keys['Objects']:
-            s3.delete_objects(Bucket=self.outfile_bucket,
+            self.s3.delete_objects(Bucket=self.outfile_bucket,
                               Delete=delete_keys)
 
     def read_s3_zipfile(self, s3key, files_to_extract):
