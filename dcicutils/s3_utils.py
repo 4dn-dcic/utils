@@ -22,6 +22,9 @@ class s3Utils(object):
         if we pass in env set the outfile and sys bucket from the environment
         '''
         if sys_bucket is None:
+            # staging and production share same buckets
+            if 'webprod' in env:
+                env='fourfront-webprod'
             # we use standardized naming schema, so s3 buckets always have same prefix
             sys_bucket = "elasticbeanstalk-%s-system" % env
             outfile_bucket = "elasticbeanstalk-%s-wfoutput" % env
