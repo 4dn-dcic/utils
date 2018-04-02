@@ -6,7 +6,7 @@ import mimetypes
 from zipfile import ZipFile
 from io import BytesIO
 import logging
-from . import beanstalk_utils as bs
+from dcicutils import beanstalk_utils as bs
 
 
 ###########################
