@@ -6,6 +6,7 @@ import mimetypes
 from zipfile import ZipFile
 from io import BytesIO
 import logging
+from dcicutils import beanstalk_utils as bs
 
 
 ###########################
@@ -23,8 +24,10 @@ class s3Utils(object):
         '''
         if sys_bucket is None:
             # staging and production share same buckets
-            if 'webprod' in env:
-                env = 'fourfront-webprod'
+            if env:
+                if 'webprod' in env or env in ['staging', 'stagging', 'data']:
+                    self.url = bs.get_beanstalk_real_url(env)
+                    env = 'fourfront-webprod'
             # we use standardized naming schema, so s3 buckets always have same prefix
             sys_bucket = "elasticbeanstalk-%s-system" % env
             outfile_bucket = "elasticbeanstalk-%s-wfoutput" % env
@@ -37,7 +40,17 @@ class s3Utils(object):
     def get_access_keys(self):
         name = 'illnevertell'
         keys = self.get_key(keyfile_name=name)
+        if isinstance(keys.get('default'), dict):
+            keys = keys['default']
+        if self.url:
+            keys['server'] = self.url
         return keys
+
+    def get_ff_key(self):
+        return self.get_access_keys()
+
+    def get_higlass_key(self):
+        return self.get_key(keyfile_name='hiwillnevertell')
 
     def get_key(self, keyfile_name='illnevertell'):
         # Share secret encrypted S3 File
@@ -51,12 +64,6 @@ class s3Utils(object):
         except (ValueError, TypeError):
             # maybe its not json after all
             return akey
-
-    def get_sbg_keys(self):
-        return self.get_key('sbgkey')
-
-    def get_s3_keys(self):
-        return self.get_key('sbgs3key')
 
     def read_s3(self, filename):
         response = s3.get_object(Bucket=self.outfile_bucket,
@@ -110,18 +117,31 @@ class s3Utils(object):
             content_type = 'binary/octet-stream'
         if acl:
             # we use this to set some of the object as public
-            s3.put_object(Bucket=self.outfile_bucket,
-                          Key=upload_key,
-                          Body=obj,
-                          ContentType=content_type,
-                          ACL=acl
-                          )
+            return s3.put_object(Bucket=self.outfile_bucket,
+                                 Key=upload_key,
+                                 Body=obj,
+                                 ContentType=content_type,
+                                 ACL=acl
+                                 )
         else:
-            s3.put_object(Bucket=self.outfile_bucket,
-                          Key=upload_key,
-                          Body=obj,
-                          ContentType=content_type
-                          )
+            return s3.put_object(Bucket=self.outfile_bucket,
+                                 Key=upload_key,
+                                 Body=obj,
+                                 ContentType=content_type
+                                 )
+
+    def s3_put_secret(self, data, keyname, bucket=None, secret=None):
+        if not bucket:
+            bucket = self.sys_bucket
+        if secret is None:
+            secret = os.environ.get("SECRET")
+            if secret is None:
+                raise RuntimeError("SECRET should be defined in env")
+        return s3.put_object(Bucket=bucket,
+                             Key=keyname,
+                             Body=data,
+                             SSECustomerKey=secret,
+                             SSECustomerAlgorithm='AES256')
 
     def s3_read_dir(self, prefix):
         return s3.list_objects(Bucket=self.outfile_bucket,
