@@ -42,6 +42,7 @@ class s3Utils(object):
     def get_access_keys(self):
         name = 'illnevertell'
         keys = self.get_key(keyfile_name=name)
+
         if isinstance(keys.get('default'), dict):
             keys = keys['default']
         if self.url:
@@ -61,6 +62,8 @@ class s3Utils(object):
                                  SSECustomerKey=os.environ.get("SECRET"),
                                  SSECustomerAlgorithm='AES256')
         akey = response['Body'].read()
+        if type(akey) == bytes:
+            akey = akey.decode()
         try:
             return json.loads(akey)
         except (ValueError, TypeError):
