@@ -6,7 +6,6 @@ import mimetypes
 from zipfile import ZipFile
 from io import BytesIO
 import logging
-from dcicutils import beanstalk_utils as bs
 
 
 ###########################
@@ -22,6 +21,9 @@ class s3Utils(object):
         '''
         if we pass in env set the outfile and sys bucket from the environment
         '''
+
+        # avoid circular ref, import as needed
+        from dcicutils import beanstalk_utils as bs
         if sys_bucket is None:
             # staging and production share same buckets
             if env:
