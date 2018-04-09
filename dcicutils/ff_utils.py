@@ -40,9 +40,14 @@ input_arg_parser.add_argument('--search',
 def get_item_ids_from_args(id_input, connection, is_search=False):
     '''depending on the args passed return a list of item ids'''
     if is_search:
-        urladdon = 'search/?limit=all&' + id_input[0]
-        result = fdnDCIC.get_FDN(None, connection, 'object', urladdon)
-        return list(set([item.get('uuid') for item in result]))
+        def search_callback(hit, results):
+            if hit.get('uuid'):
+                results.append(hit.get('uuid'))
+
+        query = 'search/?' + id_input[0]
+        results = []
+        safe_search_with_callback(connection, query, results, search_callback)
+        return list(set(results))
     try:
         with open(id_input[0]) as inf:
             return [l.strip() for l in inf]
@@ -293,6 +298,28 @@ def authorized_request(url, auth=None, **kwargs):
     if 'timeout' not in kwargs:
         kwargs['timeout'] = 20  # use a 20 second timeout by default
     return requests.get(url, auth=use_auth, **kwargs)
+
+
+def safe_search_with_callback(fdn_conn, query, container, callback, limit=20, frame='embedded'):
+    """
+    Somewhat temporary function to avoid making search queries that cause
+    memory issues. Takes a ff_utils fdn_conn, a search query (without 'limit' or
+    'from' parameters), a container to put search results in after running
+    them through a given callback function, which should take a search hit as
+    its first parameter and the container as its second parameter.
+    """
+    last_total = None
+    curr_from = 0
+    while not last_total or last_total == limit:
+        print('...', curr_from)
+        search_query = ''.join([query, '&from=', str(curr_from), '&limit=', str(limit)])
+        search_res = ff_utils.search_metadata(search_query, connection=fdn_conn, frame=frame)
+        if not search_res: # 0 results
+            break
+        last_total = len(search_res)
+        curr_from += last_total
+        for hit in search_res:
+            callback(hit, container)
 
 
 def search_metadata(search_url, key='', connection=None, frame="object"):
