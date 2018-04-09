@@ -313,8 +313,8 @@ def safe_search_with_callback(fdn_conn, query, container, callback, limit=20, fr
     while not last_total or last_total == limit:
         print('...', curr_from)
         search_query = ''.join([query, '&from=', str(curr_from), '&limit=', str(limit)])
-        search_res = ff_utils.search_metadata(search_query, connection=fdn_conn, frame=frame)
-        if not search_res: # 0 results
+        search_res = search_metadata(search_query, connection=fdn_conn, frame=frame)
+        if not search_res:  # 0 results
             break
         last_total = len(search_res)
         curr_from += last_total
