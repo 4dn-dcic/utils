@@ -22,20 +22,20 @@ def test_s3Utils_creation_data():
     assert util.url == 'https://data.4dnucleome.org'
 
 
-def test_s3Utils_get_keys_for_data():
-    util = s3Utils(env='data')
-    keys = util.get_access_keys()
-    assert keys['server'] == 'https://data.4dnucleome.org'
-
-
-def test_s3Utils_get_keys_for_staging():
-    util = s3Utils(env='staging')
-    keys = util.get_ff_key()
-    assert keys['server'] == 'http://staging.4dnucleome.org'
-
-
-def test_s3Utils_get_higlass_key():
-    util = s3Utils(env='staging')
-    keys = util.get_higlass_key()
-    assert isinstance(keys, dict)
-    assert 3 == len(keys.keys())
+# def test_s3Utils_get_keys_for_data():
+#     util = s3Utils(env='data')
+#     keys = util.get_access_keys()
+#     assert keys['server'] == 'https://data.4dnucleome.org'
+#
+#
+# def test_s3Utils_get_keys_for_staging():
+#     util = s3Utils(env='staging')
+#     keys = util.get_ff_key()
+#     assert keys['server'] == 'http://staging.4dnucleome.org'
+#
+#
+# def test_s3Utils_get_higlass_key():
+#     util = s3Utils(env='staging')
+#     keys = util.get_higlass_key()
+#     assert isinstance(keys, dict)
+#     assert 3 == len(keys.keys())
