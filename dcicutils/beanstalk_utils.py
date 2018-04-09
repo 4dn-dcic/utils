@@ -185,9 +185,13 @@ def beanstalk_info(env):
 def get_beanstalk_real_url(env):
     url = ''
 
+    urls = {'staging': 'http://staging.4dnucleome.org',
+            'data': 'https://data.4dnucleome.org'}
+
+    if env in urls:
+        return urls[env]
+
     if 'webprod' in env:
-        urls = {'staging': 'http://staging.4dnucleome.org',
-                'data': 'https://data.4dnucleome.org'}
         data_env = whodaman()
 
         if data_env == env:
