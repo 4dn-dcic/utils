@@ -16,6 +16,7 @@ import boto3
 import os
 import json
 import requests
+from . import ff_utils
 from botocore.exceptions import ClientError
 from time import sleep
 
@@ -23,8 +24,43 @@ logging.basicConfig()
 logger = logging.getLogger('logger')
 logger.setLevel(logging.INFO)
 
-FOURSIGHT_URL = 'https://foursight.4dnucleome.org/api/checks/'
+FOURSIGHT_URL = 'https://foursight.4dnucleome.org/api/'
+GOLDEN_DB = "fourfront-webprod.co3gwj7b7tpq.us-east-1.rds.amazonaws.com"
 REGION = 'us-east-1'
+
+# TODO: Maybe
+'''
+class EnvConfigData(OrderedDictionary):
+
+    def to_aws_bs_options()
+
+    def get_val_for_env()
+
+    def is_data()
+
+    def is_staging()
+
+    def url()
+
+    def bucket()
+
+    def buckets()
+
+    def part(self, componenet_name):
+        self.get(componenet_name)
+
+    def db(self):
+        return self.part('db')
+
+    def es(self):
+        return self.part('es')
+
+    def foursight(self):
+        return self.part('foursight')
+
+    def higlass(self):
+        return self.part('higlass')
+'''
 
 
 class WaitingForBoto3(Exception):
@@ -40,7 +76,7 @@ def delete_db(db_identifier, take_snapshot=True):
                 SkipFinalSnapshot=False,
                 FinalDBSnapshotIdentifier=db_identifier + "-final"
             )
-        except:  # noqa: E733
+        except:  # noqa: E722
             # try without the snapshot
             resp = client.delete_db_instance(
                 DBInstanceIdentifier=db_identifier,
@@ -64,25 +100,28 @@ def get_health_page_info(bs_url):
     return health_res.json()
 
 
+# TODO: think about health page query parameter to get direct from config
 def get_es_from_health_page(bs_url):
     health = get_health_page_info(bs_url)
     es = health['elasticsearch'].strip(':80')
     return es
 
 
-def is_indexing_finished(bs_url):
-    # get beanstalk env
-    bs = bs_url.split('.')[0].lstrip('http://')
-    # some overrides
-    if bs == 'mastertest':
-        bs = 'fourfront-mastertest'
-    is_beanstalk_ready(bs)
+def get_es_from_bs_config(env):
+    bs_env = get_bs_env(env)
+    for item in bs_env:
+        if item.startswith('ES_URL'):
+            return item.split('=')[1].strip(':80')
 
+
+def is_indexing_finished(bs):
+    is_beanstalk_ready(bs)
+    bs_url = get_beanstalk_real_url(bs)
     if not bs_url.endswith('/'):
         bs_url += "/"
     # server not up yet
     try:
-        health_res = requests.get(bs_url + 'counts?format=json')
+        health_res = ff_utils.authorized_request(bs_url + 'counts?format=json', ff_env=bs)
         totals = health_res.json().get('db_es_total').split()
 
         # DB: 74048 ES: 74048 parse totals
@@ -101,6 +140,19 @@ def is_indexing_finished(bs_url):
     return status, totals
 
 
+def swap_cname(src, dest):
+    # TODO clients should be global functions
+    client = boto3.client('elasticbeanstalk')
+
+    client.swap_environment_cnames(SourceEnvironmentName=src,
+                                   DestinationEnvironmentName=dest)
+    import time
+    print("waiting for swap environment cnames")
+    time.sleep(10)
+    client.restart_app_server(EnvironmentName=src)
+    client.restart_app_server(EnvironmentName=dest)
+
+
 def whodaman():
     '''
     determines which evironment is currently hosting data.4dnucleome.org
@@ -114,17 +166,17 @@ def whodaman():
         logger.warn(env)
         if env.get('CNAME') == magic_cname:
             # we found data
-            return env
+            return env.get('EnvironmentName')
 
 
 def beanstalk_config(env, appname='4dn-web'):
-    client = boto3.client('elasticbeanstalk', region_name=REGION)
+    client = boto3.client('elasticbeanstalk')
     return client.describe_configuration_settings(EnvironmentName=env,
                                                   ApplicationName=appname)
 
 
 def beanstalk_info(env):
-    client = boto3.client('elasticbeanstalk', region_name=REGION)
+    client = boto3.client('elasticbeanstalk')
     res = client.describe_environments(EnvironmentNames=[env])
 
     return res['Environments'][0]
@@ -150,7 +202,7 @@ def get_beanstalk_real_url(env):
 
 
 def is_beanstalk_ready(env):
-    client = boto3.client('elasticbeanstalk', region_name=REGION)
+    client = boto3.client('elasticbeanstalk')
     res = client.describe_environments(EnvironmentNames=[env])
 
     status = res['Environments'][0]['Status']
@@ -210,17 +262,19 @@ def create_db_snapshot(db_identifier, snapshot_name):
     return response
 
 
-def create_db_from_snapshot(snapshot_name):
+def create_db_from_snapshot(db_name, snapshot_name=None):
+    if not snapshot_name:
+        snapshot_name = db_name
     client = boto3.client('rds')
     try:
         response = client.restore_db_instance_from_db_snapshot(
-                DBInstanceIdentifier=snapshot_name,
+                DBInstanceIdentifier=db_name,
                 DBSnapshotIdentifier=snapshot_name,
                 DBInstanceClass='db.t2.medium')
     except ClientError:
         # drop target database no backup
         try:
-            delete_db(snapshot_name, False)
+            delete_db(db_name, True)
         except ClientError:
             pass
         return "Deleting"
@@ -315,7 +369,7 @@ def set_bs_env(envname, var, template=None):
             k, v = evar.split('=')
             if var.get(k, None) is None:
                 var[k] = v
-    except:  # noqa: E733
+    except:  # noqa: E722
         pass
 
     for key, val in var.iteritems():
@@ -384,9 +438,10 @@ def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
                                         OptionSettings=options,
                                         )
     except ClientError:
-        # already exists, just retun envmane
-        res = client.describe_environments(EnvironmentNames=[envname])
-        res = res['Environments'][0]
+        # already exists update it
+        res = client.update_environment(EnvironmentName=envname,
+                                        TemplateName=template,
+                                        OptionSettings=options)
     return res
 
 
@@ -408,11 +463,42 @@ def log_to_foursight(event, lambda_name, status='WARN', full_output=None):
                 'description': fs.get('log_desc'),
                 'full_output': full_output
                 }
-        headers = {'content-type': 'application/json'}
-        url = FOURSIGHT_URL + fs.get('check')
+        ff_auth = os.environ.get('FS_AUTH')
+        headers = {'content-type': "application/json",
+                   'Authorization': ff_auth}
+        url = FOURSIGHT_URL + 'checks/' + fs.get('check')
         res = requests.put(url, data=json.dumps(data), headers=headers)
         print(res.text)
         return res
+
+
+def create_foursight_auto(dest_env):
+    fs = {'dest_env': dest_env}
+
+    # whats our url
+    fs['bs_url'] = get_beanstalk_real_url(dest_env)
+    fs['fs_url'] = get_foursight_env(dest_env, fs['bs_url'])
+    fs['es_url'] = get_es_from_bs_config(dest_env)
+
+    fs['foursight'] = create_foursight(**fs)
+    if fs['foursight'].get('initial_checks'):
+        del fs['foursight']['initial_checks']
+
+    return fs
+
+
+def get_foursight_env(dest_env, bs_url=None):
+
+    if not bs_url:
+        bs_url = get_beanstalk_real_url(dest_env)
+
+    env = dest_env
+    if 'data.4dnucleome.org' in bs_url:
+        env = 'data'
+    elif 'staging.4dnucleome.org' in bs_url:
+        env = 'staging'
+
+    return env
 
 
 def create_foursight(dest_env, bs_url, es_url, fs_url=None):
@@ -421,7 +507,7 @@ def create_foursight(dest_env, bs_url, es_url, fs_url=None):
     '''
 
     # we want some url like thing
-    if not bs_url.startswith('http://'):
+    if not bs_url.startswith('http'):
         bs_url = 'http://' + bs_url
     if not bs_url.endswith("/"):
         bs_url += "/"
@@ -438,22 +524,23 @@ def create_foursight(dest_env, bs_url, es_url, fs_url=None):
     if "-" in fs_url:
         fs_url = fs_url.split("-")[1]
 
-    foursight_url = "https://foursight.4dnucleome.org/api/environments/"
-    foursight_url = foursight_url + fs_url
+    foursight_url = FOURSIGHT_URL + 'environments/' + fs_url
     payload = {"fourfront": bs_url,
                "es": es_url,
                "ff_env": dest_env,
                }
-    logging.info("Hitting up Foursight url %s with payload %s" %
-                 (foursight_url, json.dumps(payload)))
+    logger.info("Hitting up Foursight url %s with payload %s" %
+                (foursight_url, json.dumps(payload)))
 
-    headers = {'content-type': "application/json"}
+    ff_auth = os.environ.get('FS_AUTH')
+    headers = {'content-type': "application/json",
+               'Authorization': ff_auth}
     res = requests.put(foursight_url,
                        data=json.dumps(payload),
                        headers=headers)
     try:
         return res.json()
-    except:  # noqa: E733
+    except:  # noqa: E722
         raise Exception(res.text)
 
 
@@ -486,7 +573,8 @@ def copy_s3_buckets(new, old):
     for bucket in new_buckets:
         try:
             s3.create_bucket(Bucket=bucket)
-        except:  # noqa: E733
+        except:  # noqa: E722
+
             print("bucket already created....")
 
     # now copy them
@@ -573,7 +661,7 @@ def add_es(new, force_new=False):
             fallback += "-a"
         try:
             resp = create_new_es(new)
-        except:  # noqa: E733
+        except:  # noqa: E722
             resp = create_new_es(fallback)
     else:
         try:
