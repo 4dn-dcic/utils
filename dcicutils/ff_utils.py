@@ -41,9 +41,11 @@ def get_item_ids_from_args(id_input, connection, is_search=False):
     '''depending on the args passed return a list of item ids'''
     if is_search:
         def search_callback(hit, results):
-            if hit.get('uuid'):
+            try:
+                hit.get('uuid')
                 results.append(hit.get('uuid'))
-
+            except AttributeError:
+                pass
         query = 'search/?' + id_input[0]
         results = []
         safe_search_with_callback(connection, query, results, search_callback)
