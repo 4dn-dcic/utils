@@ -69,7 +69,7 @@ class FDN_Connection(object):
                             return
             else:
                 self.award = None
-        except:
+        except:  # noqa
             if not self.award:  # only reset if not already set
                 self.award = None
 
@@ -183,7 +183,7 @@ def get_FDN(obj_id, connection, frame="object", url_addon=None):
     if response.status_code not in [200, 404]:  # pragma: no cover
         try:
             logging.warning('%s' % (response.json().get("notification")))
-        except:
+        except:  # noqa
             logging.warning('%s' % (response.text))
     if url_addon and response.json().get('@graph'):  # pragma: no cover
         return response.json()['@graph']
@@ -200,7 +200,7 @@ def search_FDN(sheet, field, value, connection):
     if not response.status_code == 200:  # pragma: no cover
         try:
             logging.warning('%s' % (response.json().get("notification")))
-        except:
+        except:  # noqa
             logging.warning('%s' % (response.text))
     if response.json().get('@graph'):
         return response.json()['@graph']
@@ -218,7 +218,7 @@ def patch_FDN(obj_id, connection, patch_input, url_addon=None):
     if not response.status_code == 200:  # pragma: no cover
         try:
             logging.debug('%s' % (response.json().get("notification")))
-        except:
+        except:  # noqa
             logging.debug('%s' % (response.text))
     return response.json()
 
@@ -231,7 +231,7 @@ def put_FDN(obj_id, connection, put_input):
     if not response.status_code == 200:  # pragma: no cover
         try:
             logging.debug('%s' % (response.json().get("notification")))
-        except:
+        except:  # noqa
             logging.debug('%s' % (response.text))
     return response.json()
 
@@ -246,7 +246,7 @@ def new_FDN(connection, collection_name, post_input, url_addon=None):
     if not response.status_code == 201:  # pragma: no cover
         try:
             logging.debug('%s' % (response.json().get("notification")))
-        except:
+        except:  # noqa
             logging.debug('%s' % (response.text))
     return response.json()
 
