@@ -1,0 +1,7 @@
+{
+  "default": {
+    "key": "TheConnectionKey",
+    "secret": "very_secret_key",
+    "server":"www.The4dnWebsite.com"
+  }
+}

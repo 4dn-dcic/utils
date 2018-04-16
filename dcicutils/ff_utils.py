@@ -7,7 +7,7 @@ import copy
 from . import s3_utils
 import requests
 
-from wranglertools import fdnDCIC
+from dcicutils import submit_utils
 
 
 def convert_param(parameter_dict, vals_as_string=False):
@@ -210,8 +210,8 @@ def fdn_connection(key='', connection=None, keyname='default'):
         return None
     if not connection:
         try:
-            fdn_key = fdnDCIC.FDN_Key(key, keyname)
-            connection = fdnDCIC.FDN_Connection(fdn_key)
+            fdn_key = submit_utils.FDN_Key(key, keyname)
+            connection = submit_utils.FDN_Connection(fdn_key)
         except Exception as e:
             raise Exception("Unable to connect to server with check keys : %s" % e)
     return connection
@@ -223,7 +223,7 @@ def authorized_request(url, auth=None, **kwargs):
     and is used to make request to FF.
     Takes a required url and auth, and optional headers. Any other kwargs
     provided are also past into the request.
-    auth should be obtained using s3Utils.get_key or in fdnDCIC tuple form.
+    auth should be obtained using s3Utils.get_key or in submit_utils tuple form.
     If not provided, try to get the key using s3_utils if 'ff_env' in kwargs
     timeout of 20 seconds used by default but can be overwritten as a kwarg
 
@@ -239,7 +239,7 @@ def authorized_request(url, auth=None, **kwargs):
         use_env = 'fourfront-webprod' if 'webprod' in kwargs['ff_env'] else kwargs['ff_env']
         auth = s3_utils.s3Utils(env=use_env).get_key()
         del kwargs['ff_env']
-    # see if auth is directly from get_key() or the tuple form used in fdnDCIC
+    # see if auth is directly from get_key() or the tuple form used in submit_utils
     use_auth = None
     if isinstance(auth, dict) and isinstance(auth.get('default'), dict):
         use_auth = (auth['default']['key'], auth['default']['secret'])
@@ -261,7 +261,7 @@ def search_metadata(search_url, key='', connection=None, frame="object"):
     specifically the @graph contents if available.
     """
     connection = fdn_connection(key, connection)
-    return fdnDCIC.get_FDN(None, connection, frame=frame, url_addon=search_url)
+    return submit_utils.get_FDN(None, connection, frame=frame, url_addon=search_url)
 
 
 def patch_metadata(patch_item, obj_id='', key='', connection=None):
@@ -274,7 +274,7 @@ def patch_metadata(patch_item, obj_id='', key='', connection=None):
     obj_id = obj_id if obj_id else patch_item['uuid']
 
     try:
-        response = fdnDCIC.patch_FDN(obj_id, connection, patch_item)
+        response = submit_utils.patch_FDN(obj_id, connection, patch_item)
 
         if response.get('status') == 'error':
             raise Exception("error %s \n unable to patch obj: %s \n with  data: %s" %
@@ -286,13 +286,13 @@ def patch_metadata(patch_item, obj_id='', key='', connection=None):
 
 def get_metadata(obj_id, key='', connection=None, frame="object"):
     connection = fdn_connection(key, connection)
-    res = fdnDCIC.get_FDN(obj_id, connection, frame=frame)
+    res = submit_utils.get_FDN(obj_id, connection, frame=frame)
     retry = 1
     sleep = [2, 4, 12]
     while 'error' in res.get('@type', []) and retry < 3:
         time.sleep(sleep[retry])
         retry += 1
-        res = fdnDCIC.get_FDN(obj_id, connection, frame=frame)
+        res = submit_utils.get_FDN(obj_id, connection, frame=frame)
 
     return res
 
@@ -301,7 +301,7 @@ def post_to_metadata(post_item, schema_name, key='', connection=None):
     connection = fdn_connection(key, connection)
 
     try:
-        response = fdnDCIC.new_FDN(connection, schema_name, post_item)
+        response = submit_utils.new_FDN(connection, schema_name, post_item)
         if (response.get('status') == 'error' and response.get('detail') == 'UUID conflict'):
             # item already posted lets patch instead
             response = patch_metadata(post_item, connection=connection)
@@ -318,7 +318,7 @@ def delete_field(post_json, del_field, connection=None):
     """Does a put to delete the given field."""
     my_uuid = post_json.get("uuid")
     my_accession = post_json.get("accesion")
-    raw_json = fdnDCIC.get_FDN(my_uuid, connection, frame="raw")
+    raw_json = submit_utils.get_FDN(my_uuid, connection, frame="raw")
     # check if the uuid is in the raw_json
     if not raw_json.get("uuid"):
         raw_json["uuid"] = my_uuid
@@ -331,7 +331,7 @@ def delete_field(post_json, del_field, connection=None):
         del raw_json[del_field]
     # Do the put with raw_json
     try:
-        response = fdnDCIC.put_FDN(my_uuid, connection, raw_json)
+        response = submit_utils.put_FDN(my_uuid, connection, raw_json)
         if response.get('status') == 'error':
             raise Exception("error %s \n unable to delete field: %s \n of  item: %s" %
                             (response, del_field, my_uuid))
@@ -383,7 +383,7 @@ def get_item_type(connection, item):
     try:
         return item['@type'].pop(0)
     except (KeyError, TypeError):
-        res = fdnDCIC.get_FDN(item, connection)
+        res = submit_utils.get_FDN(item, connection)
         try:
             return res['@type'][0]
         except AttributeError:  # noqa: E722
@@ -438,7 +438,7 @@ def has_field_value(item_dict, field, value=None, val_is_item=False):
 def get_types_that_can_have_field(connection, field):
     """find items that have the passed in fieldname in their properties
         even if there is currently no value for that field"""
-    profiles = fdnDCIC.get_FDN('/profiles/', connection=connection, frame='raw')
+    profiles = submit_utils.get_FDN('/profiles/', connection=connection, frame='raw')
     types_w_field = []
     for t, j in profiles.items():
         if j['properties'].get(field):
@@ -456,11 +456,11 @@ def get_linked_items(connection, itemid, found_items={},
         know who are children, grandchildren, great grandchildren ... """
     # import pdb; pdb.set_trace()
     if not found_items.get(itemid):
-        res = fdnDCIC.get_FDN(itemid, connection=connection, frame='raw')
+        res = submit_utils.get_FDN(itemid, connection=connection, frame='raw')
         if 'error' not in res['status']:
             # create an entry for this item in found_items
             try:
-                obj_type = fdnDCIC.get_FDN(itemid, connection=connection)['@type'][0]
+                obj_type = submit_utils.get_FDN(itemid, connection=connection)['@type'][0]
                 found_items[itemid] = obj_type
             except AttributeError:  # noqa: E722
                 print("Can't find a type for item %s" % itemid)
