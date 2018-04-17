@@ -1,4 +1,4 @@
-from dcicutils import ff_utils
+from dcicutils import ff_utils, submit_utils
 import pytest
 pytestmark = pytest.mark.working
 
@@ -243,7 +243,7 @@ def test_get_item_ids_from_list(connection):
 
 def test_get_item_ids_from_search(mocker, connection, items_w_uuids):
     ids = ['a', 'b', 'c']
-    with mocker.patch('dcicutils.ff_utils.fdnDCIC.get_FDN', return_value=items_w_uuids):
+    with mocker.patch('dcicutils.submit_utils.get_FDN', return_value=items_w_uuids):
         result = ff_utils.get_item_ids_from_args('search', connection, True)
         for a in [i in ids for i in result]:
             assert a
