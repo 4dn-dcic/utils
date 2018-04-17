@@ -1,13 +1,60 @@
+import os
 import datetime
 import json
 import time
 from uuid import uuid4, UUID
 import random
 import copy
+import argparse
 from . import s3_utils
 import requests
-
 from dcicutils import submit_utils
+
+ff_arg_parser = argparse.ArgumentParser(add_help=False)
+ff_arg_parser.add_argument('--key',
+                           default='default',
+                           help="The keypair identifier from the keyfile.  \
+                           Default is --key=default")
+ff_arg_parser.add_argument('--keyfile',
+                           default=os.path.expanduser("~/keypairs.json"),
+                           help="The keypair file.  Default is --keyfile=%s" %
+                           (os.path.expanduser("~/keypairs.json")))
+ff_arg_parser.add_argument('--dbupdate',
+                           default=False,
+                           action='store_true',
+                           help="Do UPDATES on database objects.  Default is False \
+                           and will only UPDATE with user override")
+
+
+input_arg_parser = argparse.ArgumentParser(add_help=False)
+input_arg_parser.add_argument('input', nargs='+',
+                              help="A list of item ids, a file with item ids one per line \
+                              or a search string (use with --search option)")
+input_arg_parser.add_argument('--search',
+                              default=False,
+                              action='store_true',
+                              help='Include if you are passing in a search string \
+                              eg. type=Biosource&biosource_type=primary cell')
+
+
+def get_item_ids_from_args(id_input, connection, is_search=False):
+    '''depending on the args passed return a list of item ids'''
+    if is_search:
+        def search_callback(hit, results):
+            try:
+                hit.get('uuid')
+                results.append(hit.get('uuid'))
+            except AttributeError:
+                pass
+        query = 'search/?' + id_input[0]
+        results = []
+        safe_search_with_callback(connection, query, results, search_callback)
+        return list(set(results))
+    try:
+        with open(id_input[0]) as inf:
+            return [l.strip() for l in inf]
+    except FileNotFoundError:
+        return id_input
 
 
 def convert_param(parameter_dict, vals_as_string=False):
@@ -253,6 +300,28 @@ def authorized_request(url, auth=None, **kwargs):
     if 'timeout' not in kwargs:
         kwargs['timeout'] = 20  # use a 20 second timeout by default
     return requests.get(url, auth=use_auth, **kwargs)
+
+
+def safe_search_with_callback(fdn_conn, query, container, callback, limit=20, frame='embedded'):
+    """
+    Somewhat temporary function to avoid making search queries that cause
+    memory issues. Takes a ff_utils fdn_conn, a search query (without 'limit' or
+    'from' parameters), a container to put search results in after running
+    them through a given callback function, which should take a search hit as
+    its first parameter and the container as its second parameter.
+    """
+    last_total = None
+    curr_from = 0
+    while not last_total or last_total == limit:
+        print('...', curr_from)
+        search_query = ''.join([query, '&from=', str(curr_from), '&limit=', str(limit)])
+        search_res = search_metadata(search_query, connection=fdn_conn, frame=frame)
+        if not search_res:  # 0 results
+            break
+        last_total = len(search_res)
+        curr_from += last_total
+        for hit in search_res:
+            callback(hit, container)
 
 
 def search_metadata(search_url, key='', connection=None, frame="object"):
