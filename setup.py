@@ -7,7 +7,6 @@ README = open(os.path.join(here, 'README.md')).read()
 
 requires = [
     'pytest-runner',
-    'Submit4DN',
     'boto3',
 ]
 

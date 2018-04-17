@@ -79,7 +79,7 @@ def profiles():
 
 @pytest.fixture
 def connection(mocker):
-    return mocker.patch.object(ff_utils.fdnDCIC, 'FDN_Connection')
+    return mocker.patch.object(ff_utils.submit_utils, 'FDN_Connection')
 
 
 def test_fdn_connection_no_key_or_connection():
@@ -99,8 +99,8 @@ def test_fdn_connection_w_key_dict(mocker):
             'secret': 'so_so_secret'
         }
     }
-    with mocker.patch('dcicutils.ff_utils.fdnDCIC.FDN_Connection', return_value='test_connection'):
-        with mocker.patch('dcicutils.ff_utils.fdnDCIC.FDN_Key', return_value='test_key') as make_key:
+    with mocker.patch('dcicutils.ff_utils.submit_utils.FDN_Connection', return_value='test_connection'):
+        with mocker.patch('dcicutils.ff_utils.submit_utils.FDN_Key', return_value='test_key') as make_key:
             conn = ff_utils.fdn_connection(keydict)
             assert make_key.called_with(keydict, 'default')
             assert conn == 'test_connection'
@@ -109,8 +109,8 @@ def test_fdn_connection_w_key_dict(mocker):
 def test_fdn_connection_w_keyfile_keyname(mocker):
     keyfile = 'my_keyfile'
     keyname = '4dnprod'
-    with mocker.patch('dcicutils.ff_utils.fdnDCIC.FDN_Connection', return_value='test_connection'):
-        with mocker.patch('dcicutils.ff_utils.fdnDCIC.FDN_Key', return_value='test_key') as make_key:
+    with mocker.patch('dcicutils.ff_utils.submit_utils.FDN_Connection', return_value='test_connection'):
+        with mocker.patch('dcicutils.ff_utils.submit_utils.FDN_Key', return_value='test_key') as make_key:
             conn = ff_utils.fdn_connection(keyfile, keyname=keyname)
             assert make_key.called_with(keyfile, keyname)
             assert conn == 'test_connection'
@@ -206,7 +206,7 @@ def test_has_field_value_check_for_field_w_item(bs_embed_json):
 
 def test_get_types_that_can_have_field(mocker, profiles):
     field = 'tags'
-    with mocker.patch('dcicutils.ff_utils.fdnDCIC.get_FDN', return_value=profiles):
+    with mocker.patch('dcicutils.ff_utils.submit_utils.get_FDN', return_value=profiles):
         types_w_field = ff_utils.get_types_that_can_have_field('conn', field)
         assert 'ExperimentSetReplicate' in types_w_field
         assert 'TreatmentChemical' not in types_w_field
@@ -220,7 +220,7 @@ def test_get_item_type_from_dict(eset_json):
 
 def test_get_item_type_from_id(mocker, connection):
 
-    with mocker.patch('dcicutils.ff_utils.fdnDCIC.get_FDN', return_value={'@type': ['ExperimentSetReplicate']}):
+    with mocker.patch('dcicutils.ff_utils.submit_utils.get_FDN', return_value={'@type': ['ExperimentSetReplicate']}):
         result = ff_utils.get_item_type(connection, 'blah')
         assert result == 'ExperimentSetReplicate'
 
