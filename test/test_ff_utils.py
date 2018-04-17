@@ -1,4 +1,4 @@
-from dcicutils import ff_utils, submit_utils
+from dcicutils import ff_utils
 import pytest
 pytestmark = pytest.mark.working
 
