@@ -68,7 +68,7 @@ class WaitingForBoto3(Exception):
 
 
 def delete_db(db_identifier, take_snapshot=True):
-    client = boto3.client('rds')
+    client = boto3.client('rds', region_name=REGION)
     if take_snapshot:
         try:
             resp = client.delete_db_instance(
@@ -142,7 +142,7 @@ def is_indexing_finished(bs):
 
 def swap_cname(src, dest):
     # TODO clients should be global functions
-    client = boto3.client('elasticbeanstalk')
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
 
     client.swap_environment_cnames(SourceEnvironmentName=src,
                                    DestinationEnvironmentName=dest)
@@ -170,13 +170,13 @@ def whodaman():
 
 
 def beanstalk_config(env, appname='4dn-web'):
-    client = boto3.client('elasticbeanstalk')
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
     return client.describe_configuration_settings(EnvironmentName=env,
                                                   ApplicationName=appname)
 
 
 def beanstalk_info(env):
-    client = boto3.client('elasticbeanstalk')
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = client.describe_environments(EnvironmentNames=[env])
 
     return res['Environments'][0]
@@ -206,7 +206,7 @@ def get_beanstalk_real_url(env):
 
 
 def is_beanstalk_ready(env):
-    client = boto3.client('elasticbeanstalk')
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = client.describe_environments(EnvironmentNames=[env])
 
     status = res['Environments'][0]['Status']
@@ -217,14 +217,14 @@ def is_beanstalk_ready(env):
 
 
 def is_snapshot_ready(snapshot_name):
-    client = boto3.client('rds')
+    client = boto3.client('rds', region_name=REGION)
     resp = client.describe_db_snapshots(DBSnapshotIdentifier=snapshot_name)
     status = resp['DBSnapshots'][0]['Status']
     return status.lower() == 'available', resp['DBSnapshots'][0]['DBSnapshotIdentifier']
 
 
 def is_es_ready(es_name):
-    es = boto3.client('es')
+    es = boto3.client('es', region_name=REGION)
     describe_resp = es.describe_elasticsearch_domain(DomainName=es_name)
     endpoint = describe_resp['DomainStatus'].get('Endpoint', None)
     status = True
@@ -236,7 +236,7 @@ def is_es_ready(es_name):
 
 
 def is_db_ready(snapshot_name):
-    client = boto3.client('rds')
+    client = boto3.client('rds', region_name=REGION)
     status = False
     resp = client.describe_db_instances(DBInstanceIdentifier=snapshot_name)
     details = resp
@@ -250,7 +250,7 @@ def is_db_ready(snapshot_name):
 
 
 def create_db_snapshot(db_identifier, snapshot_name):
-    client = boto3.client('rds')
+    client = boto3.client('rds', region_name=REGION)
     try:
         response = client.create_db_snapshot(
              DBSnapshotIdentifier=snapshot_name,
@@ -269,7 +269,7 @@ def create_db_snapshot(db_identifier, snapshot_name):
 def create_db_from_snapshot(db_name, snapshot_name=None):
     if not snapshot_name:
         snapshot_name = db_name
-    client = boto3.client('rds')
+    client = boto3.client('rds', region_name=REGION)
     try:
         response = client.restore_db_instance_from_db_snapshot(
                 DBInstanceIdentifier=db_name,
@@ -313,7 +313,7 @@ def is_travis_finished(build_id):
 
 
 def snapshot_db(db_identifier, snapshot_name):
-    client = boto3.client('rds')
+    client = boto3.client('rds', region_name=REGION)
     try:
         response = client.create_db_snapshot(
              DBSnapshotIdentifier=snapshot_name,
@@ -362,7 +362,7 @@ def make_envvar_option(name, value):
 
 
 def set_bs_env(envname, var, template=None):
-    client = boto3.client('elasticbeanstalk')
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
     options = []
 
     try:
@@ -392,7 +392,7 @@ def set_bs_env(envname, var, template=None):
 
 
 def get_bs_env(envname):
-    client = boto3.client('elasticbeanstalk')
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
 
     data = client.describe_configuration_settings(EnvironmentName=envname,
                                                   ApplicationName='4dn-web')
@@ -403,7 +403,7 @@ def get_bs_env(envname):
 
 
 def update_bs_config(envname, template, keep_env_vars=False):
-    client = boto3.client('elasticbeanstalk')
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
 
     # get important env variables
     if keep_env_vars:
@@ -422,7 +422,7 @@ def update_bs_config(envname, template, keep_env_vars=False):
 
 
 def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
-    client = boto3.client('elasticbeanstalk')
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
 
     template = 'fourfront-base'
     if for_indexing:
@@ -555,7 +555,7 @@ def create_s3_buckets(new):
         'elasticbeanstalk-%s-wfoutput' % new,
         'elasticbeanstalk-%s-system' % new,
     ]
-    s3 = boto3.client('s3')
+    s3 = boto3.client('s3', region_name=REGION)
     for bucket in new_buckets:
         s3.create_bucket(Bucket=bucket)
 
@@ -573,7 +573,7 @@ def copy_s3_buckets(new, old):
         'elasticbeanstalk-%s-files' % old,
         'elasticbeanstalk-%s-wfoutput' % old,
     ]
-    s3 = boto3.client('s3')
+    s3 = boto3.client('s3', region_name=REGION)
     for bucket in new_buckets:
         try:
             s3.create_bucket(Bucket=bucket)
@@ -594,7 +594,7 @@ def copy_s3_buckets(new, old):
 
 def add_to_auth0_client(new):
     # first get the url of the newly created beanstalk environment
-    eb = boto3.client('elasticbeanstalk')
+    eb = boto3.client('elasticbeanstalk', region_name=REGION)
     env = eb.describe_environments(EnvironmentNames=[new])
     url = None
     print("waiting for beanstalk to be up, this make take some time...")
@@ -640,7 +640,7 @@ def auth0_client_update(url):
 
 
 def sizeup_es(new):
-    es = boto3.client('es')
+    es = boto3.client('es', region_name=REGION)
     resp = es.update_elasticsearch_domain_config(
         DomainName=new,
         ElasticsearchClusterConfig={
@@ -654,7 +654,7 @@ def sizeup_es(new):
 
 
 def add_es(new, force_new=False):
-    es = boto3.client('es')
+    es = boto3.client('es', region_name=REGION)
     if force_new:
         fallback = new
         if new.endswith("-a"):
@@ -681,7 +681,7 @@ def add_es(new, force_new=False):
 
 
 def create_new_es(new):
-    es = boto3.client('es')
+    es = boto3.client('es', region_name=REGION)
     resp = es.create_elasticsearch_domain(
         DomainName=new,
         ElasticsearchVersion='5.3',
@@ -708,7 +708,8 @@ def create_new_es(new):
                                 "134.174.140.197/32",
                                 "134.174.140.208/32",
                                 "172.31.16.84/32",
-                                "172.31.73.1/24"
+                                "172.31.73.1/24",
+                                "172.31.77.1/24"
                             ]
                         }
                     },
@@ -722,7 +723,7 @@ def create_new_es(new):
 
 def get_es_build_status(new):
     # get the status of this bad boy
-    es = boto3.client('es')
+    es = boto3.client('es', region_name=REGION)
     endpoint = None
     while endpoint is None:
         describe_resp = es.describe_elasticsearch_domain(DomainName=new)
