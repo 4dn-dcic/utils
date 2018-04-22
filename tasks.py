@@ -5,9 +5,28 @@ import webbrowser
 from invoke.exceptions import UnexpectedExit
 
 from invoke import task, run
+import requests
+import random
 
 docs_dir = 'docs'
 build_dir = os.path.join(docs_dir, '_build')
+POSITIVE = 'https://gist.github.com/j1z0/bbed486d85fb4d64825065afbfb2e98f/raw/positive.txt'
+NEGATIVE = 'https://gist.github.com/j1z0/bbed486d85fb4d64825065afbfb2e98f/raw/negative.txt'
+
+
+def get_random_line_in_gist(url):
+    listing = requests.get(url)
+    return random.choice(listing.text.split("\n"))
+
+
+@task
+def play(ctx, positive=False):
+    type_url = POSITIVE
+    if not positive:
+        type_url = NEGATIVE
+    # no spaces in url
+    media_url = '%20'.join(get_random_line_in_gist(type_url).split())
+    run("vlc -I rc %s --play-and-exit -q" % (media_url))
 
 
 @task
@@ -37,6 +56,12 @@ def test(ctx, watch=False, last_failing=False, no_flake=False, k=''):
     if last_failing:
         args.append('--lf')
     retcode = pytest.main(args)
+    try:
+        good = True if retcode == 0 else False
+        play(ctx, good)
+    except:  # noqa E722
+        print("install vlc for more exciting test runs...")
+        pass
     if retcode != 0:
         print("test failed exiting")
         sys.exit(retcode)
