@@ -686,17 +686,18 @@ def create_new_es(new):
         DomainName=new,
         ElasticsearchVersion='5.3',
         ElasticsearchClusterConfig={
-            'InstanceType': 'm3.large.elasticsearch',
+            'InstanceType': 'm4.large.elasticsearch',
             'InstanceCount': 3,
             'DedicatedMasterEnabled': False,
         },
+        EBSOptions={"EBSEnabled": True, "VolumeType": "standard", "VolumeSize": 10},
         AccessPolicies=json.dumps({
             "Version": "2012-10-17",
             "Statement": [
                 {
                     "Effect": "Allow",
                     "Principal": {
-                        "AWS": "*"
+                        "AWS": "arn:aws:iam::643366669028:role/Developer"
                     },
                     "Action": [
                         "es:*"

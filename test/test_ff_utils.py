@@ -219,7 +219,18 @@ def test_get_item_type_from_dict(eset_json):
 
 
 def test_get_item_type_from_id(mocker, connection):
-
     with mocker.patch('dcicutils.ff_utils.submit_utils.get_FDN', return_value={'@type': ['ExperimentSetReplicate']}):
         result = ff_utils.get_item_type(connection, 'blah')
         assert result == 'ExperimentSetReplicate'
+
+
+def test_authorized_request(mocker, ):
+    from dcicutils.ff_utils import authorized_request
+    import json
+    expected = 'success'
+
+    with mocker.patch('dcicutils.ff_utils.requests.post', return_value=expected):
+        res = authorized_request('https://data.4dnucleome.org/files-microscopy/4DNFII5APXQO/upload',
+                                 ff_env='fourfront-webprod', verb='POST', data=json.dumps({}))
+
+        assert res == expected

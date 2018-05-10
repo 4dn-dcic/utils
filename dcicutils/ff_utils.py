@@ -217,7 +217,7 @@ def fdn_connection(key='', connection=None, keyname='default'):
     return connection
 
 
-def authorized_request(url, auth=None, **kwargs):
+def authorized_request(url, auth=None, verb='GET', **kwargs):
     """
     Generalized request that takes the same authorization info as fdn_connection
     and is used to make request to FF.
@@ -249,10 +249,20 @@ def authorized_request(url, auth=None, **kwargs):
         raise Exception("ERROR!\nInvalid authoization key %s" % auth)
     headers = kwargs.get('headers')
     if not headers:
-        headers = {'content-type': 'application/json', 'accept': 'application/json'}
+        kwargs['headers'] = {'content-type': 'application/json', 'accept': 'application/json'}
     if 'timeout' not in kwargs:
         kwargs['timeout'] = 20  # use a 20 second timeout by default
-    return requests.get(url, auth=use_auth, **kwargs)
+
+    verbs = {'GET': requests.get,
+             'POST': requests.post,
+             'PATCH': requests.patch,
+             'PUT': requests.put,
+             'DELETE': requests.delete,
+             }
+
+    the_verb = verbs[verb.upper()]
+    return the_verb(url, auth=use_auth, **kwargs)
+    # return requests.get(url, auth=use_auth, **kwargs)
 
 
 def search_metadata(search_url, key='', connection=None, frame="object"):
