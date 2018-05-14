@@ -9,27 +9,23 @@ from dcicutils import s3_utils, submit_utils
 import requests
 
 
-### Possible environment variables
-### IMPORTANT: write these so code will work even if they're not present (use get())
-SECRET = os.environ.get("SECRET", '')
-HIGLASS_SERVER = os.environ.get("HIGLASS_SERVER", "localhost")
-HIGLASS_USER = os.environ.get("HIGLASS_USER")
-HIGLASS_PASS = os.environ.get("HIGLASS_PASS")
 HIGLASS_BUCKETS = ['elasticbeanstalk-fourfront-webprod-wfoutput',
                    'elasticbeanstalk-fourfront-webdev-wfoutput']
-    
+
 ### Widely used metadata functions
-    
+
 def authorized_request(url, auth=None, verb='GET', **kwargs):
     """
     Generalized request that takes the same authorization info as fdn_connection
     and is used to make request to FF.
-    Takes a required url, request verb, auth, and optional headers. Any other kwargs
-    provided are also past into the request.
+    Takes a required url, request verb, auth, and optional headers. Any other
+    kwargs provided are also past into the request.
+    For example, provide a body to a request using the 'data' kwarg.
+    timeout of 20 seconds used by default but can be overwritten as a kwarg.
+
     Verb should be one of: GET, POST, PATCH, PUT, or DELETE
     auth should be obtained using s3Utils.get_key or in submit_utils tuple form.
     If not provided, try to get the key using s3_utils if 'ff_env' in kwargs
-    timeout of 20 seconds used by default but can be overwritten as a kwarg
 
     usage:
     authorized_request('https://data.4dnucleome.org/<some path>', (<authId, authSecret))
@@ -40,12 +36,12 @@ def authorized_request(url, auth=None, verb='GET', **kwargs):
     if not auth and 'ff_env' in kwargs:
         # webprod and webprod2 both use the fourfront-webprod bucket for keys
         use_env = 'fourfront-webprod' if 'webprod' in kwargs['ff_env'] else kwargs['ff_env']
-        auth = s3_utils.s3Utils(env=use_env).get_key()
+        auth = s3_utils.s3Utils(env=use_env).get_access_keys()
         del kwargs['ff_env']
     # see if auth is directly from get_key() or the tuple form used in submit_utils
     use_auth = None
-    if isinstance(auth, dict) and isinstance(auth.get('default'), dict):
-        use_auth = (auth['default']['key'], auth['default']['secret'])
+    if isinstance(auth, dict) and 'key' in auth and 'secret' in auth:
+        use_auth = (auth['key'], auth['secret'])
     elif isinstance(auth, tuple) and len(auth) == 2:
         use_auth = auth
     if not use_auth:
@@ -68,7 +64,7 @@ def authorized_request(url, auth=None, verb='GET', **kwargs):
         raise Exception("Provided verb %s is not valid. Must one of: GET, POST, PUT, PATCH, DELETE" % verb.upper())
     return the_verb(url, auth=use_auth, **kwargs)
 
-    
+
 def fdn_connection(key='', connection=None, keyname='default'):
     try:
         assert key or connection
