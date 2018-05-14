@@ -5,6 +5,7 @@ import time
 from uuid import uuid4, UUID
 import random
 import copy
+import boto3
 from dcicutils import s3_utils, submit_utils
 import requests
 
@@ -38,8 +39,11 @@ def authorized_request(url, auth=None, verb='GET', **kwargs):
         use_env = 'fourfront-webprod' if 'webprod' in kwargs['ff_env'] else kwargs['ff_env']
         auth = s3_utils.s3Utils(env=use_env).get_access_keys()
         del kwargs['ff_env']
-    # see if auth is directly from get_key() or the tuple form used in submit_utils
+    # see if auth is directly from get_access_keys() or the tuple form used in submit_utils
     use_auth = None
+    # needed for old form of auth from get_key()
+    if isinstance(auth, dict) and isinstance(auth.get('default'), dict):
+        auth = auth['default']
     if isinstance(auth, dict) and 'key' in auth and 'secret' in auth:
         use_auth = (auth['key'], auth['secret'])
     elif isinstance(auth, tuple) and len(auth) == 2:
@@ -63,6 +67,60 @@ def authorized_request(url, auth=None, verb='GET', **kwargs):
     except KeyError:
         raise Exception("Provided verb %s is not valid. Must one of: GET, POST, PUT, PATCH, DELETE" % verb.upper())
     return the_verb(url, auth=use_auth, **kwargs)
+    
+    
+def get_guaranteed_metadata(uuid, ff_env, auth=None, frame='embedded', check_secondary=False, **kwargs):
+    """
+    Function inspired by Tibanna's old get_metadata, which always used datastore=database.
+    Does a GET request to given uuid and guarantees up-to-date metadata by checking the contents
+    of the indexer queues. If items are currently waiting in the primary or deferred queues, uses
+    a datastore=database request. Otherwise, uses ES.
+    ff_env is the string name of the desired Fourfront environment.
+    If check_secondary is True, will also require the secondary queue to be empty in order to avoid
+    using datastore=database.
+    If provided, auth must be the output of s3.get_access_keys(). If not, automatic authentication
+    will run.
+    Any other kwargs are passed to authorized_request.
+    """
+    client = boto3.client('sqs')
+    skip_datastore = False
+    queue_names = ['-indexer-queue', '-deferred-indexer-queue']
+    if check_secondary:
+        queue_names.append('-secondary-indexer-queue')
+    for queue_name in queue_names:
+        try:
+            queue_url = client.get_queue_url(
+                QueueName=ff_env + queue_name
+            ).get('QueueUrl')
+            queue_attrs = client.get_queue_attributes(
+                QueueUrl=queue_url,
+                AttributeNames=['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible']
+            ).get('Attributes', {})
+        except Exception as e:
+            print('Error finding queue or its attributes: %s' % ff_env + queue_name)
+            skip_datastore = False  # queue not found. use datastore=database
+            break
+        else:
+            visible = queue_attrs.get('ApproximateNumberOfMessages', '-1')
+            not_vis = queue_attrs.get('ApproximateNumberOfMessagesNotVisible', '-1')
+            if (visible and int(visible) == 0) and (not_vis and int(not_vis) == 0):
+                skip_datastore = True
+            else:
+                skip_datastore = False
+                break
+            
+    # handle the old form of s3Utils.get_key()
+    if isinstance(auth, dict) and isinstance(auth.get('default'), dict):
+        auth = auth['default']
+    # if auth is not in good form, get the keys. get server from auth
+    if not isinstance(auth, dict) or not {'key', 'secret', 'server'} <= set(auth.keys()):
+        auth = s3_utils.s3Utils(env=ff_env).get_access_keys()
+    # lastly make the url
+    if skip_datastore:
+        get_url = '/'.join([auth['server'], uuid, '?frame=' + frame])
+    else:
+        get_url = '/'.join([auth['server'], uuid, '?datastore=database&frame=' + frame])
+    return authorized_request(get_url, auth=auth, **kwargs)
 
 
 def fdn_connection(key='', connection=None, keyname='default'):
