@@ -190,7 +190,8 @@ def convert_param(parameter_dict, vals_as_string=False):
     return metadata_parameters
 
 
-def create_ffmeta_awsem(workflow, app_name, input_files=None, parameters=None, title=None, uuid=None,
+def create_ffmeta_awsem(workflow, app_name, input_files=None,
+                        parameters=None, title=None, uuid=None,
                         output_files=None, award='1U01CA200059-01', lab='4dn-dcic-lab',
                         run_status='started', run_platform='AWSEM', run_url='', tag=None,
                         aliases=None, awsem_postrun_json=None, submitted_by=None, extra_meta=None,
@@ -217,59 +218,15 @@ def create_ffmeta_awsem(workflow, app_name, input_files=None, parameters=None, t
                                submitted_by=submitted_by, extra_meta=extra_meta)
 
 
-def create_ffmeta(sbg, workflow, input_files=None, parameters=None, title=None, sbg_task_id=None,
-                  sbg_mounted_volume_ids=None, sbg_import_ids=None, sbg_export_ids=None, uuid=None,
-                  award='1U01CA200059-01', lab='4dn-dcic-lab', run_platform='SBG',
-                  output_files=None, run_status='started', **kwargs):
-
-    input_files = [] if input_files is None else input_files
-    parameters = [] if parameters is None else parameters
-    # TODO: this probably is not right
-    sbg_export_ids = [] if sbg_export_ids is None else sbg_export_ids
-
-    if title is None:
-        title = sbg.app_name + " run " + str(datetime.datetime.now())
-
-    if sbg_task_id is None:
-        sbg_task_id = sbg.task_id
-
-    if not sbg_mounted_volume_ids:
-        try:
-            sbg.volume_list[0]['name']
-            sbg_mounted_volume_ids = [x['name'] for x in sbg.volume_list]
-        except:
-            sbg_mounted_volume_ids = [x for x in sbg.volume_list]
-
-    if not sbg_import_ids:
-        sbg_import_ids = sbg.import_id_list
-
-    if not output_files:
-        output_files = sbg.export_report
-    else:
-        # self.output_files may contain e.g. file_format and file_type information.
-        for of in output_files:
-            for of2 in sbg.export_report:
-                if of['workflow_argument_name'] == of2['workflow_argument_name']:
-                    for k, v in of2.iteritems():
-                        of[k] = v
-
-    return WorkflowRunMetadata(workflow, sbg.app_name, input_files, parameters,
-                               sbg_task_id, sbg_import_ids, sbg_export_ids,
-                               sbg_mounted_volume_ids, uuid,
-                               award, lab, run_platform, title, output_files, run_status, **kwargs)
-
-
 class WorkflowRunMetadata(object):
     '''
     fourfront metadata
     '''
 
     def __init__(self, workflow, app_name, input_files=[],
-                 parameters=[], sbg_task_id=None,
-                 sbg_import_ids=None, sbg_export_ids=None,
-                 sbg_mounted_volume_ids=None, uuid=None,
+                 parameters=[], uuid=None,
                  award='1U01CA200059-01', lab='4dn-dcic-lab',
-                 run_platform='SBG', title=None, output_files=None,
+                 run_platform='AWSEM', title=None, output_files=None,
                  run_status='started', awsem_job_id=None,
                  run_url='', aliases=None, awsem_postrun_json=None,
                  submitted_by=None, extra_meta=None, **kwargs):
@@ -277,26 +234,7 @@ class WorkflowRunMetadata(object):
         Workflow (uuid of the workflow to run) has to be given.
         Workflow_run uuid is auto-generated when the object is created.
         """
-        if run_platform == 'SBG':
-            self.sbg_app_name = app_name
-            # self.app_name = app_name
-            if sbg_task_id is None:
-                self.sbg_task_id = ''
-            else:
-                self.sbg_task_id = sbg_task_id
-            if sbg_mounted_volume_ids is None:
-                self.sbg_mounted_volume_ids = []
-            else:
-                self.sbg_mounted_volume_ids = sbg_mounted_volume_ids
-            if sbg_import_ids is None:
-                self.sbg_import_ids = []
-            else:
-                self.sbg_import_ids = sbg_import_ids
-            if sbg_export_ids is None:
-                self.sbg_export_ids = []
-            else:
-                self.sbg_export_ids = sbg_export_ids
-        elif run_platform == 'AWSEM':
+        if run_platform == 'AWSEM':
             self.awsem_app_name = app_name
             # self.app_name = app_name
             if awsem_job_id is None:
@@ -304,7 +242,7 @@ class WorkflowRunMetadata(object):
             else:
                 self.awsem_job_id = awsem_job_id
         else:
-            raise Exception("invalid run_platform {} - it must be either SBG or AWSEM".format(run_platform))
+            raise Exception("invalid run_platform {} - it must be AWSEM".format(run_platform))
 
         self.run_status = run_status
         self.uuid = uuid if uuid else str(uuid4())
@@ -336,9 +274,6 @@ class WorkflowRunMetadata(object):
     def append_outputfile(self, outjson):
         self.output_files.append(outjson)
 
-    def append_volumes(self, sbg_volume):
-        self.sbg_mounted_volume_ids.append(sbg_volume.id)
-
     def as_dict(self):
         return self.__dict__
 
@@ -347,12 +282,10 @@ class WorkflowRunMetadata(object):
 
     def post(self, key, type_name=None):
         if not type_name:
-            if self.run_platform == 'SBG':
-                type_name = 'workflow_run_sbg'
-            elif self.run_platform == 'AWSEM':
+            if self.run_platform == 'AWSEM':
                 type_name = 'workflow_run_awsem'
             else:
-                raise Exception("cannot determine workflow schema type: SBG or AWSEM?")
+                raise Exception("cannot determine workflow schema type from the run platform: should be AWSEM.")
         return post_to_metadata(self.as_dict(), type_name, key=key)
 
 
