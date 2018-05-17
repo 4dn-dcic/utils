@@ -162,9 +162,9 @@ def whodaman():
 
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = client.describe_environments(ApplicationName="4dn-web")
-    logger.warn(res)
+    logger.info(res)
     for env in res['Environments']:
-        logger.warn(env)
+        logger.info(env)
         if env.get('CNAME') == magic_cname:
             # we found data
             return env.get('EnvironmentName')

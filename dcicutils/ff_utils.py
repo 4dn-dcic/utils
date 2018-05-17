@@ -12,44 +12,29 @@ import requests
 
 HIGLASS_BUCKETS = ['elasticbeanstalk-fourfront-webprod-wfoutput',
                    'elasticbeanstalk-fourfront-webdev-wfoutput']
+                   
+##################################
+# Widely used metadata functions #
+##################################
 
-### Widely used metadata functions
-
-def authorized_request(url, auth=None, verb='GET', **kwargs):
+def authorized_request(url, auth=None, ff_env=None, verb='GET', retry_fxn=None, **kwargs):
     """
-    Generalized request that takes the same authorization info as fdn_connection
-    and is used to make request to FF.
-    Takes a required url, request verb, auth, and optional headers. Any other
-    kwargs provided are also past into the request.
+    Generalized function that handles authentication for any type of request to FF.
+    Takes a required url, request verb, auth, fourfront environment, and optional 
+    retry function and headers. Any other kwargs provided are also past into the request.
     For example, provide a body to a request using the 'data' kwarg.
-    timeout of 20 seconds used by default but can be overwritten as a kwarg.
+    Timeout of 20 seconds used by default but can be overwritten as a kwarg.
 
     Verb should be one of: GET, POST, PATCH, PUT, or DELETE
     auth should be obtained using s3Utils.get_key or in submit_utils tuple form.
     If not provided, try to get the key using s3_utils if 'ff_env' in kwargs
 
     usage:
-    authorized_request('https://data.4dnucleome.org/<some path>', (<authId, authSecret))
+    authorized_request('https://data.4dnucleome.org/<some path>', (authId, authSecret))
     OR
     authorized_request('https://data.4dnucleome.org/<some path>', ff_env='fourfront-webprod')
     """
-    # first see if key should be obtained from using ff_env
-    if not auth and 'ff_env' in kwargs:
-        # webprod and webprod2 both use the fourfront-webprod bucket for keys
-        use_env = 'fourfront-webprod' if 'webprod' in kwargs['ff_env'] else kwargs['ff_env']
-        auth = s3_utils.s3Utils(env=use_env).get_access_keys()
-        del kwargs['ff_env']
-    # see if auth is directly from get_access_keys() or the tuple form used in submit_utils
-    use_auth = None
-    # needed for old form of auth from get_key()
-    if isinstance(auth, dict) and isinstance(auth.get('default'), dict):
-        auth = auth['default']
-    if isinstance(auth, dict) and 'key' in auth and 'secret' in auth:
-        use_auth = (auth['key'], auth['secret'])
-    elif isinstance(auth, tuple) and len(auth) == 2:
-        use_auth = auth
-    if not use_auth:
-        raise Exception("ERROR!\nInvalid authoization key %s" % auth)
+    use_auth = unified_authentication(auth, ff_env)
     headers = kwargs.get('headers')
     if not headers:
         kwargs['headers'] = {'content-type': 'application/json', 'accept': 'application/json'}
@@ -65,25 +50,238 @@ def authorized_request(url, auth=None, verb='GET', **kwargs):
     try:
         the_verb = verbs[verb.upper()]
     except KeyError:
-        raise Exception("Provided verb %s is not valid. Must one of: GET, POST, PUT, PATCH, DELETE" % verb.upper())
-    return the_verb(url, auth=use_auth, **kwargs)
+        raise Exception("Provided verb %s is not valid. Must one of: GET, POST,"
+            " PUT, PATCH, DELETE" % verb.upper())
+    # if provided, use the custom retry function. Otherwise, use the standard function
+    if retry_fxn and callable(retry_fxn):
+        return retry_fxn(the_verb, url, use_auth, verb, **kwargs)
+    else:
+        return standard_request_with_retries(the_verb, url, use_auth, verb, **kwargs)
     
     
-def get_guaranteed_metadata(uuid, ff_env, auth=None, frame='embedded', check_secondary=False, **kwargs):
+def get_metadata(obj_id, key=None, ff_env=None, frame="embedded", ensure=False):
     """
-    Function inspired by Tibanna's old get_metadata, which always used datastore=database.
-    Does a GET request to given uuid and guarantees up-to-date metadata by checking the contents
-    of the indexer queues. If items are currently waiting in the primary or deferred queues, uses
-    a datastore=database request. Otherwise, uses ES.
-    ff_env is the string name of the desired Fourfront environment.
-    If check_secondary is True, will also require the secondary queue to be empty in order to avoid
-    using datastore=database.
-    If provided, auth must be the output of s3.get_access_keys(). If not, automatic authentication
-    will run.
-    Any other kwargs are passed to authorized_request.
+    Function to get metadata for a given obj_id (uuid or @id, most likely).
+    Either takes a dictionary form authentication (MUST include 'server')
+    or a string fourfront-environment.
+    Also takes a frame for the GET and a boolean 'ensure', which if True
+    will use information from the queues and/or datastore=database to
+    ensure that the metadata is accurate.
+    *REQUIRES ff_env if ensure is used.*
     """
+    auth = get_authentication_with_server(key, ff_env)
+    get_url = '/'.join([auth['server'], obj_id, '?frame=' + frame])  
+    # check the queues if ensure is True
+    if ensure and not stuff_in_queues(ff_env, check_secondary=False):
+        get_url += '&datastore=database'
+    response = authorized_request(get_url, auth=auth, verb='GET')
+    return get_response_json(response)
+    
+
+def patch_metadata(patch_item, obj_id='', key=None, ff_env=None):
+    '''
+    Patch metadata given the patch body and an optional obj_id (if not provided,
+    will attempt to use accession or uuid from patch_item body). 
+    Either takes a dictionary form authentication (MUST include 'server')
+    or a string fourfront-environment.
+    '''
+    auth = get_authentication_with_server(key, ff_env)
+    obj_id = obj_id if obj_id else patch_item.get('accession', patch_item.get('uuid'))
+    if not obj_id:
+        raise Exception("ERROR getting id from given object %s for the request to"
+            " patch item. Supply a uuid or accession." % obj_id)
+    patch_url = '/'.join([auth['server'], obj_id])
+    # format item to json
+    patch_item = json.dumps(patch_item)
+    response = authorized_request(patch_url, auth=auth, verb='PATCH', data=patch_item)
+    return get_response_json(response)
+    
+
+def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
+    '''
+    Patch metadata given the post body and a string schema name. 
+    Either takes a dictionary form authentication (MUST include 'server')
+    or a string fourfront-environment.
+    This function checks to see if an existing object already exists
+    with the same body, and if so, runs a patch instead.
+    add_on is the string that will be appended to the post url (used
+    with tibanna)
+    '''
+    auth = get_authentication_with_server(key, ff_env)
+    post_url = '/'.join([auth['server'], schema_name])
+    post_url += add_on
+    # format item to json
+    post_item = json.dumps(post_item)
+    try:
+        response = authorized_request(post_url, auth=auth, verb='POST', data=post_item)
+    except Exception as e:
+        # this means there was a conflict. try to patch
+        if '409 Client Error' in str(e):
+            return patch_metadata(json.loads(post_item), key=auth)
+        else:
+            raise Exception(str(e))
+    return get_response_json(response)
+
+
+def search_metadata(search_url, key=None, ff_env=None):
+    """
+    Will be deprecated soon
+    """
+    print('WARNING! This function will be deprecated soon. Use authorized_request.')
+    return authorized_request(search_url, auth=key, ff_env=ff_env)
+
+
+def delete_field(obj_id, del_field, key=None, ff_env=None):
+    """
+    Given string obj_id and string del_field, delete a field(or fields seperated
+    by commas). To support the old syntax, obj_id may be a dict item. 
+    Same auth mechanism as the other metadata functions
+    """
+    auth = get_authentication_with_server(key, ff_env)
+    if isinstance(obj_id, dict):
+        obj_id = obj_id.get("accession", obj_id.get("uuid"))
+        if not obj_id:
+            raise Exception("ERROR getting id from given object %s for the request to"
+                " delete field(s): %s. Supply a uuid or accession." % (obj_id, del_field))
+    delete_str = '?delete_fields=%s' % del_field
+    patch_url = '/'.join([auth['server'], obj_id, delete_str])
+    # use an empty patch body
+    response = authorized_request(patch_url, auth=auth, verb='PATCH', data=json.dumps({}))
+    return get_response_json(response)
+    
+#####################
+# Utility functions #
+#####################
+
+def fdn_connection(key='', connection=None, keyname='default'):
+    """
+    This is a wrapper for getting submit_utils.FDN_Connection
+    It's utility has decreased after transitioning to authorized_request
+    """
+    try:
+        assert key or connection
+    except AssertionError:
+        return None
+    if not connection:
+        try:
+            fdn_key = submit_utils.FDN_Key(key, keyname)
+            connection = submit_utils.FDN_Connection(fdn_key)
+        except Exception as e:
+            raise Exception("Unable to connect to server with check keys : %s" % e)
+    return connection
+    
+
+def standard_request_with_retries(request_fxn, url, auth, verb, **kwargs):
+    """
+    Standard function to execute the request made by authorized_request.
+    If desired, you can write your own retry handling, but make sure
+    the arguments are formatted identically to this function.
+    request_fxn is the request function, url is the string url,
+    auth is the tuple standard authentication, and verb is the string
+    kind of verb. any additional kwargs are passed to the request.
+    Handles errors and returns the response if it has a status
+    code under 400.
+    """
+    # execute with retries, if necessary
+    final_res = None
+    error = None
+    retry = 0
+    retry_timeouts = [0, 1, 2, 3, 4]
+    while final_res is None and retry < len(retry_timeouts):
+        time.sleep(retry_timeouts[retry])
+        try:
+            res = request_fxn(url, auth=auth, **kwargs)
+        except Exception as e:
+            retry += 1
+            error = 'Error with %s request for %s: %s' % (verb.upper(), url, e)
+            continue
+        if res.status_code >= 400:
+            err_reason = res.reason
+            # try to get a more informative error message to replace res.reason
+            try:
+                res.raise_for_status()
+            except Exception as e:
+                err_reason = repr(e)
+            retry += 1
+            error = 'Bad status code for %s request for %s: %s. Reason: %s' % (verb.upper(), url, res.status_code, err_reason)
+        else:
+            final_res = res
+            error = None
+    if not final_res:
+        raise Exception(error)
+    return final_res
+
+    
+def unified_authentication(auth, ff_env):
+    """
+    One authentication function to rule them all.
+    Has several options for authentication, which are:
+    - manually provided tuple auth key (pass to key param)
+    - manually provided dict key, like output of
+      s3Utils.get_access_keys() (pass to key param)
+    - string name of the fourfront environment (pass to ff_env param)
+    (They are checked in this order).
+    Handles errors for authentication and returns the tuple key to
+    use with your request.
+    """
+    # first see if key should be obtained from using ff_env
+    if not auth and ff_env:
+        # webprod and webprod2 both use the fourfront-webprod bucket for keys
+        use_env = 'fourfront-webprod' if 'webprod' in ff_env else ff_env
+        auth = s3_utils.s3Utils(env=use_env).get_access_keys()
+    # see if auth is directly from get_access_keys() or the tuple form used in submit_utils
+    use_auth = None
+    # needed for old form of auth from get_key()
+    if isinstance(auth, dict) and isinstance(auth.get('default'), dict):
+        auth = auth['default']
+    if isinstance(auth, dict) and 'key' in auth and 'secret' in auth:
+        use_auth = (auth['key'], auth['secret'])
+    elif isinstance(auth, tuple) and len(auth) == 2:
+        use_auth = auth
+    if not use_auth:
+        raise Exception("Must provide a valid authorization key or ff " 
+            "environment. You gave: %s (key), %s (ff_env)" % (auth, ff_env))
+    return use_auth
+    
+
+def get_authentication_with_server(auth, ff_env):
+    """
+    Pass in authentication information and ff_env and attempts to either
+    retrieve the server info from the auth, or if it cannot, get the
+    key with s3_utils given 
+    """
+    if isinstance(auth, dict) and isinstance(auth.get('default'), dict):
+        auth = auth['default']
+    # if auth does not contain the 'server', we must get fetch from s3
+    if not isinstance(auth, dict) or not {'key', 'secret', 'server'} <= set(auth.keys()):
+        # must have ff_env if we want to get the key
+        if not ff_env:
+            raise Exception("ERROR GETTING SERVER!\nMust provide dictionary auth with" 
+                " 'server' or ff environment. You gave: %s (auth), %s (ff_env)"
+                % (auth, ff_env))
+        auth = s3_utils.s3Utils(env=ff_env).get_access_keys()
+        if 'server' not in auth:
+            raise Exception("ERROR GETTING SERVER!\nAuthentication retrieved using " 
+                " ff environment does not have server information. Found: %s (auth)"
+                ", %s (ff_env)" % (auth, ff_env))
+    # ensure that the server does not end with '/'
+    if auth['server'].endswith('/'):
+        auth['server'] = auth['server'][:-1]
+    return auth
+    
+    
+def stuff_in_queues(ff_env, check_secondary=False):
+    """
+    Used to guarantee up-to-date metadata by checking the contents of the indexer queues.
+    If items are currently waiting in the primary or deferred queues, return False.
+    If check_secondary is True, will also require the secondary queue.
+    """
+    if not ff_env:
+        raise Exception("Must provide a full fourfront environment " 
+            "name to this function (such as 'foufront-webdev'). You gave: "
+            "%s" % ff_env)
+    empty_queues = False
     client = boto3.client('sqs')
-    skip_datastore = False
     queue_names = ['-indexer-queue', '-deferred-indexer-queue']
     if check_secondary:
         queue_names.append('-secondary-indexer-queue')
@@ -98,129 +296,31 @@ def get_guaranteed_metadata(uuid, ff_env, auth=None, frame='embedded', check_sec
             ).get('Attributes', {})
         except Exception as e:
             print('Error finding queue or its attributes: %s' % ff_env + queue_name)
-            skip_datastore = False  # queue not found. use datastore=database
+            empty_queues = False  # queue not found. use datastore=database
             break
         else:
             visible = queue_attrs.get('ApproximateNumberOfMessages', '-1')
             not_vis = queue_attrs.get('ApproximateNumberOfMessagesNotVisible', '-1')
             if (visible and int(visible) == 0) and (not_vis and int(not_vis) == 0):
-                skip_datastore = True
+                empty_queues = True
             else:
-                skip_datastore = False
+                empty_queues = False
                 break
-            
-    # handle the old form of s3Utils.get_key()
-    if isinstance(auth, dict) and isinstance(auth.get('default'), dict):
-        auth = auth['default']
-    # if auth is not in good form, get the keys. get server from auth
-    if not isinstance(auth, dict) or not {'key', 'secret', 'server'} <= set(auth.keys()):
-        auth = s3_utils.s3Utils(env=ff_env).get_access_keys()
-    # lastly make the url
-    if skip_datastore:
-        get_url = '/'.join([auth['server'], uuid, '?frame=' + frame])
-    else:
-        get_url = '/'.join([auth['server'], uuid, '?datastore=database&frame=' + frame])
-    return authorized_request(get_url, auth=auth, **kwargs)
-
-
-def fdn_connection(key='', connection=None, keyname='default'):
-    try:
-        assert key or connection
-    except AssertionError:
-        return None
-    if not connection:
-        try:
-            fdn_key = submit_utils.FDN_Key(key, keyname)
-            connection = submit_utils.FDN_Connection(fdn_key)
-        except Exception as e:
-            raise Exception("Unable to connect to server with check keys : %s" % e)
-    return connection
-
-
-def search_metadata(search_url, key='', connection=None, frame="object"):
+    return empty_queues
+    
+    
+def get_response_json(res):
     """
-    Use get_FDN, but with url_addon instead of obj_id. Will return json,
-    specifically the @graph contents if available.
+    Very simple function to return json from a response or raise an error if
+    it is not present. Used with the metadata functions.
     """
-    connection = fdn_connection(key, connection)
-    return submit_utils.get_FDN(None, connection, frame=frame, url_addon=search_url)
-
-
-def patch_metadata(patch_item, obj_id='', key='', connection=None):
-    '''
-    obj_id can be uuid or @id for most object
-    '''
-
-    connection = fdn_connection(key, connection)
-
-    obj_id = obj_id if obj_id else patch_item['uuid']
-
+    res_json = None
     try:
-        response = submit_utils.patch_FDN(obj_id, connection, patch_item)
-
-        if response.get('status') == 'error':
-            raise Exception("error %s \n unable to patch obj: %s \n with  data: %s" %
-                            (response, obj_id, patch_item))
+        res_json = res.json()
     except Exception as e:
-        raise Exception("error %s \nunable to patch object %s \ndata: %s" % (e, obj_id, patch_item))
-    return response
-
-
-def get_metadata(obj_id, key='', connection=None, frame="object"):
-    connection = fdn_connection(key, connection)
-    res = submit_utils.get_FDN(obj_id, connection, frame=frame)
-    retry = 1
-    sleep = [2, 4, 12]
-    while 'error' in res.get('@type', []) and retry < 3:
-        time.sleep(sleep[retry])
-        retry += 1
-        res = submit_utils.get_FDN(obj_id, connection, frame=frame)
-
-    return res
-
-
-def post_to_metadata(post_item, schema_name, key='', connection=None):
-    connection = fdn_connection(key, connection)
-
-    try:
-        response = submit_utils.new_FDN(connection, schema_name, post_item)
-        if (response.get('status') == 'error' and response.get('detail') == 'UUID conflict'):
-            # item already posted lets patch instead
-            response = patch_metadata(post_item, connection=connection)
-        elif response.get('status') == 'error':
-            raise Exception("error %s \n unable to post data to schema %s, data: %s" %
-                            (response, schema_name, post_item))
-    except Exception as e:
-        raise Exception("error %s \nunable to post data to schema %s, data: %s" %
-                        (e, schema_name, post_item))
-    return response
-
-
-def delete_field(post_json, del_field, connection=None):
-    """Does a put to delete the given field."""
-    my_uuid = post_json.get("uuid")
-    my_accession = post_json.get("accesion")
-    raw_json = submit_utils.get_FDN(my_uuid, connection, frame="raw")
-    # check if the uuid is in the raw_json
-    if not raw_json.get("uuid"):
-        raw_json["uuid"] = my_uuid
-    # if there is an accession, add it to raw so it does not created again
-    if my_accession:
-        if not raw_json.get("accession"):
-            raw_json["accession"] = my_accession
-    # remove field from the raw_json
-    if raw_json.get(del_field):
-        del raw_json[del_field]
-    # Do the put with raw_json
-    try:
-        response = submit_utils.put_FDN(my_uuid, connection, raw_json)
-        if response.get('status') == 'error':
-            raise Exception("error %s \n unable to delete field: %s \n of  item: %s" %
-                            (response, del_field, my_uuid))
-    except Exception as e:
-        raise Exception("error %s \n unable to delete field: %s \n of  item: %s" %
-                        (e, del_field, my_uuid))
-    return response
+        raise Exception('Cannot get json for request to %s. Status'
+            ' code: %s. Error: %s' % (res.url, res.status_code, repr(e)))
+    return res_json
 
 
 def convert_param(parameter_dict, vals_as_string=False):
@@ -246,150 +346,6 @@ def convert_param(parameter_dict, vals_as_string=False):
 
     print(str(metadata_parameters))
     return metadata_parameters
-
-
-def create_ffmeta_awsem(workflow, app_name, input_files=None,
-                        parameters=None, title=None, uuid=None,
-                        output_files=None, award='1U01CA200059-01', lab='4dn-dcic-lab',
-                        run_status='started', run_platform='AWSEM', run_url='', tag=None,
-                        aliases=None, awsem_postrun_json=None, submitted_by=None, extra_meta=None,
-                        **kwargs):
-
-    input_files = [] if input_files is None else input_files
-    parameters = [] if parameters is None else parameters
-    if award is None:
-        award = '1U01CA200059-01'
-    if lab is None:
-        lab = '4dn-dcic-lab'
-
-    if title is None:
-        if tag is None:
-            title = app_name + " run " + str(datetime.datetime.now())
-        else:
-            title = app_name + ' ' + tag + " run " + str(datetime.datetime.now())
-
-    return WorkflowRunMetadata(workflow=workflow, app_name=app_name, input_files=input_files,
-                               parameters=parameters, uuid=uuid, award=award,
-                               lab=lab, run_platform=run_platform, run_url=run_url,
-                               title=title, output_files=output_files, run_status=run_status,
-                               aliases=aliases, awsem_postrun_json=awsem_postrun_json,
-                               submitted_by=submitted_by, extra_meta=extra_meta)
-
-
-class WorkflowRunMetadata(object):
-    '''
-    fourfront metadata
-    '''
-
-    def __init__(self, workflow, app_name, input_files=[],
-                 parameters=[], uuid=None,
-                 award='1U01CA200059-01', lab='4dn-dcic-lab',
-                 run_platform='AWSEM', title=None, output_files=None,
-                 run_status='started', awsem_job_id=None,
-                 run_url='', aliases=None, awsem_postrun_json=None,
-                 submitted_by=None, extra_meta=None, **kwargs):
-        """Class for WorkflowRun that matches the 4DN Metadata schema
-        Workflow (uuid of the workflow to run) has to be given.
-        Workflow_run uuid is auto-generated when the object is created.
-        """
-        if run_platform == 'AWSEM':
-            self.awsem_app_name = app_name
-            # self.app_name = app_name
-            if awsem_job_id is None:
-                self.awsem_job_id = ''
-            else:
-                self.awsem_job_id = awsem_job_id
-        else:
-            raise Exception("invalid run_platform {} - it must be AWSEM".format(run_platform))
-
-        self.run_status = run_status
-        self.uuid = uuid if uuid else str(uuid4())
-        self.workflow = workflow
-        self.run_platform = run_platform
-        if run_url:
-            self.run_url = run_url
-
-        self.title = title
-        if aliases:
-            if isinstance(aliases, basestring):
-                aliases = [aliases, ]
-            self.aliases = aliases
-        self.input_files = input_files
-        if output_files:
-            self.output_files = output_files
-        self.parameters = parameters
-        self.award = award
-        self.lab = lab
-        if awsem_postrun_json:
-            self.awsem_postrun_json = awsem_postrun_json
-        if submitted_by:
-            self.submitted_by = submitted_by
-
-        if extra_meta:
-            for k, v in extra_meta.iteritems():
-                self.__dict__[k] = v
-
-    def append_outputfile(self, outjson):
-        self.output_files.append(outjson)
-
-    def as_dict(self):
-        return self.__dict__
-
-    def toJSON(self):
-        return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
-
-    def post(self, key, type_name=None):
-        if not type_name:
-            if self.run_platform == 'AWSEM':
-                type_name = 'workflow_run_awsem'
-            else:
-                raise Exception("cannot determine workflow schema type from the run platform: should be AWSEM.")
-        return post_to_metadata(self.as_dict(), type_name, key=key)
-
-
-class ProcessedFileMetadata(object):
-    def __init__(self, uuid=None, accession=None, file_format='', lab='4dn-dcic-lab',
-                 extra_files=None, source_experiments=None,
-                 award='1U01CA200059-01', status='to be uploaded by workflow',
-                 md5sum=None, file_size=None,
-                 **kwargs):
-        self.uuid = uuid if uuid else str(uuid4())
-        self.accession = accession if accession else generate_rand_accession()
-        self.status = status
-        self.lab = lab
-        self.award = award
-        self.file_format = file_format
-        if extra_files:
-            self.extra_files = extra_files
-        if source_experiments:
-            self.source_experiments = source_experiments
-        if md5sum:
-            self.md5sum = md5sum
-        if file_size:
-            self.file_size = file_size
-
-    def as_dict(self):
-        return self.__dict__
-
-    def toJSON(self):
-        return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
-
-    def post(self, key):
-        return post_to_metadata(self.as_dict(), "file_processed", key=key)
-
-    @classmethod
-    def get(cls, uuid, key, return_data=False):
-        data = get_metadata(uuid, key=key)
-        if type(data) is not dict:
-            raise Exception("unable to find object with unique key of %s" % uuid)
-        if 'FileProcessed' not in data.get('@type', {}):
-            raise Exception("you can only load ProcessedFiles into this object")
-
-        pf = ProcessedFileMetadata(**data)
-        if return_data:
-            return pf, data
-        else:
-            return pf
 
 
 def generate_rand_accession():
@@ -527,75 +483,3 @@ def get_linked_items(connection, itemid, found_items={},
                     for uid in id_list:
                         found_items.update(get_linked_items(connection, uid, found_items))
     return found_items
-
-
-def aslist(x):
-    """
-    From tibanna
-    """
-    if isinstance(x, list):
-        return x
-    else:
-        return [x]
-
-
-def ensure_list(val):
-    """
-    From tibanna
-    """
-    if isinstance(val, (list, tuple)):
-        return val
-    return [val]
-
-
-def get_extra_file_key(infile_format, infile_key, extra_file_format, fe_map):
-    """
-    From tibanna
-    """
-    infile_extension = fe_map.get(infile_format)
-    extra_file_extension = fe_map.get(extra_file_format)
-    return infile_key.replace(infile_extension, extra_file_extension)
-
-
-def get_source_experiment(input_file_uuid, ff_keys):
-    """
-    Connects to fourfront and get source experiment info as a unique list
-    Takes a single input file uuid.
-    From tibanna
-    """
-    pf_source_experiments_set = set()
-    inf_uuids = aslist(input_file_uuid)
-    for inf_uuid in inf_uuids:
-        infile_meta = get_metadata(inf_uuid, key=ff_keys)
-        if infile_meta.get('experiments'):
-            for exp in infile_meta.get('experiments'):
-                exp_uuid = get_metadata(exp, key=ff_keys).get('uuid')
-                pf_source_experiments_set.add(exp_uuid)
-        if infile_meta.get('source_experiments'):
-            pf_source_experiments_set.update(infile_meta.get('source_experiments'))
-    return list(pf_source_experiments_set)
-
-
-def merge_source_experiments(input_file_uuids, ff_keys):
-    """
-    Connects to fourfront and get source experiment info as a unique list
-    Takes a list of input file uuids.
-    From tibanna
-    """
-    pf_source_experiments = set()
-    for input_file_uuid in input_file_uuids:
-        pf_source_experiments.update(get_source_experiment(input_file_uuid, ff_keys))
-    return list(pf_source_experiments)
-
-
-def get_format_extension_map(ff_keys):
-    """
-    get format-extension map
-    From tibanna
-    """
-    try:
-        fp_schema = get_metadata("profiles/file_processed.json", key=ff_keys)
-        fe_map = fp_schema.get('file_format_file_extension')
-    except Exception as e:
-        raise Exception("Can't get format-extension map from file_processed schema. %s\n" % e)
-    return fe_map
