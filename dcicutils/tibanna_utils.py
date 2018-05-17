@@ -1,14 +1,15 @@
 from __future__ import print_function
 from dcicutils import ff_utils
 import datetime
-from uuid import uuid4, UUID
+from uuid import uuid4
 import json
 
 
 ######################################
-# Tibanna-related metadata functions #    
+# Tibanna-related metadata functions #
 ######################################
-    
+
+
 def create_ffmeta_awsem(workflow, app_name, input_files=None,
                         parameters=None, title=None, uuid=None,
                         output_files=None, award='1U01CA200059-01', lab='4dn-dcic-lab',
@@ -72,7 +73,7 @@ class WorkflowRunMetadata(object):
 
         self.title = title
         if aliases:
-            if isinstance(aliases, basestring):
+            if isinstance(aliases, basestring):  # noqa
                 aliases = [aliases, ]
             self.aliases = aliases
         self.input_files = input_files
@@ -115,7 +116,7 @@ class ProcessedFileMetadata(object):
                  md5sum=None, file_size=None,
                  **kwargs):
         self.uuid = uuid if uuid else str(uuid4())
-        self.accession = accession if accession else generate_rand_accession()
+        self.accession = accession if accession else ff_utils.generate_rand_accession()
         self.status = status
         self.lab = lab
         self.award = award
@@ -151,11 +152,12 @@ class ProcessedFileMetadata(object):
             return pf, data
         else:
             return pf
-            
+
 ######################################
-# Tibanna-related utility functions #    
+# Tibanna-related utility functions #
 ######################################
-                
+
+
 def aslist(x):
     """
     From tibanna
@@ -193,10 +195,10 @@ def get_source_experiment(input_file_uuid, ff_keys):
     pf_source_experiments_set = set()
     inf_uuids = aslist(input_file_uuid)
     for inf_uuid in inf_uuids:
-        infile_meta = get_metadata(inf_uuid, key=ff_keys)
+        infile_meta = ff_utils.get_metadata(inf_uuid, key=ff_keys)
         if infile_meta.get('experiments'):
             for exp in infile_meta.get('experiments'):
-                exp_uuid = get_metadata(exp, key=ff_keys).get('uuid')
+                exp_uuid = ff_utils.get_metadata(exp, key=ff_keys).get('uuid')
                 pf_source_experiments_set.add(exp_uuid)
         if infile_meta.get('source_experiments'):
             pf_source_experiments_set.update(infile_meta.get('source_experiments'))
@@ -221,7 +223,7 @@ def get_format_extension_map(ff_keys):
     From tibanna
     """
     try:
-        fp_schema = get_metadata("profiles/file_processed.json", key=ff_keys)
+        fp_schema = ff_utils.get_metadata("profiles/file_processed.json", key=ff_keys)
         fe_map = fp_schema.get('file_format_file_extension')
     except Exception as e:
         raise Exception("Can't get format-extension map from file_processed schema. %s\n" % e)

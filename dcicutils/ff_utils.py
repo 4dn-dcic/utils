@@ -1,26 +1,27 @@
 from __future__ import print_function
-import datetime
 import json
 import time
-from uuid import uuid4, UUID
 import random
 import copy
 import boto3
+from uuid import UUID
 from dcicutils import s3_utils, submit_utils
 import requests
 
 
 HIGLASS_BUCKETS = ['elasticbeanstalk-fourfront-webprod-wfoutput',
                    'elasticbeanstalk-fourfront-webdev-wfoutput']
-                   
+
+
 ##################################
 # Widely used metadata functions #
 ##################################
 
+
 def authorized_request(url, auth=None, ff_env=None, verb='GET', retry_fxn=None, **kwargs):
     """
     Generalized function that handles authentication for any type of request to FF.
-    Takes a required url, request verb, auth, fourfront environment, and optional 
+    Takes a required url, request verb, auth, fourfront environment, and optional
     retry function and headers. Any other kwargs provided are also past into the request.
     For example, provide a body to a request using the 'data' kwarg.
     Timeout of 20 seconds used by default but can be overwritten as a kwarg.
@@ -51,14 +52,14 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET', retry_fxn=None, 
         the_verb = verbs[verb.upper()]
     except KeyError:
         raise Exception("Provided verb %s is not valid. Must one of: GET, POST,"
-            " PUT, PATCH, DELETE" % verb.upper())
+                        " PUT, PATCH, DELETE" % verb.upper())
     # if provided, use the custom retry function. Otherwise, use the standard function
     if retry_fxn and callable(retry_fxn):
         return retry_fxn(the_verb, url, use_auth, verb, **kwargs)
     else:
         return standard_request_with_retries(the_verb, url, use_auth, verb, **kwargs)
-    
-    
+
+
 def get_metadata(obj_id, key=None, ff_env=None, frame="embedded", ensure=False):
     """
     Function to get metadata for a given obj_id (uuid or @id, most likely).
@@ -70,18 +71,18 @@ def get_metadata(obj_id, key=None, ff_env=None, frame="embedded", ensure=False):
     *REQUIRES ff_env if ensure is used.*
     """
     auth = get_authentication_with_server(key, ff_env)
-    get_url = '/'.join([auth['server'], obj_id, '?frame=' + frame])  
+    get_url = '/'.join([auth['server'], obj_id, '?frame=' + frame])
     # check the queues if ensure is True
     if ensure and not stuff_in_queues(ff_env, check_secondary=False):
         get_url += '&datastore=database'
     response = authorized_request(get_url, auth=auth, verb='GET')
     return get_response_json(response)
-    
+
 
 def patch_metadata(patch_item, obj_id='', key=None, ff_env=None):
     '''
     Patch metadata given the patch body and an optional obj_id (if not provided,
-    will attempt to use accession or uuid from patch_item body). 
+    will attempt to use accession or uuid from patch_item body).
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
     '''
@@ -89,17 +90,17 @@ def patch_metadata(patch_item, obj_id='', key=None, ff_env=None):
     obj_id = obj_id if obj_id else patch_item.get('accession', patch_item.get('uuid'))
     if not obj_id:
         raise Exception("ERROR getting id from given object %s for the request to"
-            " patch item. Supply a uuid or accession." % obj_id)
+                        " patch item. Supply a uuid or accession." % obj_id)
     patch_url = '/'.join([auth['server'], obj_id])
     # format item to json
     patch_item = json.dumps(patch_item)
     response = authorized_request(patch_url, auth=auth, verb='PATCH', data=patch_item)
     return get_response_json(response)
-    
+
 
 def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
     '''
-    Patch metadata given the post body and a string schema name. 
+    Patch metadata given the post body and a string schema name.
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
     This function checks to see if an existing object already exists
@@ -134,7 +135,7 @@ def search_metadata(search_url, key=None, ff_env=None):
 def delete_field(obj_id, del_field, key=None, ff_env=None):
     """
     Given string obj_id and string del_field, delete a field(or fields seperated
-    by commas). To support the old syntax, obj_id may be a dict item. 
+    by commas). To support the old syntax, obj_id may be a dict item.
     Same auth mechanism as the other metadata functions
     """
     auth = get_authentication_with_server(key, ff_env)
@@ -142,16 +143,19 @@ def delete_field(obj_id, del_field, key=None, ff_env=None):
         obj_id = obj_id.get("accession", obj_id.get("uuid"))
         if not obj_id:
             raise Exception("ERROR getting id from given object %s for the request to"
-                " delete field(s): %s. Supply a uuid or accession." % (obj_id, del_field))
+                            " delete field(s): %s. Supply a uuid or accession."
+                            % (obj_id, del_field))
     delete_str = '?delete_fields=%s' % del_field
     patch_url = '/'.join([auth['server'], obj_id, delete_str])
     # use an empty patch body
     response = authorized_request(patch_url, auth=auth, verb='PATCH', data=json.dumps({}))
     return get_response_json(response)
-    
+
+
 #####################
 # Utility functions #
 #####################
+
 
 def fdn_connection(key='', connection=None, keyname='default'):
     """
@@ -169,7 +173,7 @@ def fdn_connection(key='', connection=None, keyname='default'):
         except Exception as e:
             raise Exception("Unable to connect to server with check keys : %s" % e)
     return connection
-    
+
 
 def standard_request_with_retries(request_fxn, url, auth, verb, **kwargs):
     """
@@ -203,7 +207,8 @@ def standard_request_with_retries(request_fxn, url, auth, verb, **kwargs):
             except Exception as e:
                 err_reason = repr(e)
             retry += 1
-            error = 'Bad status code for %s request for %s: %s. Reason: %s' % (verb.upper(), url, res.status_code, err_reason)
+            error = ('Bad status code for %s request for %s: %s. Reason: %s'
+                     % (verb.upper(), url,   res.status_code, err_reason))
         else:
             final_res = res
             error = None
@@ -211,7 +216,7 @@ def standard_request_with_retries(request_fxn, url, auth, verb, **kwargs):
         raise Exception(error)
     return final_res
 
-    
+
 def unified_authentication(auth, ff_env):
     """
     One authentication function to rule them all.
@@ -239,16 +244,16 @@ def unified_authentication(auth, ff_env):
     elif isinstance(auth, tuple) and len(auth) == 2:
         use_auth = auth
     if not use_auth:
-        raise Exception("Must provide a valid authorization key or ff " 
-            "environment. You gave: %s (key), %s (ff_env)" % (auth, ff_env))
+        raise Exception("Must provide a valid authorization key or ff "
+                        "environment. You gave: %s (key), %s (ff_env)" % (auth, ff_env))
     return use_auth
-    
+
 
 def get_authentication_with_server(auth, ff_env):
     """
     Pass in authentication information and ff_env and attempts to either
     retrieve the server info from the auth, or if it cannot, get the
-    key with s3_utils given 
+    key with s3_utils given
     """
     if isinstance(auth, dict) and isinstance(auth.get('default'), dict):
         auth = auth['default']
@@ -256,20 +261,20 @@ def get_authentication_with_server(auth, ff_env):
     if not isinstance(auth, dict) or not {'key', 'secret', 'server'} <= set(auth.keys()):
         # must have ff_env if we want to get the key
         if not ff_env:
-            raise Exception("ERROR GETTING SERVER!\nMust provide dictionary auth with" 
-                " 'server' or ff environment. You gave: %s (auth), %s (ff_env)"
-                % (auth, ff_env))
+            raise Exception("ERROR GETTING SERVER!\nMust provide dictionary auth with"
+                            " 'server' or ff environment. You gave: %s (auth), %s (ff_env)"
+                            % (auth, ff_env))
         auth = s3_utils.s3Utils(env=ff_env).get_access_keys()
         if 'server' not in auth:
-            raise Exception("ERROR GETTING SERVER!\nAuthentication retrieved using " 
-                " ff environment does not have server information. Found: %s (auth)"
-                ", %s (ff_env)" % (auth, ff_env))
+            raise Exception("ERROR GETTING SERVER!\nAuthentication retrieved using "
+                            " ff environment does not have server information. Found: %s (auth)"
+                            ", %s (ff_env)" % (auth, ff_env))
     # ensure that the server does not end with '/'
     if auth['server'].endswith('/'):
         auth['server'] = auth['server'][:-1]
     return auth
-    
-    
+
+
 def stuff_in_queues(ff_env, check_secondary=False):
     """
     Used to guarantee up-to-date metadata by checking the contents of the indexer queues.
@@ -277,9 +282,9 @@ def stuff_in_queues(ff_env, check_secondary=False):
     If check_secondary is True, will also require the secondary queue.
     """
     if not ff_env:
-        raise Exception("Must provide a full fourfront environment " 
-            "name to this function (such as 'foufront-webdev'). You gave: "
-            "%s" % ff_env)
+        raise Exception("Must provide a full fourfront environment "
+                        "name to this function (such as 'foufront-webdev'). You gave: "
+                        "%s" % ff_env)
     empty_queues = False
     client = boto3.client('sqs')
     queue_names = ['-indexer-queue', '-deferred-indexer-queue']
@@ -307,8 +312,8 @@ def stuff_in_queues(ff_env, check_secondary=False):
                 empty_queues = False
                 break
     return empty_queues
-    
-    
+
+
 def get_response_json(res):
     """
     Very simple function to return json from a response or raise an error if
@@ -319,7 +324,7 @@ def get_response_json(res):
         res_json = res.json()
     except Exception as e:
         raise Exception('Cannot get json for request to %s. Status'
-            ' code: %s. Error: %s' % (res.url, res.status_code, repr(e)))
+                        ' code: %s. Error: %s' % (res.url, res.status_code, repr(e)))
     return res_json
 
 
