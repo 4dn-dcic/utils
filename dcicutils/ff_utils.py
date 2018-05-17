@@ -283,7 +283,7 @@ def stuff_in_queues(ff_env, check_secondary=False):
     """
     if not ff_env:
         raise Exception("Must provide a full fourfront environment "
-                        "name to this function (such as 'foufront-webdev'). You gave: "
+                        "name to this function (such as 'fourfront-webdev'). You gave: "
                         "%s" % ff_env)
     empty_queues = False
     client = boto3.client('sqs')
