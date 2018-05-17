@@ -3,4 +3,5 @@ from .beanstalk_utils import *  # NOQA
 from .ff_utils import *  # NOQA
 from .s3_utils import *  # NOQA
 from .submit_utils import * # NOQA
+from .tibanna_utils import *  # NOQA
 from ._version import __version__  # NOQA
