@@ -66,7 +66,7 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     Takes a required url, request verb, auth, fourfront environment, and optional
     retry function and headers. Any other kwargs provided are also past into the request.
     For example, provide a body to a request using the 'data' kwarg.
-    Timeout of 20 seconds used by default but can be overwritten as a kwarg.
+    Timeout of 30 seconds used by default but can be overwritten as a kwarg.
 
     Verb should be one of: GET, POST, PATCH, PUT, or DELETE
     auth should be obtained using s3Utils.get_key or in submit_utils tuple form.
@@ -82,7 +82,7 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     if not headers:
         kwargs['headers'] = {'content-type': 'application/json', 'accept': 'application/json'}
     if 'timeout' not in kwargs:
-        kwargs['timeout'] = 20  # use a 20 second timeout by default
+        kwargs['timeout'] = 30  # default timeout
 
     verbs = {'GET': requests.get,
              'POST': requests.post,
