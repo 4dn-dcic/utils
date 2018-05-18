@@ -282,7 +282,7 @@ def stuff_in_queues(ff_env, check_secondary=False):
                         "this function (such as 'fourfront-webdev'). You gave: "
                         "%s" % ff_env)
     empty_queues = False
-    client = boto3.client('sqs')
+    client = boto3.client('sqs', region='us-east-1')
     queue_names = ['-indexer-queue', '-deferred-indexer-queue']
     if check_secondary:
         queue_names.append('-secondary-indexer-queue')
