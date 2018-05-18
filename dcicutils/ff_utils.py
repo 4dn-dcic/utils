@@ -17,8 +17,50 @@ HIGLASS_BUCKETS = ['elasticbeanstalk-fourfront-webprod-wfoutput',
 # Widely used metadata functions #
 ##################################
 
+def standard_request_with_retries(request_fxn, url, auth, verb, **kwargs):
+    """
+    Standard function to execute the request made by authorized_request.
+    If desired, you can write your own retry handling, but make sure
+    the arguments are formatted identically to this function.
+    request_fxn is the request function, url is the string url,
+    auth is the tuple standard authentication, and verb is the string
+    kind of verb. any additional kwargs are passed to the request.
+    Handles errors and returns the response if it has a status
+    code under 400.
+    """
+    # execute with retries, if necessary
+    final_res = None
+    error = None
+    retry = 0
+    retry_timeouts = [0, 1, 2, 3, 4]
+    while final_res is None and retry < len(retry_timeouts):
+        time.sleep(retry_timeouts[retry])
+        try:
+            res = request_fxn(url, auth=auth, **kwargs)
+        except Exception as e:
+            retry += 1
+            error = 'Error with %s request for %s: %s' % (verb.upper(), url, e)
+            continue
+        if res.status_code >= 400:
+            err_reason = res.reason
+            # try to get a more informative error message to replace res.reason
+            try:
+                res.raise_for_status()
+            except Exception as e:
+                err_reason = repr(e)
+            retry += 1
+            error = ('Bad status code for %s request for %s: %s. Reason: %s'
+                     % (verb.upper(), url,   res.status_code, err_reason))
+        else:
+            final_res = res
+            error = None
+    if not final_res:
+        raise Exception(error)
+    return final_res
 
-def authorized_request(url, auth=None, ff_env=None, verb='GET', retry_fxn=None, **kwargs):
+
+def authorized_request(url, auth=None, ff_env=None, verb='GET',
+                       retry_fxn=standard_request_with_retries, **kwargs):
     """
     Generalized function that handles authentication for any type of request to FF.
     Takes a required url, request verb, auth, fourfront environment, and optional
@@ -51,13 +93,9 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET', retry_fxn=None, 
     try:
         the_verb = verbs[verb.upper()]
     except KeyError:
-        raise Exception("Provided verb %s is not valid. Must one of: GET, POST,"
-                        " PUT, PATCH, DELETE" % verb.upper())
-    # if provided, use the custom retry function. Otherwise, use the standard function
-    if retry_fxn and callable(retry_fxn):
-        return retry_fxn(the_verb, url, use_auth, verb, **kwargs)
-    else:
-        return standard_request_with_retries(the_verb, url, use_auth, verb, **kwargs)
+        raise Exception("Provided verb %s is not valid. Must one of: %s" % (verb.upper(), ', '.join(verbs.keys())))
+    # use the given retry function. MUST TAKE THESE PARAMS!
+    return retry_fxn(the_verb, url, use_auth, verb, **kwargs)
 
 
 def get_metadata(obj_id, key=None, ff_env=None, frame="embedded", ensure=False):
@@ -175,48 +213,6 @@ def fdn_connection(key='', connection=None, keyname='default'):
     return connection
 
 
-def standard_request_with_retries(request_fxn, url, auth, verb, **kwargs):
-    """
-    Standard function to execute the request made by authorized_request.
-    If desired, you can write your own retry handling, but make sure
-    the arguments are formatted identically to this function.
-    request_fxn is the request function, url is the string url,
-    auth is the tuple standard authentication, and verb is the string
-    kind of verb. any additional kwargs are passed to the request.
-    Handles errors and returns the response if it has a status
-    code under 400.
-    """
-    # execute with retries, if necessary
-    final_res = None
-    error = None
-    retry = 0
-    retry_timeouts = [0, 1, 2, 3, 4]
-    while final_res is None and retry < len(retry_timeouts):
-        time.sleep(retry_timeouts[retry])
-        try:
-            res = request_fxn(url, auth=auth, **kwargs)
-        except Exception as e:
-            retry += 1
-            error = 'Error with %s request for %s: %s' % (verb.upper(), url, e)
-            continue
-        if res.status_code >= 400:
-            err_reason = res.reason
-            # try to get a more informative error message to replace res.reason
-            try:
-                res.raise_for_status()
-            except Exception as e:
-                err_reason = repr(e)
-            retry += 1
-            error = ('Bad status code for %s request for %s: %s. Reason: %s'
-                     % (verb.upper(), url,   res.status_code, err_reason))
-        else:
-            final_res = res
-            error = None
-    if not final_res:
-        raise Exception(error)
-    return final_res
-
-
 def unified_authentication(auth, ff_env):
     """
     One authentication function to rule them all.
@@ -282,8 +278,8 @@ def stuff_in_queues(ff_env, check_secondary=False):
     If check_secondary is True, will also require the secondary queue.
     """
     if not ff_env:
-        raise Exception("Must provide a full fourfront environment "
-                        "name to this function (such as 'fourfront-webdev'). You gave: "
+        raise Exception("Must provide a full fourfront environment name to "
+                        "this function (such as 'fourfront-webdev'). You gave: "
                         "%s" % ff_env)
     empty_queues = False
     client = boto3.client('sqs')
@@ -324,7 +320,8 @@ def get_response_json(res):
         res_json = res.json()
     except Exception as e:
         raise Exception('Cannot get json for request to %s. Status'
-                        ' code: %s. Error: %s' % (res.url, res.status_code, repr(e)))
+                        ' code: %s. Response text: %s' %
+                        (res.url, res.status_code, res.text))
     return res_json
 
 

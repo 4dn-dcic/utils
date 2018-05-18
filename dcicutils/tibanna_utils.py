@@ -113,8 +113,7 @@ class ProcessedFileMetadata(object):
     def __init__(self, uuid=None, accession=None, file_format='', lab='4dn-dcic-lab',
                  extra_files=None, source_experiments=None,
                  award='1U01CA200059-01', status='to be uploaded by workflow',
-                 md5sum=None, file_size=None,
-                 **kwargs):
+                 md5sum=None, file_size=None, other_fields=None, **kwargs):
         self.uuid = uuid if uuid else str(uuid4())
         self.accession = accession if accession else ff_utils.generate_rand_accession()
         self.status = status
@@ -129,6 +128,9 @@ class ProcessedFileMetadata(object):
             self.md5sum = md5sum
         if file_size:
             self.file_size = file_size
+        if other_fields:
+            for field in other_fields:
+                setattr(self, field, other_fields[field])
 
     def as_dict(self):
         return self.__dict__
@@ -140,8 +142,12 @@ class ProcessedFileMetadata(object):
         return ff_utils.post_metadata(self.as_dict(), "file_processed", key=key, add_on='?force_md5')
 
     @classmethod
-    def get(cls, uuid, key, return_data=False):
-        data = ff_utils.get_metadata(uuid, key=key)
+    def get(cls, uuid, key, ff_env=None, return_data=False):
+        data = ff_utils.get_metadata(uuid,
+                                     key=key,
+                                     ff_env=ff_env,
+                                     frame='object',
+                                     ensure=True)
         if type(data) is not dict:
             raise Exception("unable to find object with unique key of %s" % uuid)
         if 'FileProcessed' not in data.get('@type', {}):
@@ -184,37 +190,6 @@ def get_extra_file_key(infile_format, infile_key, extra_file_format, fe_map):
     infile_extension = fe_map.get(infile_format)
     extra_file_extension = fe_map.get(extra_file_format)
     return infile_key.replace(infile_extension, extra_file_extension)
-
-
-def get_source_experiment(input_file_uuid, ff_keys):
-    """
-    Connects to fourfront and get source experiment info as a unique list
-    Takes a single input file uuid.
-    From tibanna
-    """
-    pf_source_experiments_set = set()
-    inf_uuids = aslist(input_file_uuid)
-    for inf_uuid in inf_uuids:
-        infile_meta = ff_utils.get_metadata(inf_uuid, key=ff_keys)
-        if infile_meta.get('experiments'):
-            for exp in infile_meta.get('experiments'):
-                exp_uuid = ff_utils.get_metadata(exp, key=ff_keys).get('uuid')
-                pf_source_experiments_set.add(exp_uuid)
-        if infile_meta.get('source_experiments'):
-            pf_source_experiments_set.update(infile_meta.get('source_experiments'))
-    return list(pf_source_experiments_set)
-
-
-def merge_source_experiments(input_file_uuids, ff_keys):
-    """
-    Connects to fourfront and get source experiment info as a unique list
-    Takes a list of input file uuids.
-    From tibanna
-    """
-    pf_source_experiments = set()
-    for input_file_uuid in input_file_uuids:
-        pf_source_experiments.update(get_source_experiment(input_file_uuid, ff_keys))
-    return list(pf_source_experiments)
 
 
 def get_format_extension_map(ff_keys):
