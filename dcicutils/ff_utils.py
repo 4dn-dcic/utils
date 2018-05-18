@@ -32,6 +32,7 @@ def standard_request_with_retries(request_fxn, url, auth, verb, **kwargs):
     final_res = None
     error = None
     retry = 0
+    non_retry_statuses = [401, 402, 403, 404, 405, 422]
     retry_timeouts = [0, 1, 2, 3, 4]
     while final_res is None and retry < len(retry_timeouts):
         time.sleep(retry_timeouts[retry])
@@ -43,7 +44,6 @@ def standard_request_with_retries(request_fxn, url, auth, verb, **kwargs):
             continue
         if res.status_code >= 400:
             err_reason = res.reason
-            # try to get a more informative error message to replace res.reason
             try:
                 res.raise_for_status()
             except Exception as e:
@@ -51,6 +51,8 @@ def standard_request_with_retries(request_fxn, url, auth, verb, **kwargs):
             retry += 1
             error = ('Bad status code for %s request for %s: %s. Reason: %s'
                      % (verb.upper(), url,   res.status_code, err_reason))
+            if res.status_code in non_retry_statuses:
+                break
         else:
             final_res = res
             error = None
@@ -98,20 +100,20 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     return retry_fxn(the_verb, url, use_auth, verb, **kwargs)
 
 
-def get_metadata(obj_id, key=None, ff_env=None, frame="embedded", ensure=False):
+def get_metadata(obj_id, key=None, ff_env=None, frame="embedded", check_queue=False):
     """
     Function to get metadata for a given obj_id (uuid or @id, most likely).
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
-    Also takes a frame for the GET and a boolean 'ensure', which if True
+    Also takes a frame for the GET and a boolean 'check_queue', which if True
     will use information from the queues and/or datastore=database to
     ensure that the metadata is accurate.
-    *REQUIRES ff_env if ensure is used.*
+    *REQUIRES ff_env if check_queue is used.*
     """
     auth = get_authentication_with_server(key, ff_env)
     get_url = '/'.join([auth['server'], obj_id, '?frame=' + frame])
-    # check the queues if ensure is True
-    if ensure and not stuff_in_queues(ff_env, check_secondary=False):
+    # check the queues if check_queue is True
+    if check_queue and not stuff_in_queues(ff_env, check_secondary=False):
         get_url += '&datastore=database'
     response = authorized_request(get_url, auth=auth, verb='GET')
     return get_response_json(response)

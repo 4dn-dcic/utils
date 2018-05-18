@@ -142,12 +142,12 @@ class ProcessedFileMetadata(object):
         return ff_utils.post_metadata(self.as_dict(), "file_processed", key=key, add_on='?force_md5')
 
     @classmethod
-    def get(cls, uuid, key, ff_env=None, return_data=False):
+    def get(cls, uuid, key, ff_env=None, check_queue=False, return_data=False):
         data = ff_utils.get_metadata(uuid,
                                      key=key,
                                      ff_env=ff_env,
                                      frame='object',
-                                     ensure=True)
+                                     check_queue=check_queue)
         if type(data) is not dict:
             raise Exception("unable to find object with unique key of %s" % uuid)
         if 'FileProcessed' not in data.get('@type', {}):
@@ -159,9 +159,9 @@ class ProcessedFileMetadata(object):
         else:
             return pf
 
-######################################
+#####################################
 # Tibanna-related utility functions #
-######################################
+#####################################
 
 
 def aslist(x):
