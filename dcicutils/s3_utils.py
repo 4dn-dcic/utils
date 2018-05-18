@@ -11,7 +11,7 @@ import logging
 ###########################
 # Config
 ###########################
-s3 = boto3.client('s3', region='us-east-1')
+s3 = boto3.client('s3', region_name='us-east-1')
 LOG = logging.getLogger(__name__)
 
 
