@@ -43,11 +43,16 @@ def standard_request_with_retries(request_fxn, url, auth, verb, **kwargs):
             error = 'Error with %s request for %s: %s' % (verb.upper(), url, e)
             continue
         if res.status_code >= 400:
-            err_reason = res.reason
+            # attempt to get reason from res.json. then try raise_for_status
             try:
-                res.raise_for_status()
-            except Exception as e:
-                err_reason = repr(e)
+                err_reason = res.json()
+            except ValueError:
+                try:
+                    res.raise_for_status()
+                except Exception as e:
+                    err_reason = repr(e)
+                else:
+                    err_reason = res.reason
             retry += 1
             error = ('Bad status code for %s request for %s: %s. Reason: %s'
                      % (verb.upper(), url,   res.status_code, err_reason))
@@ -56,7 +61,56 @@ def standard_request_with_retries(request_fxn, url, auth, verb, **kwargs):
         else:
             final_res = res
             error = None
-    if not final_res:
+    if error and not final_res:
+        raise Exception(error)
+    return final_res
+
+
+def search_request_with_retries(request_fxn, url, auth, verb, **kwargs):
+    """
+    Example of using a non-standard retry function. This one is for searches,
+    which return a 404 on an empty search. Handle this case so an empty array
+    is returned as a search result and not an error
+    """
+    final_res = None
+    error = None
+    retry = 0
+    # include 400 here because it is returned for invalid search types
+    non_retry_statuses = [400, 401, 402, 403, 404, 405, 422]
+    retry_timeouts = [0, 1, 2, 3, 4]
+    while final_res is None and retry < len(retry_timeouts):
+        time.sleep(retry_timeouts[retry])
+        try:
+            res = request_fxn(url, auth=auth, **kwargs)
+        except Exception as e:
+            retry += 1
+            error = 'Error with %s request for %s: %s' % (verb.upper(), url, e)
+            continue
+        # look for a json response with '@graph' key
+        try:
+            res_json = res.json()
+        except ValueError:
+            res_json = {}
+            try:
+                res.raise_for_status()
+            except Exception as e:
+                err_reason = repr(e)
+            else:
+                err_reason = res.reason
+            retry += 1
+            error = ('Bad status code for %s request for %s: %s. Reason: %s'
+                     % (verb.upper(), url, res.status_code, err_reason))
+        else:
+            if res_json.get('@graph') is not None:
+                final_res = res
+                error = None
+            else:
+                retry += 1
+                error = ('Bad status code for %s request for %s: %s. Reason: %s'
+                         % (verb.upper(), url, res.status_code, res_json))
+        if res.status_code in non_retry_statuses:
+            break
+    if error and not final_res:
         raise Exception(error)
     return final_res
 
@@ -96,6 +150,9 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
         the_verb = verbs[verb.upper()]
     except KeyError:
         raise Exception("Provided verb %s is not valid. Must one of: %s" % (verb.upper(), ', '.join(verbs.keys())))
+    # automatically detect a search and overwrite the retry if it is standard
+    if '/search/' in url and retry_fxn == standard_request_with_retries:
+        retry_fxn = search_request_with_retries
     # use the given retry function. MUST TAKE THESE PARAMS!
     return retry_fxn(the_verb, url, use_auth, verb, **kwargs)
 
@@ -164,12 +221,25 @@ def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
     return get_response_json(response)
 
 
-def search_metadata(search_url, key=None, ff_env=None):
+def search_metadata(search, key=None, ff_env=None):
     """
-    Will be deprecated soon
+    Make a get request of form <server>/<search> and returns the '@graph'
+    key from the request json.
+    Either takes a dictionary form authentication (MUST include 'server')
+    or a string fourfront-environment.
     """
-    print('WARNING! This function will be deprecated soon. Use authorized_request.')
-    return authorized_request(search_url, auth=key, ff_env=ff_env)
+    auth = get_authentication_with_server(key, ff_env)
+    if search.startswith('/'):
+        search = search[1:]
+    search_url = '/'.join([auth['server'], search])
+    # use a different retry_fxn, since empty searches are returned as 400's
+    response = authorized_request(search_url, auth=key, ff_env=ff_env,
+                                  retry_fxn=search_request_with_retries)
+    try:
+        return get_response_json(response)['@graph']
+    except KeyError as e:
+        raise('Cannot get "@graph" from the search request for %s. Response '
+              'status code is %s.' % (search_url, response.status_code))
 
 
 def delete_field(obj_id, del_field, key=None, ff_env=None):
