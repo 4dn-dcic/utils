@@ -157,7 +157,8 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     return retry_fxn(the_verb, url, use_auth, verb, **kwargs)
 
 
-def get_metadata(obj_id, key=None, ff_env=None, frame="embedded", check_queue=False):
+def get_metadata(obj_id, key=None, ff_env=None, frame="embedded",
+                 check_queue=False, add_on=''):
     """
     Function to get metadata for a given obj_id (uuid or @id, most likely).
     Either takes a dictionary form authentication (MUST include 'server')
@@ -168,7 +169,7 @@ def get_metadata(obj_id, key=None, ff_env=None, frame="embedded", check_queue=Fa
     *REQUIRES ff_env if check_queue is used.*
     """
     auth = get_authentication_with_server(key, ff_env)
-    get_url = '/'.join([auth['server'], obj_id, '?frame=' + frame])
+    get_url = '/'.join([auth['server'], obj_id, '?frame=' + frame]) + add_on
     # check the queues if check_queue is True
     if check_queue and not stuff_in_queues(ff_env, check_secondary=False):
         get_url += '&datastore=database'
@@ -176,7 +177,7 @@ def get_metadata(obj_id, key=None, ff_env=None, frame="embedded", check_queue=Fa
     return get_response_json(response)
 
 
-def patch_metadata(patch_item, obj_id='', key=None, ff_env=None):
+def patch_metadata(patch_item, obj_id='', key=None, ff_env=None, add_on=''):
     '''
     Patch metadata given the patch body and an optional obj_id (if not provided,
     will attempt to use accession or uuid from patch_item body).
@@ -188,7 +189,7 @@ def patch_metadata(patch_item, obj_id='', key=None, ff_env=None):
     if not obj_id:
         raise Exception("ERROR getting id from given object %s for the request to"
                         " patch item. Supply a uuid or accession." % obj_id)
-    patch_url = '/'.join([auth['server'], obj_id])
+    patch_url = '/'.join([auth['server'], obj_id]) + add_on
     # format item to json
     patch_item = json.dumps(patch_item)
     response = authorized_request(patch_url, auth=auth, verb='PATCH', data=patch_item)
@@ -206,8 +207,7 @@ def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
     with tibanna)
     '''
     auth = get_authentication_with_server(key, ff_env)
-    post_url = '/'.join([auth['server'], schema_name])
-    post_url += add_on
+    post_url = '/'.join([auth['server'], schema_name]) + add_on
     # format item to json
     post_item = json.dumps(post_item)
     try:
@@ -215,7 +215,7 @@ def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
     except Exception as e:
         # this means there was a conflict. try to patch
         if '409' in str(e):
-            return patch_metadata(json.loads(post_item), key=auth)
+            return patch_metadata(json.loads(post_item), key=auth, add_on=add_on)
         else:
             raise Exception(str(e))
     return get_response_json(response)
