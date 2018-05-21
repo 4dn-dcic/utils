@@ -55,7 +55,7 @@ def standard_request_with_retries(request_fxn, url, auth, verb, **kwargs):
                     err_reason = res.reason
             retry += 1
             error = ('Bad status code for %s request for %s: %s. Reason: %s'
-                     % (verb.upper(), url,   res.status_code, err_reason))
+                     % (verb.upper(), url, res.status_code, err_reason))
             if res.status_code in non_retry_statuses:
                 break
         else:
@@ -214,7 +214,7 @@ def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
         response = authorized_request(post_url, auth=auth, verb='POST', data=post_item)
     except Exception as e:
         # this means there was a conflict. try to patch
-        if '409 Client Error' in str(e):
+        if '409' in str(e):
             return patch_metadata(json.loads(post_item), key=auth)
         else:
             raise Exception(str(e))
