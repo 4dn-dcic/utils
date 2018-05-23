@@ -224,13 +224,13 @@ def test_get_item_type_from_id(mocker, connection):
         assert result == 'ExperimentSetReplicate'
 
 
-def test_authorized_request(mocker, ):
+def test_authorized_request(mocker, empty_success_response):
     from dcicutils.ff_utils import authorized_request
     import json
-    expected = 'success'
+    expected = empty_success_response
 
-    with mocker.patch('dcicutils.ff_utils.requests.post', return_value=expected):
+    with mocker.patch('dcicutils.ff_utils.requests.post', return_value=empty_success_response):
         res = authorized_request('https://data.4dnucleome.org/files-microscopy/4DNFII5APXQO/upload',
                                  ff_env='fourfront-webprod', verb='POST', data=json.dumps({}))
 
-        assert res == expected
+        assert res.status_code == expected.status_code

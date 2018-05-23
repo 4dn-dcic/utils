@@ -462,3 +462,8 @@ def returned_otherlab_w_two_awards():
         'status': 'current', 'name': 'ben-ring-lab', '@type': ['Lab', 'Item']
     }
     return MockedResponse(data, 200)
+    
+    
+@pytest.fixture
+def empty_success_response():
+    return MockedResponse({}, 200)

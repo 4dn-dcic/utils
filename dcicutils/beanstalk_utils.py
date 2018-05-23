@@ -9,6 +9,7 @@ given and env in beanstalk do the follow
     b.  move files from existing bucket to new bucket
 5. new ES instance?  (probably not covered by this script yet)
 '''
+from __future__ import print_function
 import subprocess
 import logging
 import argparse
@@ -16,7 +17,7 @@ import boto3
 import os
 import json
 import requests
-from . import ff_utils
+from dcicutils import ff_utils
 from botocore.exceptions import ClientError
 from time import sleep
 
@@ -161,9 +162,9 @@ def whodaman():
 
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = client.describe_environments(ApplicationName="4dn-web")
-    logger.warn(res)
+    logger.info(res)
     for env in res['Environments']:
-        logger.warn(env)
+        logger.info(env)
         if env.get('CNAME') == magic_cname:
             # we found data
             return env.get('EnvironmentName')

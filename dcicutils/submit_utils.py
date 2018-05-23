@@ -7,6 +7,10 @@ import logging
 import os.path
 
 
+class FdnConnectionException(Exception):
+    pass
+
+
 class FDN_Key:
     def __init__(self, keyfile, keyname):
         self.error = False
