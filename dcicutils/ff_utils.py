@@ -157,22 +157,24 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     return retry_fxn(the_verb, url, use_auth, verb, **kwargs)
 
 
-def get_metadata(obj_id, key=None, ff_env=None, frame="embedded",
-                 check_queue=False, add_on=''):
+def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
     """
     Function to get metadata for a given obj_id (uuid or @id, most likely).
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
-    Also takes a frame for the GET and a boolean 'check_queue', which if True
+    Also a boolean 'check_queue', which if True
     will use information from the queues and/or datastore=database to
     ensure that the metadata is accurate.
+    Takes an optional string add_on that should contain things like
+    "frame=object". Join query parameters in the add_on using "&", e.g.
+    "frame=object&force_md5"
     *REQUIRES ff_env if check_queue is used.*
     """
     auth = get_authentication_with_server(key, ff_env)
-    get_url = '/'.join([auth['server'], obj_id, '?frame=' + frame]) + add_on
+    if check_queue and stuff_in_queues(ff_env, check_secondary=False):
+        add_on += '&datastore=database'
+    get_url = '/'.join([auth['server'], obj_id]) + process_add_on(add_on)
     # check the queues if check_queue is True
-    if check_queue and not stuff_in_queues(ff_env, check_secondary=False):
-        get_url += '&datastore=database'
     response = authorized_request(get_url, auth=auth, verb='GET')
     return get_response_json(response)
 
@@ -189,7 +191,7 @@ def patch_metadata(patch_item, obj_id='', key=None, ff_env=None, add_on=''):
     if not obj_id:
         raise Exception("ERROR getting id from given object %s for the request to"
                         " patch item. Supply a uuid or accession." % obj_id)
-    patch_url = '/'.join([auth['server'], obj_id]) + add_on
+    patch_url = '/'.join([auth['server'], obj_id]) + process_add_on(add_on)
     # format item to json
     patch_item = json.dumps(patch_item)
     response = authorized_request(patch_url, auth=auth, verb='PATCH', data=patch_item)
@@ -207,7 +209,7 @@ def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
     with tibanna)
     '''
     auth = get_authentication_with_server(key, ff_env)
-    post_url = '/'.join([auth['server'], schema_name]) + add_on
+    post_url = '/'.join([auth['server'], schema_name]) + process_add_on(add_on)
     # format item to json
     post_item = json.dumps(post_item)
     try:
@@ -224,7 +226,7 @@ def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
 def search_metadata(search, key=None, ff_env=None):
     """
     Make a get request of form <server>/<search> and returns the '@graph'
-    key from the request json.
+    key from the request json. Include all query params in the search string
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
     """
@@ -237,7 +239,7 @@ def search_metadata(search, key=None, ff_env=None):
                                   retry_fxn=search_request_with_retries)
     try:
         return get_response_json(response)['@graph']
-    except KeyError as e:
+    except KeyError:
         raise('Cannot get "@graph" from the search request for %s. Response '
               'status code is %s.' % (search_url, response.status_code))
 
@@ -256,7 +258,7 @@ def delete_field(obj_id, del_field, key=None, ff_env=None):
                             " delete field(s): %s. Supply a uuid or accession."
                             % (obj_id, del_field))
     delete_str = '?delete_fields=%s' % del_field
-    patch_url = '/'.join([auth['server'], obj_id, delete_str])
+    patch_url = '/'.join([auth['server'], obj_id]) + delete_str
     # use an empty patch body
     response = authorized_request(patch_url, auth=auth, verb='PATCH', data=json.dumps({}))
     return get_response_json(response)
@@ -367,7 +369,7 @@ def stuff_in_queues(ff_env, check_secondary=False):
                 QueueUrl=queue_url,
                 AttributeNames=['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible']
             ).get('Attributes', {})
-        except Exception as e:
+        except Exception:
             print('Error finding queue or its attributes: %s' % ff_env + queue_name)
             empty_queues = False  # queue not found. use datastore=database
             break
@@ -390,11 +392,22 @@ def get_response_json(res):
     res_json = None
     try:
         res_json = res.json()
-    except Exception as e:
+    except Exception:
         raise Exception('Cannot get json for request to %s. Status'
                         ' code: %s. Response text: %s' %
                         (res.url, res.status_code, res.text))
     return res_json
+
+
+def process_add_on(add_on):
+    """
+    simple function to ensure that a query add on string starts with "?"
+    """
+    if add_on.startswith('&'):
+        add_on = '?' + add_on[1:]
+    if add_on and not add_on.startswith('?'):
+        add_on = '?' + add_on
+    return add_on
 
 
 def convert_param(parameter_dict, vals_as_string=False):
