@@ -234,3 +234,27 @@ def test_authorized_request(mocker, empty_success_response):
                                  ff_env='fourfront-webprod', verb='POST', data=json.dumps({}))
 
         assert res.status_code == expected.status_code
+
+
+def test_generate_rand_accession():
+    test = ff_utils.generate_rand_accession()
+    assert '4DN' in test
+    assert '0' not in test
+
+
+# Integration tests
+
+@pytest.mark.integrated
+def test_get_metadata(integrated_ff):
+    # need to get some item that I can patch
+    # this is the 4dn dcic user
+    test_item = '986b362f-4eb6-4a9c-8173-3ab267307e3a'
+    res_key = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'])
+    assert res_key['first_name'] == '4dn'
+    res_env = ff_utils.get_metadata(test_item, ff_env=integrated_ff['ff_env'])
+    assert res_key == res_env
+    # doesn't work with tuple auth if you don't provide env
+    tuple_key = ff_utils.unified_authentication(integrated_ff['ff_key'], integrated_ff['ff_env'])
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.get_metadata(test_item, key=tuple_key, ff_env=None)
+    assert 'ERROR GETTING SERVER' in str(exec_info.value)
