@@ -5,7 +5,7 @@ from dcicutils.s3_utils import s3Utils
 from dcicutils.ff_utils import authorized_request
 
 # this is the ff_env we use for integrated tests
-INTEGRATED_ENV = 'fourfront-webdev'
+INTEGRATED_ENV = 'fourfront-mastertest'
 
 
 class MockedResponse(object):
@@ -15,6 +15,15 @@ class MockedResponse(object):
 
     def json(self):
         return self._json
+
+
+@pytest.fixture(scope='session')
+def basestring():
+    try:
+        basestring = basestring
+    except NameError:
+        basestring = str
+    return basestring
 
 
 @pytest.fixture(scope='session')

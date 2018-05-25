@@ -245,16 +245,101 @@ def test_generate_rand_accession():
 # Integration tests
 
 @pytest.mark.integrated
-def test_get_metadata(integrated_ff):
-    # need to get some item that I can patch
-    # this is the 4dn dcic user
-    test_item = '986b362f-4eb6-4a9c-8173-3ab267307e3a'
-    res_key = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'])
-    assert res_key['first_name'] == '4dn'
-    res_env = ff_utils.get_metadata(test_item, ff_env=integrated_ff['ff_env'])
-    assert res_key == res_env
+def test_unified_authentication(integrated_ff):
+    key1 = ff_utils.unified_authentication(integrated_ff['ff_key'], integrated_ff['ff_env'])
+    assert len(key1) == 2
+    key2 = ff_utils.unified_authentication({'default': integrated_ff['ff_key']}, integrated_ff['ff_env'])
+    assert key1 == key2
+    key3 = ff_utils.unified_authentication(None, integrated_ff['ff_env'])
+    assert key1 == key3
+    key4 = ff_utils.unified_authentication(key1, None)
+    assert key1 == key4
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.unified_authentication(None, None)
+    assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
+
+
+@pytest.mark.integrated
+def test_get_authentication_with_server(integrated_ff):
+    import copy
+    key1 = ff_utils.get_authentication_with_server(integrated_ff['ff_key'], None)
+    assert {'server', 'key', 'secret'} <= set(key1.keys())
+    key2 = ff_utils.get_authentication_with_server({'default': integrated_ff['ff_key']}, None)
+    assert key1 == key2
+    key3 = ff_utils.get_authentication_with_server(None, integrated_ff['ff_env'])
+    assert key1 == key3
+    bad_key = copy.copy(integrated_ff['ff_key'])
+    del bad_key['server']
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.get_authentication_with_server(bad_key, None)
+    assert 'ERROR GETTING SERVER' in str(exec_info.value)
+
+
+@pytest.mark.integrated
+def test_get_metadata(integrated_ff, basestring):
+    # use this test biosource
+    test_item = '331111bc-8535-4448-903e-854af460b254'
+    res_w_key = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'])
+    assert res_w_key['uuid'] == test_item
+    orig_descrip = res_w_key['description']
+    res_w_env = ff_utils.get_metadata(test_item, ff_env=integrated_ff['ff_env'])
+    assert res_w_key == res_w_env
     # doesn't work with tuple auth if you don't provide env
     tuple_key = ff_utils.unified_authentication(integrated_ff['ff_key'], integrated_ff['ff_env'])
     with pytest.raises(Exception) as exec_info:
         ff_utils.get_metadata(test_item, key=tuple_key, ff_env=None)
     assert 'ERROR GETTING SERVER' in str(exec_info.value)
+
+    # testing check_queues functionality requires patching
+    ff_utils.patch_metadata({'description': 'test description'}, obj_id=test_item, key=integrated_ff['ff_key'])
+    res_w_check = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'],
+                                        ff_env=integrated_ff['ff_env'], check_queue=True)
+    assert res_w_check['description'] == 'test description'
+    ff_utils.patch_metadata({'description': orig_descrip}, obj_id=test_item, key=integrated_ff['ff_key'])
+
+    # check add_on
+    assert isinstance(res_w_key['individual'], dict)
+    res_obj = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'], add_on='frame=object')
+    assert isinstance(res_obj['individual'], basestring)
+
+
+@pytest.mark.integrated
+def test_patch_metadata(integrated_ff):
+    test_item = '331111bc-8535-4448-903e-854af460a254'
+    original_res = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'])
+    res = ff_utils.patch_metadata({'description': 'patch test'},
+                                  obj_id=test_item, key=integrated_ff['ff_key'])
+    assert res['@graph'][0]['description'] == 'patch test'
+    res2 = ff_utils.patch_metadata({'description': original_res['description'], 'uuid': original_res['uuid']},
+                                   key=integrated_ff['ff_key'])
+    assert res2['@graph'][0]['description'] == original_res['description']
+
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.patch_metadata({'description': 'patch test'}, key=integrated_ff['ff_key'])
+    assert 'ERROR getting id' in str(exec_info.value)
+
+
+@pytest.mark.integrated
+def test_post_metadata(integrated_ff):
+    test_data = {'biosource_type': 'immortalized cell line',
+                 'award': '1U01CA200059-01', 'lab': '4dn-dcic-lab'}
+    post_res = ff_utils.post_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
+    post_item = post_res['@graph'][0]
+    assert 'uuid' in post_item
+    # make sure the item is patched if already existing
+    test_data['description'] = 'test description'
+    test_data['uuid'] = post_item['uuid']
+    post_res2 = ff_utils.post_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
+    post_item2 = post_res2['@graph'][0]
+    assert post_item2['description'] == 'test description'
+    ff_utils.patch_metadata({'status': 'deleted'}, obj_id=test_data['uuid'], key=integrated_ff['ff_key'])
+
+
+@pytest.mark.integrate
+def test_search_metadata(integrated_ff):
+    search_res = ff_utils.search_metadata('search/?limit=all&type=Biosource', key=integrated_ff['ff_key'])
+    assert isinstance(search_res, list)
+    # this will fail if biosources have not yet been indexed
+    assert len(search_res > 0)
+    search_res_w_slash = ff_utils.search_metadata('/search/?limit=all&type=Biosource', key=integrated_ff['ff_key'])
+    assert isinstance(search_res_w_slash, list)
