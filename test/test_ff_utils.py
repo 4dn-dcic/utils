@@ -353,6 +353,6 @@ def test_search_metadata(integrated_ff):
     search_res = ff_utils.search_metadata('search/?limit=all&type=Biosource', key=integrated_ff['ff_key'])
     assert isinstance(search_res, list)
     # this will fail if biosources have not yet been indexed
-    assert len(search_res > 0)
+    assert len(search_res) > 0
     search_res_w_slash = ff_utils.search_metadata('/search/?limit=all&type=Biosource', key=integrated_ff['ff_key'])
     assert isinstance(search_res_w_slash, list)
