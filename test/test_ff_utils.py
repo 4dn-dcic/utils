@@ -242,6 +242,29 @@ def test_generate_rand_accession():
     assert '0' not in test
 
 
+def test_get_response_json():
+    # use responses from http://httpbin.org
+    import requests
+    good_res = requests.get('http://httpbin.org/json')
+    good_res_json = ff_utils.get_response_json(good_res)
+    assert isinstance(good_res_json, dict)
+    bad_res = requests.get('http://httpbin.org/status/500')
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.get_response_json(bad_res)
+    assert 'Cannot get json' in str(exec_info.value)
+
+
+def test_process_add_on():
+    add_1 = '&type=Biosample&format=json'
+    assert ff_utils.process_add_on(add_1) == '?type=Biosample&format=json'
+    add_2 = 'type=Biosample&format=json'
+    assert ff_utils.process_add_on(add_2) == '?type=Biosample&format=json'
+    add_3 = ''
+    assert ff_utils.process_add_on(add_3) == ''
+
+
+
+
 # Integration tests
 
 @pytest.mark.integrated
@@ -282,14 +305,49 @@ def test_stuff_in_queue(integrated_ff):
     """
     search_res = ff_utils.search_metadata('search/?limit=all&type=File', key=integrated_ff['ff_key'])
     # just take the first handful
-    for item in search_res[:5]:
+    for item in search_res[:8]:
         ff_utils.patch_metadata({}, obj_id=item['uuid'], key=integrated_ff['ff_key'])
     stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env'], check_secondary=True)
     assert stuff_in_queue
 
 
 @pytest.mark.integrated
+def test_authorized_request_integrated(integrated_ff):
+    """
+    Cover search case explicitly since it uses a different retry fxn by default
+    """
+    server = integrated_ff['ff_key']['server']
+    item_url = server + '/331111bc-8535-4448-903e-854af460a254'  # a test item
+    # not a real verb
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.authorized_request(item_url, auth=integrated_ff['ff_key'], verb='LAME')
+    assert 'Provided verb LAME is not valid' in str(exec_info.value)
+
+    # good GET request for an item
+    good_resp1 = ff_utils.authorized_request(item_url, auth=integrated_ff['ff_key'], verb='GET')
+    assert good_resp1.status_code == 200
+    # good GET request for a search
+    good_resp2 = ff_utils.authorized_request(server + '/search/?type=Biosample',
+                                             auth=integrated_ff['ff_key'], verb='GET')
+    assert good_resp2.status_code == 200
+    # requests that return no results should have a 404 status_code but no error
+    no_results_resp = ff_utils.authorized_request(server + '/search/?type=Biosample&name=joe',
+                                             auth=integrated_ff['ff_key'], verb='GET')
+    assert no_results_resp.status_code == 404
+    assert no_results_resp.json()['@graph'] == []
+
+    # bad GET requests for an item and search
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.authorized_request(server + '/abcdefg', auth=integrated_ff['ff_key'], verb='GET')
+    assert 'Bad status code' in str(exec_info.value)
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.authorized_request(server + '/search/?type=LAME', auth=integrated_ff['ff_key'], verb='GET')
+    assert 'Bad status code' in str(exec_info.value)
+
+
+@pytest.mark.integrated
 def test_get_metadata(integrated_ff, basestring):
+    import time
     # use this test biosource
     test_item = '331111bc-8535-4448-903e-854af460b254'
     res_w_key = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'])
@@ -305,6 +363,7 @@ def test_get_metadata(integrated_ff, basestring):
 
     # testing check_queues functionality requires patching
     ff_utils.patch_metadata({'description': 'test description'}, obj_id=test_item, key=integrated_ff['ff_key'])
+    time.sleep(2)  # ensure messages have time to propogate to queue
     res_w_check = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'],
                                         ff_env=integrated_ff['ff_env'], check_queue=True)
     assert res_w_check['description'] == 'test description'
@@ -348,7 +407,7 @@ def test_post_metadata(integrated_ff):
     ff_utils.patch_metadata({'status': 'deleted'}, obj_id=test_data['uuid'], key=integrated_ff['ff_key'])
 
 
-@pytest.mark.integrate
+@pytest.mark.integrated
 def test_search_metadata(integrated_ff):
     search_res = ff_utils.search_metadata('search/?limit=all&type=Biosource', key=integrated_ff['ff_key'])
     assert isinstance(search_res, list)
@@ -356,3 +415,25 @@ def test_search_metadata(integrated_ff):
     assert len(search_res) > 0
     search_res_w_slash = ff_utils.search_metadata('/search/?limit=all&type=Biosource', key=integrated_ff['ff_key'])
     assert isinstance(search_res_w_slash, list)
+
+
+@pytest.mark.integrated
+def test_fdn_connection(integrated_ff):
+    connection = ff_utils.fdn_connection(key={'default': integrated_ff['ff_key']})
+    assert connection.server
+    # must provide key or connection
+    null_connection = ff_utils.fdn_connection()
+    assert null_connection is None
+    # bad connnection
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.fdn_connection(key={'default': 'abcdefg'})
+    assert 'Unable to connect' in str(exec_info.value)
+
+
+@pytest.mark.integrated
+def test_get_linked_items(integrated_ff):
+    test_item = '331111bc-8535-4448-903e-854af460a254'
+    connection = ff_utils.fdn_connection(key={'default': integrated_ff['ff_key']})
+    linked = ff_utils.get_linked_items(connection, test_item)
+    assert isinstance(linked, dict) and len(linked.keys()) > 1
+    assert test_item in linked  # item is in its own linked items
