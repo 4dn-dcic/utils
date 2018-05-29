@@ -355,7 +355,7 @@ def stuff_in_queues(ff_env, check_secondary=False):
         raise Exception("Must provide a full fourfront environment name to "
                         "this function (such as 'fourfront-webdev'). You gave: "
                         "%s" % ff_env)
-    empty_queues = False
+    stuff_in_queue = False
     client = boto3.client('sqs', region_name='us-east-1')
     queue_names = ['-indexer-queue', '-deferred-indexer-queue']
     if check_secondary:
@@ -371,17 +371,15 @@ def stuff_in_queues(ff_env, check_secondary=False):
             ).get('Attributes', {})
         except Exception:
             print('Error finding queue or its attributes: %s' % ff_env + queue_name)
-            empty_queues = False  # queue not found. use datastore=database
+            stuff_in_queue = True  # queue not found. use datastore=database
             break
         else:
             visible = queue_attrs.get('ApproximateNumberOfMessages', '-1')
             not_vis = queue_attrs.get('ApproximateNumberOfMessagesNotVisible', '-1')
-            if (visible and int(visible) == 0) and (not_vis and int(not_vis) == 0):
-                empty_queues = True
-            else:
-                empty_queues = False
+            if (visible and int(visible) > 0) or (not_vis and int(not_vis) > 0):
+                stuff_in_queue = True
                 break
-    return empty_queues
+    return stuff_in_queue
 
 
 def get_response_json(res):
