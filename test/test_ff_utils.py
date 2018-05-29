@@ -306,7 +306,7 @@ def test_stuff_in_queues(integrated_ff):
     # just take the first handful
     for item in search_res[:8]:
         ff_utils.patch_metadata({}, obj_id=item['uuid'], key=integrated_ff['ff_key'])
-    time.sleep(2)  # let queues catch up
+    time.sleep(5)  # let queues catch up
     stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env'], check_secondary=True)
     assert stuff_in_queue
 
@@ -363,7 +363,7 @@ def test_get_metadata(integrated_ff, basestring):
 
     # testing check_queues functionality requires patching
     ff_utils.patch_metadata({'description': 'test description'}, obj_id=test_item, key=integrated_ff['ff_key'])
-    time.sleep(2)  # ensure messages have time to propogate to queue
+    time.sleep(5)  # ensure messages have time to propogate to queue
     res_w_check = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'],
                                         ff_env=integrated_ff['ff_env'], check_queue=True)
     assert res_w_check['description'] == 'test description'
