@@ -262,10 +262,8 @@ def test_process_add_on():
     add_3 = ''
     assert ff_utils.process_add_on(add_3) == ''
 
-
-
-
 # Integration tests
+
 
 @pytest.mark.integrated
 def test_unified_authentication(integrated_ff):
@@ -332,7 +330,7 @@ def test_authorized_request_integrated(integrated_ff):
     assert good_resp2.status_code == 200
     # requests that return no results should have a 404 status_code but no error
     no_results_resp = ff_utils.authorized_request(server + '/search/?type=Biosample&name=joe',
-                                             auth=integrated_ff['ff_key'], verb='GET')
+                                                  auth=integrated_ff['ff_key'], verb='GET')
     assert no_results_resp.status_code == 404
     assert no_results_resp.json()['@graph'] == []
 

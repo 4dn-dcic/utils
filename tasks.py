@@ -46,7 +46,7 @@ def test(ctx, watch=False, last_failing=False, no_flake=False, k=''):
     import pytest
     if not no_flake:
         flake(ctx)
-    args = []
+    args = ['--cov', 'dcicutils']
     if k:
         args.append('-k %s' % k)
     if watch:
