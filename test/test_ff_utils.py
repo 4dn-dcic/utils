@@ -297,14 +297,16 @@ def test_get_authentication_with_server(integrated_ff):
 
 
 @pytest.mark.integrated
-def test_stuff_in_queue(integrated_ff):
+def test_stuff_in_queues(integrated_ff):
     """
     Gotta index a bunch of stuff to make this work
     """
+    import time
     search_res = ff_utils.search_metadata('search/?limit=all&type=File', key=integrated_ff['ff_key'])
     # just take the first handful
     for item in search_res[:8]:
         ff_utils.patch_metadata({}, obj_id=item['uuid'], key=integrated_ff['ff_key'])
+    time.sleep(2)  # let queues catch up
     stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env'], check_secondary=True)
     assert stuff_in_queue
 
