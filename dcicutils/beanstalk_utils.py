@@ -654,7 +654,7 @@ def sizeup_es(new):
     print(resp)
 
 
-def add_es(new, force_new=False):
+def add_es(new, force_new=False, kill_indices=False):
     es = boto3.client('es', region_name=REGION)
     if force_new:
         fallback = new
@@ -671,12 +671,14 @@ def add_es(new, force_new=False):
     else:
         try:
             resp = es.describe_elasticsearch_domain(DomainName=new)
-            # now kill all the indexes
-            base = 'https://' + resp['DomainStatus']['Endpoint']
-            url = base + '/_all'
-            requests.delete(url)
         except ClientError:  # its not there
             resp = create_new_es(new)
+        else:
+            # now kill all the indexes
+            if kill_indices:
+                base = 'https://' + resp['DomainStatus']['Endpoint']
+                url = base + '/_all'
+                requests.delete(url)
 
     return resp['DomainStatus']['ARN']
 
