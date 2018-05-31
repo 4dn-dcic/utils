@@ -115,13 +115,19 @@ def get_es_from_bs_config(env):
             return item.split('=')[1].strip(':80')
 
 
-def is_indexing_finished(bs):
+def is_indexing_finished(bs, version=None):
     is_beanstalk_ready(bs)
     bs_url = get_beanstalk_real_url(bs)
     if not bs_url.endswith('/'):
         bs_url += "/"
     # server not up yet
     try:
+        # check to see if our version is updated
+        if version:
+            info = beanstalk_info(bs)
+            if version == info.get('VersionLabel'):
+                raise Exception("Beanstalk version has not updated from %s" % version)
+
         health_res = ff_utils.authorized_request(bs_url + 'counts?format=json', ff_env=bs)
         totals = health_res.json().get('db_es_total').split()
 
