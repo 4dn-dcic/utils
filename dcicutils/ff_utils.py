@@ -17,6 +17,7 @@ HIGLASS_BUCKETS = ['elasticbeanstalk-fourfront-webprod-wfoutput',
 # Widely used metadata functions #
 ##################################
 
+
 def standard_request_with_retries(request_fxn, url, auth, verb, **kwargs):
     """
     Standard function to execute the request made by authorized_request.
@@ -287,7 +288,7 @@ def fdn_connection(key='', connection=None, keyname='default'):
     return connection
 
 
-def unified_authentication(auth, ff_env):
+def unified_authentication(auth=None, ff_env=None):
     """
     One authentication function to rule them all.
     Has several options for authentication, which are:
@@ -319,7 +320,7 @@ def unified_authentication(auth, ff_env):
     return use_auth
 
 
-def get_authentication_with_server(auth, ff_env):
+def get_authentication_with_server(auth=None, ff_env=None):
     """
     Pass in authentication information and ff_env and attempts to either
     retrieve the server info from the auth, or if it cannot, get the
