@@ -249,7 +249,7 @@ def upsert_metadata(upsert_item, schema_name, key=None, ff_env=None, add_on=''):
     return get_response_json(response)
 
 
-def get_search_generator(search_url, auth=None, ff_env=None, page_limit=25):
+def get_search_generator(search_url, auth=None, ff_env=None, page_limit=50):
     """
     Returns a generator given a search_url (which must contain server!), an
     auth and/or ff_env, and an int page_limit, which is used to determine how
@@ -293,7 +293,7 @@ def get_search_generator(search_url, auth=None, ff_env=None, page_limit=25):
             yield search_res
 
 
-def search_metadata(search, key=None, ff_env=None, page_limit=25):
+def search_metadata(search, key=None, ff_env=None, page_limit=50):
     """
     Make a get request of form <server>/<search> and returns a list of results
     using a paginated generator. Include all query params in the search string.

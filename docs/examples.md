@@ -82,3 +82,15 @@ response = ff_utils.post_metadata(post_body, 'upsert_body', key=key)
 # the response has the same format as in post_metadata
 metadata = response['@graph'][0]
 ```
+
+You can use `search_metadata` to easily search through metadata in Fourfront. This function takes a string search url starting with 'search', as well as the the same authorization information as the other metadata functions. It returns a list of metadata results. Optionally, the `page_limit` parameter can be used to internally adjust the size of the pagination used in underlying generator used to get search results.
+
+```
+# let's search for all biosamples
+# hits is a list of metadata dictionaries
+hits = ff_utils.search_metadata('search/?type=Biosample', key=key)
+
+# you can also specify a limit on the number of results for your search
+# other valid query params are also allowed, including sorts and filters
+hits = ff_utils.search_metadata('search/?type=Biosample&limit=10', key=key)
+```
