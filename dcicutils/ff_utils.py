@@ -1,4 +1,5 @@
 from __future__ import print_function
+import sys
 import json
 import time
 import random
@@ -7,6 +8,13 @@ import boto3
 from uuid import UUID
 from dcicutils import s3_utils, submit_utils
 import requests
+# urlparse import differs between py2 and 3
+if sys.version_info[0] < 3:
+    import urlparse
+    from urllib import urlencode as urlencode
+else:
+    import urllib.parse as urlparse
+    from urllib.parse import urlencode
 
 
 HIGLASS_BUCKETS = ['elasticbeanstalk-fourfront-webprod-wfoutput',
@@ -16,6 +24,7 @@ HIGLASS_BUCKETS = ['elasticbeanstalk-fourfront-webprod-wfoutput',
 ##################################
 # Widely used metadata functions #
 ##################################
+
 
 def standard_request_with_retries(request_fxn, url, auth, verb, **kwargs):
     """
@@ -200,11 +209,9 @@ def patch_metadata(patch_item, obj_id='', key=None, ff_env=None, add_on=''):
 
 def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
     '''
-    Patch metadata given the post body and a string schema name.
+    Post metadata given the post body and a string schema name.
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
-    This function checks to see if an existing object already exists
-    with the same body, and if so, runs a patch instead.
     add_on is the string that will be appended to the post url (used
     with tibanna)
     '''
@@ -212,21 +219,84 @@ def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
     post_url = '/'.join([auth['server'], schema_name]) + process_add_on(add_on)
     # format item to json
     post_item = json.dumps(post_item)
+    response = authorized_request(post_url, auth=auth, verb='POST', data=post_item)
+    return get_response_json(response)
+
+
+def upsert_metadata(upsert_item, schema_name, key=None, ff_env=None, add_on=''):
+    '''
+    UPSERT metadata given the upsert body and a string schema name.
+    UPSERT means POST or PATCH on conflict.
+    Either takes a dictionary form authentication (MUST include 'server')
+    or a string fourfront-environment.
+    This function checks to see if an existing object already exists
+    with the same body, and if so, runs a patch instead.
+    add_on is the string that will be appended to the upsert url (used
+    with tibanna)
+    '''
+    auth = get_authentication_with_server(key, ff_env)
+    upsert_url = '/'.join([auth['server'], schema_name]) + process_add_on(add_on)
+    # format item to json
+    upsert_item = json.dumps(upsert_item)
     try:
-        response = authorized_request(post_url, auth=auth, verb='POST', data=post_item)
+        response = authorized_request(upsert_url, auth=auth, verb='POST', data=upsert_item)
     except Exception as e:
         # this means there was a conflict. try to patch
         if '409' in str(e):
-            return patch_metadata(json.loads(post_item), key=auth, add_on=add_on)
+            return patch_metadata(json.loads(upsert_item), key=auth, add_on=add_on)
         else:
             raise Exception(str(e))
     return get_response_json(response)
 
 
-def search_metadata(search, key=None, ff_env=None):
+def get_search_generator(search_url, auth=None, ff_env=None, page_limit=50):
     """
-    Make a get request of form <server>/<search> and returns the '@graph'
-    key from the request json. Include all query params in the search string
+    Returns a generator given a search_url (which must contain server!), an
+    auth and/or ff_env, and an int page_limit, which is used to determine how
+    many results are returned per page (i.e. per iteration of the generator)
+
+    Paginates by changing the 'from' query parameter, incrementing it by the
+    page_limit size until fewer results than the page_limit are returned.
+    If 'limit' is specified in the query, the generator will stop when that many
+    results are collectively returned.
+    """
+    url_params = get_url_params(search_url)
+    # indexing below is needed because url params are returned in lists
+    curr_from = int(url_params.get('from', ['0'])[0])  # use query 'from' or 0 if not provided
+    search_limit = url_params.get('limit', ['all'])[0]  # use limit=all by default
+    if search_limit != 'all':
+        search_limit = int(search_limit)
+    url_params['limit'] = [str(page_limit)]
+    if not url_params.get('sort'):  # sort needed for pagination
+        url_params['sort'] = ['-date_created']
+    # stop when fewer results than the limit are returned
+    last_total = None
+    while last_total is None or last_total == page_limit:
+        if search_limit != 'all' and curr_from >= search_limit:
+            break
+        url_params['from'] = [str(curr_from)]  # use from to drive search pagination
+        search_url = update_url_params_and_unparse(search_url, url_params)
+        # use a different retry_fxn, since empty searches are returned as 400's
+        response = authorized_request(search_url, auth=auth, ff_env=ff_env,
+                                      retry_fxn=search_request_with_retries)
+        try:
+            search_res = get_response_json(response)['@graph']
+        except KeyError:
+            raise('Cannot get "@graph" from the search request for %s. Response '
+                  'status code is %s.' % (search_url, response.status_code))
+        last_total = len(search_res)
+        curr_from += last_total
+        if search_limit != 'all' and curr_from > search_limit:
+            limit_diff = curr_from - search_limit
+            yield search_res[:-limit_diff]
+        else:
+            yield search_res
+
+
+def search_metadata(search, key=None, ff_env=None, page_limit=50):
+    """
+    Make a get request of form <server>/<search> and returns a list of results
+    using a paginated generator. Include all query params in the search string.
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
     """
@@ -234,14 +304,10 @@ def search_metadata(search, key=None, ff_env=None):
     if search.startswith('/'):
         search = search[1:]
     search_url = '/'.join([auth['server'], search])
-    # use a different retry_fxn, since empty searches are returned as 400's
-    response = authorized_request(search_url, auth=key, ff_env=ff_env,
-                                  retry_fxn=search_request_with_retries)
-    try:
-        return get_response_json(response)['@graph']
-    except KeyError:
-        raise('Cannot get "@graph" from the search request for %s. Response '
-              'status code is %s.' % (search_url, response.status_code))
+    search_res = []
+    for page in get_search_generator(search_url, auth=auth, page_limit=page_limit):
+        search_res.extend(page)
+    return search_res
 
 
 def delete_field(obj_id, del_field, key=None, ff_env=None):
@@ -287,7 +353,7 @@ def fdn_connection(key='', connection=None, keyname='default'):
     return connection
 
 
-def unified_authentication(auth, ff_env):
+def unified_authentication(auth=None, ff_env=None):
     """
     One authentication function to rule them all.
     Has several options for authentication, which are:
@@ -319,7 +385,7 @@ def unified_authentication(auth, ff_env):
     return use_auth
 
 
-def get_authentication_with_server(auth, ff_env):
+def get_authentication_with_server(auth=None, ff_env=None):
     """
     Pass in authentication information and ff_env and attempts to either
     retrieve the server info from the auth, or if it cannot, get the
@@ -406,6 +472,25 @@ def process_add_on(add_on):
     if add_on and not add_on.startswith('?'):
         add_on = '?' + add_on
     return add_on
+
+
+def get_url_params(url):
+    """
+    Returns a dictionary of url params using urlparse.parse_qs.
+    Example: get_url_params('<server>/search/?type=Biosample&limit=5') returns
+    {'type': ['Biosample'], 'limit': '5'}
+    """
+    parsed_url = urlparse.urlparse(url)
+    return urlparse.parse_qs(parsed_url.query)
+
+
+def update_url_params_and_unparse(url, url_params):
+    """
+    Takes a string url and url params (in format of what is returned by
+    get_url_params). Returns a string url param with newly formatted params
+    """
+    parsed_url = urlparse.urlparse(url)._replace(query=urlencode(url_params, True))
+    return urlparse.urlunparse(parsed_url)
 
 
 def convert_param(parameter_dict, vals_as_string=False):

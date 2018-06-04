@@ -262,6 +262,21 @@ def test_process_add_on():
     add_3 = ''
     assert ff_utils.process_add_on(add_3) == ''
 
+
+def test_url_params_functions():
+    fake_url = 'http://not-a-url.com/?test1=abc&test2=def'
+    url_params = ff_utils.get_url_params(fake_url)
+    assert url_params['test1'] == ['abc']
+    assert url_params['test2'] == ['def']
+    url_params['test1'] = ['xyz']
+    url_params['test3'] = ['abc']
+    new_fake_url = ff_utils.update_url_params_and_unparse(fake_url, url_params)
+    assert 'http://not-a-url.com/?' in new_fake_url
+    assert 'test1=xyz' in new_fake_url
+    assert 'test2=def' in new_fake_url
+    assert 'test3=abc' in new_fake_url
+
+
 # Integration tests
 
 
@@ -393,18 +408,35 @@ def test_patch_metadata(integrated_ff):
 
 @pytest.mark.integrated
 def test_post_metadata(integrated_ff):
-    test_data = {'biosource_type': 'immortalized cell line',
-                 'award': '1U01CA200059-01', 'lab': '4dn-dcic-lab'}
+    test_data = {'biosource_type': 'immortalized cell line', 'award': '1U01CA200059-01',
+                 'lab': '4dn-dcic-lab', 'status': 'deleted'}
     post_res = ff_utils.post_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
     post_item = post_res['@graph'][0]
     assert 'uuid' in post_item
+    assert post_item['biosource_type'] == test_data['biosource_type']
+    # make sure there is a 409 when posting to an existing item
+    test_data['uuid'] = post_item['uuid']
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.post_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
+    assert '409' in str(exec_info.value)  # 409 is conflict error
+
+
+@pytest.mark.integrated
+def test_upsert_metadata(integrated_ff):
+    test_data = {'biosource_type': 'immortalized cell line',
+                 'award': '1U01CA200059-01', 'lab': '4dn-dcic-lab'}
+    upsert_res = ff_utils.upsert_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
+    upsert_item = upsert_res['@graph'][0]
+    assert 'uuid' in upsert_item
+    assert upsert_item['biosource_type'] == test_data['biosource_type']
     # make sure the item is patched if already existing
     test_data['description'] = 'test description'
-    test_data['uuid'] = post_item['uuid']
-    post_res2 = ff_utils.post_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
-    post_item2 = post_res2['@graph'][0]
-    assert post_item2['description'] == 'test description'
-    ff_utils.patch_metadata({'status': 'deleted'}, obj_id=test_data['uuid'], key=integrated_ff['ff_key'])
+    test_data['uuid'] = upsert_item['uuid']
+    test_data['status'] = 'deleted'
+    upsert_res2 = ff_utils.upsert_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
+    upsert_item2 = upsert_res2['@graph'][0]
+    assert upsert_item2['description'] == 'test description'
+    assert upsert_item2['status'] == 'deleted'
 
 
 @pytest.mark.integrated
@@ -413,8 +445,41 @@ def test_search_metadata(integrated_ff):
     assert isinstance(search_res, list)
     # this will fail if biosources have not yet been indexed
     assert len(search_res) > 0
-    search_res_w_slash = ff_utils.search_metadata('/search/?limit=all&type=Biosource', key=integrated_ff['ff_key'])
-    assert isinstance(search_res_w_slash, list)
+    search_res_slash = ff_utils.search_metadata('/search/?limit=all&type=Biosource', key=integrated_ff['ff_key'])
+    assert isinstance(search_res_slash, list)
+    # search with a limit
+    search_res_limit = ff_utils.search_metadata('/search/?limit=3&type=Biosource', key=integrated_ff['ff_key'])
+    assert len(search_res_limit) == 3
+    # search with a filter
+    search_res_filt = ff_utils.search_metadata('/search/?limit=3&type=Biosource&biosource_type=immortalized cell line',
+                                               key=integrated_ff['ff_key'])
+    assert len(search_res_filt) > 0
+
+
+@pytest.mark.integrated
+def get_search_generator(integrated_ff):
+    search_url = integrated_ff['server'] + '/search/?type=OntologyTerm'
+    generator1 = ff_utils.get_search_generator(search_url, auth=integrated_ff['ff_key'], page_limit=25)
+    list_gen1 = list(generator1)
+    assert len(list_gen1) > 0
+    for idx, page in list_gen1:
+        assert isinstance(page, list)
+        if idx < len(list_gen1) - 1:
+            assert len(page) == 25
+        else:
+            assert len(page) > 0
+    all_gen1 = [l for page in pages for pages in list_gen1]  # noqa
+    generator2 = ff_utils.get_search_generator(search_url, auth=integrated_ff['ff_key'], page_limit=50)
+    list_gen2 = list(generator2)
+    assert len(list_gen1) > list(list_gen2)
+    all_gen2 = [l for page in pages for pages in list_gen2]  # noqa
+    assert len(all_gen1) == len(all_gen2)
+    # use a limit in the search
+    search_url += '&limit=33'
+    generator3 = ff_utils.get_search_generator(search_url, auth=integrated_ff['ff_key'])
+    list_gen3 = list(generator3)
+    all_gen3 = [l for page in pages for pages in list_gen3]  # noqa
+    assert len(all_gen3) == 33
 
 
 @pytest.mark.integrated
