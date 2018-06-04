@@ -201,11 +201,9 @@ def patch_metadata(patch_item, obj_id='', key=None, ff_env=None, add_on=''):
 
 def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
     '''
-    Patch metadata given the post body and a string schema name.
+    Post metadata given the post body and a string schema name.
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
-    This function checks to see if an existing object already exists
-    with the same body, and if so, runs a patch instead.
     add_on is the string that will be appended to the post url (used
     with tibanna)
     '''
@@ -213,12 +211,31 @@ def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
     post_url = '/'.join([auth['server'], schema_name]) + process_add_on(add_on)
     # format item to json
     post_item = json.dumps(post_item)
+    response = authorized_request(post_url, auth=auth, verb='POST', data=post_item)
+    return get_response_json(response)
+
+
+def upsert_metadata(upsert_item, schema_name, key=None, ff_env=None, add_on=''):
+    '''
+    UPSERT metadata given the upsert body and a string schema name.
+    UPSERT means POST or PATCH on conflict.
+    Either takes a dictionary form authentication (MUST include 'server')
+    or a string fourfront-environment.
+    This function checks to see if an existing object already exists
+    with the same body, and if so, runs a patch instead.
+    add_on is the string that will be appended to the upsert url (used
+    with tibanna)
+    '''
+    auth = get_authentication_with_server(key, ff_env)
+    upsert_url = '/'.join([auth['server'], schema_name]) + process_add_on(add_on)
+    # format item to json
+    upsert_item = json.dumps(upsert_item)
     try:
-        response = authorized_request(post_url, auth=auth, verb='POST', data=post_item)
+        response = authorized_request(upsert_url, auth=auth, verb='POST', data=upsert_item)
     except Exception as e:
         # this means there was a conflict. try to patch
         if '409' in str(e):
-            return patch_metadata(json.loads(post_item), key=auth, add_on=add_on)
+            return patch_metadata(json.loads(upsert_item), key=auth, add_on=add_on)
         else:
             raise Exception(str(e))
     return get_response_json(response)

@@ -47,7 +47,7 @@ response = ff_utils.post_metadata(post_body, 'file_fastq', key=key)
 # response is a dictionary containing info about your post
 response['status']
 >> 'success'
-# the body of the metadata object created is in response['@graph']
+# the dictionary body of the metadata object created is in response['@graph']
 metadata = response['@graph'][0]
 ```
 
@@ -64,4 +64,21 @@ patch_body['accession'] = '4DNFIP74UWGW'
 response = ff_utils.patch_metadata(patch_body, key=key)
 
 # the response has the same format as in post_metadata
+metadata = response['@graph'][0]
+```
+
+Similar to `post_metadata` you can "UPSERT" metadata, which will perform a POST if the metadata doesn't yet exist within the system and will PATCH if it does. The `upsert_metadata` function takes the exact same arguments as `post_metadata` but will not raise an error on a metadata conflict.
+
+```
+upsert_body = {
+    'file_format': 'fastq',
+    'lab': '/labs/4dn-dcic-lab/',
+    'award': '/awards/1U01CA200059-01/',
+    'accession': '4DNFIP74UWGW'
+}
+# this will POST if file 4DNFIP74UWGW does not exist and will PATCH if it does
+response = ff_utils.post_metadata(post_body, 'upsert_body', key=key)
+
+# the response has the same format as in post_metadata
+metadata = response['@graph'][0]
 ```

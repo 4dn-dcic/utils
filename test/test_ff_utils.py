@@ -393,18 +393,36 @@ def test_patch_metadata(integrated_ff):
 
 @pytest.mark.integrated
 def test_post_metadata(integrated_ff):
-    test_data = {'biosource_type': 'immortalized cell line',
-                 'award': '1U01CA200059-01', 'lab': '4dn-dcic-lab'}
+    conflict_item = '331111bc-8535-4448-903e-854af460a254'
+    test_data = {'biosource_type': 'immortalized cell line', 'award': '1U01CA200059-01',
+                 'lab': '4dn-dcic-lab', 'status': 'deleted'}
     post_res = ff_utils.post_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
     post_item = post_res['@graph'][0]
     assert 'uuid' in post_item
+    assert post_item['biosource_type'] == test_data['biosource_type']
+    # make sure there is a 409 when posting to an existing item
+    test_data['uuid'] = post_item['uuid']
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.post_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
+    assert '409' in str(exec_info.value)  # 409 is conflict error
+
+
+@pytest.mark.integrated
+def test_upsert_metadata(integrated_ff):
+    test_data = {'biosource_type': 'immortalized cell line',
+                 'award': '1U01CA200059-01', 'lab': '4dn-dcic-lab'}
+    upsert_res = ff_utils.upsert_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
+    upsert_item = upsert_res['@graph'][0]
+    assert 'uuid' in upsert_item
+    assert upsert_item['biosource_type'] == test_data['biosource_type']
     # make sure the item is patched if already existing
     test_data['description'] = 'test description'
-    test_data['uuid'] = post_item['uuid']
-    post_res2 = ff_utils.post_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
-    post_item2 = post_res2['@graph'][0]
-    assert post_item2['description'] == 'test description'
-    ff_utils.patch_metadata({'status': 'deleted'}, obj_id=test_data['uuid'], key=integrated_ff['ff_key'])
+    test_data['uuid'] = upsert_item['uuid']
+    test_data['status'] = 'deleted'
+    upsert_res2 = ff_utils.upsert_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
+    upsert_item2 = upsert_res2['@graph'][0]
+    assert upsert_item2['description'] == 'test description'
+    assert upsert_item2['status'] == 'deleted'
 
 
 @pytest.mark.integrated
