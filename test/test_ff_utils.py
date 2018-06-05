@@ -445,8 +445,12 @@ def test_search_metadata(integrated_ff):
     assert isinstance(search_res, list)
     # this will fail if biosources have not yet been indexed
     assert len(search_res) > 0
+    # make sure uuids are unique
+    search_uuids = set([item['uuid'] for item in search_res])
+    assert len(search_uuids) == len(search_res)
     search_res_slash = ff_utils.search_metadata('/search/?limit=all&type=Biosource', key=integrated_ff['ff_key'])
     assert isinstance(search_res_slash, list)
+    assert len(search_res_slash) == len(search_res)
     # search with a limit
     search_res_limit = ff_utils.search_metadata('/search/?limit=3&type=Biosource', key=integrated_ff['ff_key'])
     assert len(search_res_limit) == 3
@@ -480,6 +484,9 @@ def get_search_generator(integrated_ff):
     list_gen3 = list(generator3)
     all_gen3 = [l for page in pages for pages in list_gen3]  # noqa
     assert len(all_gen3) == 33
+    # make sure that all results are unique
+    all_gen3_uuids = set([item['uuid'] for item in all_gen3])
+    assert len(all_gen3_uuids) == len(all_gen3)
 
 
 @pytest.mark.integrated
