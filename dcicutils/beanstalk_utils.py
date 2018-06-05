@@ -21,7 +21,6 @@ from dcicutils import ff_utils
 from botocore.exceptions import ClientError
 from time import sleep
 
-logging.basicConfig()
 logger = logging.getLogger('logger')
 logger.setLevel(logging.INFO)
 
