@@ -362,7 +362,6 @@ def test_authorized_request_integrated(integrated_ff):
 
 @pytest.mark.integrated
 def test_get_metadata(integrated_ff, basestring):
-    import time
     # use this test biosource
     test_item = '331111bc-8535-4448-903e-854af460b254'
     res_w_key = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'])
@@ -381,7 +380,7 @@ def test_get_metadata(integrated_ff, basestring):
     res_w_check = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'],
                                         ff_env=integrated_ff['ff_env'], check_queue=True)
     res_db = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'],
-                                        add_on='datastore=database')
+                                   add_on='datastore=database')
     assert res_db['description'] == 'test description'
     assert res_w_check['description'] == res_db['description']
     ff_utils.patch_metadata({'description': orig_descrip}, obj_id=test_item, key=integrated_ff['ff_key'])
