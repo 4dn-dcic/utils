@@ -378,10 +378,12 @@ def test_get_metadata(integrated_ff, basestring):
 
     # testing check_queues functionality requires patching
     ff_utils.patch_metadata({'description': 'test description'}, obj_id=test_item, key=integrated_ff['ff_key'])
-    time.sleep(5)  # ensure messages have time to propogate to queue
     res_w_check = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'],
                                         ff_env=integrated_ff['ff_env'], check_queue=True)
-    assert res_w_check['description'] == 'test description'
+    res_db = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'],
+                                        add_on='datastore=database')
+    assert res_db['description'] == 'test description'
+    assert res_w_check['description'] == res_db['description']
     ff_utils.patch_metadata({'description': orig_descrip}, obj_id=test_item, key=integrated_ff['ff_key'])
 
     # check add_on
