@@ -77,7 +77,7 @@ upsert_body = {
     'accession': '4DNFIP74UWGW'
 }
 # this will POST if file 4DNFIP74UWGW does not exist and will PATCH if it does
-response = ff_utils.post_metadata(post_body, 'upsert_body', key=key)
+response = ff_utils.post_metadata(upsert_body, 'file_fastq', key=key)
 
 # the response has the same format as in post_metadata
 metadata = response['@graph'][0]
