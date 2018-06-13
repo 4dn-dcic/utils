@@ -1,0 +1,289 @@
+[
+  {
+    "_id": "4e6613b0-69c0-11e8-875e-53258397a05d",
+    "_type": "dashboard",
+    "_source": {
+      "title": "Create Mapping",
+      "hits": 0,
+      "description": "",
+      "panelsJSON": "[{\"col\":1,\"id\":\"a903c760-69be-11e8-875e-53258397a05d\",\"panelIndex\":1,\"row\":1,\"size_x\":6,\"size_y\":3,\"type\":\"visualization\"},{\"col\":1,\"columns\":[\"level\",\"cat\",\"collection\",\"duration\",\"db_count\",\"es_count\"],\"id\":\"a0302ff0-69c0-11e8-875e-53258397a05d\",\"panelIndex\":3,\"row\":7,\"size_x\":6,\"size_y\":3,\"sort\":[\"cat\",\"desc\"],\"type\":\"search\"},{\"col\":7,\"columns\":[\"_source\"],\"id\":\"a30ea250-69c1-11e8-875e-53258397a05d\",\"panelIndex\":4,\"row\":7,\"size_x\":6,\"size_y\":3,\"sort\":[\"cat\",\"desc\"],\"type\":\"search\"},{\"col\":7,\"id\":\"3bdd4710-6a77-11e8-8a9c-87915a4d443c\",\"panelIndex\":5,\"row\":4,\"size_x\":6,\"size_y\":3,\"type\":\"visualization\"},{\"col\":1,\"id\":\"5994e7e0-6a7c-11e8-a0b4-ad031fdb7554\",\"panelIndex\":7,\"row\":4,\"size_x\":6,\"size_y\":3,\"type\":\"visualization\"},{\"size_x\":6,\"size_y\":3,\"panelIndex\":8,\"type\":\"visualization\",\"id\":\"17658f10-6a80-11e8-b1a3-fd0f45606d50\",\"col\":7,\"row\":1}]",
+      "optionsJSON": "{\"darkTheme\":false}",
+      "uiStateJSON": "{\"P-7\":{\"vis\":{\"legendOpen\":true}}}",
+      "version": 1,
+      "timeRestore": true,
+      "timeTo": "now",
+      "timeFrom": "now-24h",
+      "refreshInterval": {
+        "display": "Off",
+        "pause": false,
+        "value": 0
+      },
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"highlightAll\":true,\"filter\":[{\"query\":{\"query_string\":{\"analyze_wildcard\":true,\"query\":\"type:create_mapping\"}}}]}"
+      }
+    }
+  },
+  {
+    "_id": "90d2f200-6a7d-11e8-946d-5163b0cccb12",
+    "_type": "dashboard",
+    "_source": {
+      "title": "System Status",
+      "hits": 0,
+      "description": "",
+      "panelsJSON": "[{\"col\":1,\"columns\":[\"level\",\"logger\",\"event\",\"exception\"],\"id\":\"c91c8010-6a7b-11e8-99c9-495379b95050\",\"panelIndex\":1,\"row\":4,\"size_x\":12,\"size_y\":6,\"sort\":[\"@timestamp\",\"desc\"],\"type\":\"search\"},{\"size_x\":6,\"size_y\":3,\"panelIndex\":2,\"type\":\"visualization\",\"id\":\"24cba6f0-6a7e-11e8-946d-5163b0cccb12\",\"col\":1,\"row\":1}]",
+      "optionsJSON": "{\"darkTheme\":false}",
+      "uiStateJSON": "{}",
+      "version": 1,
+      "timeRestore": true,
+      "timeTo": "now",
+      "timeFrom": "now-24h",
+      "refreshInterval": {
+        "display": "Off",
+        "pause": false,
+        "value": 0
+      },
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"highlightAll\":true,\"filter\":[{\"query\":{\"query_string\":{\"analyze_wildcard\":true,\"query\":\"*\"}}}]}"
+      }
+    }
+  },
+  {
+    "_id": "6a730c40-6b3a-11e8-b78f-ad9adadb60aa",
+    "_type": "dashboard",
+    "_source": {
+      "title": "Indexing Times",
+      "hits": 0,
+      "description": "",
+      "panelsJSON": "[{\"col\":1,\"id\":\"2d8b13b0-6b38-11e8-b78f-ad9adadb60aa\",\"panelIndex\":1,\"row\":1,\"size_x\":12,\"size_y\":3,\"type\":\"visualization\"},{\"col\":1,\"id\":\"1fcdd090-6b39-11e8-b78f-ad9adadb60aa\",\"panelIndex\":2,\"row\":7,\"size_x\":8,\"size_y\":3,\"type\":\"visualization\"},{\"col\":1,\"id\":\"e970a2d0-6b32-11e8-b78f-ad9adadb60aa\",\"panelIndex\":3,\"row\":4,\"size_x\":12,\"size_y\":3,\"type\":\"visualization\"}]",
+      "optionsJSON": "{\"darkTheme\":false}",
+      "uiStateJSON": "{\"P-1\":{\"vis\":{\"legendOpen\":true},\"spy\":{\"mode\":{\"name\":null,\"fill\":false}}}}",
+      "version": 1,
+      "timeRestore": true,
+      "timeTo": "now",
+      "timeFrom": "now-4h",
+      "refreshInterval": {
+        "display": "Off",
+        "pause": false,
+        "value": 0
+      },
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"highlightAll\":true,\"filter\":[{\"query\":{\"query_string\":{\"analyze_wildcard\":true,\"query\":\"*\"}}}]}"
+      }
+    }
+  },
+  {
+    "_id": "a0302ff0-69c0-11e8-875e-53258397a05d",
+    "_type": "search",
+    "_source": {
+      "title": "create mapping quick view",
+      "description": "",
+      "hits": 0,
+      "columns": [
+        "level",
+        "cat",
+        "collection",
+        "duration",
+        "db_count",
+        "es_count"
+      ],
+      "sort": [
+        "cat",
+        "desc"
+      ],
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"filebeat-*\",\"highlightAll\":true,\"query\":{\"query_string\":{\"analyze_wildcard\":true,\"query\":\"type:create_mapping\"}},\"filter\":[]}"
+      }
+    }
+  },
+  {
+    "_id": "a30ea250-69c1-11e8-875e-53258397a05d",
+    "_type": "search",
+    "_source": {
+      "title": "errors in create mapping",
+      "description": "",
+      "hits": 0,
+      "columns": [
+        "_source"
+      ],
+      "sort": [
+        "cat",
+        "desc"
+      ],
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"filebeat-*\",\"highlightAll\":true,\"query\":{\"query_string\":{\"query\":\"error AND type:create_mapping\",\"analyze_wildcard\":true}},\"filter\":[]}"
+      }
+    }
+  },
+  {
+    "_id": "c91c8010-6a7b-11e8-99c9-495379b95050",
+    "_type": "search",
+    "_source": {
+      "title": "Errors in the System",
+      "description": "",
+      "hits": 0,
+      "columns": [
+        "level",
+        "logger",
+        "event",
+        "exception"
+      ],
+      "sort": [
+        "@timestamp",
+        "desc"
+      ],
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"filebeat-*\",\"highlightAll\":true,\"query\":{\"query_string\":{\"analyze_wildcard\":true,\"query\":\"level:error\"}},\"filter\":[]}"
+      }
+    }
+  },
+  {
+    "_id": "4ab5b4c0-6b53-11e8-9637-a10441a6e5e0",
+    "_type": "search",
+    "_source": {
+      "title": "find my tibanna error",
+      "description": "",
+      "hits": 0,
+      "columns": [
+        "cat",
+        "type"
+      ],
+      "sort": [
+        "embed_uuid",
+        "asc"
+      ],
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"filebeat-*\",\"highlightAll\":true,\"query\":{\"query_string\":{\"analyze_wildcard\":true,\"query\":\"logger:snovault.elasticsearch.indexer\"}},\"filter\":[]}"
+      }
+    }
+  },
+  {
+    "_id": "e11170d0-69af-11e8-875e-53258397a05d",
+    "_type": "visualization",
+    "_source": {
+      "title": "Create Mapping times per index",
+      "visState": "{\"title\":\"Create Mapping times per index\",\"type\":\"histogram\",\"params\":{\"addTooltip\":true,\"addLegend\":true,\"legendPosition\":\"right\",\"scale\":\"linear\",\"mode\":\"stacked\",\"times\":[],\"addTimeMarker\":false,\"defaultYExtents\":false,\"setYExtents\":false},\"aggs\":[{\"id\":\"3\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"collection\",\"size\":20,\"order\":\"desc\",\"orderBy\":\"_term\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"sum\",\"schema\":\"metric\",\"params\":{\"field\":\"index_time\",\"json\":\"\",\"customLabel\":\"build index time\"}},{\"id\":\"4\",\"enabled\":true,\"type\":\"sum\",\"schema\":\"metric\",\"params\":{\"field\":\"map_time\",\"customLabel\":\"create mapping by type\"}}],\"listeners\":{}}",
+      "uiStateJSON": "{}",
+      "description": "",
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"filebeat-*\",\"query\":{\"query_string\":{\"analyze_wildcard\":true,\"query\":\"cat:\\\"index mapping time\\\"\"}},\"filter\":[]}"
+      }
+    }
+  },
+  {
+    "_id": "3bdd4710-6a77-11e8-8a9c-87915a4d443c",
+    "_type": "visualization",
+    "_source": {
+      "title": "Items Queued Create Mapping",
+      "visState": "{\"title\":\"Items Queued Create Mapping\",\"type\":\"histogram\",\"params\":{\"addTooltip\":true,\"addLegend\":true,\"legendPosition\":\"right\",\"scale\":\"linear\",\"mode\":\"stacked\",\"times\":[],\"addTimeMarker\":false,\"defaultYExtents\":false,\"setYExtents\":false},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"sum\",\"schema\":\"metric\",\"params\":{\"field\":\"count\",\"customLabel\":\"items indexed\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"collection\",\"size\":5,\"order\":\"desc\",\"orderBy\":\"1\"}}],\"listeners\":{}}",
+      "uiStateJSON": "{}",
+      "description": "",
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"filebeat-*\",\"query\":{\"query_string\":{\"analyze_wildcard\":true,\"query\":\"cat:\\\"items to queue\\\"\"}},\"filter\":[]}"
+      }
+    }
+  },
+  {
+    "_id": "a903c760-69be-11e8-875e-53258397a05d",
+    "_type": "visualization",
+    "_source": {
+      "title": "Create Mapping Time",
+      "visState": "{\"title\":\"Create Mapping Time\",\"type\":\"metric\",\"params\":{\"fontSize\":60,\"handleNoResults\":true},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"sum\",\"schema\":\"metric\",\"params\":{\"field\":\"duration\",\"customLabel\":\"Create Mapping Time\"}}],\"listeners\":{}}",
+      "uiStateJSON": "{}",
+      "description": "",
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"filebeat-*\",\"query\":{\"query_string\":{\"query\":\"cat:overall mapping time\",\"analyze_wildcard\":true}},\"filter\":[]}"
+      }
+    }
+  },
+  {
+    "_id": "24cba6f0-6a7e-11e8-946d-5163b0cccb12",
+    "_type": "visualization",
+    "_source": {
+      "title": "Errors per minute",
+      "visState": "{\"aggs\":[{\"enabled\":true,\"id\":\"1\",\"params\":{},\"schema\":\"metric\",\"type\":\"count\"},{\"enabled\":true,\"id\":\"2\",\"params\":{\"field\":\"level\",\"order\":\"desc\",\"orderBy\":\"1\",\"size\":5},\"schema\":\"group\",\"type\":\"terms\"},{\"enabled\":true,\"id\":\"3\",\"params\":{\"customInterval\":\"2h\",\"extended_bounds\":{},\"field\":\"@timestamp\",\"interval\":\"m\",\"min_doc_count\":1},\"schema\":\"segment\",\"type\":\"date_histogram\"}],\"listeners\":{},\"params\":{\"addLegend\":true,\"addTimeMarker\":true,\"addTooltip\":true,\"defaultYExtents\":false,\"drawLinesBetweenPoints\":true,\"interpolate\":\"linear\",\"legendPosition\":\"right\",\"radiusRatio\":9,\"scale\":\"linear\",\"setYExtents\":false,\"showCircles\":true,\"times\":[]},\"title\":\"Errors per minute\",\"type\":\"line\"}",
+      "uiStateJSON": "{}",
+      "description": "",
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"filter\":[],\"index\":\"filebeat-*\",\"highlightAll\":true,\"query\":{\"query_string\":{\"analyze_wildcard\":true,\"query\":\"level:error\"}}}"
+      }
+    }
+  },
+  {
+    "_id": "e970a2d0-6b32-11e8-b78f-ad9adadb60aa",
+    "_type": "visualization",
+    "_source": {
+      "title": "Re-indexing per item",
+      "visState": "{\"title\":\"Re-indexing per item\",\"type\":\"area\",\"params\":{\"addTooltip\":true,\"addLegend\":true,\"legendPosition\":\"right\",\"scale\":\"linear\",\"interpolate\":\"linear\",\"mode\":\"stacked\",\"times\":[],\"addTimeMarker\":false,\"defaultYExtents\":false,\"setYExtents\":false},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"avg\",\"schema\":\"metric\",\"params\":{\"field\":\"duration\",\"customLabel\":\"\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"embed_uuid\",\"size\":1000,\"order\":\"desc\",\"orderBy\":\"1\"}},{\"id\":\"4\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"group\",\"params\":{\"field\":\"event\",\"size\":50,\"order\":\"desc\",\"orderBy\":\"1\"}},{\"id\":\"5\",\"enabled\":true,\"type\":\"count\",\"schema\":\"metric\",\"params\":{\"customLabel\":\"times indexed\"}}],\"listeners\":{}}",
+      "uiStateJSON": "{}",
+      "description": "",
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"filebeat-*\",\"query\":{\"query_string\":{\"query\":\"cat:\\\"update object\\\"\",\"analyze_wildcard\":true}},\"filter\":[]}"
+      }
+    }
+  },
+  {
+    "_id": "2d8b13b0-6b38-11e8-b78f-ad9adadb60aa",
+    "_type": "visualization",
+    "_source": {
+      "title": "50 Longest embeds",
+      "visState": "{\"title\":\"50 Longest embeds\",\"type\":\"area\",\"params\":{\"addLegend\":true,\"addTimeMarker\":false,\"addTooltip\":true,\"defaultYExtents\":false,\"interpolate\":\"linear\",\"legendPosition\":\"right\",\"mode\":\"stacked\",\"scale\":\"linear\",\"setYExtents\":false,\"times\":[]},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"avg\",\"schema\":\"metric\",\"params\":{\"field\":\"duration\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"embed_uuid\",\"size\":50,\"order\":\"desc\",\"orderBy\":\"1\"}}],\"listeners\":{}}",
+      "uiStateJSON": "{}",
+      "description": "",
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"filebeat-*\",\"query\":{\"query_string\":{\"analyze_wildcard\":true,\"query\":\"cat:\\\"embed time\\\"\"}},\"filter\":[]}"
+      }
+    }
+  },
+  {
+    "_id": "5994e7e0-6a7c-11e8-a0b4-ad031fdb7554",
+    "_type": "visualization",
+    "_source": {
+      "title": "Longest times for Create Mapping",
+      "visState": "{\"aggs\":[{\"enabled\":true,\"id\":\"1\",\"params\":{\"field\":\"index_time\"},\"schema\":\"metric\",\"type\":\"sum\"},{\"enabled\":true,\"id\":\"2\",\"params\":{\"field\":\"collection\",\"order\":\"desc\",\"orderBy\":\"1\",\"size\":5},\"schema\":\"segment\",\"type\":\"terms\"}],\"listeners\":{},\"params\":{\"addLegend\":true,\"addTooltip\":true,\"isDonut\":false,\"legendPosition\":\"right\"},\"title\":\"Longest times for Create Mapping\",\"type\":\"pie\"}",
+      "uiStateJSON": "{}",
+      "description": "",
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"filebeat-*\",\"query\":{\"query_string\":{\"analyze_wildcard\":true,\"query\":\"cat:\\\"index mapping time\\\"\"}},\"filter\":[]}"
+      }
+    }
+  },
+  {
+    "_id": "17658f10-6a80-11e8-b1a3-fd0f45606d50",
+    "_type": "visualization",
+    "_source": {
+      "title": "Total Items to Index From create Mapping",
+      "visState": "{\"title\":\"Total Items to Index From create Mapping\",\"type\":\"metric\",\"params\":{\"handleNoResults\":true,\"fontSize\":60},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"sum\",\"schema\":\"metric\",\"params\":{\"field\":\"count\",\"customLabel\":\"Total number of Items to Index\"}}],\"listeners\":{}}",
+      "uiStateJSON": "{}",
+      "description": "",
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"filebeat-*\",\"query\":{\"query_string\":{\"query\":\"cat:\\\"items to queue\\\" AND type:create_mapping\",\"analyze_wildcard\":true}},\"filter\":[]}"
+      }
+    }
+  },
+  {
+    "_id": "1fcdd090-6b39-11e8-b78f-ad9adadb60aa",
+    "_type": "visualization",
+    "_source": {
+      "title": "Indexing Load - successful embedding vs update object",
+      "visState": "{\"title\":\"Indexing Load - successful embedding vs update object\",\"type\":\"line\",\"params\":{\"addTooltip\":true,\"addLegend\":true,\"legendPosition\":\"right\",\"showCircles\":true,\"interpolate\":\"linear\",\"scale\":\"linear\",\"drawLinesBetweenPoints\":true,\"radiusRatio\":9,\"times\":[],\"addTimeMarker\":true,\"defaultYExtents\":false,\"setYExtents\":false},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"count\",\"schema\":\"metric\",\"params\":{\"customLabel\":\"# attempts to reindex\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"schema\":\"segment\",\"params\":{\"field\":\"@timestamp\",\"interval\":\"m\",\"customInterval\":\"2h\",\"min_doc_count\":1,\"extended_bounds\":{},\"customLabel\":\"completed per minute\"}},{\"id\":\"3\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"group\",\"params\":{\"field\":\"event\",\"size\":5,\"order\":\"desc\",\"orderBy\":\"1\"}}],\"listeners\":{}}",
+      "uiStateJSON": "{\"vis\":{\"colors\":{\"time to embed\":\"#508642\"},\"legendOpen\":true}}",
+      "description": "",
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"filebeat-*\",\"query\":{\"query_string\":{\"query\":\"cat:\\\"embed time\\\" OR cat:\\\"update object\\\"\",\"analyze_wildcard\":true}},\"filter\":[]}"
+      }
+    }
+  }
+]
