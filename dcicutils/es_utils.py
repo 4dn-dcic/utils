@@ -31,7 +31,7 @@ def create_es_client(es_url, use_aws_auth=True):
     Elasticsearch(addresses, **es_options)
 
 
-def create_snapshot_repo(client, s3_bucket):
+def create_snapshot_repo(client, repo_name,  s3_bucket):
     import pdb; pdb.set_trace()
     snapshot_body = {'type': 's3',
                      'settings': {
@@ -40,7 +40,7 @@ def create_snapshot_repo(client, s3_bucket):
                          'role_arn': 'arn:aws:iam::643366669028:role/S3Roll'
                      }
                     }
-    res = client.snapshot.create_repository(repository='backup', body=snapshot_body)
+    res = client.snapshot.create_repository(repository=repo_name, body=snapshot_body)
     print(res)
 
 
