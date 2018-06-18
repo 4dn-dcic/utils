@@ -33,7 +33,6 @@ def create_es_client(es_url, use_aws_auth=False):
 
 
 def create_snapshot_repo(client, repo_name,  s3_bucket):
-    import pdb; pdb.set_trace()
     snapshot_body = {'type': 's3',
                      'settings': {
                          'bucket': s3_bucket,
@@ -42,7 +41,6 @@ def create_snapshot_repo(client, repo_name,  s3_bucket):
                      }
                     }
     res = client.snapshot.create_repository(repository=repo_name, body=snapshot_body)
-    print(res)
 
 
 
