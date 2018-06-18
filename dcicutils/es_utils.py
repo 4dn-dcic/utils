@@ -8,27 +8,28 @@ def get_index_list(client, name, days_old=0, timestring='%Y.%m.%d', ilo=None):
     return ilo
 
 
-def create_es_client(es_url, use_aws_auth=True):
+def create_es_client(es_url, use_aws_auth=False):
     from elasticsearch import Elasticsearch, RequestsHttpConnection
     from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
 
     if isinstance(es_url, (list, tuple)):
         addresses = es_url
     else:
-        addresses = list(es_url)
+        addresses = [es_url,]
 
     es_options = {'retry_on_timeout': True,
                   'maxsize': 50  # parallellism...
                  }
     if use_aws_auth:
-        host = addresses[0].split(':')
-        auth = BotoAWSRequestsAuth(aws_host=host[0],
+        host = addresses[0].split('//')
+        host = host[-1].split(":")
+        auth = BotoAWSRequestsAuth(aws_host=host[0].rstrip('/'),
                                    aws_region='us-east-1',
                                    aws_service='es')
         es_options['connection_class'] = RequestsHttpConnection
         es_options['http_auth'] = auth
 
-    Elasticsearch(addresses, **es_options)
+    return Elasticsearch(addresses, **es_options)
 
 
 def create_snapshot_repo(client, repo_name,  s3_bucket):
