@@ -1,3 +1,8 @@
+from elasticsearch import Elasticsearch, RequestsHttpConnection
+from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
+import curator
+
+
 def get_index_list(client, name, days_old=0, timestring='%Y.%m.%d', ilo=None):
     if ilo is None:
         ilo = curator.IndexList(client)
@@ -9,17 +14,14 @@ def get_index_list(client, name, days_old=0, timestring='%Y.%m.%d', ilo=None):
 
 
 def create_es_client(es_url, use_aws_auth=False):
-    from elasticsearch import Elasticsearch, RequestsHttpConnection
-    from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
-
     if isinstance(es_url, (list, tuple)):
         addresses = es_url
     else:
-        addresses = [es_url,]
+        addresses = [es_url, ]
 
     es_options = {'retry_on_timeout': True,
                   'maxsize': 50  # parallellism...
-                 }
+                  }
     if use_aws_auth:
         host = addresses[0].split('//')
         host = host[-1].split(":")
@@ -38,9 +40,6 @@ def create_snapshot_repo(client, repo_name,  s3_bucket):
                          'bucket': s3_bucket,
                          'region': 'us-east-1',
                          'role_arn': 'arn:aws:iam::643366669028:role/S3Roll'
+                      }
                      }
-                    }
-    res = client.snapshot.create_repository(repository=repo_name, body=snapshot_body)
-
-
-
+    return client.snapshot.create_repository(repository=repo_name, body=snapshot_body)
