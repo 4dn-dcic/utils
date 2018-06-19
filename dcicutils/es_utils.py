@@ -7,6 +7,7 @@ info about snapshots on AWS
 https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/es-managedomains-snapshots.html
 '''
 
+
 def get_index_list(client, name, days_old=0, timestring='%Y.%m.%d', ilo=None):
     if ilo is None:
         ilo = curator.IndexList(client)
