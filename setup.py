@@ -8,7 +8,7 @@ README = open(os.path.join(here, 'README.md')).read()
 requires = [
     'pytest-runner',
     'boto3',
-    'elasticsearch==5.3.*',
+    'elasticsearch>=5.3.0',
     'elasticsearch-curator==5.*',
     'aws_requests_auth'
 ]
