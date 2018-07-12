@@ -7,6 +7,7 @@ info about snapshots on AWS
 https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/es-managedomains-snapshots.html
 '''
 
+
 def create_es_client(es_url, use_aws_auth=True, **options):
     """
     Use to create a ES that supports the signature version 4 signing process.
