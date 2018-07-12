@@ -1,8 +1,5 @@
 from elasticsearch import Elasticsearch, RequestsHttpConnection
-from
-
-
-.boto_utils import BotoAWSRequestsAuth
+from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
 import curator
 
 '''
@@ -24,7 +21,6 @@ def create_es_client(es_url, use_aws_auth=True, **options):
 
     es_options = {'retry_on_timeout': True,
                   'maxsize': 50}  # parallellism...
-    es_options.update(**options)  # add any given keyword options
     if use_aws_auth:
         host = es_url.split('//')  # remove schema from url
         host = host[-1].split(":")
@@ -33,6 +29,7 @@ def create_es_client(es_url, use_aws_auth=True, **options):
                                    aws_service='es')
         es_options['connection_class'] = RequestsHttpConnection
         es_options['http_auth'] = auth
+    es_options.update(**options)  # add any given keyword options at the end
 
     return Elasticsearch(es_url, **es_options)
 
