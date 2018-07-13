@@ -6,7 +6,11 @@ import random
 import copy
 import boto3
 from uuid import UUID
-from dcicutils import s3_utils, submit_utils
+from dcicutils import (
+    s3_utils,
+    submit_utils,
+    es_utils
+)
 import requests
 # urlparse import differs between py2 and 3
 if sys.version_info[0] < 3:
@@ -328,6 +332,29 @@ def delete_field(obj_id, del_field, key=None, ff_env=None):
     # use an empty patch body
     response = authorized_request(patch_url, auth=auth, verb='PATCH', data=json.dumps({}))
     return get_response_json(response)
+
+
+def get_es_metadata(uuid, schema_name, es_client=None, key=None, ff_env=None):
+    """
+    Given string item uuid and schema name (e.g. "file_fastq"), will return a
+    dictionary response of the full ES ecord for that item (or an empty
+    dictionary if the item doesn't exist/ is not indexed)
+    You can pass in an Elasticsearch client (initialized by create_es_client)
+    through the es_client param to save init time.
+    Same auth mechanism as the other metadata functions
+    """
+    from elasticsearch.exceptions import TransportError
+    if es_client is None:
+        # need to know ES server location and item type
+        auth = get_authentication_with_server(key, ff_env)
+        health_res = authorized_request(auth['server'] + '/health', auth=auth, verb='GET')
+        es_url = get_response_json(health_res)['elasticsearch']
+        es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
+    try:
+        es_res = es_client.get(index=schema_name, doc_type=schema_name, id=uuid)
+    except TransportError:
+        return {}
+    return es_res.get('_source', {})
 
 
 #####################
