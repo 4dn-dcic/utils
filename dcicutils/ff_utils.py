@@ -9,7 +9,7 @@ from dcicutils import (
     es_utils
 )
 import requests
-# urlparse import differs between py2 and py3
+# urlparse import differs between py2 and 3
 if sys.version_info[0] < 3:
     import urlparse
     from urllib import urlencode as urlencode
