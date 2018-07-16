@@ -3,12 +3,9 @@ import sys
 import json
 import time
 import random
-import copy
 import boto3
-from uuid import UUID
 from dcicutils import (
     s3_utils,
-    submit_utils,
     es_utils
 )
 import requests
@@ -138,7 +135,7 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     Timeout of 60 seconds used by default but can be overwritten as a kwarg.
 
     Verb should be one of: GET, POST, PATCH, PUT, or DELETE
-    auth should be obtained using s3Utils.get_key or in submit_utils tuple form.
+    auth should be obtained using s3Utils.get_key.
     If not provided, try to get the key using s3_utils if 'ff_env' in kwargs
 
     usage:
@@ -334,52 +331,36 @@ def delete_field(obj_id, del_field, key=None, ff_env=None):
     return get_response_json(response)
 
 
-def get_es_metadata(uuid, schema_name, es_client=None, key=None, ff_env=None):
+def get_es_metadata(uuid, es_client=None, key=None, ff_env=None):
     """
-    Given string item uuid and schema name (e.g. "file_fastq"), will return a
+    Given string item uuid, will return a
     dictionary response of the full ES ecord for that item (or an empty
     dictionary if the item doesn't exist/ is not indexed)
     You can pass in an Elasticsearch client (initialized by create_es_client)
     through the es_client param to save init time.
     Same auth mechanism as the other metadata functions
     """
-    from elasticsearch.exceptions import TransportError
     if es_client is None:
         # need to know ES server location and item type
         auth = get_authentication_with_server(key, ff_env)
         health_res = authorized_request(auth['server'] + '/health', auth=auth, verb='GET')
         es_url = get_response_json(health_res)['elasticsearch']
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
-    try:
-        es_res = es_client.get(index=schema_name, doc_type=schema_name, id=uuid)
-    except TransportError:
+    es_res = es_client.search(index='_all', body={'query': {'term': {'_id': uuid}}})
+    es_hits = es_res['hits']['hits']
+    if not isinstance(es_hits, list):
+        raise Exception('ERROR malformed results found when searching for uuid %s' % uuid)
+    elif len(es_hits) > 1:
+        raise Exception('ERROR multiple results found when searching for uuid %s' % uuid)
+    elif len(es_hits) == 0:
         return {}
-    return es_res.get('_source', {})
+    # es_hits should only be length 1, so this is the result
+    return es_hits[0]['_source']
 
 
 #####################
 # Utility functions #
 #####################
-
-
-def fdn_connection(key='', connection=None, keyname='default'):
-    """
-    This is a wrapper for getting submit_utils.FDN_Connection
-    It's utility has decreased after transitioning to authorized_request
-    """
-    try:
-        assert key or connection
-    except AssertionError:
-        return None
-    if not connection:
-        try:
-            fdn_key = submit_utils.FDN_Key(key, keyname)
-            connection = submit_utils.FDN_Connection(fdn_key)
-        except Exception as e:
-            raise Exception("Unable to connect to server with check keys : %s" % e)
-    return connection
-
-
 def unified_authentication(auth=None, ff_env=None):
     """
     One authentication function to rule them all.
@@ -397,7 +378,7 @@ def unified_authentication(auth=None, ff_env=None):
         # webprod and webprod2 both use the fourfront-webprod bucket for keys
         use_env = 'fourfront-webprod' if 'webprod' in ff_env else ff_env
         auth = s3_utils.s3Utils(env=use_env).get_access_keys()
-    # see if auth is directly from get_access_keys() or the tuple form used in submit_utils
+    # see if auth is directly from get_access_keys()
     use_auth = None
     # needed for old form of auth from get_key()
     if isinstance(auth, dict) and isinstance(auth.get('default'), dict):
@@ -552,131 +533,3 @@ def generate_rand_accession():
         rand_accession += r
     accession = "4DNFI"+rand_accession
     return accession
-
-
-def is_uuid(value):
-    """Does the string look like a uuid"""
-    if '-' not in value:
-        # md5checksums are valid uuids but do not contain dashes so this skips those
-        return False
-    try:
-        UUID(value, version=4)
-        return True
-    except ValueError:  # noqa: E722
-        return False
-
-
-def find_uuids(val):
-    """Find any uuids in the value"""
-    vals = []
-    if not val:
-        return []
-    elif isinstance(val, str):
-        if is_uuid(val):
-            vals = [val]
-        else:
-            return []
-    else:
-        text = str(val)
-        text_list = [i for i in text. split("'") if len(i) == 36]
-        vals = [i for i in text_list if is_uuid(i)]
-    return vals
-
-
-def get_item_type(connection, item):
-    try:
-        return item['@type'].pop(0)
-    except (KeyError, TypeError):
-        res = submit_utils.get_FDN(item, connection)
-        try:
-            return res['@type'][0]
-        except AttributeError:  # noqa: E722
-            print("Can't find a type for item %s" % item)
-    return None
-
-
-def filter_dict_by_value(dictionary, values, include=True):
-    """Will filter items from a dictionary based on values
-        can be either an inclusive or exclusive filter
-        if include=False will remove the items with given values
-        else will remove items that don't match the given values
-    """
-    if include:
-        return {k: v for k, v in dictionary.items() if v in values}
-    else:
-        return {k: v for k, v in dictionary.items() if v not in values}
-
-
-def has_field_value(item_dict, field, value=None, val_is_item=False):
-    """Returns True if the field is present in the item
-        BUT if there is value parameter only returns True if value provided is
-        the field value or one of the values if the field is an array
-        How fancy do we want to make this?"""
-    # 2 simple cases
-    if field not in item_dict:
-        return False
-    if not value and field in item_dict:
-        return True
-
-    # now checking value
-    val_in_item = item_dict.get(field)
-
-    if isinstance(val_in_item, list):
-        if value in val_in_item:
-            return True
-    elif isinstance(val_in_item, str):
-        if value == val_in_item:
-            return True
-
-    # only check dict val_is_item param is True and only
-    # check @id and link_id - uuid raw format will have been
-    # checked above
-    if val_in_item:
-        if isinstance(val_in_item, dict):
-            ids = [val_in_item.get('@id'), val_in_item.get('link_id')]
-            if value in ids:
-                return True
-    return False
-
-
-def get_types_that_can_have_field(connection, field):
-    """find items that have the passed in fieldname in their properties
-        even if there is currently no value for that field"""
-    profiles = submit_utils.get_FDN('/profiles/', connection=connection, frame='raw')
-    types_w_field = []
-    for t, j in profiles.items():
-        if j['properties'].get(field):
-            types_w_field.append(t)
-    return types_w_field
-
-
-def get_linked_items(connection, itemid, found_items={},
-                     no_children=['Publication', 'Lab', 'User', 'Award']):
-    """Given an ID for an item all descendant linked item uuids (as given in 'frame=raw')
-        are stored in a dict with each item type as the value.
-        All descendants are retrieved recursively except the children of the types indicated
-        in the no_children argument.
-        The relationships between descendant linked items are not preserved - i.e. you don't
-        know who are children, grandchildren, great grandchildren ... """
-    if not found_items.get(itemid):
-        res = submit_utils.get_FDN(itemid, connection=connection, frame='raw')
-        if 'error' not in res['status']:
-            # create an entry for this item in found_items
-            try:
-                obj_type = submit_utils.get_FDN(itemid, connection=connection)['@type'][0]
-                found_items[itemid] = obj_type
-            except AttributeError:  # noqa: E722
-                print("Can't find a type for item %s" % itemid)
-            if obj_type not in no_children:
-                fields_to_check = copy.deepcopy(res)
-                id_list = []
-                for key, val in fields_to_check.items():
-                    # could be more than one item in a value
-                    foundids = find_uuids(val)
-                    if foundids:
-                        id_list.extend(foundids)
-                if id_list:
-                    id_list = [i for i in list(set(id_list)) if i not in found_items]
-                    for uid in id_list:
-                        found_items.update(get_linked_items(connection, uid, found_items))
-    return found_items
