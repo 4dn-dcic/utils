@@ -491,6 +491,32 @@ def get_search_generator(integrated_ff):
 
 
 @pytest.mark.integrated
+def test_get_es_metadata(integrated_ff):
+    from dcicutils import es_utils
+    # use this test biosource
+    test_item = '331111bc-8535-4448-903e-854af460b254'
+    res = ff_utils.get_es_metadata(test_item, 'biosource', key=integrated_ff['ff_key'])
+    assert res['uuid'] == test_item
+    assert res['item_type'] == 'biosource'
+    assert isinstance(res['embedded'], dict)
+    assert isinstance(res['links'], dict)
+
+    # you can also pass in your own elasticsearch client
+    # ugly here because we need to get it from health page
+    health_res = ff_utils.authorized_request(integrated_ff['ff_key']['server'] + '/health',
+                                             auth=integrated_ff['ff_key'])
+    es_url = ff_utils.get_response_json(health_res)['elasticsearch']
+    es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
+    res2 = ff_utils.get_es_metadata(test_item, 'biosource', es_client=es_client,
+                                    key=integrated_ff['ff_key'])
+    assert res2['uuid'] == res['uuid']
+
+    # bad item returns empty dict
+    res = ff_utils.get_es_metadata('blahblah', 'biosource', key=integrated_ff['ff_key'])
+    assert res == {}
+
+
+@pytest.mark.integrated
 def test_fdn_connection(integrated_ff):
     connection = ff_utils.fdn_connection(key={'default': integrated_ff['ff_key']})
     assert connection.server
