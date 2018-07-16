@@ -331,9 +331,9 @@ def delete_field(obj_id, del_field, key=None, ff_env=None):
     return get_response_json(response)
 
 
-def get_es_metadata(uuid, schema_name, es_client=None, key=None, ff_env=None):
+def get_es_metadata(uuid, es_client=None, key=None, ff_env=None):
     """
-    Given string item uuid and schema name (e.g. "file_fastq"), will return a
+    Given string item uuid, will return a
     dictionary response of the full ES ecord for that item (or an empty
     dictionary if the item doesn't exist/ is not indexed)
     You can pass in an Elasticsearch client (initialized by create_es_client)
@@ -347,11 +347,16 @@ def get_es_metadata(uuid, schema_name, es_client=None, key=None, ff_env=None):
         health_res = authorized_request(auth['server'] + '/health', auth=auth, verb='GET')
         es_url = get_response_json(health_res)['elasticsearch']
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
-    try:
-        es_res = es_client.get(index=schema_name, doc_type=schema_name, id=uuid)
-    except TransportError:
+    es_res = es_client.search(index='_all', body={'query': {'term': {'_id': uuid}}})
+    es_hits = es_res['hits']['hits']
+    if not isinstance(es_hits, list):
+        raise Exception('ERROR malformed results found when searching for uuid %s' % uuid)
+    elif len(es_hits) > 1:
+        raise Exception('ERROR multiple results found when searching for uuid %s' % uuid)
+    elif len(es_hits) == 0:
         return {}
-    return es_res.get('_source', {})
+    # es_hits should only be length 1, so this is the result
+    return es_hits[0]
 
 
 #####################

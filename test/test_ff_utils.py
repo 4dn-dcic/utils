@@ -336,7 +336,7 @@ def test_get_es_metadata(integrated_ff):
     from dcicutils import es_utils
     # use this test biosource
     test_item = '331111bc-8535-4448-903e-854af460b254'
-    res = ff_utils.get_es_metadata(test_item, 'biosource', key=integrated_ff['ff_key'])
+    res = ff_utils.get_es_metadata(test_item, key=integrated_ff['ff_key'])
     assert res['uuid'] == test_item
     assert res['item_type'] == 'biosource'
     assert isinstance(res['embedded'], dict)
@@ -348,7 +348,7 @@ def test_get_es_metadata(integrated_ff):
                                              auth=integrated_ff['ff_key'])
     es_url = ff_utils.get_response_json(health_res)['elasticsearch']
     es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
-    res2 = ff_utils.get_es_metadata(test_item, 'biosource', es_client=es_client,
+    res2 = ff_utils.get_es_metadata(test_item, es_client=es_client,
                                     key=integrated_ff['ff_key'])
     assert res2['uuid'] == res['uuid']
 
