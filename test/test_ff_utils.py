@@ -353,5 +353,5 @@ def test_get_es_metadata(integrated_ff):
     assert res2['uuid'] == res['uuid']
 
     # bad item returns empty dict
-    res = ff_utils.get_es_metadata('blahblah', 'biosource', key=integrated_ff['ff_key'])
+    res = ff_utils.get_es_metadata('blahblah', key=integrated_ff['ff_key'])
     assert res == {}

@@ -340,7 +340,6 @@ def get_es_metadata(uuid, es_client=None, key=None, ff_env=None):
     through the es_client param to save init time.
     Same auth mechanism as the other metadata functions
     """
-    from elasticsearch.exceptions import TransportError
     if es_client is None:
         # need to know ES server location and item type
         auth = get_authentication_with_server(key, ff_env)
@@ -356,7 +355,7 @@ def get_es_metadata(uuid, es_client=None, key=None, ff_env=None):
     elif len(es_hits) == 0:
         return {}
     # es_hits should only be length 1, so this is the result
-    return es_hits[0]
+    return es_hits[0]['_source']
 
 
 #####################
