@@ -1,6 +1,5 @@
 from elasticsearch import Elasticsearch, RequestsHttpConnection
 from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
-import curator
 
 '''
 info about snapshots on AWS
@@ -37,13 +36,15 @@ def create_es_client(es_url, use_aws_auth=True, **options):
 
 
 def get_index_list(client, name, days_old=0, timestring='%Y.%m.%d', ilo=None):
-    if ilo is None:
-        ilo = curator.IndexList(client)
-
-    ilo.filter_by_regex(kind='prefix', value=name)
-    ilo.filter_by_age(source='name', direction='older', timestring=timestring, unit='days',
-                      unit_count=days_old)
-    return ilo
+    return []
+    # import curator
+    # if ilo is None:
+    #     ilo = curator.IndexList(client)
+    #
+    # ilo.filter_by_regex(kind='prefix', value=name)
+    # ilo.filter_by_age(source='name', direction='older', timestring=timestring, unit='days',
+    #                   unit_count=days_old)
+    # return ilo
 
 
 def create_snapshot_repo(client, repo_name,  s3_bucket):
