@@ -6,14 +6,13 @@ here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.md')).read()
 
 
-# we want strict package requirements on install 
+# we want strict package requirements on install
 with open('requirements.txt') as f:
     requires = f.read().splitlines()
 requires = [req.strip() for req in requires]
 
 tests_require = [
     'pytest',
-    'pytest-runner',
     'pytest-mock',
     'pytest-cov',
 ]
