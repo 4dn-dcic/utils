@@ -5,13 +5,11 @@ from setuptools import setup
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.md')).read()
 
-requires = [
-    'pytest-runner',
-    'boto3==1.7.42',
-    'botocore==1.10.42',
-    'elasticsearch>=5.3.0,<6.0.0',
-    'aws_requests_auth'
-]
+
+# we want strict package requirements on install
+with open('requirements.txt') as f:
+    requires = f.read().splitlines()
+requires = [req.strip() for req in requires]
 
 tests_require = [
     'pytest',
