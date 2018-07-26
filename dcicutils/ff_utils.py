@@ -331,9 +331,9 @@ def delete_field(obj_id, del_field, key=None, ff_env=None):
     return get_response_json(response)
 
 
-def get_es_metadata(uuid, es_client=None, key=None, ff_env=None):
+def get_es_metadata(uuids, es_client=None, key=None, ff_env=None):
     """
-    Given string item uuid, will return a
+    Given a list of string item uuids, will return a
     dictionary response of the full ES ecord for that item (or an empty
     dictionary if the item doesn't exist/ is not indexed)
     You can pass in an Elasticsearch client (initialized by create_es_client)
@@ -346,16 +346,14 @@ def get_es_metadata(uuid, es_client=None, key=None, ff_env=None):
         health_res = authorized_request(auth['server'] + '/health', auth=auth, verb='GET')
         es_url = get_response_json(health_res)['elasticsearch']
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
-    es_res = es_client.search(index='_all', body={'query': {'term': {'_id': uuid}}})
+    es_res = es_client.search(index='_all', body={'query': {'terms': {'_id': uuids}}})
     es_hits = es_res['hits']['hits']
     if not isinstance(es_hits, list):
-        raise Exception('ERROR malformed results found when searching for uuid %s' % uuid)
-    elif len(es_hits) > 1:
-        raise Exception('ERROR multiple results found when searching for uuid %s' % uuid)
+        raise Exception('ERROR malformed results found when searching for uuids %s' % uuids)
     elif len(es_hits) == 0:
-        return {}
-    # es_hits should only be length 1, so this is the result
-    return es_hits[0]['_source']
+        return []
+    # return the document source for each hit
+    return [hit['_source'] for hit in es_hits]
 
 
 #####################
