@@ -334,13 +334,21 @@ def get_search_generator(integrated_ff):
 @pytest.mark.integrated
 def test_get_es_metadata(integrated_ff):
     from dcicutils import es_utils
-    # use this test biosource
-    test_item = '331111bc-8535-4448-903e-854af460b254'
-    res = ff_utils.get_es_metadata(test_item, key=integrated_ff['ff_key'])
-    assert res['uuid'] == test_item
-    assert res['item_type'] == 'biosource'
-    assert isinstance(res['embedded'], dict)
-    assert isinstance(res['links'], dict)
+    # use this test biosource and biosample
+    test_biosource = '331111bc-8535-4448-903e-854af460b254'
+    test_biosample = '111112bc-1111-4448-903e-854af460b123'
+    res = ff_utils.get_es_metadata([test_biosource, test_biosample], key=integrated_ff['ff_key'])
+    assert len(res) == 2
+    if res[0]['uuid'] == test_biosource:
+        biosource_res, biosample_res = res
+    else:
+        biosample_res, biosource_res = res
+    assert biosource_res['uuid'] == test_biosource
+    assert biosource_res['item_type'] == 'biosource'
+    assert isinstance(biosource_res['embedded'], dict)
+    assert isinstance(biosource_res['links'], dict)
+    assert biosample_res['uuid'] == test_biosample
+    assert biosample_res['item_type'] == 'biosample'
 
     # you can also pass in your own elasticsearch client
     # ugly here because we need to get it from health page
@@ -348,10 +356,11 @@ def test_get_es_metadata(integrated_ff):
                                              auth=integrated_ff['ff_key'])
     es_url = ff_utils.get_response_json(health_res)['elasticsearch']
     es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
-    res2 = ff_utils.get_es_metadata(test_item, es_client=es_client,
+    res2 = ff_utils.get_es_metadata([test_biosource], es_client=es_client,
                                     key=integrated_ff['ff_key'])
-    assert res2['uuid'] == res['uuid']
+    assert len(res2) == 1
+    assert res2[0]['uuid'] == biosource_res['uuid']
 
-    # bad item returns empty dict
-    res = ff_utils.get_es_metadata('blahblah', key=integrated_ff['ff_key'])
-    assert res == {}
+    # bad item returns empty list
+    res = ff_utils.get_es_metadata(['blahblah'], key=integrated_ff['ff_key'])
+    assert res == []
