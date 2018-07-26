@@ -76,14 +76,15 @@ class s3Utils(object):
         LOG.info(str(response))
         return response['Body'].read()
 
-    def does_key_exist(self, key, bucket=None):
+    def does_key_exist(self, key, bucket=None, print_error=True):
         if not bucket:
             bucket = self.outfile_bucket
         try:
             file_metadata = self.s3.head_object(Bucket=bucket, Key=key)
         except Exception as e:
-            print("object %s not found on bucket %s" % (str(key), str(bucket)))
-            print(str(e))
+            if print_error:
+                print("object %s not found on bucket %s" % (str(key), str(bucket)))
+                print(str(e))
             return False
         return file_metadata
 
