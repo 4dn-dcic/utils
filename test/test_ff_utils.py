@@ -388,7 +388,7 @@ def test_get_es_search_generator(integrated_ff):
     es_query = {'query': {'match_all': {}}}
     # search for all ontology terms with a low pagination size
     es_gen = ff_utils.get_es_search_generator(es_client, 'ontology_term',
-                                               es_query, page_size=7)
+                                              es_query, page_size=7)
     list_gen = list(es_gen)
     assert len(list_gen) > 0
     for idx, page in enumerate(list_gen):
