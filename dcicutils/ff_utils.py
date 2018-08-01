@@ -364,7 +364,7 @@ def get_es_metadata(uuids, es_client=None, key=None, ff_env=None):
         es_url = get_response_json(health_res)['elasticsearch']
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
     # match all given uuids to _id fields
-    es_query = {'query': {'terms': {'_id': uuids}}}
+    es_query = {'query': {'terms': {'_id': uuids}}, 'sort': [{'_uid': {'order': 'desc'}}]}
     es_res = []
     for es_page in get_es_search_generator(es_client, '_all', es_query):
         # return the document source only; eliminate es metadata

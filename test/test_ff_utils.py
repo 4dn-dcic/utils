@@ -385,7 +385,7 @@ def test_get_es_search_generator(integrated_ff):
                                              auth=integrated_ff['ff_key'])
     es_url = ff_utils.get_response_json(health_res)['elasticsearch']
     es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
-    es_query = {'query': {'match_all': {}}}
+    es_query = {'query': {'match_all': {}}, 'sort': [{'_uid': {'order': 'desc'}}]}
     # search for all ontology terms with a low pagination size
     es_gen = ff_utils.get_es_search_generator(es_client, 'ontology_term',
                                               es_query, page_size=7)
@@ -396,3 +396,9 @@ def test_get_es_search_generator(integrated_ff):
         # last page may be empty if # ontology terms is divisible by 7
         if idx < len(list_gen) - 1:
             assert len(page) == 7
+    all_es_uuids = set([page['_source']['uuid'] for pages in list_gen for page in pages])  # noqa
+    # make sure all items are unique and len matches ff search
+    search_res = ff_utils.search_metadata('/search/?type=OntologyTerm&frame=object',
+                                          key=integrated_ff['ff_key'])
+    search_uuids = set(hit['uuid'] for hit in search_res)
+    assert all_es_uuids == search_uuids
