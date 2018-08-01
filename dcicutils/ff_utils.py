@@ -331,6 +331,23 @@ def delete_field(obj_id, del_field, key=None, ff_env=None):
     return get_response_json(response)
 
 
+def get_es_search_generator(es_client, index, body, page_size=50):
+    """
+    Simple generator behind get_es_metada which takes an es_client (from
+    es_utils create_es_client), a string index, and a dict query body.
+    Also takes an optional string page_size, which controls pagination size
+    """
+    search_total = None
+    covered = 0
+    while search_total is None or covered < search_total:
+        es_res = es_client.search(index=index, body=body, size=page_size, from_=covered)
+        if search_total is None:
+            search_total = es_res['hits']['total']
+        es_hits = es_res['hits']['hits']
+        covered += len(es_hits)
+        yield es_hits
+
+
 def get_es_metadata(uuids, es_client=None, key=None, ff_env=None):
     """
     Given a list of string item uuids, will return a
@@ -346,14 +363,13 @@ def get_es_metadata(uuids, es_client=None, key=None, ff_env=None):
         health_res = authorized_request(auth['server'] + '/health', auth=auth, verb='GET')
         es_url = get_response_json(health_res)['elasticsearch']
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
-    es_res = es_client.search(index='_all', body={'query': {'terms': {'_id': uuids}}})
-    es_hits = es_res['hits']['hits']
-    if not isinstance(es_hits, list):
-        raise Exception('ERROR malformed results found when searching for uuids %s' % uuids)
-    elif len(es_hits) == 0:
-        return []
-    # return the document source for each hit
-    return [hit['_source'] for hit in es_hits]
+    # match all given uuids to _id fields
+    es_query = {'query': {'terms': {'_id': uuids}}}
+    es_res = []
+    for es_page in get_es_search_generator(es_client, '_all', es_query):
+        # return the document source only; eliminate es metadata
+        es_res.extend([hit['_source'] for hit in es_page])
+    return es_res
 
 
 #####################

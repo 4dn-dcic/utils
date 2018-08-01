@@ -303,28 +303,28 @@ def test_search_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
-def get_search_generator(integrated_ff):
-    search_url = integrated_ff['server'] + '/search/?type=OntologyTerm'
+def test_get_search_generator(integrated_ff):
+    search_url = integrated_ff['ff_key']['server'] + '/search/?type=OntologyTerm'
     generator1 = ff_utils.get_search_generator(search_url, auth=integrated_ff['ff_key'], page_limit=25)
     list_gen1 = list(generator1)
     assert len(list_gen1) > 0
-    for idx, page in list_gen1:
+    for idx, page in enumerate(list_gen1):
         assert isinstance(page, list)
         if idx < len(list_gen1) - 1:
             assert len(page) == 25
         else:
             assert len(page) > 0
-    all_gen1 = [l for page in pages for pages in list_gen1]  # noqa
+    all_gen1 = [page for pages in list_gen1 for page in pages]  # noqa
     generator2 = ff_utils.get_search_generator(search_url, auth=integrated_ff['ff_key'], page_limit=50)
     list_gen2 = list(generator2)
-    assert len(list_gen1) > list(list_gen2)
-    all_gen2 = [l for page in pages for pages in list_gen2]  # noqa
+    assert len(list_gen1) > len(list_gen2)
+    all_gen2 = [page for pages in list_gen2 for page in pages]  # noqa
     assert len(all_gen1) == len(all_gen2)
     # use a limit in the search
     search_url += '&limit=33'
     generator3 = ff_utils.get_search_generator(search_url, auth=integrated_ff['ff_key'])
     list_gen3 = list(generator3)
-    all_gen3 = [l for page in pages for pages in list_gen3]  # noqa
+    all_gen3 = [page for pages in list_gen3 for page in pages]  # noqa
     assert len(all_gen3) == 33
     # make sure that all results are unique
     all_gen3_uuids = set([item['uuid'] for item in all_gen3])
@@ -361,6 +361,38 @@ def test_get_es_metadata(integrated_ff):
     assert len(res2) == 1
     assert res2[0]['uuid'] == biosource_res['uuid']
 
+    # you can get more than 10 items. compare a search result to es result
+    # use 55 because the default pagination in the es generator is 50 items
+    search_res = ff_utils.search_metadata('/search/?limit=55&type=Item&frame=object',
+                                          key=integrated_ff['ff_key'])
+    search_uuids = [item['uuid'] for item in search_res]
+    assert len(search_uuids) == 55
+    es_res = ff_utils.get_es_metadata(search_uuids, es_client=es_client,
+                                      key=integrated_ff['ff_key'])
+    es_search_uuids = [item['uuid'] for item in es_res]
+    assert len(es_res) == len(search_res)
+    assert set(search_uuids) == set(es_search_uuids)
+
     # bad item returns empty list
     res = ff_utils.get_es_metadata(['blahblah'], key=integrated_ff['ff_key'])
     assert res == []
+
+
+def test_get_es_search_generator(integrated_ff):
+    from dcicutils import es_utils
+    # get es_client info from the health page
+    health_res = ff_utils.authorized_request(integrated_ff['ff_key']['server'] + '/health',
+                                             auth=integrated_ff['ff_key'])
+    es_url = ff_utils.get_response_json(health_res)['elasticsearch']
+    es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
+    es_query = {'query': {'match_all': {}}}
+    # search for all ontology terms with a low pagination size
+    es_gen = ff_utils.get_es_search_generator(es_client, 'ontology_term',
+                                              es_query, page_size=7)
+    list_gen = list(es_gen)
+    assert len(list_gen) > 0
+    for idx, page in enumerate(list_gen):
+        assert isinstance(page, list)
+        # last page may be empty if # ontology terms is divisible by 7
+        if idx < len(list_gen) - 1:
+            assert len(page) == 7
