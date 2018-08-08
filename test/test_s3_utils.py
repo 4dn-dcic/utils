@@ -39,3 +39,12 @@ def test_s3Utils_get_higlass_key():
     keys = util.get_higlass_key()
     assert isinstance(keys, dict)
     assert 3 == len(keys.keys())
+
+def test_s3Utils_get_google_key():
+    util = s3Utils(env='staging')
+    keys = util.get_google_key()
+    assert isinstance(keys, dict)
+    assert keys['type'] == 'service_account'
+    assert keys["project_id"] == "fourdn-fourfront"
+    for dict_key in ['private_key_id', 'private_key', 'client_email', 'client_id', 'auth_uri', 'client_x509_cert_url']:
+        assert keys[dict_key] # Check for non-falsy vals.
