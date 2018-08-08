@@ -56,6 +56,9 @@ class s3Utils(object):
     def get_higlass_key(self):
         return self.get_key(keyfile_name='hiwillnevertell')
 
+    def get_google_key(self):
+        return self.get_key(keyfile_name='fourdn-fourfront-google-key')
+
     def get_key(self, keyfile_name='illnevertell'):
         # Share secret encrypted S3 File
         response = self.s3.get_object(Bucket=self.sys_bucket,
