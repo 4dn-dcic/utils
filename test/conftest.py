@@ -1,5 +1,6 @@
 # flake8: noqa
 import pytest
+import os
 from dcicutils.s3_utils import s3Utils
 from dcicutils.ff_utils import authorized_request
 
@@ -32,4 +33,21 @@ def integrated_ff():
         raise Exception('Environment %s is not ready for integrated status. Requesting '
                         'the homepage gave status of: %s' % (INTEGRATED_ENV, res.status_code))
     return integrated
-    
+
+
+@pytest.fixture(scope='session')
+def integrated_s3_info():
+    """
+    Ensure the test files are present in the s3 sys bucket of the integrated
+    environment (probably 'fourfront-mastertest') and return some info on them
+    """
+    test_filename = '__test_data/test_file.txt'
+    zip_filename = '__test_data/fastqc_report.zip'
+    s3Obj = s3Utils(env=INTEGRATED_ENV)
+    # for now, always upload these files
+    s3Obj.s3.put_object(Bucket=s3Obj.sys_bucket, Key=test_filename,
+                          Body=str.encode('thisisatest'))
+    zip_path = os.path.join('test', 'data_files', zip_filename.split('/')[-1])
+    s3Obj.s3.upload_file(Filename=str(zip_path), Bucket=s3Obj.sys_bucket, Key=zip_filename)
+
+    return {'s3Obj': s3Obj, 'filename': test_filename, 'zip_filename': zip_filename}
