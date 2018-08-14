@@ -38,11 +38,13 @@ def integrated_ff():
 @pytest.fixture(scope='session')
 def integrated_s3_info():
     """
-    Ensure a test file is present in the integrated s3 buckets
+    Ensure the test files are present in the s3 sys bucket of the integrated
+    environment (probably 'fourfront-mastertest') and return some info on them
     """
     test_filename = '__test_data/test_file.txt'
     zip_filename = '__test_data/fastqc_report.zip'
     s3Obj = s3Utils(env=INTEGRATED_ENV)
+    # for now, always upload these files
     s3Obj.s3.put_object(Bucket=s3Obj.sys_bucket, Key=test_filename,
                           Body=str.encode('thisisatest'))
     zip_path = os.path.join('test', 'data_files', zip_filename.split('/')[-1])
