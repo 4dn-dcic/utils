@@ -51,47 +51,45 @@ def test_s3Utils_get_google_key():
         assert keys[dict_key]
 
 
-def test_read_s3(s3_utils):
-    filename = '__test_data/test_file.txt'
-    read = s3_utils.read_s3(filename)
-    assert read.strip() == 'thisisatest'
+def test_read_s3(integrated_s3_info):
+    read = integrated_s3_info['s3Obj'].read_s3(integrated_s3_info['filename'])
+    assert read.strip() == b'thisisatest'
 
 
-def test_get_file_size(s3_utils):
-    filename = '__test_data/test_file.txt'
-    size = s3_utils.get_file_size(filename)
+def test_get_file_size(integrated_s3_info):
+    size = integrated_s3_info['s3Obj'].get_file_size(integrated_s3_info['filename'])
     assert size == 12
 
 
-def test_get_file_size_in_bg(s3_utils):
-    filename = '__test_data/test_file.txt'
-    size = s3_utils.get_file_size(filename, add_gb=2, size_in_gb=True)
-    assert size == 2
+def test_get_file_size_in_bg(integrated_s3_info):
+    size = integrated_s3_info['s3Obj'].get_file_size(integrated_s3_info['filename'],
+                                                     add_gb=2, size_in_gb=True)
+    assert int(size) == 2
 
 
-def test_read_s3_zip(s3_utils):
-    filename = '__test_data/fastqc_report.zip'
-    files = s3_utils.read_s3_zipfile(filename, ['summary.txt', 'fastqc_data.txt'])
+def test_read_s3_zip(integrated_s3_info):
+    filename = integrated_s3_info['zip_filename']
+    files = integrated_s3_info['s3Obj'].read_s3_zipfile(filename, ['summary.txt', 'fastqc_data.txt'])
     assert files['summary.txt']
     assert files['fastqc_data.txt']
-    assert files['summary.txt'].startswith('PASS')
+    assert files['summary.txt'].startswith(b'PASS')
 
 
-def test_unzip_s3_to_s3(s3_utils):
+def test_unzip_s3_to_s3(integrated_s3_info):
     prefix = '__test_data/extracted'
-    filename = '__test_data/fastqc_report.zip'
-    s3_utils.s3_delete_dir(prefix)
+    filename = integrated_s3_info['zip_filename']
+    integrated_s3_info['s3Obj'].s3_delete_dir(prefix)
 
     # ensure this thing was deleted
     # if no files there will be no Contents in response
-    objs = s3_utils.s3_read_dir(prefix)
+    objs = integrated_s3_info['s3Obj'].s3_read_dir(prefix)
     assert [] == objs.get('Contents', [])
 
     # now copy to that dir we just deleted
     retfile_list = ['summary.txt', 'fastqc_data.txt', 'fastqc_report.html']
-    ret_files = s3_utils.unzip_s3_to_s3(filename, prefix, retfile_list)
+    ret_files = integrated_s3_info['s3Obj'].unzip_s3_to_s3(filename, prefix, retfile_list)
     assert 3 == len(ret_files.keys())
     assert ret_files['fastqc_report.html']['s3key'].startswith("https://s3.amazonaws.com")
 
-    objs = s3_utils.s3_read_dir(prefix)
+    objs = integrated_s3_info['s3Obj'].s3_read_dir(prefix)
     assert objs.get('Contents', None)
