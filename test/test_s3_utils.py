@@ -67,3 +67,31 @@ def test_get_file_size_in_bg(s3_utils):
     filename = '__test_data/test_file.txt'
     size = s3_utils.get_file_size(filename, add_gb=2, size_in_gb=True)
     assert size == 2
+
+
+def test_read_s3_zip(s3_utils):
+    filename = '__test_data/fastqc_report.zip'
+    files = s3_utils.read_s3_zipfile(filename, ['summary.txt', 'fastqc_data.txt'])
+    assert files['summary.txt']
+    assert files['fastqc_data.txt']
+    assert files['summary.txt'].startswith('PASS')
+
+
+def test_unzip_s3_to_s3(s3_utils):
+    prefix = '__test_data/extracted'
+    filename = '__test_data/fastqc_report.zip'
+    s3_utils.s3_delete_dir(prefix)
+
+    # ensure this thing was deleted
+    # if no files there will be no Contents in response
+    objs = s3_utils.s3_read_dir(prefix)
+    assert [] == objs.get('Contents', [])
+
+    # now copy to that dir we just deleted
+    retfile_list = ['summary.txt', 'fastqc_data.txt', 'fastqc_report.html']
+    ret_files = s3_utils.unzip_s3_to_s3(filename, prefix, retfile_list)
+    assert 3 == len(ret_files.keys())
+    assert ret_files['fastqc_report.html']['s3key'].startswith("https://s3.amazonaws.com")
+
+    objs = s3_utils.s3_read_dir(prefix)
+    assert objs.get('Contents', None)
