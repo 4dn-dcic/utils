@@ -49,3 +49,21 @@ def test_s3Utils_get_google_key():
     assert keys["project_id"] == "fourdn-fourfront"
     for dict_key in ['private_key_id', 'private_key', 'client_email', 'client_id', 'auth_uri', 'client_x509_cert_url']:
         assert keys[dict_key]
+
+
+def test_read_s3(s3_utils):
+    filename = '__test_data/test_file.txt'
+    read = s3_utils.read_s3(filename)
+    assert read.strip() == 'thisisatest'
+
+
+def test_get_file_size(s3_utils):
+    filename = '__test_data/test_file.txt'
+    size = s3_utils.get_file_size(filename)
+    assert size == 12
+
+
+def test_get_file_size_in_bg(s3_utils):
+    filename = '__test_data/test_file.txt'
+    size = s3_utils.get_file_size(filename, add_gb=2, size_in_gb=True)
+    assert size == 2

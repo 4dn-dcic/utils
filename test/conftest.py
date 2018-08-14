@@ -32,4 +32,13 @@ def integrated_ff():
         raise Exception('Environment %s is not ready for integrated status. Requesting '
                         'the homepage gave status of: %s' % (INTEGRATED_ENV, res.status_code))
     return integrated
-    
+
+   
+@pytest.fixture(scope='session')
+def used_env():
+    return 'fourfront-webdev'
+
+
+@pytest.fixture(scope='session')
+def s3_utils(used_env):
+    return s3Utils(env=used_env)
