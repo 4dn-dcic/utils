@@ -417,3 +417,6 @@ def test_get_health_page(integrated_ff):
     health_res2 = ff_utils.get_health_page(ff_env=integrated_ff['ff_env'])
     assert health_res2 and 'error' not in health_res2
     assert health_res2['elasticsearch'] == health_res['elasticsearch']
+    # make sure it's error tolerant
+    bad_health_res = ff_utils.get_health_page(ff_env='not_an_env')
+    assert bad_health_res and 'error' in bad_health_res

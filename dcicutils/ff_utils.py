@@ -380,9 +380,9 @@ def get_health_page(key=None, ff_env=None):
     ff_env. Will return json containing an error rather than raising an
     exception if this fails, since this function should tolerate failure
     """
-    auth = get_authentication_with_server(key, ff_env)
-    health_res = authorized_request(auth['server'] + '/health', auth=auth, verb='GET')
     try:
+        auth = get_authentication_with_server(key, ff_env)
+        health_res = authorized_request(auth['server'] + '/health', auth=auth, verb='GET')
         ret = get_response_json(health_res)
     except Exception as exc:
         ret = {'error': str(exc)}
