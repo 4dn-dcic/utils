@@ -374,6 +374,14 @@ def test_get_es_metadata(integrated_ff):
     res = ff_utils.get_es_metadata(['blahblah'], key=integrated_ff['ff_key'])
     assert res == []
 
+    # make sure searches work with pagination set at 100 (default)
+    all_items = ff_utils.search_metadata('/search/?type=Item&frame=object', key=integrated_ff['ff_key'])
+    all_uuids = [item['uuid'] for item in all_items]
+    all_es = ff_utils.get_es_metadata(all_uuids, key=integrated_ff['ff_key'])
+    assert len(all_es) == len(all_uuids)
+    all_es_uuids = [item['uuid'] for item in all_es]
+    assert set(all_es_uuids) == set(all_uuids)
+
 
 def test_get_es_search_generator(integrated_ff):
     from dcicutils import es_utils
