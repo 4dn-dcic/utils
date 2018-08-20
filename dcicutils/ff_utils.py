@@ -351,25 +351,42 @@ def get_es_search_generator(es_client, index, body, page_size=50):
 def get_es_metadata(uuids, es_client=None, key=None, ff_env=None):
     """
     Given a list of string item uuids, will return a
-    dictionary response of the full ES ecord for that item (or an empty
-    dictionary if the item doesn't exist/ is not indexed)
+    dictionary response of the full ES record for those items (or an empty
+    dictionary if the items don't exist/ are not indexed)
     You can pass in an Elasticsearch client (initialized by create_es_client)
     through the es_client param to save init time.
     Same auth mechanism as the other metadata functions
     """
     if es_client is None:
-        # need to know ES server location and item type
-        auth = get_authentication_with_server(key, ff_env)
-        health_res = authorized_request(auth['server'] + '/health', auth=auth, verb='GET')
-        es_url = get_response_json(health_res)['elasticsearch']
+        es_url = get_health_page(key, ff_env)['elasticsearch']
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
     # match all given uuids to _id fields
-    es_query = {'query': {'terms': {'_id': uuids}}, 'sort': [{'_uid': {'order': 'desc'}}]}
+    # sending in too many uuids in the terms query can crash es; break them up
+    # into groups of max size 100
     es_res = []
-    for es_page in get_es_search_generator(es_client, '_all', es_query):
-        # return the document source only; eliminate es metadata
-        es_res.extend([hit['_source'] for hit in es_page])
+    for i in range(0, len(uuids), 100):
+        query_uuids = uuids[i:i + 100]
+        es_query = {'query': {'terms': {'_id': query_uuids}},
+                    'sort': [{'_uid': {'order': 'desc'}}]}
+        for es_page in get_es_search_generator(es_client, '_all', es_query):
+            # return the document source only; eliminate es metadata
+            es_res.extend([hit['_source'] for hit in es_page])
     return es_res
+
+
+def get_health_page(key=None, ff_env=None):
+    """
+    Simple function to return the json for a FF health page given keys or
+    ff_env. Will return json containing an error rather than raising an
+    exception if this fails, since this function should tolerate failure
+    """
+    try:
+        auth = get_authentication_with_server(key, ff_env)
+        health_res = authorized_request(auth['server'] + '/health', auth=auth, verb='GET')
+        ret = get_response_json(health_res)
+    except Exception as exc:
+        ret = {'error': str(exc)}
+    return ret
 
 
 #####################
