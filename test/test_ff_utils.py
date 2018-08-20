@@ -350,11 +350,8 @@ def test_get_es_metadata(integrated_ff):
     assert biosample_res['uuid'] == test_biosample
     assert biosample_res['item_type'] == 'biosample'
 
-    # you can also pass in your own elasticsearch client
-    # ugly here because we need to get it from health page
-    health_res = ff_utils.authorized_request(integrated_ff['ff_key']['server'] + '/health',
-                                             auth=integrated_ff['ff_key'])
-    es_url = ff_utils.get_response_json(health_res)['elasticsearch']
+    # you can pass in your own elasticsearch client or build it here
+    es_url = ff_utils.get_health_page(key=integrated_ff['ff_key'])['elasticsearch']
     es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
     res2 = ff_utils.get_es_metadata([test_biosource], es_client=es_client,
                                     key=integrated_ff['ff_key'])
@@ -381,9 +378,7 @@ def test_get_es_metadata(integrated_ff):
 def test_get_es_search_generator(integrated_ff):
     from dcicutils import es_utils
     # get es_client info from the health page
-    health_res = ff_utils.authorized_request(integrated_ff['ff_key']['server'] + '/health',
-                                             auth=integrated_ff['ff_key'])
-    es_url = ff_utils.get_response_json(health_res)['elasticsearch']
+    es_url = ff_utils.get_health_page(key=integrated_ff['ff_key'])['elasticsearch']
     es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
     es_query = {'query': {'match_all': {}}, 'sort': [{'_uid': {'order': 'desc'}}]}
     # search for all ontology terms with a low pagination size
@@ -402,3 +397,15 @@ def test_get_es_search_generator(integrated_ff):
                                           key=integrated_ff['ff_key'])
     search_uuids = set(hit['uuid'] for hit in search_res)
     assert all_es_uuids == search_uuids
+
+
+def test_get_health_page(integrated_ff):
+    health_res = ff_utils.get_health_page(key=integrated_ff['ff_key'])
+    assert health_res and 'error' not in health_res
+    assert 'elasticsearch' in health_res
+    assert 'database' in health_res
+    assert health_res['beanstalk_env'] == integrated_ff['ff_env']
+    # try with ff_env instead of key
+    health_res2 = ff_utils.get_health_page(ff_env=integrated_ff['ff_env'])
+    assert health_res2 and 'error' not in health_res2
+    assert health_res2['elasticsearch'] == health_res['elasticsearch']

@@ -91,6 +91,10 @@ def delete_db(db_identifier, take_snapshot=True):
 
 
 def get_health_page_info(bs_url):
+    """
+    Different use cases than ff_utils.get_health_page (that one is oriented
+    towards external API usage and this one is more internal)
+    """
     if not bs_url.endswith('/'):
         bs_url += "/"
     if not bs_url.startswith('http'):
