@@ -35,10 +35,12 @@ class s3Utils(object):
             sys_bucket = "elasticbeanstalk-%s-system" % env
             outfile_bucket = "elasticbeanstalk-%s-wfoutput" % env
             raw_file_bucket = "elasticbeanstalk-%s-files" % env
+            blob_bucket = "elasticbeanstalk-%s-blobs" % env
 
         self.sys_bucket = sys_bucket
         self.outfile_bucket = outfile_bucket
         self.raw_file_bucket = raw_file_bucket
+        self.blob_bucket = blob_bucket
 
     def get_access_keys(self):
         name = 'illnevertell'
