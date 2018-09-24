@@ -207,7 +207,6 @@ def get_beanstalk_real_url(env):
     if env in urls:
         return urls[env]
 
-    client = boto3.client('elasticbeanstalk', region_name=REGION)
     # times to wait on a throttling error. Keep 5 min lambda limit in mind
     for retry in [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]:
         try:
