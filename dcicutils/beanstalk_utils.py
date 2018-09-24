@@ -17,9 +17,9 @@ import boto3
 import os
 import json
 import requests
+import time
 from dcicutils import ff_utils
 from botocore.exceptions import ClientError
-from time import sleep
 
 logger = logging.getLogger('logger')
 logger.setLevel(logging.INFO)
@@ -377,7 +377,7 @@ def snapshot_db(db_identifier, snapshot_name):
             print("we got an endpoint:", endpoint['Address'])
             return endpoint['Address']
         print(".")
-        sleep(10)
+        time.sleep(10)
 
 
 def make_envvar_option(name, value):
@@ -628,7 +628,7 @@ def add_to_auth0_client(new):
         url = env['Environments'][0].get('CNAME')
         if url is None:
             print(".")
-            sleep(10)
+            time.sleep(10)
     auth0_client_update(url)
 
     # TODO: need to also update ES permissions policy with ip addresses of elasticbeanstalk
@@ -759,7 +759,7 @@ def get_es_build_status(new):
         endpoint = describe_resp['DomainStatus'].get('Endpoint')
         if endpoint is None:
             print(".")
-            sleep(10)
+            time.sleep(10)
 
     print(endpoint)
 
