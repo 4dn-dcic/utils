@@ -16,7 +16,8 @@ LOG = logging.getLogger(__name__)
 
 class s3Utils(object):
 
-    def __init__(self, outfile_bucket=None, sys_bucket=None, raw_file_bucket=None, env=None):
+    def __init__(self, outfile_bucket=None, sys_bucket=None, raw_file_bucket=None,
+                 blob_bucket=None, env=None):
         '''
         if we pass in env set the outfile and sys bucket from the environment
         '''
