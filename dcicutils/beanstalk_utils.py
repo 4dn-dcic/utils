@@ -17,9 +17,9 @@ import boto3
 import os
 import json
 import requests
+import time
 from dcicutils import ff_utils
 from botocore.exceptions import ClientError
-from time import sleep
 
 logger = logging.getLogger('logger')
 logger.setLevel(logging.INFO)
@@ -193,25 +193,41 @@ def beanstalk_info(env):
 
 
 def get_beanstalk_real_url(env):
-    url = ''
+    """
+    Return the real url for the elasticbeanstalk with given environment name.
+    Name can be 'data', 'staging', or an actual environment.
 
+    This function handles API throttling to AWS, so it should be used for all
+    cases of getting the env name
+    """
+    url = ''
     urls = {'staging': 'http://staging.4dnucleome.org',
             'data': 'https://data.4dnucleome.org'}
 
     if env in urls:
         return urls[env]
 
-    if 'webprod' in env:
-        data_env = whodaman()
+    # times to wait on a throttling error. Keep 5 min lambda limit in mind
+    for retry in [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]:
+        try:
+            if 'webprod' in env:
+                data_env = whodaman()
 
-        if data_env == env:
-            url = urls['data']
+                if data_env == env:
+                    url = urls['data']
+                else:
+                    url = urls['staging']
+            else:
+                bs_info = beanstalk_info(env)
+                url = "http://" + bs_info['CNAME']
+        except ClientError as e:
+            print('Client exception encountered while getting BS info for %s. Error: %s' % (env, str(e)))
+            time.sleep(retry)
+        except Exception as e:
+            print('Unhandled exception encountered while getting BS info for %s. Error: %s' % (env, str(e)))
+            raise e
         else:
-            url = urls['staging']
-    else:
-        bs_info = beanstalk_info(env)
-        url = "http://" + bs_info['CNAME']
-
+            break
     return url
 
 
@@ -361,7 +377,7 @@ def snapshot_db(db_identifier, snapshot_name):
             print("we got an endpoint:", endpoint['Address'])
             return endpoint['Address']
         print(".")
-        sleep(10)
+        time.sleep(10)
 
 
 def make_envvar_option(name, value):
@@ -612,7 +628,7 @@ def add_to_auth0_client(new):
         url = env['Environments'][0].get('CNAME')
         if url is None:
             print(".")
-            sleep(10)
+            time.sleep(10)
     auth0_client_update(url)
 
     # TODO: need to also update ES permissions policy with ip addresses of elasticbeanstalk
@@ -743,7 +759,7 @@ def get_es_build_status(new):
         endpoint = describe_resp['DomainStatus'].get('Endpoint')
         if endpoint is None:
             print(".")
-            sleep(10)
+            time.sleep(10)
 
     print(endpoint)
 
