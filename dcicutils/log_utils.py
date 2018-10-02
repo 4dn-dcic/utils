@@ -21,9 +21,9 @@ class ElasticsearchHandler(logging.Handler):
         Must be given a string es_server url to work.
         Calls __init__ of parent Handler
         """
-        print('\n\n\nINIT LOG WITH SERVER: %s\n\n\n' % es_server)
         self.resend_timer = None
-        self.records_to_resend = []
+        self.messages_to_resend = []
+        self.retry_limit = 2
         self.es_client = es_utils.create_es_client(es_server, use_aws_auth=True)
         logging.Handler.__init__(self)
 
@@ -38,41 +38,49 @@ class ElasticsearchHandler(logging.Handler):
     def schedule_resend(self):
         """
         Create a threading Timer as self.resend_timer to schedule resending any
-        records in self.resend_records after 5 seconds.
+        records in self.resend_messages after 5 seconds.
         If already resending, do nothing
         """
         if self.resend_timer is None:
-            self.resend_timer = Timer(5, self.resend_records)
+            self.resend_timer = Timer(5, self.resend_messages)
             self.resend_timer.daemon = True
             self.resend_timer.start()
 
 
-    def resend_records(self):
+    def resend_messages(self):
         """
-        Send all records held in self.records_to_resend in batch
+        Send all records held in self.messages_to_resend in Elasticsearch in bulk.
+        Keep track of subsequent errors and retry them, if they have been
+        retried fewer times than self.retry_limit
         """
         # clean up the timer
         if self.resend_timer is not None and self.resend_timer.is_alive():
             self.resend_timer.cancel()
         self.resend_timer = None
-        if self.records_to_resend:
-            records_copy = self.records_to_resend[:]
-            self.records_to_resend = []
+        if self.messages_to_resend:
+            messages_copy = self.messages_to_resend[:]
+            self.messages_to_resend = []
             idx_name = calculate_log_index()
             actions = (
                 {
                     '_index': idx_name,
-                    '_type': log,
-                    '_source': record
+                    '_type': 'log',
+                    '_id': message[0],
+                    '_source': message[1]
                 }
-                for record in records_copy
+                for message in messages_copy
             )
+            errors = []
             for ok, resp in helpers.streaming_bulk(self.es_client, actions):
-                print('RESEND RESP: %s' % resp)
                 if not ok:
-                    self.records_to_resend.append(resp)
+                    errors.append(resp['index']['_id'])
+            for sent_message in messages_copy:
+                if sent_message[0] in errors and sent_messages[2] < self.retry_limit:
+                    sent_message[2] += 1  # increment retries
+                    print('\nRETRIED %s TIMES...\n' % sent_message[2])
+                    self.messages_to_resend.append(sent_message)
         # trigger resending logs if any failed
-        if self.records_to_resend:
+        if self.messages_to_resend:
             self.schedule_resend()
 
 
@@ -82,27 +90,33 @@ class ElasticsearchHandler(logging.Handler):
         """
         # required?
         # entry = self.format(record)
-        import pdb; pdb.set_trace()
         idx_name = calculate_log_index()
-        log_id = str(uuid.uuid4())
+        # get the message from the record
+        message = record.__dict__.get('msg')
+        if not message or message.get('skip_es', False) is True:
+            return
+        # use the inherent log_uuid if possible
+        log_id = message.get('log_uuid', str(uuid.uuid4()))
         try:
-            self.es_client.index(index=idx_name, doc_type='log', body=record, id=log_id)
+            self.es_client.index(index=idx_name, doc_type='log', body=message, id=log_id)
         except Exception as e:
-            print('ERROR in logging to ES! %s' % str(e))
-            self.records_to_resend.append(record)
+            # append resend messages as tuples: (<uuid>, <dict message>, <int retries>)
+            self.messages_to_resend.append((log_id, message, 0))
             self.schedule_resend()
 
 
 class ElasticsearchLoggerFactory(structlog.stdlib.LoggerFactory):
     """
-    Needed to bind the ElasticsearchHandler to the structlog logger
+    Needed to bind the ElasticsearchHandler to the structlog logger.
+    Use for logger_factory arg in structlog.configure function
     See: https://github.com/hynek/structlog/blob/master/src/structlog/stdlib.py
     """
-    def __init__(self, ignore_frame_names=None, es_server=None):
+    def __init__(self, ignore_frame_names=None, es_server=None, in_prod=False):
         """
-        Set self.es_server and call __init__ of parent
+        Set self.es_server and call __init__ of parent.
+        If not in prod, always set the es_server to None (dev mode)
         """
-        self.es_server = es_server
+        self.es_server = es_server if in_prod else None
         structlog.stdlib.LoggerFactory.__init__(self, ignore_frame_names)
 
 
@@ -115,24 +129,25 @@ class ElasticsearchLoggerFactory(structlog.stdlib.LoggerFactory):
         if args:
             name = args[0]
         else:
-            _, name = _find_first_app_frame_and_name(self._ignore)
-        import pdb; pdb.set_trace()
+            _, name = structlog._frames._find_first_app_frame_and_name(self._ignore)
         logger = logging.getLogger(name)
         if self.es_server:
             es_handler = ElasticsearchHandler(self.es_server)
             logger.addHandler(es_handler)
+            # also set level to info
+            logger.setLevel(logging.INFO)
         return logger
 
 
 def calculate_log_index():
     """
     Simple function to name the ES log index by month
-    Convention is: filebeat-<yyyy>-<mm>
+    Convention is: logs-<yyyy>-<mm>
     * Uses UTC *
     """
     now = datetime.datetime.utcnow()
     idx_suffix = datetime.datetime.strftime(now, '%Y-%m')
-    return 'filebeat-' + idx_suffix
+    return 'logs-' + idx_suffix
 
 
 def convert_ts_to_at_ts(logger, log_method, event_dict):
@@ -146,6 +161,14 @@ def convert_ts_to_at_ts(logger, log_method, event_dict):
         return event_dict
 
 
+def add_log_uuid(logger, log_method, event_dict):
+    '''
+    this function adds a uuid to the log
+    '''
+    event_dict['log_uuid'] = str(uuid.uuid4())
+    return event_dict
+
+
 # configure structlog to use its formats for stdlib logging and / or structlog logging
 def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None, log_dir=None):
     '''
@@ -154,7 +177,8 @@ def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None
     visualizing later.
 
     Providing an Elasticsearch server name (es_server) will cause the logs to
-    be automatically written to that server.
+    be automatically written to that server. Setting 'skip_es' to True for any
+    individual logging statement will cause it not to be written.
 
     Currently this only JSONifies our own logs, and the bit at the very bottom
     would JSONify other logs, like botocore and stuff but that's  probably more
@@ -184,18 +208,21 @@ def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None
         structlog.stdlib.PositionalArgumentsFormatter(),
         timestamper,
         convert_ts_to_at_ts,
+        add_log_uuid,
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
     ]
 
-    if in_prod:
-        # should be on beanstalk
-        level = logging.INFO
-        processors.append(structlog.processors.JSONRenderer())
-    else:
+    # if we are in_prod, do not do any prettifying of the log messages and
+    # instead send them to ES. Also set the logging level lower, to INFO
+    # in_prod affects the logging handlers used in ElasticsearchLoggerFactory
+    if not in_prod:
         # pretty color logs
         processors.append(structlog.dev.ConsoleRenderer())
+
+    # test
+    processors.append(structlog.dev.ConsoleRenderer())
 
     # need this guy to go last
     processors.append(structlog.stdlib.ProcessorFormatter.wrap_for_formatter)
@@ -205,7 +232,7 @@ def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None
     structlog.configure(
         processors=processors,
         context_class=wrap_dict(dict),
-        logger_factory=ElasticsearchLoggerFactory(es_server=es_server),
+        logger_factory=ElasticsearchLoggerFactory(es_server=es_server, in_prod=in_prod),
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )

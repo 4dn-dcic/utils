@@ -4,4 +4,5 @@ botocore==1.10.42
 elasticsearch==5.5.2
 aws_requests_auth==0.4.1
 urllib3==1.22
+structlog==18.1.0
 pytest-runner
