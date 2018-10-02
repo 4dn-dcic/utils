@@ -181,7 +181,7 @@ def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None
 
     if log_name is None:
         log_name = __name__
-    logger = logging.getLogger(log_name)
+    logger = structlog.get_logger(log_name)
 
     # add the handler responsible for posting the logs to ES
     import pdb; pdb.set_trace()
