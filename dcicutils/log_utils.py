@@ -98,6 +98,14 @@ class ElasticsearchLoggerFactory(structlog.stdlib.LoggerFactory):
     Needed to bind the ElasticsearchHandler to the structlog logger
     See: https://github.com/hynek/structlog/blob/master/src/structlog/stdlib.py
     """
+    def __init__(self, ignore_frame_names=None, es_server=None):
+        """
+        Set self.es_server and call __init__ of parent
+        """
+        self.es_server = es_server()
+        structlog.stdlib.LoggerFactory.__init__(self, ignore_frame_names)
+
+
     def __call__(self, *args):
         """
         Overload the original __call__ function and add the custom handler
@@ -106,13 +114,12 @@ class ElasticsearchLoggerFactory(structlog.stdlib.LoggerFactory):
         """
         if args:
             name = args[0]
-            es_server = args[1]
         else:
             _, name = _find_first_app_frame_and_name(self._ignore)
         import pdb; pdb.set_trace()
         logger = logging.getLogger(name)
-        if es_server:
-            es_handler = ElasticsearchHandler(es_server)
+        if self.es_server:
+            es_handler = ElasticsearchHandler(self.es_server)
             logger.addHandler(es_handler)
         return logger
 
@@ -198,20 +205,10 @@ def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None
     structlog.configure(
         processors=processors,
         context_class=wrap_dict(dict),
-        logger_factory=ElasticsearchLoggerFactory(),
+        logger_factory=ElasticsearchLoggerFactory(es_server=es_server),
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
-
-    if log_name is None:
-        log_name = __name__
-    logger = structlog.get_logger(log_name)
-
-    # add the handler responsible for posting the logs to ES
-    import pdb; pdb.set_trace()
-    if es_server:
-        es_handler = ElasticsearchHandler(es_server)
-        logger.addHandler(es_handler)
 
     # define format and processors for stdlib logging, in case someone hasn't switched
     # yet to using structlog.  Switched off for now as botocore and es are both
@@ -242,9 +239,12 @@ def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None
     '''
 
     # below could be used ot redirect logging to a file if desired
+    if log_name is None:
+        log_name = __name__
     if log_dir and log_name:
         import os
         log_file = os.path.join(log_dir, log_name + ".log")
+        logger = structlog.get_logger(log_name)
         hdlr = logging.FileHandler(log_file)
         formatter = logging.Formatter('')
         hdlr.setFormatter(formatter)
