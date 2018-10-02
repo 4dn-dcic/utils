@@ -102,7 +102,7 @@ class ElasticsearchLoggerFactory(structlog.stdlib.LoggerFactory):
         """
         Set self.es_server and call __init__ of parent
         """
-        self.es_server = es_server()
+        self.es_server = es_server
         structlog.stdlib.LoggerFactory.__init__(self, ignore_frame_names)
 
 
