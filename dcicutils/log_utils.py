@@ -93,6 +93,27 @@ class ElasticsearchHandler(logging.Handler):
             self.schedule_resend()
 
 
+class ElasticsearchLoggerFactory(structlog.stdlib.LoggerFactory):
+    """
+    Needed to bind the ElasticsearchHandler to the structlog logger
+    See: https://github.com/hynek/structlog/blob/master/src/structlog/stdlib.py
+    """
+    def __call__(self, *args):
+        """
+        Overload the original __call__ function and add the custom handler
+        """
+        if args:
+            name = args[0]
+        else:
+            _, name = _find_first_app_frame_and_name(self._ignore)
+        import pdb; pdb.set_trace()
+        logger = logging.getLogger(name)
+        # always add the ElasticsearchHandler
+        es_handler = ElasticsearchHandler(es_server)
+        logger.addHandler(es_handler)
+        return logger
+
+
 def calculate_log_index():
     """
     Simple function to name the ES log index by month
@@ -174,7 +195,7 @@ def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None
     structlog.configure(
         processors=processors,
         context_class=wrap_dict(dict),
-        logger_factory=structlog.stdlib.LoggerFactory(),
+        logger_factory=ElasticsearchLoggerFactory(),
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
