@@ -179,6 +179,10 @@ def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None
         cache_logger_on_first_use=True,
     )
 
+    if log_name is None:
+        log_name = __name__
+    logger = logging.getLogger(log_name)
+
     # add the handler responsible for posting the logs to ES
     import pdb; pdb.set_trace()
     if es_server:
@@ -214,12 +218,9 @@ def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None
     '''
 
     # below could be used ot redirect logging to a file if desired
-    if log_name is None:
-        log_name = __name__
     if log_dir and log_name:
         import os
         log_file = os.path.join(log_dir, log_name + ".log")
-        logger = logging.getLogger(log_name)
         hdlr = logging.FileHandler(log_file)
         formatter = logging.Formatter('')
         hdlr.setFormatter(formatter)
