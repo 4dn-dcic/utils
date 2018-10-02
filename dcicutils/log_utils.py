@@ -1,6 +1,107 @@
 import logging
 import structlog
+import time
+import datetime
+import uuid
+from threading import Timer, Lock
+from dcicutils import es_utils
 from structlog.threadlocal import wrap_dict
+from elasticsearch import eshelpers
+
+
+class ElasticsearchHandler(logging.Handler):
+    """
+    Custom handler to post logs to Elasticsearch.
+    Needed to sign ES requests with the AWS V4 Signature
+    Loosely based off of code here:
+    https://github.com/cmanaha/python-elasticsearch-logger
+    """
+    def __init__(self, es_server):
+        """
+        Must be given a string es_server url to work.
+        Calls __init__ of parent Handler
+        """
+        print('\n\n\nINIT LOG WITH SERVER: %s\n\n\n' % es_server)
+        self.resend_timer = None
+        self.records_to_resend = []
+        self.es_client = es_utils.create_es_client(es_server, use_aws_auth=True)
+        logging.Handler.__init__(self)
+
+
+    def test_es_server(self):
+        """
+        Simple ping against the given ES server; will return True if successful
+        """
+        return self.es_client.ping()
+
+
+    def schedule_resend(self):
+        """
+        Create a threading Timer as self.resend_timer to schedule resending any
+        records in self.resend_records after 5 seconds.
+        If already resending, do nothing
+        """
+        if self.resend_timer is None:
+            self.resend_timer = Timer(5, self.resend_records)
+            self.resend_timer.daemon = True
+            self.resend_timer.start()
+
+
+    def resend_records(self):
+        """
+        Send all records held in self.records_to_resend in batch
+        """
+        # clean up the timer
+        if self.resend_timer is not None and self.resend_timer.is_alive():
+            self.resend_timer.cancel()
+        self.resend_timer = None
+        if self.records_to_resend:
+            records_copy = self.records_to_resend[:]
+            self.records_to_resend = []
+            idx_name = calculate_log_index()
+            actions = (
+                {
+                    '_index': idx_name,
+                    '_type': log,
+                    '_source': record
+                }
+                for record in records_copy
+            )
+            for ok, resp in eshelpers.streaming_bulk(self.es_client, actions):
+                print('RESEND RESP: %s' % resp)
+                if not ok:
+                    self.records_to_resend.append(resp)
+        # trigger resending logs if any failed
+        if self.records_to_resend:
+            self.schedule_resend()
+
+
+    def emit(self, record):
+        """
+        Overload the emit method to post logs to ES
+        """
+        # required?
+        # entry = self.format(record)
+        import pdb; pdb.set_trace()
+        idx_name = calculate_log_index()
+        log_id = str(uuid.uuid4())
+        try:
+            self.es_client.index(index=idx_name, doc_type='log', body=record, id=log_id)
+        except Exception as e:
+            print('ERROR in logging to ES! %s' % str(e))
+            self.records_to_resend.append(record)
+            self.schedule_resend()
+
+
+def calculate_log_index():
+    """
+    Simple function to name the ES log index by month
+    Convention is: filebeat-<yyyy>-<mm>
+    * Uses UTC *
+    """
+    now = datetime.datetime.utcnow()
+    idx_suffix = datetime.datetime.strftime(now, '%Y-%m')
+    return 'filebeat-' + idx_suffix
 
 
 def convert_ts_to_at_ts(logger, log_method, event_dict):
@@ -15,18 +116,22 @@ def convert_ts_to_at_ts(logger, log_method, event_dict):
 
 
 # configure structlog to use its formats for stdlib logging and / or structlog logging
-def set_logging(in_prod=False, level=logging.INFO, log_name=None, log_dir=None):
+def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None, log_dir=None):
     '''
     Set logging is a function to be used everywhere, to encourage all subsytems
     to generate structured JSON logs, for easy insertion into ES for searching and
     visualizing later.
+
+    Providing an Elasticsearch server name (es_server) will cause the logs to
+    be automatically written to that server.
+
     Currently this only JSONifies our own logs, and the bit at the very bottom
-    would JSONify otehr logs, like botocore and stuff but that's  probably more
+    would JSONify other logs, like botocore and stuff but that's  probably more
     than we want to store.
 
     Also sets some standard handlers for the following:
     add_logger_name - python module generating the log
-    timestamper - timestamps... big suprise there
+    timestamper - timestamps... big surprise there
     convert_ts_ta_at_ts - takes our timestamp and overwrides
     the @timestamp key used by filebeats, so queries in ES will
     be against our times, which in things like indexing can differ
@@ -73,6 +178,12 @@ def set_logging(in_prod=False, level=logging.INFO, log_name=None, log_dir=None):
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
+
+    # add the handler responsible for posting the logs to ES
+    import pdb; pdb.set_trace()
+    if es_server:
+        es_handler = ElasticsearchHandler(es_server)
+        logger.addHandler(es_handler)
 
     # define format and processors for stdlib logging, in case someone hasn't switched
     # yet to using structlog.  Switched off for now as botocore and es are both
