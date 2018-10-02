@@ -101,16 +101,19 @@ class ElasticsearchLoggerFactory(structlog.stdlib.LoggerFactory):
     def __call__(self, *args):
         """
         Overload the original __call__ function and add the custom handler
+        The args used to structlog.get_logger should be <logger name> and
+        <es server>, in that order
         """
         if args:
             name = args[0]
+            es_server = args[1]
         else:
             _, name = _find_first_app_frame_and_name(self._ignore)
         import pdb; pdb.set_trace()
         logger = logging.getLogger(name)
-        # always add the ElasticsearchHandler
-        es_handler = ElasticsearchHandler(es_server)
-        logger.addHandler(es_handler)
+        if es_server:
+            es_handler = ElasticsearchHandler(es_server)
+            logger.addHandler(es_handler)
         return logger
 
 
