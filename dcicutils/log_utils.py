@@ -6,7 +6,7 @@ import uuid
 from threading import Timer, Lock
 from dcicutils import es_utils
 from structlog.threadlocal import wrap_dict
-from elasticsearch import eshelpers
+from elasticsearch import helpers
 
 
 class ElasticsearchHandler(logging.Handler):
@@ -67,7 +67,7 @@ class ElasticsearchHandler(logging.Handler):
                 }
                 for record in records_copy
             )
-            for ok, resp in eshelpers.streaming_bulk(self.es_client, actions):
+            for ok, resp in helpers.streaming_bulk(self.es_client, actions):
                 print('RESEND RESP: %s' % resp)
                 if not ok:
                     self.records_to_resend.append(resp)
