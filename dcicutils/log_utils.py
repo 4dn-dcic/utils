@@ -75,7 +75,7 @@ class ElasticsearchHandler(logging.Handler):
                 if not ok:
                     errors.append(resp['index']['_id'])
             for sent_message in messages_copy:
-                if sent_message[0] in errors and sent_messages[2] < self.retry_limit:
+                if sent_message[0] in errors and sent_message[2] < self.retry_limit:
                     sent_message[2] += 1  # increment retries
                     print('\nRETRIED %s TIMES...\n' % sent_message[2])
                     self.messages_to_resend.append(sent_message)
@@ -93,15 +93,21 @@ class ElasticsearchHandler(logging.Handler):
         idx_name = calculate_log_index()
         # get the message from the record
         message = record.__dict__.get('msg')
-        if not message or message.get('skip_es', False) is True:
+        # adds the ability to manually skip logging the message to ES
+        if not message or message.get('_skip_es', False) is True:
             return
-        # use the inherent log_uuid if possible
+        # make a uuid; use the inherent log_uuid if provided
         log_id = message.get('log_uuid', str(uuid.uuid4()))
+        # for testing purposes. trigger the retry mechanism
+        if message.get('_test_log_utils', False) is True:
+            self.messages_to_resend.append([log_id, message, 0])
+            self.schedule_resend()
+            return
         try:
             self.es_client.index(index=idx_name, doc_type='log', body=message, id=log_id)
         except Exception as e:
-            # append resend messages as tuples: (<uuid>, <dict message>, <int retries>)
-            self.messages_to_resend.append((log_id, message, 0))
+            # append resend messages as a list: [<uuid>, <dict message>, <int retries>]
+            self.messages_to_resend.append([log_id, message, 0])
             self.schedule_resend()
 
 
@@ -220,9 +226,6 @@ def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None
     if not in_prod:
         # pretty color logs
         processors.append(structlog.dev.ConsoleRenderer())
-
-    # test
-    processors.append(structlog.dev.ConsoleRenderer())
 
     # need this guy to go last
     processors.append(structlog.stdlib.ProcessorFormatter.wrap_for_formatter)
