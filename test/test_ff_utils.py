@@ -383,6 +383,7 @@ def test_get_es_metadata(integrated_ff):
     assert set(all_es_uuids) == set(all_uuids)
 
 
+@pytest.mark.integrated
 def test_get_es_search_generator(integrated_ff):
     from dcicutils import es_utils
     # get es_client info from the health page
@@ -407,6 +408,7 @@ def test_get_es_search_generator(integrated_ff):
     assert all_es_uuids == search_uuids
 
 
+@pytest.mark.integrated
 def test_get_health_page(integrated_ff):
     health_res = ff_utils.get_health_page(key=integrated_ff['ff_key'])
     assert health_res and 'error' not in health_res
