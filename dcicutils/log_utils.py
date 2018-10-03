@@ -26,12 +26,6 @@ class ElasticsearchHandler(logging.Handler):
         self.es_client = es_utils.create_es_client(es_server, use_aws_auth=True)
         logging.Handler.__init__(self)
 
-    def test_es_server(self):
-        """
-        Simple ping against the given ES server; will return True if successful
-        """
-        return self.es_client.ping()
-
     def schedule_resend(self):
         """
         Create a threading Timer as self.resend_timer to schedule resending any
@@ -73,7 +67,6 @@ class ElasticsearchHandler(logging.Handler):
             for sent_message in messages_copy:
                 if sent_message[0] in errors and sent_message[2] < self.retry_limit:
                     sent_message[2] += 1  # increment retries
-                    print('\nRETRIED %s TIMES...\n' % sent_message[2])
                     self.messages_to_resend.append(sent_message)
         # trigger resending logs if any failed
         if self.messages_to_resend:
@@ -123,7 +116,7 @@ class ElasticsearchLoggerFactory(structlog.stdlib.LoggerFactory):
     def __call__(self, *args):
         """
         Overload the original __call__ function and add the custom handler
-        The args used to structlog.get_logger should be <logger name> and
+        The args used to structlog.getLogger should be <logger name> and
         <es server>, in that order
         """
         if args:
