@@ -88,7 +88,6 @@ def test_logging_retry(caplog, integrated_ff):
     log_utils.set_logging(es_server=es_url, in_prod=True)
     log = structlog.getLogger(__name__)
     log.warning('test_retry', _test_log_utils=True)
-    es_log_idx = log_utils.calculate_log_index()
     assert len(caplog.records) == 1
     assert caplog.records[0].__dict__['msg']['event'] == 'test_retry'
     log_uuid = caplog.records[0].__dict__['msg']['log_uuid']

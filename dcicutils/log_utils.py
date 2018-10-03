@@ -1,9 +1,8 @@
 import logging
 import structlog
-import time
 import datetime
 import uuid
-from threading import Timer, Lock
+from threading import Timer
 from dcicutils import es_utils
 from structlog.threadlocal import wrap_dict
 from elasticsearch import helpers
@@ -27,13 +26,11 @@ class ElasticsearchHandler(logging.Handler):
         self.es_client = es_utils.create_es_client(es_server, use_aws_auth=True)
         logging.Handler.__init__(self)
 
-
     def test_es_server(self):
         """
         Simple ping against the given ES server; will return True if successful
         """
         return self.es_client.ping()
-
 
     def schedule_resend(self):
         """
@@ -45,7 +42,6 @@ class ElasticsearchHandler(logging.Handler):
             self.resend_timer = Timer(5, self.resend_messages)
             self.resend_timer.daemon = True
             self.resend_timer.start()
-
 
     def resend_messages(self):
         """
@@ -83,7 +79,6 @@ class ElasticsearchHandler(logging.Handler):
         if self.messages_to_resend:
             self.schedule_resend()
 
-
     def emit(self, record):
         """
         Overload the emit method to post logs to ES
@@ -105,7 +100,7 @@ class ElasticsearchHandler(logging.Handler):
             return
         try:
             self.es_client.index(index=idx_name, doc_type='log', body=message, id=log_id)
-        except Exception as e:
+        except Exception:
             # append resend messages as a list: [<uuid>, <dict message>, <int retries>]
             self.messages_to_resend.append([log_id, message, 0])
             self.schedule_resend()
@@ -124,7 +119,6 @@ class ElasticsearchLoggerFactory(structlog.stdlib.LoggerFactory):
         """
         self.es_server = es_server if in_prod else None
         structlog.stdlib.LoggerFactory.__init__(self, ignore_frame_names)
-
 
     def __call__(self, *args):
         """
