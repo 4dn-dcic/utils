@@ -98,7 +98,7 @@ def test_logging_retry(caplog, integrated_ff):
                                       key=integrated_ff['ff_key'])
     assert len(es_res) == 0
     # wait to allow logs to retry
-    time.sleep(5)
+    time.sleep(7)
     es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
     es_res = ff_utils.get_es_metadata([log_uuid], es_client=es_client,
                                       key=integrated_ff['ff_key'])
