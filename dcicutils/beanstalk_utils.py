@@ -170,7 +170,7 @@ def whodaman():
     magic_cname = 'fourfront-webprod.9wzadzju3p.us-east-1.elasticbeanstalk.com'
 
     client = boto3.client('elasticbeanstalk', region_name=REGION)
-    res = client.describe_environments(ApplicationName="4dn-web")
+    res = describe_beanstalk_environments(client, ApplicationName="4dn-web")
     logger.info(res)
     for env in res['Environments']:
         logger.info(env)
@@ -187,7 +187,7 @@ def beanstalk_config(env, appname='4dn-web'):
 
 def beanstalk_info(env):
     client = boto3.client('elasticbeanstalk', region_name=REGION)
-    res = client.describe_environments(EnvironmentNames=[env])
+    res = describe_beanstalk_environments(client, EnvironmentNames=[env])
 
     return res['Environments'][0]
 
@@ -196,9 +196,6 @@ def get_beanstalk_real_url(env):
     """
     Return the real url for the elasticbeanstalk with given environment name.
     Name can be 'data', 'staging', or an actual environment.
-
-    This function handles API throttling to AWS, so it should be used for all
-    cases of getting the env name
     """
     url = ''
     urls = {'staging': 'http://staging.4dnucleome.org',
@@ -207,19 +204,40 @@ def get_beanstalk_real_url(env):
     if env in urls:
         return urls[env]
 
-    # times to wait on a throttling error. Keep 5 min lambda limit in mind
-    for retry in [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]:
-        try:
-            if 'webprod' in env:
-                data_env = whodaman()
+    if 'webprod' in env:
+        data_env = whodaman()
 
-                if data_env == env:
-                    url = urls['data']
-                else:
-                    url = urls['staging']
-            else:
-                bs_info = beanstalk_info(env)
-                url = "http://" + bs_info['CNAME']
+        if data_env == env:
+            url = urls['data']
+        else:
+            url = urls['staging']
+    else:
+        bs_info = beanstalk_info(env)
+        url = "http://" + bs_info['CNAME']
+
+    return url
+
+
+def is_beanstalk_ready(env):
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
+    res = describe_beanstalk_environments(client, EnvironmentNames=[env])
+
+    status = res['Environments'][0]['Status']
+    if status != 'Ready':
+        raise WaitingForBoto3("Beanstalk enviornment status is %s" % status)
+
+    return status, 'http://' + res['Environments'][0].get('CNAME')
+
+
+def describe_beanstalk_environments(client, **kwargs):
+    """
+    Generic function for retrying client.describe_environments to avoid
+    AWS throttling errors
+    Passes all given kwargs to client.describe_environments
+    """
+    for retry in [1, 1, 1, 1, 2, 2, 2, 4, 4, 6, 8, 10, 12, 14, 16, 18, 20]:
+        try:
+            res = client.describe_environments(**kwargs)
         except ClientError as e:
             print('Client exception encountered while getting BS info for %s. Error: %s' % (env, str(e)))
             time.sleep(retry)
@@ -227,19 +245,9 @@ def get_beanstalk_real_url(env):
             print('Unhandled exception encountered while getting BS info for %s. Error: %s' % (env, str(e)))
             raise e
         else:
-            break
-    return url
+            return res
+    raise Exception('Could not describe Beanstalk environments due ClientErrors, likely throttled connections.')
 
-
-def is_beanstalk_ready(env):
-    client = boto3.client('elasticbeanstalk', region_name=REGION)
-    res = client.describe_environments(EnvironmentNames=[env])
-
-    status = res['Environments'][0]['Status']
-    if status != 'Ready':
-        raise WaitingForBoto3("Beanstalk enviornment status is %s" % status)
-
-    return status, 'http://' + res['Environments'][0].get('CNAME')
 
 
 def is_snapshot_ready(snapshot_name):
@@ -621,7 +629,7 @@ def copy_s3_buckets(new, old):
 def add_to_auth0_client(new):
     # first get the url of the newly created beanstalk environment
     eb = boto3.client('elasticbeanstalk', region_name=REGION)
-    env = eb.describe_environments(EnvironmentNames=[new])
+    env = describe_beanstalk_environments(client, EnvironmentNames=[new])
     url = None
     print("waiting for beanstalk to be up, this make take some time...")
     while url is None:
