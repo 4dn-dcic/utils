@@ -235,19 +235,19 @@ def describe_beanstalk_environments(client, **kwargs):
     AWS throttling errors
     Passes all given kwargs to client.describe_environments
     """
+    env_info = kwargs.get('EnvironmentNames', kwargs.get('ApplicationName', 'Unknown environment'))
     for retry in [1, 1, 1, 1, 2, 2, 2, 4, 4, 6, 8, 10, 12, 14, 16, 18, 20]:
         try:
             res = client.describe_environments(**kwargs)
         except ClientError as e:
-            print('Client exception encountered while getting BS info for %s. Error: %s' % (env, str(e)))
+            print('Client exception encountered while getting BS info for %s. Error: %s' % (env_info, str(e)))
             time.sleep(retry)
         except Exception as e:
-            print('Unhandled exception encountered while getting BS info for %s. Error: %s' % (env, str(e)))
+            print('Unhandled exception encountered while getting BS info for %s. Error: %s' % (env_info, str(e)))
             raise e
         else:
             return res
     raise Exception('Could not describe Beanstalk environments due ClientErrors, likely throttled connections.')
-
 
 
 def is_snapshot_ready(snapshot_name):
@@ -628,7 +628,7 @@ def copy_s3_buckets(new, old):
 
 def add_to_auth0_client(new):
     # first get the url of the newly created beanstalk environment
-    eb = boto3.client('elasticbeanstalk', region_name=REGION)
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
     env = describe_beanstalk_environments(client, EnvironmentNames=[new])
     url = None
     print("waiting for beanstalk to be up, this make take some time...")
