@@ -331,7 +331,7 @@ def delete_field(obj_id, del_field, key=None, ff_env=None):
     return get_response_json(response)
 
 
-def get_es_search_generator(es_client, index, body, page_size=50):
+def get_es_search_generator(es_client, index, body, page_size=1000):
     """
     Simple generator behind get_es_metada which takes an es_client (from
     es_utils create_es_client), a string index, and a dict query body.
@@ -372,8 +372,9 @@ def get_es_metadata(uuids, es_client=None, filters={}, key=None, ff_env=None):
     # sending in too many uuids in the terms query can crash es; break them up
     # into groups of max size 100
     es_res = []
-    for i in range(0, len(uuids), 100):
-        query_uuids = uuids[i:i + 100]
+    chunk_size = 1000  # number of uuids to batch in one ES terms query
+    for i in range(0, len(uuids), chunk_size):
+        query_uuids = uuids[i:i + chunk_size]
         es_query = {
             'query': {
                 'bool': {
