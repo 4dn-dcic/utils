@@ -362,9 +362,12 @@ def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
         You can also specify NOT fields:
             example: filters={'status': '!released'}
         You can also specifiy lists of values for fields:
-            example: filters={'status': ['released', '!archived']}
-    NOTE: filters are always combined using AND queries (must all match)
-    Int chunk_size may be used to control the number of uuids that are
+            example: filters={'status': ['released', archived']}
+    NOTES:
+        - different filter field are combined using AND queries (must all match)
+            example: filters={'status': ['released'], 'public_release': ['2018-01-01']}
+        - values for the same field and combined with OR (such as multiple statuses)
+    Integer chunk_size may be used to control the number of uuids that are
     passed to Elasticsearch in each query; setting this too high may cause
     ES reads to timeout.
     Same auth mechanism as the other metadata functions
