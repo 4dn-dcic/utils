@@ -382,6 +382,24 @@ def test_get_es_metadata(integrated_ff):
     all_es_uuids = [item['uuid'] for item in all_es]
     assert set(all_es_uuids) == set(all_uuids)
 
+    # make sure filters work with the search
+    bios_in_rev = ff_utils.search_metadata('/search/?type=Biosample&frame=object&status=in+review+by+lab',
+                                               key=integrated_ff['ff_key'])
+    bios_replaced = ff_utils.search_metadata('/search/?type=Biosample&frame=object&status=replaced',
+                                                 key=integrated_ff['ff_key'])
+    bios_uuids = [item['uuid'] for item in bios_in_rev + bios_replaced]
+    all_uuids.extend(bios_uuids)  # add the replaced biosample uuids
+    filters = {'status': ['in review by lab', 'replaced'], '@type': ['Biosample']}
+    bios_es = ff_utils.get_es_metadata(all_uuids, filters=filters, key=integrated_ff['ff_key'])
+    assert set([item['uuid'] for item in bios_es]) == set(bios_uuids)
+
+    bios_neg_search = '/search/?type=Biosample&frame=object&status=in+review+by+lab&modifications.modification_type!=Other'
+    bios_neg_res = ff_utils.search_metadata(bios_neg_search, key=integrated_ff['ff_key'])
+    filters2 = {'status': ['in review by lab'], 'modifications.modification_type': ['!Other'], '@type': ['Biosample']}
+    bios_neg_es = ff_utils.get_es_metadata(all_uuids, filters=filters2, key=integrated_ff['ff_key'])
+    assert set([item['uuid'] for item in bios_neg_es]) == set(item['uuid'] for item in bios_neg_res)
+
+
 
 @pytest.mark.integrated
 def test_get_es_search_generator(integrated_ff):
