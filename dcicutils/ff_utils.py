@@ -348,13 +348,21 @@ def get_es_search_generator(es_client, index, body, page_size=50):
         yield es_hits
 
 
-def get_es_metadata(uuids, es_client=None, key=None, ff_env=None):
+def get_es_metadata(uuids, es_client=None, filters={}, key=None, ff_env=None):
     """
     Given a list of string item uuids, will return a
     dictionary response of the full ES record for those items (or an empty
     dictionary if the items don't exist/ are not indexed)
     You can pass in an Elasticsearch client (initialized by create_es_client)
     through the es_client param to save init time.
+    Advanced users can optionally pass a dict of filters that will be added
+    to the Elasticsearch query.
+        For example: filters={'status': 'released'}
+        You can also specify NOT fields:
+            example: filters={'status': '!released'}
+        You can also specifiy lists of values for fields:
+            example: filters={'status': ['released', '!archived']}
+    NOTE: filters are always combined using AND queries (must all match)
     Same auth mechanism as the other metadata functions
     """
     if es_client is None:
@@ -366,8 +374,38 @@ def get_es_metadata(uuids, es_client=None, key=None, ff_env=None):
     es_res = []
     for i in range(0, len(uuids), 100):
         query_uuids = uuids[i:i + 100]
-        es_query = {'query': {'terms': {'_id': query_uuids}},
-                    'sort': [{'_uid': {'order': 'desc'}}]}
+        es_query = {
+            'query': {
+                'bool': {
+                    'must': [
+                        {'terms': {'_id': query_uuids}}
+                    ],
+                    'must_not': []
+                }
+            },
+            'sort': [{'_uid': {'order': 'desc'}}]
+        }
+        if filters:
+            if not isinstance(filters, dict):
+                print('Invalid filter for get_es_metadata: %s' % filters)
+            else:
+                for k, v in filters.items():
+                    key_terms = []
+                    key_not_terms = []
+                    iter_terms = [v] if not isinstance(v, list) else v
+                    for val in iter_terms:
+                        if val.startswith('!'):
+                            key_not_terms.append(val[1:])
+                        else:
+                            key_terms.append(val)
+                    if key_terms:
+                        es_query['query']['bool']['must'].append(
+                            {'terms': {'embedded.' + k + '.raw': key_terms}}
+                        )
+                    if key_not_terms:
+                        es_query['query']['bool']['must_not'].append(
+                            {'terms': {'embedded.' + k + '.raw': key_not_terms}}
+                        )
         for es_page in get_es_search_generator(es_client, '_all', es_query):
             # return the document source only; eliminate es metadata
             es_res.extend([hit['_source'] for hit in es_page])
