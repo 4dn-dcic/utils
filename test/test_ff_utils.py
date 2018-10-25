@@ -1,5 +1,6 @@
 from dcicutils import ff_utils
 import pytest
+import json
 pytestmark = pytest.mark.working
 
 
@@ -218,6 +219,11 @@ def test_get_metadata(integrated_ff, basestring):
 
     # testing check_queues functionality requires patching
     ff_utils.patch_metadata({'description': 'test description'}, obj_id=test_item, key=integrated_ff['ff_key'])
+    # add a bunch more stuff to the queue
+    idx_body = json.dumps({'uuids': [test_item], 'target_queue': 'secondary'})
+    for i in range(10):
+        ff_utils.authorized_request(integrated_ff['ff_key']['server'] + '/queue_indexing',
+                                    auth=integrated_ff['ff_key'], verb='POST', data=idx_body)
     res_w_check = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'],
                                         ff_env=integrated_ff['ff_env'], check_queue=True)
     res_db = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'],
