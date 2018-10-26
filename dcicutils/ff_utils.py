@@ -331,7 +331,7 @@ def delete_field(obj_id, del_field, key=None, ff_env=None):
     return get_response_json(response)
 
 
-def get_es_search_generator(es_client, index, body, page_size=50):
+def get_es_search_generator(es_client, index, body, page_size=200):
     """
     Simple generator behind get_es_metada which takes an es_client (from
     es_utils create_es_client), a string index, and a dict query body.
@@ -348,13 +348,28 @@ def get_es_search_generator(es_client, index, body, page_size=50):
         yield es_hits
 
 
-def get_es_metadata(uuids, es_client=None, key=None, ff_env=None):
+def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
+                    key=None, ff_env=None):
     """
     Given a list of string item uuids, will return a
     dictionary response of the full ES record for those items (or an empty
     dictionary if the items don't exist/ are not indexed)
     You can pass in an Elasticsearch client (initialized by create_es_client)
     through the es_client param to save init time.
+    Advanced users can optionally pass a dict of filters that will be added
+    to the Elasticsearch query.
+        For example: filters={'status': 'released'}
+        You can also specify NOT fields:
+            example: filters={'status': '!released'}
+        You can also specifiy lists of values for fields:
+            example: filters={'status': ['released', archived']}
+    NOTES:
+        - different filter field are combined using AND queries (must all match)
+            example: filters={'status': ['released'], 'public_release': ['2018-01-01']}
+        - values for the same field and combined with OR (such as multiple statuses)
+    Integer chunk_size may be used to control the number of uuids that are
+    passed to Elasticsearch in each query; setting this too high may cause
+    ES reads to timeout.
     Same auth mechanism as the other metadata functions
     """
     if es_client is None:
@@ -364,11 +379,43 @@ def get_es_metadata(uuids, es_client=None, key=None, ff_env=None):
     # sending in too many uuids in the terms query can crash es; break them up
     # into groups of max size 100
     es_res = []
-    for i in range(0, len(uuids), 100):
-        query_uuids = uuids[i:i + 100]
-        es_query = {'query': {'terms': {'_id': query_uuids}},
-                    'sort': [{'_uid': {'order': 'desc'}}]}
-        for es_page in get_es_search_generator(es_client, '_all', es_query):
+    for i in range(0, len(uuids), chunk_size):
+        query_uuids = uuids[i:i + chunk_size]
+        es_query = {
+            'query': {
+                'bool': {
+                    'must': [
+                        {'terms': {'_id': query_uuids}}
+                    ],
+                    'must_not': []
+                }
+            },
+            'sort': [{'_uid': {'order': 'desc'}}]
+        }
+        if filters:
+            if not isinstance(filters, dict):
+                print('Invalid filter for get_es_metadata: %s' % filters)
+            else:
+                for k, v in filters.items():
+                    key_terms = []
+                    key_not_terms = []
+                    iter_terms = [v] if not isinstance(v, list) else v
+                    for val in iter_terms:
+                        if val.startswith('!'):
+                            key_not_terms.append(val[1:])
+                        else:
+                            key_terms.append(val)
+                    if key_terms:
+                        es_query['query']['bool']['must'].append(
+                            {'terms': {'embedded.' + k + '.raw': key_terms}}
+                        )
+                    if key_not_terms:
+                        es_query['query']['bool']['must_not'].append(
+                            {'terms': {'embedded.' + k + '.raw': key_not_terms}}
+                        )
+        # use chunk_limit as page size for performance reasons
+        for es_page in get_es_search_generator(es_client, '_all', es_query,
+                                               page_size=chunk_size):
             # return the document source only; eliminate es metadata
             es_res.extend([hit['_source'] for hit in es_page])
     return es_res
