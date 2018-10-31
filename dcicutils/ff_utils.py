@@ -349,7 +349,7 @@ def get_es_search_generator(es_client, index, body, page_size=200):
 
 
 def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
-                    key=None, ff_env=None):
+                    key=None, ff_env=None, is_generator=False):
     """
     Given a list of string item uuids, will return a
     dictionary response of the full ES record for those items (or an empty
@@ -416,8 +416,11 @@ def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
         # use chunk_limit as page size for performance reasons
         for es_page in get_es_search_generator(es_client, '_all', es_query,
                                                page_size=chunk_size):
-            # return the document source only; eliminate es metadata
-            es_res.extend([hit['_source'] for hit in es_page])
+            for hit in es_page:
+                if is_generator:
+                    yield hit['_source']
+                else:
+                    es_res.extend(hit['_source'])
     return es_res
 
 
