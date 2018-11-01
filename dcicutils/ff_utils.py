@@ -348,8 +348,8 @@ def get_es_search_generator(es_client, index, body, page_size=200):
         yield es_hits
 
 
-def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
-                    key=None, ff_env=None, is_generator=False):
+def _get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
+                     key=None, ff_env=None):
     """
     Given a list of string item uuids, will return a
     dictionary response of the full ES record for those items (or an empty
@@ -417,11 +417,16 @@ def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
         for es_page in get_es_search_generator(es_client, '_all', es_query,
                                                page_size=chunk_size):
             for hit in es_page:
-                if is_generator:
-                    yield hit['_source']
-                else:
-                    es_res.extend(hit['_source'])
-    return es_res
+                # import pdb; pdb.set_trace()
+                yield hit['_source']
+
+
+def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
+                    key=None, ff_env=None, is_generator=False):
+    meta = _get_es_metadata(uuids, es_client, filters, chunk_size, key, ff_env)
+    if is_generator:
+        return meta
+    return list(meta)
 
 
 def get_health_page(key=None, ff_env=None):
