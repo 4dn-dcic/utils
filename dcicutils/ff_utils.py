@@ -294,10 +294,22 @@ def get_search_generator(search_url, auth=None, ff_env=None, page_limit=50):
             yield search_res
 
 
-def search_metadata(search, key=None, ff_env=None, page_limit=50):
+def search_result_generator(page_generator):
+    """
+    Simple wrapper function to return a generator to iterate through item
+    results on the search page
+    """
+    for page in page_generator:
+        for res in page:
+            yield res
+
+
+def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=False):
     """
     Make a get request of form <server>/<search> and returns a list of results
     using a paginated generator. Include all query params in the search string.
+    If is_generator is True, return a generator that yields individual search
+    results. Otherwise, return all results in a list (default)
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
     """
@@ -305,10 +317,16 @@ def search_metadata(search, key=None, ff_env=None, page_limit=50):
     if search.startswith('/'):
         search = search[1:]
     search_url = '/'.join([auth['server'], search])
-    search_res = []
-    for page in get_search_generator(search_url, auth=auth, page_limit=page_limit):
-        search_res.extend(page)
-    return search_res
+    search_generator = get_search_generator(search_url, auth=auth, page_limit=page_limit)
+    if is_generator:
+        # yields individual items from search result
+        return search_result_generator(search_generator)
+    else:
+        # return a list of all search results
+        search_res = []
+        for page in search_generator:
+            search_res.extend(page)
+        return search_res
 
 
 def delete_field(obj_id, del_field, key=None, ff_env=None):
@@ -349,7 +367,7 @@ def get_es_search_generator(es_client, index, body, page_size=200):
 
 
 def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
-                    key=None, ff_env=None):
+                    is_generator=False, key=None, ff_env=None):
     """
     Given a list of string item uuids, will return a
     dictionary response of the full ES record for those items (or an empty
@@ -370,7 +388,21 @@ def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
     Integer chunk_size may be used to control the number of uuids that are
     passed to Elasticsearch in each query; setting this too high may cause
     ES reads to timeout.
+    Boolean is_generator will return a generator for individual results if True;
+    if False (default), returns a list of results.
     Same auth mechanism as the other metadata functions
+    """
+    meta = _get_es_metadata(uuids, es_client, filters, chunk_size, key, ff_env)
+    if is_generator:
+        return meta
+    return list(meta)
+
+
+def _get_es_metadata(uuids, es_client, filters, chunk_size, key, ff_env):
+    """
+    Internal function needed because there are multiple levels of iteration
+    used to create the generator.
+    Should NOT be used directly
     """
     if es_client is None:
         es_url = get_health_page(key, ff_env)['elasticsearch']
@@ -378,7 +410,6 @@ def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
     # match all given uuids to _id fields
     # sending in too many uuids in the terms query can crash es; break them up
     # into groups of max size 100
-    es_res = []
     for i in range(0, len(uuids), chunk_size):
         query_uuids = uuids[i:i + chunk_size]
         es_query = {
@@ -416,9 +447,8 @@ def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
         # use chunk_limit as page size for performance reasons
         for es_page in get_es_search_generator(es_client, '_all', es_query,
                                                page_size=chunk_size):
-            # return the document source only; eliminate es metadata
-            es_res.extend([hit['_source'] for hit in es_page])
-    return es_res
+            for hit in es_page:
+                yield hit['_source']  # yield individual items from ES
 
 
 def get_health_page(key=None, ff_env=None):
