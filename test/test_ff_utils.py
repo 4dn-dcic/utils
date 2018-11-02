@@ -204,6 +204,7 @@ def test_authorized_request_integrated(integrated_ff):
 
 @pytest.mark.integrated
 def test_get_metadata(integrated_ff, basestring):
+    import time
     # use this test biosource
     test_item = '331111bc-8535-4448-903e-854af460b254'
     res_w_key = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'])
@@ -224,6 +225,7 @@ def test_get_metadata(integrated_ff, basestring):
     for i in range(10):
         ff_utils.authorized_request(integrated_ff['ff_key']['server'] + '/queue_indexing',
                                     auth=integrated_ff['ff_key'], verb='POST', data=idx_body)
+    time.sleep(5)  # let the queue catch up
     res_w_check = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'],
                                         ff_env=integrated_ff['ff_env'], check_queue=True)
     res_db = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'],
@@ -335,6 +337,7 @@ def test_get_search_generator(integrated_ff):
     # make sure that all results are unique
     all_gen3_uuids = set([item['uuid'] for item in all_gen3])
     assert len(all_gen3_uuids) == len(all_gen3)
+    # TODO add test for is_generator=True
 
 
 @pytest.mark.integrated
@@ -405,6 +408,7 @@ def test_get_es_metadata(integrated_ff):
     filters2 = {'status': ['in review by lab'], 'modifications.modification_type': ['!Other'], '@type': ['Biosample']}
     bios_neg_es = ff_utils.get_es_metadata(all_uuids, filters=filters2, key=integrated_ff['ff_key'])
     assert set([item['uuid'] for item in bios_neg_es]) == set(item['uuid'] for item in bios_neg_res)
+    # TODO add test for is_generator=True
 
 
 @pytest.mark.integrated
