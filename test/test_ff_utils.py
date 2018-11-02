@@ -291,23 +291,24 @@ def test_upsert_metadata(integrated_ff):
 
 @pytest.mark.integrated
 def test_search_metadata(integrated_ff):
-    search_res = ff_utils.search_metadata('search/?limit=all&type=Biosource', key=integrated_ff['ff_key'])
+    search_res = ff_utils.search_metadata('search/?limit=all&type=File', key=integrated_ff['ff_key'])
     assert isinstance(search_res, list)
-    # this will fail if biosources have not yet been indexed
+    # this will fail if items have not yet been indexed
     assert len(search_res) > 0
     # make sure uuids are unique
     search_uuids = set([item['uuid'] for item in search_res])
     assert len(search_uuids) == len(search_res)
-    search_res_slash = ff_utils.search_metadata('/search/?limit=all&type=Biosource', key=integrated_ff['ff_key'])
+    search_res_slash = ff_utils.search_metadata('/search/?limit=all&type=File', key=integrated_ff['ff_key'])
     assert isinstance(search_res_slash, list)
     assert len(search_res_slash) == len(search_res)
     # search with a limit
-    search_res_limit = ff_utils.search_metadata('/search/?limit=3&type=Biosource', key=integrated_ff['ff_key'])
+    search_res_limit = ff_utils.search_metadata('/search/?limit=3&type=File', key=integrated_ff['ff_key'])
     assert len(search_res_limit) == 3
     # search with a filter
-    search_res_filt = ff_utils.search_metadata('/search/?limit=3&type=Biosource&biosource_type=immortalized cell line',
+    search_res_filt = ff_utils.search_metadata('/search/?limit=3&type=File&file_type=reads',
                                                key=integrated_ff['ff_key'])
     assert len(search_res_filt) > 0
+    # TODO add test for is_generator=True
 
 
 @pytest.mark.integrated
@@ -337,7 +338,6 @@ def test_get_search_generator(integrated_ff):
     # make sure that all results are unique
     all_gen3_uuids = set([item['uuid'] for item in all_gen3])
     assert len(all_gen3_uuids) == len(all_gen3)
-    # TODO add test for is_generator=True
 
 
 @pytest.mark.integrated
