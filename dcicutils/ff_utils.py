@@ -367,7 +367,7 @@ def get_es_search_generator(es_client, index, body, page_size=200):
 
 
 def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
-                    key=None, ff_env=None, is_generator=False):
+                    is_generator=False, key=None, ff_env=None):
     """
     Given a list of string item uuids, will return a
     dictionary response of the full ES record for those items (or an empty
@@ -388,7 +388,7 @@ def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
     Integer chunk_size may be used to control the number of uuids that are
     passed to Elasticsearch in each query; setting this too high may cause
     ES reads to timeout.
-    Boolean is_generator will return a generator to obtain results if True;
+    Boolean is_generator will return a generator for individual results if True;
     if False (default), returns a list of results.
     Same auth mechanism as the other metadata functions
     """
