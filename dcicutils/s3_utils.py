@@ -62,6 +62,10 @@ class s3Utils(object):
     def get_google_key(self):
         return self.get_key(keyfile_name='fourdn-fourfront-google-key')
 
+    def get_jupyterhub_key(self):
+        # the jupyterhub key is a Jupyterhub API token
+        return self.get_key(keyfile_name='jupyterhub-fourfront-key')
+
     def get_key(self, keyfile_name='illnevertell'):
         # Share secret encrypted S3 File
         response = self.s3.get_object(Bucket=self.sys_bucket,
