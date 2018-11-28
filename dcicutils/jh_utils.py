@@ -178,7 +178,7 @@ def mount_4dn_file(obj_id, format=None):
     """
     file_info = find_valid_file_or_extra_file(obj_id, format)
     # for now, ensure the file exists. Will catch non-uploaded files
-    if not os.path.isfile(file_info['path']):
+    if not os.path.isfile(file_info['full_path']):
         raise Exception('Could not open file: %s. Reason: file cannot be mounted.' % obj_id)
     return file_info['full_path']
 
