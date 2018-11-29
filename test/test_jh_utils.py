@@ -2,7 +2,6 @@
 # Add more following 4DN Annual Meeting 2018
 import os
 import pytest
-import time
 from dcicutils import s3_utils
 pytestmark = pytest.mark.working
 
@@ -45,9 +44,8 @@ def test_some_decorated_methods_work(integrated_ff):
     assert 'uuid' in meta_res
     post_res = jh_utils.post_metadata({'tracking_type': 'other'}, 'tracking-items')
     assert 'uuid' in post_res['@graph'][0]
-    time.sleep(4)
     patch_res = jh_utils.patch_metadata({'other_tracking': {'test_field': 'test_value'}},
-                                        '892648b8-1a15-4069-8318-a0e8d03211c5')
+                                        post_res['@graph'][0]['uuid'])
     assert patch_res['@graph'][0]['other_tracking']['test_field'] == 'test_value'
 
 
