@@ -9,6 +9,15 @@ if sys.version_info[0] == 3:
     import urllib.request as use_urllib
 else:
     import urllib2 as use_urllib
+# disabled JH autosave, if we are in a notebook (with Ipython module)
+try:
+    from IPython import get_ipython
+except ImportError:
+    pass
+else:
+    ipython = get_ipython()
+    # disable autosaving in a notebook -- analogous to running %autosave 0
+    ipython.magic("autosave 0")
 
 # do some top level stuff when the module is imported
 if 'FF_ACCESS_KEY' not in os.environ or 'FF_ACCESS_SECRET' not in os.environ:
