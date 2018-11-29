@@ -37,7 +37,8 @@ def test_s3Utils_get_keys_for_staging():
 def test_s3Utils_get_jupyterhub_key(basestring):
     util = s3Utils(env='data')
     key = util.get_jupyterhub_key()
-    assert isinstance(key, basestring)
+    assert 'secret' in key
+    assert key['server'] == 'https://jupyter.4dnucleome.org'
 
 
 def test_s3Utils_get_higlass_key():
