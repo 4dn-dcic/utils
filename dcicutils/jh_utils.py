@@ -147,11 +147,6 @@ def find_valid_file_or_extra_file(obj_id, format):
             extra_ff = extra_file['file_format']['display_title']
             all_ffs[extra_ff] = {'uk': extra_file['upload_key'], 'href': extra_file['href']}
             ff_display += (extra_ff + '\n')
-        if format is None and len(all_ffs) > 1:  # notify the users of extra files
-            print('There are extra files associated with the given file ID (%s). '
-                  'The file formats of those files are:\n%sTo open an extra '
-                  'file, add the following parameter: `format=<chosen format>`'
-                  % (obj_id, ff_display))
 
     if format and format not in all_ffs:
         raise Exception('Could not open file: %s. Reason: invalid file format '
