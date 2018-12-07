@@ -318,7 +318,8 @@ def test_post_delete_purge_links_metadata(integrated_ff):
     assert purge_res3['status'] == 'success'
     # make sure it is purged
     with pytest.raises(Exception) as exec_info:
-        ff_utils.get_metadata(post_item['uuid'], key=integrated_ff['ff_key'])
+        ff_utils.get_metadata(post_item['uuid'], key=integrated_ff['ff_key'],
+                              add_on='datastore=database')
     assert 'The resource could not be found' in str(exec_info.value)
 
 
