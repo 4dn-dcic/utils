@@ -44,6 +44,9 @@ HANDLED_FUNCTIONS = [
     'patch_metadata',
     'upsert_metadata',
     'search_metadata',
+    'delete_metadata',
+    'purge_metadata',
+    'get_metadata_links',
     'delete_field'
 ]
 

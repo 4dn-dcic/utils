@@ -1,6 +1,7 @@
 from dcicutils import ff_utils
 import pytest
 import json
+import time
 pytestmark = pytest.mark.working
 
 
@@ -158,7 +159,6 @@ def test_stuff_in_queues(integrated_ff):
     """
     Gotta index a bunch of stuff to make this work
     """
-    import time
     search_res = ff_utils.search_metadata('search/?limit=all&type=File', key=integrated_ff['ff_key'])
     # just take the first handful
     for item in search_res[:8]:
@@ -204,7 +204,6 @@ def test_authorized_request_integrated(integrated_ff):
 
 @pytest.mark.integrated
 def test_get_metadata(integrated_ff, basestring):
-    import time
     # use this test biosource
     test_item = '331111bc-8535-4448-903e-854af460b254'
     res_w_key = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'])
@@ -257,18 +256,66 @@ def test_patch_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
-def test_post_metadata(integrated_ff):
-    test_data = {'biosource_type': 'immortalized cell line', 'award': '1U01CA200059-01',
-                 'lab': '4dn-dcic-lab', 'status': 'deleted'}
-    post_res = ff_utils.post_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
+def test_post_delete_purge_links_metadata(integrated_ff):
+    """
+    Combine all of these tests because they logically fit
+    """
+    post_data = {'biosource_type': 'immortalized cell line', 'award': '1U01CA200059-01',
+                 'lab': '4dn-dcic-lab'}
+    post_res = ff_utils.post_metadata(post_data, 'biosource', key=integrated_ff['ff_key'])
     post_item = post_res['@graph'][0]
     assert 'uuid' in post_item
-    assert post_item['biosource_type'] == test_data['biosource_type']
+    assert post_item['biosource_type'] == post_data['biosource_type']
     # make sure there is a 409 when posting to an existing item
-    test_data['uuid'] = post_item['uuid']
+    post_data['uuid'] = post_item['uuid']
     with pytest.raises(Exception) as exec_info:
-        ff_utils.post_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
+        ff_utils.post_metadata(post_data, 'biosource', key=integrated_ff['ff_key'])
     assert '409' in str(exec_info.value)  # 409 is conflict error
+
+    # make a biosample that links to the biosource
+    bios_data = {'biosource': [post_data['uuid']], 'status': 'deleted',
+                 'lab': '4dn-dcic-lab', 'award': '1U01CA200059-01'}
+    bios_res = ff_utils.post_metadata(bios_data, 'biosample', key=integrated_ff['ff_key'])
+    bios_item = bios_res['@graph'][0]
+    assert 'uuid' in bios_item
+
+    # delete the biosource
+    del_res = ff_utils.delete_metadata(post_item['uuid'], key=integrated_ff['ff_key'])
+    assert del_res['status'] == 'success'
+    assert del_res['@graph'][0]['status'] == 'deleted'
+
+    # test get_metadata_links function (this will ensure everything is indexed, as well)
+    links = []
+    tries = 0
+    while not links and tries < 10:
+        post_links = ff_utils.get_metadata_links(post_item['uuid'], key=integrated_ff['ff_key'])
+        links = post_links.get('uuids_linking_to', [])
+        tries += 1
+        time.sleep(2)
+    assert len(links) == 1
+    assert links[0]['uuid'] == bios_item['uuid']
+    assert links[0]['field'] == 'biosource[0].uuid'
+
+    # purge biosource first, which will failed because biosample is still linked
+    purge_res1 = ff_utils.purge_metadata(post_item['uuid'], key=integrated_ff['ff_key'])
+    assert purge_res1['status'] == 'error'
+    assert bios_item['uuid'] in [purge['uuid'] for purge in purge_res1['comment']]
+
+    # purge biosample and then biosource
+    purge_res2 = ff_utils.purge_metadata(bios_item['uuid'], key=integrated_ff['ff_key'])
+    assert purge_res2['status'] == 'success'
+
+    # wait for indexing to catch up
+    tries = 0
+    while len(links) > 0 and tries < 10:
+        post_links = ff_utils.get_metadata_links(post_item['uuid'], key=integrated_ff['ff_key'])
+        links = post_links.get('uuids_linking_to', [])
+        tries += 1
+        time.sleep(2)
+    assert len(links) == 0
+
+    purge_res3 = ff_utils.purge_metadata(post_item['uuid'], key=integrated_ff['ff_key'])
+    assert purge_res3['status'] == 'success'
 
 
 @pytest.mark.integrated
