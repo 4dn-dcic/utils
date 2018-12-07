@@ -288,10 +288,10 @@ def test_post_delete_purge_links_metadata(integrated_ff):
     links = []
     tries = 0
     while not links and tries < 10:
+        time.sleep(2)
         post_links = ff_utils.get_metadata_links(post_item['uuid'], key=integrated_ff['ff_key'])
         links = post_links.get('uuids_linking_to', [])
         tries += 1
-        time.sleep(2)
     assert len(links) == 1
     assert links[0]['uuid'] == bios_item['uuid']
     assert links[0]['field'] == 'biosource[0].uuid'
@@ -308,14 +308,18 @@ def test_post_delete_purge_links_metadata(integrated_ff):
     # wait for indexing to catch up
     tries = 0
     while len(links) > 0 and tries < 10:
+        time.sleep(2)
         post_links = ff_utils.get_metadata_links(post_item['uuid'], key=integrated_ff['ff_key'])
         links = post_links.get('uuids_linking_to', [])
         tries += 1
-        time.sleep(2)
     assert len(links) == 0
 
     purge_res3 = ff_utils.purge_metadata(post_item['uuid'], key=integrated_ff['ff_key'])
     assert purge_res3['status'] == 'success'
+    # make sure it is purged
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.get_metadata(post_item['uuid'], key=integrated_ff['ff_key'])
+    assert 'The resource could not be found' in str(exec_info.value)
 
 
 @pytest.mark.integrated
