@@ -125,6 +125,58 @@ def search_request_with_retries(request_fxn, url, auth, verb, **kwargs):
     return final_res
 
 
+def purge_request_with_retries(request_fxn, url, auth, verb, **kwargs):
+    """
+    Example of using a non-standard retry function. This one is for purges,
+    which return a 423 if the item is locked. This function returns a list of
+    locked items to faciliate easier purging
+    """
+    final_res = None
+    error = None
+    retry = 0
+    # 423 is not included here because it is handled specially
+    non_retry_statuses = [401, 402, 403, 404, 405, 422]
+    retry_timeouts = [0, 1, 2, 3, 4]
+    while final_res is None and retry < len(retry_timeouts):
+        time.sleep(retry_timeouts[retry])
+        try:
+            res = request_fxn(url, auth=auth, **kwargs)
+        except Exception as e:
+            retry += 1
+            error = 'Error with %s request for %s: %s' % (verb.upper(), url, e)
+            continue
+        if res.status_code >= 400:
+            # attempt to get reason from res.json. then try raise_for_status
+            try:
+                err_reason = res.json()
+            except ValueError:
+                try:
+                    res.raise_for_status()
+                except Exception as e:
+                    err_reason = repr(e)
+                else:
+                    err_reason = res.reason
+            else:
+                # handle locked items
+                if res.status_code == 423:
+                    locked_items = err_reason.get('comment', [])
+                    if locked_items:
+                        final_res = res
+                        error = None
+                        break
+            retry += 1
+            error = ('Bad status code for %s request for %s: %s. Reason: %s'
+                     % (verb.upper(), url, res.status_code, err_reason))
+            if res.status_code in non_retry_statuses:
+                break
+        else:
+            final_res = res
+            error = None
+    if error and not final_res:
+        raise Exception(error)
+    return final_res
+
+
 def authorized_request(url, auth=None, ff_env=None, verb='GET',
                        retry_fxn=standard_request_with_retries, **kwargs):
     """
@@ -178,7 +230,7 @@ def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
     Takes an optional string add_on that should contain things like
     "frame=object". Join query parameters in the add_on using "&", e.g.
     "frame=object&force_md5"
-    *REQUIRES ff_env if check_queue is used.*
+    *REQUIRES ff_env if check_queue is used*
     """
     auth = get_authentication_with_server(key, ff_env)
     if check_queue and stuff_in_queues(ff_env, check_secondary=False):
@@ -327,6 +379,38 @@ def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=F
         for page in search_generator:
             search_res.extend(page)
         return search_res
+
+
+def get_metadata_links(obj_id, key=None, ff_env=None):
+    """
+    Given standard key/ff_env authentication, return result for @@links view
+    """
+    auth = get_authentication_with_server(key, ff_env)
+    purge_url = '/'.join([auth['server'], obj_id, '@@links'])
+    response = authorized_request(purge_url, auth=auth, verb='GET')
+    return get_response_json(response)
+
+
+def delete_metadata(obj_id, key=None, ff_env=None):
+    """
+    Given standard key/ff_env authentication, simply set the status of the
+    given object to 'deleted'
+    """
+    return patch_metadata({'status': 'deleted'}, obj_id, key, ff_env)
+
+
+def purge_metadata(obj_id, key=None, ff_env=None):
+    """
+    Given standard key/ff_env authentication, attempt to purge the item from
+    the DB (FULL delete). If the item cannot be deleted due to other items
+    still linking it, this function provides information in the response
+    `@graph`
+    """
+    auth = get_authentication_with_server(key, ff_env)
+    purge_url = '/'.join([auth['server'], obj_id]) + '?purge=True'
+    response = authorized_request(purge_url, auth=auth, verb='DELETE',
+                                  retry_fxn=purge_request_with_retries)
+    return get_response_json(response)
 
 
 def delete_field(obj_id, del_field, key=None, ff_env=None):
