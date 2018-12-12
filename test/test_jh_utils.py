@@ -1,6 +1,7 @@
 # This file is set up with minimal tests for now
 # Add more following 4DN Annual Meeting 2018
 import os
+import datetime
 import pytest
 from dcicutils import s3_utils
 pytestmark = pytest.mark.working
@@ -93,3 +94,20 @@ def test_jh_open_4dn_file(integrated_ff):
             pass
     # different error, since it attempts to find the file locally
     assert 'No such file or directory' in str(exec_info6.value)
+
+
+def test_add_mounted_file_to_session(integrated_ff):
+    test_server = integrated_ff['ff_key']['server']
+    initialize_jh_env(test_server)
+    from dcicutils import jh_utils
+    # this should fail silently if FF_TRACKING_ID not in environ
+    jh_utils.add_mounted_file_to_session('test')
+    # now make sure that it works for a real item
+    session_body = {'date_initialized': datetime.datetime.now(datetime.timezone.utc)}
+    res = jh_utils.post_metadata({'tracking_type': 'jupyterhub_session',
+                              'jupyterhub_sesion': session_body}, 'tracking-items')
+    res_uuid = res['@graph']['uuid']
+    os.environ['FF_TRACKING_ID'] = res_uuid
+    jh_utils.add_mounted_file_to_session('test')
+    res2 = jh_utils.get_metadata(res_uuid, add_on='datastore=database')
+    assert 'test' in res2.get('jupyterhub_session', {}).get('files_mounted', [])
