@@ -170,6 +170,32 @@ def find_valid_file_or_extra_file(obj_id, format):
     return {'metadata': file_meta, 'full_href': full_href, 'full_path': full_path}
 
 
+def add_mounted_file_to_session(file_uuid):
+    """
+    Simple helper function to add the given uuid to the files_mounted array
+    in a jupyterhub_session TrackingItem
+    """
+    if not os.environ.get('FF_TRACKING_ID'):
+        return
+    track_id = os.environ['FF_TRACKING_ID']
+    try:
+        track_res = get_metadata(track_id)  # NOQA
+    except Exception as e:
+        print("Error updating JH session: %s" % str(e))
+        pass  # Nothing to do here
+    else:
+        session = track_res.get('jupyterhub_session')
+        if session and isinstance(session, dict):
+            mounted = session.get('files_mounted', [])
+            mounted.append(file_uuid)
+            session['files_mounted'] = mounted
+            try:
+                patch_metadata({'jupyterhub_session': session}, track_res['uuid'])  # NOQA
+            except Exception as e2:
+                print("Error updating JH session: %s" % str(e2))
+                pass
+
+
 def locate_4dn_file(obj_id, format=None):
     """
     Use this function to return the full download href for a file on the
@@ -193,6 +219,8 @@ def mount_4dn_file(obj_id, format=None):
     # for now, ensure the file exists. Will catch non-uploaded files
     if not os.path.isfile(file_info['full_path']):
         raise Exception('Could not open file: %s. Reason: file cannot be mounted.' % obj_id)
+    # add uuid of mounted file to the jupyterhub session info
+    add_mounted_file_to_session(file_info['metadata']['uuid'])
     return file_info['full_path']
 
 
