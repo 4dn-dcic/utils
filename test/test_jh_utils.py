@@ -103,10 +103,10 @@ def test_add_mounted_file_to_session(integrated_ff):
     # this should fail silently if FF_TRACKING_ID not in environ
     jh_utils.add_mounted_file_to_session('test')
     # now make sure that it works for a real item
-    session_body = {'date_initialized': datetime.datetime.now(datetime.timezone.utc)}
+    session_body = {'date_initialized': datetime.datetime.utcnow().isoformat() + '+00:00'}
     res = jh_utils.post_metadata({'tracking_type': 'jupyterhub_session',
-                              'jupyterhub_sesion': session_body}, 'tracking-items')
-    res_uuid = res['@graph']['uuid']
+                                  'jupyterhub_session': session_body}, 'tracking-items')
+    res_uuid = res['@graph'][0]['uuid']
     os.environ['FF_TRACKING_ID'] = res_uuid
     jh_utils.add_mounted_file_to_session('test')
     res2 = jh_utils.get_metadata(res_uuid, add_on='datastore=database')

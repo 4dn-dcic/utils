@@ -179,8 +179,9 @@ def add_mounted_file_to_session(file_uuid):
         return
     track_id = os.environ['FF_TRACKING_ID']
     try:
-        track_res = get_metadata(track_id)
-    except:
+        track_res = get_metadata(track_id)  # NOQA
+    except Exception as e:
+        print("Error updating JH session: %s" % str(e))
         pass  # Nothing to do here
     else:
         session = track_res.get('jupyterhub_session')
@@ -189,8 +190,9 @@ def add_mounted_file_to_session(file_uuid):
             mounted.append(file_uuid)
             session['files_mounted'] = mounted
             try:
-                patch_metadata({'jupyterhub_session': session})
-            except:
+                patch_metadata({'jupyterhub_session': session}, track_res['uuid'])  # NOQA
+            except Exception as e2:
+                print("Error updating JH session: %s" % str(e2))
                 pass
 
 
