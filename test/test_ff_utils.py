@@ -547,13 +547,17 @@ def test_expand_es_metadata_ignore_fields(integrated_ff):
 
 @pytest.mark.file_operation
 def test_dump_results_to_json(integrated_ff):
-    test_folder = 'test/test_data'
     import shutil
     import os
-    try:
-        shutil.rmtree(test_folder)
-    except:
-        pass
+
+    def clear_folder(folder):
+        try:
+            shutil.rmtree(test_folder)
+        except FileNotFoundError:
+            pass
+
+    test_folder = 'test/test_data'
+    clear_folder(test_folder)
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key = integrated_ff['ff_key']
     store, uuids = ff_utils.expand_es_metadata(test_list, key, store_frame='object')
@@ -561,8 +565,4 @@ def test_dump_results_to_json(integrated_ff):
     ff_utils.dump_results_to_json(store, test_folder)
     all_files = os.listdir(test_folder)
     assert len(all_files) == len_store
-    # do cleanup
-    try:
-        shutil.rmtree(test_folder)
-    except:
-        pass
+    clear_folder(test_folder)
