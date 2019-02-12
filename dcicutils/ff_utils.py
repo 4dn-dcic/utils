@@ -728,7 +728,7 @@ def generate_rand_accession():
     return accession
 
 
-def expand_metadata(uuid_list, con_key, store_frame='raw', add_pc_wfr=False, ignore_field=None):
+def expand_es_metadata(uuid_list, con_key, store_frame='raw', add_pc_wfr=False, ignore_field=[]):
     """starting from list of uuids, tracks all linked items in object frame by default
     if you want to add processed files and workflowruns, you can change add_pc_wfr to True
     returns a dictionary with item types (schema name), and list of items in defined frame
@@ -754,10 +754,11 @@ def expand_metadata(uuid_list, con_key, store_frame='raw', add_pc_wfr=False, ign
     # wrap key remover, used multiple times
     def remove_keys(my_dict, remove_list):
         if remove_list:
-            for a_ig_f in remove_list:
-                if a_ig_f in my_dict.keys():
-                    del my_dict[a_ig_f]
+            for del_field in remove_list:
+                if del_field in my_dict.keys():
+                    del my_dict[del_field]
         return my_dict
+
     # creates a dictionary of schema names to collection names
     schema_name = {}
     profiles = get_metadata('/profiles/', key=con_key, add_on='frame=raw')
@@ -801,10 +802,10 @@ def expand_metadata(uuid_list, con_key, store_frame='raw', add_pc_wfr=False, ign
                 else:
                     store[obj_key].append(raw_resp)
                 item_uuids.append(uuid)
-            # this case should not happen actually
+            # this case should not happen
             else:
-                print('Problem encountered - skipped - check')
-                continue
+                print('Item aded twice, should not happen')
+                return
 
             # get linked items from es
             for key in ES_item['links']:
@@ -830,9 +831,11 @@ def expand_metadata(uuid_list, con_key, store_frame='raw', add_pc_wfr=False, ign
                         # turn it into string
                         field_val = str(field_val)
                         # check if any of embedded uuids is in the field value
-                        for a_uuid in ES_item['linked_uuids']:
+                        es_links = [i['uuid'] for i in ES_item['linked_uuids_embedded']]
+                        for a_uuid in es_links:
                             if a_uuid in field_val:
                                 uuids_to_check.append(a_uuid)
+
         # get uniques
         uuids_to_check = list(set(uuids_to_check))
         uuid_list = []
@@ -843,6 +846,13 @@ def expand_metadata(uuid_list, con_key, store_frame='raw', add_pc_wfr=False, ign
 
 
 def dump_results_to_json(store, folder):
+    """Takes resuls from expand_es_metadata, and dumps them into the given folder in json format.
+    Args:
+        store (dict): results from expand_es_metadata
+        folder:       folder for storing output
+    """
+    if folder[-1] == '/':
+        folder = folder[:-1]
     if not os.path.exists(folder):
         os.makedirs(folder)
     for a_type in store:
