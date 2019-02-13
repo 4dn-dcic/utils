@@ -536,8 +536,8 @@ def _get_es_metadata(uuids, es_client, filters, chunk_size, key, ff_env):
                 yield hit['_source']  # yield individual items from ES
 
 
-def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_pc_wfr=False,
-                       ignore_field=[], es_client=None):
+def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_pc_wfr=False, ignore_field=[],
+                       use_generator=False, es_client=None):
     """
     starting from list of uuids, tracks all linked items in object frame by default
     if you want to add processed files and workflowruns, you can change add_pc_wfr to True
@@ -550,6 +550,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
         store_frame ('raw' or 'object'): Depending on use case, can store frame raw or object.
         add_pc_wfr (bool):               Include workflow_runs and linked items (processed/ref files, wf, software...)
         ignore_field(list):              Remove keys from items, so any linking through these fields, ie relations
+        use_generator (bool):            Use a generator when getting es. Less memory used but takes longer
         es_client:                       optional result from es_utils.create_es_client
     Returns:
         dict: contains all item types as keys, and with values of list of dictionaries
@@ -596,7 +597,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
     while uuid_list:
         uuids_to_check = []  # uuids to add to uuid_list if not if not in item_uuids
         for es_item in get_es_metadata(uuid_list, es_client=es_client, chunk_size=chunk,
-                                       is_generator=True, key=auth):
+                                       is_generator=use_generator, key=auth):
             # get object type via es result and schema for storing
             obj_type = es_item['object']['@type'][0]
             obj_key = schema_name[obj_type]
