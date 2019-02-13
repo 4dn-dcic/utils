@@ -533,7 +533,7 @@ def test_expand_es_metadata_add_wfrs(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     store, uuids = ff_utils.expand_es_metadata(test_list, add_pc_wfr=True, key=key, ff_env=ff_env)
-    assert len(uuids) == 74
+    assert len(uuids) == 73
 
 
 @pytest.mark.integrated
@@ -542,8 +542,7 @@ def test_expand_es_metadata_ignore_fields(integrated_ff):
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     store, uuids = ff_utils.expand_es_metadata(test_list, add_pc_wfr=True, ignore_field=['quality_metric'],
                                                key=key, ff_env=ff_env)
-    print(store.keys())
-    assert len(uuids) == 72
+    assert len(uuids) == 71
 
 
 @pytest.mark.file_operation
