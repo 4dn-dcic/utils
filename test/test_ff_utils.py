@@ -1,7 +1,7 @@
-from dcicutils import ff_utils
 import pytest
 import json
 import time
+from dcicutils import ff_utils
 pytestmark = pytest.mark.working
 
 
@@ -502,3 +502,67 @@ def test_get_health_page(integrated_ff):
     # make sure it's error tolerant
     bad_health_res = ff_utils.get_health_page(ff_env='not_an_env')
     assert bad_health_res and 'error' in bad_health_res
+
+
+@pytest.mark.integrated
+def test_expand_es_metadata(integrated_ff):
+    test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    store, uuids = ff_utils.expand_es_metadata(test_list, key=key, ff_env=ff_env)
+    assert len(uuids) == 10
+    assert 'file_processed' in store
+    # make sure the frame is raw (default)
+    test_item = store['file_processed'][0]
+    assert test_item['lab'].startswith('828cd4fe')
+
+
+@pytest.mark.integrated
+def test_expand_es_metadata_frame_object(integrated_ff):
+    test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    store, uuids = ff_utils.expand_es_metadata(test_list, store_frame='object', key=key, ff_env=ff_env)
+    assert len(uuids) == 10
+    assert 'file_processed' in store
+    # make sure the frame is raw (default)
+    test_item = store['file_processed'][0]
+    assert test_item['lab'].startswith('/labs/')
+
+
+@pytest.mark.integrated
+def test_expand_es_metadata_add_wfrs(integrated_ff):
+    test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    store, uuids = ff_utils.expand_es_metadata(test_list, add_pc_wfr=True, key=key, ff_env=ff_env)
+    assert len(uuids) == 73
+
+
+@pytest.mark.integrated
+def test_expand_es_metadata_ignore_fields(integrated_ff):
+    test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    store, uuids = ff_utils.expand_es_metadata(test_list, add_pc_wfr=True, ignore_field=['quality_metric'],
+                                               key=key, ff_env=ff_env)
+    assert len(uuids) == 71
+
+
+@pytest.mark.file_operation
+def test_dump_results_to_json(integrated_ff):
+    import shutil
+    import os
+
+    def clear_folder(folder):
+        try:
+            shutil.rmtree(test_folder)
+        except FileNotFoundError:
+            pass
+
+    test_folder = 'test/test_data'
+    clear_folder(test_folder)
+    test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    store, uuids = ff_utils.expand_es_metadata(test_list, store_frame='object', key=key, ff_env=ff_env)
+    len_store = len(store)
+    ff_utils.dump_results_to_json(store, test_folder)
+    all_files = os.listdir(test_folder)
+    assert len(all_files) == len_store
+    clear_folder(test_folder)

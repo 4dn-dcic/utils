@@ -1,6 +1,7 @@
 from __future__ import print_function
 import sys
 import json
+import os
 import time
 import random
 import boto3
@@ -535,6 +536,121 @@ def _get_es_metadata(uuids, es_client, filters, chunk_size, key, ff_env):
                 yield hit['_source']  # yield individual items from ES
 
 
+def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_pc_wfr=False, ignore_field=[],
+                       use_generator=False, es_client=None):
+    """
+    starting from list of uuids, tracks all linked items in object frame by default
+    if you want to add processed files and workflowruns, you can change add_pc_wfr to True
+    returns a dictionary with item types (schema name), and list of items in defined frame
+    Sometimes, certain fields need to be skipped (i.e. relations), you can use ignore fields.
+    Args:
+        uuid_list (array):               Starting node for search, only use uuids.
+        key (dict):                      standard ff_utils authentication key
+        ff_env (str):                    standard ff environment string
+        store_frame ('raw' or 'object'): Depending on use case, can store frame raw or object.
+        add_pc_wfr (bool):               Include workflow_runs and linked items (processed/ref files, wf, software...)
+        ignore_field(list):              Remove keys from items, so any linking through these fields, ie relations
+        use_generator (bool):            Use a generator when getting es. Less memory used but takes longer
+        es_client:                       optional result from es_utils.create_es_client
+    Returns:
+        dict: contains all item types as keys, and with values of list of dictionaries
+              i.e.
+              {
+                  'experiment_hi_c': [ {'uuid': '1234', '@id': '/a/b/', ...}, {...}],
+                  'experiment_set': [ {'uuid': '12345', '@id': '/c/d/', ...}, {...}],
+              }
+        list: contains all uuids from all items.
+
+    # TODO: if more file types (currently FileFastq and FileProcessed) get workflowrun calculated properties
+            we need to add them to the add_from_embedded dictionary.
+    """
+    # wrap key remover, used multiple times
+    def remove_keys(my_dict, remove_list):
+        if remove_list:
+            for del_field in remove_list:
+                if del_field in my_dict:
+                    del my_dict[del_field]
+        return my_dict
+
+    auth = get_authentication_with_server(key, ff_env)
+    if es_client is None:  # set up an es client if none is provided
+        es_url = get_health_page(key, ff_env)['elasticsearch']
+        es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
+
+    # creates a dictionary of schema names to collection names
+    schema_name = {}
+    profiles = get_metadata('/profiles/', key=auth, add_on='frame=raw')
+    for key, value in profiles.items():
+        schema_name[key] = value['id'].split('/')[-1][:-5]
+
+    # keep list of fields that only exist in frame embedded (revlinks, calcprops) that you want connected
+    if add_pc_wfr:
+        add_from_embedded = {'file_fastq': ['workflow_run_inputs', 'workflow_run_outputs'],
+                             'file_processed': ['workflow_run_inputs', 'workflow_run_outputs']
+                             }
+    else:
+        add_from_embedded = {}
+    store = {}
+    item_uuids = set()  # uuids we've already stored
+    chunk = 100  # chunk the requests - don't want to hurt es performance
+
+    while uuid_list:
+        uuids_to_check = []  # uuids to add to uuid_list if not if not in item_uuids
+        for es_item in get_es_metadata(uuid_list, es_client=es_client, chunk_size=chunk,
+                                       is_generator=use_generator, key=auth):
+            # get object type via es result and schema for storing
+            obj_type = es_item['object']['@type'][0]
+            obj_key = schema_name[obj_type]
+            if obj_key not in store:
+                store[obj_key] = []
+            # add raw frame to store and uuid to list
+            uuid = es_item['uuid']
+            if uuid not in item_uuids:
+                # get the desired frame from the ES response
+                if store_frame == 'object':
+                    frame_resp = remove_keys(es_item['object'], ignore_field)
+                else:
+                    frame_resp = remove_keys(es_item['properties'], ignore_field)
+                store[obj_key].append(frame_resp)
+                item_uuids.add(uuid)
+            else:  # this case should not happen
+                raise Exception('Item %s aded twice in expand_es_metadata, should not happen' % uuid)
+
+            # get linked items from es
+            for key in es_item['links']:
+                skip = False
+                # if link is from ignored_field, skip
+                if key in ignore_field:
+                    skip = True
+                # sub embedded objects have a different naming str:
+                for ignored in ignore_field:
+                    if key.startswith(ignored + '~'):
+                        skip = True
+                if skip:
+                    continue
+                uuids_to_check.extend(es_item['links'][key])
+
+            # check if any field from the embedded frame is required
+            add_fields = add_from_embedded.get(obj_key)
+            if add_fields:
+                for a_field in add_fields:
+                    field_val = es_item['embedded'].get(a_field)
+                    if field_val:
+                        # turn it into string
+                        field_val = str(field_val)
+                        # check if any of embedded uuids is in the field value
+                        es_links = [i['uuid'] for i in es_item['linked_uuids_embedded']]
+                        for a_uuid in es_links:
+                            if a_uuid in field_val:
+                                uuids_to_check.append(a_uuid)
+
+        # get uniques for uuids_to_check and then update uuid_list
+        uuids_to_check = set(uuids_to_check)
+        uuid_list = list(uuids_to_check - item_uuids)
+
+    return store, list(item_uuids)
+
+
 def get_health_page(key=None, ff_env=None):
     """
     Simple function to return the json for a FF health page given keys or
@@ -725,3 +841,19 @@ def generate_rand_accession():
         rand_accession += r
     accession = "4DNFI"+rand_accession
     return accession
+
+
+def dump_results_to_json(store, folder):
+    """Takes resuls from expand_es_metadata, and dumps them into the given folder in json format.
+    Args:
+        store (dict): results from expand_es_metadata
+        folder:       folder for storing output
+    """
+    if folder[-1] == '/':
+        folder = folder[:-1]
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+    for a_type in store:
+        filename = folder + '/' + a_type + '.json'
+        with open(filename, 'w') as outfile:
+            json.dump(store[a_type], outfile, indent=4)
