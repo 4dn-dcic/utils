@@ -507,8 +507,8 @@ def test_get_health_page(integrated_ff):
 @pytest.mark.integrated
 def test_expand_es_metadata(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
-    key = integrated_ff['ff_key']
-    store, uuids = ff_utils.expand_es_metadata(test_list, key)
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    store, uuids = ff_utils.expand_es_metadata(test_list, key=key, ff_env=ff_env)
     assert len(uuids) == 10
     assert 'file_processed' in store
     # make sure the frame is raw (default)
@@ -519,8 +519,8 @@ def test_expand_es_metadata(integrated_ff):
 @pytest.mark.integrated
 def test_expand_es_metadata_frame_object(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
-    key = integrated_ff['ff_key']
-    store, uuids = ff_utils.expand_es_metadata(test_list, key, store_frame='object')
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    store, uuids = ff_utils.expand_es_metadata(test_list, store_frame='object', key=key, ff_env=ff_env)
     assert len(uuids) == 10
     assert 'file_processed' in store
     # make sure the frame is raw (default)
@@ -531,16 +531,17 @@ def test_expand_es_metadata_frame_object(integrated_ff):
 @pytest.mark.integrated
 def test_expand_es_metadata_add_wfrs(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
-    key = integrated_ff['ff_key']
-    store, uuids = ff_utils.expand_es_metadata(test_list, key, add_pc_wfr=True)
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    store, uuids = ff_utils.expand_es_metadata(test_list, add_pc_wfr=True, key=key, ff_env=ff_env)
     assert len(uuids) == 74
 
 
 @pytest.mark.integrated
 def test_expand_es_metadata_ignore_fields(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
-    key = integrated_ff['ff_key']
-    store, uuids = ff_utils.expand_es_metadata(test_list, key, add_pc_wfr=True, ignore_field=['quality_metric'])
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    store, uuids = ff_utils.expand_es_metadata(test_list, add_pc_wfr=True, ignore_field=['quality_metric'],
+                                               key=key, ff_env=ff_env)
     print(store.keys())
     assert len(uuids) == 72
 
@@ -559,8 +560,8 @@ def test_dump_results_to_json(integrated_ff):
     test_folder = 'test/test_data'
     clear_folder(test_folder)
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
-    key = integrated_ff['ff_key']
-    store, uuids = ff_utils.expand_es_metadata(test_list, key, store_frame='object')
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    store, uuids = ff_utils.expand_es_metadata(test_list, store_frame='object', key=key, ff_env=ff_env)
     len_store = len(store)
     ff_utils.dump_results_to_json(store, test_folder)
     all_files = os.listdir(test_folder)

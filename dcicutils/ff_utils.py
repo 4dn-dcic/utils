@@ -536,6 +536,122 @@ def _get_es_metadata(uuids, es_client, filters, chunk_size, key, ff_env):
                 yield hit['_source']  # yield individual items from ES
 
 
+def expand_es_metadata(uuid_list, store_frame='raw', add_pc_wfr=False,
+                       ignore_field=[], es_client=None, key=None, ff_env=None):
+    """
+    TODO: update docstring
+
+    starting from list of uuids, tracks all linked items in object frame by default
+    if you want to add processed files and workflowruns, you can change add_pc_wfr to True
+    returns a dictionary with item types (schema name), and list of items in defined frame
+    Sometimes, certain fields need to be skipped (i.e. relations), you can use ignore fields.
+    Args:
+        uuid_list (array):               Starting node for search, only use uuids.
+        con_key (dict):                  Key dictionary for autharization.
+        store_frame ('raw' or 'object'): Depending on use case, can store frame raw or object.
+        add_pc_wfr (bool):               Include workflow_runs and linked items (processed/ref files, wf, software...)
+        ignore_field(list):              Remove keys from items, so any linking through these fields, ie relations
+    Returns:
+        dict: contains all item types as keys, and with values of list of dictionaries
+              i.e.
+              {
+                  'experiment_hi_c': [ {'uuid': '1234', '@id': '/a/b/', ...}, {...}],
+                  'experiment_set': [ {'uuid': '12345', '@id': '/c/d/', ...}, {...}],
+              }
+        list: contains all uuids from all items.
+
+    # TODO: if more file types (currently FileFastq and FileProcessed) get workflowrun calculated properties
+            we need to add them to the add_from_embedded dictionary.
+    """
+    # wrap key remover, used multiple times
+    def remove_keys(my_dict, remove_list):
+        if remove_list:
+            for del_field in remove_list:
+                if del_field in my_dict:
+                    del my_dict[del_field]
+        return my_dict
+
+    auth = get_authentication_with_server(key, ff_env)
+    if es_client is None:  # set up an es client if none is provided
+        es_url = get_health_page(key, ff_env)['elasticsearch']
+        es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
+
+    # creates a dictionary of schema names to collection names
+    schema_name = {}
+    profiles = get_metadata('/profiles/', key=auth, add_on='frame=raw')
+    for key, value in profiles.items():
+        schema_name[key] = value['id'].split('/')[-1][:-5]
+
+    # keep list of fields that only exist in frame embedded (revlinks, calcprops) that you want connected
+    if add_pc_wfr:
+        add_from_embedded = {'file_fastq': ['workflow_run_inputs', 'workflow_run_outputs'],
+                             'file_processed': ['workflow_run_inputs', 'workflow_run_outputs']
+                             }
+    else:
+        add_from_embedded = {}
+    store = {}
+    item_uuids = set()  # uuids we've already stored
+    chunk = 100  # chunk the requests - don't want to hurt es performance
+
+    while uuid_list:
+        # don't want to change size of list while iterating over it
+        use_uuids = uuid_list[:]
+        uuids_to_check = []
+        for es_item in get_es_metadata(use_uuids, es_client=es_client, chunk_size=chunk,
+                                       is_generator=True, key=auth):
+            # get object type via es result and schema for storing
+            obj_type = es_item['object']['@type'][0]
+            obj_key = schema_name[obj_type]
+            if obj_key not in store:
+                store[obj_key] = []
+            # add raw frame to store and uuid to list
+            uuid = es_item['uuid']
+            if uuid not in item_uuids:
+                # get the desired frame from the ES response
+                if store_frame == 'object':
+                    frame_resp = remove_keys(es_item['object'], ignore_field)
+                else:
+                    frame_resp = remove_keys(es_item['properties'], ignore_field)
+                store[obj_key].append(frame_resp)
+                item_uuids.add(uuid)
+            else:  # this case should not happen
+                raise Exception('Item %s aded twice in expand_es_metadata, should not happen' % uuid)
+
+            # get linked items from es
+            for key in es_item['links']:
+                skip = False
+                # if link is from ignored_field, skip
+                if key in ignore_field:
+                    skip = True
+                # sub embedded objects have a different naming str:
+                for ignored in ignore_field:
+                    if key.startswith(ignored + '~'):
+                        skip = True
+                if skip:
+                    continue
+                uuids_to_check.extend(es_item['links'][key])
+
+            # check if any field from the embedded frame is required
+            add_fields = add_from_embedded.get(obj_key)
+            if add_fields:
+                for a_field in add_fields:
+                    field_val = es_item['embedded'].get(a_field)
+                    if field_val:
+                        # turn it into string
+                        field_val = str(field_val)
+                        # check if any of embedded uuids is in the field value
+                        es_links = [i['uuid'] for i in es_item['linked_uuids_embedded']]
+                        for a_uuid in es_links:
+                            if a_uuid in field_val:
+                                uuids_to_check.append(a_uuid)
+
+        # get uniques for uuids_to_check and then update uuid_list
+        uuids_to_check = set(uuids_to_check)
+        uuid_list = list(uuids_to_check - item_uuids)
+
+    return store, list(item_uuids)
+
+
 def get_health_page(key=None, ff_env=None):
     """
     Simple function to return the json for a FF health page given keys or
@@ -726,123 +842,6 @@ def generate_rand_accession():
         rand_accession += r
     accession = "4DNFI"+rand_accession
     return accession
-
-
-def expand_es_metadata(uuid_list, con_key, store_frame='raw', add_pc_wfr=False, ignore_field=[]):
-    """starting from list of uuids, tracks all linked items in object frame by default
-    if you want to add processed files and workflowruns, you can change add_pc_wfr to True
-    returns a dictionary with item types (schema name), and list of items in defined frame
-    Sometimes, certain fields need to be skipped (i.e. relations), you can use ignore fields.
-    Args:
-        uuid_list (array):               Starting node for search, only use uuids.
-        con_key (dict):                  Key dictionary for autharization.
-        store_frame ('raw' or 'object'): Depending on use case, can store frame raw or object.
-        add_pc_wfr (bool):               Include workflow_runs and linked items (processed/ref files, wf, software...)
-        ignore_field(list):              Remove keys from items, so any linking through these fields, ie relations
-    Returns:
-        dict: contains all item types as keys, and with values of list of dictionaries
-              i.e.
-              {
-                  'experiment_hi_c': [ {'uuid': '1234', '@id': '/a/b/', ...}, {...}],
-                  'experiment_set': [ {'uuid': '12345', '@id': '/c/d/', ...}, {...}],
-              }
-        list: contains all uuids from all items.
-
-    # TODO: if more file types (currently FileFastq and FileProcessed) get workflowrun calculated properties
-            we need to add them to the add_from_embedded dictionary.
-    """
-    # wrap key remover, used multiple times
-    def remove_keys(my_dict, remove_list):
-        if remove_list:
-            for del_field in remove_list:
-                if del_field in my_dict.keys():
-                    del my_dict[del_field]
-        return my_dict
-
-    # creates a dictionary of schema names to collection names
-    schema_name = {}
-    profiles = get_metadata('/profiles/', key=con_key, add_on='frame=raw')
-    for key, value in profiles.items():
-        schema_name[key] = value['id'].split('/')[-1][:-5]
-
-    # keep list of fields that only exist in frame embedded (revlinks, calcprops) that you want connected
-    if add_pc_wfr:
-        add_from_embedded = {'file_fastq': ['workflow_run_inputs', 'workflow_run_outputs'],
-                             'file_processed': ['workflow_run_inputs', 'workflow_run_outputs']
-                             }
-    else:
-        add_from_embedded = {}
-    store = {}
-    item_uuids = []
-    while uuid_list:
-        # chunk the requests - don't want to hurt es performance
-        chunk = 100
-        # find schema name, store as obj_key, create empty list if missing in store
-        chunked_uuids = [uuid_list[i:i + chunk] for i in range(0, len(uuid_list), chunk)]
-        all_responses = []
-        for a_chunk in chunked_uuids:
-            all_responses.extend(get_es_metadata(a_chunk, key=con_key))
-        uuids_to_check = []
-        for ES_item in all_responses:
-            uuid = ES_item['uuid']
-            object_resp = ES_item['object']
-            object_resp = remove_keys(object_resp, ignore_field)
-
-            obj_type = object_resp['@type'][0]
-            obj_key = schema_name[obj_type]
-            if obj_key not in store:
-                store[obj_key] = []
-            raw_resp = ES_item['properties']
-            raw_resp = remove_keys(raw_resp, ignore_field)
-            raw_resp['uuid'] = uuid
-            # add raw frame to store and uuid to list
-            if uuid not in item_uuids:
-                if store_frame == 'object':
-                    store[obj_key].append(object_resp)
-                else:
-                    store[obj_key].append(raw_resp)
-                item_uuids.append(uuid)
-            # this case should not happen
-            else:
-                print('Item aded twice, should not happen')
-                return
-
-            # get linked items from es
-            for key in ES_item['links']:
-                skip = False
-                # if link is from ignored_field, skip
-                if key in ignore_field:
-                    skip = True
-                # sub embedded objects have a different naming str:
-                for ignored in ignore_field:
-                    if key.startswith(ignored + '~'):
-                        skip = True
-                if skip:
-                    continue
-                uuids_to_check.extend(ES_item['links'][key])
-
-            # check if any field from the embedded frame is required
-            add_fields = add_from_embedded.get(obj_key)
-            if add_fields:
-                emb_resp = ES_item['embedded']
-                for a_field in add_fields:
-                    field_val = emb_resp.get(a_field)
-                    if field_val:
-                        # turn it into string
-                        field_val = str(field_val)
-                        # check if any of embedded uuids is in the field value
-                        es_links = [i['uuid'] for i in ES_item['linked_uuids_embedded']]
-                        for a_uuid in es_links:
-                            if a_uuid in field_val:
-                                uuids_to_check.append(a_uuid)
-
-        # get uniques
-        uuids_to_check = list(set(uuids_to_check))
-        uuid_list = []
-        for an_uuid in uuids_to_check:
-            if an_uuid not in item_uuids:
-                uuid_list.append(an_uuid)
-    return store, item_uuids
 
 
 def dump_results_to_json(store, folder):
