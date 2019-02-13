@@ -594,10 +594,8 @@ def expand_es_metadata(uuid_list, store_frame='raw', add_pc_wfr=False,
     chunk = 100  # chunk the requests - don't want to hurt es performance
 
     while uuid_list:
-        # don't want to change size of list while iterating over it
-        use_uuids = uuid_list[:]
-        uuids_to_check = []
-        for es_item in get_es_metadata(use_uuids, es_client=es_client, chunk_size=chunk,
+        uuids_to_check = []  # uuids to add to uuid_list if not if not in item_uuids
+        for es_item in get_es_metadata(uuid_list, es_client=es_client, chunk_size=chunk,
                                        is_generator=True, key=auth):
             # get object type via es result and schema for storing
             obj_type = es_item['object']['@type'][0]
