@@ -539,18 +539,18 @@ def _get_es_metadata(uuids, es_client, filters, chunk_size, key, ff_env):
 def expand_es_metadata(uuid_list, store_frame='raw', add_pc_wfr=False,
                        ignore_field=[], es_client=None, key=None, ff_env=None):
     """
-    TODO: update docstring
-
     starting from list of uuids, tracks all linked items in object frame by default
     if you want to add processed files and workflowruns, you can change add_pc_wfr to True
     returns a dictionary with item types (schema name), and list of items in defined frame
     Sometimes, certain fields need to be skipped (i.e. relations), you can use ignore fields.
     Args:
         uuid_list (array):               Starting node for search, only use uuids.
-        con_key (dict):                  Key dictionary for autharization.
         store_frame ('raw' or 'object'): Depending on use case, can store frame raw or object.
         add_pc_wfr (bool):               Include workflow_runs and linked items (processed/ref files, wf, software...)
         ignore_field(list):              Remove keys from items, so any linking through these fields, ie relations
+        es_client:                       optional result from es_utils.create_es_client
+        key (dict):                      standard ff_utils authentication key
+        ff_env (str):                    standard ff environment string
     Returns:
         dict: contains all item types as keys, and with values of list of dictionaries
               i.e.
