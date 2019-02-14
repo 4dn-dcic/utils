@@ -509,8 +509,6 @@ def test_expand_es_metadata(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     store, uuids = ff_utils.expand_es_metadata(test_list, key=key, ff_env=ff_env)
-    print(store.keys())
-
     for pos_case in ['file_processed', 'user', 'file_format', 'award', 'lab']:
         assert pos_case in store
     for neg_case in ['workflow_run_awsem', 'workflow', 'file_reference', 'software', 'workflow_run_sbg',
