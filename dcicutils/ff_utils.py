@@ -611,6 +611,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
                     frame_resp = remove_keys(es_item['object'], ignore_field)
                 else:
                     frame_resp = remove_keys(es_item['properties'], ignore_field)
+                    frame_resp['uuid'] = uuid  # uuid is not in properties, so add it
                 store[obj_key].append(frame_resp)
                 item_uuids.add(uuid)
             else:  # this case should not happen

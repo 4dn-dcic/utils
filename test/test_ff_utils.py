@@ -509,8 +509,11 @@ def test_expand_es_metadata(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     store, uuids = ff_utils.expand_es_metadata(test_list, key=key, ff_env=ff_env)
-    assert len(uuids) == 10
-    assert 'file_processed' in store
+    for pos_case in ['file_processed', 'user', 'file_format', 'award', 'lab']:
+        assert pos_case in store
+    for neg_case in ['workflow_run_awsem', 'workflow', 'file_reference', 'software', 'workflow_run_sbg',
+                     'quality_metric_pairsqc',  'quality_metric_fastqc']:
+        assert neg_case not in store
     # make sure the frame is raw (default)
     test_item = store['file_processed'][0]
     assert test_item['lab'].startswith('828cd4fe')
@@ -521,9 +524,7 @@ def test_expand_es_metadata_frame_object(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     store, uuids = ff_utils.expand_es_metadata(test_list, store_frame='object', key=key, ff_env=ff_env)
-    assert len(uuids) == 10
-    assert 'file_processed' in store
-    # make sure the frame is raw (default)
+    # make sure the frame is object (default)
     test_item = store['file_processed'][0]
     assert test_item['lab'].startswith('/labs/')
 
@@ -533,16 +534,22 @@ def test_expand_es_metadata_add_wfrs(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     store, uuids = ff_utils.expand_es_metadata(test_list, add_pc_wfr=True, key=key, ff_env=ff_env)
-    assert len(uuids) == 73
+    for pos_case in ['workflow_run_awsem', 'workflow', 'file_reference', 'software', 'workflow_run_sbg',
+                     'quality_metric_pairsqc',  'quality_metric_fastqc']:
+        assert pos_case in store
 
 
 @pytest.mark.integrated
 def test_expand_es_metadata_ignore_fields(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
-    store, uuids = ff_utils.expand_es_metadata(test_list, add_pc_wfr=True, ignore_field=['quality_metric'],
+    store, uuids = ff_utils.expand_es_metadata(test_list, add_pc_wfr=True, ignore_field=['quality_metric',
+                                                                                         'output_quality_metrics'],
                                                key=key, ff_env=ff_env)
-    assert len(uuids) == 71
+    for pos_case in ['workflow_run_awsem', 'workflow', 'file_reference', 'software', 'workflow_run_sbg']:
+        assert pos_case in store
+    for neg_case in ['quality_metric_pairsqc',  'quality_metric_fastqc']:
+        neg_case not in store
 
 
 @pytest.mark.file_operation
