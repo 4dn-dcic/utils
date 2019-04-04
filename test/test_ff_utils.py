@@ -343,6 +343,7 @@ def test_upsert_metadata(integrated_ff):
 
 @pytest.mark.integrated
 def test_search_metadata(integrated_ff):
+    from types import GeneratorType
     search_res = ff_utils.search_metadata('search/?limit=all&type=File', key=integrated_ff['ff_key'])
     assert isinstance(search_res, list)
     # this will fail if items have not yet been indexed
@@ -360,7 +361,12 @@ def test_search_metadata(integrated_ff):
     search_res_filt = ff_utils.search_metadata('/search/?limit=3&type=File&file_type=reads',
                                                key=integrated_ff['ff_key'])
     assert len(search_res_filt) > 0
-    # TODO add test for is_generator=True
+    # test is_generator=True
+    search_res_gen = ff_utils.search_metadata('/search/?limit=3&type=File&file_type=reads',
+                                              key=integrated_ff['ff_key'], is_generator=True)
+    assert isinstance(search_res_gen, GeneratorType)
+    gen_res = [v for v in search_res_gen]  # run the gen
+    assert len(gen_res) == 3
 
 
 @pytest.mark.integrated
@@ -395,6 +401,7 @@ def test_get_search_generator(integrated_ff):
 @pytest.mark.integrated
 def test_get_es_metadata(integrated_ff):
     from dcicutils import es_utils
+    from types import GeneratorType
     # use this test biosource and biosample
     test_biosource = '331111bc-8535-4448-903e-854af460b254'
     test_biosample = '111112bc-1111-4448-903e-854af460b123'
@@ -460,7 +467,44 @@ def test_get_es_metadata(integrated_ff):
     filters2 = {'status': ['in review by lab'], 'modifications.modification_type': ['!Other'], '@type': ['Biosample']}
     bios_neg_es = ff_utils.get_es_metadata(all_uuids, filters=filters2, key=integrated_ff['ff_key'])
     assert set([item['uuid'] for item in bios_neg_es]) == set(item['uuid'] for item in bios_neg_res)
-    # TODO add test for is_generator=True
+    # raise error if filters is not dict
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.get_es_metadata(all_uuids, filters=['not', 'a', 'dict'],
+                                 key=integrated_ff['ff_key'])
+    assert 'Invalid filters for get_es_metadata' in str(exec_info.value)
+
+    # test is_generator=True, compare to bios_neg_res
+    bios_neg_gen = ff_utils.get_es_metadata(all_uuids, filters=filters2,
+                                            is_generator=True,
+                                            key=integrated_ff['ff_key'])
+    assert isinstance(bios_neg_gen, GeneratorType)
+    # run the gen
+    gen_res = [v for v in bios_neg_gen]
+    assert set([item['uuid'] for item in bios_neg_es]) == set(item['uuid'] for item in gen_res)
+
+    # test sources
+    bios_neg_sources = ff_utils.get_es_metadata(all_uuids, filters=filters2,
+                                                sources=['object.*', 'embedded.biosource.uuid'],
+                                                key=integrated_ff['ff_key'])
+    for item in bios_neg_sources:
+        # get expected frame=object keys from matching biosample from search res
+        matching_bios = [bio for bio in bios_neg_res if bio['uuid'] == item['object']['uuid']]
+        expected_obj_keys = set(matching_bios[0].keys())
+        assert set(item.keys()) == {'object', 'embedded'}
+        # expect all keys in object frame, since we used object.*
+        assert set(item['object'].keys()) == expected_obj_keys
+        assert set(item['embedded'].keys()) == {'biosource'}
+        # expected only uuid in embedded.biosource
+        for biosource in item['embedded']['biosource']:
+            assert set(biosource.keys()) == {'uuid'}
+    # confirm that all items were found
+    assert set([item['uuid'] for item in bios_neg_es]) == set(item['object']['uuid'] for item in bios_neg_sources)
+    # raise error if sources is not list
+    with pytest.raises(Exception) as exec_info2:
+        ff_utils.get_es_metadata(all_uuids, filters=filters2,
+                                 sources='not a list',
+                                 key=integrated_ff['ff_key'])
+    assert 'Invalid sources for get_es_metadata' in str(exec_info2.value)
 
 
 @pytest.mark.integrated
