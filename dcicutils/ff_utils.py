@@ -451,7 +451,7 @@ def get_es_search_generator(es_client, index, body, page_size=200):
         yield es_hits
 
 
-def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
+def get_es_metadata(uuids, es_client=None, filters={}, sources=[], chunk_size=200,
                     is_generator=False, key=None, ff_env=None):
     """
     Given a list of string item uuids, will return a
@@ -459,6 +459,7 @@ def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
     dictionary if the items don't exist/ are not indexed)
     You can pass in an Elasticsearch client (initialized by create_es_client)
     through the es_client param to save init time.
+
     Advanced users can optionally pass a dict of filters that will be added
     to the Elasticsearch query.
         For example: filters={'status': 'released'}
@@ -470,6 +471,14 @@ def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
         - different filter field are combined using AND queries (must all match)
             example: filters={'status': ['released'], 'public_release': ['2018-01-01']}
         - values for the same field and combined with OR (such as multiple statuses)
+
+    You may also specify which fields are returned from ES by specifying a
+    list of source fields with the sources argument. This is an advanced option
+    and MUST include the full path of the field, such as 'embedded.uuid'
+    (for the embedded frame) or 'object.uuid' for the object frame. You may
+    also use the wildcard, such as 'embedded.*' for all fields in the embedded
+    frame.
+
     Integer chunk_size may be used to control the number of uuids that are
     passed to Elasticsearch in each query; setting this too high may cause
     ES reads to timeout.
@@ -477,13 +486,13 @@ def get_es_metadata(uuids, es_client=None, filters={}, chunk_size=200,
     if False (default), returns a list of results.
     Same auth mechanism as the other metadata functions
     """
-    meta = _get_es_metadata(uuids, es_client, filters, chunk_size, key, ff_env)
+    meta = _get_es_metadata(uuids, es_client, filters, sources, chunk_size, key, ff_env)
     if is_generator:
         return meta
     return list(meta)
 
 
-def _get_es_metadata(uuids, es_client, filters, chunk_size, key, ff_env):
+def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, key, ff_env):
     """
     Internal function needed because there are multiple levels of iteration
     used to create the generator.
@@ -510,7 +519,7 @@ def _get_es_metadata(uuids, es_client, filters, chunk_size, key, ff_env):
         }
         if filters:
             if not isinstance(filters, dict):
-                print('Invalid filter for get_es_metadata: %s' % filters)
+                raise Exception('Invalid filters for get_es_metadata: %s' % filters)
             else:
                 for k, v in filters.items():
                     key_terms = []
@@ -529,6 +538,11 @@ def _get_es_metadata(uuids, es_client, filters, chunk_size, key, ff_env):
                         es_query['query']['bool']['must_not'].append(
                             {'terms': {'embedded.' + k + '.raw': key_not_terms}}
                         )
+        if sources:
+            if not isinstance(sources, list):
+                raise Exception('Invalid sources for get_es_metadata: %s' % sources)
+            else:
+                es_query['_source'] = sources
         # use chunk_limit as page size for performance reasons
         for es_page in get_es_search_generator(es_client, '_all', es_query,
                                                page_size=chunk_size):
