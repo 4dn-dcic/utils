@@ -457,34 +457,59 @@ def get_es_metadata(uuids, es_client=None, filters={}, sources=[], chunk_size=20
     Given a list of string item uuids, will return a
     dictionary response of the full ES record for those items (or an empty
     dictionary if the items don't exist/ are not indexed)
-    You can pass in an Elasticsearch client (initialized by create_es_client)
-    through the es_client param to save init time.
-
-    Advanced users can optionally pass a dict of filters that will be added
-    to the Elasticsearch query.
-        For example: filters={'status': 'released'}
-        You can also specify NOT fields:
-            example: filters={'status': '!released'}
-        You can also specifiy lists of values for fields:
-            example: filters={'status': ['released', archived']}
-    NOTES:
-        - different filter field are combined using AND queries (must all match)
-            example: filters={'status': ['released'], 'public_release': ['2018-01-01']}
-        - values for the same field and combined with OR (such as multiple statuses)
-
-    You may also specify which fields are returned from ES by specifying a
-    list of source fields with the sources argument. This is an advanced option
-    and MUST include the full path of the field, such as 'embedded.uuid'
-    (for the embedded frame) or 'object.uuid' for the object frame. You may
-    also use the wildcard, such as 'embedded.*' for all fields in the embedded
-    frame.
-
-    Integer chunk_size may be used to control the number of uuids that are
-    passed to Elasticsearch in each query; setting this too high may cause
-    ES reads to timeout.
-    Boolean is_generator will return a generator for individual results if True;
-    if False (default), returns a list of results.
-    Same auth mechanism as the other metadata functions
+    Returns
+        A dictionary with following keys
+            -keys with metadata
+                properties (raw frame without uuid), embedded, object
+            -keys summarizing interactions
+                linked_uuids_object, linked_uuids_embedded, links, rev_linked_to_me
+            -others
+                paths, aggregated_items, rev_link_names, item_type, principals_allowed,
+                unique_keys, sid, audit, uuid, propsheets
+    Args
+        uuids:
+            list of uuids to fetch from ES
+        es_client:
+            You can pass in an Elasticsearch client
+            (initialized by create_es_client)
+            through the es_client param to save init time.
+        filters:
+            Advanced users can optionally pass a dict of filters that will be added
+            to the Elasticsearch query.
+                For example: filters={'status': 'released'}
+                You can also specify NOT fields:
+                    example: filters={'status': '!released'}
+                You can also specifiy lists of values for fields:
+                    example: filters={'status': ['released', archived']}
+            NOTES:
+                - different filter field are combined using AND queries (must all match)
+                    example: filters={'status': ['released'], 'public_release': ['2018-01-01']}
+                - values for the same field and combined with OR (such as multiple statuses)
+        sources:
+            You may also specify which fields are returned from ES by specifying a
+            list of source fields with the sources argument.
+            This field MUST include the full path of the field, such as 'embedded.uuid'
+            (for the embedded frame) or 'object.uuid' for the object frame. You may
+            also use the wildcard, such as 'embedded.*' for all fields in the embedded
+            frame.
+            You need to follow the dictionary structure of the get_es_metadata result
+            i.e. for getting uuids on the linked field 'files'
+                sources = ['properties.files']
+                or
+                sources = ['embedded.files.uuid']
+            i.e. getting all fields for lab in embedded frame
+                sources = ['embedded.lab.*']
+            i.e. for getting a only object frame
+                sources = ['object.*']
+        chunk_size:
+            Integer chunk_size may be used to control the number of uuids that are
+            passed to Elasticsearch in each query; setting this too high may cause
+            ES reads to timeout.
+        is_generator:
+            Boolean is_generator will return a generator for individual results if True;
+            if False (default), returns a list of results.
+        key: autentication key
+        ff_env: authentication by env (needs system variables)
     """
     meta = _get_es_metadata(uuids, es_client, filters, sources, chunk_size, key, ff_env)
     if is_generator:
