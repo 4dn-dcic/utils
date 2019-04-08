@@ -586,7 +586,9 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
         uuid_list (array):               Starting node for search, only use uuids.
         key (dict):                      standard ff_utils authentication key
         ff_env (str):                    standard ff environment string
-        store_frame ('raw' or 'object'): Depending on use case, can store frame raw or object.
+        store_frame (str, default 'raw'):Depending on use case, can store frame raw or object or embedded
+                                         Note: If you store in embedded, the total collection can have references
+                                         to the items that are not in the store
         add_pc_wfr (bool):               Include workflow_runs and linked items (processed/ref files, wf, software...)
         ignore_field(list):              Remove keys from items, so any linking through these fields, ie relations
         use_generator (bool):            Use a generator when getting es. Less memory used but takes longer
@@ -648,6 +650,8 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
                 # get the desired frame from the ES response
                 if store_frame == 'object':
                     frame_resp = remove_keys(es_item['object'], ignore_field)
+                elif store_frame == 'embedded':
+                    frame_resp = remove_keys(es_item['embedded'], ignore_field)
                 else:
                     frame_resp = remove_keys(es_item['properties'], ignore_field)
                     frame_resp['uuid'] = uuid  # uuid is not in properties, so add it
