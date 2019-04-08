@@ -574,6 +574,17 @@ def test_expand_es_metadata_frame_object(integrated_ff):
 
 
 @pytest.mark.integrated
+def test_expand_es_metadata_frame_embedded(integrated_ff):
+    test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    store, uuids = ff_utils.expand_es_metadata(test_list, store_frame='embedded', key=key, ff_env=ff_env)
+    # make sure the frame is object (default)
+    test_item = store['file_processed'][0]
+    assert isinstance(test_item['lab'], dict)
+    assert test_item['lab']['@id'].startswith('/labs/')
+
+
+@pytest.mark.integrated
 def test_expand_es_metadata_add_wfrs(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
