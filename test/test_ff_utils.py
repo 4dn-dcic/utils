@@ -564,24 +564,21 @@ def test_expand_es_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
-def test_expand_es_metadata_frame_object(integrated_ff):
+def test_expand_es_metadata_frame_object_embedded(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
-    store, uuids = ff_utils.expand_es_metadata(test_list, store_frame='object', key=key, ff_env=ff_env)
+    store_obj, uuids_obj = ff_utils.expand_es_metadata(test_list, store_frame='object', key=key, ff_env=ff_env)
     # make sure the frame is object (default)
-    test_item = store['file_processed'][0]
-    assert test_item['lab'].startswith('/labs/')
+    test_item_obj = store_obj['file_processed'][0]
+    assert test_item_obj['lab'].startswith('/labs/')
 
-
-@pytest.mark.integrated
-def test_expand_es_metadata_frame_embedded(integrated_ff):
-    test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
-    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
-    store, uuids = ff_utils.expand_es_metadata(test_list, store_frame='embedded', key=key, ff_env=ff_env)
-    # make sure the frame is object (default)
-    test_item = store['file_processed'][0]
-    assert isinstance(test_item['lab'], dict)
-    assert test_item['lab']['@id'].startswith('/labs/')
+    # now test frame=embedded
+    store_emb, uuids_emb = ff_utils.expand_es_metadata(test_list, store_frame='embedded', key=key, ff_env=ff_env)
+    test_item_emb = store_emb['file_processed'][0]
+    assert isinstance(test_item_emb['lab'], dict)
+    assert test_item_emb['lab']['@id'].startswith('/labs/')
+    # links found stay the same between embedded and obj
+    assert set(uuids_obj) == set(uuids_emb)
 
 
 @pytest.mark.integrated
