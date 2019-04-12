@@ -605,6 +605,11 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
     # TODO: if more file types (currently FileFastq and FileProcessed) get workflowrun calculated properties
             we need to add them to the add_from_embedded dictionary.
     """
+    # assert that the used parameter is correct
+    accepted_frames = ['raw', 'object', 'embedded']
+    if store_frame not in accepted_frames:
+        raise Exception('Invalid frame name "{}", please use one of {}'.format(store_frame, accepted_frames))
+
     # wrap key remover, used multiple times
     def remove_keys(my_dict, remove_list):
         if remove_list:

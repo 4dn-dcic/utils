@@ -592,6 +592,15 @@ def test_expand_es_metadata_add_wfrs(integrated_ff):
 
 
 @pytest.mark.integrated
+def test_expand_es_metadata_complain_wrong_frame(integrated_ff):
+    test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
+    key = integrated_ff['ff_key']
+    with pytest.raises(Exception) as exec_info:
+        store, uuids = ff_utils.expand_es_metadata(test_list, add_pc_wfr=True, store_frame='embroiled', key=key)
+    assert str(exec_info.value) == """Invalid frame name "embroiled", please use one of ['raw', 'object', 'embedded']"""
+
+
+@pytest.mark.integrated
 def test_expand_es_metadata_ignore_fields(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
