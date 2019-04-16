@@ -575,6 +575,19 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, key, ff_env
                 yield hit['_source']  # yield individual items from ES
 
 
+def get_schema_names(ff_key):
+    """create a dictionary of schema names to item class names
+    i.e. FileFastq: file_fastq """
+    schema_name = {}
+    profiles = get_metadata('/profiles/', key=ff_key, add_on='frame=raw')
+    for key, value in profiles.items():
+        # some test schemas in local don't have the id field
+        schema_filename = value.get('id')
+        if schema_filename:
+            schema_name[key] = schema_filename.split('/')[-1][:-5]
+    return schema_name
+
+
 def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_pc_wfr=False, ignore_field=[],
                        use_generator=False, es_client=None):
     """
@@ -624,13 +637,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
 
     # creates a dictionary of schema names to collection names
-    schema_name = {}
-    profiles = get_metadata('/profiles/', key=auth, add_on='frame=raw')
-    for key, value in profiles.items():
-        try:  # skip test profiles in local
-            schema_name[key] = value['id'].split('/')[-1][:-5]
-        except:
-            continue
+    schema_name = get_schema_names(auth)
 
     # keep list of fields that only exist in frame embedded (revlinks, calcprops) that you want connected
     if add_pc_wfr:

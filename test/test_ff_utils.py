@@ -549,6 +549,16 @@ def test_get_health_page(integrated_ff):
 
 
 @pytest.mark.integrated
+def test_get_schema_names(integrated_ff):
+    key = integrated_ff['ff_key']
+    schema_names = ff_utils.get_schema_names(key)
+    # assert that it gets quite some schemas
+    assert len(schema_names) > 75
+    assert schema_names['FileFastq'] == 'file_fastq'
+    assert schema_names['ExperimentSetReplicate'] == 'experiment_set_replicate'
+
+
+@pytest.mark.integrated
 def test_expand_es_metadata(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
