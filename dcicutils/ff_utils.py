@@ -627,7 +627,10 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
     schema_name = {}
     profiles = get_metadata('/profiles/', key=auth, add_on='frame=raw')
     for key, value in profiles.items():
-        schema_name[key] = value['id'].split('/')[-1][:-5]
+        try:  # skip test profiles in local
+            schema_name[key] = value['id'].split('/')[-1][:-5]
+        except:
+            continue
 
     # keep list of fields that only exist in frame embedded (revlinks, calcprops) that you want connected
     if add_pc_wfr:
