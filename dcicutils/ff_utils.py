@@ -575,6 +575,29 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, key, ff_env
                 yield hit['_source']  # yield individual items from ES
 
 
+def get_schema_names(key=None, ff_env=None):
+    """
+    Create a dictionary of all schema names to item class names
+    i.e. FileFastq: file_fastq
+
+    Args:
+        key (dict):                      standard ff_utils authentication key
+        ff_env (str):                    standard ff environment string
+
+    Returns:
+        dict: contains key schema names and value item class names
+    """
+    auth = get_authentication_with_server(key, ff_env)
+    schema_name = {}
+    profiles = get_metadata('/profiles/', key=auth, add_on='frame=raw')
+    for key, value in profiles.items():
+        # some test schemas in local don't have the id field
+        schema_filename = value.get('id')
+        if schema_filename:
+            schema_name[key] = schema_filename.split('/')[-1][:-5]
+    return schema_name
+
+
 def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_pc_wfr=False, ignore_field=[],
                        use_generator=False, es_client=None):
     """
@@ -605,6 +628,11 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
     # TODO: if more file types (currently FileFastq and FileProcessed) get workflowrun calculated properties
             we need to add them to the add_from_embedded dictionary.
     """
+    # assert that the used parameter is correct
+    accepted_frames = ['raw', 'object', 'embedded']
+    if store_frame not in accepted_frames:
+        raise ValueError('Invalid frame name "{}", please use one of {}'.format(store_frame, accepted_frames))
+
     # wrap key remover, used multiple times
     def remove_keys(my_dict, remove_list):
         if remove_list:
@@ -619,10 +647,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
 
     # creates a dictionary of schema names to collection names
-    schema_name = {}
-    profiles = get_metadata('/profiles/', key=auth, add_on='frame=raw')
-    for key, value in profiles.items():
-        schema_name[key] = value['id'].split('/')[-1][:-5]
+    schema_name = get_schema_names(key=auth)
 
     # keep list of fields that only exist in frame embedded (revlinks, calcprops) that you want connected
     if add_pc_wfr:

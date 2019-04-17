@@ -549,6 +549,16 @@ def test_get_health_page(integrated_ff):
 
 
 @pytest.mark.integrated
+def test_get_schema_names(integrated_ff):
+    schema_names = ff_utils.get_schema_names(key=integrated_ff['ff_key'],
+                                             ff_env=integrated_ff['ff_env'])
+    # assert that it gets quite some schemas
+    assert len(schema_names) > 75
+    assert schema_names['FileFastq'] == 'file_fastq'
+    assert schema_names['ExperimentSetReplicate'] == 'experiment_set_replicate'
+
+
+@pytest.mark.integrated
 def test_expand_es_metadata(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
@@ -589,6 +599,15 @@ def test_expand_es_metadata_add_wfrs(integrated_ff):
     for pos_case in ['workflow_run_awsem', 'workflow', 'file_reference', 'software', 'workflow_run_sbg',
                      'quality_metric_pairsqc',  'quality_metric_fastqc']:
         assert pos_case in store
+
+
+@pytest.mark.integrated
+def test_expand_es_metadata_complain_wrong_frame(integrated_ff):
+    test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
+    key = integrated_ff['ff_key']
+    with pytest.raises(Exception) as exec_info:
+        store, uuids = ff_utils.expand_es_metadata(test_list, add_pc_wfr=True, store_frame='embroiled', key=key)
+    assert str(exec_info.value) == """Invalid frame name "embroiled", please use one of ['raw', 'object', 'embedded']"""
 
 
 @pytest.mark.integrated
