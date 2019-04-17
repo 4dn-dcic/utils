@@ -550,8 +550,8 @@ def test_get_health_page(integrated_ff):
 
 @pytest.mark.integrated
 def test_get_schema_names(integrated_ff):
-    key = integrated_ff['ff_key']
-    schema_names = ff_utils.get_schema_names(key)
+    schema_names = ff_utils.get_schema_names(key=integrated_ff['ff_key'],
+                                             ff_env=integrated_ff['ff_env'])
     # assert that it gets quite some schemas
     assert len(schema_names) > 75
     assert schema_names['FileFastq'] == 'file_fastq'

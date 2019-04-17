@@ -575,11 +575,21 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, key, ff_env
                 yield hit['_source']  # yield individual items from ES
 
 
-def get_schema_names(ff_key):
-    """create a dictionary of schema names to item class names
-    i.e. FileFastq: file_fastq """
+def get_schema_names(key=None, ff_env=None):
+    """
+    Create a dictionary of all schema names to item class names
+    i.e. FileFastq: file_fastq
+
+    Args:
+        key (dict):                      standard ff_utils authentication key
+        ff_env (str):                    standard ff environment string
+
+    Returns:
+        dict: contains key schema names and value item class names
+    """
+    auth = get_authentication_with_server(key, ff_env)
     schema_name = {}
-    profiles = get_metadata('/profiles/', key=ff_key, add_on='frame=raw')
+    profiles = get_metadata('/profiles/', key=auth, add_on='frame=raw')
     for key, value in profiles.items():
         # some test schemas in local don't have the id field
         schema_filename = value.get('id')
@@ -637,7 +647,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
 
     # creates a dictionary of schema names to collection names
-    schema_name = get_schema_names(auth)
+    schema_name = get_schema_names(key=auth)
 
     # keep list of fields that only exist in frame embedded (revlinks, calcprops) that you want connected
     if add_pc_wfr:
