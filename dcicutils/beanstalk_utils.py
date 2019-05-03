@@ -1,13 +1,6 @@
 '''
-given and env in beanstalk do the follow
-2. backup database
-1. clone the existing environment to new beanstalk
-   eb clone
-3. set env variables on new beanstalk to point to database backup
-4. for each s3bucket in existing environment:
-    a.  create new bucket with proper naming
-    b.  move files from existing bucket to new bucket
-5. new ES instance?  (probably not covered by this script yet)
+Utilities related to ElasticBeanstalk deployment and management.
+This includes, but is not limited to: ES, s3, RDS, Auth0, and Foursight.
 '''
 from __future__ import print_function
 import subprocess
@@ -18,66 +11,52 @@ import os
 import json
 import requests
 import time
+from datetime import datetime
 from dcicutils import ff_utils
 from botocore.exceptions import ClientError
 
+logging.basicConfig()
 logger = logging.getLogger('logger')
 logger.setLevel(logging.INFO)
 
 FOURSIGHT_URL = 'https://foursight.4dnucleome.org/api/'
+# magic CNAME corresponds to data.4dnucleome
+MAGIC_CNAME = 'fourfront-webprod.9wzadzju3p.us-east-1.elasticbeanstalk.com'
 GOLDEN_DB = "fourfront-webprod.co3gwj7b7tpq.us-east-1.rds.amazonaws.com"
 REGION = 'us-east-1'
-
-# TODO: Maybe
-'''
-class EnvConfigData(OrderedDictionary):
-
-    def to_aws_bs_options()
-
-    def get_val_for_env()
-
-    def is_data()
-
-    def is_staging()
-
-    def url()
-
-    def bucket()
-
-    def buckets()
-
-    def part(self, componenet_name):
-        self.get(componenet_name)
-
-    def db(self):
-        return self.part('db')
-
-    def es(self):
-        return self.part('es')
-
-    def foursight(self):
-        return self.part('foursight')
-
-    def higlass(self):
-        return self.part('higlass')
-'''
 
 
 class WaitingForBoto3(Exception):
     pass
 
 
-def delete_db(db_identifier, take_snapshot=True):
-    client = boto3.client('rds', region_name=REGION)
+def delete_db(db_identifier, take_snapshot=True, allow_delete_prod=False):
+    """
+    Given db_identifier, delete an RDS instance. If take_snapshot is true,
+    will create a final snapshot named "<db_identifier>-final-<yyyy-mm-dd>".
+
+    Args:
+        db_identifier (str): name of RDS instance
+        take_snapshot (bool): If True, take a final snapshot before deleting
+        allow_delete_prod (bool): Must be True to allow deletion of 'webprod' DB
+
+    Returns:
+        dict: boto3 response from delete_db_instance
+    """
+    # safety. Do not allow accidental programmatic deletion of webprod DB
+    if 'webprod' in db_identifier and not allow_delete_prod:
+        raise Exception('Must set allow_delete_prod to True to delete RDS instance' % db_identifier)
+    client = boto3.client('rds')
+    timestamp = datetime.strftime(datetime.utcnow(), "%Y-%m-%d")
     if take_snapshot:
         try:
             resp = client.delete_db_instance(
                 DBInstanceIdentifier=db_identifier,
                 SkipFinalSnapshot=False,
-                FinalDBSnapshotIdentifier=db_identifier + "-final"
+                FinalDBSnapshotIdentifier=db_identifier + "-final-" + timestamp
             )
-        except:  # noqa: E722
-            # try without the snapshot
+        except:
+            # Snapshot cannot be made. Likely a date conflict
             resp = client.delete_db_instance(
                 DBInstanceIdentifier=db_identifier,
                 SkipFinalSnapshot=True,
@@ -88,37 +67,43 @@ def delete_db(db_identifier, take_snapshot=True):
             SkipFinalSnapshot=True,
         )
     print(resp)
-
-
-def get_health_page_info(bs_url):
-    """
-    Different use cases than ff_utils.get_health_page (that one is oriented
-    towards external API usage and this one is more internal)
-    """
-    if not bs_url.endswith('/'):
-        bs_url += "/"
-    if not bs_url.startswith('http'):
-        bs_url = 'http://' + bs_url
-
-    health_res = requests.get(bs_url + 'health?format=json')
-    return health_res.json()
-
-
-# TODO: think about health page query parameter to get direct from config
-def get_es_from_health_page(bs_url):
-    health = get_health_page_info(bs_url)
-    es = health['elasticsearch'].strip(':80')
-    return es
+    return resp
 
 
 def get_es_from_bs_config(env):
+    """
+    Given an ElasticBeanstalk environment name, get the corresponding
+    Elasticsearch url from the EB configuration
+
+    Args:
+        env (str): ElasticBeanstalk environment name
+
+    Returns:
+        str: Elasticsearch url
+    """
     bs_env = get_bs_env(env)
     for item in bs_env:
         if item.startswith('ES_URL'):
             return item.split('=')[1].strip(':80')
 
 
-def is_indexing_finished(bs, version=None):
+def is_indexing_finished(bs, prev_version=None):
+    """
+    Checker function used with torb waitfor lambda; output must be standarized.
+    Check to see if indexing of a Fourfront environment corresponding to given
+    ElasticBeanstalk environment is finished by looking at the /counts page.
+
+    Args:
+        bs (str): ElasticBeanstalk environment name
+        prev_version (str): optional EB version of the previous configuration
+
+    Returns:
+        bool, list: True if done, results from /counts page
+
+    Raises:
+        Exception: if EB environment VersionLabel is equal to prev_version
+    """
+    # is_beanstalk_ready will raise WaitingForBoto3 if not ready
     is_beanstalk_ready(bs)
     bs_url = get_beanstalk_real_url(bs)
     if not bs_url.endswith('/'):
@@ -126,55 +111,70 @@ def is_indexing_finished(bs, version=None):
     # server not up yet
     try:
         # check to see if our version is updated
-        if version:
+        if prev_version:
             info = beanstalk_info(bs)
-            if version == info.get('VersionLabel'):
-                raise Exception("Beanstalk version has not updated from %s" % version)
+            if prev_version == info.get('VersionLabel'):
+                raise Exception("Beanstalk version has not updated from %s"
+                                % prev_version)
 
-        health_res = ff_utils.authorized_request(bs_url + 'counts?format=json', ff_env=bs)
+        health_res = ff_utils.authorized_request(bs_url + 'counts?format=json',
+                                                 ff_env=bs)
         totals = health_res.json().get('db_es_total').split()
 
-        # DB: 74048 ES: 74048 parse totals
+        # example value of split totals: ["DB:", "74048", "ES:", "74048"]
         db_total = totals[1]
         es_total = totals[3]
 
         if int(db_total) > int(es_total):
-            status = False
+            is_ready = False
         else:
-            status = True
-    except Exception as e:
-        print(e)
-        status = False
-        totals = 0
+            is_ready = True
+    except Exception as exc:
+        print('Error on is_indexing_finished: %s' % exc)
+        is_ready = False
+        totals = []
 
-    return status, totals
+    return is_ready, totals
 
 
 def swap_cname(src, dest):
-    # TODO clients should be global functions
-    client = boto3.client('elasticbeanstalk', region_name=REGION)
+    """
+    Swap the CNAMEs of two ElasticBeanstalk (EB) environments, given by
+    src and dest. Will restart the app servers after swapping.
+    Should be used for swapping production/staging environments.
 
+    Args:
+        src (str): EB environment name of production
+        dest (str): EB environment name of staging
+
+    Returns:
+        None
+    """
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
+    printing("Swapping CNAMEs %s and %s..." % (src, dest))
     client.swap_environment_cnames(SourceEnvironmentName=src,
                                    DestinationEnvironmentName=dest)
-    import time
-    print("waiting for swap environment cnames")
+    print("Giving CNAMEs 10 seconds to update...")
     time.sleep(10)
+    print("Restarting app servers for %s and %s..." % (src, dest))
     client.restart_app_server(EnvironmentName=src)
     client.restart_app_server(EnvironmentName=dest)
 
 
 def whodaman():
     '''
-    determines which evironment is currently hosting data.4dnucleome.org
-    '''
-    magic_cname = 'fourfront-webprod.9wzadzju3p.us-east-1.elasticbeanstalk.com'
+    Determines which ElasticBeanstalk environment is currently hosting
+    data.4dnucleome.org. Requires IAM permissions for EB!
 
+    Returns:
+        str: EB environment name hosting data.4dnucleome
+    '''
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = describe_beanstalk_environments(client, ApplicationName="4dn-web")
     logger.info(res)
     for env in res['Environments']:
         logger.info(env)
-        if env.get('CNAME') == magic_cname:
+        if env.get('CNAME') == MAGIC_CNAME:
             # we found data
             return env.get('EnvironmentName')
 
@@ -186,9 +186,17 @@ def beanstalk_config(env, appname='4dn-web'):
 
 
 def beanstalk_info(env):
+    """
+    Describe a ElasticBeanstalk environment given an environment name
+
+    Args:
+        env (str): ElasticBeanstalk environment name
+
+    Returns:
+        dict: Environments result from describe_beanstalk_environments
+    """
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = describe_beanstalk_environments(client, EnvironmentNames=[env])
-
     return res['Environments'][0]
 
 
@@ -196,6 +204,12 @@ def get_beanstalk_real_url(env):
     """
     Return the real url for the elasticbeanstalk with given environment name.
     Name can be 'data', 'staging', or an actual environment.
+
+    Args:
+        env (str): ElasticBeanstalk environment name
+
+    Returns:
+        str: url of the ElasticBeanstalk environment
     """
     url = ''
     urls = {'staging': 'http://staging.4dnucleome.org',
@@ -219,14 +233,27 @@ def get_beanstalk_real_url(env):
 
 
 def is_beanstalk_ready(env):
+    """
+    Checker function used with torb waitfor lambda; output must be standarized.
+    Check to see if a ElasticBeanstalk environment status is "Ready"
+
+    Args:
+        env (str): ElasticBeanstalk environment name
+
+    Returns:
+        bool, str: True if done, ElasticBeanstalk url
+
+    Raises:
+        WaitingForBoto3: if EB environment status != "Ready"
+    """
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = describe_beanstalk_environments(client, EnvironmentNames=[env])
 
     status = res['Environments'][0]['Status']
     if status != 'Ready':
-        raise WaitingForBoto3("Beanstalk enviornment status is %s" % status)
+        raise WaitingForBoto3("Beanstalk environment status is %s" % status)
 
-    return status, 'http://' + res['Environments'][0].get('CNAME')
+    return True, 'http://' + res['Environments'][0].get('CNAME')
 
 
 def describe_beanstalk_environments(client, **kwargs):
@@ -251,36 +278,66 @@ def describe_beanstalk_environments(client, **kwargs):
 
 
 def is_snapshot_ready(snapshot_name):
+    """
+    Checker function used with torb waitfor lambda; output must be standarized.
+    Check to see if an RDS snapshot with given name is available
+
+    Args:
+        snapshot_name (str): RDS snapshot name
+
+    Returns:
+        bool, str: True if done, identifier of snapshot
+    """
     client = boto3.client('rds', region_name=REGION)
     resp = client.describe_db_snapshots(DBSnapshotIdentifier=snapshot_name)
-    status = resp['DBSnapshots'][0]['Status']
-    return status.lower() == 'available', resp['DBSnapshots'][0]['DBSnapshotIdentifier']
+    db_status = resp['DBSnapshots'][0]['Status']
+    is_ready = status.lower() == 'available'
+    return is_ready, resp['DBSnapshots'][0]['DBSnapshotIdentifier']
 
 
 def is_es_ready(es_name):
+    """
+    Checker function used with torb waitfor lambda; output must be standarized.
+    Check to see if an ES instance is ready and has an endpoint
+
+    Args:
+        es_name (str): ES instance name
+
+    Returns:
+        bool, str: True if done, ES url
+    """
     es = boto3.client('es', region_name=REGION)
     describe_resp = es.describe_elasticsearch_domain(DomainName=es_name)
     endpoint = describe_resp['DomainStatus'].get('Endpoint', None)
-    status = True
+    is_ready = True
     if endpoint is None:
-        status = False
+        is_ready = False
     else:
         endpoint = endpoint + ":80"
-    return status, endpoint
+    return is_ready, endpoint
 
 
-def is_db_ready(snapshot_name):
+def is_db_ready(db_identifier):
+    """
+    Checker function used with torb waitfor lambda; output must be standarized.
+    Check to see if an RDS instance with given name is ready
+
+    Args:
+        db_identifier (str): RDS instance identifier
+
+    Returns:
+        bool, str: True if done, RDS address
+    """
     client = boto3.client('rds', region_name=REGION)
-    status = False
-    resp = client.describe_db_instances(DBInstanceIdentifier=snapshot_name)
+    is_ready = False
+    resp = client.describe_db_instances(DBInstanceIdentifier=db_identifier)
     details = resp
     endpoint = resp['DBInstances'][0].get('Endpoint')
     if endpoint and endpoint.get('Address'):
-        print("we got an endpoint:", endpoint['Address'])
         details = endpoint['Address']
-        status = True
+        is_ready = True
 
-    return status, details
+    return is_ready, details
 
 
 def create_db_snapshot(db_identifier, snapshot_name):
@@ -300,92 +357,80 @@ def create_db_snapshot(db_identifier, snapshot_name):
     return response
 
 
-def create_db_from_snapshot(db_name, snapshot_name=None):
-    if not snapshot_name:
-        snapshot_name = db_name
+def create_db_from_snapshot(db_identifier, snapshot_name, delete_db=True):
+    """
+    Given an RDS instance indentifier and a snapshot ARN/name, create an RDS
+    instance from the snapshot. If an existing instance already exists with
+    the given identifier and delete_db is True, will attempt to delete it
+    and return "Deleting". Otherwise, will just bail
+
+    Args:
+        db_identifier (str): RDS instance identifier
+        snapshot_name (str): identifier/ARN of RDS snapshot to restore from
+
+
+    Returns:
+        str: resource ARN if successful, otherwise "Deleting"
+    """
     client = boto3.client('rds', region_name=REGION)
     try:
         response = client.restore_db_instance_from_db_snapshot(
-                DBInstanceIdentifier=db_name,
-                DBSnapshotIdentifier=snapshot_name,
-                DBInstanceClass='db.t2.medium')
-    except ClientError:
-        # drop target database no backup
-        try:
-            delete_db(db_name, True)
-        except ClientError:
-            pass
-        return "Deleting"
+            DBInstanceIdentifier=db_identifier,
+            DBSnapshotIdentifier=snapshot_name,
+            DBInstanceClass='db.t2.medium',
 
+        )
+    except ClientError:
+        # Something went wrong
+        # Even if delete_db, never allow deletion of a db with 'webprod' in it
+        if delete_db:
+            # Drop target database with final snapshot
+            try:
+                delete_db(db_identifier, True)
+            except ClientError:
+                pass
+            return "Deleting"
+        else:
+            return "Error"
     return response['DBInstance']['DBInstanceArn']
 
 
 def is_travis_finished(build_id):
+    """
+    Checker function used with torb waitfor lambda; output must be standarized.
+    Check to see if a given travis build has passed
+
+    Args:
+        build_id (str): Travis build identifier
+
+    Returns:
+        bool, dict: True if done, Travis response JSON
+
+    Raises:
+        Exception: if the Travis build failed
+    """
     travis_key = os.environ.get('travis_key')
-    status = False
+    is_ready = False
     details = 'build not done or not found'
     headers = {'Content-Type': 'application/json',
                'Accept': 'application/json',
                'Travis-API-Version': '3',
                'User-Agent': 'tibanna/0.1.0',
-               'Authorization': 'token %s' % travis_key
-               }
+               'Authorization': 'token %s' % travis_key}
 
     url = 'https://api.travis-ci.org/build/%s' % build_id
 
-    logger.info("url: %s" % url)
+    logger.info("Travis build url: %s" % url)
     resp = requests.get(url, headers=headers)
-    logger.info(resp.text)
+    logger.info("Travis build response: %s" % resp.text)
     state = resp.json()['state']
     if resp.ok and state == 'failed':
         raise Exception('Build Failed')
     elif resp.ok and state == 'passed':
-        status = True
+        is_ready = True
         details = resp.json()
 
-    return status, details
-
-
-def snapshot_db(db_identifier, snapshot_name):
-    client = boto3.client('rds', region_name=REGION)
-    try:
-        response = client.create_db_snapshot(
-             DBSnapshotIdentifier=snapshot_name,
-             DBInstanceIdentifier=db_identifier)
-    except ClientError:
-        # probably the guy already exists
-        client.delete_db_snapshot(DBSnapshotIdentifier=snapshot_name)
-        response = client.create_db_snapshot(
-             DBSnapshotIdentifier=snapshot_name,
-             DBInstanceIdentifier=db_identifier)
-    print("Response from create db snapshot", response)
-    print("waiting for snapshot to create")
-    waiter = client.get_waiter('db_snapshot_completed')
-    waiter.wait(DBSnapshotIdentifier=snapshot_name)
-    print("done waiting, let's create a new database")
-    try:
-        response = client.restore_db_instance_from_db_snapshot(
-                DBInstanceIdentifier=snapshot_name,
-                DBSnapshotIdentifier=snapshot_name,
-                DBInstanceClass='db.t2.medium')
-    except ClientError:
-        # drop target database
-        delete_db(snapshot_name)
-
-    waiter = client.get_waiter('db_instance_available')
-    print("waiting for db to be restore... this might take some time")
-    # waiter.wait(DBInstanceIdentifier=snapshot_name)
-    # This doesn't mean the database is done creating, but
-    # we now have enough information to continue to the next step
-    endpoint = ''
-    while not endpoint:
-        resp = client.describe_db_instances(DBInstanceIdentifier=snapshot_name)
-        endpoint = resp['DBInstances'][0].get('Endpoint')
-        if endpoint and endpoint.get('Address'):
-            print("we got an endpoint:", endpoint['Address'])
-            return endpoint['Address']
-        print(".")
-        time.sleep(10)
+    return is_ready, details
 
 
 def make_envvar_option(name, value):
@@ -426,6 +471,16 @@ def set_bs_env(envname, var, template=None):
 
 
 def get_bs_env(envname):
+    """
+    Given an ElasticBeanstalk environment name, get the env variables from that
+    environment and return them. Returned variables are in form: <name>=<value>
+
+    Args:
+        envname (str): name of ElasticBeanstalk environment
+
+    Returns:
+        list: of environment variables in <name>=<value> form
+    """
     client = boto3.client('elasticbeanstalk', region_name=REGION)
 
     data = client.describe_configuration_settings(EnvironmentName=envname,
@@ -437,9 +492,22 @@ def get_bs_env(envname):
 
 
 def update_bs_config(envname, template, keep_env_vars=False):
+    """
+    Update the configuration for an existing ElasticBeanstalk environment.
+    Requires the environment name and a template to use. Can optionally
+    keep all environment variables from the existing environment
+
+    Args:
+        envname (str): name of the EB environment
+        template (str): configuration template to use
+        keep_env_vars (bool): if True, keep existing env vars. Default False
+
+    Returns:
+        dict: update_environment response
+    """
     client = boto3.client('elasticbeanstalk', region_name=REGION)
 
-    # get important env variables
+    # get important env variables from the current env and keep them
     if keep_env_vars:
         options = []
         env_vars = get_bs_env(envname)
@@ -456,64 +524,134 @@ def update_bs_config(envname, template, keep_env_vars=False):
 
 
 def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
+    """
+    Create a beanstalk environment given an envname. Use customized options,
+    configuration template, and environment variables. If adding new env vars,
+    make sure to overwrite them here.
+    If the environment already exists, will update it instead
+
+    Args:
+        envname (str): ElasticBeanstalk (EB) enviroment name
+        load_prod (bool): sets the LOAD_FUNCTION EB env var
+        db_endpoint (str): sets the RDS_HOSTNAME EB env var
+        es_url (str): sets the ES_URL EB env var
+        for_indexing (bool): If True, use 'fourfront-indexing' config template
+
+    Returns:
+        dict: boto3 res from create_environment/update_environment
+    """
     client = boto3.client('elasticbeanstalk', region_name=REGION)
 
+    # deterimine the configuration template for Elasticbeanstal
     template = 'fourfront-base'
     if for_indexing:
         template = 'fourfront-indexing'
     load_value = 'load_test_data'
     if load_prod:
         load_value = 'load_prod_data'
-    options = [make_envvar_option('RDS_HOSTNAME', db_endpoint),
-               make_envvar_option('ENV_NAME', envname),
-               make_envvar_option('ES_URL', es_url),
-               make_envvar_option('LOAD_FUNCTION', load_value)
-               ]
+
+    options = [
+        make_envvar_option('RDS_HOSTNAME', db_endpoint),
+        make_envvar_option('ENV_NAME', envname),
+        make_envvar_option('ES_URL', es_url),
+        make_envvar_option('LOAD_FUNCTION', load_value)
+    ]
+
+    # logic for mirrorEsEnv, which is used to coordinate elasticsearch
+    # changes between fourfront data and staging
+    if 'fourfront-webprod' in envname:
+        other_env = 'fourfront-webprod2' if envname == 'fourfront-webprod' else 'fourfront-webprod'
+        mirror_es = get_es_build_status(other_env, max_tries=3)
+        if mirror_es:
+            options.append(make_envvar_option('mirrorEnvEs', mirror_es))
+
     try:
-        res = client.create_environment(ApplicationName='4dn-web',
-                                        EnvironmentName=envname,
-                                        TemplateName=template,
-                                        OptionSettings=options,
-                                        )
+        res = client.create_environment(
+            ApplicationName='4dn-web',
+            EnvironmentName=envname,
+            TemplateName=template,
+            OptionSettings=options,
+        )
     except ClientError:
-        # already exists update it
-        res = client.update_environment(EnvironmentName=envname,
-                                        TemplateName=template,
-                                        OptionSettings=options)
+        # environment already exists update it
+        res = client.update_environment(
+            EnvironmentName=envname,
+            TemplateName=template,
+            OptionSettings=options
+        )
     return res
 
 
-def clone_bs_env(old, new, load_prod, db_endpoint, es_url):
-    env = 'RDS_HOSTNAME=%s,ENV_NAME=%s,ES_URL=%s' % (db_endpoint, new, es_url)
-    if load_prod is True:
-        env += ",LOAD_FUNCTION=load_prod_data"
-    subprocess.check_call(['./eb', 'clone', old, '-n', new,
-                           '--envvars', env,
-                           '--exact', '--nohang'])
+def log_to_foursight(event, lambda_name='', overrides=None):
+    """
+    Use Foursight as a logging tool within in a lambda function by doing a PUT
+    to /api/checks. Requires the the event has "_foursight" key, which is a
+    subobject with the following:
+    fields:
+        "check": required, in form "<fs environment>/<check name>"
+        "log_desc": will set "summary" and "description" if those are missing
+        "full_output": optional. If not provided, use to provide info on lambda
+        "brief_output": optional
+        "summary": optional. If not provided, use "log_desc" value
+        "description": optional. If not provided, use "log_desc" value
+        "status": optional. If not provided, use "WARN"
+    Can also optionally provide an dictionary to overrides param, which will
+    update the event["_foursight"]
 
+    Args:
+        event (dict): Event input, most likely from a lambda with a workflow
+        lambda_name (str): Name of the lambda that is calling this
+        overrides (dict): Optionally override event['_foursight'] with this
 
-def log_to_foursight(event, lambda_name, status='WARN', full_output=None):
+    Returns:
+        Response object from foursight
+
+    Raises:
+        Exception: if cannot get body from Foursight response
+    """
     fs = event.get('_foursight')
-    if not full_output:
-        full_output = '%s started to run' % lambda_name
-    if fs:
-        data = {'status': status,
-                'description': fs.get('log_desc'),
-                'full_output': full_output
-                }
-        ff_auth = os.environ.get('FS_AUTH')
-        headers = {'content-type': "application/json",
-                   'Authorization': ff_auth}
-        url = FOURSIGHT_URL + 'checks/' + fs.get('check')
+    if fs and fs.get('check'):
+        if overrides is not None and isinstance(overrides, dict):
+            fs.update(overrides)
+        # handles these fields. set full_output as a special case
+        full_output = fs.get('full_output', '%s started to run' % lambda_name)
+        brief_output = fs.get('brief_output')
+        summary = fs.get('summary', fs.get('log_desc'))
+        description = fs.get('description', fs.get('log_desc'))
+        status = fs.get('status', 'WARN')
+
+        data = {'status': status, 'summary': summary, 'description': description,
+                'full_output': full_output, 'brief_output': brief_output}
+        fs_auth = os.environ.get('FS_AUTH')
+        headers = {'content-type': "application/json", 'Authorization': fs_auth}
+        # fs['check'] should be in form: "<fs environment>/<check name>"
+        url = FOURSIGHT_URL + 'checks/' + fs['check']
         res = requests.put(url, data=json.dumps(data), headers=headers)
-        print(res.text)
-        return res
+        print('Foursight response from %s: %s' % (url, res.text))
+        try:
+            return res.json()
+        except Exception as exc:
+            raise Exception('Error putting FS check to %s with body %s. '
+                            'Exception: %s. Response text: %s'
+                            % (url, data, exc, res.text))
 
 
 def create_foursight_auto(dest_env):
+    """
+    Call `create_foursight` to create a Foursight environment based off a
+    just a ElasticBeanstalk environment name. Determines a number of fields
+    needed for the environment creation automatically. Also causes initial
+    checks to be run on the new FS environment.
+
+    Args:
+        dest_env (str): ElasticBeanstalk environment name
+
+    Returns:
+        dict: response from Foursight PUT /api/environments
+    """
     fs = {'dest_env': dest_env}
 
-    # whats our url
+    # automatically determine info for FS environ creation
     fs['bs_url'] = get_beanstalk_real_url(dest_env)
     fs['fs_url'] = get_foursight_env(dest_env, fs['bs_url'])
     fs['es_url'] = get_es_from_bs_config(dest_env)
@@ -526,24 +664,48 @@ def create_foursight_auto(dest_env):
 
 
 def get_foursight_env(dest_env, bs_url=None):
+    """
+    Get a Foursight environment name corresponding the given ElasticBeanstalk
+    environment name, with optionally providing the EB url for must robustness
 
+    Args:
+        dest_env (str): ElasticBeanstalk environment name
+        bs_url (str): optional url for the ElasticBeanstalk instance
+
+    Returns:
+        str: Foursight environment name
+    """
     if not bs_url:
         bs_url = get_beanstalk_real_url(dest_env)
-
     env = dest_env
     if 'data.4dnucleome.org' in bs_url:
         env = 'data'
     elif 'staging.4dnucleome.org' in bs_url:
         env = 'staging'
-
     return env
 
 
 def create_foursight(dest_env, bs_url, es_url, fs_url=None):
-    '''
-    creates a new environment on foursight to be used for monitoring
-    '''
+    """
+    Creates a new Foursight environment based off of dest_env. Since Foursight
+    environments don't include "fourfront-" by convention, remove this if part
+    of the env. Take some other options for settings on the env
 
+    Note: this will cause all checks in all schedules to be run, to initialize
+          environment.
+
+    Args:
+        dest_env (str): ElasticBeanstalk environment name
+        bs_url (str): url of the ElasticBeanstalk for FS env
+        es_url (str): url of the ElasticSearch for FS env
+        fs_url (str): If provided, use to override dest-env based FS url
+
+    Returns:
+        dict: response from Foursight PUT to /api/environments
+
+    Raises:
+        Exception: if cannot get body from Foursight response
+    """
     # we want some url like thing
     if not bs_url.startswith('http'):
         bs_url = 'http://' + bs_url
@@ -559,30 +721,178 @@ def create_foursight(dest_env, bs_url, es_url, fs_url=None):
     # environments on foursight don't include fourfront
     if not fs_url:
         fs_url = dest_env
-    if "-" in fs_url:
-        fs_url = fs_url.split("-")[1]
+    if fs_url.startswith('fourfront-'):
+        fs_url = fs_url[len('fourfront-'):]
 
     foursight_url = FOURSIGHT_URL + 'environments/' + fs_url
-    payload = {"fourfront": bs_url,
-               "es": es_url,
-               "ff_env": dest_env,
-               }
-    logger.info("Hitting up Foursight url %s with payload %s" %
-                (foursight_url, json.dumps(payload)))
+    payload = {"fourfront": bs_url,  "es": es_url, "ff_env": dest_env}
 
     ff_auth = os.environ.get('FS_AUTH')
-    headers = {'content-type': "application/json",
-               'Authorization': ff_auth}
-    res = requests.put(foursight_url,
-                       data=json.dumps(payload),
-                       headers=headers)
+    headers = {'content-type': "application/json", 'Authorization': ff_auth}
+    res = requests.put(foursight_url, data=json.dumps(payload), headers=headers)
     try:
         return res.json()
-    except:  # noqa: E722
-        raise Exception(res.text)
+    except Exception as exc:
+        raise Exception('Error creating FS environ to %s with body %s. '
+                        'Exception: %s. Response text: %s'
+                        % (foursight_url, payload, exc, res.text))
 
+
+def create_new_es(new):
+    """
+    Create a new Elasticsearch domain with given name. See the
+    args below for the settings used.
+
+    TODO: do we want to add cognito and access policy setup here?
+          I think not, since that's a lot of info to put out there...
+
+    Args:
+        new (str): Elasticsearch instance name
+
+    Returns:
+        dict: response from boto3 client
+    """
+    es = boto3.client('es', region_name=REGION)
+    resp = es.create_elasticsearch_domain(
+        DomainName=new,
+        ElasticsearchVersion='5.3',
+        ElasticsearchClusterConfig={
+            'InstanceType': 'm4.xlarge.elasticsearch',
+            'InstanceCount': 1,
+            'DedicatedMasterEnabled': True,
+            'DedicatedMasterType': 't2.small.elasticsearch',
+            'DedicatedMasterCount': 3
+        },
+        EBSOptions={
+            "EBSEnabled": True,
+            "VolumeType": "standard",
+            "VolumeSize": 100
+        }
+    )
+    print('=== CREATED NEW ES INSTANCE %s ===' % new)
+    print('MAKE SURE TO UPDATE COGNITO AND ACCESS POLICY USING THE GUI!')
+    print(resp)
+
+    return resp
+
+
+def get_es_build_status(new, max_tries=None):
+    """
+    Check the build status of an Elasticsearch instance with given name.
+    If max_tries is provided, only allow that many iterative checks to ES.
+    Returns the ES endpoint plus port (80)
+
+    Args:
+        new (str): ES instance name
+        max_tries (int): max number of times to check. Default None (no limit)
+
+    Returns:
+        str: ES endpoint plus port, or None if not found in max_tries
+    """
+    es = boto3.client('es', region_name=REGION)
+    endpoint = None
+    tries = 0
+    while endpoint is None:
+        describe_resp = es.describe_elasticsearch_domain(DomainName=new)
+        endpoint = describe_resp['DomainStatus'].get('Endpoint')
+        if max_tries is not None and tries >= max_tries:
+            break
+        if endpoint is None:
+            print(".")
+            tries += 1
+            time.sleep(10)
+
+    # aws uses port 80 for es connection, lets be specific
+    if endpoint:
+        endpoint += ":80"
+    print('Found ES endpoint for %s: %s' % (new, endpoint))
+    return endpoint
+
+
+###############################################################
+# Functions meant to be used locally to clone a beanstalk ENV #
+# A lot of these functions use command line tools.            #
+# Sort of janky, but could end up being helpful someday ...   #
+###############################################################
+
+
+def add_es(new, force_new=False, kill_indices=False):
+    """
+    Either gets information on an existing Elasticsearch instance
+    or, if force_new is True, will create a new instance.
+
+    If not force_new, attempt to delete all indices if kill_indices=True
+
+    Args:
+        new (str): Fourfront EB environment name used for ES instance
+        force_new (bool): if True, make a new ES. Default False
+        kill_indices(bool): if True, delete all indices. Default False
+
+    Returns:
+        str: AWS ARN of the ES instance
+    """
+    es = boto3.client('es', region_name=REGION)
+    if force_new:
+        # fallback is a new ES env to use if cannot create one with
+        # `new` environment name
+        fallback = new
+        if new.endswith("-a"):
+            fallback = fallback.replace("-a", "-b")
+        elif new.endswith("-b"):
+            fallback = fallback.replace("-b", "-a")
+        else:
+            fallback += "-a"
+        try:
+            resp = create_new_es(new)
+        except:  # noqa: E722
+            resp = create_new_es(fallback)
+    else:
+        try:
+            resp = es.describe_elasticsearch_domain(DomainName=new)
+        except ClientError:  # its not there
+            resp = create_new_es(new)
+        else:
+            # now kill all the indexes
+            if kill_indices:
+                base = 'https://' + resp['DomainStatus']['Endpoint']
+                url = base + '/_all'
+                requests.delete(url)
+
+    return resp['DomainStatus']['ARN']
+
+
+def clone_bs_env(old, new, load_prod, db_endpoint, es_url):
+    """
+    Use the eb command line client to clone an ElasticBeanstalk environment
+    with some extra options.
+
+    Args:
+        old (str): existing EB environment name
+        new (str): new EB environment name
+        load_prod (bool): determins LOAD_FUNCTION EB env var
+        db_endpoint (str): determines RDS_HOSTNAME EB env var
+        es_url (str): determines ES_URL EB env var
+
+    Returns:
+        None
+    """
+    env = 'RDS_HOSTNAME=%s,ENV_NAME=%s,ES_URL=%s' % (db_endpoint, new, es_url)
+    if load_prod is True:
+        env += ",LOAD_FUNCTION=load_prod_data"
+    subprocess.check_call(['./eb', 'clone', old, '-n', new,
+                           '--envvars', env,
+                           '--exact', '--nohang'])
 
 def create_s3_buckets(new):
+    """
+    Given an ElasticBeanstalk env name, create the following s3 buckets
+
+    Args:
+        new (str): EB environment name
+
+    Returns:
+        None
+    """
     new_buckets = [
         'elasticbeanstalk-%s-blobs' % new,
         'elasticbeanstalk-%s-files' % new,
@@ -594,36 +904,43 @@ def create_s3_buckets(new):
         s3.create_bucket(Bucket=bucket)
 
 
-def copy_s3_buckets(new, old):
-    # each env needs the following buckets
-    new_buckets = [
-        'elasticbeanstalk-%s-blobs' % new,
-        'elasticbeanstalk-%s-files' % new,
-        'elasticbeanstalk-%s-wfoutput' % new,
-        'elasticbeanstalk-%s-system' % new,
-    ]
-    old_buckets = [
-        'elasticbeanstalk-%s-blobs' % old,
-        'elasticbeanstalk-%s-files' % old,
-        'elasticbeanstalk-%s-wfoutput' % old,
-    ]
-    s3 = boto3.client('s3', region_name=REGION)
-    for bucket in new_buckets:
-        try:
-            s3.create_bucket(Bucket=bucket)
-        except:  # noqa: E722
+def snapshot_and_clone_db(db_identifier, snapshot_name):
+    """
+    Given a RDS instance identifier and snapshot name, will create a snapshot
+    with that name and then spin up a new RDS instance named after the snapshot
 
-            print("bucket already created....")
+    Args:
+        db_identifier (str): original RDS identifier of DB to snapshot
+        snapshot_name (str): identifier of snapshot AND new instance
 
-    # now copy them
-    # aws s3 sync s3://mybucket s3://backup-mybucket
-    # get rid of system bucket
-    new_buckets.pop()
-    for old, new in zip(old_buckets, new_buckets):
-        oldb = "s3://%s" % old
-        newb = "s3://%s" % new
-        print("copying data from old %s to new %s" % (oldb, newb))
-        subprocess.call(['aws', 's3', 'sync', oldb, newb])
+    Returns:
+        str: address of the new instance
+    """
+    client = boto3.client('rds', region_name=REGION)
+    snap_res = create_db_snapshot(db_identifier, snapshot_name)
+    if snap_res == 'Deleting':
+        snap_res = client.create_db_snapshot(
+            DBSnapshotIdentifier=snapshot_name,
+            DBInstanceIdentifier=db_identifier
+        )
+    print("Response from create db snapshot: %s" % snap_res)
+    print("Waiting for snapshot to create...")
+    waiter = client.get_waiter('db_snapshot_completed')
+    waiter.wait(DBSnapshotIdentifier=snapshot_name)
+    print("Done waiting, creating a new database with name %s" % snapshot_name)
+    db_res = create_db_from_snapshot(snapshot_name, snapshot_name, False)
+    if db_res == 'Error':
+        raise Exception('Could not create DB %s; already exists' % snapshot_name)
+    print("Waiting for DB to be created from snapshot...")
+    endpoint = ''
+    while not endpoint:
+        resp = client.describe_db_instances(DBInstanceIdentifier=snapshot_name)
+        endpoint = resp['DBInstances'][0].get('Endpoint')
+        if endpoint and endpoint.get('Address'):
+            print("We got an endpoint:", endpoint['Address'])
+            return endpoint['Address']
+        print(".")
+        time.sleep(10)
 
 
 def add_to_auth0_client(new):
@@ -673,154 +990,70 @@ def auth0_client_update(url):
     print(update_res.json().get('callbacks'))
 
 
-def sizeup_es(new):
-    es = boto3.client('es', region_name=REGION)
-    resp = es.update_elasticsearch_domain_config(
-        DomainName=new,
-        ElasticsearchClusterConfig={
-            'InstanceType': 'm3.xlarge.elasticsearch',
-            'InstanceCount': 4,
-            'DedicatedMasterEnabled': True,
-        }
-    )
-
-    print(resp)
-
-
-def add_es(new, force_new=False, kill_indices=False):
-    es = boto3.client('es', region_name=REGION)
-    if force_new:
-        fallback = new
-        if new.endswith("-a"):
-            fallback = fallback.replace("-a", "-b")
-        elif new.endswith("-b"):
-            fallback = fallback.replace("-b", "-a")
-        else:
-            fallback += "-a"
+def copy_s3_buckets(new, old):
+    # each env needs the following buckets
+    new_buckets = [
+        'elasticbeanstalk-%s-blobs' % new,
+        'elasticbeanstalk-%s-files' % new,
+        'elasticbeanstalk-%s-wfoutput' % new,
+        'elasticbeanstalk-%s-system' % new,
+    ]
+    old_buckets = [
+        'elasticbeanstalk-%s-blobs' % old,
+        'elasticbeanstalk-%s-files' % old,
+        'elasticbeanstalk-%s-wfoutput' % old,
+    ]
+    s3 = boto3.client('s3', region_name=REGION)
+    for bucket in new_buckets:
         try:
-            resp = create_new_es(new)
+            s3.create_bucket(Bucket=bucket)
         except:  # noqa: E722
-            resp = create_new_es(fallback)
-    else:
-        try:
-            resp = es.describe_elasticsearch_domain(DomainName=new)
-        except ClientError:  # its not there
-            resp = create_new_es(new)
-        else:
-            # now kill all the indexes
-            if kill_indices:
-                base = 'https://' + resp['DomainStatus']['Endpoint']
-                url = base + '/_all'
-                requests.delete(url)
 
-    return resp['DomainStatus']['ARN']
+            print("bucket already created....")
+
+    # now copy them
+    # aws s3 sync s3://mybucket s3://backup-mybucket
+    # get rid of system bucket
+    new_buckets.pop()
+    for old, new in zip(old_buckets, new_buckets):
+        oldb = "s3://%s" % old
+        newb = "s3://%s" % new
+        print("copying data from old %s to new %s" % (oldb, newb))
+        subprocess.call(['aws', 's3', 'sync', oldb, newb])
 
 
-def create_new_es(new):
-    es = boto3.client('es', region_name=REGION)
-    resp = es.create_elasticsearch_domain(
-        DomainName=new,
-        ElasticsearchVersion='5.3',
-        ElasticsearchClusterConfig={
-            'InstanceType': 'm4.large.elasticsearch',
-            'InstanceCount': 3,
-            'DedicatedMasterEnabled': False,
-        },
-        EBSOptions={"EBSEnabled": True, "VolumeType": "standard", "VolumeSize": 10},
-        AccessPolicies=json.dumps({
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Principal": {
-                        "AWS": "arn:aws:iam::643366669028:role/Developer"
-                    },
-                    "Action": [
-                        "es:*"
-                    ],
-                    "Condition": {
-                        "IpAddress": {
-                            "aws:SourceIp": [
-                                "0.0.0.0/0",
-                                "134.174.140.197/32",
-                                "134.174.140.208/32",
-                                "172.31.16.84/32",
-                                "172.31.73.1/24",
-                                "172.31.77.1/24"
-                            ]
-                        }
-                    },
-                }
-            ]
-        })
-    )
-    print(resp)
-    return resp
+def clone_beanstalk_command_line(old, new, prod=False, copy_s3=False):
+    """
+    Maybe useful command to clone an existing ElasticBeanstalk environment to
+    a new one. Will create an Elasticsearch instance, s3 buckets, clone the
+    existing RDS of the environment, and optionally copy s3 contents.
+    Also adds the new environment to Auth0 callback urls.
 
+    Args:
+        old (str): environment name of existing ElasticBeanstalk
+        new (str): new ElasticBeanstalk environment name
+        prod (bool): set to True if this is a prod environment. Default False
+        copy_s3 (bool): set to True to copy s3 contents. Default False
 
-def get_es_build_status(new):
-    # get the status of this bad boy
-    es = boto3.client('es', region_name=REGION)
-    endpoint = None
-    while endpoint is None:
-        describe_resp = es.describe_elasticsearch_domain(DomainName=new)
-        endpoint = describe_resp['DomainStatus'].get('Endpoint')
-        if endpoint is None:
-            print(".")
-            time.sleep(10)
-
-    print(endpoint)
-
-    # aws uses port 80 for es connection, lets be specific
-    return endpoint + ":80"
-
-
-def eb_deploy(new):
-    subprocess.check_call(['eb', 'deploy', new])
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="Clone a beanstalk env into a new one",
-        )
-    parser.add_argument('--old')
-    parser.add_argument('--new')
-    parser.add_argument('--prod', action='store_true', default=False, help='load prod data on new env?')
-    parser.add_argument('--deploy_current', action='store_true', help='deploy current branch')
-    parser.add_argument('--skips3', action='store_true', default=False,
-                        help='skip copying files from s3')
-
-    parser.add_argument('--onlys3', action='store_true', default=False,
-                        help='skip copying files from s3')
-
-    args = parser.parse_args()
-    if args.onlys3:
-        print("### only copy contents of s3")
-        copy_s3_buckets(args.new, args.old)
-        return
+    Returns:
+        None
+    """
 
     print("### start build ES service")
-    add_es(args.new)
+    add_es(new)
     print("### create the s3 buckets")
-    create_s3_buckets(args.new)
-    print("### copy database")
-    db_endpoint = snapshot_db(args.old, args.new)
+    create_s3_buckets(new)
+    print("### create snapshot and copy database")
+    db_endpoint = snapshot_and_clone_db(old, new)
     print("### waiting for ES service")
-    es_endpoint = get_es_build_status(args.new)
+    es_endpoint = get_es_build_status(new)
     print("### clone elasticbeanstalk envrionment")
     # TODO, can we pass in github commit id here?
-    clone_bs_env(args.old, args.new, args.prod, db_endpoint, es_endpoint)
+    clone_bs_env(old, new, prod, db_endpoint, es_endpoint)
     print("### allow auth-0 requests")
-    add_to_auth0_client(args.new)
-    if not args.skips3:
+    add_to_auth0_client(new)
+    if copy_s3 is True:
         print("### copy contents of s3")
-        copy_s3_buckets(args.new, args.old)
-    if args.deploy_current:
-        print("### deploying local code to new eb environment")
-        eb_deploy(args.new)
-
-    print("all set, it may take some time for the beanstalk env to finish starting up")
-
-
-if __name__ == "__main__":
-    main()
+        copy_s3_buckets(new, old)
+    print("All done! It may take some time for the beanstalk env to finish "
+          "initialization. You may want to deploy the most current FF branch.")
