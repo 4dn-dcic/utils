@@ -55,7 +55,7 @@ def delete_db(db_identifier, take_snapshot=True, allow_delete_prod=False):
                 SkipFinalSnapshot=False,
                 FinalDBSnapshotIdentifier=db_identifier + "-final-" + timestamp
             )
-        except:
+        except:  # noqa: E722
             # Snapshot cannot be made. Likely a date conflict
             resp = client.delete_db_instance(
                 DBInstanceIdentifier=db_identifier,
@@ -1006,7 +1006,6 @@ def copy_s3_buckets(new, old):
         try:
             s3.create_bucket(Bucket=bucket)
         except:  # noqa: E722
-
             print("bucket already created....")
 
     # now copy them
