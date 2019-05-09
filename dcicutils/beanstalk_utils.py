@@ -899,6 +899,7 @@ def clone_bs_env(old, new, load_prod, db_endpoint, es_url):
                            '--envvars', env,
                            '--exact', '--nohang'])
 
+
 def delete_bs_env(env_name):
     """
     Use the eb command line client to remove an ElasticBeanstalk environment
