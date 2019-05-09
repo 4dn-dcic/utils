@@ -582,7 +582,7 @@ def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
 def log_to_foursight(event, lambda_name='', overrides=None):
     """
     Use Foursight as a logging tool within in a lambda function by doing a PUT
-    to /api/checks. Requires the the event has "_foursight" key, which is a
+    to /api/checks. Requires that the event has "_foursight" key, which is a
     subobject with the following:
     fields:
         "check": required, in form "<fs environment>/<check name>"
@@ -806,11 +806,11 @@ def get_es_build_status(new, max_tries=None):
     return endpoint
 
 
-###############################################################
-# Functions meant to be used locally to clone a beanstalk ENV #
-# A lot of these functions use command line tools.            #
-# Sort of janky, but could end up being helpful someday ...   #
-###############################################################
+#########################################################################
+# Functions meant to be used locally to clone or remove a beanstalk ENV #
+# A lot of these functions use command line tools.                      #
+# Sort of janky, but could end up being helpful someday ...             #
+#########################################################################
 
 
 def add_es(new, force_new=False, kill_indices=False):
@@ -858,6 +858,25 @@ def add_es(new, force_new=False, kill_indices=False):
     return resp['DomainStatus']['ARN']
 
 
+def delete_es_domain(env_name):
+    """
+    Given an Elasticsearch domain name, delete the domain
+
+    Args:
+        env_name (str): Fourfront EB environment name used for ES instance
+
+    Returns:
+        None
+    """
+    # get the status of this bad boy
+    es = boto3.client('es')
+    try:
+        res = es.delete_elasticsearch_domain(DomainName=env_name)
+        print(res)
+    except:  # noqa: E722
+        print("es domain %s not found, skipping" % env_name)
+
+
 def clone_bs_env(old, new, load_prod, db_endpoint, es_url):
     """
     Use the eb command line client to clone an ElasticBeanstalk environment
@@ -880,10 +899,24 @@ def clone_bs_env(old, new, load_prod, db_endpoint, es_url):
                            '--envvars', env,
                            '--exact', '--nohang'])
 
+def delete_bs_env(env_name):
+    """
+    Use the eb command line client to remove an ElasticBeanstalk environment
+    with some extra options.
+
+    Args:
+        env_name (str): EB environment name
+
+    Returns:
+        None
+    """
+    subprocess.check_call(['eb', 'terminate', env_name, '-nh', '--force'])
+
 
 def create_s3_buckets(new):
     """
-    Given an ElasticBeanstalk env name, create the following s3 buckets
+    Given an ElasticBeanstalk env name, create the following s3 buckets that
+    are standard for any of our EB environments.
 
     Args:
         new (str): EB environment name
@@ -900,6 +933,34 @@ def create_s3_buckets(new):
     s3 = boto3.client('s3', region_name=REGION)
     for bucket in new_buckets:
         s3.create_bucket(Bucket=bucket)
+
+
+def delete_s3_buckets(env_name):
+    """
+    Given an ElasticBeanstalk env name, remove the following s3 buckets that
+    are standard for any of our EB environments.
+
+    Args:
+        env_name (str): EB environment name
+
+    Returns:
+        None
+    """
+    buckets = [
+        'elasticbeanstalk-%s-blobs' % env_name,
+        'elasticbeanstalk-%s-files' % env_name,
+        'elasticbeanstalk-%s-wfoutput' % env_name,
+        'elasticbeanstalk-%s-system' % env_name,
+    ]
+
+    s3 = boto3.resource('s3')
+    for bucket in buckets:
+        print("deleting content for " + bucket)
+        try:
+            s3.Bucket(bucket).objects.delete()
+            s3.Bucket(bucket).delete()
+        except:  # noqa: E722
+            print(bucket + " not found skipping...")
 
 
 def snapshot_and_clone_db(db_identifier, snapshot_name):
@@ -942,11 +1003,20 @@ def snapshot_and_clone_db(db_identifier, snapshot_name):
 
 
 def add_to_auth0_client(new):
-    # first get the url of the newly created beanstalk environment
+    """
+    Given an ElasticBeanstalk env name, find the url and use it to update the
+    callback URLs for Auth0
+
+    Args:
+        new (str): EB environment name
+
+    Returns:
+        None
+    """
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     env = describe_beanstalk_environments(client, EnvironmentNames=[new])
     url = None
-    print("waiting for beanstalk to be up, this make take some time...")
+    print("Getting beanstalk URL for env %s..." % new)
     while url is None:
         url = env['Environments'][0].get('CNAME')
         if url is None:
@@ -954,16 +1024,44 @@ def add_to_auth0_client(new):
             time.sleep(10)
     auth0_client_update(url)
 
-    # TODO: need to also update ES permissions policy with ip addresses of elasticbeanstalk
-    # or configure application to use AWS IAM stuff
+
+def remove_from_auth0_client(env_name):
+    """
+    Given an ElasticBeanstalk env name, find the url and remove it from the
+    callback urls for Auth0
+
+    Args:
+        env_name (str): EB environment name
+
+    Returns:
+        None
+    """
+    eb = boto3.client('elasticbeanstalk')
+    env = eb.describe_environments(EnvironmentNames=[env_name])
+    url = None
+    print("Getting beanstalk URL for env %s..." % env_name)
+    while url is None:
+        url = env['Environments'][0].get('CNAME')
+        if url is None:
+            print(".")
+            time.sleep(10)
+    auth0_client_remove(url)
 
 
 def auth0_client_update(url):
-    # Auth0 stuff
-    # generate a jwt to validate future requests
-    client = os.environ.get("Auth0Client")
-    secret = os.environ.get("Auth0Secret")
+    """
+    Get a JWT for programmatic access to Auth0 using Client/Secret env vars.
+    Then add the given `url` to the Auth0 callbacks list.
 
+    Args:
+        url (str): url to add to callbacks
+
+    Returns:
+        None
+    """
+    # generate a jwt to validate future requests
+    client = os.environ["Auth0Client"]
+    secret = os.environ["Auth0Secret"]
     payload = {"grant_type": "client_credentials",
                "client_id": client,
                "client_secret": secret,
@@ -972,23 +1070,75 @@ def auth0_client_update(url):
     res = requests.post("https://hms-dbmi.auth0.com/oauth/token",
                         data=json.dumps(payload),
                         headers=headers)
-
-    print(res.json())
     jwt = res.json()['access_token']
+
     client_url = "https://hms-dbmi.auth0.com/api/v2/clients/%s" % client
     headers['authorization'] = 'Bearer %s' % jwt
 
     get_res = requests.get(client_url + '?fields=callbacks', headers=headers)
-
     callbacks = get_res.json()['callbacks']
     callbacks.append("http://" + url)
     client_data = {'callbacks': callbacks}
 
     update_res = requests.patch(client_url, data=json.dumps(client_data), headers=headers)
-    print(update_res.json().get('callbacks'))
+    print('auth0 callback urls are: %s' % update_res.json().get('callbacks'))
+
+
+def auth0_client_remove(url):
+    """
+    Get a JWT for programmatic access to Auth0 using Client/Secret env vars.
+    Then use that to remove the given `url` from the Auth0 callbacks list.
+
+    Args:
+        url (str): url to remove from callbacks
+
+    Returns:
+        None
+    """
+    # generate a jwt to validate future requests
+    client = os.environ["Auth0Client"]
+    secret = os.environ["Auth0Secret"]
+    payload = {"grant_type": "client_credentials",
+               "client_id": client,
+               "client_secret": secret,
+               "audience": "https://hms-dbmi.auth0.com/api/v2/"}
+    headers = {'content-type': "application/json"}
+    res = requests.post("https://hms-dbmi.auth0.com/oauth/token",
+                        data=json.dumps(payload),
+                        headers=headers)
+    jwt = res.json()['access_token']
+    client_url = "https://hms-dbmi.auth0.com/api/v2/clients/%s" % client
+    headers['authorization'] = 'Bearer %s' % jwt
+
+    get_res = requests.get(client_url + '?fields=callbacks', headers=headers)
+    callbacks = get_res.json()['callbacks']
+    full_url = 'http://' + url
+    try:
+        idx = callbacks.index(full_url)
+    except ValueError:
+        print(full_url + " Not in auth0 auth, doesn't need to be removed")
+        return
+    if idx:
+        callbacks.pop(idx)
+    client_data = {'callbacks': callbacks}
+
+    update_res = requests.patch(client_url, data=json.dumps(client_data), headers=headers)
+    print('auth0 callback urls are: %s' % update_res.json().get('callbacks'))
 
 
 def copy_s3_buckets(new, old):
+    """
+    Given a new ElasticBeanstalk environment name and existing "old" one,
+    create the given buckets and copy contents from the corresponding
+    existing ones
+
+    Args:
+        new (str): new EB environment name
+        old (str): existing EB environment name
+
+    Returns:
+        None
+    """
     # each env needs the following buckets
     new_buckets = [
         'elasticbeanstalk-%s-blobs' % new,
@@ -1006,7 +1156,7 @@ def copy_s3_buckets(new, old):
         try:
             s3.create_bucket(Bucket=bucket)
         except:  # noqa: E722
-            print("bucket already created....")
+            print("bucket %s already created..." % bucket)
 
     # now copy them
     # aws s3 sync s3://mybucket s3://backup-mybucket
@@ -1024,7 +1174,9 @@ def clone_beanstalk_command_line(old, new, prod=False, copy_s3=False):
     Maybe useful command to clone an existing ElasticBeanstalk environment to
     a new one. Will create an Elasticsearch instance, s3 buckets, clone the
     existing RDS of the environment, and optionally copy s3 contents.
-    Also adds the new environment to Auth0 callback urls.
+    Also adds the new EB url to Auth0 callback urls.
+    Should be run exclusively via command line, as it requires manual input
+    and subprocess calls of AWS command line tools.
 
     Args:
         old (str): environment name of existing ElasticBeanstalk
@@ -1035,7 +1187,15 @@ def clone_beanstalk_command_line(old, new, prod=False, copy_s3=False):
     Returns:
         None
     """
-
+    if 'Auth0Client' not in os.environ or "Auth0Secret" not in os.environ:
+        print('Must set Auth0Client and Auth0Secret env variables! Exiting...')
+        return
+    name = input("This will create an environment named %s, cloned from %s."
+                 "This includes s3, ES, RDS, and Auth0 callbacks. If you are "
+                 "sure, type the new env name to confirm:" % (new, old))
+    if str(name) != new:
+        print("Could not confirm env. Exiting...")
+        return
     print("### start build ES service")
     add_es(new)
     print("### create the s3 buckets")
@@ -1052,5 +1212,41 @@ def clone_beanstalk_command_line(old, new, prod=False, copy_s3=False):
     if copy_s3 is True:
         print("### copy contents of s3")
         copy_s3_buckets(new, old)
-    print("All done! It may take some time for the beanstalk env to finish "
-          "initialization. You may want to deploy the most current FF branch.")
+    print("### All done! It may take some time for the beanstalk env to finish"
+          " initialization. You may want to deploy the most current FF branch.")
+
+
+def delete_beanstalk_command_line(env):
+    """
+    Maybe useful command to delete an existing ElasticBeanstalk environment,
+    including associated ES, s3, and RDS resources. Will also remove the
+    associated callback url from Auth0.
+    Should be run exclusively via command line, as it requires manual input
+    and subprocess calls of AWS command line tools.
+
+    Args:
+        env (str): EB environment name to delete
+
+    Returns:
+        None
+    """
+    if 'Auth0Client' not in os.environ or "Auth0Secret" not in os.environ:
+        print('Must set Auth0Client and Auth0Secret env variables! Exiting...')
+        return
+    name = input("This will totally blow away the environment, including s3, ES, "
+                 "RDS, and Auth0 callbacks. If you are sure, type the env name "
+                 "to confirm:")
+    if str(name) != env:
+        print("Could not confirm env. Exiting...")
+        return
+    print("### Removing access to auth0")
+    remove_from_auth0_client(env)
+    print("### Deleting beanstalk enviornment")
+    delete_bs_env(env)
+    print("### Delete contents of s3")
+    delete_s3_buckets(env)
+    print("### Delete es domain")
+    delete_es_domain(env)
+    print("### Delete database")
+    delete_db(env)
+    print('### All done!')
