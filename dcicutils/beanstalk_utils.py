@@ -73,13 +73,13 @@ def delete_db(db_identifier, take_snapshot=True, allow_delete_prod=False):
 def get_es_from_bs_config(env):
     """
     Given an ElasticBeanstalk environment name, get the corresponding
-    Elasticsearch url from the EB configuration
+    Elasticsearch url from the EB configurationock
 
     Args:
         env (str): ElasticBeanstalk environment name
 
     Returns:
-        str: Elasticsearch url
+        str: Elasticsearch url without port info
     """
     bs_env = get_bs_env(env)
     for item in bs_env:
@@ -151,7 +151,7 @@ def swap_cname(src, dest):
         None
     """
     client = boto3.client('elasticbeanstalk', region_name=REGION)
-    printing("Swapping CNAMEs %s and %s..." % (src, dest))
+    print("Swapping CNAMEs %s and %s..." % (src, dest))
     client.swap_environment_cnames(SourceEnvironmentName=src,
                                    DestinationEnvironmentName=dest)
     print("Giving CNAMEs 10 seconds to update...")
@@ -177,12 +177,6 @@ def whodaman():
         if env.get('CNAME') == MAGIC_CNAME:
             # we found data
             return env.get('EnvironmentName')
-
-
-def beanstalk_config(env, appname='4dn-web'):
-    client = boto3.client('elasticbeanstalk', region_name=REGION)
-    return client.describe_configuration_settings(EnvironmentName=env,
-                                                  ApplicationName=appname)
 
 
 def beanstalk_info(env):
@@ -259,8 +253,17 @@ def is_beanstalk_ready(env):
 def describe_beanstalk_environments(client, **kwargs):
     """
     Generic function for retrying client.describe_environments to avoid
-    AWS throttling errors
-    Passes all given kwargs to client.describe_environments
+    AWS throttling errors. Passes all given kwargs to describe_environments
+
+    Args:
+        client (botocore.client.ElasticBeanstalk): boto3 client
+
+    Returns:
+        dict: response from client.describe_environments
+
+    Raises:
+        Exception: if a non-ClientError exception is encountered during
+            describe_environments or cannot complete within retry framework
     """
     env_info = kwargs.get('EnvironmentNames', kwargs.get('ApplicationName', 'Unknown environment'))
     for retry in [1, 1, 1, 1, 2, 2, 2, 4, 4, 6, 8, 10, 12, 14, 16, 18, 20]:
@@ -341,6 +344,18 @@ def is_db_ready(db_identifier):
 
 
 def create_db_snapshot(db_identifier, snapshot_name):
+    """
+    Given an RDS instance indentifier, create a snapshot using the given name.
+    If a snapshot with given name already exists, attempt to delete and return
+    "Deleting". Otherwise, return snapshot ARN.
+
+    Args:
+        db_identifier (str): RDS instance identifier
+        snapshot_name (str): identifier/ARN of RDS snapshot to create
+
+    Returns:
+        str: resource ARN if successful, otherwise "Deleting"
+    """
     client = boto3.client('rds', region_name=REGION)
     try:
         response = client.create_db_snapshot(
@@ -360,14 +375,13 @@ def create_db_snapshot(db_identifier, snapshot_name):
 def create_db_from_snapshot(db_identifier, snapshot_name, delete_db=True):
     """
     Given an RDS instance indentifier and a snapshot ARN/name, create an RDS
-    instance from the snapshot. If an existing instance already exists with
-    the given identifier and delete_db is True, will attempt to delete it
-    and return "Deleting". Otherwise, will just bail
+    instance from the snapshot. If an instance already exists with the given
+    identifier and delete_db is True, attempt to delete and return "Deleting".
+    Otherwise, return instance ARN.
 
     Args:
         db_identifier (str): RDS instance identifier
         snapshot_name (str): identifier/ARN of RDS snapshot to restore from
-
 
     Returns:
         str: resource ARN if successful, otherwise "Deleting"
@@ -440,36 +454,6 @@ def make_envvar_option(name, value):
             }
 
 
-def set_bs_env(envname, var, template=None):
-    client = boto3.client('elasticbeanstalk', region_name=REGION)
-    options = []
-
-    try:
-        # add default environment from existing env
-        # allowing them to be overwritten by var
-        env_vars = get_bs_env(envname)
-        for evar in env_vars:
-            k, v = evar.split('=')
-            if var.get(k, None) is None:
-                var[k] = v
-    except:  # noqa: E722
-        pass
-
-    for key, val in var.iteritems():
-        options.append(make_envvar_option(key, val))
-
-    logging.info("About to update beanstalk with options as %s" % str(options))
-
-    if template:
-        return client.update_environment(EnvironmentName=envname,
-                                         OptionSettings=options,
-                                         TemplateName=template
-                                         )
-    else:
-        return client.update_environment(EnvironmentName=envname,
-                                         OptionSettings=options)
-
-
 def get_bs_env(envname):
     """
     Given an ElasticBeanstalk environment name, get the env variables from that
@@ -491,36 +475,50 @@ def get_bs_env(envname):
     return env_vars.split(',')
 
 
-def update_bs_config(envname, template, keep_env_vars=False):
+def update_bs_config(envname, template=None, keep_env_vars=False,
+                     env_override=None):
     """
     Update the configuration for an existing ElasticBeanstalk environment.
-    Requires the environment name and a template to use. Can optionally
-    keep all environment variables from the existing environment
+    Requires the environment name. Can optionally specify a configuration
+    template, as well as keep all environment variables from the existing
+    environment with optional variable overrides.
 
     Args:
         envname (str): name of the EB environment
-        template (str): configuration template to use
+        template (str): configuration template to use. Default None
         keep_env_vars (bool): if True, keep existing env vars. Default False
+        env_override (dict): if provided, overwrite existing env vars using the
+            given key/values. Must use keep_env_vars to work. Default None
 
     Returns:
         dict: update_environment response
     """
+    if template is None and not keep_env_vars:
+        # nothing to update
+        logger.info("update_bs_config: nothing to update for env %s!" % envname)
+        return None
     client = boto3.client('elasticbeanstalk', region_name=REGION)
-
-    # get important env variables from the current env and keep them
+    options = []  # used to hold env vars
     if keep_env_vars:
-        options = []
         env_vars = get_bs_env(envname)
         for var in env_vars:
             key, value = var.split('=')
-            options.append(make_envvar_option(key, value))
+            if env_override and env_override.get(key):
+                options.append(make_envvar_option(key, env_override[key]))
+            else:
+                options.append(make_envvar_option(key, value))
 
+    # update template and/or env var options
+    if options and template:
         return client.update_environment(EnvironmentName=envname,
                                          TemplateName=template,
                                          OptionSettings=options)
-
-    return client.update_environment(EnvironmentName=envname,
-                                     TemplateName=template)
+    elif template:
+        return client.update_environment(EnvironmentName=envname,
+                                         TemplateName=template)
+    else:
+        return client.update_environment(EnvironmentName=envname,
+                                         OptionSettings=options)
 
 
 def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):

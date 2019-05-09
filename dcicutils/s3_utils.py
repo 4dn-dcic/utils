@@ -11,7 +11,8 @@ import logging
 ###########################
 # Config
 ###########################
-LOG = logging.getLogger(__name__)
+logging.basicConfig()
+logger = logging.getLogger(__name__)
 
 
 class s3Utils(object):
@@ -83,7 +84,7 @@ class s3Utils(object):
 
     def read_s3(self, filename):
         response = self.s3.get_object(Bucket=self.outfile_bucket, Key=filename)
-        LOG.info(str(response))
+        logger.info(str(response))
         return response['Body'].read()
 
     def does_key_exist(self, key, bucket=None, print_error=True):
