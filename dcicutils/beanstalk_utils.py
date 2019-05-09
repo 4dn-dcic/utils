@@ -5,7 +5,6 @@ This includes, but is not limited to: ES, s3, RDS, Auth0, and Foursight.
 from __future__ import print_function
 import subprocess
 import logging
-import argparse
 import boto3
 import os
 import json
@@ -294,7 +293,7 @@ def is_snapshot_ready(snapshot_name):
     client = boto3.client('rds', region_name=REGION)
     resp = client.describe_db_snapshots(DBSnapshotIdentifier=snapshot_name)
     db_status = resp['DBSnapshots'][0]['Status']
-    is_ready = status.lower() == 'available'
+    is_ready = db_status.lower() == 'available'
     return is_ready, resp['DBSnapshots'][0]['DBSnapshotIdentifier']
 
 
@@ -880,6 +879,7 @@ def clone_bs_env(old, new, load_prod, db_endpoint, es_url):
     subprocess.check_call(['./eb', 'clone', old, '-n', new,
                            '--envvars', env,
                            '--exact', '--nohang'])
+
 
 def create_s3_buckets(new):
     """
