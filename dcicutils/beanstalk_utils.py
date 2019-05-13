@@ -1,5 +1,4 @@
-'''
-Utilities related to ElasticBeanstalk deployment and management.
+'''Utilities related to ElasticBeanstalk deployment and management.
 This includes, but is not limited to: ES, s3, RDS, Auth0, and Foursight.
 '''
 from __future__ import print_function
@@ -132,14 +131,14 @@ def is_indexing_finished(env, prev_version=None, travis_build_id=None):
                 else:
                     raise WaitingForBoto3("EB version has not updated from %s. "
                                           "Encountered error when getting build"
-                                          " %s from Travis. Error: %s" %s "
+                                          " %s from Travis. Error: %s"
                                           % (prev_version, travis_build_id, exc))
             else:
                 # Travis build is running/has passed
                 if trav_done is True:
                     logger.info("EB version has not updated from %s."
                                 "Associated travis build %s has finished."
-                                % (prev_version, travis_build_id)))
+                                % (prev_version, travis_build_id))
                 else:
                     raise WaitingForBoto3("EB version has not updated from %s."
                                           "Associated travis build is %s and "
