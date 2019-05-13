@@ -18,6 +18,12 @@ logging.basicConfig()
 logger = logging.getLogger('logger')
 logger.setLevel(logging.INFO)
 
+# input vs. raw_input for python 2/3
+try:
+    use_input = raw_input
+except NameError:
+    use_input = input
+
 FOURSIGHT_URL = 'https://foursight.4dnucleome.org/api/'
 # magic CNAME corresponds to data.4dnucleome
 MAGIC_CNAME = 'fourfront-webprod.9wzadzju3p.us-east-1.elasticbeanstalk.com'
@@ -86,15 +92,16 @@ def get_es_from_bs_config(env):
             return item.split('=')[1].strip(':80')
 
 
-def is_indexing_finished(bs, prev_version=None):
+def is_indexing_finished(env, prev_version=None, travis_build_id=None):
     """
     Checker function used with torb waitfor lambda; output must be standarized.
     Check to see if indexing of a Fourfront environment corresponding to given
     ElasticBeanstalk environment is finished by looking at the /counts page.
 
     Args:
-        bs (str): ElasticBeanstalk environment name
+        env (str): ElasticBeanstalk environment name
         prev_version (str): optional EB version of the previous configuration
+        travis_build_id (int): optional ID for a Travis build
 
     Returns:
         bool, list: True if done, results from /counts page
@@ -103,22 +110,51 @@ def is_indexing_finished(bs, prev_version=None):
         Exception: if EB environment VersionLabel is equal to prev_version
     """
     # is_beanstalk_ready will raise WaitingForBoto3 if not ready
-    is_beanstalk_ready(bs)
-    bs_url = get_beanstalk_real_url(bs)
+    is_beanstalk_ready(env)
+    bs_url = get_beanstalk_real_url(env)
     if not bs_url.endswith('/'):
         bs_url += "/"
-    # server not up yet
-    try:
-        # check to see if our version is updated
-        if prev_version:
-            info = beanstalk_info(bs)
-            if prev_version == info.get('VersionLabel'):
-                raise Exception("Beanstalk version has not updated from %s"
-                                % prev_version)
 
-        health_res = ff_utils.authorized_request(bs_url + 'counts?format=json',
-                                                 ff_env=bs)
-        totals = health_res.json().get('db_es_total').split()
+    # retry if the beanstalk version has not updated from previous version,
+    # unless the travis build has failed (in which case it will never update).
+    # If failed, let is_indexing continue as usual so the deployment will
+    # complete, despite being on the wrong EB application version
+    if prev_version and beanstalk_info(env).get('VersionLabel') == prev_version:
+        if travis_build_id:
+            try:
+                trav_done, trav_details = is_travis_finished(travis_build_id)
+            except Exception as exc:
+                # if the build failed, let the indexing check continue
+                if 'Build Failed' in str(exc):
+                    logger.info("EB version has not updated from %s."
+                                "Associated travis build %s has failed."
+                                % (prev_version, travis_build_id))
+                else:
+                    raise WaitingForBoto3("EB version has not updated from %s. "
+                                          "Encountered error when getting build"
+                                          " %s from Travis. Error: %s" %s "
+                                          % (prev_version, travis_build_id, exc))
+            else:
+                # Travis build is running/has passed
+                if trav_done is True:
+                    logger.info("EB version has not updated from %s."
+                                "Associated travis build %s has finished."
+                                % (prev_version, travis_build_id)))
+                else:
+                    raise WaitingForBoto3("EB version has not updated from %s."
+                                          "Associated travis build is %s and "
+                                          "has not yet finished. Details: %s"
+                                          % (prev_version, travis_build_id, trav_details))
+        else:
+            # no build ID provided; must retry on not updated version
+            raise WaitingForBoto3("EB version has not updated from %s"
+                                  % prev_version)
+
+    # check counts from the portal to determine indexing state
+    try:
+        counts_res = ff_utils.authorized_request(bs_url + 'counts?format=json',
+                                                 ff_env=env)
+        totals = counts_res.json().get('db_es_total').split()
 
         # example value of split totals: ["DB:", "74048", "ES:", "74048"]
         db_total = totals[1]
@@ -129,10 +165,9 @@ def is_indexing_finished(bs, prev_version=None):
         else:
             is_ready = True
     except Exception as exc:
-        print('Error on is_indexing_finished: %s' % exc)
+        logger.info('Error on is_indexing_finished: %s' % exc)
         is_ready = False
         totals = []
-
     return is_ready, totals
 
 
@@ -877,7 +912,7 @@ def delete_es_domain(env_name):
         print("es domain %s not found, skipping" % env_name)
 
 
-def clone_bs_env(old, new, load_prod, db_endpoint, es_url):
+def clone_bs_env_cli(old, new, load_prod, db_endpoint, es_url):
     """
     Use the eb command line client to clone an ElasticBeanstalk environment
     with some extra options.
@@ -895,12 +930,12 @@ def clone_bs_env(old, new, load_prod, db_endpoint, es_url):
     env = 'RDS_HOSTNAME=%s,ENV_NAME=%s,ES_URL=%s' % (db_endpoint, new, es_url)
     if load_prod is True:
         env += ",LOAD_FUNCTION=load_prod_data"
-    subprocess.check_call(['./eb', 'clone', old, '-n', new,
+    subprocess.check_call(['eb', 'clone', old, '-n', new,
                            '--envvars', env,
                            '--exact', '--nohang'])
 
 
-def delete_bs_env(env_name):
+def delete_bs_env_cli(env_name):
     """
     Use the eb command line client to remove an ElasticBeanstalk environment
     with some extra options.
@@ -1179,6 +1214,11 @@ def clone_beanstalk_command_line(old, new, prod=False, copy_s3=False):
     Should be run exclusively via command line, as it requires manual input
     and subprocess calls of AWS command line tools.
 
+    Note:
+        The eb cli tool sets up a configuration file in the directory of the
+        project respository. As such, this command MUST be called from that
+        directory. Will exit if not called from an eb initialized directory.
+
     Args:
         old (str): environment name of existing ElasticBeanstalk
         new (str): new ElasticBeanstalk environment name
@@ -1191,9 +1231,15 @@ def clone_beanstalk_command_line(old, new, prod=False, copy_s3=False):
     if 'Auth0Client' not in os.environ or "Auth0Secret" not in os.environ:
         print('Must set Auth0Client and Auth0Secret env variables! Exiting...')
         return
-    name = input("This will create an environment named %s, cloned from %s."
-                 "This includes s3, ES, RDS, and Auth0 callbacks. If you are "
-                 "sure, type the new env name to confirm:" % (new, old))
+    print('### eb status (START)')
+    eb_ret = subprocess.call(['eb', 'status'])
+    if eb_ret != 0:
+        print('This command must be called from an eb initialized repo! Exiting...')
+        return
+    print('### eb status (END)')
+    name = use_input("This will create an environment named %s, cloned from %s."
+                     " This includes s3, ES, RDS, and Auth0 callbacks. If you "
+                     "are sure, type the new env name to confirm: " % (new, old))
     if str(name) != new:
         print("Could not confirm env. Exiting...")
         return
@@ -1207,7 +1253,7 @@ def clone_beanstalk_command_line(old, new, prod=False, copy_s3=False):
     es_endpoint = get_es_build_status(new)
     print("### clone elasticbeanstalk envrionment")
     # TODO, can we pass in github commit id here?
-    clone_bs_env(old, new, prod, db_endpoint, es_endpoint)
+    clone_bs_env_cli(old, new, prod, db_endpoint, es_endpoint)
     print("### allow auth-0 requests")
     add_to_auth0_client(new)
     if copy_s3 is True:
@@ -1225,6 +1271,11 @@ def delete_beanstalk_command_line(env):
     Should be run exclusively via command line, as it requires manual input
     and subprocess calls of AWS command line tools.
 
+    Note:
+        The eb cli tool sets up a configuration file in the directory of the
+        project respository. As such, this command MUST be called from that
+        directory. Will exit if not called from an eb initialized directory.
+
     Args:
         env (str): EB environment name to delete
 
@@ -1234,16 +1285,22 @@ def delete_beanstalk_command_line(env):
     if 'Auth0Client' not in os.environ or "Auth0Secret" not in os.environ:
         print('Must set Auth0Client and Auth0Secret env variables! Exiting...')
         return
-    name = input("This will totally blow away the environment, including s3, ES, "
-                 "RDS, and Auth0 callbacks. If you are sure, type the env name "
-                 "to confirm:")
+    print('### eb status (START)')
+    eb_ret = subprocess.call(['eb', 'status'])
+    if eb_ret != 0:
+        print('This command must be called from an eb initialized repo! Exiting...')
+        return
+    print('### eb status (END)')
+    name = use_input("This will totally blow away the environment, including s3,"
+                     "ES, RDS, and Auth0 callbacks. If you are sure, type the "
+                     "env name to confirm: ")
     if str(name) != env:
         print("Could not confirm env. Exiting...")
         return
     print("### Removing access to auth0")
     remove_from_auth0_client(env)
     print("### Deleting beanstalk enviornment")
-    delete_bs_env(env)
+    delete_bs_env_cli(env)
     print("### Delete contents of s3")
     delete_s3_buckets(env)
     print("### Delete es domain")
