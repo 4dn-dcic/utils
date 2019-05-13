@@ -106,7 +106,8 @@ def is_indexing_finished(env, prev_version=None, travis_build_id=None):
         bool, list: True if done, results from /counts page
 
     Raises:
-        Exception: if EB environment VersionLabel is equal to prev_version
+        Exception: if Travis done and bad EB environment VersionLabel
+        WaitingForBoto3: on a retryable waitfor condition
     """
     # is_beanstalk_ready will raise WaitingForBoto3 if not ready
     is_beanstalk_ready(env)
@@ -442,6 +443,39 @@ def create_db_from_snapshot(db_identifier, snapshot_name, delete_db=True):
     return response['DBInstance']['DBInstanceArn']
 
 
+def is_travis_started(request_url):
+    """
+    Checker function used with torb waitfor lambda; output must be standarized.
+    Check the requests url to see if a given build has stared and been issued
+    a build id, which can in turn be used for is_travis_finished
+
+    Args:
+        request_url (str): Travis request url
+
+    Returns:
+        bool, dict: True if started, Travis response JSON
+
+    Raises:
+        Exception: if Travis key not in environ
+    """
+    if 'travis_key' not in os.environ:
+        raise Exception('Must have travis_key environment variable defined')
+    is_ready = False
+    details = 'requested build has not started'
+    headers = {'Content-Type': 'application/json',
+               'Accept': 'application/json',
+               'Travis-API-Version': '3',
+               'User-Agent': 'tibanna/0.1.0',
+               'Authorization': 'token %s' % os.environ['travis_key']}
+    resp = requests.get(request_url, headers=headers)
+    if resp.ok:
+        logger.info("Travis request response (okay): %s" % resp.json())
+        details = resp.json()
+        if len(resp.json().get('builds', []) == 1):
+            is_ready = True
+    return is_ready, details
+
+
 def is_travis_finished(build_id):
     """
     Checker function used with torb waitfor lambda; output must be standarized.
@@ -454,16 +488,17 @@ def is_travis_finished(build_id):
         bool, dict: True if done, Travis response JSON
 
     Raises:
-        Exception: if the Travis build failed
+        Exception: if the Travis build failed or Travis key not in environ
     """
-    travis_key = os.environ.get('travis_key')
+    if 'travis_key' not in os.environ:
+        raise Exception('Must have travis_key environment variable defined')
     is_ready = False
     details = 'build not done or not found'
     headers = {'Content-Type': 'application/json',
                'Accept': 'application/json',
                'Travis-API-Version': '3',
                'User-Agent': 'tibanna/0.1.0',
-               'Authorization': 'token %s' % travis_key}
+               'Authorization': 'token %s' % os.environ['travis_key']}
 
     url = 'https://api.travis-ci.org/build/%s' % build_id
 
@@ -476,7 +511,6 @@ def is_travis_finished(build_id):
     elif resp.ok and state == 'passed':
         is_ready = True
         details = resp.json()
-
     return is_ready, details
 
 
