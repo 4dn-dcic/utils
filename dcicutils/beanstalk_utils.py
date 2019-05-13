@@ -471,7 +471,7 @@ def is_travis_started(request_url):
     if resp.ok:
         logger.info("Travis request response (okay): %s" % resp.json())
         details = resp.json()
-        if len(resp.json().get('builds', []) == 1):
+        if len(resp.json().get('builds', [])) == 1:
             is_ready = True
     return is_ready, details
 
