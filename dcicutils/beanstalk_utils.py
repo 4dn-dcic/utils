@@ -23,7 +23,7 @@ try:
 except NameError:
     use_input = input
 
-FOURSIGHT_URL = 'https://foursight.4dnucleome.org/api/'
+FOURSIGHT_URL = 'https://foursight.4dnucleome.org/'
 # magic CNAME corresponds to data.4dnucleome
 MAGIC_CNAME = 'fourfront-webprod.9wzadzju3p.us-east-1.elasticbeanstalk.com'
 GOLDEN_DB = "fourfront-webprod.co3gwj7b7tpq.us-east-1.rds.amazonaws.com"
