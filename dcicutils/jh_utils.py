@@ -267,7 +267,7 @@ def open_4dn_file(obj_id, format=None, local=True):
                 ff_file = open(file_info['full_path'], 'rb')
             else:
                 ff_file.seek(0)
-    f = gzip.open(ff_file) if gz else ff_file
+    f = gzip.open(ff_file, 'rt') if gz else ff_file
     try:
         yield f
     finally:
