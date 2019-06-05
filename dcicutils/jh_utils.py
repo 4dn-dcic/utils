@@ -259,14 +259,14 @@ def open_4dn_file(obj_id, format=None, local=True):
             ff_file = gzip.open(file_info['full_path'])
         else:
             ff_file = open(file_info['full_path'])
-        # see if the file is binary (needs to opened with 'rb' mode)
-        # try to read a line from the file; if it is read, reset with seek()
-        try:
-            ff_file.readline()
-        except UnicodeDecodeError:
-            ff_file = open(file_info['full_path'], 'rb')
-        else:
-            ff_file.seek(0)
+            # see if the file is binary (needs to opened with 'rb' mode)
+            # try to read a line from the file; if it is read, reset with seek()
+            try:
+                ff_file.readline()
+            except UnicodeDecodeError:
+                ff_file = open(file_info['full_path'], 'rb')
+            else:
+                ff_file.seek(0)
     f = gzip.open(ff_file) if gz else ff_file
     try:
         yield f
