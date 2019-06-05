@@ -263,7 +263,7 @@ def open_4dn_file(obj_id, format=None, local=True):
         # try to read a line from the file; if it is read, reset with seek()
         try:
             ff_file.readline()
-        except UnicodeDecodeError as e:
+        except UnicodeDecodeError:
             ff_file = open(file_info['full_path'], 'rb')
         else:
             ff_file.seek(0)
