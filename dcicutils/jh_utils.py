@@ -1,4 +1,5 @@
 import functools
+import gzip
 import types
 import os
 import sys
@@ -247,23 +248,32 @@ def open_4dn_file(obj_id, format=None, local=True):
     """
     file_info = find_valid_file_or_extra_file(obj_id, format)
     # this will be the base case in the future...
+    gz = False
     if not local:
         # this seems to handle both binary and non-binary files
         ff_file = use_urllib.urlopen(file_info['full_href'])
+        if file_info.get('full_href', '').endswith('.gz'):
+            gz = True
     else:
-        ff_file = open(file_info['full_path'])
-        # see if the file is binary (needs to opened with 'rb' mode)
-        # try to read a line from the file; if it is read, reset with seek()
-        try:
-            ff_file.readline()
-        except UnicodeDecodeError:
-            ff_file = open(file_info['full_path'], 'rb')
+        if file_info.get('full_path', '').endswith('.gz'):
+            ff_file = gzip.open(file_info['full_path'])
         else:
-            ff_file.seek(0)
+            ff_file = open(file_info['full_path'])
+            # see if the file is binary (needs to opened with 'rb' mode)
+            # try to read a line from the file; if it is read, reset with seek()
+            try:
+                ff_file.readline()
+            except UnicodeDecodeError:
+                ff_file = open(file_info['full_path'], 'rb')
+            else:
+                ff_file.seek(0)
+    f = gzip.open(ff_file, 'rt') if gz else ff_file
     try:
-        yield ff_file
+        yield f
     finally:
-        ff_file.close()
+        if gz:
+            ff_file.close()
+        f.close()
 
 
 # LASTLY, do setup that requires the above functions to be defined
