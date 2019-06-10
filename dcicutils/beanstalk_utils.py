@@ -506,7 +506,7 @@ def is_travis_finished(build_id):
     resp = requests.get(url, headers=headers)
     logger.info("Travis build response: %s" % resp.text)
     state = resp.json()['state']
-    if resp.ok and state == 'failed':
+    if resp.ok and state in ['failed', 'errored']:
         raise Exception('Build Failed')
     elif resp.ok and state == 'passed':
         is_ready = True
