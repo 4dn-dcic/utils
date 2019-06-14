@@ -255,15 +255,17 @@ def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None
     root_logger.setLevel(level)
     '''
 
+    # set logging level
+    logger = structlog.get_logger(log_name)
+    logger.setLevel(level)
+
     # below could be used ot redirect logging to a file if desired
     if log_name is None:
         log_name = __name__
     if log_dir and log_name:
         import os
         log_file = os.path.join(log_dir, log_name + ".log")
-        logger = structlog.get_logger(log_name)
         hdlr = logging.FileHandler(log_file)
         formatter = logging.Formatter('')
         hdlr.setFormatter(formatter)
         logger.addHandler(hdlr)
-        logger.setLevel(level)
