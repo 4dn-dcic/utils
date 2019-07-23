@@ -163,7 +163,7 @@ def add_log_uuid(logger, log_method, event_dict):
 
 
 # configure structlog to use its formats for stdlib logging and / or structlog logging
-def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None, log_dir=None):
+def set_logging(es_server=None, in_prod=False, level=logging.WARN, log_name=None, log_dir=None):
     '''
     Set logging is a function to be used everywhere, to encourage all subsytems
     to generate structured JSON logs, for easy insertion into ES for searching and
@@ -256,9 +256,6 @@ def set_logging(es_server=None, in_prod=False, level=logging.INFO, log_name=None
     '''
 
     # set logging level
-
-
-
     # below could be used ot redirect logging to a file if desired
     if log_name is None:
         log_name = __name__
