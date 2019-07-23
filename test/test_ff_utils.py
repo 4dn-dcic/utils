@@ -371,7 +371,7 @@ def test_search_metadata(integrated_ff):
 
 @pytest.mark.integrated
 def test_get_search_generator(integrated_ff):
-    search_url = integrated_ff['ff_key']['server'] + '/search/?type=OntologyTerm'
+    search_url = integrated_ff['ff_key']['server'] + '/search/?type=FileFastq'
     generator1 = ff_utils.get_search_generator(search_url, auth=integrated_ff['ff_key'], page_limit=25)
     list_gen1 = list(generator1)
     assert len(list_gen1) > 0
@@ -388,11 +388,11 @@ def test_get_search_generator(integrated_ff):
     all_gen2 = [page for pages in list_gen2 for page in pages]  # noqa
     assert len(all_gen1) == len(all_gen2)
     # use a limit in the search
-    search_url += '&limit=33'
+    search_url += '&limit=21'
     generator3 = ff_utils.get_search_generator(search_url, auth=integrated_ff['ff_key'])
     list_gen3 = list(generator3)
     all_gen3 = [page for pages in list_gen3 for page in pages]  # noqa
-    assert len(all_gen3) == 33
+    assert len(all_gen3) == 21
     # make sure that all results are unique
     all_gen3_uuids = set([item['uuid'] for item in all_gen3])
     assert len(all_gen3_uuids) == len(all_gen3)
@@ -514,8 +514,8 @@ def test_get_es_search_generator(integrated_ff):
     es_url = ff_utils.get_health_page(key=integrated_ff['ff_key'])['elasticsearch']
     es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
     es_query = {'query': {'match_all': {}}, 'sort': [{'_uid': {'order': 'desc'}}]}
-    # search for all ontology terms with a low pagination size
-    es_gen = ff_utils.get_es_search_generator(es_client, 'ontology_term',
+    # search for all fastqs with a low pagination size
+    es_gen = ff_utils.get_es_search_generator(es_client, 'file_fastq',
                                               es_query, page_size=7)
     list_gen = list(es_gen)
     assert len(list_gen) > 0
@@ -526,7 +526,7 @@ def test_get_es_search_generator(integrated_ff):
             assert len(page) == 7
     all_es_uuids = set([page['_source']['uuid'] for pages in list_gen for page in pages])  # noqa
     # make sure all items are unique and len matches ff search
-    search_res = ff_utils.search_metadata('/search/?type=OntologyTerm&frame=object',
+    search_res = ff_utils.search_metadata('/search/?type=FileFastq&frame=object',
                                           key=integrated_ff['ff_key'])
     search_uuids = set(hit['uuid'] for hit in search_res)
     assert all_es_uuids == search_uuids
