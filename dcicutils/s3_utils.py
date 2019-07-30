@@ -218,9 +218,11 @@ class s3Utils(object):
                 # files twice that we want to further interogate
                 the_file = zipstream.open(file_name, 'r').read()
                 file_to_find = file_name.split('/')[-1]
-                if file_to_find in retfile_names:
-                    ret_files[file_to_find] = {'s3key': s3_key,
-                                               'data': the_file}
+                for rn in retfile_names:
+                    if file_to_find.endswith(rn):  # retfile_names may be suffices
+                        ret_files[file_to_find] = {'s3key': s3_key,
+                                                   'data': the_file}
+                        break
                 self.s3_put(the_file, s3_file_name, acl=acl)
 
         return ret_files
