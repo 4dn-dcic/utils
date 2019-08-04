@@ -191,10 +191,7 @@ class s3Utils(object):
                 ret_files[name] = zipstream.open(zipped_filename).read()
         return ret_files
 
-    def unzip_s3_to_s3(self, zipped_s3key, dest_dir, retfile_names=None, acl=None):
-        if retfile_names is None:
-            retfile_names = []
-
+    def unzip_s3_to_s3(self, zipped_s3key, dest_dir, acl=None):
         if not dest_dir.endswith('/'):
             dest_dir += '/'
 
@@ -218,11 +215,8 @@ class s3Utils(object):
                 # files twice that we want to further interogate
                 the_file = zipstream.open(file_name, 'r').read()
                 file_to_find = file_name.split('/')[-1]
-                for rn in retfile_names:
-                    if file_to_find.endswith(rn):  # retfile_names may be suffices
-                        ret_files[file_to_find] = {'s3key': s3_key,
-                                                   'data': the_file}
-                        break
+                ret_files[file_to_find] = {'s3key': s3_key,
+                                           'data': the_file}
                 self.s3_put(the_file, s3_file_name, acl=acl)
 
         return ret_files
