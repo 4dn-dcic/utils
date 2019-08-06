@@ -213,7 +213,7 @@ class s3Utils(object):
                 s3_key = "https://s3.amazonaws.com/%s/%s" % (self.outfile_bucket, s3_file_name)
                 # just perf optimization so we don't have to copy
                 # files twice that we want to further interogate
-                the_file = zipstream.open(file_name, 'r').read().decode('utf-8', 'backslashreplace')
+                the_file = zipstream.open(file_name, 'r').read()
                 file_to_find = file_name.split('/')[-1]
                 ret_files[file_to_find] = {'s3key': s3_key,
                                            'data': the_file}
