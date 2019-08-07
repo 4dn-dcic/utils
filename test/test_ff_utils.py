@@ -286,12 +286,10 @@ def test_post_delete_purge_links_metadata(integrated_ff):
 
     # test get_metadata_links function (this will ensure everything is indexed, as well)
     links = []
-    tries = 0
-    while not links and tries < 10:
+    while not links or ff_utils.stuff_in_queues(integrated_ff['ff_env'], True):
         time.sleep(2)
         post_links = ff_utils.get_metadata_links(post_item['uuid'], key=integrated_ff['ff_key'])
         links = post_links.get('uuids_linking_to', [])
-        tries += 1
     assert len(links) == 1
     assert links[0]['uuid'] == bios_item['uuid']
     assert links[0]['field'] == 'biosource[0].uuid'
@@ -306,12 +304,10 @@ def test_post_delete_purge_links_metadata(integrated_ff):
     assert purge_res2['status'] == 'success'
 
     # wait for indexing to catch up
-    tries = 0
-    while len(links) > 0 and tries < 10:
+    while len(links) > 0 or ff_utils.stuff_in_queues(integrated_ff['ff_env'], True):
         time.sleep(2)
         post_links = ff_utils.get_metadata_links(post_item['uuid'], key=integrated_ff['ff_key'])
         links = post_links.get('uuids_linking_to', [])
-        tries += 1
     assert len(links) == 0
 
     purge_res3 = ff_utils.purge_metadata(post_item['uuid'], key=integrated_ff['ff_key'])
