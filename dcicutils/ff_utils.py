@@ -799,8 +799,8 @@ def get_authentication_with_server(auth=None, ff_env=None):
 def stuff_in_queues(ff_env, check_secondary=False):
     """
     Used to guarantee up-to-date metadata by checking the contents of the indexer queues.
-    If items are currently waiting in the primary or deferred queues, return False.
-    If check_secondary is True, will also require the secondary queue.
+    If items are currently waiting in the primary queue, return False.
+    If check_secondary is True, will also check the secondary queue.
     """
     if not ff_env:
         raise Exception("Must provide a full fourfront environment name to "
@@ -808,7 +808,7 @@ def stuff_in_queues(ff_env, check_secondary=False):
                         "%s" % ff_env)
     stuff_in_queue = False
     client = boto3.client('sqs', region_name='us-east-1')
-    queue_names = ['-indexer-queue', '-deferred-indexer-queue']
+    queue_names = ['-indexer-queue']
     if check_secondary:
         queue_names.append('-secondary-indexer-queue')
     for queue_name in queue_names:
