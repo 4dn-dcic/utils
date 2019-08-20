@@ -44,10 +44,8 @@ class s3Utils(object):
         self.raw_file_bucket = raw_file_bucket
         self.blob_bucket = blob_bucket
 
-    def get_access_keys(self):
-        name = 'illnevertell'
-        keys = self.get_key(keyfile_name=name)
-
+    def get_access_keys(self, name='illnevertell', secret="SECRET"):
+        keys = self.get_key(keyfile_name=name, secret_arg=secret)
         if isinstance(keys.get('default'), dict):
             keys = keys['default']
         if self.url:
@@ -67,11 +65,11 @@ class s3Utils(object):
         # the jupyterhub key is a Jupyterhub API token
         return self.get_key(keyfile_name='jupyterhub-fourfront-key')
 
-    def get_key(self, keyfile_name='illnevertell'):
+    def get_key(self, keyfile_name='illnevertell', secret_arg="SECRET"):
         # Share secret encrypted S3 File
         response = self.s3.get_object(Bucket=self.sys_bucket,
                                       Key=keyfile_name,
-                                      SSECustomerKey=os.environ.get("SECRET"),
+                                      SSECustomerKey=os.environ.get(secret_arg),
                                       SSECustomerAlgorithm='AES256')
         akey = response['Body'].read()
         if type(akey) == bytes:
