@@ -4,6 +4,7 @@ import time
 from dcicutils import ff_utils
 pytestmark = pytest.mark.working
 
+MASTERTEST_URL = 'http://fourfront-mastertest.9wzadzju3p.us-east-1.elasticbeanstalk.com/'
 
 @pytest.fixture
 def eset_json():
