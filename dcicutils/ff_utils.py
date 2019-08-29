@@ -371,10 +371,10 @@ def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=F
     if search.startswith('/'):
         search = search[1:]
     parsed_search = urlparse(search)
-    if ((parsed_search.scheme == '') and (parsed_search.netloc == '')): # both will be empty for non-urls
+    if ((parsed_search.scheme == '') and (parsed_search.netloc == '')):  # both will be empty for non-urls
         search_url = '/'.join([auth['server'], search])
     else:
-        search_url = search # assume full url is correct?
+        search_url = search  # assume full url is correct
     search_generator = get_search_generator(search_url, auth=auth, page_limit=page_limit)
     if is_generator:
         # yields individual items from search result
