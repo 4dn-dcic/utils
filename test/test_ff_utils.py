@@ -124,6 +124,7 @@ def test_url_params_functions():
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_unified_authentication(integrated_ff):
     key1 = ff_utils.unified_authentication(integrated_ff['ff_key'], integrated_ff['ff_env'])
     assert len(key1) == 2
@@ -139,6 +140,7 @@ def test_unified_authentication(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_get_authentication_with_server(integrated_ff):
     import copy
     key1 = ff_utils.get_authentication_with_server(integrated_ff['ff_key'], None)
@@ -155,6 +157,7 @@ def test_get_authentication_with_server(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_stuff_in_queues(integrated_ff):
     """
     Gotta index a bunch of stuff to make this work
@@ -169,6 +172,7 @@ def test_stuff_in_queues(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_authorized_request_integrated(integrated_ff):
     """
     Cover search case explicitly since it uses a different retry fxn by default
@@ -203,6 +207,7 @@ def test_authorized_request_integrated(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_get_metadata(integrated_ff, basestring):
     # use this test biosource
     test_item = '331111bc-8535-4448-903e-854af460b254'
@@ -240,6 +245,7 @@ def test_get_metadata(integrated_ff, basestring):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_patch_metadata(integrated_ff):
     test_item = '331111bc-8535-4448-903e-854af460a254'
     original_res = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'])
@@ -256,6 +262,7 @@ def test_patch_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_post_delete_purge_links_metadata(integrated_ff):
     """
     Combine all of these tests because they logically fit
@@ -320,6 +327,7 @@ def test_post_delete_purge_links_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_upsert_metadata(integrated_ff):
     test_data = {'biosource_type': 'immortalized cell line',
                  'award': '1U01CA200059-01', 'lab': '4dn-dcic-lab'}
@@ -338,6 +346,7 @@ def test_upsert_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 @pytest.mark.parametrize('url', ['', 'to_become_full_url'])
 def test_search_metadata(integrated_ff, url):
     from types import GeneratorType
@@ -372,6 +381,7 @@ def test_search_metadata(integrated_ff, url):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_get_search_generator(integrated_ff):
     search_url = integrated_ff['ff_key']['server'] + '/search/?type=FileFastq'
     generator1 = ff_utils.get_search_generator(search_url, auth=integrated_ff['ff_key'], page_limit=25)
@@ -401,6 +411,7 @@ def test_get_search_generator(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_get_es_metadata(integrated_ff):
     from dcicutils import es_utils
     from types import GeneratorType
@@ -510,6 +521,7 @@ def test_get_es_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_get_es_search_generator(integrated_ff):
     from dcicutils import es_utils
     # get es_client info from the health page
@@ -535,6 +547,7 @@ def test_get_es_search_generator(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_get_health_page(integrated_ff):
     health_res = ff_utils.get_health_page(key=integrated_ff['ff_key'])
     assert health_res and 'error' not in health_res
@@ -551,6 +564,7 @@ def test_get_health_page(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_get_schema_names(integrated_ff):
     schema_names = ff_utils.get_schema_names(key=integrated_ff['ff_key'],
                                              ff_env=integrated_ff['ff_env'])
@@ -561,6 +575,7 @@ def test_get_schema_names(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_expand_es_metadata(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
@@ -576,6 +591,7 @@ def test_expand_es_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_expand_es_metadata_frame_object_embedded(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
@@ -594,6 +610,7 @@ def test_expand_es_metadata_frame_object_embedded(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_expand_es_metadata_add_wfrs(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
@@ -604,6 +621,7 @@ def test_expand_es_metadata_add_wfrs(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_expand_es_metadata_complain_wrong_frame(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key = integrated_ff['ff_key']
@@ -613,6 +631,7 @@ def test_expand_es_metadata_complain_wrong_frame(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_expand_es_metadata_ignore_fields(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
@@ -626,6 +645,7 @@ def test_expand_es_metadata_ignore_fields(integrated_ff):
 
 
 @pytest.mark.file_operation
+@pytest.mark.flaky
 def test_dump_results_to_json(integrated_ff):
     import shutil
     import os
