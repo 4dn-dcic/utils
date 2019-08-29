@@ -4,6 +4,7 @@ import time
 from dcicutils import ff_utils
 pytestmark = pytest.mark.working
 
+MASTERTEST_URL = 'http://fourfront-mastertest.9wzadzju3p.us-east-1.elasticbeanstalk.com/'
 
 @pytest.fixture
 def eset_json():
@@ -338,31 +339,35 @@ def test_upsert_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
-def test_search_metadata(integrated_ff):
+@pytest.mark.parametrize('url', ['', MASTERTEST_URL])
+def test_search_metadata(integrated_ff, url):
     from types import GeneratorType
-    search_res = ff_utils.search_metadata('search/?limit=all&type=File', key=integrated_ff['ff_key'])
+    search_res = ff_utils.search_metadata(url + 'search/?limit=all&type=File', key=integrated_ff['ff_key'])
     assert isinstance(search_res, list)
     # this will fail if items have not yet been indexed
     assert len(search_res) > 0
     # make sure uuids are unique
     search_uuids = set([item['uuid'] for item in search_res])
     assert len(search_uuids) == len(search_res)
-    search_res_slash = ff_utils.search_metadata('/search/?limit=all&type=File', key=integrated_ff['ff_key'])
+    search_res_slash = ff_utils.search_metadata(url + '/search/?limit=all&type=File', key=integrated_ff['ff_key'])
     assert isinstance(search_res_slash, list)
     assert len(search_res_slash) == len(search_res)
     # search with a limit
-    search_res_limit = ff_utils.search_metadata('/search/?limit=3&type=File', key=integrated_ff['ff_key'])
+    search_res_limit = ff_utils.search_metadata(url + '/search/?limit=3&type=File', key=integrated_ff['ff_key'])
     assert len(search_res_limit) == 3
     # search with a filter
-    search_res_filt = ff_utils.search_metadata('/search/?limit=3&type=File&file_type=reads',
+    search_res_filt = ff_utils.search_metadata(url + '/search/?limit=3&type=File&file_type=reads',
                                                key=integrated_ff['ff_key'])
     assert len(search_res_filt) > 0
     # test is_generator=True
-    search_res_gen = ff_utils.search_metadata('/search/?limit=3&type=File&file_type=reads',
+    search_res_gen = ff_utils.search_metadata(url + '/search/?limit=3&type=File&file_type=reads',
                                               key=integrated_ff['ff_key'], is_generator=True)
     assert isinstance(search_res_gen, GeneratorType)
     gen_res = [v for v in search_res_gen]  # run the gen
     assert len(gen_res) == 3
+    # do same search as limit but use the browse endpoint instead
+    browse_res_limit = ff_utils.search_metadata(url + '/browse/?limit=3&type=File', key=integrated_ff['ff_key'])
+    assert len(browse_res_limit) == 3
 
 
 @pytest.mark.integrated
