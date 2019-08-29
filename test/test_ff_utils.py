@@ -4,8 +4,6 @@ import time
 from dcicutils import ff_utils
 pytestmark = pytest.mark.working
 
-MASTERTEST_URL = 'http://fourfront-mastertest.9wzadzju3p.us-east-1.elasticbeanstalk.com/'
-
 
 @pytest.fixture
 def eset_json():
@@ -340,9 +338,11 @@ def test_upsert_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
-@pytest.mark.parametrize('url', ['', MASTERTEST_URL])
+@pytest.mark.parametrize('url', ['', 'to_become_full_url'])
 def test_search_metadata(integrated_ff, url):
     from types import GeneratorType
+    if (url != ''):  # replace stub with actual url from integrated_ff
+        url = integrated_ff['ff_key']['server'] + '/'
     search_res = ff_utils.search_metadata(url + 'search/?limit=all&type=File', key=integrated_ff['ff_key'])
     assert isinstance(search_res, list)
     # this will fail if items have not yet been indexed
