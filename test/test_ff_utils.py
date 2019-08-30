@@ -124,6 +124,7 @@ def test_url_params_functions():
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_unified_authentication(integrated_ff):
     key1 = ff_utils.unified_authentication(integrated_ff['ff_key'], integrated_ff['ff_env'])
     assert len(key1) == 2
@@ -139,6 +140,7 @@ def test_unified_authentication(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_get_authentication_with_server(integrated_ff):
     import copy
     key1 = ff_utils.get_authentication_with_server(integrated_ff['ff_key'], None)
@@ -155,6 +157,7 @@ def test_get_authentication_with_server(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_stuff_in_queues(integrated_ff):
     """
     Gotta index a bunch of stuff to make this work
@@ -169,6 +172,7 @@ def test_stuff_in_queues(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_authorized_request_integrated(integrated_ff):
     """
     Cover search case explicitly since it uses a different retry fxn by default
@@ -203,6 +207,7 @@ def test_authorized_request_integrated(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_get_metadata(integrated_ff, basestring):
     # use this test biosource
     test_item = '331111bc-8535-4448-903e-854af460b254'
@@ -240,6 +245,7 @@ def test_get_metadata(integrated_ff, basestring):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_patch_metadata(integrated_ff):
     test_item = '331111bc-8535-4448-903e-854af460a254'
     original_res = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'])
@@ -256,6 +262,7 @@ def test_patch_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_post_delete_purge_links_metadata(integrated_ff):
     """
     Combine all of these tests because they logically fit
@@ -287,7 +294,7 @@ def test_post_delete_purge_links_metadata(integrated_ff):
     # test get_metadata_links function (this will ensure everything is indexed, as well)
     links = []
     while not links or ff_utils.stuff_in_queues(integrated_ff['ff_env'], True):
-        time.sleep(2)
+        time.sleep(5)
         post_links = ff_utils.get_metadata_links(post_item['uuid'], key=integrated_ff['ff_key'])
         links = post_links.get('uuids_linking_to', [])
     assert len(links) == 1
@@ -305,7 +312,7 @@ def test_post_delete_purge_links_metadata(integrated_ff):
 
     # wait for indexing to catch up
     while len(links) > 0 or ff_utils.stuff_in_queues(integrated_ff['ff_env'], True):
-        time.sleep(2)
+        time.sleep(5)
         post_links = ff_utils.get_metadata_links(post_item['uuid'], key=integrated_ff['ff_key'])
         links = post_links.get('uuids_linking_to', [])
     assert len(links) == 0
@@ -320,6 +327,7 @@ def test_post_delete_purge_links_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_upsert_metadata(integrated_ff):
     test_data = {'biosource_type': 'immortalized cell line',
                  'award': '1U01CA200059-01', 'lab': '4dn-dcic-lab'}
@@ -338,34 +346,42 @@ def test_upsert_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
-def test_search_metadata(integrated_ff):
+@pytest.mark.flaky
+@pytest.mark.parametrize('url', ['', 'to_become_full_url'])
+def test_search_metadata(integrated_ff, url):
     from types import GeneratorType
-    search_res = ff_utils.search_metadata('search/?limit=all&type=File', key=integrated_ff['ff_key'])
+    if (url != ''):  # replace stub with actual url from integrated_ff
+        url = integrated_ff['ff_key']['server'] + '/'
+    search_res = ff_utils.search_metadata(url + 'search/?limit=all&type=File', key=integrated_ff['ff_key'])
     assert isinstance(search_res, list)
     # this will fail if items have not yet been indexed
     assert len(search_res) > 0
     # make sure uuids are unique
     search_uuids = set([item['uuid'] for item in search_res])
     assert len(search_uuids) == len(search_res)
-    search_res_slash = ff_utils.search_metadata('/search/?limit=all&type=File', key=integrated_ff['ff_key'])
+    search_res_slash = ff_utils.search_metadata(url + '/search/?limit=all&type=File', key=integrated_ff['ff_key'])
     assert isinstance(search_res_slash, list)
     assert len(search_res_slash) == len(search_res)
     # search with a limit
-    search_res_limit = ff_utils.search_metadata('/search/?limit=3&type=File', key=integrated_ff['ff_key'])
+    search_res_limit = ff_utils.search_metadata(url + '/search/?limit=3&type=File', key=integrated_ff['ff_key'])
     assert len(search_res_limit) == 3
     # search with a filter
-    search_res_filt = ff_utils.search_metadata('/search/?limit=3&type=File&file_type=reads',
+    search_res_filt = ff_utils.search_metadata(url + '/search/?limit=3&type=File&file_type=reads',
                                                key=integrated_ff['ff_key'])
     assert len(search_res_filt) > 0
     # test is_generator=True
-    search_res_gen = ff_utils.search_metadata('/search/?limit=3&type=File&file_type=reads',
+    search_res_gen = ff_utils.search_metadata(url + '/search/?limit=3&type=File&file_type=reads',
                                               key=integrated_ff['ff_key'], is_generator=True)
     assert isinstance(search_res_gen, GeneratorType)
     gen_res = [v for v in search_res_gen]  # run the gen
     assert len(gen_res) == 3
+    # do same search as limit but use the browse endpoint instead
+    browse_res_limit = ff_utils.search_metadata(url + '/browse/?limit=3&type=File', key=integrated_ff['ff_key'])
+    assert len(browse_res_limit) == 3
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_get_search_generator(integrated_ff):
     search_url = integrated_ff['ff_key']['server'] + '/search/?type=FileFastq'
     generator1 = ff_utils.get_search_generator(search_url, auth=integrated_ff['ff_key'], page_limit=25)
@@ -395,6 +411,7 @@ def test_get_search_generator(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_get_es_metadata(integrated_ff):
     from dcicutils import es_utils
     from types import GeneratorType
@@ -504,6 +521,7 @@ def test_get_es_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_get_es_search_generator(integrated_ff):
     from dcicutils import es_utils
     # get es_client info from the health page
@@ -529,6 +547,7 @@ def test_get_es_search_generator(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_get_health_page(integrated_ff):
     health_res = ff_utils.get_health_page(key=integrated_ff['ff_key'])
     assert health_res and 'error' not in health_res
@@ -545,6 +564,7 @@ def test_get_health_page(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_get_schema_names(integrated_ff):
     schema_names = ff_utils.get_schema_names(key=integrated_ff['ff_key'],
                                              ff_env=integrated_ff['ff_env'])
@@ -555,6 +575,7 @@ def test_get_schema_names(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_expand_es_metadata(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
@@ -570,6 +591,7 @@ def test_expand_es_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_expand_es_metadata_frame_object_embedded(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
@@ -588,6 +610,7 @@ def test_expand_es_metadata_frame_object_embedded(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_expand_es_metadata_add_wfrs(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
@@ -598,6 +621,7 @@ def test_expand_es_metadata_add_wfrs(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_expand_es_metadata_complain_wrong_frame(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key = integrated_ff['ff_key']
@@ -607,6 +631,7 @@ def test_expand_es_metadata_complain_wrong_frame(integrated_ff):
 
 
 @pytest.mark.integrated
+@pytest.mark.flaky
 def test_expand_es_metadata_ignore_fields(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
@@ -620,6 +645,7 @@ def test_expand_es_metadata_ignore_fields(integrated_ff):
 
 
 @pytest.mark.file_operation
+@pytest.mark.flaky
 def test_dump_results_to_json(integrated_ff):
     import shutil
     import os

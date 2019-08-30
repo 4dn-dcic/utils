@@ -366,10 +366,15 @@ def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=F
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
     """
+    from urllib.parse import urlparse
     auth = get_authentication_with_server(key, ff_env)
     if search.startswith('/'):
         search = search[1:]
-    search_url = '/'.join([auth['server'], search])
+    parsed_search = urlparse(search)
+    if ((parsed_search.scheme == '') and (parsed_search.netloc == '')):  # both will be empty for non-urls
+        search_url = '/'.join([auth['server'], search])
+    else:
+        search_url = search  # assume full url is correct
     search_generator = get_search_generator(search_url, auth=auth, page_limit=page_limit)
     if is_generator:
         # yields individual items from search result
