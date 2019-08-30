@@ -23,7 +23,7 @@ jobs:
     - pip install codacy-coverage
     - pip install tox
     script:
-    - invoke test
+    - travis_wait invoke test
     after_success:
     - echo "Finished running tests on repo"
   - stage: install tests
@@ -32,7 +32,7 @@ jobs:
     - python setup.py build
     - python setup.py install
     script:
-    - python setup.py test
+    - travis_wait python setup.py test
     after_success:
     - echo "Finished running package tests"
     - python-codacy-coverage -r coverage.xml

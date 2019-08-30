@@ -294,8 +294,7 @@ def test_post_delete_purge_links_metadata(integrated_ff):
     # test get_metadata_links function (this will ensure everything is indexed, as well)
     links = []
     while not links or ff_utils.stuff_in_queues(integrated_ff['ff_env'], True):
-        print("Waiting on Indexing")  # So Travis does not timeout
-        time.sleep(15)
+        time.sleep(5)
         post_links = ff_utils.get_metadata_links(post_item['uuid'], key=integrated_ff['ff_key'])
         links = post_links.get('uuids_linking_to', [])
     assert len(links) == 1
@@ -313,8 +312,7 @@ def test_post_delete_purge_links_metadata(integrated_ff):
 
     # wait for indexing to catch up
     while len(links) > 0 or ff_utils.stuff_in_queues(integrated_ff['ff_env'], True):
-        print("Waiting on Indexing")  # So Travis does not timeout
-        time.sleep(15)
+        time.sleep(5)
         post_links = ff_utils.get_metadata_links(post_item['uuid'], key=integrated_ff['ff_key'])
         links = post_links.get('uuids_linking_to', [])
     assert len(links) == 0
