@@ -146,10 +146,8 @@ class s3Utils(object):
     def s3_put_secret(self, data, keyname, bucket=None, secret=None):
         if not bucket:
             bucket = self.sys_bucket
-        if secret is None:
-            secret = os.environ.get("S3_ENCRYPT_KEY")
-            if secret is None:
-                raise RuntimeError("S3_ENCRYPT_KEY should be defined in env")
+        if not secret:
+            secret = os.environ["S3_ENCRYPT_KEY"]
         return self.s3.put_object(Bucket=bucket,
                                   Key=keyname,
                                   Body=data,
