@@ -596,6 +596,9 @@ def get_schema_names(key=None, ff_env=None):
     schema_name = {}
     profiles = get_metadata('/profiles/', key=auth, add_on='frame=raw')
     for key, value in profiles.items():
+        # skip abstract types
+        if value.get('isAbstract') is True:
+            continue
         # some test schemas in local don't have the id field
         schema_filename = value.get('id')
         if schema_filename:
