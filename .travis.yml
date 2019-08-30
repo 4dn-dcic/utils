@@ -25,7 +25,6 @@ jobs:
     install:
     - pip install -U -r requirements-dev.txt
     - pip install -U -r requirements.txt
-    - pip install tox
     script:
     - travis_wait invoke test
     after_success:
@@ -36,7 +35,6 @@ jobs:
     - python setup.py build
     - python setup.py install
     - pip install coveralls
-    - pip install tox
     script:
     - travis_wait python setup.py test
     - coveralls
