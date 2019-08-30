@@ -2,6 +2,7 @@
 pytest
 pytest-cov
 pytest-mock
+flaky
 
 # Build tasks
 invoke
