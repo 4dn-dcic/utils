@@ -21,6 +21,7 @@ tests_require = [
     'pytest',
     'pytest-mock',
     'pytest-cov',
+    'flaky'
 ]
 
 setup(
