@@ -16,27 +16,27 @@ deploy:
 jobs:
   include:
   - stage: unit tests
-  install:
-  - pip install -U -r requirements-dev.txt
-  - pip install -U -r requirements.txt
-  - pip install coveralls
-  - pip install codacy-coverage
-  - pip install tox
-  script:
-  - invoke test
-  after_success:
-  - echo "Finished running tests on repo"
+    install:
+    - pip install -U -r requirements-dev.txt
+    - pip install -U -r requirements.txt
+    - pip install coveralls
+    - pip install codacy-coverage
+    - pip install tox
+    script:
+    - invoke test
+    after_success:
+    - echo "Finished running tests on repo"
   - stage: install tests
-  install:
-  - echo "Installing package and running tests on the installed package"
-  - python setup.py build
-  - python setup.py install
-  script:
-  - python setup.py test
-  after_success:
-  - echo "Finished running package tests"
-  - python-codacy-coverage -r coverage.xml
-  - coveralls
+    install:
+    - echo "Installing package and running tests on the installed package"
+    - python setup.py build
+    - python setup.py install
+    script:
+    - python setup.py test
+    after_success:
+    - echo "Finished running package tests"
+    - python-codacy-coverage -r coverage.xml
+    - coveralls
 env:
   global:
   - secure: x8IUUQIlfb/RYfdbMdNLy5Q2/WhRWhAmVZqhum1WPZq4DlhQh2o5ntDCavJ3j3iQ3vekYZPksgQicX0Z6NUz8wXH7+gsbgCHvhN4NdDI3sLMpXc95tzHWP5YY1XY9UDryjZjqAiz2FVnmth7Y++gsRnPk2vCzw0xTOpwYDZoA+qLsYWUMZWNZkwQS3HlpeIj1f869+htzgLy+BaeeCUXEdKJF5rxZZpqSOPNIAeribaEKYdGRTtxTu3Sf+pq5rVQ+LM/X/FwzJcGfxrS3yKZErr2tS/DclONGCx8hcY01mTH6+rCb/zYd8NHTU+ZEOI41vICPSWcaoHvajMmLOF8h+6FRYWAYt5yF+GfWVdnuEDMxB1/Czul7+oKI6yh3Uv0R5/Nlhu8gpZ2Qwr9zk9OyZd9X1cYtRTEpPiqH2mc4aylclR1/MD/nLs1bHB+K591duyyWPtUQE7BFT0gksLLT9S/mt2p8pPu7CF6ZTAViLD4yUArmjBF/acP/QfThaXuHWqGUxO2oRvcD/YYPwyGWw/I2qmvVSAAZwNkaMahN6SAb5vgu3yOMrsQt6xDN+dcoqNQNu1tno4naFUnYzxW0ozR4mCTycAvbh9BknxuE5gAj/mAn4ZP4et6nwXyYbqJbeAFdhlwxL8ttiqgwZLdXD9oxBYlptPORzQCrpS3U74=
