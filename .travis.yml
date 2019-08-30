@@ -25,13 +25,8 @@ jobs:
     install:
     - pip install -U -r requirements-dev.txt
     - pip install -U -r requirements.txt
-    - pip install coveralls
-    - pip install codacy-coverage
-    - pip install tox
     script:
     - travis_wait invoke test
-    - python-codacy-coverage -r coverage.xml
-    - coveralls
     after_success:
     - echo "Finished running tests on repo"
   - stage: install tests
@@ -39,7 +34,12 @@ jobs:
     - echo "Installing package and running tests on the installed package"
     - python setup.py build
     - python setup.py install
+    - pip install coveralls
+    - pip install codacy-coverage
+    - pip install tox
     script:
     - travis_wait python setup.py test
+    - python-codacy-coverage -r coverage.xml
+    - coveralls
     after_success:
     - echo "Finished running package tests"
