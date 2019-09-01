@@ -2,7 +2,11 @@
 pytest
 pytest-cov
 pytest-mock
+pytest-runner
 flaky
+
+# used with structlog
+colorama
 
 # Build tasks
 invoke

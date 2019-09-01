@@ -22,16 +22,15 @@ class s3Utils(object):
         '''
         if we pass in env set the outfile and sys bucket from the environment
         '''
-
+        # avoid circular ref
+        from dcicutils.beanstalk_utils import get_beanstalk_real_url
         self.url = ''
         self.s3 = boto3.client('s3', region_name='us-east-1')
-        # avoid circular ref, import as needed
-        from dcicutils import beanstalk_utils as bs
         if sys_bucket is None:
             # staging and production share same buckets
             if env:
                 if 'webprod' in env or env in ['staging', 'stagging', 'data']:
-                    self.url = bs.get_beanstalk_real_url(env)
+                    self.url = get_beanstalk_real_url(env)
                     env = 'fourfront-webprod'
             # we use standardized naming schema, so s3 buckets always have same prefix
             sys_bucket = "elasticbeanstalk-%s-system" % env
@@ -44,10 +43,8 @@ class s3Utils(object):
         self.raw_file_bucket = raw_file_bucket
         self.blob_bucket = blob_bucket
 
-    def get_access_keys(self):
-        name = 'illnevertell'
+    def get_access_keys(self, name='access_key_admin'):
         keys = self.get_key(keyfile_name=name)
-
         if isinstance(keys.get('default'), dict):
             keys = keys['default']
         if self.url:
@@ -58,20 +55,21 @@ class s3Utils(object):
         return self.get_access_keys()
 
     def get_higlass_key(self):
-        return self.get_key(keyfile_name='hiwillnevertell')
+        # higlass key corresponds to Django server super user credentials
+        return self.get_key(keyfile_name='api_key_higlass')
 
     def get_google_key(self):
-        return self.get_key(keyfile_name='fourdn-fourfront-google-key')
+        return self.get_key(keyfile_name='api_key_google')
 
     def get_jupyterhub_key(self):
-        # the jupyterhub key is a Jupyterhub API token
-        return self.get_key(keyfile_name='jupyterhub-fourfront-key')
+        # jupyterhub key is a Jupyterhub API token
+        return self.get_key(keyfile_name='api_key_jupyterhub')
 
-    def get_key(self, keyfile_name='illnevertell'):
+    def get_key(self, keyfile_name='access_key_admin'):
         # Share secret encrypted S3 File
         response = self.s3.get_object(Bucket=self.sys_bucket,
                                       Key=keyfile_name,
-                                      SSECustomerKey=os.environ.get("SECRET"),
+                                      SSECustomerKey=os.environ['S3_ENCRYPT_KEY'],
                                       SSECustomerAlgorithm='AES256')
         akey = response['Body'].read()
         if type(akey) == bytes:
@@ -138,22 +136,18 @@ class s3Utils(object):
                                       Key=upload_key,
                                       Body=obj,
                                       ContentType=content_type,
-                                      ACL=acl
-                                      )
+                                      ACL=acl)
         else:
             return self.s3.put_object(Bucket=self.outfile_bucket,
                                       Key=upload_key,
                                       Body=obj,
-                                      ContentType=content_type
-                                      )
+                                      ContentType=content_type)
 
     def s3_put_secret(self, data, keyname, bucket=None, secret=None):
         if not bucket:
             bucket = self.sys_bucket
-        if secret is None:
-            secret = os.environ.get("SECRET")
-            if secret is None:
-                raise RuntimeError("SECRET should be defined in env")
+        if not secret:
+            secret = os.environ["S3_ENCRYPT_KEY"]
         return self.s3.put_object(Bucket=bucket,
                                   Key=keyname,
                                   Body=data,

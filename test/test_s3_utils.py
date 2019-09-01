@@ -26,6 +26,13 @@ def test_s3Utils_get_keys_for_data():
     util = s3Utils(env='data')
     keys = util.get_access_keys()
     assert keys['server'] == 'https://data.4dnucleome.org'
+    # make sure we have keys for foursight and tibanna as well
+    keys_tb = util.get_access_keys('access_key_tibanna')
+    assert keys_tb['key'] != keys['key']
+    assert keys_tb['server'] == keys['server']
+    keys_fs = util.get_access_keys('access_key_foursight')
+    assert keys_fs['key'] != keys_tb['key'] != keys['key']
+    assert keys_fs['server'] == keys['server']
 
 
 def test_s3Utils_get_keys_for_staging():
