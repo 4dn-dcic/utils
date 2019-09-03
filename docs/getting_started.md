@@ -8,7 +8,7 @@ First, install dcicutils using pip. Python 2.7 and 3.x are supported.
 
 ### Internal DCIC set up
 
-To fully utilize the utilities, you should have your AWS credentials set up. In addition, you should also have the `SECRET` environment variable needed for decrypting the administrator access keys stored on Amazon S3. If you would rather not set these up, using a local administrator access key generated from Fourfront is also an option; see the instructions for external set up below.
+To fully utilize the utilities, you should have your AWS credentials set up. In addition, you should also have the `S3_ENCRYPT_KEY` environment variable needed for decrypting the administrator access keys stored on Amazon S3. Usually, this is done by leveraging the `ff_env` kwarg in various `dcicutils.ff_utils` functions. If you would rather not set these up, using a local administrator access key generated from Fourfront is also an option; see the instructions for external set up below.
 
 ### External set up
 
@@ -16,7 +16,7 @@ The utilities require an access key, which is generated using your use account o
 
 The main format of the authorization used for the utilities is:
 
-`{'key': <YOUR KEY>, 'secret' <YOUR SECRET>, 'server': 'https://data.4dnucleome.org/'}`
+`{'key': <YOUR KEY>, 'secret' <YOUR SECRET>, 'server': 'https://data.4dnucleome.org'}`
 
 You can replace server with another Fourfront environment if you have an access key made on that environment.
 
