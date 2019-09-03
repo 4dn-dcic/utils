@@ -111,3 +111,18 @@ def test_add_mounted_file_to_session(integrated_ff):
     jh_utils.add_mounted_file_to_session('test')
     res2 = jh_utils.get_metadata(res_uuid, add_on='datastore=database')
     assert 'test' in res2.get('jupyterhub_session', {}).get('files_mounted', [])
+
+
+def test_mount_4dn_file(integrated_ff):
+    """ Tests getting full filepath of test file on JH 
+        Needs an additional test (how to?)
+    """
+    test_server = integrated_ff['ff_key']['server']
+    initialize_jh_env(test_server)
+    from dcicutils import jh_utils
+    try:
+        jh_utils.mount_4dn_file('not_an_id')
+        assert False
+    except Exception:
+        pass  # catch exception and continue as it's expected
+

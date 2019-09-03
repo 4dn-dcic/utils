@@ -1,4 +1,5 @@
 from dcicutils.s3_utils import s3Utils
+import pytest
 
 
 def test_s3Utils_creation():
@@ -65,6 +66,12 @@ def test_s3Utils_get_google_key():
         assert keys[dict_key]
 
 
+def test_does_key_exist():
+    """ Use staging to check for non-existant key """
+    util = s3Utils(env='staging')
+    assert not util.does_key_exist('not_a_key')
+
+
 def test_read_s3(integrated_s3_info):
     read = integrated_s3_info['s3Obj'].read_s3(integrated_s3_info['filename'])
     assert read.strip() == b'thisisatest'
@@ -72,7 +79,20 @@ def test_read_s3(integrated_s3_info):
 
 def test_get_file_size(integrated_s3_info):
     size = integrated_s3_info['s3Obj'].get_file_size(integrated_s3_info['filename'])
-    assert size == 12
+    assert size == 11
+    with pytest.raises(Exception) as exec_info:
+      integrated_s3_info['s3Obj'].get_file_size('not_a_file')
+    assert 'not found' in str(exec_info.value)
+
+
+def test_size(integrated_s3_info):
+    """ Get size of non-existent, real bucket """
+    bucket = integrated_s3_info['s3Obj'].sys_bucket
+    sz = integrated_s3_info['s3Obj'].size(bucket)
+    assert sz > 0
+    with pytest.raises(Exception) as exec_info:
+        integrated_s3_info['s3Obj'].size('not_a_bucket')
+    assert 'NoSuchBucket' in str(exec_info.value)
 
 
 def test_get_file_size_in_bg(integrated_s3_info):
