@@ -72,7 +72,7 @@ def test_read_s3(integrated_s3_info):
 
 def test_get_file_size(integrated_s3_info):
     size = integrated_s3_info['s3Obj'].get_file_size(integrated_s3_info['filename'])
-    assert size == 12
+    assert size == 11
 
 
 def test_get_file_size_in_bg(integrated_s3_info):
