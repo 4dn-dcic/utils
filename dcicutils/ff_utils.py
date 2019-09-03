@@ -516,20 +516,21 @@ def get_es_metadata(uuids, es_client=None, filters={}, sources=[], chunk_size=20
         key: autentication key
         ff_env: authentication by env (needs system variables)
     """
-    meta = _get_es_metadata(uuids, es_client, filters, sources, chunk_size, key, ff_env)
+    auth = get_authentication_with_server(key, ff_env)
+    meta = _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth)
     if is_generator:
         return meta
     return list(meta)
 
 
-def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, key, ff_env):
+def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth):
     """
     Internal function needed because there are multiple levels of iteration
     used to create the generator.
     Should NOT be used directly
     """
     if es_client is None:
-        es_url = get_health_page(key, ff_env)['elasticsearch']
+        es_url = get_health_page(key=auth)['elasticsearch']
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
     # match all given uuids to _id fields
     # sending in too many uuids in the terms query can crash es; break them up
@@ -651,7 +652,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
 
     auth = get_authentication_with_server(key, ff_env)
     if es_client is None:  # set up an es client if none is provided
-        es_url = get_health_page(key, ff_env)['elasticsearch']
+        es_url = get_health_page(key=auth)['elasticsearch']
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
 
     # creates a dictionary of schema names to collection names
@@ -911,13 +912,12 @@ def convert_param(parameter_dict, vals_as_string=False):
     return metadata_parameters
 
 
-def generate_rand_accession():
+def generate_rand_accession(project_prefix='4DN', item_prefix='FI'):
     rand_accession = ''
     for i in range(7):
         r = random.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789')
         rand_accession += r
-    accession = "4DNFI"+rand_accession
-    return accession
+    return ''.join([project_prefix, item_prefix, rand_accession])
 
 
 def dump_results_to_json(store, folder):
