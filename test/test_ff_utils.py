@@ -697,11 +697,9 @@ def test_dump_results_to_json(integrated_ff):
 
 def test_convert_param():
     """ Very basic test that illustrates what convert_param should do """
-    params = {'param1': 'value1', 'param2': 5}
-    expected1 = [{'workflow_argument_name': 'param1', 'value': 'value1'},
-                 {'workflow_argument_name': 'param2', 'value': 5}]
-    expected2 = [{'workflow_argument_name': 'param1', 'value': 'value1'},
-                 {'workflow_argument_name': 'param2', 'value': '5'}]
+    params = {'param1': 5}
+    expected1 = [{'workflow_argument_name': 'param1', 'value': 5}]
+    expected2 = [{'workflow_argument_name': 'param1', 'value': '5'}]
     converted_params1 = ff_utils.convert_param(params)
     converted_params2 = ff_utils.convert_param(params, vals_as_string=True)
     assert expected1 == converted_params1
