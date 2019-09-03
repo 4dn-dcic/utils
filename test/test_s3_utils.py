@@ -81,7 +81,7 @@ def test_get_file_size(integrated_s3_info):
     size = integrated_s3_info['s3Obj'].get_file_size(integrated_s3_info['filename'])
     assert size == 11
     with pytest.raises(Exception) as exec_info:
-      integrated_s3_info['s3Obj'].get_file_size('not_a_file')
+        integrated_s3_info['s3Obj'].get_file_size('not_a_file')
     assert 'not found' in str(exec_info.value)
 
 

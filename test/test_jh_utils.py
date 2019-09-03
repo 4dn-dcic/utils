@@ -114,7 +114,7 @@ def test_add_mounted_file_to_session(integrated_ff):
 
 
 def test_mount_4dn_file(integrated_ff):
-    """ Tests getting full filepath of test file on JH 
+    """ Tests getting full filepath of test file on JH
         Needs an additional test (how to?)
     """
     test_server = integrated_ff['ff_key']['server']
@@ -125,4 +125,3 @@ def test_mount_4dn_file(integrated_ff):
         assert False
     except Exception:
         pass  # catch exception and continue as it's expected
-

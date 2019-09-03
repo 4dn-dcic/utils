@@ -352,8 +352,9 @@ def test_upsert_metadata(integrated_ff):
     try:
         ff_utils.upsert_metadata(test_data, 'biosourc', key=integrated_ff['ff_key'])
         assert False  # above should throw an exception
-    except Exception:  
+    except Exception:
         assert True
+
 
 @pytest.mark.integrated
 @pytest.mark.flaky
@@ -668,7 +669,7 @@ def test_delete_field(integrated_ff):
         assert(False)
     except Exception:
         assert True  # should throw exception if item is not found
-    
+
 
 @pytest.mark.file_operation
 @pytest.mark.flaky
@@ -697,9 +698,11 @@ def test_dump_results_to_json(integrated_ff):
 def test_convert_param():
     """ Very basic test that illustrates what convert_param should do """
     params = {'param1': 'value1', 'param2': 5}
-    expected1 = [{'workflow_argument_name': 'param1', 'value': 'value1'}, {'workflow_argument_name': 'param2', 'value': 5}]
-    expected2 = [{'workflow_argument_name': 'param1', 'value': 'value1'}, {'workflow_argument_name': 'param2', 'value': '5'}]
-    converted_params1 = ff_utils.convert_param(params) 
+    expected1 = [{'workflow_argument_name': 'param1', 'value': 'value1'},
+                 {'workflow_argument_name': 'param2', 'value': 5}]
+    expected2 = [{'workflow_argument_name': 'param1', 'value': 'value1'},
+                 {'workflow_argument_name': 'param2', 'value': '5'}]
+    converted_params1 = ff_utils.convert_param(params)
     converted_params2 = ff_utils.convert_param(params, vals_as_string=True)
     assert expected1 == converted_params1
     assert expected2 == converted_params2
