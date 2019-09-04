@@ -173,6 +173,7 @@ def test_stuff_in_queues(integrated_ff):
         ff_utils.stuff_in_queues(None, check_secondary=True)  # fail if no env specified
     assert 'Must provide a full fourfront environment name' in str(exec_info.value)
 
+
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_authorized_request_integrated(integrated_ff):
