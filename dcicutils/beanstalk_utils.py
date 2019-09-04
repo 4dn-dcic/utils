@@ -517,8 +517,7 @@ def is_travis_finished(build_id):
 def make_envvar_option(name, value):
     return {'Namespace': 'aws:elasticbeanstalk:application:environment',
             'OptionName': name,
-            'Value': value
-            }
+            'Value': value}
 
 
 def get_bs_env(envname):
@@ -593,7 +592,7 @@ def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
     Create a beanstalk environment given an envname. Use customized options,
     configuration template, and environment variables. If adding new env vars,
     make sure to overwrite them here.
-    If the environment already exists, will update it instead
+    If the environment already exists, will update it with `update_bs_config`
 
     Args:
         envname (str): ElasticBeanstalk (EB) enviroment name
@@ -638,12 +637,11 @@ def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
             OptionSettings=options,
         )
     except ClientError:
-        # environment already exists update it
-        res = client.update_environment(
-            EnvironmentName=envname,
-            TemplateName=template,
-            OptionSettings=options
-        )
+        # environment already exists update it with given template
+        # parse out current env variables and override existing values
+        env_vars = {opt['OptionName']: opt['Value'] for opt in options}
+        res = update_bs_config(envname, template=template, keep_env_vars=True,
+                               env_override=env_vars)
     return res
 
 

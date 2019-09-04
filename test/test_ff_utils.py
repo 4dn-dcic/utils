@@ -83,6 +83,10 @@ def test_generate_rand_accession():
     test = ff_utils.generate_rand_accession()
     assert '4DN' in test
     assert '0' not in test
+    test_cgap = ff_utils.generate_rand_accession('GAP', 'XX')
+    assert 'GAPXX' in test_cgap
+    assert '4DN' not in test_cgap
+    assert '0' not in test_cgap
 
 
 def test_get_response_json():
