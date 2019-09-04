@@ -173,6 +173,9 @@ def test_stuff_in_queues(integrated_ff):
     time.sleep(5)  # let queues catch up
     stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env'], check_secondary=True)
     assert stuff_in_queue
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.stuff_in_queues(None, check_secondary=True)  # fail if no env specified
+    assert 'Must provide a full fourfront environment name' in str(exec_info.value)
 
 
 @pytest.mark.integrated
@@ -188,12 +191,13 @@ def test_authorized_request_integrated(integrated_ff):
         ff_utils.authorized_request(item_url, auth=integrated_ff['ff_key'], verb='LAME')
     assert 'Provided verb LAME is not valid' in str(exec_info.value)
 
-    # good GET request for an item
-    good_resp1 = ff_utils.authorized_request(item_url, auth=integrated_ff['ff_key'], verb='GET')
+    # good GET request for an item (passing in header)
+    hdr = {'content-type': 'application/json', 'accept': 'application/json'}
+    good_resp1 = ff_utils.authorized_request(item_url, auth=integrated_ff['ff_key'], verb='GET', headers=hdr)
     assert good_resp1.status_code == 200
-    # good GET request for a search
+    # good GET request for a search (passing in a timeout)
     good_resp2 = ff_utils.authorized_request(server + '/search/?type=Biosample',
-                                             auth=integrated_ff['ff_key'], verb='GET')
+                                             auth=integrated_ff['ff_key'], verb='GET', timeout=45)
     assert good_resp2.status_code == 200
     # requests that return no results should have a 404 status_code but no error
     no_results_resp = ff_utils.authorized_request(server + '/search/?type=Biosample&name=joe',
@@ -347,6 +351,9 @@ def test_upsert_metadata(integrated_ff):
     upsert_item2 = upsert_res2['@graph'][0]
     assert upsert_item2['description'] == 'test description'
     assert upsert_item2['status'] == 'deleted'
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.upsert_metadata(test_data, 'biosourc', key=integrated_ff['ff_key'])
+    assert 'Bad status code' in str(exec_info.value)
 
 
 @pytest.mark.integrated
@@ -648,6 +655,20 @@ def test_expand_es_metadata_ignore_fields(integrated_ff):
         neg_case not in store
 
 
+@pytest.mark.integrated
+@pytest.mark.flaky
+def test_delete_field(integrated_ff):
+    """ Tests deleting a field from a specific item """
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    res1 = ff_utils.delete_field('7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f', 'software', key=key, ff_env=ff_env)
+    assert res1['status'] == 'success'
+    res2 = ff_utils.delete_field('7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f', 'not_a_field', key=key, ff_env=ff_env)
+    assert res2['status'] == 'success'  # a non-existent field should still 'succeed'
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.delete_field('7f9eb396-5c1a-4c5e-aebf-28ea39d6a50ff', 'not_a_field', key=key, ff_env=ff_env)
+    assert "Bad status code" in str(exec_info.value)
+
+
 @pytest.mark.file_operation
 @pytest.mark.flaky
 def test_dump_results_to_json(integrated_ff):
@@ -670,3 +691,14 @@ def test_dump_results_to_json(integrated_ff):
     all_files = os.listdir(test_folder)
     assert len(all_files) == len_store
     clear_folder(test_folder)
+
+
+def test_convert_param():
+    """ Very basic test that illustrates what convert_param should do """
+    params = {'param1': 5}
+    expected1 = [{'workflow_argument_name': 'param1', 'value': 5}]
+    expected2 = [{'workflow_argument_name': 'param1', 'value': '5'}]
+    converted_params1 = ff_utils.convert_param(params)
+    converted_params2 = ff_utils.convert_param(params, vals_as_string=True)
+    assert expected1 == converted_params1
+    assert expected2 == converted_params2

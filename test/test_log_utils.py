@@ -2,6 +2,7 @@ from dcicutils import log_utils, ff_utils, es_utils
 import pytest
 import structlog
 import time
+import logging
 pytestmark = pytest.mark.working
 
 
@@ -36,6 +37,16 @@ def test_set_logging_prod_but_no_es(caplog):
     assert isinstance(log_record.__dict__['msg'], dict)
     assert 'log_uuid' in log_record.__dict__['msg']
     assert len(log_record._logger.handlers) == 0
+
+
+@pytest.mark.integrated
+def test_set_logging_level(caplog, integrated_ff):
+    """ Provides log_dir, log_name and level args to set_logging """
+    es_url = ff_utils.get_health_page(key=integrated_ff['ff_key'])['elasticsearch']
+    log_utils.set_logging(es_server=es_url, level=logging.ERROR, log_name='Errors', log_dir='.')
+    log = structlog.getLogger('Errors')
+    log.error('oh no an error!', foo='faux')
+    assert len(caplog.records) == 1
 
 
 @pytest.mark.integrated
