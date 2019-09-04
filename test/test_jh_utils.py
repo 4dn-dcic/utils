@@ -120,8 +120,6 @@ def test_mount_4dn_file(integrated_ff):
     test_server = integrated_ff['ff_key']['server']
     initialize_jh_env(test_server)
     from dcicutils import jh_utils
-    try:
+    with pytest.raises(Exception) as exec_info:
         jh_utils.mount_4dn_file('not_an_id')
-        assert False
-    except Exception:
-        pass  # catch exception and continue as it's expected
+    assert "Bad status code" in str(exec_info.value)

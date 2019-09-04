@@ -169,12 +169,9 @@ def test_stuff_in_queues(integrated_ff):
     time.sleep(5)  # let queues catch up
     stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env'], check_secondary=True)
     assert stuff_in_queue
-    try:
+    with pytest.raises(Exception) as exec_info:
         ff_utils.stuff_in_queues(None, check_secondary=True)  # fail if no env specified
-        assert False
-    except Exception:
-        assert True
-
+    assert 'Must provide a full fourfront environment name' in str(exec_info.value)
 
 @pytest.mark.integrated
 @pytest.mark.flaky
@@ -349,11 +346,9 @@ def test_upsert_metadata(integrated_ff):
     upsert_item2 = upsert_res2['@graph'][0]
     assert upsert_item2['description'] == 'test description'
     assert upsert_item2['status'] == 'deleted'
-    try:
+    with pytest.raises(Exception) as exec_info:
         ff_utils.upsert_metadata(test_data, 'biosourc', key=integrated_ff['ff_key'])
-        assert False  # above should throw an exception
-    except Exception:
-        assert True
+    assert 'Bad status code' in str(exec_info.value)
 
 
 @pytest.mark.integrated
@@ -664,11 +659,9 @@ def test_delete_field(integrated_ff):
     assert res1['status'] == 'success'
     res2 = ff_utils.delete_field('7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f', 'not_a_field', key=key, ff_env=ff_env)
     assert res2['status'] == 'success'  # a non-existent field should still 'succeed'
-    try:
+    with pytest.raises(Exception) as exec_info:
         ff_utils.delete_field('7f9eb396-5c1a-4c5e-aebf-28ea39d6a50ff', 'not_a_field', key=key, ff_env=ff_env)
-        assert(False)
-    except Exception:
-        assert True  # should throw exception if item is not found
+    assert "Bad status code" in str(exec_info.value)
 
 
 @pytest.mark.file_operation
