@@ -426,7 +426,8 @@ def create_db_from_snapshot(db_identifier, snapshot_name, delete_db=True):
             DBInstanceIdentifier=db_identifier,
             DBSnapshotIdentifier=snapshot_name,
             DBInstanceClass='db.t2.medium',
-
+            StorageType='gp2',
+            PubliclyAccessible=False
         )
     except ClientError:
         # Something went wrong
