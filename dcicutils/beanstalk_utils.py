@@ -820,7 +820,7 @@ def create_new_es(new):
         DomainName=new,
         ElasticsearchVersion='5.3',
         ElasticsearchClusterConfig={
-            'InstanceType': 'm4.xlarge.elasticsearch',
+            'InstanceType': 'r5.xlarge.elasticsearch',
             'InstanceCount': 1,
             'DedicatedMasterEnabled': True,
             'DedicatedMasterType': 't2.small.elasticsearch',
@@ -828,7 +828,7 @@ def create_new_es(new):
         },
         EBSOptions={
             "EBSEnabled": True,
-            "VolumeType": "standard",
+            "VolumeType": "gp2",
             "VolumeSize": 100
         }
     )
