@@ -41,7 +41,7 @@ jobs:
     after_success:
     - echo "Finished running package tests"
     - |
-    if [[ $TRAVIS_BRANCH == 'master' ]]; then
-      echo 'Triggering docs build'
-      curl -X POST -d "branches=master" -d "token=$DOCS_TOKEN" https://readthedocs.org/api/v2/webhook/dcic-utils/99616/
-    fi
+      if [[ $TRAVIS_BRANCH == 'master' ]]; then
+        echo 'Triggering docs build'
+        curl -X POST -d "branches=master" -d "token=$DOCS_TOKEN" https://readthedocs.org/api/v2/webhook/dcic-utils/99616/
+      fi
