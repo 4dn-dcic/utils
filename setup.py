@@ -3,7 +3,7 @@ from setuptools import setup
 from os import path
 
 this_directory = path.abspath(path.dirname(__file__))
-with io.open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
+with io.open(path.join(this_directory, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 
@@ -29,7 +29,7 @@ setup(
     version=open("dcicutils/_version.py").readlines()[-1].split()[-1].strip("\"'"),
     description='Utility modules shared amongst several repos in the 4dn-dcic organization',
     long_description=long_description,
-    long_description_content_type='text/markdown',
+    long_description_content_type='text/x-rst',
     packages=['dcicutils'],
     include_package_data=True,
     zip_safe=False,
