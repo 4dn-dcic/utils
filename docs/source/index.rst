@@ -18,6 +18,9 @@ See `this document <./docs/getting_started.md>`_ for tips on getting started. `G
    :target: https://coveralls.io/github/4dn-dcic/utils?branch=master
    :alt: Coverage
 
+.. image:: https://readthedocs.org/projects/dcic-utils/badge/?version=latest
+   :target: https://dcic-utils.readthedocs.io/en/latest/?badge=latest
+   :alt: Documentation Status
 
 .. toctree::
   ::maxdepth: 4
