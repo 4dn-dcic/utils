@@ -1,9 +1,6 @@
-.. role:: raw-html-m2r(raw)
-   :format: html
-
-
+========
 Examples 
-====================================
+========
 
 See `getting started <'./getting_started.md'>`_ for help with getting up and running with dcicutils.
 
@@ -13,8 +10,8 @@ As a first step, we will import our modules from the dcicutils package.
 
    from dcicutils import ff_utils
 
-:raw-html-m2r:`<a name="key"></a>`\ Making your key
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Making Your key
+^^^^^^^^^^^^^^^
 
 Authentication methods differ if you are an external user or an internal 4DN team member. If you are an external user, create a Python dictionary called ``key`` using your access key. This will be used in the examples below.
 
@@ -28,7 +25,7 @@ If you are an internal user, you may simply use the string Fourfront environment
 
    key = ff_utils.get_authentication_with_server(ff_env='data')
 
-:raw-html-m2r:`<a name="metadata"></a>`\ Examples for metadata functions
+Metadata Function Examples
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You can use ``get_metadata`` to get the metadata for a single object. It returns a dictionary of metadata on a successful get request. In our example, we get a publicly available HEK293 biosource, which has an internal accession of 4DNSRVF4XB1F.
