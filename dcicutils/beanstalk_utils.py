@@ -811,7 +811,7 @@ def create_new_es(new):
           I think not, since that's a lot of info to put out there...
 
     Args:
-        new (str): Elasticsearch instance name
+        new (str): Elasticsearch domain name
 
     Returns:
         dict: response from boto3 client
@@ -821,19 +821,17 @@ def create_new_es(new):
         DomainName=new,
         ElasticsearchVersion='5.3',
         ElasticsearchClusterConfig={
-            'InstanceType': 'r5.xlarge.elasticsearch',
-            'InstanceCount': 1,
-            'DedicatedMasterEnabled': True,
-            'DedicatedMasterType': 't2.small.elasticsearch',
-            'DedicatedMasterCount': 3
+            'InstanceType': 'm4.large.elasticsearch',
+            'InstanceCount': 2
         },
         EBSOptions={
             "EBSEnabled": True,
             "VolumeType": "gp2",
-            "VolumeSize": 100
+            "VolumeSize": 50
         }
     )
-    print('=== CREATED NEW ES INSTANCE %s ===' % new)
+    print('=== CREATED NEW ES DOMAIN %s ===' % new)
+    print('NO MASTER INSTANCES ARE USED!')
     print('MAKE SURE TO UPDATE COGNITO AND ACCESS POLICY USING THE GUI!')
     print(resp)
 
@@ -880,17 +878,14 @@ def get_es_build_status(new, max_tries=None):
 #########################################################################
 
 
-def add_es(new, force_new=False, kill_indices=False):
+def add_es(new, force_new=False):
     """
     Either gets information on an existing Elasticsearch instance
     or, if force_new is True, will create a new instance.
 
-    If not force_new, attempt to delete all indices if kill_indices=True
-
     Args:
         new (str): Fourfront EB environment name used for ES instance
         force_new (bool): if True, make a new ES. Default False
-        kill_indices(bool): if True, delete all indices. Default False
 
     Returns:
         str: AWS ARN of the ES instance
@@ -915,13 +910,6 @@ def add_es(new, force_new=False, kill_indices=False):
             resp = es.describe_elasticsearch_domain(DomainName=new)
         except ClientError:  # its not there
             resp = create_new_es(new)
-        else:
-            # now kill all the indexes
-            if kill_indices:
-                base = 'https://' + resp['DomainStatus']['Endpoint']
-                url = base + '/_all'
-                requests.delete(url)
-
     return resp['DomainStatus']['ARN']
 
 
