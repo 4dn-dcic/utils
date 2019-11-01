@@ -8,10 +8,10 @@ with io.open(path.join(this_directory, 'README.rst'), encoding='utf-8') as f:
 
 
 requires = [
-    'boto3>=1.7.42',
-    'botocore>=1.10.42',
+    'boto3>=1.10.7',
+    'botocore>=1.13.7',
     'elasticsearch==5.5.3',
-    'aws_requests_auth>=0.4.1',
+    'aws_requests_auth>=0.4.2',
     'urllib3>=1.23',
     'structlog>=18.1.0',
     'requests>=2.20.0'
