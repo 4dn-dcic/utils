@@ -1070,10 +1070,10 @@ def add_to_auth0_client(new):
         None
     """
     client = boto3.client('elasticbeanstalk', region_name=REGION)
-    env = describe_beanstalk_environments(client, EnvironmentNames=[new])
     url = None
     print("Getting beanstalk URL for env %s..." % new)
     while url is None:
+        env = describe_beanstalk_environments(client, EnvironmentNames=[new])
         url = env['Environments'][0].get('CNAME')
         if url is None:
             print(".")
@@ -1092,11 +1092,11 @@ def remove_from_auth0_client(env_name):
     Returns:
         None
     """
-    eb = boto3.client('elasticbeanstalk')
-    env = eb.describe_environments(EnvironmentNames=[env_name])
+    client = boto3.client('elasticbeanstalk', region_name=REGION)
     url = None
     print("Getting beanstalk URL for env %s..." % env_name)
     while url is None:
+        env = client.describe_environments(EnvironmentNames=[env_name])
         url = env['Environments'][0].get('CNAME')
         if url is None:
             print(".")
