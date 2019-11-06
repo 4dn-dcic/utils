@@ -5,6 +5,7 @@ from dcicutils import ff_utils
 pytestmark = pytest.mark.working
 INDEX_NAMESPACE = 'fourfront-mastertest'
 
+
 @pytest.fixture
 def eset_json():
     return {
