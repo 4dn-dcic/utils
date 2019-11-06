@@ -3,7 +3,7 @@ import json
 import time
 from dcicutils import ff_utils
 pytestmark = pytest.mark.working
-
+INDEX_NAMESPACE = 'fourfront-mastertest'
 
 @pytest.fixture
 def eset_json():
@@ -540,7 +540,8 @@ def test_get_es_search_generator(integrated_ff):
     es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
     es_query = {'query': {'match_all': {}}, 'sort': [{'_uid': {'order': 'desc'}}]}
     # search for all fastqs with a low pagination size
-    es_gen = ff_utils.get_es_search_generator(es_client, 'file_fastq',
+    index = INDEX_NAMESPACE + 'file_fastq'
+    es_gen = ff_utils.get_es_search_generator(es_client, index,
                                               es_query, page_size=7)
     list_gen = list(es_gen)
     assert len(list_gen) > 0
