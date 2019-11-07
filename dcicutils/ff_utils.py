@@ -444,6 +444,7 @@ def get_es_search_generator(es_client, index, body, page_size=200):
     Simple generator behind get_es_metada which takes an es_client (from
     es_utils create_es_client), a string index, and a dict query body.
     Also takes an optional string page_size, which controls pagination size
+    NOTE: 'index' must be namespaced
     """
     search_total = None
     covered = 0
@@ -529,9 +530,11 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth):
     used to create the generator.
     Should NOT be used directly
     """
+    health = get_health_page(key=auth)
     if es_client is None:
-        es_url = get_health_page(key=auth)['elasticsearch']
+        es_url = health['elasticsearch']
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
+    namespace_star = health.get('namespace', '') + '*'
     # match all given uuids to _id fields
     # sending in too many uuids in the terms query can crash es; break them up
     # into groups of max size 100
@@ -575,7 +578,7 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth):
             else:
                 es_query['_source'] = sources
         # use chunk_limit as page size for performance reasons
-        for es_page in get_es_search_generator(es_client, '_all', es_query,
+        for es_page in get_es_search_generator(es_client, namespace_star, es_query,
                                                page_size=chunk_size):
             for hit in es_page:
                 yield hit['_source']  # yield individual items from ES
