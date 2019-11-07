@@ -989,8 +989,8 @@ def create_s3_buckets(new):
     s3 = boto3.client('s3', region_name=REGION)
     for bucket in new_buckets:
         s3.create_bucket(Bucket=bucket)
-    print('=== CREATED NEW ES s3 BUCKETS ===' % new)
-    print('MAKE SURE TO UPDATE CORS POLICY FOR files + wfoutput BUCKETS!')
+    print('=== CREATED NEW S3 BUCKETS ===' % new)
+    print('MAKE SURE TO UPDATE CORS POLICY FOR -files AND -wfoutput BUCKETS!')
 
 
 def delete_s3_buckets(env_name):
