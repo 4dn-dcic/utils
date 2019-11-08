@@ -92,7 +92,7 @@ def test_set_logging_in_prod(caplog, integrated_ff):
 def test_logging_retry(caplog, integrated_ff):
     # get es_client info from the health page
     es_url = ff_utils.get_health_page(key=integrated_ff['ff_key'])['elasticsearch']
-    log_utils.set_logging(es_server=es_url, in_prod=True)
+    log_utils.set_logging(env='fourfront-mastertest', es_server=es_url, in_prod=True)
     log = structlog.getLogger(__name__)
     log.warning('test_retry', _test_log_utils=True)
     assert len(caplog.records) == 1
