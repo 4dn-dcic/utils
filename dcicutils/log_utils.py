@@ -15,7 +15,7 @@ class ElasticsearchHandler(logging.Handler):
     Loosely based off of code here:
     https://github.com/cmanaha/python-elasticsearch-logger
     """
-    def __init__(self, es_server):
+    def __init__(self, env, es_server):
         """
         Must be given a string es_server url to work.
         Calls __init__ of parent Handler
@@ -23,8 +23,16 @@ class ElasticsearchHandler(logging.Handler):
         self.resend_timer = None
         self.messages_to_resend = []
         self.retry_limit = 2
+        self.namespace = self.get_namespace(env)
         self.es_client = es_utils.create_es_client(es_server, use_aws_auth=True)
         logging.Handler.__init__(self)
+
+    @staticmethod
+    def get_namespace(env):
+        """ Grabs ES namespace from health page """
+        from .ff_utils import get_health_page
+        health = get_health_page(ff_env=env)
+        return health.get('namespace', '')
 
     def schedule_resend(self):
         """
@@ -50,7 +58,7 @@ class ElasticsearchHandler(logging.Handler):
         if self.messages_to_resend:
             messages_copy = self.messages_to_resend[:]
             self.messages_to_resend = []
-            idx_name = calculate_log_index()
+            idx_name = self.calculate_log_index()
             actions = (
                 {
                     '_index': idx_name,
@@ -78,7 +86,7 @@ class ElasticsearchHandler(logging.Handler):
         """
         # required?
         # entry = self.format(record)
-        idx_name = calculate_log_index()
+        idx_name = self.calculate_log_index()
         # get the message from the record
         message = record.__dict__.get('msg')
         # adds the ability to manually skip logging the message to ES
@@ -98,6 +106,16 @@ class ElasticsearchHandler(logging.Handler):
             self.messages_to_resend.append([log_id, message, 0])
             self.schedule_resend()
 
+    def calculate_log_index(self):
+        """
+        Simple function to name the ES log index by month
+        Convention is: logs-<yyyy>-<mm>
+        * Uses UTC *
+        """
+        now = datetime.datetime.utcnow()
+        idx_suffix = datetime.datetime.strftime(now, '%Y-%m')
+        return self.namespace + 'logs-' + idx_suffix
+
 
 class ElasticsearchLoggerFactory(structlog.stdlib.LoggerFactory):
     """
@@ -105,11 +123,12 @@ class ElasticsearchLoggerFactory(structlog.stdlib.LoggerFactory):
     Use for logger_factory arg in structlog.configure function
     See: https://github.com/hynek/structlog/blob/master/src/structlog/stdlib.py
     """
-    def __init__(self, ignore_frame_names=None, es_server=None, in_prod=False):
+    def __init__(self, env=None, ignore_frame_names=None, es_server=None, in_prod=False):
         """
         Set self.es_server and call __init__ of parent.
         If not in prod, always set the es_server to None (dev mode)
         """
+        self.env = None if not env else env
         self.es_server = es_server if in_prod else None
         structlog.stdlib.LoggerFactory.__init__(self, ignore_frame_names)
 
@@ -125,22 +144,11 @@ class ElasticsearchLoggerFactory(structlog.stdlib.LoggerFactory):
             _, name = structlog._frames._find_first_app_frame_and_name(self._ignore)
         logger = logging.getLogger(name)
         if self.es_server:
-            es_handler = ElasticsearchHandler(self.es_server)
+            es_handler = ElasticsearchHandler(self.env, self.es_server)
             logger.addHandler(es_handler)
             # also set level to info
             logger.setLevel(logging.INFO)
         return logger
-
-
-def calculate_log_index():
-    """
-    Simple function to name the ES log index by month
-    Convention is: logs-<yyyy>-<mm>
-    * Uses UTC *
-    """
-    now = datetime.datetime.utcnow()
-    idx_suffix = datetime.datetime.strftime(now, '%Y-%m')
-    return 'logs-' + idx_suffix
 
 
 def convert_ts_to_at_ts(logger, log_method, event_dict):
@@ -163,7 +171,7 @@ def add_log_uuid(logger, log_method, event_dict):
 
 
 # configure structlog to use its formats for stdlib logging and / or structlog logging
-def set_logging(es_server=None, in_prod=False, level=logging.WARN, log_name=None, log_dir=None):
+def set_logging(env=None, es_server=None, in_prod=False, level=logging.WARN, log_name=None, log_dir=None):
     '''
     Set logging is a function to be used everywhere, to encourage all subsytems
     to generate structured JSON logs, for easy insertion into ES for searching and
@@ -222,7 +230,7 @@ def set_logging(es_server=None, in_prod=False, level=logging.WARN, log_name=None
     structlog.configure(
         processors=processors,
         context_class=wrap_dict(dict),
-        logger_factory=ElasticsearchLoggerFactory(es_server=es_server, in_prod=in_prod),
+        logger_factory=ElasticsearchLoggerFactory(env=env, es_server=es_server, in_prod=in_prod),
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
