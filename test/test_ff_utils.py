@@ -536,11 +536,13 @@ def test_get_es_metadata(integrated_ff):
 def test_get_es_search_generator(integrated_ff):
     from dcicutils import es_utils
     # get es_client info from the health page
-    es_url = ff_utils.get_health_page(key=integrated_ff['ff_key'])['elasticsearch']
+    health = ff_utils.get_health_page(key=integrated_ff['ff_key'])
+    es_url = health['elasticsearch']
     es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
     es_query = {'query': {'match_all': {}}, 'sort': [{'_uid': {'order': 'desc'}}]}
     # search for all fastqs with a low pagination size
-    es_gen = ff_utils.get_es_search_generator(es_client, 'file_fastq',
+    index = health['namespace'] + 'file_fastq'
+    es_gen = ff_utils.get_es_search_generator(es_client, index,
                                               es_query, page_size=7)
     list_gen = list(es_gen)
     assert len(list_gen) > 0
