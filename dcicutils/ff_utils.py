@@ -387,6 +387,50 @@ def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=F
         return search_res
 
 
+def search_experiment_sets(base_url, ff_env=None, key=None, project=None, lab=None,
+                           experiment_category=None, experiment_type=None,
+                           dataset=None, sample_type=None, sample_category=None,
+                           sample=None, tissue_source=None, publication=None,
+                           modifications=None, treatments=None, assay_details=None,
+                           status=None, warnings=None):
+    """
+    Wrapper method for `search_metadata` that provides an easier way to search
+    experiment sets based on facets
+    """
+    search = '?type=ExperimentSetReplicate'
+    if project:
+        search = search + '&award.project=' + project
+    if lab:
+        search = search + '&lab.display_title=' + '+'.join(lab.split())
+    if experiment_category:
+        search = search + '&experiments_in_set.experiment_type.experiment_category=' + '+'.join(experiment_category.split())
+    if experiment_type:
+        search = search + '&experiments_in_set.experiment_type.display_title=' + '+'.join(experiment_type.split())
+    if dataset:
+        search = search + '&dataset_label=' + '+'.join(dataset.split())
+    if sample_type:
+        search = search + '&experiments_in_set.biosample.biosample_type=' + '+'.join(sample_type.split())
+    if sample_category:
+        search = search + '&experiments_in_set.biosample.biosample_category=' + '+'.join(sample_category.split())
+    if sample:
+        search = search + '&experiments_in_set.biosample.biosource_summary=' + '+'.join(sample.split())
+    if tissue_source:
+        search = search + '&aggregated_items.tissue.item.preferred_name=' + '+'.join(tissue_source.split())
+    if publication:
+        search = search + '&publications_of_set.display_title=' + '+'.join(publication.split())
+    if modifications:
+        search = search + '&experiments_in_set.biosample.modifications.modification_type=' + '+'.join(modifications.split())
+    if treatments:
+        search = search + '&experiments_in_set.biosample.treatments.treatment_type=' + '+'.join(treatments.split())
+    if assay_details: # ':' is difficult to handle here
+        search = search + '&experiments_in_set.experiment_categorizer.combined=' + '+'.join(assay_details.split())
+    if status:
+        search = search + '&status=' + '+'.join(status.split())
+    if warnings:
+        search = search + '&aggregated_items.badges.item.badge.warning=' + '+'.join(warnings.split())
+    return search_metadata(base_url + search, ff_env=ff_env, key=None)
+
+
 def get_metadata_links(obj_id, key=None, ff_env=None):
     """
     Given standard key/ff_env authentication, return result for @@links view

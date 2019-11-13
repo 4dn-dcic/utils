@@ -604,6 +604,43 @@ def test_expand_es_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
+def test_experiment_set_search(integrated_ff):
+    """ Tests the experiment set search features using mastertest """
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    url = integrated_ff['ff_key']['server'] + '/search/'
+    resp = ff_utils.search_experiment_sets(base_url=url, project='4DN', ff_env=ff_env, key=key)
+    assert len(resp) == 8
+    resp = ff_utils.search_experiment_sets(base_url=url, lab='4DN Testing Lab', ff_env=ff_env, key=key)
+    assert len(resp) == 12
+    resp = ff_utils.search_experiment_sets(base_url=url, experiment_category='No value', ff_env=ff_env, key=key)
+    assert len(resp) == 10
+    resp = ff_utils.search_experiment_sets(base_url=url, experiment_type='Dilution Hi-C', ff_env=ff_env, key=key)
+    assert len(resp) == 3
+    resp = ff_utils.search_experiment_sets(base_url=url, dataset='No value', ff_env=ff_env, key=key)
+    assert len(resp) == 9
+    resp = ff_utils.search_experiment_sets(base_url=url, sample_type='immortalized cells', ff_env=ff_env, key=key)
+    assert len(resp) == 13
+    resp = ff_utils.search_experiment_sets(base_url=url, sample_category='In vitro Differentiation', ff_env=ff_env, key=key)
+    assert len(resp) == 1
+    resp = ff_utils.search_experiment_sets(base_url=url, sample='GM12878', ff_env=ff_env, key=key)
+    assert len(resp) == 13
+    resp = ff_utils.search_experiment_sets(base_url=url, tissue_source='endoderm', ff_env=ff_env, key=key)
+    assert len(resp) == 1
+    resp = ff_utils.search_experiment_sets(base_url=url, publication='No value', ff_env=ff_env, key=key)
+    assert len(resp) == 10
+    resp = ff_utils.search_experiment_sets(base_url=url, modifications='Stable Transfection', ff_env=ff_env, key=key)
+    assert len(resp) == 7
+    resp = ff_utils.search_experiment_sets(base_url=url, treatments='RNAi', ff_env=ff_env, key=key)
+    assert len(resp) == 7
+    resp = ff_utils.search_experiment_sets(base_url=url, assay_details='No value', ff_env=ff_env, key=key)
+    assert len(resp) == 1
+    resp = ff_utils.search_experiment_sets(base_url=url, status='released', ff_env=ff_env, key=key)
+    assert len(resp) == 12
+    resp = ff_utils.search_experiment_sets(base_url=url, warnings='No value', ff_env=ff_env, key=key)
+    assert len(resp) == 4
+
+
+@pytest.mark.integrated
 @pytest.mark.flaky
 def test_expand_es_metadata_frame_object_embedded(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
