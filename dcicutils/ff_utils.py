@@ -395,39 +395,56 @@ def search_experiment_sets(base_url, ff_env=None, key=None, project=None, lab=No
                            status=None, warnings=None):
     """
     Wrapper method for `search_metadata` that provides an easier way to search
-    experiment sets based on facets
+    experiment sets based on facets.
+    Search terms are pipe (|) seperated
     """
     search = '?type=ExperimentSetReplicate'
     if project:
-        search = search + '&award.project=' + project
+        for p in project.split('|'):
+            search = search + '&award.project=' + p
     if lab:
-        search = search + '&lab.display_title=' + '+'.join(lab.split())
+        for l in lab.split('|'):
+            search = search + '&lab.display_title=' + '+'.join(l.split())
     if experiment_category:
-        search = search + '&experiments_in_set.experiment_type.experiment_category=' + '+'.join(experiment_category.split())
+        for c in experiment_category.split('|'):
+            search = search + '&experiments_in_set.experiment_type.experiment_category=' + '+'.join(c.split())
     if experiment_type:
-        search = search + '&experiments_in_set.experiment_type.display_title=' + '+'.join(experiment_type.split())
+        for t in experiment_type.split('|'):
+            search = search + '&experiments_in_set.experiment_type.display_title=' + '+'.join(t.split())
     if dataset:
-        search = search + '&dataset_label=' + '+'.join(dataset.split())
+        for d in dataset.split('|'):
+            search = search + '&dataset_label=' + '+'.join(d.split())
     if sample_type:
-        search = search + '&experiments_in_set.biosample.biosample_type=' + '+'.join(sample_type.split())
+        for s in sample_type.split('|'):
+            search = search + '&experiments_in_set.biosample.biosample_type=' + '+'.join(s.split())
     if sample_category:
-        search = search + '&experiments_in_set.biosample.biosample_category=' + '+'.join(sample_category.split())
+        for s in sample_category.split('|'):
+            search = search + '&experiments_in_set.biosample.biosample_category=' + '+'.join(s.split())
     if sample:
-        search = search + '&experiments_in_set.biosample.biosource_summary=' + '+'.join(sample.split())
+        for s in sample.split('|'):
+            search = search + '&experiments_in_set.biosample.biosource_summary=' + '+'.join(s.split())
     if tissue_source:
-        search = search + '&aggregated_items.tissue.item.preferred_name=' + '+'.join(tissue_source.split())
+        for t in tissue_source.split('|'):
+            search = search + '&aggregated_items.tissue.item.preferred_name=' + '+'.join(t.split())
     if publication:
-        search = search + '&publications_of_set.display_title=' + '+'.join(publication.split())
+        for p in publication.split('|'):
+            search = search + '&publications_of_set.display_title=' + '+'.join(p.split())
     if modifications:
-        search = search + '&experiments_in_set.biosample.modifications.modification_type=' + '+'.join(modifications.split())
+        for m in modifications.split('|'):
+            search = search + '&experiments_in_set.biosample.modifications.modification_type=' + '+'.join(m.split())
     if treatments:
-        search = search + '&experiments_in_set.biosample.treatments.treatment_type=' + '+'.join(treatments.split())
+        for t in treatments.split('|'):
+            search = search + '&experiments_in_set.biosample.treatments.treatment_type=' + '+'.join(t.split())
     if assay_details: # ':' is difficult to handle here
-        search = search + '&experiments_in_set.experiment_categorizer.combined=' + '+'.join(assay_details.split())
+        for d in assay_details.split('|'):
+            d = d.replace(':', '%3A')
+            search = search + '&experiments_in_set.experiment_categorizer.combined=' + '+'.join(d.split())
     if status:
-        search = search + '&status=' + '+'.join(status.split())
+        for s in status.split('|'):
+            search = search + '&status=' + '+'.join(s.split())
     if warnings:
-        search = search + '&aggregated_items.badges.item.badge.warning=' + '+'.join(warnings.split())
+        for w in warnings.split('|'):
+            search = search + '&aggregated_items.badges.item.badge.warning=' + '+'.join(w.split())
     return search_metadata(base_url + search, ff_env=ff_env, key=None)
 
 

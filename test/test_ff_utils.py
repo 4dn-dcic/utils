@@ -638,6 +638,18 @@ def test_experiment_set_search(integrated_ff):
     assert len(resp) == 12
     resp = ff_utils.search_experiment_sets(base_url=url, warnings='No value', ff_env=ff_env, key=key)
     assert len(resp) == 4
+    resp = ff_utils.search_experiment_sets(base_url=url, project='4DN|External', ff_env=ff_env, key=key)
+    assert len(resp) == 13
+    resp = ff_utils.search_experiment_sets(base_url=url, lab='4DN Testing Lab|Some Other Guys lab', ff_env=ff_env, key=key)
+    assert len(resp) == 13
+    resp = ff_utils.search_experiment_sets(base_url=url, project='4DN', experiment_type='Dilution Hi-C', ff_env=ff_env, key=key)
+    assert len(resp) == 2
+    resp = ff_utils.search_experiment_sets(base_url=url, project='4DN|External', experiment_type='Dilution Hi-C|2-stage Repli-seq', ff_env=ff_env, key=key)
+    assert len(resp) == 5
+    resp = ff_utils.search_experiment_sets(base_url=url, project='4DN|External', experiment_type='Dilution Hi-C|2-stage Repli-seq', sample_type='in vitro differentiated cells', ff_env=ff_env, key=key)
+    assert len(resp) == 1
+    resp = ff_utils.search_experiment_sets(base_url=url, experiment_type='ATAC-seq', sample='GM12878', ff_env=ff_env, key=key)
+    assert len(resp) == 1
 
 
 @pytest.mark.integrated
