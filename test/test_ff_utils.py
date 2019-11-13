@@ -653,6 +653,16 @@ def test_experiment_set_search(integrated_ff):
 
 
 @pytest.mark.integrated
+def test_get_qc_metrics(integrated_ff):
+    """ XXX: How to test? """
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    resp = ff_utils.search_metadata('/search/?type=ExperimentSetReplicate', key=key, ff_env=ff_env)
+    for entry in resp:
+        res = ff_utils.get_associated_qc_metrics(entry['uuid'], key=key, ff_env=ff_env)
+        if res != {}:
+            pass # yay we found one, test more later
+
+@pytest.mark.integrated
 @pytest.mark.flaky
 def test_expand_es_metadata_frame_object_embedded(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']

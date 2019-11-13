@@ -448,6 +448,37 @@ def search_experiment_sets(base_url, ff_env=None, key=None, project=None, lab=No
     return search_metadata(base_url + search, ff_env=ff_env, key=None)
 
 
+def get_associated_qc_metrics(uuid, key=None, ff_env=None):
+    """
+    Given a uuid of an experiment set, return a dictionary of uuid : item mappings
+    with all data associated with all the QC metrics
+    """
+    # get experiment set info from uuid
+    result = {}
+    resp = get_metadata(uuid, key=key, ff_env=ff_env)
+    if 'processed_files' in resp:
+        for entry in resp['processed_files']:
+            if 'quality_metric' not in entry:
+                continue
+            uuid = entry['quality_metric']['uuid']
+            result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
+    if 'experiments_in_set' in resp:
+        for exp in resp['experiments_in_set']:
+            if 'files' in exp:
+                for entry in exp['files']:
+                    if 'quality_metric' not in entry:
+                        continue
+                    uuid = entry['quality_metric']['uuid']
+                    result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
+            if 'processed_files' in exp:
+                for entry in exp['processed_files']:
+                    if 'quality_metric' not in entry:
+                        continue
+                    uuid = entry['quality_metric']['uuid']
+                    result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
+    return result
+
+
 def get_metadata_links(obj_id, key=None, ff_env=None):
     """
     Given standard key/ff_env authentication, return result for @@links view
