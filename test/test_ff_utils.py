@@ -741,7 +741,10 @@ def test_faceted_search_exp_set(integrated_ff):
 
 @pytest.mark.integrated
 def test_faceted_search_users(integrated_ff):
-    """ Tests faceted_search with users intead of experiment set """
+    """ 
+    Tests faceted_search with users intead of experiment set
+    Tests a negative search as well
+    """
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     url = integrated_ff['ff_key']['server']
     all_facets = ff_utils.get_item_facets('user', key=key, ff_env=ff_env)
@@ -753,6 +756,14 @@ def test_faceted_search_users(integrated_ff):
                    'item_facets': all_facets}
     resp = ff_utils.faceted_search(**affiliation)
     assert len(resp) == 4
+    neg_affiliation = {'item_type': 'user',
+                       'Affiliation': '-4DN Testing Lab',
+                       'key': key,
+                       'ff_env': ff_env,
+                       'base_url': url,
+                       'item_facets': all_facets}
+    resp = ff_utils.faceted_search(**neg_affiliation)
+    assert len(resp) == 19
 
 
 @pytest.mark.integrated

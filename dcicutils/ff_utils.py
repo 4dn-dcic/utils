@@ -389,7 +389,7 @@ def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=F
 
 def get_item_facets(item_type, key=None, ff_env=None):
     """
-    Gets facet information for the given item type from the given env
+    Gets facet query string information ie: mapping from facet to query string
     """
     resp = get_metadata('/profiles/' + item_type + '.json', key=key, ff_env=ff_env)
     facets = {}
@@ -405,7 +405,9 @@ def get_item_facets(item_type, key=None, ff_env=None):
 
 
 def get_item_facet_values(item_type, key=None, ff_env=None):
-    """ Gets all facets and returns all possible values for each one """
+    """
+    Gets all facets and returns all possible values for each one with counts
+    """
     resp = get_metadata('/search/?type=' + item_type, key=key, ff_env=ff_env)['facets']
     facets = {}
     for facet in resp:
@@ -450,7 +452,11 @@ def faceted_search(**kwargs):
         if facet != 'item_type':
             if facet in item_facets:
                 for value in values.split('|'):
-                    search = search + '&' + item_facets[facet] + '=' + '+'.join(value.split())
+                    fmt_value = '+'.join(value.split())
+                    if fmt_value[0] == '-':  # handle negative
+                        search = search + '&' + item_facets[facet] + '!=' + fmt_value[1:]
+                    else:
+                        search = search + '&' + item_facets[facet] + '=' + fmt_value
     return search_metadata(search, ff_env=ff_env, key=None)
 
 
