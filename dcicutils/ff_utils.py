@@ -426,7 +426,6 @@ def faceted_search(**kwargs):
     kwargs should contain the following 5 things:
         - key (if not using built in aws auth)
         - ff_env (if not using build in aws auth)
-        - base_url (REQUIRED) ex: data.4dnucleome.org/
         - item_type (if not searching for experiment sets)
         - item_facets (if you don't want to resolve these in this function)
         + any facets (| seperated values) you'd like to search on (see example below)
@@ -437,7 +436,6 @@ def faceted_search(**kwargs):
                    'Experiment Type': 'Dilution Hi-C',
                    'key': key,
                    'ff_env': ff_env,
-                   'base_url': base_url,
                    'item_type': 'ExperimentSetReplicate' }
         results = search_facets(**kwargs)
     """
