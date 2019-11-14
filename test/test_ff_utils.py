@@ -612,15 +612,17 @@ def test_experiment_set_search(integrated_ff):
     assert len(resp) == 8
     resp = ff_utils.search_experiment_sets(base_url=url, lab='4DN Testing Lab', ff_env=ff_env, key=key)
     assert len(resp) == 12
-    resp = ff_utils.search_experiment_sets(base_url=url, experiment_category='No value', ff_env=ff_env, key=key)
-    assert len(resp) == 10
+    resp = ff_utils.search_experiment_sets(base_url=url, experiment_category='Microscopy', ff_env=ff_env, key=key)
+    assert len(resp) == 1
     resp = ff_utils.search_experiment_sets(base_url=url, experiment_type='Dilution Hi-C', ff_env=ff_env, key=key)
     assert len(resp) == 3
     resp = ff_utils.search_experiment_sets(base_url=url, dataset='No value', ff_env=ff_env, key=key)
     assert len(resp) == 9
     resp = ff_utils.search_experiment_sets(base_url=url, sample_type='immortalized cells', ff_env=ff_env, key=key)
     assert len(resp) == 13
-    resp = ff_utils.search_experiment_sets(base_url=url, sample_category='In vitro Differentiation', ff_env=ff_env, key=key)
+    resp = ff_utils.search_experiment_sets(base_url=url,
+                                           sample_category='In vitro Differentiation',
+                                           ff_env=ff_env, key=key)
     assert len(resp) == 1
     resp = ff_utils.search_experiment_sets(base_url=url, sample='GM12878', ff_env=ff_env, key=key)
     assert len(resp) == 13
@@ -640,27 +642,49 @@ def test_experiment_set_search(integrated_ff):
     assert len(resp) == 4
     resp = ff_utils.search_experiment_sets(base_url=url, project='4DN|External', ff_env=ff_env, key=key)
     assert len(resp) == 13
-    resp = ff_utils.search_experiment_sets(base_url=url, lab='4DN Testing Lab|Some Other Guys lab', ff_env=ff_env, key=key)
+    resp = ff_utils.search_experiment_sets(base_url=url,
+                                           lab='4DN Testing Lab|Some Other Guys lab',
+                                           ff_env=ff_env, key=key)
     assert len(resp) == 13
-    resp = ff_utils.search_experiment_sets(base_url=url, project='4DN', experiment_type='Dilution Hi-C', ff_env=ff_env, key=key)
+    resp = ff_utils.search_experiment_sets(base_url=url,
+                                           project='4DN',
+                                           experiment_type='Dilution Hi-C',
+                                           ff_env=ff_env, key=key)
     assert len(resp) == 2
-    resp = ff_utils.search_experiment_sets(base_url=url, project='4DN|External', experiment_type='Dilution Hi-C|2-stage Repli-seq', ff_env=ff_env, key=key)
+    resp = ff_utils.search_experiment_sets(base_url=url,
+                                           project='4DN|External',
+                                           experiment_type='Dilution Hi-C|2-stage Repli-seq',
+                                           ff_env=ff_env, key=key)
     assert len(resp) == 5
-    resp = ff_utils.search_experiment_sets(base_url=url, project='4DN|External', experiment_type='Dilution Hi-C|2-stage Repli-seq', sample_type='in vitro differentiated cells', ff_env=ff_env, key=key)
+    resp = ff_utils.search_experiment_sets(base_url=url,
+                                           project='4DN|External',
+                                           experiment_type='Dilution Hi-C|2-stage Repli-seq',
+                                           sample_type='in vitro differentiated cells',
+                                           ff_env=ff_env, key=key)
     assert len(resp) == 1
-    resp = ff_utils.search_experiment_sets(base_url=url, experiment_type='ATAC-seq', sample='GM12878', ff_env=ff_env, key=key)
+    resp = ff_utils.search_experiment_sets(base_url=url,
+                                           experiment_type='ATAC-seq',
+                                           sample='GM12878', ff_env=ff_env, key=key)
     assert len(resp) == 1
+    resp = ff_utils.search_experiment_sets(base_url=url,
+                                           experiment_category='Sequencing',
+                                           sample_category='GM12878',
+                                           dataset='Z et al. 2-Stage Repliseq',
+                                           ff_env=ff_env, key=key)
+    assert len(resp) == 2
 
 
 @pytest.mark.integrated
 def test_get_qc_metrics(integrated_ff):
-    """ XXX: How to test? """
+    """
+    Tests that we correctly extract qc metric uuids (and therefore items) from the helper
+    """
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
-    resp = ff_utils.search_metadata('/search/?type=ExperimentSetReplicate', key=key, ff_env=ff_env)
-    for entry in resp:
-        res = ff_utils.get_associated_qc_metrics(entry['uuid'], key=key, ff_env=ff_env)
-        if res != {}:
-            pass # yay we found one, test more later
+    uuid = '331106bc-8535-3338-903e-854af460b544'
+    qc_metrics = ff_utils.get_associated_qc_metrics(uuid, key=key, ff_env=ff_env)
+    assert '4c9dabc6-61d6-4054-a951-c4fdd0023800' in qc_metrics
+    assert '131106bc-8535-4448-903e-854abbbbbbbb' in qc_metrics
+
 
 @pytest.mark.integrated
 @pytest.mark.flaky

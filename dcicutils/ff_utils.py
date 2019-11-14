@@ -395,8 +395,9 @@ def search_experiment_sets(base_url, ff_env=None, key=None, project=None, lab=No
                            status=None, warnings=None):
     """
     Wrapper method for `search_metadata` that provides an easier way to search
-    experiment sets based on facets.
-    Search terms are pipe (|) seperated
+    experiment sets based on facets
+    All arguments are optional and can contain pipe | separated values where all
+    provided will be searched for. Negative searches are not possible at this time.
     """
     search = '?type=ExperimentSetReplicate'
     if project:
@@ -435,9 +436,9 @@ def search_experiment_sets(base_url, ff_env=None, key=None, project=None, lab=No
     if treatments:
         for t in treatments.split('|'):
             search = search + '&experiments_in_set.biosample.treatments.treatment_type=' + '+'.join(t.split())
-    if assay_details: # ':' is difficult to handle here
+    if assay_details:
         for d in assay_details.split('|'):
-            d = d.replace(':', '%3A')
+            d = d.replace(':', '%3A')  # encode ':' into hex
             search = search + '&experiments_in_set.experiment_categorizer.combined=' + '+'.join(d.split())
     if status:
         for s in status.split('|'):
