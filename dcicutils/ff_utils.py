@@ -404,7 +404,19 @@ def get_item_facets(item_type, key=None, ff_env=None):
     return facets
 
 
-def search_facets(**kwargs):
+def get_item_facet_values(item_type, key=None, ff_env=None):
+    """ Gets all facets and returns all possible values for each one """
+    resp = get_metadata('/search/?type=' + item_type, key=key, ff_env=ff_env)['facets']
+    facets = {}
+    for facet in resp:
+        name = facet['title']
+        facets[name] = {}
+        for term in facet['terms']:
+            facets[name][term['key']] = term['doc_count']
+    return facets
+
+
+def faceted_search(**kwargs):
     """
     Wrapper method for `search_metadata` that provides an easier way to search
     items based on facets
@@ -425,10 +437,8 @@ def search_facets(**kwargs):
                    'ff_env': ff_env,
                    'base_url': base_url,
                    'item_type': 'ExperimentSetReplicate' }
-        results = search_facets(base_url, kwargs=kwargs)
+        results = search_facets(**kwargs)
     """
-    kwargs = kwargs['kwargs']
-    base_url = kwargs['base_url']  # only required field
     key = kwargs.get('key', None)
     ff_env = kwargs.get('ff_env', None)
     item_facets = kwargs.get('item_facets', None)
@@ -441,7 +451,7 @@ def search_facets(**kwargs):
             if facet in item_facets:
                 for value in values.split('|'):
                     search = search + '&' + item_facets[facet] + '=' + '+'.join(value.split())
-    return search_metadata(base_url + search, ff_env=ff_env, key=None)
+    return search_metadata(search, ff_env=ff_env, key=None)
 
 
 def get_associated_qc_metrics(uuid, key=None, ff_env=None):
