@@ -741,7 +741,7 @@ def test_faceted_search_exp_set(integrated_ff):
 
 @pytest.mark.integrated
 def test_faceted_search_users(integrated_ff):
-    """ 
+    """
     Tests faceted_search with users intead of experiment set
     Tests a negative search as well
     """
@@ -776,6 +776,8 @@ def test_get_qc_metrics(integrated_ff):
     qc_metrics = ff_utils.get_associated_qc_metrics(uuid, key=key, ff_env=ff_env)
     assert '4c9dabc6-61d6-4054-a951-c4fdd0023800' in qc_metrics
     assert '131106bc-8535-4448-903e-854abbbbbbbb' in qc_metrics
+    assert 'QualityMetric' in qc_metrics['4c9dabc6-61d6-4054-a951-c4fdd0023800']['@type']
+    assert 'QualityMetric' in qc_metrics['131106bc-8535-4448-903e-854abbbbbbbb']['@type']
 
 
 @pytest.mark.integrated
