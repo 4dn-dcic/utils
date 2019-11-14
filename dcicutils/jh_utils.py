@@ -33,6 +33,7 @@ HANDLED_FUNCTIONS = [
     'delete_metadata',
     'purge_metadata',
     'get_metadata_links',
+    'faceted_search',
     'delete_field'
 ]
 

@@ -455,7 +455,7 @@ def faceted_search(**kwargs):
                         search = search + '&' + item_facets[facet] + '!=' + fmt_value[1:]
                     else:
                         search = search + '&' + item_facets[facet] + '=' + fmt_value
-    return search_metadata(search, ff_env=ff_env, key=None)
+    return search_metadata(search, ff_env=ff_env, key=key)
 
 
 def get_associated_qc_metrics(uuid, key=None, ff_env=None):
