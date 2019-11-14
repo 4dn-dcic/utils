@@ -393,20 +393,20 @@ def get_item_facets(item_type, key=None, ff_env=None):
     """
     resp = get_metadata('/profiles/' + item_type + '.json', key=key, ff_env=ff_env)
     facets = {}
-
-    # get direct facets
     for query_url, info in resp.get('facets', {}).items():
         facets[info['title']] = query_url
 
     # status is hardcoded in search.py, so the same must be done here
     facets['Status'] = 'status'
-
     return facets
 
 
 def get_item_facet_values(item_type, key=None, ff_env=None):
     """
     Gets all facets and returns all possible values for each one with counts
+    ie: dictionary of facets mapping to a dictionary containing all possible values
+    for that facet mapping to the count for that value
+    format: {'Project': {'4DN': 2, 'Other': 6}, 'Lab': {...}}
     """
     resp = get_metadata('/search/?type=' + item_type, key=key, ff_env=ff_env)['facets']
     facets = {}
@@ -437,7 +437,7 @@ def faceted_search(**kwargs):
                    'key': key,
                    'ff_env': ff_env,
                    'item_type': 'ExperimentSetReplicate' }
-        results = search_facets(**kwargs)
+        results = faceted_search(**kwargs)
     """
     key = kwargs.get('key', None)
     ff_env = kwargs.get('ff_env', None)
