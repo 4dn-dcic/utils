@@ -604,74 +604,133 @@ def test_expand_es_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
-def test_experiment_set_search(integrated_ff):
+def test_get_item_facets(integrated_ff):
+    """ Tests that we can resolve information on facets """
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    item_type = 'experiment_set_replicate'
+    facets = ff_utils.get_item_facets(item_type, key=key, ff_env=ff_env)
+    assert 'Lab' in facets
+    assert 'Center' in facets
+    assert 'Set Type' in facets
+    assert 'Internal Release Date' in facets
+
+
+@pytest.mark.integrated
+def test_search_facets_exp_set(integrated_ff):
     """ Tests the experiment set search features using mastertest """
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
-    url = integrated_ff['ff_key']['server'] + '/search/'
-    resp = ff_utils.search_experiment_sets(base_url=url, project='4DN', ff_env=ff_env, key=key)
+    url = integrated_ff['ff_key']['server']
+    all_facets = ff_utils.get_item_facets('experiment_set_replicate', key=key, ff_env=ff_env)
+    for_all = {'base_url': url, 'key': key, 'ff_env': ff_env, 'item_facets': all_facets}
+    project = { 'Project': '4DN' }
+    project.update(for_all)
+    resp = ff_utils.search_facets(kwargs=project)
     assert len(resp) == 8
-    resp = ff_utils.search_experiment_sets(base_url=url, lab='4DN Testing Lab', ff_env=ff_env, key=key)
+    lab = { 'Lab': '4DN Testing Lab' }
+    lab.update(for_all)
+    resp = ff_utils.search_facets(kwargs=lab)
     assert len(resp) == 12
-    resp = ff_utils.search_experiment_sets(base_url=url, experiment_category='Microscopy', ff_env=ff_env, key=key)
+    exp_cat = { 'Experiment Category' : 'Microscopy' }
+    exp_cat.update(for_all)
+    resp = ff_utils.search_facets(kwargs=exp_cat)
     assert len(resp) == 1
-    resp = ff_utils.search_experiment_sets(base_url=url, experiment_type='Dilution Hi-C', ff_env=ff_env, key=key)
+    exp_type = { 'Experiment Type': 'Dilution Hi-C' }
+    exp_type.update(for_all)
+    resp = ff_utils.search_facets(kwargs=exp_type)
     assert len(resp) == 3
-    resp = ff_utils.search_experiment_sets(base_url=url, dataset='No value', ff_env=ff_env, key=key)
+    dataset = { 'Dataset': 'No value' }
+    dataset.update(for_all)
+    resp = ff_utils.search_facets(kwargs=dataset)
     assert len(resp) == 9
-    resp = ff_utils.search_experiment_sets(base_url=url, sample_type='immortalized cells', ff_env=ff_env, key=key)
+    sample_type = { 'Sample Type': 'immortalized cells' }
+    sample_type.update(for_all)
+    resp = ff_utils.search_facets(kwargs=sample_type)
     assert len(resp) == 13
-    resp = ff_utils.search_experiment_sets(base_url=url,
-                                           sample_category='In vitro Differentiation',
-                                           ff_env=ff_env, key=key)
+    sample_cat = { 'Sample Category': 'In vitro Differentiation' }
+    sample_cat.update(for_all)
+    resp = ff_utils.search_facets(kwargs=sample_cat)
     assert len(resp) == 1
-    resp = ff_utils.search_experiment_sets(base_url=url, sample='GM12878', ff_env=ff_env, key=key)
+    sample = { 'Sample': 'GM12878' }
+    sample.update(for_all)
+    resp = ff_utils.search_facets(kwargs=sample)
     assert len(resp) == 13
-    resp = ff_utils.search_experiment_sets(base_url=url, tissue_source='endoderm', ff_env=ff_env, key=key)
+    tissue_src = { 'Tissue Source': 'endoderm' }
+    tissue_src.update(for_all)
+    resp = ff_utils.search_facets(kwargs=tissue_src)
     assert len(resp) == 1
-    resp = ff_utils.search_experiment_sets(base_url=url, publication='No value', ff_env=ff_env, key=key)
+    pub = { 'Publication': 'No value' }
+    pub.update(for_all)
+    resp = ff_utils.search_facets(kwargs=pub)
     assert len(resp) == 10
-    resp = ff_utils.search_experiment_sets(base_url=url, modifications='Stable Transfection', ff_env=ff_env, key=key)
+    mods = { 'Modifications': 'Stable Transfection' }
+    mods.update(for_all)
+    resp = ff_utils.search_facets(kwargs=mods)
     assert len(resp) == 7
-    resp = ff_utils.search_experiment_sets(base_url=url, treatments='RNAi', ff_env=ff_env, key=key)
+    treats = { 'Treatments': 'RNAi' }
+    treats.update(for_all)
+    resp = ff_utils.search_facets(kwargs=treats)
     assert len(resp) == 7
-    resp = ff_utils.search_experiment_sets(base_url=url, assay_details='No value', ff_env=ff_env, key=key)
+    assay_details = { 'Assay Details': 'No value' }
+    assay_details.update(for_all)
+    resp = ff_utils.search_facets(kwargs=assay_details)
     assert len(resp) == 1
-    resp = ff_utils.search_experiment_sets(base_url=url, status='released', ff_env=ff_env, key=key)
+    status = { 'Status': 'released' }
+    status.update(for_all)
+    resp = ff_utils.search_facets(base_url=url, ff_env=ff_env, key=key, kwargs=status)
     assert len(resp) == 12
-    resp = ff_utils.search_experiment_sets(base_url=url, warnings='No value', ff_env=ff_env, key=key)
+    warnings = { 'Warnings': 'No value' }
+    warnings.update(for_all)
+    resp = ff_utils.search_facets(kwargs=warnings)
     assert len(resp) == 4
-    resp = ff_utils.search_experiment_sets(base_url=url, project='4DN|External', ff_env=ff_env, key=key)
+    both_projects = { 'Project': '4DN|External' }
+    both_projects.update(for_all)
+    resp = ff_utils.search_facets(kwargs=both_projects)
     assert len(resp) == 13
-    resp = ff_utils.search_experiment_sets(base_url=url,
-                                           lab='4DN Testing Lab|Some Other Guys lab',
-                                           ff_env=ff_env, key=key)
+    both_labs = { 'Lab': '4DN Testing Lab|Some Other Guys lab'}
+    both_labs.update(for_all)
+    resp = ff_utils.search_facets(kwargs=both_labs)
     assert len(resp) == 13
-    resp = ff_utils.search_experiment_sets(base_url=url,
-                                           project='4DN',
-                                           experiment_type='Dilution Hi-C',
-                                           ff_env=ff_env, key=key)
+    proj_exp_type = { 'Project': '4DN', 'Experiment Type': 'Dilution Hi-C' }
+    proj_exp_type.update(for_all)
+    resp = ff_utils.search_facets(kwargs=proj_exp_type)
     assert len(resp) == 2
-    resp = ff_utils.search_experiment_sets(base_url=url,
-                                           project='4DN|External',
-                                           experiment_type='Dilution Hi-C|2-stage Repli-seq',
-                                           ff_env=ff_env, key=key)
+    proj_exp_type = { 'Project': '4DN|External', 'Experiment Type': 'Dilution Hi-C|2-stage Repli-seq' }
+    proj_exp_type.update(for_all)
+    resp = ff_utils.search_facets(kwargs=proj_exp_type)
     assert len(resp) == 5
-    resp = ff_utils.search_experiment_sets(base_url=url,
-                                           project='4DN|External',
-                                           experiment_type='Dilution Hi-C|2-stage Repli-seq',
-                                           sample_type='in vitro differentiated cells',
-                                           ff_env=ff_env, key=key)
+    proj_exp_sam = { 'Project': '4DN|External',
+                     'Experiment Type': 'Dilution Hi-C|2-stage Repli-seq',
+                     'Sample Type': 'in vitro differentiated cells'
+    }
+    proj_exp_sam.update(for_all)
+    resp = ff_utils.search_facets(kwargs=proj_exp_sam)
     assert len(resp) == 1
-    resp = ff_utils.search_experiment_sets(base_url=url,
-                                           experiment_type='ATAC-seq',
-                                           sample='GM12878', ff_env=ff_env, key=key)
+    exp_sam = { 'Experiment Type': 'ATAC-seq', 'Sample': 'GM12878' }
+    exp_sam.update(for_all)
+    resp = ff_utils.search_facets(kwargs=exp_sam)
     assert len(resp) == 1
-    resp = ff_utils.search_experiment_sets(base_url=url,
-                                           experiment_category='Sequencing',
-                                           sample_category='GM12878',
-                                           dataset='Z et al. 2-Stage Repliseq',
-                                           ff_env=ff_env, key=key)
+    exp_sam_data = { 'Experiment Category': 'Sequencing', 'Sample': 'GM12878',
+                     'Dataset': 'Z et al. 2-Stage Repliseq'
+    }
+    exp_sam_data.update(for_all)
+    resp = ff_utils.search_facets(kwargs=exp_sam_data)
     assert len(resp) == 2
+
+
+@pytest.mark.integrated
+def test_search_facets_users(integrated_ff):
+    """ Tests search_facets with users intead of experiment set """
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    url = integrated_ff['ff_key']['server']
+    all_facets = ff_utils.get_item_facets('user', key=key, ff_env=ff_env)
+    affiliation = { 'item_type': 'user',
+                    'Affiliation': '4DN Testing Lab',
+                    'key': key,
+                    'ff_env': ff_env,
+                    'base_url': url,
+                    'item_facets': all_facets }
+    resp = ff_utils.search_facets(kwargs=affiliation)
+    assert len(resp) == 4
 
 
 @pytest.mark.integrated

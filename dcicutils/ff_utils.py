@@ -387,65 +387,60 @@ def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=F
         return search_res
 
 
-def search_experiment_sets(base_url, ff_env=None, key=None, project=None, lab=None,
-                           experiment_category=None, experiment_type=None,
-                           dataset=None, sample_type=None, sample_category=None,
-                           sample=None, tissue_source=None, publication=None,
-                           modifications=None, treatments=None, assay_details=None,
-                           status=None, warnings=None):
+def get_item_facets(item_type, key=None, ff_env=None):
+    """
+    Gets facet information for the given item type from the given env
+    """
+    resp = get_metadata('/profiles/' + item_type + '.json', key=key, ff_env=ff_env)
+    facets = {}
+
+    # get direct facets
+    for query_url, info in resp.get('facets', {}).items():
+        facets[info['title']] = query_url
+
+    # status is hardcoded in search.py, so the same must be done here
+    facets['Status'] = 'status'
+
+    return facets
+
+
+def search_facets(**kwargs):
     """
     Wrapper method for `search_metadata` that provides an easier way to search
-    experiment sets based on facets
-    All arguments are optional and can contain pipe | separated values where all
-    provided will be searched for. Negative searches are not possible at this time.
+    items based on facets
+
+    kwargs should contain the following 5 things:
+        - key (if not using built in aws auth)
+        - ff_env (if not using build in aws auth)
+        - base_url (REQUIRED) ex: data.4dnucleome.org/
+        - item_type (if not searching for experiment sets)
+        - item_facets (if you don't want to resolve these in this function)
+        + any facets (| seperated values) you'd like to search on (see example below)
+
+    Example: search for all experiments under the 4DN project with experiment type
+    Dilution Hi-C
+        kwargs = { 'Project': '4DN',
+                   'Experiment Type': 'Dilution Hi-C',
+                   'key': key,
+                   'ff_env': ff_env,
+                   'base_url': base_url,
+                   'item_type': 'ExperimentSetReplicate' }
+        results = search_facets(base_url, kwargs=kwargs)
     """
-    search = '?type=ExperimentSetReplicate'
-    if project:
-        for p in project.split('|'):
-            search = search + '&award.project=' + p
-    if lab:
-        for l in lab.split('|'):
-            search = search + '&lab.display_title=' + '+'.join(l.split())
-    if experiment_category:
-        for c in experiment_category.split('|'):
-            search = search + '&experiments_in_set.experiment_type.experiment_category=' + '+'.join(c.split())
-    if experiment_type:
-        for t in experiment_type.split('|'):
-            search = search + '&experiments_in_set.experiment_type.display_title=' + '+'.join(t.split())
-    if dataset:
-        for d in dataset.split('|'):
-            search = search + '&dataset_label=' + '+'.join(d.split())
-    if sample_type:
-        for s in sample_type.split('|'):
-            search = search + '&experiments_in_set.biosample.biosample_type=' + '+'.join(s.split())
-    if sample_category:
-        for s in sample_category.split('|'):
-            search = search + '&experiments_in_set.biosample.biosample_category=' + '+'.join(s.split())
-    if sample:
-        for s in sample.split('|'):
-            search = search + '&experiments_in_set.biosample.biosource_summary=' + '+'.join(s.split())
-    if tissue_source:
-        for t in tissue_source.split('|'):
-            search = search + '&aggregated_items.tissue.item.preferred_name=' + '+'.join(t.split())
-    if publication:
-        for p in publication.split('|'):
-            search = search + '&publications_of_set.display_title=' + '+'.join(p.split())
-    if modifications:
-        for m in modifications.split('|'):
-            search = search + '&experiments_in_set.biosample.modifications.modification_type=' + '+'.join(m.split())
-    if treatments:
-        for t in treatments.split('|'):
-            search = search + '&experiments_in_set.biosample.treatments.treatment_type=' + '+'.join(t.split())
-    if assay_details:
-        for d in assay_details.split('|'):
-            d = d.replace(':', '%3A')  # encode ':' into hex
-            search = search + '&experiments_in_set.experiment_categorizer.combined=' + '+'.join(d.split())
-    if status:
-        for s in status.split('|'):
-            search = search + '&status=' + '+'.join(s.split())
-    if warnings:
-        for w in warnings.split('|'):
-            search = search + '&aggregated_items.badges.item.badge.warning=' + '+'.join(w.split())
+    kwargs = kwargs['kwargs']
+    base_url = kwargs['base_url'] # only required field
+    key = kwargs.get('key', None)
+    ff_env = kwargs.get('ff_env', None)
+    item_facets = kwargs.get('item_facets', None)
+    item_type = kwargs.get('item_type', 'ExperimentSetReplicate')
+    search = '/search/?type=' + item_type
+    if item_facets is None:
+        item_facets = get_item_facets(item_type, key=key, ff_env=ff_env)
+    for facet, values in kwargs.items():
+        if facet != 'item_type':
+            if facet in item_facets:
+                for value in values.split('|'):
+                    search = search + '&' + item_facets[facet] + '=' + '+'.join(value.split())
     return search_metadata(base_url + search, ff_env=ff_env, key=None)
 
 
