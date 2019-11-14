@@ -34,7 +34,9 @@ HANDLED_FUNCTIONS = [
     'purge_metadata',
     'get_metadata_links',
     'faceted_search',
-    'delete_field'
+    'delete_field',
+    'get_item_facets',
+    'get_item_facet_values'
 ]
 
 
