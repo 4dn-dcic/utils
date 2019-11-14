@@ -428,7 +428,7 @@ def search_facets(**kwargs):
         results = search_facets(base_url, kwargs=kwargs)
     """
     kwargs = kwargs['kwargs']
-    base_url = kwargs['base_url'] # only required field
+    base_url = kwargs['base_url']  # only required field
     key = kwargs.get('key', None)
     ff_env = kwargs.get('ff_env', None)
     item_facets = kwargs.get('item_facets', None)
