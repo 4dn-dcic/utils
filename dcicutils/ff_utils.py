@@ -458,15 +458,14 @@ def faceted_search(**kwargs):
     return search_metadata(search, ff_env=ff_env, key=key)
 
 
-def get_associated_qc_metrics(uuid, key=None, ff_env=None, **kwargs):
+def get_associated_qc_metrics(uuid, **kwargs):
     """
     Given a uuid of an experiment set, return a dictionary of uuid : item mappings
     with all data associated with all the QC metrics
     """
-    # get experiment set info from uuid
     result = {}
-    key = kwargs.get('key', None) if key is None else key
-    ff_env = kwargs.get('ff_env', None) if ff_env is None else ff_env
+    key = kwargs.get('key', None)
+    ff_env = kwargs.get('ff_env', None)
     resp = get_metadata(uuid, key=key, ff_env=ff_env)
     if 'processed_files' in resp:
         for entry in resp['processed_files']:
