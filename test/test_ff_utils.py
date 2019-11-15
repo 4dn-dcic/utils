@@ -778,7 +778,15 @@ def test_get_qc_metrics(integrated_ff):
     assert '131106bc-8535-4448-903e-854abbbbbbbb' in qc_metrics
     assert 'QualityMetric' in qc_metrics['4c9dabc6-61d6-4054-a951-c4fdd0023800']['@type']
     assert 'QualityMetric' in qc_metrics['131106bc-8535-4448-903e-854abbbbbbbb']['@type']
-
+    kwargs = {  # do same as above w/ kwargs instead
+        'key': key,
+        'ff_env': ff_env
+    }
+    qc_metrics = ff_utils.get_associated_qc_metrics(uuid, **kwargs)
+    assert '4c9dabc6-61d6-4054-a951-c4fdd0023800' in qc_metrics
+    assert '131106bc-8535-4448-903e-854abbbbbbbb' in qc_metrics
+    assert 'QualityMetric' in qc_metrics['4c9dabc6-61d6-4054-a951-c4fdd0023800']['@type']
+    assert 'QualityMetric' in qc_metrics['131106bc-8535-4448-903e-854abbbbbbbb']['@type']
 
 @pytest.mark.integrated
 @pytest.mark.flaky

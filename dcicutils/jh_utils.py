@@ -36,7 +36,8 @@ HANDLED_FUNCTIONS = [
     'faceted_search',
     'delete_field',
     'get_item_facets',
-    'get_item_facet_values'
+    'get_item_facet_values',
+    'get_associated_qc_metrics'
 ]
 
 
