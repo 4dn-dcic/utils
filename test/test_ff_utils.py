@@ -633,6 +633,7 @@ def test_faceted_search_exp_set(integrated_ff):
     """ Tests the experiment set search features using mastertest """
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     all_facets = ff_utils.get_item_facets('experiment_set_replicate', key=key, ff_env=ff_env)
+    import pdb; pdb.set_trace()
     for_all = {'key': key, 'ff_env': ff_env, 'item_facets': all_facets}
 
     # helper method that verifies a top level facet value
@@ -773,20 +774,21 @@ def test_get_qc_metrics(integrated_ff):
     """
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     uuid = '331106bc-8535-3338-903e-854af460b544'
+    expected_qc_uuids = ['4c9dabc6-61d6-4054-a951-c4fdd0023800', '131106bc-8535-4448-903e-854abbbbbbbb']
     qc_metrics = ff_utils.get_associated_qc_metrics(uuid, key=key, ff_env=ff_env)
-    assert '4c9dabc6-61d6-4054-a951-c4fdd0023800' in qc_metrics
-    assert '131106bc-8535-4448-903e-854abbbbbbbb' in qc_metrics
-    assert 'QualityMetric' in qc_metrics['4c9dabc6-61d6-4054-a951-c4fdd0023800']['@type']
-    assert 'QualityMetric' in qc_metrics['131106bc-8535-4448-903e-854abbbbbbbb']['@type']
+    assert len(qc_metrics) == 2
+    for entry in qc_metrics:
+        assert entry['uuid'] in expected_qc_uuids
+        assert 'QualityMetric' in entry['@type']
     kwargs = {  # do same as above w/ kwargs instead
         'key': key,
         'ff_env': ff_env
     }
     qc_metrics = ff_utils.get_associated_qc_metrics(uuid, **kwargs)
-    assert '4c9dabc6-61d6-4054-a951-c4fdd0023800' in qc_metrics
-    assert '131106bc-8535-4448-903e-854abbbbbbbb' in qc_metrics
-    assert 'QualityMetric' in qc_metrics['4c9dabc6-61d6-4054-a951-c4fdd0023800']['@type']
-    assert 'QualityMetric' in qc_metrics['131106bc-8535-4448-903e-854abbbbbbbb']['@type']
+    assert len(qc_metrics) == 2
+    for entry in qc_metrics:
+        assert entry['uuid'] in expected_qc_uuids
+        assert 'QualityMetric' in entry['@type']
 
 
 @pytest.mark.integrated

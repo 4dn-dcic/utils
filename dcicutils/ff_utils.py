@@ -460,34 +460,17 @@ def faceted_search(**kwargs):
 
 def get_associated_qc_metrics(uuid, **kwargs):
     """
-    Given a uuid of an experiment set, return a dictionary of uuid : item mappings
-    with all data associated with all the QC metrics
+    Given a uuid of an experiment set, return a list of associated qc metrics
     """
-    result = {}
-    key = kwargs.get('key', None)
-    ff_env = kwargs.get('ff_env', None)
-    resp = get_metadata(uuid, key=key, ff_env=ff_env)
-    if 'processed_files' in resp:
-        for entry in resp['processed_files']:
-            if 'quality_metric' not in entry:
-                continue
-            uuid = entry['quality_metric']['uuid']
-            result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
-    if 'experiments_in_set' in resp:
-        for exp in resp['experiments_in_set']:
-            if 'files' in exp:
-                for entry in exp['files']:
-                    if 'quality_metric' not in entry:
-                        continue
-                    uuid = entry['quality_metric']['uuid']
-                    result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
-            if 'processed_files' in exp:
-                for entry in exp['processed_files']:
-                    if 'quality_metric' not in entry:
-                        continue
-                    uuid = entry['quality_metric']['uuid']
-                    result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
-    return result
+    store, _ = expand_es_metadata([uuid], key=kwargs.get('key', None),
+                                              ff_env=kwargs.get('ff_env', None),
+                                              store_frame='embedded',
+                                              add_pc_wfr=True,
+                                              ignore_field=['experiment_relation',
+                                              'biosample_relation', 'references',
+                                              'reference_pubs'])
+    all_qc_items = [item for key in  store for item in store[key] if key.startswith('quality_metric')]
+    return all_qc_items
 
 
 def get_metadata_links(obj_id, key=None, ff_env=None):
