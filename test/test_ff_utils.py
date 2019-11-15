@@ -633,7 +633,6 @@ def test_faceted_search_exp_set(integrated_ff):
     """ Tests the experiment set search features using mastertest """
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     all_facets = ff_utils.get_item_facets('experiment_set_replicate', key=key, ff_env=ff_env)
-    import pdb; pdb.set_trace()
     for_all = {'key': key, 'ff_env': ff_env, 'item_facets': all_facets}
 
     # helper method that verifies a top level facet value

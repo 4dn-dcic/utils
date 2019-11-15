@@ -462,14 +462,16 @@ def get_associated_qc_metrics(uuid, **kwargs):
     """
     Given a uuid of an experiment set, return a list of associated qc metrics
     """
-    store, _ = expand_es_metadata([uuid], key=kwargs.get('key', None),
-                                              ff_env=kwargs.get('ff_env', None),
-                                              store_frame='embedded',
-                                              add_pc_wfr=True,
-                                              ignore_field=['experiment_relation',
-                                              'biosample_relation', 'references',
-                                              'reference_pubs'])
-    all_qc_items = [item for key in  store for item in store[key] if key.startswith('quality_metric')]
+    store, _ = expand_es_metadata([uuid],
+                                  key=kwargs.get('key', None),
+                                  ff_env=kwargs.get('ff_env', None),
+                                  store_frame='embedded',
+                                  add_pc_wfr=True,
+                                  ignore_field=['experiment_relation',
+                                                'biosample_relation',
+                                                'references',
+                                                'reference_pubs'])
+    all_qc_items = [item for key in store for item in store[key] if key.startswith('quality_metric')]
     return all_qc_items
 
 
