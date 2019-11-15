@@ -788,6 +788,7 @@ def test_get_qc_metrics(integrated_ff):
     assert 'QualityMetric' in qc_metrics['4c9dabc6-61d6-4054-a951-c4fdd0023800']['@type']
     assert 'QualityMetric' in qc_metrics['131106bc-8535-4448-903e-854abbbbbbbb']['@type']
 
+
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_expand_es_metadata_frame_object_embedded(integrated_ff):
