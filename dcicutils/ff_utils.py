@@ -456,8 +456,8 @@ def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
     return search_metadata(search, ff_env=ff_env, key=key)
 
 
-def get_associated_qc_metrics(uuid, key=None, ff_env=None, 
-                              exclude_raw_files=True, 
+def get_associated_qc_metrics(uuid, key=None, ff_env=None,
+                              exclude_raw_files=True,
                               exclude_supplementary_files=True):
     """
     Given a uuid of an experiment set, return a dictionary of uuid : item
