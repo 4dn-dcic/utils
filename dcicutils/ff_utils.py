@@ -418,7 +418,7 @@ def get_item_facet_values(item_type, key=None, ff_env=None):
     return facets
 
 
-def faceted_search(**kwargs):
+def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
     """
     Wrapper method for `search_metadata` that provides an easier way to search
     items based on facets
@@ -439,10 +439,8 @@ def faceted_search(**kwargs):
                    'item_type': 'ExperimentSetReplicate' }
         results = faceted_search(**kwargs)
     """
-    key = kwargs.get('key', None)
-    ff_env = kwargs.get('ff_env', None)
     item_facets = kwargs.get('item_facets', None)
-    item_type = kwargs.get('item_type', 'ExperimentSetReplicate')
+    item_type = 'ExperimentSetReplicate' if item_type is None else item_type
     search = '/search/?type=' + item_type
     if item_facets is None:
         item_facets = get_item_facets(item_type, key=key, ff_env=ff_env)
@@ -458,7 +456,9 @@ def faceted_search(**kwargs):
     return search_metadata(search, ff_env=ff_env, key=key)
 
 
-def get_associated_qc_metrics(uuid, **kwargs):
+def get_associated_qc_metrics(uuid, key=None, ff_env=None, 
+                              exclude_raw_files=True, 
+                              exclude_supplementary_files=True):
     """
     Given a uuid of an experiment set, return a dictionary of uuid : item
     mappings of quality metric items.
@@ -470,10 +470,6 @@ def get_associated_qc_metrics(uuid, **kwargs):
                                      non-processed files. Default: True
     """
     result = {}
-    key = kwargs.get('key', None)
-    ff_env = kwargs.get('ff_env', None)
-    exclude_raw_files = kwargs.get('exclude_raw_files', True)
-    exclude_supplementary_files = kwargs.get('exclude_supplementary_files', True)
     resp = get_metadata(uuid, key=key, ff_env=ff_env)
 
     # handle all 'processed_files' by default

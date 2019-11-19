@@ -121,7 +121,7 @@ In addition to ``search_metadata``, we also provide ``faceted_search`` which all
     'item_type' = 'user',
     'Affiliation' = '4DN Testing Lab'
   }
-  results = faceted_search(kwargs)
+  results = faceted_search(**kwargs)
 
   # you can also perform negative searches by pre-pending '-' to your desired value
   # ie: get all users not affiliated with the 4DN Testing Lab
