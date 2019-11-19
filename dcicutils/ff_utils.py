@@ -460,8 +460,8 @@ def faceted_search(**kwargs):
 
 def get_associated_qc_metrics(uuid, **kwargs):
     """
-    Given a uuid of an experiment set, return a dictionary of uuid : item 
-    mappings of quality metric items. 
+    Given a uuid of an experiment set, return a dictionary of uuid : item
+    mappings of quality metric items.
 
     Args:
         exclude_raw_files: if False will provide QC metrics on raw files as well
@@ -475,7 +475,7 @@ def get_associated_qc_metrics(uuid, **kwargs):
     exclude_raw_files = kwargs.get('exclude_raw_files', True)
     exclude_supplementary_files = kwargs.get('exclude_supplementary_files', True)
     resp = get_metadata(uuid, key=key, ff_env=ff_env)
-    
+
     # handle all 'processed_files' by default
     if 'processed_files' in resp:
         for entry in resp['processed_files']:
@@ -483,7 +483,7 @@ def get_associated_qc_metrics(uuid, **kwargs):
                 continue
             uuid = entry['quality_metric']['uuid']
             result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
-    
+
     # handle 'other_processed_files' if we are doing supplementary files
     if 'other_processed_files' in resp and not exclude_supplementary_files:
         for entry in resp['processed_files']:
@@ -491,19 +491,19 @@ def get_associated_qc_metrics(uuid, **kwargs):
                 continue
             uuid = entry['quality_metric']['uuid']
             result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
-    
+
     # check 'experiment_in_set' as these can contain things too
     if 'experiments_in_set' in resp:
         for exp in resp['experiments_in_set']:
-            
+
             # handle all 'processed_files' by default
             if 'processed_files' in exp:
                 for entry in exp['processed_files']:
-                   if 'quality_metric' not in entry:
-                       continue
-                   uuid = entry['quality_metric']['uuid']
-                   result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
-            
+                    if 'quality_metric' not in entry:
+                        continue
+                    uuid = entry['quality_metric']['uuid']
+                    result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
+
             # handle 'other_processed_files' if we're doing supplementary files
             if 'other_processed_files' in exp and not exclude_supplementary_files:
                 for entry in exp['processed_files']:
@@ -511,15 +511,16 @@ def get_associated_qc_metrics(uuid, **kwargs):
                         continue
                     uuid = entry['quality_metric']['uuid']
                     result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
-            
+
             # handle 'files' only if we are doing raw files
             if 'files' in exp and not exclude_raw_files:
-                for entry in exp['files']: 
+                for entry in exp['files']:
                     if 'quality_metric' not in entry:
                         continue
                     uuid = entry['quality_metric']['uuid']
                     result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
     return result
+
 
 def get_metadata_links(obj_id, key=None, ff_env=None):
     """
