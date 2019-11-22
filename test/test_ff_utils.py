@@ -746,7 +746,6 @@ def test_faceted_search_users(integrated_ff):
     Tests a negative search as well
     """
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
-    url = integrated_ff['ff_key']['server']
     all_facets = ff_utils.get_item_facets('user', key=key, ff_env=ff_env)
     affiliation = {'item_type': 'user',
                    'Affiliation': '4DN Testing Lab',
