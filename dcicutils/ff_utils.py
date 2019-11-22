@@ -387,6 +387,137 @@ def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=F
         return search_res
 
 
+def get_item_facets(item_type, key=None, ff_env=None):
+    """
+    Gets facet query string information ie: mapping from facet to query string
+    """
+    resp = get_metadata('/profiles/' + item_type + '.json', key=key, ff_env=ff_env)
+    facets = {}
+    for query_url, info in resp.get('facets', {}).items():
+        facets[info['title']] = query_url
+
+    # status is hardcoded in search.py, so the same must be done here
+    facets['Status'] = 'status'
+    return facets
+
+
+def get_item_facet_values(item_type, key=None, ff_env=None):
+    """
+    Gets all facets and returns all possible values for each one with counts
+    ie: dictionary of facets mapping to a dictionary containing all possible values
+    for that facet mapping to the count for that value
+    format: {'Project': {'4DN': 2, 'Other': 6}, 'Lab': {...}}
+    """
+    resp = get_metadata('/search/?type=' + item_type, key=key, ff_env=ff_env)['facets']
+    facets = {}
+    for facet in resp:
+        name = facet['title']
+        facets[name] = {}
+        for term in facet['terms']:
+            facets[name][term['key']] = term['doc_count']
+    return facets
+
+
+def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
+    """
+    Wrapper method for `search_metadata` that provides an easier way to search
+    items based on facets
+
+    kwargs should contain the following 5 things:
+        - key (if not using built in aws auth)
+        - ff_env (if not using build in aws auth)
+        - item_type (if not searching for experiment sets)
+        - item_facets (if you don't want to resolve these in this function)
+        + any facets (| seperated values) you'd like to search on (see example below)
+
+    Example: search for all experiments under the 4DN project with experiment type
+    Dilution Hi-C
+        kwargs = { 'Project': '4DN',
+                   'Experiment Type': 'Dilution Hi-C',
+                   'key': key,
+                   'ff_env': ff_env,
+                   'item_type': 'ExperimentSetReplicate' }
+        results = faceted_search(**kwargs)
+    """
+    item_facets = kwargs.get('item_facets', None)
+    item_type = 'ExperimentSetReplicate' if item_type is None else item_type
+    search = '/search/?type=' + item_type
+    if item_facets is None:
+        item_facets = get_item_facets(item_type, key=key, ff_env=ff_env)
+    for facet, values in kwargs.items():
+        if facet != 'item_type':
+            if facet in item_facets:
+                for value in values.split('|'):
+                    fmt_value = '+'.join(value.split())
+                    if fmt_value[0] == '-':  # handle negative
+                        search = search + '&' + item_facets[facet] + '!=' + fmt_value[1:]
+                    else:
+                        search = search + '&' + item_facets[facet] + '=' + fmt_value
+    return search_metadata(search, ff_env=ff_env, key=key)
+
+
+def get_associated_qc_metrics(uuid, key=None, ff_env=None,
+                              exclude_raw_files=True,
+                              exclude_supplementary_files=True):
+    """
+    Given a uuid of an experiment set, return a dictionary of uuid : item
+    mappings of quality metric items.
+
+    Args:
+        exclude_raw_files: if False will provide QC metrics on raw files as well
+                           Default: True
+        exclude_supplementary_files: if False will also give QC's associated with
+                                     non-processed files. Default: True
+    """
+    result = {}
+    resp = get_metadata(uuid, key=key, ff_env=ff_env)
+
+    # handle all 'processed_files' by default
+    if 'processed_files' in resp:
+        for entry in resp['processed_files']:
+            if 'quality_metric' not in entry:
+                continue
+            uuid = entry['quality_metric']['uuid']
+            result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
+
+    # handle 'other_processed_files' if we are doing supplementary files
+    if 'other_processed_files' in resp and not exclude_supplementary_files:
+        for entry in resp['processed_files']:
+            if 'quality_metric' not in entry:
+                continue
+            uuid = entry['quality_metric']['uuid']
+            result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
+
+    # check 'experiment_in_set' as these can contain things too
+    if 'experiments_in_set' in resp:
+        for exp in resp['experiments_in_set']:
+
+            # handle all 'processed_files' by default
+            if 'processed_files' in exp:
+                for entry in exp['processed_files']:
+                    if 'quality_metric' not in entry:
+                        continue
+                    uuid = entry['quality_metric']['uuid']
+                    result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
+
+            # handle 'other_processed_files' if we're doing supplementary files
+            if 'other_processed_files' in exp and not exclude_supplementary_files:
+                for entry in exp['processed_files']:
+                    if 'quality_metric' not in entry:
+                        continue
+                    uuid = entry['quality_metric']['uuid']
+                    result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
+
+            # handle 'files' only if we are doing raw files
+            if 'files' in exp and not exclude_raw_files:
+                for entry in exp['files']:
+                    if 'quality_metric' not in entry:
+                        continue
+                    uuid = entry['quality_metric']['uuid']
+                    result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
+    return result
+
+
 def get_metadata_links(obj_id, key=None, ff_env=None):
     """
     Given standard key/ff_env authentication, return result for @@links view

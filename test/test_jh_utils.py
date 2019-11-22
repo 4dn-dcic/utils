@@ -48,6 +48,8 @@ def test_some_decorated_methods_work(integrated_ff):
     patch_res = jh_utils.patch_metadata({'other_tracking': {'test_field': 'test_value'}},
                                         post_res['@graph'][0]['uuid'])
     assert patch_res['@graph'][0]['other_tracking']['test_field'] == 'test_value'
+    faceted_search_res = jh_utils.faceted_search(**{'Project': '4DN'})
+    assert len(faceted_search_res) == 8
 
 
 @pytest.mark.integrated

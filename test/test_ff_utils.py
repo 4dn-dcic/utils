@@ -604,6 +604,193 @@ def test_expand_es_metadata(integrated_ff):
 
 
 @pytest.mark.integrated
+def test_get_item_facets(integrated_ff):
+    """ Tests that we can resolve information on facets """
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    item_type = 'experiment_set_replicate'
+    facets = ff_utils.get_item_facets(item_type, key=key, ff_env=ff_env)
+    assert 'Lab' in facets
+    assert 'Center' in facets
+    assert 'Set Type' in facets
+    assert 'Internal Release Date' in facets
+
+
+@pytest.mark.integrated
+def test_get_item_facet_values(integrated_ff):
+    """ Tests that we correctly grab facets and all their possible values """
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    item_type = 'experiment_set_replicate'
+    facets = ff_utils.get_item_facet_values(item_type, key=key, ff_env=ff_env)
+    assert 'Project' in facets
+    assert '4DN' in facets['Project']
+    assert 'Assay Details' in facets
+    assert 'Target: YFG protein' in facets['Assay Details']
+    assert 'Status' in facets
+
+
+@pytest.mark.integrated
+def test_faceted_search_exp_set(integrated_ff):
+    """ Tests the experiment set search features using mastertest """
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    all_facets = ff_utils.get_item_facets('experiment_set_replicate', key=key, ff_env=ff_env)
+    for_all = {'key': key, 'ff_env': ff_env, 'item_facets': all_facets}
+
+    # helper method that verifies a top level facet value
+    def validate_items(items, facet, expected):
+        facet_levels = facet.split('.')
+        for item in items:
+            it = item
+            for level in facet_levels:
+                it = it[level]
+            assert it == expected
+
+    project = {'Project': '4DN'}
+    project.update(for_all)
+    resp = ff_utils.faceted_search(**project)
+    assert len(resp) == 8
+    validate_items(resp, all_facets['Project'], '4DN')
+    lab = {'Lab': '4DN Testing Lab'}
+    lab.update(for_all)
+    resp = ff_utils.faceted_search(**lab)
+    assert len(resp) == 12
+    validate_items(resp, all_facets['Lab'], '4DN Testing Lab')
+    exp_cat = {'Experiment Category': 'Microscopy'}
+    exp_cat.update(for_all)
+    resp = ff_utils.faceted_search(**exp_cat)
+    assert len(resp) == 1
+    exp_type = {'Experiment Type': 'Dilution Hi-C'}
+    exp_type.update(for_all)
+    resp = ff_utils.faceted_search(**exp_type)
+    assert len(resp) == 3
+    dataset = {'Dataset': 'No value'}
+    dataset.update(for_all)
+    resp = ff_utils.faceted_search(**dataset)
+    assert len(resp) == 9
+    sample_type = {'Sample Type': 'immortalized cells'}
+    sample_type.update(for_all)
+    resp = ff_utils.faceted_search(**sample_type)
+    assert len(resp) == 13
+    sample_cat = {'Sample Category': 'In vitro Differentiation'}
+    sample_cat.update(for_all)
+    resp = ff_utils.faceted_search(**sample_cat)
+    assert len(resp) == 1
+    sample = {'Sample': 'GM12878'}
+    sample.update(for_all)
+    resp = ff_utils.faceted_search(**sample)
+    assert len(resp) == 13
+    tissue_src = {'Tissue Source': 'endoderm'}
+    tissue_src.update(for_all)
+    resp = ff_utils.faceted_search(**tissue_src)
+    assert len(resp) == 1
+    pub = {'Publication': 'No value'}
+    pub.update(for_all)
+    resp = ff_utils.faceted_search(**pub)
+    assert len(resp) == 10
+    mods = {'Modifications': 'Stable Transfection'}
+    mods.update(for_all)
+    resp = ff_utils.faceted_search(**mods)
+    assert len(resp) == 7
+    treats = {'Treatments': 'RNAi'}
+    treats.update(for_all)
+    resp = ff_utils.faceted_search(**treats)
+    assert len(resp) == 7
+    assay_details = {'Assay Details': 'No value'}
+    assay_details.update(for_all)
+    resp = ff_utils.faceted_search(**assay_details)
+    assert len(resp) == 1
+    status = {'Status': 'released'}
+    status.update(for_all)
+    resp = ff_utils.faceted_search(**status)
+    assert len(resp) == 12
+    warnings = {'Warnings': 'No value'}
+    warnings.update(for_all)
+    resp = ff_utils.faceted_search(**warnings)
+    assert len(resp) == 4
+    both_projects = {'Project': '4DN|External'}
+    both_projects.update(for_all)
+    resp = ff_utils.faceted_search(**both_projects)
+    assert len(resp) == 13
+    both_labs = {'Lab': '4DN Testing Lab|Some Other Guys lab'}
+    both_labs.update(for_all)
+    resp = ff_utils.faceted_search(**both_labs)
+    assert len(resp) == 13
+    proj_exp_type = {'Project': '4DN', 'Experiment Type': 'Dilution Hi-C'}
+    proj_exp_type.update(for_all)
+    resp = ff_utils.faceted_search(**proj_exp_type)
+    assert len(resp) == 2
+    proj_exp_type = {'Project': '4DN|External', 'Experiment Type': 'Dilution Hi-C|2-stage Repli-seq'}
+    proj_exp_type.update(for_all)
+    resp = ff_utils.faceted_search(**proj_exp_type)
+    assert len(resp) == 5
+    proj_exp_sam = {'Project': '4DN|External',
+                    'Experiment Type': 'Dilution Hi-C|2-stage Repli-seq',
+                    'Sample Type': 'in vitro differentiated cells'}
+    proj_exp_sam.update(for_all)
+    resp = ff_utils.faceted_search(**proj_exp_sam)
+    assert len(resp) == 1
+    exp_sam = {'Experiment Type': 'ATAC-seq', 'Sample': 'GM12878'}
+    exp_sam.update(for_all)
+    resp = ff_utils.faceted_search(**exp_sam)
+    assert len(resp) == 1
+    exp_sam_data = {'Experiment Category': 'Sequencing', 'Sample': 'GM12878',
+                    'Dataset': 'Z et al. 2-Stage Repliseq'}
+    exp_sam_data.update(for_all)
+    resp = ff_utils.faceted_search(**exp_sam_data)
+    assert len(resp) == 2
+
+
+@pytest.mark.integrated
+def test_faceted_search_users(integrated_ff):
+    """
+    Tests faceted_search with users intead of experiment set
+    Tests a negative search as well
+    """
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    url = integrated_ff['ff_key']['server']
+    all_facets = ff_utils.get_item_facets('user', key=key, ff_env=ff_env)
+    affiliation = {'item_type': 'user',
+                   'Affiliation': '4DN Testing Lab',
+                   'key': key,
+                   'ff_env': ff_env,
+                   'base_url': url,
+                   'item_facets': all_facets}
+    resp = ff_utils.faceted_search(**affiliation)
+    assert len(resp) == 4
+    neg_affiliation = {'item_type': 'user',
+                       'Affiliation': '-4DN Testing Lab',
+                       'key': key,
+                       'ff_env': ff_env,
+                       'base_url': url,
+                       'item_facets': all_facets}
+    resp = ff_utils.faceted_search(**neg_affiliation)
+    assert len(resp) == 19
+
+
+@pytest.mark.integrated
+def test_get_qc_metrics(integrated_ff):
+    """
+    Tests that we correctly extract qc metric uuids (and therefore items) from the helper
+    """
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    uuid = '331106bc-8535-3338-903e-854af460b544'
+    qc_metrics = ff_utils.get_associated_qc_metrics(uuid, key=key, ff_env=ff_env)
+    assert len(qc_metrics.keys()) == 1
+    assert '131106bc-8535-4448-903e-854abbbbbbbb' in qc_metrics
+    assert 'QualityMetric' in qc_metrics['131106bc-8535-4448-903e-854abbbbbbbb']['@type']
+    kwargs = {  # do same as above w/ kwargs, specify to include raw files this time
+        'key': key,
+        'ff_env': ff_env,
+        'exclude_raw_files': False
+    }
+    qc_metrics = ff_utils.get_associated_qc_metrics(uuid, **kwargs)
+    assert len(qc_metrics.keys()) == 2
+    assert '4c9dabc6-61d6-4054-a951-c4fdd0023800' in qc_metrics
+    assert '131106bc-8535-4448-903e-854abbbbbbbb' in qc_metrics
+    assert 'QualityMetric' in qc_metrics['131106bc-8535-4448-903e-854abbbbbbbb']['@type']
+    assert 'QualityMetric' in qc_metrics['4c9dabc6-61d6-4054-a951-c4fdd0023800']['@type']
+
+
+@pytest.mark.integrated
 @pytest.mark.flaky
 def test_expand_es_metadata_frame_object_embedded(integrated_ff):
     test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
