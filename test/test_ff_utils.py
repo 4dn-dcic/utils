@@ -752,7 +752,6 @@ def test_faceted_search_users(integrated_ff):
                    'Affiliation': '4DN Testing Lab',
                    'key': key,
                    'ff_env': ff_env,
-                   'base_url': url,
                    'item_facets': all_facets}
     resp = ff_utils.faceted_search(**affiliation)
     assert len(resp) == 4
@@ -760,10 +759,17 @@ def test_faceted_search_users(integrated_ff):
                        'Affiliation': '-4DN Testing Lab',
                        'key': key,
                        'ff_env': ff_env,
-                       'base_url': url,
                        'item_facets': all_facets}
     resp = ff_utils.faceted_search(**neg_affiliation)
     assert len(resp) == 19
+    neg_affiliation = {'item_type': 'user',
+                       'Affiliation': '-4DN Testing Lab',
+                       'key': key,
+                       'ff_env': ff_env,
+                       'item_facets': all_facets,
+                       'Limit': '10'}  # test limit
+    resp = ff_utils.faceted_search(**neg_affiliation)
+    assert len(resp) == 10
 
 
 @pytest.mark.integrated

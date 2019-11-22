@@ -396,8 +396,9 @@ def get_item_facets(item_type, key=None, ff_env=None):
     for query_url, info in resp.get('facets', {}).items():
         facets[info['title']] = query_url
 
-    # status is hardcoded in search.py, so the same must be done here
+    # status/limit is hardcoded in search.py, so the same must be done here
     facets['Status'] = 'status'
+    facets['Limit'] = 'limit'
     return facets
 
 
