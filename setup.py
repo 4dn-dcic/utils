@@ -38,7 +38,7 @@ setup(
     url='https://data.4dnucleome.org',
     license='MIT',
     install_requires=requires,
-    setup_requires=['pytest-runner', 'colorama'],
+    setup_requires=['pytest-runner', 'colorama==0.3.9'],
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
