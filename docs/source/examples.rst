@@ -2,7 +2,7 @@
 Examples
 ========
 
-See `getting started <./getting_started.rst>`_ for help with getting up and running with dcicutils.
+See `getting started <./getting_started.html>`_ for help with getting up and running with dcicutils.
 
 As a first step, we will import our modules from the dcicutils package.
 
