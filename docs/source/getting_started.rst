@@ -29,4 +29,4 @@ Central metadata functions
 
 The most useful utilities functions for most users are the metadata functions, which generally are used to access, create, or edit object metadata on the Fourfront portal. Since this utilities module is a pip-installable Python package, they can be leveraged as an API to the portal in your scripts. All of these functions are contained within  ``dcicutils.ff_utils.py``.
 
-See example usage of these functions `here <./examples.md#metadata>`_
+See example usage of these functions `here <./examples.rst#metadata>`_
