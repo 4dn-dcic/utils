@@ -28,3 +28,4 @@ See `this document <./getting_started.html>`_ for tips on getting started. `Go h
   self
   getting_started
   examples
+  dcicutils
