@@ -4,53 +4,37 @@ dcicutils package
 Submodules
 ----------
 
-dcicutils.beanstalk\_utils module
+dcicutils.beanstalk_utils module
 ---------------------------------
 
 .. automodule:: dcicutils.beanstalk_utils
    :members:
-   :undoc-members:
-   :show-inheritance:
 
-dcicutils.es\_utils module
+
+dcicutils.es_utils module
 --------------------------
 
 .. automodule:: dcicutils.es_utils
    :members:
-   :undoc-members:
-   :show-inheritance:
 
-dcicutils.ff\_utils module
+dcicutils.ff_utils module
 --------------------------
 
 .. automodule:: dcicutils.ff_utils
    :members:
-   :undoc-members:
-   :show-inheritance:
 
-dcicutils.jh\_utils module
---------------------------
 
-.. automodule:: dcicutils.jh_utils
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-dcicutils.log\_utils module
+dcicutils.log_utils module
 ---------------------------
 
 .. automodule:: dcicutils.log_utils
    :members:
-   :undoc-members:
-   :show-inheritance:
 
-dcicutils.s3\_utils module
+dcicutils.s3_utils module
 --------------------------
 
 .. automodule:: dcicutils.s3_utils
    :members:
-   :undoc-members:
-   :show-inheritance:
 
 
 Module contents
@@ -58,5 +42,3 @@ Module contents
 
 .. automodule:: dcicutils
    :members:
-   :undoc-members:
-   :show-inheritance:
