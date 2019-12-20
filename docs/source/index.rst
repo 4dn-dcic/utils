@@ -23,8 +23,9 @@ See `this document <./getting_started.html>`_ for tips on getting started. `Go h
    :alt: Documentation Status
 
 .. toctree::
-  ::maxdepth: 4
+  :maxdepth: 4
 
   self
   getting_started
   examples
+  dcicutils
