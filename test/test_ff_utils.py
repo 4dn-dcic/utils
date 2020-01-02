@@ -414,7 +414,6 @@ def test_search_metadata_with_generator(integrated_ff):
                                           is_generator=True)
     validate_gen(search_gen, 7)
     # do limit = 3 search on users
-    # do limit = 10 search, iterate through generator, should have 10 results
     search_gen = ff_utils.search_metadata(url + 'search/?limit=3&type=User',
                                           key=integrated_ff['ff_key'],
                                           is_generator=True)
