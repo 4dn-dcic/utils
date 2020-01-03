@@ -26,7 +26,7 @@ jobs:
     before_install:
     - pip install poetry
     install:
-    - echo "Installing package and running tests on the installed package"
+    - echo "Installing through poetry then running tests"
     - poetry install
     - pip install coveralls
     script:
