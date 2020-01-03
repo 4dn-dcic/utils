@@ -31,7 +31,7 @@ jobs:
     - pip install coveralls
     script:
     - flake8 dcicutils
-    - pytest -vv test
+    - travis_wait pytest -vv test
     - coveralls
     after_success:
     - echo "Finished running tests"

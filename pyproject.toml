@@ -1,12 +1,15 @@
 [tool.poetry]
-name = "utils"
+name = "dcicutils"
 version = "0.8.6"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["William Ronchetti <william_ronchetti@hms.harvard.edu>"]
 license = "MIT"
 readme = "README.rst"
-homepage = "https://dcic-utils.readthedocs.io/en/latest/"
+homepage = "https://github.com/4dn-dcic/utils"
 repository = "https://github.com/4dn-dcic/utils"
+packages = [
+  { include="dcicutils", from="." }
+]
 
 [tool.poetry.dependencies]
 python = "^3.4"
