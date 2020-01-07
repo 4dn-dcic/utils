@@ -4,16 +4,6 @@ cache:
   pip: true
 python:
 - '3.5'
-deploy:
-  provider: pypi
-  user:
-    secure: Jpkqo70FGa0K1+VGPIvgAisNa1FB/Hd4rcwgxJtYUQc3wby+nyxuIrzsu7NOsYkDJ8vxaE/FbKND1ZFW18vbD9kY6S3/oMSCE5f4fAEhpPEMlOGW5jLI00427PdhbYxk1X2NkhMpU5mEYFFoEf4+GsfoO6zKhhH/xVHjirrcKSJoThQpbYymvJ6uQAuNddSSxqDIcHJGDEfFPUqydOlqgi4oizCagl8N+gIJqpDQ6VQopN8tdM/4YavMaOF7yeU/XEYBQLQgldcjwIeP/X0hy3bLpphgI2MoZ2Y8mJjWF3sC6stKhIjXrUdcjodpzPTJSVuaio1FajTn0h6E1COa+lmckWtzdkGIgSmA6gwKh44nFQcDSV/8fD/or4xjc210V1tG12+MugOuI5q4NFmjbjNEsKw7KIoDqPGRdfE/HZOr30oLWTgaEqdTtG0SzdFfQPq84P80UGlcv68CgnrXtQGwXR08/H4NsuDhnjBKFXZq1afC7Tqw7JtlJyXQmJnmKElrXNaugJe4ru4RY+FlGCt44QZe/sozzFutzqWUfNUrDP2AP+saF7CiH6kD+tcPDioD18dJx0Y0E726Hu7O4wGZk6gl1AYV0LluXulDBO1x8/5vJtzolvC4AsXYWAhk+uUP4j1pO0Pmi+ahuEyyYdUQScMr+gNe0aa/JpzV2L0=
-  password:
-    secure: dP62awneMbu7jlpFmkQpwGqDxmqlOJorbWjh51BLOuPDc/LHOlI50vdLCwNLwfQFedKoP5LZIfWYBoy8wbXLhXpqZkgwwPvBesaUPuRONdxLqXCqM21d/1nmgIEIdwgFkcIKTRwTPK5LKygXg5iAstkrq+kcdv0Hwake4QE7ZtJEo2kTKPF8jkzHteeBfSB1n6GrQ6iQnkzMg6RiqjB3t0sdNRX/sKZqM5CdYzA523tDjrPTGTWyhVS++/TeNW5PZajZyVr2HKH5+OYp5Ik/8w0Q6EXM51ZuFrqTnv67kTCSIfXai6tpCauI3x3EiUVhkyznIXz2uC5i518GWQWwbuf+k4IKmhXtUe6uA+rVaCkdBOjBN6CyLGJwKaefCJw/RMgWKnqqrHr+6hfwKJctQVxDQcXpvP3+O+LkqBY3D1CYtSjAiini3ooKa2UQGGBhCe8HcPXsMwzPzefdv36RdGASg4X27qOTCKm4F+Jzo9LWF5K3AmYDyGUOXlpfSK1gug6DBrp3VsE3rNX3z8PRj5+LZhDXKg/K99FzM3lsoYypP/V5btoZ3rbUvklRueotSjIO2mohzX4aJ7cZt8hMuoABaXdyIEggWccPYCkOnBnJ0yiXp/PpiRdXeVF2G7eo5fRM/TWPAkvNUJpFvQBRCtvW3xmirY+7Rf79S8FntHM=
-  skip_existing: true
-  on:
-    tags: true
-  distributions: sdist bdist_wheel
 env:
   global:
   - secure: x8IUUQIlfb/RYfdbMdNLy5Q2/WhRWhAmVZqhum1WPZq4DlhQh2o5ntDCavJ3j3iQ3vekYZPksgQicX0Z6NUz8wXH7+gsbgCHvhN4NdDI3sLMpXc95tzHWP5YY1XY9UDryjZjqAiz2FVnmth7Y++gsRnPk2vCzw0xTOpwYDZoA+qLsYWUMZWNZkwQS3HlpeIj1f869+htzgLy+BaeeCUXEdKJF5rxZZpqSOPNIAeribaEKYdGRTtxTu3Sf+pq5rVQ+LM/X/FwzJcGfxrS3yKZErr2tS/DclONGCx8hcY01mTH6+rCb/zYd8NHTU+ZEOI41vICPSWcaoHvajMmLOF8h+6FRYWAYt5yF+GfWVdnuEDMxB1/Czul7+oKI6yh3Uv0R5/Nlhu8gpZ2Qwr9zk9OyZd9X1cYtRTEpPiqH2mc4aylclR1/MD/nLs1bHB+K591duyyWPtUQE7BFT0gksLLT9S/mt2p8pPu7CF6ZTAViLD4yUArmjBF/acP/QfThaXuHWqGUxO2oRvcD/YYPwyGWw/I2qmvVSAAZwNkaMahN6SAb5vgu3yOMrsQt6xDN+dcoqNQNu1tno4naFUnYzxW0ozR4mCTycAvbh9BknxuE5gAj/mAn4ZP4et6nwXyYbqJbeAFdhlwxL8ttiqgwZLdXD9oxBYlptPORzQCrpS3U74=
@@ -33,6 +23,14 @@ jobs:
     - flake8 dcicutils
     - travis_wait pytest -vv test
     - coveralls
+    before_deploy:
+    - poetry config http-basic.pypi $PYPI_USER $PYPI_PASSWORD
+    - poetry build
+    deploy:
+      provider: script
+      script: poetry publish
+      on:
+        tags: true
     after_success:
     - echo "Finished running tests"
     - |
