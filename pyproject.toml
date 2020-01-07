@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "0.8.6"
+version = "0.9.0b1"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["William Ronchetti <william_ronchetti@hms.harvard.edu>"]
 license = "MIT"
