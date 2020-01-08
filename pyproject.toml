@@ -28,6 +28,7 @@ pytest-mock = "1.10.4"
 pytest-runner = "5.1"
 flaky = "3.6.1"
 flake8 = "3.7.8"
+coverage = "4.5.4"
 
 [build-system]
 requires = ["poetry>=0.12"]

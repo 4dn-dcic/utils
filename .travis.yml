@@ -21,7 +21,7 @@ jobs:
     - pip install coveralls
     script:
     - flake8 dcicutils
-    - travis_wait pytest -vv test
+    - travis_wait coverage run -m pytest -vv test
     - coveralls
     before_deploy:
     - poetry config http-basic.pypi $PYPI_USER $PYPI_PASSWORD
