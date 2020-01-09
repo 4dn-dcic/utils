@@ -1,0 +1,35 @@
+[tool.poetry]
+name = "dcicutils"
+version = "0.9.0"
+description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
+authors = ["William Ronchetti <william_ronchetti@hms.harvard.edu>"]
+license = "MIT"
+readme = "README.rst"
+homepage = "https://github.com/4dn-dcic/utils"
+repository = "https://github.com/4dn-dcic/utils"
+packages = [
+  { include="dcicutils", from="." }
+]
+
+[tool.poetry.dependencies]
+python = "^3.4"
+boto3 = "1.10.46"
+botocore = "1.13.46"
+elasticsearch = "5.5.3"
+aws-requests-auth = "0.4.2"
+urllib3 = "1.24.3"
+structlog = "19.2.0"
+requests = "2.21.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "4.5.0"
+pytest-cov = "2.7.1"
+pytest-mock = "1.10.4"
+pytest-runner = "5.1"
+flaky = "3.6.1"
+flake8 = "3.7.8"
+coverage = "4.5.4"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
