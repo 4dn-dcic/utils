@@ -21,7 +21,7 @@ jobs:
     - pip install coveralls
     script:
     - flake8 dcicutils
-    - travis_wait coverage run -m pytest -vv test
+    - travis_wait coverage run --source=dcicutils -m pytest -vv test
     - coveralls
     deploy:
       provider: script
