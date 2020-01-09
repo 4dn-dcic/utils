@@ -23,11 +23,9 @@ jobs:
     - flake8 dcicutils
     - travis_wait coverage run -m pytest -vv test
     - coveralls
-    before_deploy:
-    - poetry config http-basic.pypi $PYPI_USER $PYPI_PASSWORD
     deploy:
       provider: script
-      script: poetry publish --build
+      script: poetry publish --build --username=$PYPI_USER --password=$PYPI_PASSWORD
       on:
         tags: true
     after_success:
