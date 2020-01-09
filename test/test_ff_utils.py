@@ -392,6 +392,50 @@ def test_search_metadata(integrated_ff, url):
 
 
 @pytest.mark.integrated
+def test_search_metadata_with_generator(integrated_ff):
+    """ Test using search_metadata with a generator """
+    url = integrated_ff['ff_key']['server'] + '/'
+
+    # helper to validate generator
+    def validate_gen(gen, expected):
+        found = 0
+        for entry in gen:
+            found += 1
+        assert found == expected
+
+    # do limit = 10 search, iterate through generator, should have 10 results
+    search_gen = ff_utils.search_metadata(url + 'search/?limit=10&type=File',
+                                          key=integrated_ff['ff_key'],
+                                          is_generator=True)
+    validate_gen(search_gen, 10)
+    # do limit = 7 search, iterate through generator, should have 7 results
+    search_gen = ff_utils.search_metadata(url + 'search/?limit=7&type=File',
+                                          key=integrated_ff['ff_key'],
+                                          is_generator=True)
+    validate_gen(search_gen, 7)
+    # do limit = 3 search on users
+    search_gen = ff_utils.search_metadata(url + 'search/?limit=3&type=User',
+                                          key=integrated_ff['ff_key'],
+                                          is_generator=True)
+    validate_gen(search_gen, 3)
+
+
+@pytest.mark.integrated
+def test_get_es_metadata_with_generator(integrated_ff):
+    """ Tests using get_es_metadata with the generator option """
+    url = integrated_ff['ff_key']['server'] + '/'
+    search_res = ff_utils.search_metadata(url + 'search/?limit=15&type=File', key=integrated_ff['ff_key'])
+    # get 15 random uuids, pass into get_es_metadata, iterate through the gen
+    uuids = [entry['uuid'] for entry in search_res]
+    metadata_gen = ff_utils.get_es_metadata(uuids, key=integrated_ff['ff_key'], is_generator=True)
+    found = 0
+    for entry in metadata_gen:
+        assert entry['uuid'] in uuids
+        found += 1
+    assert found == 15
+
+
+@pytest.mark.integrated
 @pytest.mark.flaky
 def test_get_search_generator(integrated_ff):
     search_url = integrated_ff['ff_key']['server'] + '/search/?type=FileFastq'
