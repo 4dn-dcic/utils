@@ -111,13 +111,14 @@ description = "Python client for Elasticsearch"
 name = "elasticsearch"
 optional = false
 python-versions = "*"
-version = "5.5.3"
+version = "6.4.0"
 
 [package.dependencies]
 urllib3 = ">=1.21.1"
 
 [package.extras]
 develop = ["requests (>=2.0.0,<3.0.0)", "nose", "coverage", "mock", "pyaml", "nosexcover", "sphinx", "sphinx-rtd-theme"]
+requests = ["requests (>=2.4.0,<3.0.0)"]
 
 [[package]]
 category = "dev"
@@ -449,7 +450,7 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["pathlib2", "contextlib2", "unittest2"]
 
 [metadata]
-content-hash = "a88bc31b1ffce2f02bf40e1fd539fe53d4c225e7c129cbeed371c726cea61ae7"
+content-hash = "e8957ffac37ddcfe8d3d29762aa74199d197b394260e877d85d6967fb8a6fa3c"
 python-versions = "^3.4"
 
 [metadata.files]
@@ -524,8 +525,8 @@ docutils = [
     {file = "docutils-0.15.2.tar.gz", hash = "sha256:a2aeea129088da402665e92e0b25b04b073c04b2dce4ab65caaa38b7ce2e1a99"},
 ]
 elasticsearch = [
-    {file = "elasticsearch-5.5.3-py2.py3-none-any.whl", hash = "sha256:658380fd60bdaf746fef12958f0abc49063218ce93ee1ae4ca1fe6291c896433"},
-    {file = "elasticsearch-5.5.3.tar.gz", hash = "sha256:ae91b089f2f2b5b3daa04297949e5f805ab12d187218cb587273f472656fd250"},
+    {file = "elasticsearch-6.4.0-py2.py3-none-any.whl", hash = "sha256:1f0f633e3b500d5042424f75a505badf8c4b9962c1b4734cdfb3087fb67920be"},
+    {file = "elasticsearch-6.4.0.tar.gz", hash = "sha256:fb5ab15ee283f104b5a7a5695c7e879cb2927e4eb5aed9c530811590b41259ad"},
 ]
 entrypoints = [
     {file = "entrypoints-0.3-py2.py3-none-any.whl", hash = "sha256:589f874b313739ad35be6e0cd7efde2a4e9b6fea91edcc34e58ecbb8dbe56d19"},
