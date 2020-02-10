@@ -194,6 +194,10 @@ class s3Utils(object):
         bytestream = BytesIO(s3_stream)
         zipstream = ZipFile(bytestream, 'r')
         
+        # The contents of zip can sometimes be like
+        # ["foo/", "file1", "file2", "file3"]
+        # and other times like
+        # ["file1", "file2", "file3"]
         file_list = zipstream.namelist()
         if file_list[0].endswith('/'):
             # in case directory first name in the list
