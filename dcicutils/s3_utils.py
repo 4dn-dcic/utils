@@ -195,7 +195,7 @@ class s3Utils(object):
         zipstream = ZipFile(bytestream, 'r')
         
         file_list = zipstream.namelist()
-        if basedir_name.endswith('/'):
+        if file_list[0].endswith('/'):
             # in case directory first name in the list
             basedir_name = file_list.pop(0)
         else:
