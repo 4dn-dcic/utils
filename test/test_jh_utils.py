@@ -98,6 +98,7 @@ def test_jh_open_4dn_file(integrated_ff):
     assert 'No such file or directory' in str(exec_info6.value)
 
 
+@pytest.mark.skip(reason="we no longer have tracking items")
 def test_add_mounted_file_to_session(integrated_ff):
     test_server = integrated_ff['ff_key']['server']
     initialize_jh_env(test_server)

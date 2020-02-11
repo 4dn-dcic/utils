@@ -193,7 +193,7 @@ class s3Utils(object):
         # read this badboy to memory, don't go to disk
         bytestream = BytesIO(s3_stream)
         zipstream = ZipFile(bytestream, 'r')
-        
+
         # The contents of zip can sometimes be like
         # ["foo/", "file1", "file2", "file3"]
         # and other times like
