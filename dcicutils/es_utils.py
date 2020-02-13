@@ -56,3 +56,21 @@ def create_snapshot_repo(client, repo_name,  s3_bucket):
                       }
                      }
     return client.snapshot.create_repository(repository=repo_name, body=snapshot_body)
+
+
+def execute_lucene_query_on_es(client, index, query):
+    """
+        Executes the given lucene query (in dictionary form)
+
+        :arg client: elasticsearch client
+        :arg index: index to search under
+        :arg query: dictionary of query
+
+        :returns: result of query or None
+    """
+    try:
+        result = client.search(body=query, index=index)['hits']['hits']
+        return result
+    except Exception as e:  # XXX: What exceptions to catch?
+        print('Failed to execute search on index %s with query %s' % (index, query))
+        return None

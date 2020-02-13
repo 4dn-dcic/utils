@@ -27,6 +27,8 @@ def integrated_ff():
     integrated['ff_key'] = s3.get_access_keys()
     integrated['higlass_key'] = s3.get_higlass_key()
     integrated['ff_env'] = INTEGRATED_ENV
+    # XXX: Read from config? Somewhere else?
+    integrated['es_url'] = 'https://search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.us-east-1.es.amazonaws.com'
     # do this to make sure env is up (will error if not)
     res = authorized_request(integrated['ff_key']['server'], auth=integrated['ff_key'])
     if res.status_code != 200:
