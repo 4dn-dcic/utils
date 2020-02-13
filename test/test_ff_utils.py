@@ -934,8 +934,23 @@ def test_dump_results_to_json(integrated_ff):
 @pytest.mark.integrated
 def test_search_es_metadata(integrated_ff):
     """ Tests search_es_metadata on mastertest """
-    res = ff_utils.search_es_metadata('fourfront-mastertestuser', {}, key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
+    res = ff_utils.search_es_metadata('fourfront-mastertestuser', {},
+                                      key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
     assert len(res) == 10
+    test_query = {
+        'query': {
+            'bool': {
+                'must': [  # search for will's user insert
+                    {'terms': {'_id': ['1a12362f-4eb6-4a9c-8173-776667226988']}}
+                ],
+                'must_not': []
+            }
+        },
+        'sort': [{'_uid': {'order': 'desc'}}]
+    }
+    res = ff_utils.search_es_metadata('fourfront-mastertestuser', test_query,
+                                      key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
+    assert len(res) == 1
 
 
 def test_convert_param():
