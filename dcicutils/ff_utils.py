@@ -882,7 +882,7 @@ def get_health_page(key=None, ff_env=None):
 class SearchESMetadataHandler(object):
     """
     Wrapper class for executing lucene queries directly on ES.
-    Resolves ES instance location via health page of the given 
+    Resolves ES instance location via health page of the given
     environment. Requires AWS permissions to use.
     Can be used directly but is used through search_es_metadata
     """
@@ -907,10 +907,11 @@ def search_es_metadata(index, query, key=None, ff_env=None):
         :arg index: index to search under
         :arg query: dictionary of query
         :arg key: optional, 2-tuple authentication key
-        :arg ff_env: ff_env to 
+        :arg ff_env: ff_env to use
     """
     search_handler = SearchESMetadataHandler(key, ff_env)
     return search_handler.execute_search(index, query)
+
 
 #####################
 # Utility functions #
