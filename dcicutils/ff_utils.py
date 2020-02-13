@@ -879,6 +879,39 @@ def get_health_page(key=None, ff_env=None):
     return ret
 
 
+class SearchESMetadataHandler(object):
+    """
+    Wrapper class for executing lucene queries directly on ES.
+    Resolves ES instance location via health page of the given 
+    environment. Requires AWS permissions to use.
+    Can be used directly but is used through search_es_metadata
+    """
+
+    def __init__(self, key=None, ff_env=None):
+        self.health = get_health_page(key, ff_env)
+        self.es_url = self.health['elasticsearch']
+        self.client = es_utils.create_es_client(self.es_url)
+
+    def execute_search(self, index, query):
+        """
+        Executes lucene query on this client's index.
+        """
+        return es_utils.execute_lucene_query_on_es(self.client, index=index, query=query)
+
+
+def search_es_metadata(index, query, key=None, ff_env=None):
+    """
+        Executes a lucene search query on on the ES Instance for this
+        environment.
+
+        :arg index: index to search under
+        :arg query: dictionary of query
+        :arg key: optional, 2-tuple authentication key
+        :arg ff_env: ff_env to 
+    """
+    search_handler = SearchESMetadataHandler(key, ff_env)
+    return search_handler.execute_search(index, query)
+
 #####################
 # Utility functions #
 #####################

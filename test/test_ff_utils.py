@@ -931,6 +931,13 @@ def test_dump_results_to_json(integrated_ff):
     clear_folder(test_folder)
 
 
+@pytest.mark.integrated
+def test_search_es_metadata(integrated_ff):
+    """ Tests search_es_metadata on mastertest """
+    res = ff_utils.search_es_metadata('fourfront-mastertestuser', {}, key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
+    assert len(res) == 10
+
+
 def test_convert_param():
     """ Very basic test that illustrates what convert_param should do """
     params = {'param1': 5}

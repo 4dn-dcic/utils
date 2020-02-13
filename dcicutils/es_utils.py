@@ -72,5 +72,5 @@ def execute_lucene_query_on_es(client, index, query):
         result = client.search(body=query, index=index)['hits']['hits']
         return result
     except Exception as e:  # XXX: What exceptions to catch?
-        print('Failed to execute search on index %s with query %s' % (index, query))
+        print('Failed to execute search on index %s with query %s.\n Exception: %s' % (index, query, str(e)))
         return None

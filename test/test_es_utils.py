@@ -9,6 +9,7 @@ def es_client_fixture(integrated_ff):
     return create_es_client(integrated_ff['es_url'])
 
 
+@pytest.mark.integrated
 def test_lucene_query_basic(es_client_fixture):
     """ Tests basic lucene queries via the endpoint on mastertest """
     q = {}
