@@ -1,10 +1,11 @@
+import logging
 from elasticsearch import Elasticsearch, RequestsHttpConnection
 from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
 
-'''
-info about snapshots on AWS
-https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/es-managedomains-snapshots.html
-'''
+
+logging.basicConfig()
+logger = logging.getLogger('logger')
+logger.setLevel(logging.INFO)
 
 
 def create_es_client(es_url, use_aws_auth=True, **options):
@@ -48,6 +49,12 @@ def get_index_list(client, name, days_old=0, timestring='%Y.%m.%d', ilo=None):
 
 
 def create_snapshot_repo(client, repo_name,  s3_bucket):
+    """
+    Creates a repo to store ES snapshots on
+
+    info about snapshots on AWS
+    https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/es-managedomains-snapshots.html
+    """
     snapshot_body = {'type': 's3',
                      'settings': {
                          'bucket': s3_bucket,
@@ -69,8 +76,14 @@ def execute_lucene_query_on_es(client, index, query):
         :returns: result of query or None
     """
     try:
-        result = client.search(body=query, index=index)['hits']['hits']
-        return result
+        raw_result = client.search(body=query, index=index)
     except Exception as e:  # XXX: What exceptions to catch?
-        print('Failed to execute search on index %s with query %s.\n Exception: %s' % (index, query, str(e)))
+        logger.error('Failed to execute search on index %s with query %s.\n Exception: %s' % (index, query, str(e)))
         return None
+    try:
+        result = raw_result['hits']['hits']
+        return result
+    except KeyError:
+        logger.error('Searching index %s with query %s gave no results' % (index, query))
+        return None
+

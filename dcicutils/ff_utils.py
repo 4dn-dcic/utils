@@ -884,7 +884,10 @@ class SearchESMetadataHandler(object):
     Wrapper class for executing lucene queries directly on ES.
     Resolves ES instance location via health page of the given
     environment. Requires AWS permissions to use.
-    Can be used directly but is used through search_es_metadata
+    Can be used directly but is used through search_es_metadata.
+
+    NOTE: use this class directly if you plan on making multiple subsequent requests
+    to the same environment.
     """
 
     def __init__(self, key=None, ff_env=None):
@@ -895,6 +898,11 @@ class SearchESMetadataHandler(object):
     def execute_search(self, index, query):
         """
         Executes lucene query on this client's index.
+
+        :arg index: index to search under
+        :arg query: query to run
+
+        :returns: result of query or None
         """
         return es_utils.execute_lucene_query_on_es(self.client, index=index, query=query)
 
@@ -904,10 +912,15 @@ def search_es_metadata(index, query, key=None, ff_env=None):
         Executes a lucene search query on on the ES Instance for this
         environment.
 
+        NOTE: It is okay to use this function directly but for repeat usage please use
+        SearchESMetadataHandler as it caches an expensive API request to AWS
+
         :arg index: index to search under
         :arg query: dictionary of query
-        :arg key: optional, 2-tuple authentication key
+        :arg key: optional, 2-tuple authentication key (access_key_id, secret)
         :arg ff_env: ff_env to use
+
+        :returns: result of query or None
     """
     search_handler = SearchESMetadataHandler(key, ff_env)
     return search_handler.execute_search(index, query)
