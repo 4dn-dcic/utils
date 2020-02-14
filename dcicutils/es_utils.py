@@ -77,7 +77,7 @@ def execute_lucene_query_on_es(client, index, query):
     """
     try:
         raw_result = client.search(body=query, index=index)
-    except Exception as e:  # XXX: What exceptions to catch?
+    except Exception as e:
         logger.error('Failed to execute search on index %s with query %s.\n Exception: %s' % (index, query, str(e)))
         return None
     try:
@@ -86,4 +86,3 @@ def execute_lucene_query_on_es(client, index, query):
     except KeyError:
         logger.error('Searching index %s with query %s gave no results' % (index, query))
         return None
-
