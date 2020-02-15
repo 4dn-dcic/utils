@@ -84,7 +84,10 @@ celerybeat-schedule
 
 # virtualenv
 .venv
-venv/
+# Other environment names with more descriptive prefixes might also be used.
+# Let's just exclude all of them. -kmp 15-Feb-2020
+# venv/
+*env/
 ENV/
 
 # Spyder project settings
@@ -104,3 +107,10 @@ ENV/
 .pytest_cache/
 
 .DS_Store
+
+# Emacs backup files
+*~
+
+# PyCharm metadata
+.idea/
+
