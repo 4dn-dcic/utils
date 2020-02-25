@@ -209,7 +209,10 @@ class s3Utils(object):
         for file_name in file_list:
             # don't copy dirs just files
             if not file_name.endswith('/'):
-                s3_file_name = file_name.replace(basedir_name, dest_dir)
+                if basedir_name:
+                    s3_file_name = file_name.replace(basedir_name, dest_dir)
+                else:
+                    s3_file_name = dest_dir + file_name
                 s3_key = "https://s3.amazonaws.com/%s/%s" % (self.outfile_bucket, s3_file_name)
                 # just perf optimization so we don't have to copy
                 # files twice that we want to further interogate
