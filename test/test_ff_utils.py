@@ -934,9 +934,9 @@ def test_dump_results_to_json(integrated_ff):
 @pytest.mark.integrated
 def test_search_es_metadata(integrated_ff):
     """ Tests search_es_metadata on mastertest """
-    res = ff_utils.search_es_metadata('fourfront-mastertestuser', {},
+    res = ff_utils.search_es_metadata('fourfront-mastertestuser', {'size': '1000'},
                                       key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
-    assert len(res) == 10
+    assert len(res) == 27
     test_query = {
         'query': {
             'bool': {
@@ -951,6 +951,20 @@ def test_search_es_metadata(integrated_ff):
     res = ff_utils.search_es_metadata('fourfront-mastertestuser', test_query,
                                       key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
     assert len(res) == 1
+
+
+@pytest.mark.integrated
+def test_search_es_metadata_generator(integrated_ff):
+    """ Tests SearchESMetadataHandler both normally and with a generator, verifies consistent results """
+    handler = ff_utils.SearchESMetadataHandler(key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
+    no_gen_res = ff_utils.search_es_metadata('fourfront-mastertestuser', {'size': '1000'},
+                                      key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
+    res = handler.execute_search('fourfront-mastertestuser', {'size': '1000'}, is_generator=True, page_size=5)
+    count = 0
+    for grouped_hits in res:
+        for _ in grouped_hits:
+            count += 1
+    assert count == len(no_gen_res)
 
 
 def test_convert_param():

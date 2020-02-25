@@ -891,23 +891,27 @@ class SearchESMetadataHandler(object):
     """
 
     def __init__(self, key=None, ff_env=None):
-        self.health = get_health_page(key, ff_env)
+        self.health = get_health_page(key, ff_env)  # expensive - do not call repeatedly!
         self.es_url = self.health['elasticsearch']
         self.client = es_utils.create_es_client(self.es_url)
 
-    def execute_search(self, index, query):
+    def execute_search(self, index, query, is_generator=False, page_size=200):
         """
         Executes lucene query on this client's index.
 
         :arg index: index to search under
         :arg query: query to run
+        :arg is_generator: boolean on whether or not to use a generator
+        :arg page_size: if using a generator, how many results to give per request
 
         :returns: result of query or None
         """
-        return es_utils.execute_lucene_query_on_es(self.client, index=index, query=query)
+        if not is_generator:
+            return es_utils.execute_lucene_query_on_es(self.client, index=index, query=query)
+        return get_es_search_generator(self.client, index, query, page_size=page_size)
 
 
-def search_es_metadata(index, query, key=None, ff_env=None):
+def search_es_metadata(index, query, key=None, ff_env=None, is_generator=False):
     """
         Executes a lucene search query on on the ES Instance for this
         environment.
@@ -919,11 +923,12 @@ def search_es_metadata(index, query, key=None, ff_env=None):
         :arg query: dictionary of query
         :arg key: optional, 2-tuple authentication key (access_key_id, secret)
         :arg ff_env: ff_env to use
+        :arg is_generator: boolean on whether or not to use a generator
 
         :returns: result of query or None
     """
     search_handler = SearchESMetadataHandler(key, ff_env)
-    return search_handler.execute_search(index, query)
+    return search_handler.execute_search(index, query, is_generator)
 
 
 #####################
