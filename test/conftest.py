@@ -43,11 +43,15 @@ def integrated_s3_info():
     """
     test_filename = '__test_data/test_file.txt'
     zip_filename = '__test_data/fastqc_report.zip'
+    zip_filename2 = '__test_data/madqc_report.zip'
     s3Obj = s3Utils(env=INTEGRATED_ENV)
     # for now, always upload these files
     s3Obj.s3.put_object(Bucket=s3Obj.sys_bucket, Key=test_filename,
                           Body=str.encode('thisisatest'))
     zip_path = os.path.join('test', 'data_files', zip_filename.split('/')[-1])
     s3Obj.s3.upload_file(Filename=str(zip_path), Bucket=s3Obj.sys_bucket, Key=zip_filename)
+    zip_path2 = os.path.join('test', 'data_files', zip_filename2.split('/')[-1])
+    s3Obj.s3.upload_file(Filename=str(zip_path2), Bucket=s3Obj.sys_bucket, Key=zip_filename2)
 
-    return {'s3Obj': s3Obj, 'filename': test_filename, 'zip_filename': zip_filename}
+    return {'s3Obj': s3Obj, 'filename': test_filename, 'zip_filename': zip_filename,
+            'zip_filename2': zip_filename2}
