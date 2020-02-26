@@ -215,7 +215,7 @@ def test_authorized_request_integrated(integrated_ff):
 
 
 @pytest.mark.integrated
-@pytest.mark.flaky
+@pytest.mark.flaky(max_runs=3)  # very flaky for some reason
 def test_get_metadata(integrated_ff, basestring):
     # use this test biosource
     test_item = '331111bc-8535-4448-903e-854af460b254'
