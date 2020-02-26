@@ -961,9 +961,8 @@ def test_search_es_metadata_generator(integrated_ff):
                                       key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
     res = handler.execute_search('fourfront-mastertestuser', {'size': '1000'}, is_generator=True, page_size=5)
     count = 0
-    for grouped_hits in res:
-        for _ in grouped_hits:
-            count += 1
+    for _ in res:
+        count += 1
     assert count == len(no_gen_res)
 
 
