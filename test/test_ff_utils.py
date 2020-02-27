@@ -825,8 +825,8 @@ def test_get_qc_metrics(integrated_ff):
     uuid = '331106bc-8535-3338-903e-854af460b544'
     qc_metrics = ff_utils.get_associated_qc_metrics(uuid, key=key, ff_env=ff_env)
     assert len(qc_metrics.keys()) == 2
-    assert '7f9eb396-5c1a-1112-aebf-28ea39d6a50f' in qc_metrics['experiments_in_set_qc_metrics']
-    target_qc = qc_metrics['experiments_in_set_qc_metrics']['7f9eb396-5c1a-1112-aebf-28ea39d6a50f']
+    assert '131106bc-8535-4448-903e-854abbbbbbbb' in qc_metrics['experiments_in_set_qc_metrics']
+    target_qc = qc_metrics['experiments_in_set_qc_metrics']['131106bc-8535-4448-903e-854abbbbbbbb']
     assert 'QualityMetric' in target_qc['values']['@type']
     assert target_qc['organism'] == 'human'
     assert target_qc['experiment_type'] == 'Dilution Hi-C'
@@ -841,10 +841,10 @@ def test_get_qc_metrics(integrated_ff):
 
     qc_metrics = ff_utils.get_associated_qc_metrics(uuid, **kwargs)
     assert len(qc_metrics.keys()) == 2
-    assert '46e82a90-49e5-4c33-afab-9ec90d65faa0' in qc_metrics['experiments_in_set_qc_metrics']
-    assert '7f9eb396-5c1a-1112-aebf-28ea39d6a50f' in qc_metrics['experiments_in_set_qc_metrics']
-    assert 'QualityMetric' in qc_metrics['experiments_in_set_qc_metrics']['46e82a90-49e5-4c33-afab-9ec90d65faa0']['values']['@type']
-    assert 'QualityMetric' in qc_metrics['experiments_in_set_qc_metrics']['7f9eb396-5c1a-1112-aebf-28ea39d6a50f']['values']['@type']
+    assert '131106bc-8535-4448-903e-854abbbbbbbb' in qc_metrics['experiments_in_set_qc_metrics']
+    assert '4c9dabc6-61d6-4054-a951-c4fdd0023800' in qc_metrics['experiments_in_set_qc_metrics']
+    assert 'QualityMetric' in qc_metrics['experiments_in_set_qc_metrics']['131106bc-8535-4448-903e-854abbbbbbbb']['values']['@type']
+    assert 'QualityMetric' in qc_metrics['experiments_in_set_qc_metrics']['4c9dabc6-61d6-4054-a951-c4fdd0023800']['values']['@type']
 
 
 @pytest.mark.integrated

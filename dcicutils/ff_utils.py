@@ -459,7 +459,8 @@ def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
 
 def fetch_files_qc_metrics(data, associated_files, ignored_fields=True, key=None, ff_env=None):
     """
-    Utility function to grap all the qc metrics from associated types of file such as 'proccessed_files', 'other_processed_files', 'raw_files'
+    Utility function to grap all the qc metrics from associated types of file such as:
+    'proccessed_files', 'other_processed_files', 'files'
     inputs:
         data: the metadata of a ExperimentSet or the embeded experiments in the ExperimentSet
         associated_files: a list of the types of the files fields the qc metrics will be extracted from:
@@ -484,13 +485,13 @@ def fetch_files_qc_metrics(data, associated_files, ignored_fields=True, key=None
         if associated_file in data:
             for entry in data[associated_file]:
                 if entry.get('quality_metric'):
-                    qc_info = {entry['uuid']: {}}
                     qc_uuid = entry['quality_metric']['uuid']
+                    qc_info = {qc_uuid: {}}
                     qc_meta = get_metadata(qc_uuid, key=key, ff_env=ff_env)
-                    qc_info[entry['uuid']]['values'] = {k: v for k, v in qc_meta.items() if k not in ignored_qc_fields}
-                    qc_info[entry['uuid']]['association'] = associated_file if associated_file != 'files' else 'raw_file'
-                    qc_info[entry['uuid']]['file_of_origin_accession'] = entry['accession']
-                    qc_info[entry['uuid']]['file_of_origin_type'] = entry['file_type_detailed']
+                    qc_info[qc_uuid]['values'] = {k: v for k, v in qc_meta.items() if k not in ignored_qc_fields}
+                    qc_info[qc_uuid]['association'] = associated_file if associated_file != 'files' else 'raw_file'
+                    qc_info[qc_uuid]['file_of_origin_accession'] = entry['accession']
+                    qc_info[qc_uuid]['file_of_origin_type'] = entry['file_type_detailed']
                     qc_metrics.update(qc_info)
     return qc_metrics
 
