@@ -825,8 +825,14 @@ def test_get_qc_metrics(integrated_ff):
     uuid = '331106bc-8535-3338-903e-854af460b544'
     qc_metrics = ff_utils.get_associated_qc_metrics(uuid, key=key, ff_env=ff_env)
     assert len(qc_metrics.keys()) == 2
-    assert '46e82a90-49e5-4c33-afab-9ec90d65faa0' in qc_metrics['experiments_in_set_qc_metrics']
-    assert 'QualityMetric' in qc_metrics['experiments_in_set_qc_metrics']['46e82a90-49e5-4c33-afab-9ec90d65faa0']['values']['@type']
+    assert '7f9eb396-5c1a-1112-aebf-28ea39d6a50f' in qc_metrics['experiments_in_set_qc_metrics']
+    target_qc = qc_metrics['experiments_in_set_qc_metrics']['7f9eb396-5c1a-1112-aebf-28ea39d6a50f']
+    assert 'QualityMetric' in target_qc['values']['@type']
+    assert target_qc['organism'] == 'human'
+    assert target_qc['experiment_type'] == 'Dilution Hi-C'
+    assert target_qc['experiment_subclass'] == 'Hi-C'
+    assert target_qc['association'] == 'processed_files'
+
     kwargs = {  # do same as above w/ kwargs, specify to include raw files this time
         'key': key,
         'ff_env': ff_env,
