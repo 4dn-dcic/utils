@@ -469,7 +469,7 @@ def fetch_files_qc_metrics(data, associated_files, ignored_fields=True, key=None
         ignored_fields: flag to ignore 4DN custom fields from the qc metric object
 
     Returns:
-        a dictionaries of dictionaries containing the qc_metric information
+        a dictionary of dictionaries containing the qc_metric information
     """
     qc_metrics = {}
 
@@ -496,21 +496,23 @@ def fetch_files_qc_metrics(data, associated_files, ignored_fields=True, key=None
     return qc_metrics
 
 
-def get_associated_qc_metrics(uuid, key=None, ff_env=None,
-                              exclude_raw_files=True,
-                              exclude_supplementary_files=True):
+def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_files=True,
+                              include_raw_files=False,
+                              include_supplementary_files=False):
     """
     Given a uuid of an experiment set, return a list of dictionaries with the following structure:
-        'experiment_set_qc_metrics':  a list of quality metrics associated with the experiment set
-        'experiments_in_set_qc_metrics': a list of quality metrics associated with the experiments in the experiment set
+        'experiment_set_qc_metrics':  a dictionary with quality metrics associated with the experiment set
+        'experiments_in_set_qc_metrics': a dictionary with quality metrics associated with the experiments in the experiment set
 
     Args:
-        exclude_raw_files: if False will provide QC metrics on raw files as well
-                           Default: True
-        exclude_supplementary_files: if False will also give QC's associated with
-                                     non-processed files. Default: True
+        include_processed_files: if False will exclude QC metrics on processed files
+                                Default: True
+        include_raw_files: if True will provide QC metrics on raw files as well
+                           Default: False
+        include_supplementary_files: if True will also give QC's associated with
+                                     non-processed files. Default: False
     Returns:
-        a list of dictionaries with the following structure:
+        a dictionary of dictionaries with the following structure:
             {'qc_metric_uuid'}:{'values':'', The values of the qc_metric object
                                 'association':'', the file class (processed_file or raw_files)
                                 'file_of_origin_accession, the accession of the file that the qc is linked to
@@ -521,17 +523,22 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None,
                                 'experiment_subclass' (Hi-C)
     """
     result = {'experiment_set_qc_metrics': {}, 'experiments_in_set_qc_metrics': {}}
-    associated_files = ['processed_files', 'other_processed_files', 'files']
+    associated_files = []
     extra_info = False
     resp = get_metadata(uuid, key=key, ff_env=ff_env)
 
     if 'ExperimentSet' not in resp['@type']:
         raise TypeError('Expected ExperimentSet Item')
 
-    if exclude_supplementary_files:
-        associated_files.pop(1)
-    if exclude_raw_files:
-        associated_files.pop()
+    if include_processed_files:
+        associated_files.append('processed_files')
+    if include_supplementary_files:
+        associated_files.append('other_processed_files')
+    if include_raw_files:
+        associated_files.append('files')
+
+    if not associated_files:
+        return result
 
     if 'experiments_in_set' in resp:
         organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['individual']['organism']['name']

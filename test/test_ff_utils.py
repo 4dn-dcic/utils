@@ -836,7 +836,7 @@ def test_get_qc_metrics(integrated_ff):
     kwargs = {  # do same as above w/ kwargs, specify to include raw files this time
         'key': key,
         'ff_env': ff_env,
-        'exclude_raw_files': False
+        'include_raw_files': True
     }
 
     qc_metrics = ff_utils.get_associated_qc_metrics(uuid, **kwargs)
