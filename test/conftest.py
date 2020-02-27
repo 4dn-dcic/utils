@@ -4,8 +4,9 @@ import os
 from dcicutils.s3_utils import s3Utils
 from dcicutils.ff_utils import authorized_request
 
-# this is the ff_env we use for integrated tests
+# XXX: Refactor to config
 INTEGRATED_ENV = 'fourfront-mastertest'
+INTEGRATED_ES = 'https://search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.us-east-1.es.amazonaws.com'
 
 
 @pytest.fixture(scope='session')
@@ -27,6 +28,7 @@ def integrated_ff():
     integrated['ff_key'] = s3.get_access_keys()
     integrated['higlass_key'] = s3.get_higlass_key()
     integrated['ff_env'] = INTEGRATED_ENV
+    integrated['es_url'] = INTEGRATED_ES
     # do this to make sure env is up (will error if not)
     res = authorized_request(integrated['ff_key']['server'], auth=integrated['ff_key'])
     if res.status_code != 200:
