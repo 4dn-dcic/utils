@@ -846,6 +846,14 @@ def test_get_qc_metrics(integrated_ff):
     assert 'QualityMetric' in qc_metrics['experiments_in_set_qc_metrics']['131106bc-8535-4448-903e-854abbbbbbbb']['values']['@type']
     assert 'QualityMetric' in qc_metrics['experiments_in_set_qc_metrics']['4c9dabc6-61d6-4054-a951-c4fdd0023800']['values']['@type']
 
+    # Test Experiment input file
+    uuid = '75041e2f-3e43-4388-8bbb-e861f209b3fb'
+    qc_metrics = ff_utils.get_associated_qc_metrics(uuid, **kwargs)
+    assert len(qc_metrics.keys()) == 1
+    assert '75041e2f-3e43-4388-8bbb-e861f209b3fb' in qc_metrics
+    assert 'QualityMetric' in qc_metrics['75041e2f-3e43-4388-8bbb-e861f209b3fb']
+
+
 
 @pytest.mark.integrated
 @pytest.mark.flaky

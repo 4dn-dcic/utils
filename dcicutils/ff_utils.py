@@ -462,7 +462,7 @@ def fetch_files_qc_metrics(data, associated_files, ignored_fields=True, key=None
     Utility function to grap all the qc metrics from associated types of file such as:
     'proccessed_files', 'other_processed_files', 'files'
     inputs:
-        data: the metadata of a ExperimentSet or the embeded experiments in the ExperimentSet
+        data: the metadata of a ExperimentSet or Experiment
         associated_files: a list of the types of the files fields the qc metrics will be extracted from:
             examples are = ['files', 'processed_files', 'other_processed_files']
     Args:
@@ -485,14 +485,30 @@ def fetch_files_qc_metrics(data, associated_files, ignored_fields=True, key=None
         if associated_file in data:
             for entry in data[associated_file]:
                 if entry.get('quality_metric'):
-                    qc_uuid = entry['quality_metric']['uuid']
-                    qc_info = {qc_uuid: {}}
-                    qc_meta = get_metadata(qc_uuid, key=key, ff_env=ff_env)
-                    qc_info[qc_uuid]['values'] = {k: v for k, v in qc_meta.items() if k not in ignored_qc_fields}
-                    qc_info[qc_uuid]['association'] = associated_file if associated_file != 'files' else 'raw_file'
-                    qc_info[qc_uuid]['file_of_origin_accession'] = entry['accession']
-                    qc_info[qc_uuid]['file_of_origin_type'] = entry['file_type_detailed']
-                    qc_metrics.update(qc_info)
+                    # check if it is a list of qc metrics
+                    if entry['quality_metric']['display_title'].startswith('QualityMetricQclist'):
+                        qc_metric_list = get_metadata(entry['quality_metric']['uuid'], key=key, ff_env=ff_env)
+                        if not qc_metric_list.get('qc_list'):
+                            continue
+                        for qc in qc_metric_list['qc_list']:
+                            qc_uuid = qc['value']['uuid']
+                            qc_info = {qc_uuid: {}}
+                            qc_meta = get_metadata(qc_uuid, key=key, ff_env=ff_env)
+                            qc_info[qc_uuid]['values'] = {k: v for k, v in qc_meta.items() if k not in ignored_qc_fields}
+                            qc_info[qc_uuid]['association'] = associated_file if associated_file != 'files' else 'raw_file'
+                            qc_info[qc_uuid]['file_of_origin_accession'] = entry['accession']
+                            qc_info[qc_uuid]['file_of_origin_type'] = entry['file_type_detailed']
+                            qc_metrics.update(qc_info)
+
+                    else:
+                        qc_uuid = entry['quality_metric']['uuid']
+                        qc_info = {qc_uuid: {}}
+                        qc_meta = get_metadata(qc_uuid, key=key, ff_env=ff_env)
+                        qc_info[qc_uuid]['values'] = {k: v for k, v in qc_meta.items() if k not in ignored_qc_fields}
+                        qc_info[qc_uuid]['association'] = associated_file if associated_file != 'files' else 'raw_file'
+                        qc_info[qc_uuid]['file_of_origin_accession'] = entry['accession']
+                        qc_info[qc_uuid]['file_of_origin_type'] = entry['file_type_detailed']
+                        qc_metrics.update(qc_info)
     return qc_metrics
 
 
@@ -500,10 +516,12 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
                               include_raw_files=False,
                               include_supplementary_files=False):
     """
-    Given a uuid of an experiment set, return a list of dictionaries with the following structure:
+    Given a uuid of an experimentSet or an experiment, return a dictionrary of dictionaries with the following structure:
+        For ExperimentSet
         'experiment_set_qc_metrics':  a dictionary with quality metrics associated with the experiment set
         'experiments_in_set_qc_metrics': a dictionary with quality metrics associated with the experiments in the experiment set
 
+        For Experiment it outputs the dictionaries are the qc_metrics of each file in the experiment
     Args:
         include_processed_files: if False will exclude QC metrics on processed files
                                 Default: True
@@ -522,14 +540,32 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
                                 'experiment_type', the experiment type (in situ Hi-C, ChIP-seq)
                                 'experiment_subclass' (Hi-C)
     """
-    result = {'experiment_set_qc_metrics': {}, 'experiments_in_set_qc_metrics': {}}
+    result = {}
     associated_files = []
-    extra_info = False
+    experimentSet = True  # Assumes is a experiment set by default
+
+    # Additional information to include in the results for interpretation
+    organism = None
+    experiment_type = None
+    experiment_subclass = None
+    description = None
+
     resp = get_metadata(uuid, key=key, ff_env=ff_env)
 
-    if 'ExperimentSet' not in resp['@type']:
-        raise TypeError('Expected ExperimentSet Item')
+    # Checks wheter the input is a experiment or experimentset otherwise throws an error
+    if 'ExperimentSet'in resp['@type']:
+        result = {'experiment_set_qc_metrics': {}, 'experiments_in_set_qc_metrics': {}}
+        description = resp.get('dataset_label', None)
+    elif 'Experiment' in resp['@type']:
+        experimentSet = False
+        organism = resp['biosample']['biosource'][0]['individual']['organism']['name']
+        experiment_type = resp['experiment_type']['display_title']
+        experiment_subclass = resp['experiment_type']['assay_subclass_short']
 
+    else:
+        raise TypeError('Expected ExperimentSet or Experiment Item')
+
+    # verifies what category of files to include (processed_files, other_processed_files, files)
     if include_processed_files:
         associated_files.append('processed_files')
     if include_supplementary_files:
@@ -540,19 +576,19 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
     if not associated_files:
         return result
 
-    if 'experiments_in_set' in resp:
+    # If it is an experimentset, get qc_metrics for the experiments in the experiment set
+    if experimentSet and resp.get('experiments_in_set'):
         organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['individual']['organism']['name']
         experiment_type = resp['experiments_in_set'][0]['experiment_type']['display_title']
         experiment_subclass = resp['experiments_in_set'][0]['experiment_type']['assay_subclass_short']
-        extra_info = True
         experiments_qc_metrics = {}
 
         for exp in resp['experiments_in_set']:
-            description = exp['display_title']
+            exp_description = exp['display_title']
             exp_qc_metrics = fetch_files_qc_metrics(exp, associated_files, key=key, ff_env=ff_env)
             if exp_qc_metrics:
                 for exp_qc_metric in exp_qc_metrics.values():
-                    exp_qc_metric['description'] = description
+                    exp_qc_metric['experiment_description'] = exp_description
                     exp_qc_metric['organism'] = organism
                     exp_qc_metric['experiment_type'] = experiment_type
                     exp_qc_metric['experiment_subclass'] = experiment_subclass
@@ -560,14 +596,17 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
                     experiments_qc_metrics.update(exp_qc_metrics)
         result['experiments_in_set_qc_metrics'] = experiments_qc_metrics
 
-    expSet_qc_metrics = fetch_files_qc_metrics(resp, associated_files, key=key, ff_env=ff_env)
-    if expSet_qc_metrics and extra_info:
-        for expSet_qc_metric in expSet_qc_metrics.values():
-            expSet_qc_metric['description'] = resp['dataset_label']
-            expSet_qc_metric['organism'] = organism
-            expSet_qc_metric['experiment_type'] = experiment_type
-            expSet_qc_metric['experiment_subclass'] = experiment_subclass
-            result['experiment_set_qc_metrics'].update(expSet_qc_metrics)
+    qc_metrics = fetch_files_qc_metrics(resp, associated_files, key=key, ff_env=ff_env)
+    if qc_metrics:
+        for qc_metric in qc_metrics.values():
+            qc_metric['experiment_description'] = description
+            qc_metric['organism'] = organism
+            qc_metric['experiment_type'] = experiment_type
+            qc_metric['experiment_subclass'] = experiment_subclass
+            if experimentSet:
+                result['experiment_set_qc_metrics'].update(qc_metrics)
+            else:
+                result.update(qc_metrics)
 
     return result
 
