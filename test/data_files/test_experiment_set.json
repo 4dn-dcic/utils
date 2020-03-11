@@ -1,0 +1,3792 @@
+{
+	"@context": "/terms/",
+	"uuid": "6ba6a5df-dac5-4111-b5f0-aaaaaaaaaaaa",
+	"external_references": [],
+	"completed_processes": ["HiC_Pipeline_0.2.6"],
+	"submitted_by": {
+		"error": "no view permissions"
+	},
+	"publications_of_set": [{
+		"@id": "/publications/b13590b2-a341-4e5e-ad5e-72e233b32e9d/",
+		"uuid": "b13590b2-a341-4e5e-ad5e-72e233b32e9d",
+		"principals_allowed": {
+			"view": ["system.Everyone"],
+			"edit": ["group.admin"]
+		},
+		"@type": ["Publication", "Item"],
+		"abstract": "Over the past decade, 3C-related methods, complemented by increasingly detailed microscopic views of the nucleus, have provided unprecedented insights into chromosome folding in vivo. Here, to overcome the resolution limits inherent to the majority of genome-wide chromosome architecture mapping studies, we extend a recently-developed Hi-C variant, Micro-C, to map chromosome architecture at nucleosome resolution in human embryonic stem cells and fibroblasts. Micro-C maps robustly capture well-described features of mammalian chromosome folding including A/B compartment organization, topologically associating domains (TADs), and cis interaction peaks anchored at CTCF binding sites, while also providing a detailed 1-dimensional map of nucleosome positioning and phasing genome-wide. Compared to high-resolution in situ Hi-C, Micro-C exhibits substantially improved signal-to-noise with an order of magnitude greater dynamic range, enabling not only localization of domain boundaries with single-nucleosome accuracy, but also resolving more than 20,000 additional looping interaction peaks in each cell type. Intriguingly, many of these newly-identified peaks are localized along stripe patterns and form transitive grids, consistent with their anchors being pause sites impeding the process of cohesin-dependent loop extrusion. Together, our analyses provide the highest resolution maps of chromosome folding in human cells to date, and provide a valuable resource for studies of chromosome folding mechanisms.",
+		"journal": "bioRxiv",
+		"title": "Ultrastructural details of mammalian chromosome architecture",
+		"date_published": "2019-05-17",
+		"display_title": "Nils Krietenstein et al. (2019) Ultrastructural details of mammalian chromosome architecture",
+		"authors": ["Nils Krietenstein", "Sameer Abraham", "Sergey V. Venev", "Nezar Abdennur", "Johan Gibcus", "Tsung-Han S. Hsieh", "Krishna Mohan Parsi", "Liyan Yang", "Ren Maehr", "Leonid A. Mirny", "Job TEST", "Oliver J. Rando"]
+	}],
+	"alternate_accessions": [],
+	"aliases": ["TEST-lab:ExperimentSet_U54_U54-ESC4DN-FA-DpnII-2017524"],
+	"condition": "Enzyme Dpn II - cells cultured following 4DN SOP",
+	"@id": "/experiment-set-replicates/TESTS2AAAAAA/",
+	"tags": ["4DN Joint Analysis 2018", "2018_01_public", "2018_01_internal", "2018_01_internal_JA"],
+	"principals_allowed": {
+		"view": ["system.Everyone"],
+		"edit": ["group.admin"]
+	},
+	"static_content": [{
+		"location": "tab:processed-files",
+		"description": "auto_generated_higlass_view_config",
+		"content": {
+			"status": "released",
+			"name": "13e2ca00-957a-47ce-bdf4-080af3a67b9c",
+			"uuid": "13e2ca00-957a-47ce-bdf4-080af3a67b9c",
+			"@type": ["HiglassViewConfig", "UserContent", "Item"],
+			"title": "TESTS2AAAAAA - Processed files",
+			"display_title": "TESTS2AAAAAA - Processed files",
+			"contributing_labs": [],
+			"lab": {
+				"@id": "/labs/job-TEST-lab/",
+				"uuid": "3c577664-affb-41c4-bf27-9e21c2fc1554",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin", "submits_for.3c577664-affb-41c4-bf27-9e21c2fc1554"]
+				},
+				"@type": ["Lab", "Item"],
+				"display_title": "Job TEST, UMMS"
+			},
+			"@id": "/higlass-view-configs/13e2ca00-957a-47ce-bdf4-080af3a67b9c/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin", "userid.986b362f-4eb6-4a9c-8173-3ab267307e3a"]
+			},
+			"filetype": "HiglassViewConfig",
+			"award": {
+				"@id": "/awards/1U54DK107980-01/",
+				"uuid": "ae6c618f-7a8c-441e-a886-e30bbbe591da",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["Award", "Item"],
+				"display_title": "CENTER FOR 3D STRUCTURE AND PHYSICS OF THE GENOME"
+			},
+			"description": "TESTS2AAAAAA (in situ Hi-C on H1-hESC (Tier 1) with DpnII): 4DNFI6HDY7WZ"
+		}
+	}],
+	"aggregated-items": {
+		"tissue": [{
+			"embedded_path": "experiments_in_set.biosample.biosource.tissue",
+			"parent": "/biosources/4DNSRV3SKQ8M/",
+			"item": {
+				"preferred_name": "stem cell"
+			}
+		}],
+		"badges": [{
+			"embedded_path": "badges",
+			"parent": "/experiment-set-replicates/TESTS2AAAAAA/",
+			"item": {
+				"messages": ["Replicate set contains only a single biological replicate"],
+				"badge": {
+					"commendation": null,
+					"warning": "Replicate Numbers",
+					"@id": "/badges/replicate-numbers/",
+					"uuid": "24a64a84-3c33-4d76-aaf2-e5ef45eff347",
+					"badge_icon": "/static/img/badges/replicates-orange-circle.svg",
+					"description": "Issues with replicate numbers"
+				}
+			}
+		}, {
+			"embedded_path": "experiments_in_set.biosample.badges",
+			"parent": "/biosamples/4DNBS3O2FNJO/",
+			"item": {
+				"messages": ["Biosample missing doubling_number", "Biosample missing morphology_image"],
+				"badge": {
+					"commendation": null,
+					"warning": "Biosample Metadata Incomplete",
+					"@id": "/badges/biosample-metadata-incomplete/",
+					"uuid": "2b2cc7ff-b7a8-4138-9a6c-22884fc71690",
+					"badge_icon": "/static/img/badges/biosample-icon.svg",
+					"description": "Biosample is missing metadata information required as part of the standards implemented by the 4DN Samples working group."
+				}
+			}
+		}]
+	},
+	"dataset_label": "Hi-C on H1 cells - protocol variations",
+	"validation-errors": [],
+	"replicate_exps": [{
+		"tec_rep_no": 1,
+		"replicate_exp": {
+			"@id": "/experiments-hi-c/4DNEXENKINA2/",
+			"uuid": "eca3ac9b-9dc4-4891-861d-771279b7f9b1",
+			"accession": "4DNEXENKINA2",
+			"@type": ["ExperimentHiC", "Experiment", "Item"],
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"display_title": "in situ Hi-C on H1-hESC (Tier 1) with DpnII - 4DNEXENKINA2"
+		},
+		"bio_rep_no": 1
+	}, {
+		"tec_rep_no": 2,
+		"replicate_exp": {
+			"@id": "/experiments-hi-c/4DNEXZJZ5EBZ/",
+			"uuid": "c00ecfa0-7e3d-43af-b1c2-091aa9379594",
+			"accession": "4DNEXZJZ5EBZ",
+			"@type": ["ExperimentHiC", "Experiment", "Item"],
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"display_title": "in situ Hi-C on H1-hESC (Tier 1) with DpnII - 4DNEXZJZ5EBZ"
+		},
+		"bio_rep_no": 1
+	}],
+	"experimentset_type": "replicate",
+	"status": "released",
+	"number_of_experiments": 2,
+	"project_release": "2017-07-26",
+	"@type": ["ExperimentSetReplicate", "ExperimentSet", "Item"],
+	"badges": [{
+		"messages": ["Replicate set contains only a single biological replicate"],
+		"badge": {
+			"warning": "Replicate Numbers",
+			"@id": "/badges/replicate-numbers/",
+			"uuid": "24a64a84-3c33-4d76-aaf2-e5ef45eff347",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"display_title": "Replicate Numbers",
+			"@type": ["Badge", "Item"],
+			"badge_icon": "/static/img/badges/replicates-orange-circle.svg",
+			"badge_classification": "Warning",
+			"description": "Issues with replicate numbers",
+			"title": "Replicate Numbers"
+		}
+	}],
+	"other_processed_files": [{
+		"type": "archived",
+		"files": [{
+			"status": "released",
+			"uuid": "aff4c78b-b07a-4fb0-b568-388f0a8ff0e3",
+			"href": "/files-processed/4DNFI3RIKRUJ/@@download/4DNFI3RIKRUJ.hic",
+			"@type": ["FileProcessed", "File", "Item"],
+			"display_title": "4DNFI3RIKRUJ.hic",
+			"@id": "/files-processed/4DNFI3RIKRUJ/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"last_modified": {
+				"date_modified": "2018-09-18T04:20:33.471425+00:00"
+			},
+			"file_format": {
+				"@id": "/file-formats/hic/",
+				"uuid": "d13d11cf-218e-4f61-bbf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["FileFormat", "Item"],
+				"display_title": "hic"
+			},
+			"accession": "4DNFI3RIKRUJ",
+			"file_size": 10960590432,
+			"file_type_detailed": "contact matrix (hic)"
+		}, {
+			"status": "released",
+			"uuid": "d0237baf-973a-45f4-acb3-33ee6cf7c7f6",
+			"href": "/files-processed/4DNFI65CBIKX/@@download/4DNFI65CBIKX.mcool",
+			"@type": ["FileProcessed", "File", "Item"],
+			"genome_assembly": "GRCh38",
+			"display_title": "4DNFI65CBIKX.mcool",
+			"@id": "/files-processed/4DNFI65CBIKX/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"last_modified": {
+				"date_modified": "2019-05-08T18:39:20.016666+00:00"
+			},
+			"file_format": {
+				"@id": "/file-formats/mcool/",
+				"uuid": "d13d06cf-218e-4f61-ccf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["FileFormat", "Item"],
+				"display_title": "mcool"
+			},
+			"accession": "4DNFI65CBIKX",
+			"file_size": 13385314415,
+			"higlass_uid": "fwgPd2PMTW6E5Clf7zIK6Q",
+			"file_type_detailed": "contact matrix (mcool)"
+		}, {
+			"status": "released",
+			"uuid": "2d661756-da8c-44be-ab49-321ec5763ae0",
+			"href": "/files-processed/4DNFIY3DJCHA/@@download/4DNFIY3DJCHA.normvector.juicerformat.gz",
+			"@type": ["FileProcessed", "File", "Item"],
+			"display_title": "4DNFIY3DJCHA.normvector.juicerformat.gz",
+			"@id": "/files-processed/4DNFIY3DJCHA/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"last_modified": {
+				"date_modified": "2018-09-18T04:20:31.616215+00:00"
+			},
+			"file_format": {
+				"@id": "/file-formats/normvector_juicerformat/",
+				"uuid": "d13d06cf-218e-4f61-55f0-94f226118b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["FileFormat", "Item"],
+				"display_title": "normvector_juicerformat"
+			},
+			"accession": "4DNFIY3DJCHA",
+			"file_size": 8462189,
+			"file_type_detailed": "juicebox norm vector (normvector_juicerformat)"
+		}],
+		"higlass_view_config": {
+			"@id": "/higlass-view-configs/1d58b3ad-83d6-40bf-a2b0-bd4b214b2fda/",
+			"uuid": "1d58b3ad-83d6-40bf-a2b0-bd4b214b2fda",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin", "userid.7677f8a8-79d2-4cff-ab0a-a967a2a68e39"]
+			},
+			"description": "Supplementary Files (Archived results) for TESTS2AAAAAA (in situ Hi-C on H1-hESC (Tier 1) with DpnII): 4DNFI65CBIKX",
+			"@type": ["HiglassViewConfig", "UserContent", "Item"],
+			"display_title": "TESTS2AAAAAA - Archived results",
+			"last_modified": {
+				"date_modified": "2019-12-11T21:19:22.741672+00:00"
+			}
+		},
+		"title": "Archived results",
+		"description": "Results from a preliminary version of the HiC processing pipeline, retained for archival purposes"
+	}, {
+		"type": "supplementary",
+		"files": [{
+			"error": "no view permissions"
+		}, {
+			"error": "no view permissions"
+		}, {
+			"error": "no view permissions"
+		}, {
+			"error": "no view permissions"
+		}],
+		"higlass_view_config": {
+			"error": "no view permissions"
+		},
+		"title": "JAWG results - TEST Lab"
+	}, {
+		"type": "supplementary",
+		"files": [{
+			"error": "no view permissions"
+		}, {
+			"error": "no view permissions"
+		}],
+		"higlass_view_config": {
+			"error": "no view permissions"
+		},
+		"title": "JAWG results - TEST Lab - TAD calls round 1"
+	}, {
+		"type": "preliminary",
+		"files": [{
+			"error": "no view permissions"
+		}, {
+			"error": "no view permissions"
+		}, {
+			"error": "no view permissions"
+		}, {
+			"error": "no view permissions"
+		}, {
+			"error": "no view permissions"
+		}],
+		"higlass_view_config": {
+			"error": "no view permissions"
+		},
+		"title": "JAWG results - TEST Lab version 1",
+		"description": "These are files provided as Preliminary results of analyses by the TEST lab and for use in the Joint Analysis - they include PC1, Directionality Index (DI), TAD, Stripe and Loop calls"
+	}],
+	"award": {
+		"center_title": "NOFIC - TEST",
+		"uuid": "ae6c618f-7a8c-441e-a886-e30bbbe591da",
+		"principals_allowed": {
+			"view": ["system.Everyone"],
+			"edit": ["group.admin"]
+		},
+		"@type": ["Award", "Item"],
+		"project": "4DN",
+		"@id": "/awards/1U54DK107980-01/",
+		"display_title": "CENTER FOR 3D STRUCTURE AND PHYSICS OF THE GENOME"
+	},
+	"documents": [],
+	"static_headers": [{
+		"name": "item-page-headers.ExperimentType.insituhic",
+		"status": "released",
+		"uuid": "298554ad-20e2-4449-a752-ac190123dab7",
+		"external_references": [],
+		"@type": ["StaticSection", "UserContent", "Item"],
+		"@id": "/static-sections/298554ad-20e2-4449-a752-ac190123dab7/",
+		"submitted_by": {
+			"error": "no view permissions"
+		},
+		"title": "Assay Description",
+		"aliases": ["4dn-dcic-lab:experiment_infobox_hic"],
+		"options": {
+			"filetype": "html",
+			"default_open": false,
+			"collapsible": false
+		},
+		"lab": {
+			"@id": "/labs/4dn-dcic-lab/",
+			"uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin", "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"]
+			},
+			"@type": ["Lab", "Item"],
+			"display_title": "4DN DCIC, HMS"
+		},
+		"schema_version": "2",
+		"principals_allowed": {
+			"view": ["system.Everyone"],
+			"edit": ["group.admin", "userid.56c9c683-bb11-471b-b590-c656f7dc03c1"]
+		},
+		"last_modified": {
+			"date_modified": "2019-04-22T16:22:05.901177+00:00",
+			"modified_by": {
+				"error": "no view permissions"
+			}
+		},
+		"body": "<b>In Situ Hi-C</b>\n\n<p>\n   In situ Hi-C is a method to detect and quantify the pairwise interactions between chromosome regions across the entire genome. It was developed in 2014 as an improvement over the dilution Hi-C method. Compared to standard dilution Hi-C, this technique reduces the frequency of random ligation because the ligation is performed <i>in situ</i> inside the nucleus, a constrained space, instead of in solution, where DNA fragments are floating freely. In addition, this protocol can be done more quickly in the lab and was the first to introduce the use of 4-cutter restriction enzymes as opposed to the previous 6-cutters, providing higher resolution.\n</p>\n<p>\nThe protocol involves cross-linking the cells with formaldehyde to form links between physically adjacent DNA regions. The cells are then permeabilized with their nuclei intact. A 4-cutter restriction enzyme is used to digest the chromatin into multiple DNA fragments. The resulting fragments are biotinylated by end filling of the fragments ends. The fragments are then ligated and the DNA is purified and sheared. The biotinylated fragments are pulled down from the solution with streptavidin beads and a library is constructed and sequenced. Analysis of the resulting paired-end short read sequences produces a matrix that shows the number of interactions between different DNA regions.\n</p>\n<p>\nSee <a href=\"https://www.sciencedirect.com/science/article/pii/S0092867414014974?via%3Dihub\">Rao et al., 2014</a> for more details.\n</p>\n\n<div>\n<img style=\"width: 600px;\" src=\"https://s3.amazonaws.com/4dn-dcic-public/static-pages/InfoBoxes/IsHC_fig1.png\"/>\n  <br/><br/>\n  <em>Image source: Rao et al., 2014, Figure 1A</em>\n</div>",
+		"display_title": "Assay Description",
+		"filetype": "html",
+		"section_type": "Item Page Header",
+		"date_created": "2018-09-07T18:19:43.777198+00:00",
+		"award": {
+			"@id": "/awards/1U01CA200059-01/",
+			"uuid": "b0b9c607-f8b4-4f02-93f4-9895b461334b",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"@type": ["Award", "Item"],
+			"display_title": "4D NUCLEOME NETWORK DATA COORDINATION AND INTEGRATION CENTER"
+		},
+		"content": "<b>In Situ Hi-C</b>\n\n<p>\n   In situ Hi-C is a method to detect and quantify the pairwise interactions between chromosome regions across the entire genome. It was developed in 2014 as an improvement over the dilution Hi-C method. Compared to standard dilution Hi-C, this technique reduces the frequency of random ligation because the ligation is performed <i>in situ</i> inside the nucleus, a constrained space, instead of in solution, where DNA fragments are floating freely. In addition, this protocol can be done more quickly in the lab and was the first to introduce the use of 4-cutter restriction enzymes as opposed to the previous 6-cutters, providing higher resolution.\n</p>\n<p>\nThe protocol involves cross-linking the cells with formaldehyde to form links between physically adjacent DNA regions. The cells are then permeabilized with their nuclei intact. A 4-cutter restriction enzyme is used to digest the chromatin into multiple DNA fragments. The resulting fragments are biotinylated by end filling of the fragments ends. The fragments are then ligated and the DNA is purified and sheared. The biotinylated fragments are pulled down from the solution with streptavidin beads and a library is constructed and sequenced. Analysis of the resulting paired-end short read sequences produces a matrix that shows the number of interactions between different DNA regions.\n</p>\n<p>\nSee <a href=\"https://www.sciencedirect.com/science/article/pii/S0092867414014974?via%3Dihub\">Rao et al., 2014</a> for more details.\n</p>\n\n<div>\n<img style=\"width: 600px;\" src=\"https://s3.amazonaws.com/4dn-dcic-public/static-pages/InfoBoxes/IsHC_fig1.png\"/>\n  <br/><br/>\n  <em>Image source: Rao et al., 2014, Figure 1A</em>\n</div>"
+	}],
+	"produced_in_pub": {
+		"journal": "bioRxiv",
+		"@id": "/publications/b13590b2-a341-4e5e-ad5e-72e233b32e9d/",
+		"uuid": "b13590b2-a341-4e5e-ad5e-72e233b32e9d",
+		"principals_allowed": {
+			"view": ["system.Everyone"],
+			"edit": ["group.admin"]
+		},
+		"abstract": "Over the past decade, 3C-related methods, complemented by increasingly detailed microscopic views of the nucleus, have provided unprecedented insights into chromosome folding in vivo. Here, to overcome the resolution limits inherent to the majority of genome-wide chromosome architecture mapping studies, we extend a recently-developed Hi-C variant, Micro-C, to map chromosome architecture at nucleosome resolution in human embryonic stem cells and fibroblasts. Micro-C maps robustly capture well-described features of mammalian chromosome folding including A/B compartment organization, topologically associating domains (TADs), and cis interaction peaks anchored at CTCF binding sites, while also providing a detailed 1-dimensional map of nucleosome positioning and phasing genome-wide. Compared to high-resolution in situ Hi-C, Micro-C exhibits substantially improved signal-to-noise with an order of magnitude greater dynamic range, enabling not only localization of domain boundaries with single-nucleosome accuracy, but also resolving more than 20,000 additional looping interaction peaks in each cell type. Intriguingly, many of these newly-identified peaks are localized along stripe patterns and form transitive grids, consistent with their anchors being pause sites impeding the process of cohesin-dependent loop extrusion. Together, our analyses provide the highest resolution maps of chromosome folding in human cells to date, and provide a valuable resource for studies of chromosome folding mechanisms.",
+		"@type": ["Publication", "Item"],
+		"short_attribution": "Nils Krietenstein et al. (2019)",
+		"title": "Ultrastructural details of mammalian chromosome architecture",
+		"date_published": "2019-05-17",
+		"display_title": "Nils Krietenstein et al. (2019) Ultrastructural details of mammalian chromosome architecture",
+		"authors": ["Nils Krietenstein", "Sameer Abraham", "Sergey V. Venev", "Nezar Abdennur", "Johan Gibcus", "Tsung-Han S. Hsieh", "Krishna Mohan Parsi", "Liyan Yang", "Ren Maehr", "Leonid A. Mirny", "Job TEST", "Oliver J. Rando"]
+	},
+	"schema_version": "2",
+	"last_modified": {
+		"date_modified": "2019-12-11T21:19:30.104078+00:00",
+		"modified_by": {
+			"error": "no view permissions"
+		}
+	},
+	"lab": {
+		"postal_code": "",
+		"@id": "/labs/job-TEST-lab/",
+		"uuid": "3c577664-affb-41c4-bf27-9e21c2fc1554",
+		"principals_allowed": {
+			"view": ["system.Everyone"],
+			"edit": ["group.admin", "submits_for.3c577664-affb-41c4-bf27-9e21c2fc1554"]
+		},
+		"state": "",
+		"@type": ["Lab", "Item"],
+		"country": "",
+		"city": "",
+		"correspondence": [{
+			"@id": "/users/83b5073a-069b-4162-9b30-6f42d5551e34/",
+			"display_title": "Job TEST",
+			"contact_email": "am9iLmRla2tlckB1bWFzc21lZC5lZHU="
+		}],
+		"display_title": "Job TEST, UMMS"
+	},
+	"processed_files": [{
+		"status": "released",
+		"uuid": "d6f17148-609b-4f64-bb32-9567efb17e13",
+		"file_classification": "processed file",
+		"href": "/files-processed/4DNFITU7K8VQ/@@download/4DNFITU7K8VQ.pairs.gz",
+		"@type": ["FileProcessed", "File", "Item"],
+		"upload_key": "d6f17148-609b-4f64-bb32-9567efb17e13/4DNFITU7K8VQ.pairs.gz",
+		"file_type": "contact list-combined",
+		"genome_assembly": "GRCh38",
+		"last_modified": {
+			"date_modified": "2020-02-20T19:20:55.406342+00:00"
+		},
+		"accession": "4DNFITU7K8VQ",
+		"@id": "/files-processed/4DNFITU7K8VQ/",
+		"principals_allowed": {
+			"view": ["system.Everyone"],
+			"edit": ["group.admin"]
+		},
+		"display_title": "4DNFITU7K8VQ.pairs.gz",
+		"file_format": {
+			"@id": "/file-formats/pairs/",
+			"uuid": "d13d06cf-218e-4f61-aaf0-91f226248b2c",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"display_title": "pairs",
+			"@type": ["FileFormat", "Item"]
+		},
+		"quality_metric_summary": [{
+			"numberType": "integer",
+			"value": "2525323776",
+			"title": "Filtered Reads"
+		}, {
+			"numberType": "percent",
+			"value": "30.312",
+			"title": "Cis reads (>20kb)",
+			"tooltip": "Percent of total reads (=765.49m)"
+		}, {
+			"numberType": "percent",
+			"value": "16.691",
+			"title": "Short cis reads",
+			"tooltip": "Percent of total reads (=421.5m)"
+		}, {
+			"numberType": "percent",
+			"value": "52.997",
+			"title": "Trans Reads",
+			"tooltip": "Percent of total reads (=1338.34m)"
+		}],
+		"quality_metric": {
+			"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFITU7K8VQ/pairsqc_report.html",
+			"@id": "/quality-metrics-pairsqc/7a2d8f3d-2108-4b81-a09e-fdcf622a0392/",
+			"uuid": "7a2d8f3d-2108-4b81-a09e-fdcf622a0392",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"@type": ["QualityMetricPairsqc", "QualityMetric", "Item"],
+			"overall_quality_status": "PASS",
+			"display_title": "QualityMetricPairsqc from 2018-04-27"
+		},
+		"file_size": 49203877939,
+		"extra_files": [{
+			"href": "/files-processed/4DNFITU7K8VQ/@@download/4DNFITU7K8VQ.pairs.gz.px2",
+			"file_format": {
+				"@id": "/file-formats/pairs_px2/",
+				"uuid": "d13d06cf-218e-4f61-aaf0-91f226348b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["FileFormat", "Item"],
+				"display_title": "pairs_px2"
+			}
+		}],
+		"file_type_detailed": "contact list-combined (pairs)"
+	}, {
+		"status": "released",
+		"file_type": "contact matrix",
+		"uuid": "0d72e78a-fc87-4716-8b8e-6dc5650ff2ef",
+		"href": "/files-processed/4DNFIQYQWPF5/@@download/4DNFIQYQWPF5.hic",
+		"@type": ["FileProcessed", "File", "Item"],
+		"upload_key": "0d72e78a-fc87-4716-8b8e-6dc5650ff2ef/4DNFIQYQWPF5.hic",
+		"file_format": {
+			"@id": "/file-formats/hic/",
+			"uuid": "d13d11cf-218e-4f61-bbf0-91f226248b2c",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"display_title": "hic",
+			"@type": ["FileFormat", "Item"]
+		},
+		"genome_assembly": "GRCh38",
+		"display_title": "4DNFIQYQWPF5.hic",
+		"@id": "/files-processed/4DNFIQYQWPF5/",
+		"principals_allowed": {
+			"view": ["system.Everyone"],
+			"edit": ["group.admin"]
+		},
+		"last_modified": {
+			"date_modified": "2018-09-18T04:00:31.069121+00:00"
+		},
+		"file_classification": "processed file",
+		"accession": "4DNFIQYQWPF5",
+		"file_size": 22161530585,
+		"extra_files": [],
+		"file_type_detailed": "contact matrix (hic)"
+	}, {
+		"status": "released",
+		"file_type": "contact matrix",
+		"uuid": "8600d037-9af0-477d-9e39-fec95552b64d",
+		"href": "/files-processed/4DNFI6HDY7WZ/@@download/4DNFI6HDY7WZ.mcool",
+		"@type": ["FileProcessed", "File", "Item"],
+		"upload_key": "8600d037-9af0-477d-9e39-fec95552b64d/4DNFI6HDY7WZ.mcool",
+		"file_format": {
+			"@id": "/file-formats/mcool/",
+			"uuid": "d13d06cf-218e-4f61-ccf0-91f226248b2c",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"display_title": "mcool",
+			"@type": ["FileFormat", "Item"]
+		},
+		"genome_assembly": "GRCh38",
+		"display_title": "4DNFI6HDY7WZ.mcool",
+		"@id": "/files-processed/4DNFI6HDY7WZ/",
+		"principals_allowed": {
+			"view": ["system.Everyone"],
+			"edit": ["group.admin"]
+		},
+		"last_modified": {
+			"date_modified": "2020-02-20T20:18:38.176833+00:00"
+		},
+		"file_classification": "processed file",
+		"accession": "4DNFI6HDY7WZ",
+		"file_type_detailed": "contact matrix (mcool)",
+		"file_size": 26310980892,
+		"extra_files": [],
+		"higlass_uid": "bJORvAOhSmCkED7QGB7FYA",
+		"static_content": [{
+			"location": "tab:higlass",
+			"description": "auto_generated_higlass_view_config",
+			"content": {
+				"@id": "/higlass-view-configs/befc872f-6120-4712-bd62-3eec91a4daeb/",
+				"uuid": "befc872f-6120-4712-bd62-3eec91a4daeb",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin", "userid.986b362f-4eb6-4a9c-8173-3ab267307e3a"]
+				},
+				"display_title": "4DNFI6HDY7WZ - contact matrix for H1-hESC (Tier 1) in situ Hi-C DpnII",
+				"@type": ["HiglassViewConfig", "UserContent", "Item"]
+			}
+		}]
+	}],
+	"public_release": "2017-07-26",
+	"display_title": "TESTS2AAAAAA",
+	"accession": "TESTS2AAAAAA",
+	"date_created": "2017-07-13T14:23:13.113468+00:00",
+	"description": "in situ Hi-C on H1-hESC (Tier 1) with DpnII",
+	"experiments_in_set": [{
+		"status": "released",
+		"experiment_type": {
+			"@id": "/experiment-types/in-situ-hi-c/",
+			"uuid": "a2920a38-cdba-4ff0-b4f0-c6bb53257747",
+			"assay_subclassification": "DNA-DNA Pairwise Interactions",
+			"@type": ["ExperimentType", "Item"],
+			"assay_classification": "3C via Ligation",
+			"experiment_category": "Sequencing",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"assay_subclass_short": "Hi-C",
+			"display_title": "in situ Hi-C",
+			"other_tags": ["DNA-DNA", "Pairwise", "3D"]
+		},
+		"uuid": "eca3ac9b-9dc4-4891-861d-771279b7f9b1",
+		"@type": ["ExperimentHiC", "Experiment", "Item"],
+		"other_processed_files": [{
+			"type": "archived",
+			"files": [{
+				"status": "released",
+				"uuid": "6169212f-9a1c-4f17-aca6-3c8562d2919a",
+				"href": "/files-processed/4DNFIS58ESR4/@@download/4DNFIS58ESR4.bam",
+				"@type": ["FileProcessed", "File", "Item"],
+				"genome_assembly": "GRCh38",
+				"display_title": "4DNFIS58ESR4.bam",
+				"@id": "/files-processed/4DNFIS58ESR4/",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"last_modified": {
+					"date_modified": "2020-02-21T04:15:55.748191+00:00"
+				},
+				"file_format": {
+					"@id": "/file-formats/bam/",
+					"uuid": "d13d06cf-218e-4f61-aaf0-91f226248b3c",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "bam",
+					"@type": ["FileFormat", "Item"]
+				},
+				"accession": "4DNFIS58ESR4",
+				"file_size": 271660375461,
+				"file_type_detailed": "alignments (bam)"
+			}, {
+				"status": "released",
+				"uuid": "42ac46e8-1fff-4342-a3e4-29e34799a754",
+				"href": "/files-processed/4DNFIQL5L5I3/@@download/4DNFIQL5L5I3.pairs.gz",
+				"@type": ["FileProcessed", "File", "Item"],
+				"quality_metric": {
+					"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIQL5L5I3/pairsqc_report.html",
+					"@id": "/quality-metrics-pairsqc/9adc818b-1e74-4d3e-9ac9-85a9d9f9cc54/",
+					"uuid": "9adc818b-1e74-4d3e-9ac9-85a9d9f9cc54",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"@type": ["QualityMetricPairsqc", "QualityMetric", "Item"],
+					"overall_quality_status": "PASS",
+					"display_title": "QualityMetricPairsqc from 2018-01-26"
+				},
+				"display_title": "4DNFIQL5L5I3.pairs.gz",
+				"@id": "/files-processed/4DNFIQL5L5I3/",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"last_modified": {
+					"date_modified": "2019-05-23T01:47:59.291843+00:00"
+				},
+				"file_format": {
+					"@id": "/file-formats/pairs/",
+					"uuid": "d13d06cf-218e-4f61-aaf0-91f226248b2c",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "pairs",
+					"@type": ["FileFormat", "Item"]
+				},
+				"quality_metric_summary": [{
+					"numberType": "integer",
+					"value": "1318462319",
+					"title": "Filtered Reads"
+				}, {
+					"numberType": "percent",
+					"value": "30.587",
+					"title": "Cis reads (>20kb)",
+					"tooltip": "Percent of total reads (=403.28m)"
+				}, {
+					"numberType": "percent",
+					"value": "16.703",
+					"title": "Short cis reads",
+					"tooltip": "Percent of total reads (=220.22m)"
+				}, {
+					"numberType": "percent",
+					"value": "52.71",
+					"title": "Trans Reads",
+					"tooltip": "Percent of total reads (=694.96m)"
+				}],
+				"accession": "4DNFIQL5L5I3",
+				"file_size": 29900868622,
+				"file_type_detailed": "contact list (pairs)"
+			}, {
+				"status": "released",
+				"uuid": "ce74f51c-4174-4baa-963e-b1c515470c81",
+				"href": "/files-processed/4DNFI9NDGTUJ/@@download/4DNFI9NDGTUJ.hic",
+				"@type": ["FileProcessed", "File", "Item"],
+				"display_title": "4DNFI9NDGTUJ.hic",
+				"@id": "/files-processed/4DNFI9NDGTUJ/",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"last_modified": {
+					"date_modified": "2018-09-18T04:20:36.086112+00:00"
+				},
+				"file_format": {
+					"@id": "/file-formats/hic/",
+					"uuid": "d13d11cf-218e-4f61-bbf0-91f226248b2c",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "hic",
+					"@type": ["FileFormat", "Item"]
+				},
+				"accession": "4DNFI9NDGTUJ",
+				"file_size": 6793377891,
+				"file_type_detailed": "contact matrix (hic)"
+			}, {
+				"status": "released",
+				"uuid": "a7a847ed-9649-4cf5-b37d-b349743dea0d",
+				"href": "/files-processed/4DNFI29JL6ZO/@@download/4DNFI29JL6ZO.mcool",
+				"@type": ["FileProcessed", "File", "Item"],
+				"genome_assembly": "GRCh38",
+				"display_title": "4DNFI29JL6ZO.mcool",
+				"@id": "/files-processed/4DNFI29JL6ZO/",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"last_modified": {
+					"date_modified": "2019-05-08T18:39:48.616061+00:00"
+				},
+				"file_format": {
+					"@id": "/file-formats/mcool/",
+					"uuid": "d13d06cf-218e-4f61-ccf0-91f226248b2c",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "mcool",
+					"@type": ["FileFormat", "Item"]
+				},
+				"accession": "4DNFI29JL6ZO",
+				"file_size": 8388649047,
+				"higlass_uid": "W8BNoyqxTAO0yUlTQ4GNww",
+				"file_type_detailed": "contact matrix (mcool)"
+			}, {
+				"status": "released",
+				"uuid": "45865c4c-c854-4ed7-bcc1-aff2dd554ee5",
+				"href": "/files-processed/4DNFI3J81EEE/@@download/4DNFI3J81EEE.normvector.juicerformat.gz",
+				"@type": ["FileProcessed", "File", "Item"],
+				"display_title": "4DNFI3J81EEE.normvector.juicerformat.gz",
+				"@id": "/files-processed/4DNFI3J81EEE/",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"last_modified": {
+					"date_modified": "2018-09-18T04:20:32.655794+00:00"
+				},
+				"file_format": {
+					"@id": "/file-formats/normvector_juicerformat/",
+					"uuid": "d13d06cf-218e-4f61-55f0-94f226118b2c",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "normvector_juicerformat",
+					"@type": ["FileFormat", "Item"]
+				},
+				"accession": "4DNFI3J81EEE",
+				"file_size": 8492570,
+				"file_type_detailed": "juicebox norm vector (normvector_juicerformat)"
+			}],
+			"title": "Archived results",
+			"description": "Results from a preliminary version of the HiC processing pipeline, retained for archival purposes"
+		}, {
+			"type": "supplementary",
+			"files": [{
+				"error": "no view permissions"
+			}, {
+				"error": "no view permissions"
+			}, {
+				"error": "no view permissions"
+			}, {
+				"error": "no view permissions"
+			}],
+			"title": "JAWG results - TEST Lab"
+		}],
+		"biosample": {
+			"biosample_category": ["H1-hESC", "Human stem cell"],
+			"cell_culture_details": [{
+				"@id": "/biosample-cell-cultures/525242f1-8d24-4e44-bb06-7643fa924647/",
+				"uuid": "525242f1-8d24-4e44-bb06-7643fa924647",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["BiosampleCellCulture", "Item"],
+				"display_title": "BiosampleCellCulture from 2017-07-13"
+			}],
+			"uuid": "fcd173b9-1463-4bac-ada3-e48f035a24e0",
+			"@type": ["Biosample", "Item"],
+			"modifications_summary": "None",
+			"modifications": [],
+			"biosource": [{
+				"cell_line": {
+					"preferred_name": "H1-hESC",
+					"@id": "/ontology-terms/EFO:0003042/",
+					"uuid": "c3f6e06f-900e-45f9-9c23-983c5673f58d",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"@type": ["OntologyTerm", "Item"],
+					"slim_terms": [{
+						"@id": "/ontology-terms/CL:0000000/",
+						"uuid": "45d2b02e-130b-40db-8bf2-2288c6c57dcf",
+						"principals_allowed": {
+							"view": ["system.Everyone"],
+							"edit": ["group.admin"]
+						},
+						"@type": ["OntologyTerm", "Item"],
+						"display_title": "cell"
+					}, {
+						"@id": "/ontology-terms/GO:0005623/",
+						"uuid": "72e16a19-eef3-46ca-a1b8-20e646e69675",
+						"principals_allowed": {
+							"view": ["system.Everyone"],
+							"edit": ["group.admin"]
+						},
+						"@type": ["OntologyTerm", "Item"],
+						"display_title": "cell"
+					}],
+					"display_title": "H1-hESC",
+					"synonyms": ["H1"]
+				},
+				"@id": "/biosources/4DNSRV3SKQ8M/",
+				"uuid": "68172441-97c4-40cc-b73f-d0f5dbc5cc05",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["Biosource", "Item"],
+				"tissue": {
+					"preferred_name": "stem cell",
+					"@id": "/ontology-terms/CL:0000034/",
+					"uuid": "082f5be3-3617-4d3e-9ee9-78df53a71802",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"@type": ["OntologyTerm", "Item"],
+					"slim_terms": [{
+						"@id": "/ontology-terms/CL:0000000/",
+						"uuid": "45d2b02e-130b-40db-8bf2-2288c6c57dcf",
+						"principals_allowed": {
+							"view": ["system.Everyone"],
+							"edit": ["group.admin"]
+						},
+						"@type": ["OntologyTerm", "Item"],
+						"display_title": "cell"
+					}, {
+						"@id": "/ontology-terms/GO:0005623/",
+						"uuid": "72e16a19-eef3-46ca-a1b8-20e646e69675",
+						"principals_allowed": {
+							"view": ["system.Everyone"],
+							"edit": ["group.admin"]
+						},
+						"@type": ["OntologyTerm", "Item"],
+						"display_title": "cell"
+					}],
+					"display_title": "stem cell"
+				},
+				"cell_line_tier": "Tier 1",
+				"biosource_type": "stem cell derived cell line",
+				"individual": {
+					"@id": "/individuals-human/4DNIN3RG3ZKE/",
+					"uuid": "c97775b7-3d00-4132-9598-863797b8ef14",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"@type": ["IndividualHuman", "Individual", "Item"],
+					"organism": {
+						"name": "human",
+						"@id": "/organisms/9606/",
+						"uuid": "7745b647-ff15-4ff3-9ced-b897d4e2983c",
+						"principals_allowed": {
+							"view": ["system.Everyone"],
+							"edit": ["group.admin"]
+						},
+						"@type": ["Organism", "Item"],
+						"display_title": "H. sapiens"
+					},
+					"display_title": "4DNIN3RG3ZKE"
+				},
+				"display_title": "H1-hESC (Tier 1) - 4DNSRV3SKQ8M"
+			}],
+			"display_title": "4DNBS3O2FNJO",
+			"treatments": [],
+			"biosource_summary": "H1-hESC (Tier 1)",
+			"badges": [{
+				"messages": ["Biosample missing doubling_number", "Biosample missing morphology_image"],
+				"badge": {
+					"warning": "Biosample Metadata Incomplete",
+					"@id": "/badges/biosample-metadata-incomplete/",
+					"uuid": "2b2cc7ff-b7a8-4138-9a6c-22884fc71690",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "Biosample Metadata Incomplete",
+					"@type": ["Badge", "Item"],
+					"badge_icon": "/static/img/badges/biosample-icon.svg",
+					"badge_classification": "Warning",
+					"description": "Biosample is missing metadata information required as part of the standards implemented by the 4DN Samples working group.",
+					"title": "Biosample Metadata Incomplete"
+				}
+			}],
+			"@id": "/biosamples/4DNBS3O2FNJO/",
+			"accession": "4DNBS3O2FNJO",
+			"biosample_type": "stem cells",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"treatments_summary": "None"
+		},
+		"experiment_categorizer": {
+			"combined": "Enzyme: DpnII",
+			"value": "DpnII",
+			"field": "Enzyme"
+		},
+		"display_title": "in situ Hi-C on H1-hESC (Tier 1) with DpnII - 4DNEXENKINA2",
+		"digestion_enzyme": {
+			"name": "DpnII",
+			"@id": "/enzymes/DpnII/",
+			"uuid": "356a57a1-1f1d-463d-a972-27742f79a6a5",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"@type": ["Enzyme", "Item"],
+			"display_title": "DpnII"
+		},
+		"processed_files": [{
+			"status": "released",
+			"uuid": "572904ad-5d91-4105-ab4c-2d1b3c914975",
+			"file_classification": "processed file",
+			"href": "/files-processed/4DNFIN6ZI1S4/@@download/4DNFIN6ZI1S4.bam",
+			"@type": ["FileProcessed", "File", "Item"],
+			"upload_key": "572904ad-5d91-4105-ab4c-2d1b3c914975/4DNFIN6ZI1S4.bam",
+			"file_type": "alignments",
+			"genome_assembly": "GRCh38",
+			"last_modified": {
+				"date_modified": "2020-02-21T04:10:13.118014+00:00"
+			},
+			"accession": "4DNFIN6ZI1S4",
+			"@id": "/files-processed/4DNFIN6ZI1S4/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"display_title": "4DNFIN6ZI1S4.bam",
+			"file_format": {
+				"@id": "/file-formats/bam/",
+				"uuid": "d13d06cf-218e-4f61-aaf0-91f226248b3c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["FileFormat", "Item"],
+				"display_title": "bam"
+			},
+			"quality_metric_summary": [{
+				"numberType": "integer",
+				"value": "3165786921",
+				"title": "Total Reads"
+			}, {
+				"numberType": "percent",
+				"value": "17.846",
+				"title": "Unmapped Reads",
+				"tooltip": "Percent of total reads (=564.95m)"
+			}, {
+				"numberType": "percent",
+				"value": "22.328",
+				"title": "Multimapped Reads",
+				"tooltip": "Percent of total reads (=706.87m)"
+			}, {
+				"numberType": "percent",
+				"value": "18.172",
+				"title": "Duplicate Reads",
+				"tooltip": "Percent of total reads (=575.28m)"
+			}, {
+				"numberType": "percent",
+				"value": "0.007",
+				"title": "Walks",
+				"tooltip": "Percent of total reads (=0.24m)"
+			}, {
+				"numberType": "percent",
+				"value": "0.185",
+				"title": "Minor Contigs",
+				"tooltip": "Percent of total reads (=5.87m)"
+			}],
+			"quality_metric": {
+				"@id": "/quality-metrics-bamqc/9b0b1733-0f17-420e-9e38-1f58ba993c54/",
+				"uuid": "9b0b1733-0f17-420e-9e38-1f58ba993c54",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["QualityMetricBamqc", "QualityMetric", "Item"],
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricBamqc from 2019-12-21"
+			},
+			"file_size": 271651190780,
+			"extra_files": [],
+			"file_type_detailed": "alignments (bam)"
+		}, {
+			"status": "released",
+			"uuid": "35d9afd3-0117-4d62-b4c9-95b0456eae57",
+			"file_classification": "processed file",
+			"href": "/files-processed/4DNFIINYRY8H/@@download/4DNFIINYRY8H.pairs.gz",
+			"@type": ["FileProcessed", "File", "Item"],
+			"upload_key": "35d9afd3-0117-4d62-b4c9-95b0456eae57/4DNFIINYRY8H.pairs.gz",
+			"file_type": "contact list-replicate",
+			"genome_assembly": "GRCh38",
+			"last_modified": {
+				"date_modified": "2019-05-23T01:38:46.664629+00:00"
+			},
+			"accession": "4DNFIINYRY8H",
+			"@id": "/files-processed/4DNFIINYRY8H/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"display_title": "4DNFIINYRY8H.pairs.gz",
+			"file_format": {
+				"@id": "/file-formats/pairs/",
+				"uuid": "d13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["FileFormat", "Item"],
+				"display_title": "pairs"
+			},
+			"quality_metric_summary": [{
+				"numberType": "integer",
+				"value": "1318448509",
+				"title": "Filtered Reads"
+			}, {
+				"numberType": "percent",
+				"value": "30.587",
+				"title": "Cis reads (>20kb)",
+				"tooltip": "Percent of total reads (=403.28m)"
+			}, {
+				"numberType": "percent",
+				"value": "16.703",
+				"title": "Short cis reads",
+				"tooltip": "Percent of total reads (=220.22m)"
+			}, {
+				"numberType": "percent",
+				"value": "52.71",
+				"title": "Trans Reads",
+				"tooltip": "Percent of total reads (=694.95m)"
+			}],
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIINYRY8H/pairsqc_report.html",
+				"@id": "/quality-metrics-pairsqc/762d3cc0-fcd4-4c1a-a99f-124b0f371690/",
+				"uuid": "762d3cc0-fcd4-4c1a-a99f-124b0f371690",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["QualityMetricPairsqc", "QualityMetric", "Item"],
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricPairsqc from 2018-03-06"
+			},
+			"file_size": 27213955480,
+			"extra_files": [{
+				"href": "/files-processed/4DNFIINYRY8H/@@download/4DNFIINYRY8H.pairs.gz.px2",
+				"file_format": {
+					"@id": "/file-formats/pairs_px2/",
+					"uuid": "d13d06cf-218e-4f61-aaf0-91f226348b2c",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "pairs_px2",
+					"@type": ["FileFormat", "Item"]
+				}
+			}],
+			"file_type_detailed": "contact list-replicate (pairs)"
+		}],
+		"@id": "/experiments-hi-c/4DNEXENKINA2/",
+		"accession": "4DNEXENKINA2",
+		"last_modified": {
+			"date_modified": "2019-04-24T17:00:01.714315+00:00"
+		},
+		"files": [{
+			"status": "released",
+			"md5sum": "0e9cb8a8ed230e8203ad556748f91613",
+			"uuid": "4bf24163-435b-47f4-a5bf-fb0f82935402",
+			"accession": "4DNFIHNEAEMA",
+			"href": "/files-fastq/4DNFIHNEAEMA/@@download/4DNFIHNEAEMA.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "4bf24163-435b-47f4-a5bf-fb0f82935402/4DNFIHNEAEMA.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFINLRXHSC/",
+					"uuid": "14883855-bec8-4a76-a374-b57ef24338dd",
+					"accession": "4DNFINLRXHSC",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFINLRXHSC.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIHNEAEMA/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIHNEAEMA.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIHNEAEMA/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/e53ef0ec-f459-4887-82c1-5de1f7064333/",
+				"uuid": "e53ef0ec-f459-4887-82c1-5de1f7064333",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 340747352,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 10982811060
+		}, {
+			"status": "released",
+			"md5sum": "b3914c5b5b43d6e140954cb5d49099eb",
+			"uuid": "ce353ca8-6157-48b1-aa9a-de1688ab92c4",
+			"accession": "4DNFIBCRYBPW",
+			"href": "/files-fastq/4DNFIBCRYBPW/@@download/4DNFIBCRYBPW.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "ce353ca8-6157-48b1-aa9a-de1688ab92c4/4DNFIBCRYBPW.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFI8TIPK75/",
+					"uuid": "7825488a-5cd3-4434-9bfb-a53fc337f0da",
+					"accession": "4DNFI8TIPK75",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFI8TIPK75.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIBCRYBPW/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIBCRYBPW.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIBCRYBPW/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/cdc5ecd6-3575-4509-9615-7da395f95171/",
+				"uuid": "cdc5ecd6-3575-4509-9615-7da395f95171",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 360470026,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10937494760
+		}, {
+			"status": "released",
+			"md5sum": "cd947730fc954df2395e1ed12fb92833",
+			"uuid": "9cc83449-91a4-4fc1-b87d-28c78d216b1f",
+			"accession": "4DNFI96OZWFF",
+			"href": "/files-fastq/4DNFI96OZWFF/@@download/4DNFI96OZWFF.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "9cc83449-91a4-4fc1-b87d-28c78d216b1f/4DNFI96OZWFF.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIHY3D1G7/",
+					"uuid": "1a64c4bc-3b27-4a6e-9c81-b70abed4aa19",
+					"accession": "4DNFIHY3D1G7",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIHY3D1G7.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFI96OZWFF/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFI96OZWFF.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFI96OZWFF/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/a098b8c9-3e9b-4baa-8383-65074ee5c0df/",
+				"uuid": "a098b8c9-3e9b-4baa-8383-65074ee5c0df",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 345015631,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 11451268931
+		}, {
+			"status": "released",
+			"md5sum": "f56a5c07ee31178ff8436d142e1c55cc",
+			"uuid": "eee7fba5-0115-4e91-9b12-ab3545e871cf",
+			"accession": "4DNFI1PAJKFC",
+			"href": "/files-fastq/4DNFI1PAJKFC/@@download/4DNFI1PAJKFC.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "eee7fba5-0115-4e91-9b12-ab3545e871cf/4DNFI1PAJKFC.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIUXJJM67/",
+					"uuid": "0942066d-d702-41ed-a5a3-752bfc73c6a6",
+					"accession": "4DNFIUXJJM67",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIUXJJM67.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFI1PAJKFC/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFI1PAJKFC.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFI1PAJKFC/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/b3df8208-ae8d-4743-9957-22486d8d0f6f/",
+				"uuid": "b3df8208-ae8d-4743-9957-22486d8d0f6f",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 348819073,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10736514671
+		}, {
+			"status": "released",
+			"md5sum": "79276a3220d1adf9533c889141fdc2ed",
+			"uuid": "0942066d-d702-41ed-a5a3-752bfc73c6a6",
+			"accession": "4DNFIUXJJM67",
+			"href": "/files-fastq/4DNFIUXJJM67/@@download/4DNFIUXJJM67.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "0942066d-d702-41ed-a5a3-752bfc73c6a6/4DNFIUXJJM67.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFI1PAJKFC/",
+					"uuid": "eee7fba5-0115-4e91-9b12-ab3545e871cf",
+					"accession": "4DNFI1PAJKFC",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFI1PAJKFC.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIUXJJM67/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIUXJJM67.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFIUXJJM67/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/8f7e0bab-f056-4f92-b9ee-8643853888c6/",
+				"uuid": "8f7e0bab-f056-4f92-b9ee-8643853888c6",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 348819073,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 11477272949
+		}, {
+			"status": "released",
+			"md5sum": "db0c57327a1802e16357df8cb5c8b65a",
+			"uuid": "be5455dd-dbe9-4b5b-981c-cc947eda67f7",
+			"accession": "4DNFI4F6KXR5",
+			"href": "/files-fastq/4DNFI4F6KXR5/@@download/4DNFI4F6KXR5.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "be5455dd-dbe9-4b5b-981c-cc947eda67f7/4DNFI4F6KXR5.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIY55W1HW/",
+					"uuid": "a0dde283-a68b-47f2-8e0e-928f01341bc5",
+					"accession": "4DNFIY55W1HW",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIY55W1HW.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFI4F6KXR5/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFI4F6KXR5.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFI4F6KXR5/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/50ae8fe2-4fcd-4249-a4ff-eaecd6ae5b82/",
+				"uuid": "50ae8fe2-4fcd-4249-a4ff-eaecd6ae5b82",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 345874427,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10601235782
+		}, {
+			"status": "released",
+			"md5sum": "899a06f4622c38516b50e9e652b9e6da",
+			"uuid": "a28fabeb-1465-4651-8a3c-99416076faa2",
+			"accession": "4DNFIVNDDEDZ",
+			"href": "/files-fastq/4DNFIVNDDEDZ/@@download/4DNFIVNDDEDZ.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "a28fabeb-1465-4651-8a3c-99416076faa2/4DNFIVNDDEDZ.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFI29W6CX6/",
+					"uuid": "fdf44035-8309-4703-a87b-167c9d92c393",
+					"accession": "4DNFI29W6CX6",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFI29W6CX6.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIVNDDEDZ/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIVNDDEDZ.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFIVNDDEDZ/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/6ac548bd-4b8a-4ada-a663-6d8df79cc3cc/",
+				"uuid": "6ac548bd-4b8a-4ada-a663-6d8df79cc3cc",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 357628798,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10950510577
+		}, {
+			"status": "released",
+			"md5sum": "ff1808fe4761cb83b406eec5c5394a18",
+			"uuid": "a0dde283-a68b-47f2-8e0e-928f01341bc5",
+			"accession": "4DNFIY55W1HW",
+			"href": "/files-fastq/4DNFIY55W1HW/@@download/4DNFIY55W1HW.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "a0dde283-a68b-47f2-8e0e-928f01341bc5/4DNFIY55W1HW.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFI4F6KXR5/",
+					"uuid": "be5455dd-dbe9-4b5b-981c-cc947eda67f7",
+					"accession": "4DNFI4F6KXR5",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFI4F6KXR5.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIY55W1HW/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIY55W1HW.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFIY55W1HW/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/21aadb70-7671-46cf-a39a-6e6794245ea8/",
+				"uuid": "21aadb70-7671-46cf-a39a-6e6794245ea8",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 345874427,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 11294664886
+		}, {
+			"status": "released",
+			"md5sum": "3c8fecf76d72b397eaf5af890bec4723",
+			"uuid": "fdf44035-8309-4703-a87b-167c9d92c393",
+			"accession": "4DNFI29W6CX6",
+			"href": "/files-fastq/4DNFI29W6CX6/@@download/4DNFI29W6CX6.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "fdf44035-8309-4703-a87b-167c9d92c393/4DNFI29W6CX6.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIVNDDEDZ/",
+					"uuid": "a28fabeb-1465-4651-8a3c-99416076faa2",
+					"accession": "4DNFIVNDDEDZ",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIVNDDEDZ.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFI29W6CX6/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFI29W6CX6.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFI29W6CX6/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/b106497f-c5e5-47d1-a073-1ea9de17090e/",
+				"uuid": "b106497f-c5e5-47d1-a073-1ea9de17090e",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 357628798,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 11735835952
+		}, {
+			"status": "released",
+			"md5sum": "67bc3d8cd2bf6997fd98c8300b4126a6",
+			"uuid": "fc80b065-332b-4ff7-849f-38e50d156462",
+			"accession": "4DNFI7PO1Y9I",
+			"href": "/files-fastq/4DNFI7PO1Y9I/@@download/4DNFI7PO1Y9I.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "fc80b065-332b-4ff7-849f-38e50d156462/4DNFI7PO1Y9I.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFI7FTRUX4/",
+					"uuid": "b8424a3d-058e-4444-88d5-0b7d490f6187",
+					"accession": "4DNFI7FTRUX4",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFI7FTRUX4.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFI7PO1Y9I/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFI7PO1Y9I.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFI7PO1Y9I/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/b0f60747-d72b-4704-9c66-f805f4cc7f40/",
+				"uuid": "b0f60747-d72b-4704-9c66-f805f4cc7f40",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 357395279,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10875643819
+		}, {
+			"status": "released",
+			"md5sum": "f8c1fb3bc84c85980c65b245c28a1b0d",
+			"uuid": "79cd223e-43fe-4ad1-96b7-6292ed39fd73",
+			"accession": "4DNFIMZ4MZCG",
+			"href": "/files-fastq/4DNFIMZ4MZCG/@@download/4DNFIMZ4MZCG.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "79cd223e-43fe-4ad1-96b7-6292ed39fd73/4DNFIMZ4MZCG.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIJI2ZEWN/",
+					"uuid": "7d78fb08-b740-4df6-8a9d-354bdc5984ba",
+					"accession": "4DNFIJI2ZEWN",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIJI2ZEWN.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIMZ4MZCG/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIMZ4MZCG.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFIMZ4MZCG/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/dd8582da-c07c-4d38-97c7-623710a037b9/",
+				"uuid": "dd8582da-c07c-4d38-97c7-623710a037b9",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 357286779,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 11737265696
+		}, {
+			"status": "released",
+			"md5sum": "748a9ffdcea39e12d1b9f7d008277c55",
+			"uuid": "5a49563d-9c8c-41a5-96fe-bea8a833d822",
+			"accession": "4DNFIA7QPBK1",
+			"href": "/files-fastq/4DNFIA7QPBK1/@@download/4DNFIA7QPBK1.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "5a49563d-9c8c-41a5-96fe-bea8a833d822/4DNFIA7QPBK1.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIFSML3KY/",
+					"uuid": "0c226c4e-daed-448d-9ecb-7a43117a4adc",
+					"accession": "4DNFIFSML3KY",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIFSML3KY.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIA7QPBK1/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIA7QPBK1.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFIA7QPBK1/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/59234790-e519-4fd1-86f8-86909d38cd1a/",
+				"uuid": "59234790-e519-4fd1-86f8-86909d38cd1a",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 352549556,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10831079354
+		}, {
+			"status": "released",
+			"md5sum": "a08ace42f9e0919e358296bee2551398",
+			"uuid": "b8424a3d-058e-4444-88d5-0b7d490f6187",
+			"accession": "4DNFI7FTRUX4",
+			"href": "/files-fastq/4DNFI7FTRUX4/@@download/4DNFI7FTRUX4.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "b8424a3d-058e-4444-88d5-0b7d490f6187/4DNFI7FTRUX4.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFI7PO1Y9I/",
+					"uuid": "fc80b065-332b-4ff7-849f-38e50d156462",
+					"accession": "4DNFI7PO1Y9I",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFI7PO1Y9I.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFI7FTRUX4/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFI7FTRUX4.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFI7FTRUX4/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/c44d9e4a-8e0b-4862-932c-369fe4588e93/",
+				"uuid": "c44d9e4a-8e0b-4862-932c-369fe4588e93",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 357395279,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 11637900766
+		}, {
+			"status": "released",
+			"md5sum": "0347432436e4c0acdea22d1c1e42027c",
+			"uuid": "0c226c4e-daed-448d-9ecb-7a43117a4adc",
+			"accession": "4DNFIFSML3KY",
+			"href": "/files-fastq/4DNFIFSML3KY/@@download/4DNFIFSML3KY.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "0c226c4e-daed-448d-9ecb-7a43117a4adc/4DNFIFSML3KY.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIA7QPBK1/",
+					"uuid": "5a49563d-9c8c-41a5-96fe-bea8a833d822",
+					"accession": "4DNFIA7QPBK1",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIA7QPBK1.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIFSML3KY/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIFSML3KY.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFIFSML3KY/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/0074617c-e7b7-423a-ae8d-f0acce5897c9/",
+				"uuid": "0074617c-e7b7-423a-ae8d-f0acce5897c9",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 352549556,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 11612753204
+		}, {
+			"status": "released",
+			"md5sum": "72296fb53c916c5b2402e64c1bd82036",
+			"uuid": "1a64c4bc-3b27-4a6e-9c81-b70abed4aa19",
+			"accession": "4DNFIHY3D1G7",
+			"href": "/files-fastq/4DNFIHY3D1G7/@@download/4DNFIHY3D1G7.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "1a64c4bc-3b27-4a6e-9c81-b70abed4aa19/4DNFIHY3D1G7.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFI96OZWFF/",
+					"uuid": "9cc83449-91a4-4fc1-b87d-28c78d216b1f",
+					"accession": "4DNFI96OZWFF",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFI96OZWFF.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIHY3D1G7/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIHY3D1G7.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIHY3D1G7/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/2208b871-3bd0-41ff-a840-922d172b4b97/",
+				"uuid": "2208b871-3bd0-41ff-a840-922d172b4b97",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 345015631,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10696202395
+		}, {
+			"status": "released",
+			"md5sum": "69fc1997b3fc9c70f991676748eeb621",
+			"uuid": "14883855-bec8-4a76-a374-b57ef24338dd",
+			"accession": "4DNFINLRXHSC",
+			"href": "/files-fastq/4DNFINLRXHSC/@@download/4DNFINLRXHSC.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "14883855-bec8-4a76-a374-b57ef24338dd/4DNFINLRXHSC.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIHNEAEMA/",
+					"uuid": "4bf24163-435b-47f4-a5bf-fb0f82935402",
+					"accession": "4DNFIHNEAEMA",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIHNEAEMA.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFINLRXHSC/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFINLRXHSC.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFINLRXHSC/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/37e45f41-ec13-415a-8a09-248897594cc6/",
+				"uuid": "37e45f41-ec13-415a-8a09-248897594cc6",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 340747352,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10239800002
+		}, {
+			"status": "released",
+			"md5sum": "534aa2e223a2f5eb37cea43917598324",
+			"uuid": "7825488a-5cd3-4434-9bfb-a53fc337f0da",
+			"accession": "4DNFI8TIPK75",
+			"href": "/files-fastq/4DNFI8TIPK75/@@download/4DNFI8TIPK75.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "7825488a-5cd3-4434-9bfb-a53fc337f0da/4DNFI8TIPK75.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIBCRYBPW/",
+					"uuid": "ce353ca8-6157-48b1-aa9a-de1688ab92c4",
+					"accession": "4DNFIBCRYBPW",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIBCRYBPW.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFI8TIPK75/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFI8TIPK75.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFI8TIPK75/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/b216a779-a3c1-471b-a7b1-4d9ec5cdb41b/",
+				"uuid": "b216a779-a3c1-471b-a7b1-4d9ec5cdb41b",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 360470026,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 11747232845
+		}, {
+			"status": "released",
+			"md5sum": "b8d6a865e0d45b6860a049c9596519fb",
+			"uuid": "7d78fb08-b740-4df6-8a9d-354bdc5984ba",
+			"accession": "4DNFIJI2ZEWN",
+			"href": "/files-fastq/4DNFIJI2ZEWN/@@download/4DNFIJI2ZEWN.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "7d78fb08-b740-4df6-8a9d-354bdc5984ba/4DNFIJI2ZEWN.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIMZ4MZCG/",
+					"uuid": "79cd223e-43fe-4ad1-96b7-6292ed39fd73",
+					"accession": "4DNFIMZ4MZCG",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIMZ4MZCG.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIJI2ZEWN/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIJI2ZEWN.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFIJI2ZEWN/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/24f4a068-369b-416a-b49e-0e4f84d9d1e8/",
+				"uuid": "24f4a068-369b-416a-b49e-0e4f84d9d1e8",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 357286779,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10943116212
+		}],
+		"principals_allowed": {
+			"view": ["system.Everyone"],
+			"edit": ["group.admin"]
+		}
+	}, {
+		"status": "released",
+		"experiment_type": {
+			"@id": "/experiment-types/in-situ-hi-c/",
+			"uuid": "a2920a38-cdba-4ff0-b4f0-c6bb53257747",
+			"assay_subclassification": "DNA-DNA Pairwise Interactions",
+			"@type": ["ExperimentType", "Item"],
+			"assay_classification": "3C via Ligation",
+			"experiment_category": "Sequencing",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"assay_subclass_short": "Hi-C",
+			"display_title": "in situ Hi-C",
+			"other_tags": ["DNA-DNA", "Pairwise", "3D"]
+		},
+		"uuid": "c00ecfa0-7e3d-43af-b1c2-091aa9379594",
+		"@type": ["ExperimentHiC", "Experiment", "Item"],
+		"other_processed_files": [{
+			"type": "archived",
+			"files": [{
+				"status": "released",
+				"uuid": "461b19b3-530b-4f21-8736-d5628453158f",
+				"href": "/files-processed/4DNFIOM76FMO/@@download/4DNFIOM76FMO.bam",
+				"@type": ["FileProcessed", "File", "Item"],
+				"genome_assembly": "GRCh38",
+				"display_title": "4DNFIOM76FMO.bam",
+				"@id": "/files-processed/4DNFIOM76FMO/",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"last_modified": {
+					"date_modified": "2020-02-21T04:15:53.046068+00:00"
+				},
+				"file_format": {
+					"@id": "/file-formats/bam/",
+					"uuid": "d13d06cf-218e-4f61-aaf0-91f226248b3c",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "bam",
+					"@type": ["FileFormat", "Item"]
+				},
+				"accession": "4DNFIOM76FMO",
+				"file_size": 272120030098,
+				"file_type_detailed": "alignments (bam)"
+			}, {
+				"status": "released",
+				"uuid": "1c8b2f40-ecae-4343-b6e2-8b90a9b5fbba",
+				"href": "/files-processed/4DNFIYLQMUFZ/@@download/4DNFIYLQMUFZ.pairs.gz",
+				"@type": ["FileProcessed", "File", "Item"],
+				"quality_metric": {
+					"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIYLQMUFZ/pairsqc_report.html",
+					"@id": "/quality-metrics-pairsqc/27bff730-b586-4a8d-bc99-74bb1b180fd0/",
+					"uuid": "27bff730-b586-4a8d-bc99-74bb1b180fd0",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"@type": ["QualityMetricPairsqc", "QualityMetric", "Item"],
+					"overall_quality_status": "PASS",
+					"display_title": "QualityMetricPairsqc from 2018-01-26"
+				},
+				"display_title": "4DNFIYLQMUFZ.pairs.gz",
+				"@id": "/files-processed/4DNFIYLQMUFZ/",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"last_modified": {
+					"date_modified": "2019-05-23T01:47:55.808472+00:00"
+				},
+				"file_format": {
+					"@id": "/file-formats/pairs/",
+					"uuid": "d13d06cf-218e-4f61-aaf0-91f226248b2c",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "pairs",
+					"@type": ["FileFormat", "Item"]
+				},
+				"quality_metric_summary": [{
+					"numberType": "integer",
+					"value": "1206886275",
+					"title": "Filtered Reads"
+				}, {
+					"numberType": "percent",
+					"value": "30.012",
+					"title": "Cis reads (>20kb)",
+					"tooltip": "Percent of total reads (=362.21m)"
+				}, {
+					"numberType": "percent",
+					"value": "16.678",
+					"title": "Short cis reads",
+					"tooltip": "Percent of total reads (=201.28m)"
+				}, {
+					"numberType": "percent",
+					"value": "53.311",
+					"title": "Trans Reads",
+					"tooltip": "Percent of total reads (=643.4m)"
+				}],
+				"accession": "4DNFIYLQMUFZ",
+				"file_size": 27437698202,
+				"file_type_detailed": "contact list (pairs)"
+			}, {
+				"status": "released",
+				"uuid": "09c59c3f-1f2f-4dfc-b6e5-d6062a7f336f",
+				"href": "/files-processed/4DNFI92GEPN1/@@download/4DNFI92GEPN1.hic",
+				"@type": ["FileProcessed", "File", "Item"],
+				"display_title": "4DNFI92GEPN1.hic",
+				"@id": "/files-processed/4DNFI92GEPN1/",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"last_modified": {
+					"date_modified": "2018-09-18T04:20:34.667585+00:00"
+				},
+				"file_format": {
+					"@id": "/file-formats/hic/",
+					"uuid": "d13d11cf-218e-4f61-bbf0-91f226248b2c",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "hic",
+					"@type": ["FileFormat", "Item"]
+				},
+				"accession": "4DNFI92GEPN1",
+				"file_size": 6414543327,
+				"file_type_detailed": "contact matrix (hic)"
+			}, {
+				"status": "released",
+				"uuid": "47856772-bbd8-4760-8607-8bcec67aede8",
+				"href": "/files-processed/4DNFIKTHE2OT/@@download/4DNFIKTHE2OT.mcool",
+				"@type": ["FileProcessed", "File", "Item"],
+				"genome_assembly": "GRCh38",
+				"display_title": "4DNFIKTHE2OT.mcool",
+				"@id": "/files-processed/4DNFIKTHE2OT/",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"last_modified": {
+					"date_modified": "2019-05-08T18:39:44.160473+00:00"
+				},
+				"file_format": {
+					"@id": "/file-formats/mcool/",
+					"uuid": "d13d06cf-218e-4f61-ccf0-91f226248b2c",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "mcool",
+					"@type": ["FileFormat", "Item"]
+				},
+				"accession": "4DNFIKTHE2OT",
+				"file_size": 7928916230,
+				"higlass_uid": "KNkz3cxdTreSXZLoItnH2g",
+				"file_type_detailed": "contact matrix (mcool)"
+			}, {
+				"status": "released",
+				"uuid": "afcd281d-a420-4ec9-b6fa-a7a46e06e0c1",
+				"href": "/files-processed/4DNFIDLGV28D/@@download/4DNFIDLGV28D.normvector.juicerformat.gz",
+				"@type": ["FileProcessed", "File", "Item"],
+				"display_title": "4DNFIDLGV28D.normvector.juicerformat.gz",
+				"@id": "/files-processed/4DNFIDLGV28D/",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"last_modified": {
+					"date_modified": "2018-09-18T04:20:31.978033+00:00"
+				},
+				"file_format": {
+					"@id": "/file-formats/normvector_juicerformat/",
+					"uuid": "d13d06cf-218e-4f61-55f0-94f226118b2c",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "normvector_juicerformat",
+					"@type": ["FileFormat", "Item"]
+				},
+				"accession": "4DNFIDLGV28D",
+				"file_size": 8990474,
+				"file_type_detailed": "juicebox norm vector (normvector_juicerformat)"
+			}],
+			"title": "Archived results",
+			"description": "Results from a preliminary version of the HiC processing pipeline, retained for archival purposes"
+		}, {
+			"type": "supplementary",
+			"files": [{
+				"error": "no view permissions"
+			}, {
+				"error": "no view permissions"
+			}, {
+				"error": "no view permissions"
+			}, {
+				"error": "no view permissions"
+			}],
+			"title": "JAWG results - TEST Lab"
+		}],
+		"biosample": {
+			"biosample_category": ["H1-hESC", "Human stem cell"],
+			"cell_culture_details": [{
+				"@id": "/biosample-cell-cultures/525242f1-8d24-4e44-bb06-7643fa924647/",
+				"uuid": "525242f1-8d24-4e44-bb06-7643fa924647",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["BiosampleCellCulture", "Item"],
+				"display_title": "BiosampleCellCulture from 2017-07-13"
+			}],
+			"uuid": "fcd173b9-1463-4bac-ada3-e48f035a24e0",
+			"@type": ["Biosample", "Item"],
+			"modifications_summary": "None",
+			"modifications": [],
+			"biosource": [{
+				"cell_line": {
+					"preferred_name": "H1-hESC",
+					"@id": "/ontology-terms/EFO:0003042/",
+					"uuid": "c3f6e06f-900e-45f9-9c23-983c5673f58d",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"@type": ["OntologyTerm", "Item"],
+					"slim_terms": [{
+						"@id": "/ontology-terms/CL:0000000/",
+						"uuid": "45d2b02e-130b-40db-8bf2-2288c6c57dcf",
+						"principals_allowed": {
+							"view": ["system.Everyone"],
+							"edit": ["group.admin"]
+						},
+						"@type": ["OntologyTerm", "Item"],
+						"display_title": "cell"
+					}, {
+						"@id": "/ontology-terms/GO:0005623/",
+						"uuid": "72e16a19-eef3-46ca-a1b8-20e646e69675",
+						"principals_allowed": {
+							"view": ["system.Everyone"],
+							"edit": ["group.admin"]
+						},
+						"@type": ["OntologyTerm", "Item"],
+						"display_title": "cell"
+					}],
+					"display_title": "H1-hESC",
+					"synonyms": ["H1"]
+				},
+				"@id": "/biosources/4DNSRV3SKQ8M/",
+				"uuid": "68172441-97c4-40cc-b73f-d0f5dbc5cc05",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["Biosource", "Item"],
+				"tissue": {
+					"preferred_name": "stem cell",
+					"@id": "/ontology-terms/CL:0000034/",
+					"uuid": "082f5be3-3617-4d3e-9ee9-78df53a71802",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"@type": ["OntologyTerm", "Item"],
+					"slim_terms": [{
+						"@id": "/ontology-terms/CL:0000000/",
+						"uuid": "45d2b02e-130b-40db-8bf2-2288c6c57dcf",
+						"principals_allowed": {
+							"view": ["system.Everyone"],
+							"edit": ["group.admin"]
+						},
+						"@type": ["OntologyTerm", "Item"],
+						"display_title": "cell"
+					}, {
+						"@id": "/ontology-terms/GO:0005623/",
+						"uuid": "72e16a19-eef3-46ca-a1b8-20e646e69675",
+						"principals_allowed": {
+							"view": ["system.Everyone"],
+							"edit": ["group.admin"]
+						},
+						"@type": ["OntologyTerm", "Item"],
+						"display_title": "cell"
+					}],
+					"display_title": "stem cell"
+				},
+				"cell_line_tier": "Tier 1",
+				"biosource_type": "stem cell derived cell line",
+				"individual": {
+					"@id": "/individuals-human/4DNIN3RG3ZKE/",
+					"uuid": "c97775b7-3d00-4132-9598-863797b8ef14",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"@type": ["IndividualHuman", "Individual", "Item"],
+					"organism": {
+						"name": "human",
+						"@id": "/organisms/9606/",
+						"uuid": "7745b647-ff15-4ff3-9ced-b897d4e2983c",
+						"principals_allowed": {
+							"view": ["system.Everyone"],
+							"edit": ["group.admin"]
+						},
+						"@type": ["Organism", "Item"],
+						"display_title": "H. sapiens"
+					},
+					"display_title": "4DNIN3RG3ZKE"
+				},
+				"display_title": "H1-hESC (Tier 1) - 4DNSRV3SKQ8M"
+			}],
+			"display_title": "4DNBS3O2FNJO",
+			"treatments": [],
+			"biosource_summary": "H1-hESC (Tier 1)",
+			"badges": [{
+				"messages": ["Biosample missing doubling_number", "Biosample missing morphology_image"],
+				"badge": {
+					"warning": "Biosample Metadata Incomplete",
+					"@id": "/badges/biosample-metadata-incomplete/",
+					"uuid": "2b2cc7ff-b7a8-4138-9a6c-22884fc71690",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "Biosample Metadata Incomplete",
+					"@type": ["Badge", "Item"],
+					"badge_icon": "/static/img/badges/biosample-icon.svg",
+					"badge_classification": "Warning",
+					"description": "Biosample is missing metadata information required as part of the standards implemented by the 4DN Samples working group.",
+					"title": "Biosample Metadata Incomplete"
+				}
+			}],
+			"@id": "/biosamples/4DNBS3O2FNJO/",
+			"accession": "4DNBS3O2FNJO",
+			"biosample_type": "stem cells",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"treatments_summary": "None"
+		},
+		"experiment_categorizer": {
+			"combined": "Enzyme: DpnII",
+			"value": "DpnII",
+			"field": "Enzyme"
+		},
+		"display_title": "in situ Hi-C on H1-hESC (Tier 1) with DpnII - 4DNEXZJZ5EBZ",
+		"digestion_enzyme": {
+			"name": "DpnII",
+			"@id": "/enzymes/DpnII/",
+			"uuid": "356a57a1-1f1d-463d-a972-27742f79a6a5",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"@type": ["Enzyme", "Item"],
+			"display_title": "DpnII"
+		},
+		"processed_files": [{
+			"status": "released",
+			"uuid": "13df1f34-672a-4721-977a-27bda15f3c26",
+			"file_classification": "processed file",
+			"href": "/files-processed/4DNFIQP64RT3/@@download/4DNFIQP64RT3.bam",
+			"@type": ["FileProcessed", "File", "Item"],
+			"upload_key": "13df1f34-672a-4721-977a-27bda15f3c26/4DNFIQP64RT3.bam",
+			"file_type": "alignments",
+			"genome_assembly": "GRCh38",
+			"last_modified": {
+				"date_modified": "2020-02-21T04:10:15.563158+00:00"
+			},
+			"accession": "4DNFIQP64RT3",
+			"@id": "/files-processed/4DNFIQP64RT3/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"display_title": "4DNFIQP64RT3.bam",
+			"file_format": {
+				"@id": "/file-formats/bam/",
+				"uuid": "d13d06cf-218e-4f61-aaf0-91f226248b3c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["FileFormat", "Item"],
+				"display_title": "bam"
+			},
+			"quality_metric_summary": [{
+				"numberType": "integer",
+				"value": "3191509775",
+				"title": "Total Reads"
+			}, {
+				"numberType": "percent",
+				"value": "18.173",
+				"title": "Unmapped Reads",
+				"tooltip": "Percent of total reads (=579.98m)"
+			}, {
+				"numberType": "percent",
+				"value": "22.216",
+				"title": "Multimapped Reads",
+				"tooltip": "Percent of total reads (=709.01m)"
+			}, {
+				"numberType": "percent",
+				"value": "21.79",
+				"title": "Duplicate Reads",
+				"tooltip": "Percent of total reads (=695.43m)"
+			}, {
+				"numberType": "percent",
+				"value": "0.007",
+				"title": "Walks",
+				"tooltip": "Percent of total reads (=0.21m)"
+			}, {
+				"numberType": "percent",
+				"value": "0.172",
+				"title": "Minor Contigs",
+				"tooltip": "Percent of total reads (=5.49m)"
+			}],
+			"quality_metric": {
+				"@id": "/quality-metrics-bamqc/c8a903b2-2fee-4c75-837e-6ef6764b7252/",
+				"uuid": "c8a903b2-2fee-4c75-837e-6ef6764b7252",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["QualityMetricBamqc", "QualityMetric", "Item"],
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricBamqc from 2019-12-21"
+			},
+			"file_size": 272111684753,
+			"extra_files": [],
+			"file_type_detailed": "alignments (bam)"
+		}, {
+			"status": "released",
+			"uuid": "0401edff-028d-48cf-b3a9-ac58f35a4a3b",
+			"file_classification": "processed file",
+			"href": "/files-processed/4DNFILR6CKEJ/@@download/4DNFILR6CKEJ.pairs.gz",
+			"@type": ["FileProcessed", "File", "Item"],
+			"upload_key": "0401edff-028d-48cf-b3a9-ac58f35a4a3b/4DNFILR6CKEJ.pairs.gz",
+			"file_type": "contact list-replicate",
+			"genome_assembly": "GRCh38",
+			"last_modified": {
+				"date_modified": "2019-05-23T01:38:52.693738+00:00"
+			},
+			"accession": "4DNFILR6CKEJ",
+			"@id": "/files-processed/4DNFILR6CKEJ/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"display_title": "4DNFILR6CKEJ.pairs.gz",
+			"file_format": {
+				"@id": "/file-formats/pairs/",
+				"uuid": "d13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["FileFormat", "Item"],
+				"display_title": "pairs"
+			},
+			"quality_metric_summary": [{
+				"numberType": "integer",
+				"value": "1206875267",
+				"title": "Filtered Reads"
+			}, {
+				"numberType": "percent",
+				"value": "30.012",
+				"title": "Cis reads (>20kb)",
+				"tooltip": "Percent of total reads (=362.21m)"
+			}, {
+				"numberType": "percent",
+				"value": "16.678",
+				"title": "Short cis reads",
+				"tooltip": "Percent of total reads (=201.28m)"
+			}, {
+				"numberType": "percent",
+				"value": "53.31",
+				"title": "Trans Reads",
+				"tooltip": "Percent of total reads (=643.39m)"
+			}],
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFILR6CKEJ/pairsqc_report.html",
+				"@id": "/quality-metrics-pairsqc/82ade5a4-8154-4b8a-8ff8-4f41acbab04a/",
+				"uuid": "82ade5a4-8154-4b8a-8ff8-4f41acbab04a",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"@type": ["QualityMetricPairsqc", "QualityMetric", "Item"],
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricPairsqc from 2018-03-06"
+			},
+			"file_size": 25008910992,
+			"extra_files": [{
+				"href": "/files-processed/4DNFILR6CKEJ/@@download/4DNFILR6CKEJ.pairs.gz.px2",
+				"file_format": {
+					"@id": "/file-formats/pairs_px2/",
+					"uuid": "d13d06cf-218e-4f61-aaf0-91f226348b2c",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "pairs_px2",
+					"@type": ["FileFormat", "Item"]
+				}
+			}],
+			"file_type_detailed": "contact list-replicate (pairs)"
+		}],
+		"@id": "/experiments-hi-c/4DNEXZJZ5EBZ/",
+		"accession": "4DNEXZJZ5EBZ",
+		"last_modified": {
+			"date_modified": "2019-04-24T16:59:59.792727+00:00"
+		},
+		"files": [{
+			"status": "released",
+			"md5sum": "c6cfa613710b2b1a8d7e5b69252be176",
+			"uuid": "cb2dbe53-2f7a-4542-9843-2d8265805733",
+			"accession": "4DNFIO9OHYUV",
+			"href": "/files-fastq/4DNFIO9OHYUV/@@download/4DNFIO9OHYUV.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "cb2dbe53-2f7a-4542-9843-2d8265805733/4DNFIO9OHYUV.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIM62WI62/",
+					"uuid": "8ff3cb1b-30c5-462e-a234-246f30747c1d",
+					"accession": "4DNFIM62WI62",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIM62WI62.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIO9OHYUV/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIO9OHYUV.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIO9OHYUV/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/c410bd65-de81-41aa-90f3-ebd4e70af10c/",
+				"uuid": "c410bd65-de81-41aa-90f3-ebd4e70af10c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 331456009,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 9897412116
+		}, {
+			"status": "released",
+			"md5sum": "378f0bdcdf8dfd22723f1cac8493bdea",
+			"uuid": "18a3e6cd-1d44-4a17-8530-9d1ff3a4be79",
+			"accession": "4DNFI3TE7QNY",
+			"href": "/files-fastq/4DNFI3TE7QNY/@@download/4DNFI3TE7QNY.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "18a3e6cd-1d44-4a17-8530-9d1ff3a4be79/4DNFI3TE7QNY.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIS28AISX/",
+					"uuid": "cfe2ea41-80ee-41aa-9c39-d76a0a3345a7",
+					"accession": "4DNFIS28AISX",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIS28AISX.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFI3TE7QNY/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFI3TE7QNY.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFI3TE7QNY/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/d78e3b2d-2984-4df9-908c-6fb65ef8d607/",
+				"uuid": "d78e3b2d-2984-4df9-908c-6fb65ef8d607",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 359709230,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10729323194
+		}, {
+			"status": "released",
+			"md5sum": "cbd8d018e2947ee74604da5319775fb6",
+			"uuid": "147fc064-39d6-4689-bf43-9c266e169d0a",
+			"accession": "4DNFIN9HJDNO",
+			"href": "/files-fastq/4DNFIN9HJDNO/@@download/4DNFIN9HJDNO.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "147fc064-39d6-4689-bf43-9c266e169d0a/4DNFIN9HJDNO.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIBZJ8W8V/",
+					"uuid": "83cdd1d0-779d-46f9-970e-56bc4e814d3e",
+					"accession": "4DNFIBZJ8W8V",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIBZJ8W8V.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIN9HJDNO/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIN9HJDNO.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIN9HJDNO/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/39266444-bf84-4f1d-8a6f-a25fca73a21d/",
+				"uuid": "39266444-bf84-4f1d-8a6f-a25fca73a21d",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 357393834,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10813983102
+		}, {
+			"status": "released",
+			"md5sum": "4d252a91ea71a423b04fd6c9b824a22c",
+			"uuid": "4062cab9-c32a-4355-81bf-c42e45b971b3",
+			"accession": "4DNFI6LI5AMP",
+			"href": "/files-fastq/4DNFI6LI5AMP/@@download/4DNFI6LI5AMP.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "4062cab9-c32a-4355-81bf-c42e45b971b3/4DNFI6LI5AMP.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIEIHJLLV/",
+					"uuid": "4d3860a8-7f01-49e8-b474-70b6ac1b92a8",
+					"accession": "4DNFIEIHJLLV",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIEIHJLLV.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFI6LI5AMP/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFI6LI5AMP.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFI6LI5AMP/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/a0f73b15-cefa-48a1-8ea0-a97fb0f4596b/",
+				"uuid": "a0f73b15-cefa-48a1-8ea0-a97fb0f4596b",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 354594591,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10974982284
+		}, {
+			"status": "released",
+			"md5sum": "da0f9415d661765b90cb666937adc18f",
+			"uuid": "5d0b3e21-6f3c-41d0-9807-6bd6ef713eec",
+			"accession": "4DNFIU8LC2OB",
+			"href": "/files-fastq/4DNFIU8LC2OB/@@download/4DNFIU8LC2OB.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "5d0b3e21-6f3c-41d0-9807-6bd6ef713eec/4DNFIU8LC2OB.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFI4Z2Y6IR/",
+					"uuid": "b8136e93-6b93-4ce3-a11f-64f949591fe6",
+					"accession": "4DNFI4Z2Y6IR",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFI4Z2Y6IR.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIU8LC2OB/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIU8LC2OB.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIU8LC2OB/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/82a46b95-a89f-4dfd-a685-4f698663520f/",
+				"uuid": "82a46b95-a89f-4dfd-a685-4f698663520f",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 353033846,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10964020552
+		}, {
+			"status": "released",
+			"md5sum": "117ee47956e6c36bd7316249d50f5c64",
+			"uuid": "82ac0fa4-34c6-4380-9380-02a87efd593d",
+			"accession": "4DNFIROGHFF7",
+			"href": "/files-fastq/4DNFIROGHFF7/@@download/4DNFIROGHFF7.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "82ac0fa4-34c6-4380-9380-02a87efd593d/4DNFIROGHFF7.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFITO994UM/",
+					"uuid": "0821731c-3420-455c-bd4d-9fe22cb2c5eb",
+					"accession": "4DNFITO994UM",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFITO994UM.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIROGHFF7/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIROGHFF7.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFIROGHFF7/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/68964360-97db-4a89-a1d1-de569807bfd1/",
+				"uuid": "68964360-97db-4a89-a1d1-de569807bfd1",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 352662959,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 13287773082
+		}, {
+			"status": "released",
+			"md5sum": "6b878da51e8520f4feb6e20afbc344aa",
+			"uuid": "b8136e93-6b93-4ce3-a11f-64f949591fe6",
+			"accession": "4DNFI4Z2Y6IR",
+			"href": "/files-fastq/4DNFI4Z2Y6IR/@@download/4DNFI4Z2Y6IR.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "b8136e93-6b93-4ce3-a11f-64f949591fe6/4DNFI4Z2Y6IR.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIU8LC2OB/",
+					"uuid": "5d0b3e21-6f3c-41d0-9807-6bd6ef713eec",
+					"accession": "4DNFIU8LC2OB",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIU8LC2OB.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFI4Z2Y6IR/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFI4Z2Y6IR.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFI4Z2Y6IR/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/8803f7a4-f5cb-4f7f-92ae-de556391f6ec/",
+				"uuid": "8803f7a4-f5cb-4f7f-92ae-de556391f6ec",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 353033846,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 13276364081
+		}, {
+			"status": "released",
+			"md5sum": "8237c9b19200440057f4624b3ca169fe",
+			"uuid": "4d3860a8-7f01-49e8-b474-70b6ac1b92a8",
+			"accession": "4DNFIEIHJLLV",
+			"href": "/files-fastq/4DNFIEIHJLLV/@@download/4DNFIEIHJLLV.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "4d3860a8-7f01-49e8-b474-70b6ac1b92a8/4DNFIEIHJLLV.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFI6LI5AMP/",
+					"uuid": "4062cab9-c32a-4355-81bf-c42e45b971b3",
+					"accession": "4DNFI6LI5AMP",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFI6LI5AMP.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIEIHJLLV/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIEIHJLLV.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIEIHJLLV/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/8c093ba9-b5f1-466e-8740-d81169e73c5f/",
+				"uuid": "8c093ba9-b5f1-466e-8740-d81169e73c5f",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 354594591,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 12923689848
+		}, {
+			"status": "released",
+			"md5sum": "92aa3eabbfcdd39c199577ee70ba1c50",
+			"uuid": "83cdd1d0-779d-46f9-970e-56bc4e814d3e",
+			"accession": "4DNFIBZJ8W8V",
+			"href": "/files-fastq/4DNFIBZJ8W8V/@@download/4DNFIBZJ8W8V.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "83cdd1d0-779d-46f9-970e-56bc4e814d3e/4DNFIBZJ8W8V.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIN9HJDNO/",
+					"uuid": "147fc064-39d6-4689-bf43-9c266e169d0a",
+					"accession": "4DNFIN9HJDNO",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIN9HJDNO.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIBZJ8W8V/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIBZJ8W8V.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIBZJ8W8V/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/f7d11e97-8f1d-49cc-968b-7f602e735144/",
+				"uuid": "f7d11e97-8f1d-49cc-968b-7f602e735144",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 357393834,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 12174987690
+		}, {
+			"status": "released",
+			"md5sum": "077c99b22e6191f3339ec454fe9610bc",
+			"uuid": "cfe2ea41-80ee-41aa-9c39-d76a0a3345a7",
+			"accession": "4DNFIS28AISX",
+			"href": "/files-fastq/4DNFIS28AISX/@@download/4DNFIS28AISX.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "cfe2ea41-80ee-41aa-9c39-d76a0a3345a7/4DNFIS28AISX.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFI3TE7QNY/",
+					"uuid": "18a3e6cd-1d44-4a17-8530-9d1ff3a4be79",
+					"accession": "4DNFI3TE7QNY",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFI3TE7QNY.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIS28AISX/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIS28AISX.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIS28AISX/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/684af52b-be25-4fc8-aab1-2c7a426ea379/",
+				"uuid": "684af52b-be25-4fc8-aab1-2c7a426ea379",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 359709230,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 11857615461
+		}, {
+			"status": "released",
+			"md5sum": "41a711695680b5ceeab3e94f043cfb67",
+			"uuid": "0821731c-3420-455c-bd4d-9fe22cb2c5eb",
+			"accession": "4DNFITO994UM",
+			"href": "/files-fastq/4DNFITO994UM/@@download/4DNFITO994UM.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "0821731c-3420-455c-bd4d-9fe22cb2c5eb/4DNFITO994UM.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIROGHFF7/",
+					"uuid": "82ac0fa4-34c6-4380-9380-02a87efd593d",
+					"accession": "4DNFIROGHFF7",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIROGHFF7.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFITO994UM/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFITO994UM.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFITO994UM/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/02b7e9b1-123f-453b-8ec4-2f386ae544c7/",
+				"uuid": "02b7e9b1-123f-453b-8ec4-2f386ae544c7",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 352662959,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10987403427
+		}, {
+			"status": "released",
+			"md5sum": "0e07e878ba68d227f8e12759917c3035",
+			"uuid": "bbb1dc38-3cd6-49bd-ae8a-bd355f9b7e06",
+			"accession": "4DNFIYC5ZZGF",
+			"href": "/files-fastq/4DNFIYC5ZZGF/@@download/4DNFIYC5ZZGF.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "bbb1dc38-3cd6-49bd-ae8a-bd355f9b7e06/4DNFIYC5ZZGF.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFI6LY81F9/",
+					"uuid": "7bfd8442-ebfa-4dda-9e34-35772a005325",
+					"accession": "4DNFI6LY81F9",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFI6LY81F9.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIYC5ZZGF/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIYC5ZZGF.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIYC5ZZGF/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/b0fa6c55-168a-4373-aacd-6de4e2457802/",
+				"uuid": "b0fa6c55-168a-4373-aacd-6de4e2457802",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 359340353,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10989106223
+		}, {
+			"status": "released",
+			"md5sum": "da11cbafd2c12df65f42566591a06d96",
+			"uuid": "7a41c9a0-0bef-475c-adcc-487b533db7dc",
+			"accession": "4DNFIZWJPRWP",
+			"href": "/files-fastq/4DNFIZWJPRWP/@@download/4DNFIZWJPRWP.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "7a41c9a0-0bef-475c-adcc-487b533db7dc/4DNFIZWJPRWP.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIQQ1T6EJ/",
+					"uuid": "cd04cfc7-52f8-4ed1-99a5-f75a9b7a94fb",
+					"accession": "4DNFIQQ1T6EJ",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIQQ1T6EJ.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIZWJPRWP/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIZWJPRWP.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIZWJPRWP/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/f9371a95-c7d0-4895-8a23-579bd0b8a111/",
+				"uuid": "f9371a95-c7d0-4895-8a23-579bd0b8a111",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 363446443,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10876892349
+		}, {
+			"status": "released",
+			"md5sum": "ccff254fe75bd8026a8188b9dc4b634c",
+			"uuid": "cd04cfc7-52f8-4ed1-99a5-f75a9b7a94fb",
+			"accession": "4DNFIQQ1T6EJ",
+			"href": "/files-fastq/4DNFIQQ1T6EJ/@@download/4DNFIQQ1T6EJ.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "cd04cfc7-52f8-4ed1-99a5-f75a9b7a94fb/4DNFIQQ1T6EJ.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIZWJPRWP/",
+					"uuid": "7a41c9a0-0bef-475c-adcc-487b533db7dc",
+					"accession": "4DNFIZWJPRWP",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIZWJPRWP.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIQQ1T6EJ/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIQQ1T6EJ.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFIQQ1T6EJ/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/42e6458b-6a21-47be-901e-1fa5b50c687b/",
+				"uuid": "42e6458b-6a21-47be-901e-1fa5b50c687b",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 363446443,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 12113567365
+		}, {
+			"status": "released",
+			"md5sum": "2e5aaa9ca44f0956f48652a6d69d3ffa",
+			"uuid": "c1f21f6c-26b5-47ce-81aa-4c38b1082a56",
+			"accession": "4DNFIF3HEOMM",
+			"href": "/files-fastq/4DNFIF3HEOMM/@@download/4DNFIF3HEOMM.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "c1f21f6c-26b5-47ce-81aa-4c38b1082a56/4DNFIF3HEOMM.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFICIEIA1P/",
+					"uuid": "5d6b01b5-e2aa-4a4f-8f4b-eed599941bc0",
+					"accession": "4DNFICIEIA1P",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "2",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFICIEIA1P.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIF3HEOMM/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIF3HEOMM.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFIF3HEOMM/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/97cb89e2-3c08-4c7e-95b2-89a1af372d4a/",
+				"uuid": "97cb89e2-3c08-4c7e-95b2-89a1af372d4a",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 359872510,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "1",
+			"extra_files": [],
+			"file_size": 10687836913
+		}, {
+			"status": "released",
+			"md5sum": "8f26bb3e2895588ff65e3a335a304c48",
+			"uuid": "5d6b01b5-e2aa-4a4f-8f4b-eed599941bc0",
+			"accession": "4DNFICIEIA1P",
+			"href": "/files-fastq/4DNFICIEIA1P/@@download/4DNFICIEIA1P.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "5d6b01b5-e2aa-4a4f-8f4b-eed599941bc0/4DNFICIEIA1P.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIF3HEOMM/",
+					"uuid": "c1f21f6c-26b5-47ce-81aa-4c38b1082a56",
+					"accession": "4DNFIF3HEOMM",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIF3HEOMM.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFICIEIA1P/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFICIEIA1P.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFICIEIA1P/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/679f47d8-6ae3-4e64-95a7-991cb56172b2/",
+				"uuid": "679f47d8-6ae3-4e64-95a7-991cb56172b2",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 359872510,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 11851176492
+		}, {
+			"status": "released",
+			"md5sum": "700340a76ffbae013d7ef8ac6d8acdad",
+			"uuid": "7bfd8442-ebfa-4dda-9e34-35772a005325",
+			"accession": "4DNFI6LY81F9",
+			"href": "/files-fastq/4DNFI6LY81F9/@@download/4DNFI6LY81F9.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "7bfd8442-ebfa-4dda-9e34-35772a005325/4DNFI6LY81F9.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIYC5ZZGF/",
+					"uuid": "bbb1dc38-3cd6-49bd-ae8a-bd355f9b7e06",
+					"accession": "4DNFIYC5ZZGF",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIYC5ZZGF.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFI6LY81F9/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFI6LY81F9.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFI6LY81F9/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/340406ad-d7a4-436a-8d56-05872f770b0b/",
+				"uuid": "340406ad-d7a4-436a-8d56-05872f770b0b",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 359340353,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-11"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 12586105662
+		}, {
+			"status": "released",
+			"md5sum": "3406597308b13a0b9e8f42d90bde9744",
+			"uuid": "8ff3cb1b-30c5-462e-a234-246f30747c1d",
+			"accession": "4DNFIM62WI62",
+			"href": "/files-fastq/4DNFIM62WI62/@@download/4DNFIM62WI62.fastq.gz",
+			"@type": ["FileFastq", "File", "Item"],
+			"upload_key": "8ff3cb1b-30c5-462e-a234-246f30747c1d/4DNFIM62WI62.fastq.gz",
+			"related_files": [{
+				"file": {
+					"@id": "/files-fastq/4DNFIO9OHYUV/",
+					"uuid": "cb2dbe53-2f7a-4542-9843-2d8265805733",
+					"accession": "4DNFIO9OHYUV",
+					"@type": ["FileFastq", "File", "Item"],
+					"paired_end": "1",
+					"file_type": "reads",
+					"principals_allowed": {
+						"view": ["system.Everyone"],
+						"edit": ["group.admin"]
+					},
+					"display_title": "4DNFIO9OHYUV.fastq.gz"
+				},
+				"relationship_type": "paired with"
+			}],
+			"file_type": "reads",
+			"file_format": {
+				"@id": "/file-formats/fastq/",
+				"uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"display_title": "fastq",
+				"@type": ["FileFormat", "Item"]
+			},
+			"@id": "/files-fastq/4DNFIM62WI62/",
+			"principals_allowed": {
+				"view": ["system.Everyone"],
+				"edit": ["group.admin"]
+			},
+			"file_type_detailed": "reads (fastq)",
+			"file_classification": "raw file",
+			"display_title": "4DNFIM62WI62.fastq.gz",
+			"quality_metric": {
+				"url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFIM62WI62/fastqc_report.html",
+				"@id": "/quality-metrics-fastqc/b0e44d9f-c1eb-40d5-bac5-539c9ad7c84c/",
+				"uuid": "b0e44d9f-c1eb-40d5-bac5-539c9ad7c84c",
+				"principals_allowed": {
+					"view": ["system.Everyone"],
+					"edit": ["group.admin"]
+				},
+				"Sequence length": "50",
+				"@type": ["QualityMetricFastqc", "QualityMetric", "Item"],
+				"Total Sequences": 331456009,
+				"overall_quality_status": "PASS",
+				"display_title": "QualityMetricFastqc from 2017-08-10"
+			},
+			"paired_end": "2",
+			"extra_files": [],
+			"file_size": 10690007361
+		}],
+		"principals_allowed": {
+			"view": ["system.Everyone"],
+			"edit": ["group.admin"]
+		}
+	}]
+}
