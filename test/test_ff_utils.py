@@ -817,7 +817,7 @@ def test_faceted_search_users(integrated_ff):
                        'ff_env': ff_env,
                        'item_facets': all_facets}
     resp = ff_utils.faceted_search(**neg_affiliation)
-    assert len(resp) == 23
+    assert len(resp) == 24
     neg_affiliation = {'item_type': 'user',
                        'Affiliation': '-4DN Testing Lab',
                        'key': key,
