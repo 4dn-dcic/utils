@@ -762,7 +762,7 @@ def test_faceted_search_exp_set(integrated_ff):
     warnings = {'Warnings': 'No value'}
     warnings.update(for_all)
     resp = ff_utils.faceted_search(**warnings)
-    assert len(resp) == 4
+    assert len(resp) == 5
     both_projects = {'Project': '4DN|External'}
     both_projects.update(for_all)
     resp = ff_utils.faceted_search(**both_projects)
