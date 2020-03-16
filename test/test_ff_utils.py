@@ -762,7 +762,7 @@ def test_faceted_search_exp_set(integrated_ff):
     warnings = {'Warnings': 'No value'}
     warnings.update(for_all)
     resp = ff_utils.faceted_search(**warnings)
-    assert len(resp) == 5
+    assert len(resp) == 4
     both_projects = {'Project': '4DN|External'}
     both_projects.update(for_all)
     resp = ff_utils.faceted_search(**both_projects)
@@ -817,7 +817,7 @@ def test_faceted_search_users(integrated_ff):
                        'ff_env': ff_env,
                        'item_facets': all_facets}
     resp = ff_utils.faceted_search(**neg_affiliation)
-    assert len(resp) == 24
+    assert len(resp) == 23
     neg_affiliation = {'item_type': 'user',
                        'Affiliation': '-4DN Testing Lab',
                        'key': key,

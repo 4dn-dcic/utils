@@ -457,7 +457,9 @@ def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
     return search_metadata(search, ff_env=ff_env, key=key)
 
 
-def fetch_files_qc_metrics(data, associated_files=['processed_files'], ignored_fields=True, key=None, ff_env=None):
+def fetch_files_qc_metrics(data, associated_files=['processed_files'],
+                           ignore_typical_fields=True,
+                           key=None, ff_env=None):
     """
     Utility function to grap all the qc metrics from associated types of file such as:
     'proccessed_files', 'other_processed_files', 'files'
@@ -473,13 +475,13 @@ def fetch_files_qc_metrics(data, associated_files=['processed_files'], ignored_f
     """
     qc_metrics = {}
 
-    if ignored_fields:
-        ignored_qc_fields = ['contributing_labs', 'schema_version', 'external_references', '@context', 'aliases',
-                             'project_release', 'award', 'principals_allowed', 'validation-errors',
-                             'last_modified', 'slope', '@id', 'aggregated-items', 'status', 'public_release',
-                             'actions', 'submitted_by', 'convergence', 'lab', 'date_created', 'uuid']
+    if ignore_typical_fields:
+        ignorable_qc_fields = ['contributing_labs', 'schema_version', 'external_references', '@context', 'aliases',
+                               'project_release', 'award', 'principals_allowed', 'validation-errors',
+                               'last_modified', 'slope', '@id', 'aggregated-items', 'status', 'public_release',
+                               'actions', 'submitted_by', 'convergence', 'lab', 'date_created', 'uuid']
     else:
-        ignored_qc_fields = []
+        ignore_typical_fields = []
     # for each file
     for associated_file in associated_files:
         if associated_file in data:
@@ -492,22 +494,34 @@ def fetch_files_qc_metrics(data, associated_files=['processed_files'], ignored_f
                             continue
                         for qc in qc_metric_list['qc_list']:
                             qc_uuid = qc['value']['uuid']
-                            qc_info = {qc_uuid: {}}
                             qc_meta = get_metadata(qc_uuid, key=key, ff_env=ff_env)
-                            qc_info[qc_uuid]['values'] = {k: v for k, v in qc_meta.items() if k not in ignored_qc_fields}
-                            qc_info[qc_uuid]['source_file_association'] = associated_file if associated_file != 'files' else 'raw_file'
-                            qc_info[qc_uuid]['source_file'] = entry['accession']
-                            qc_info[qc_uuid]['source_file_type'] = entry['file_type_detailed']
+                            qc_values = {k: v for k, v in qc_meta.items() if k not in ignorable_qc_fields}
+                            source_file_association = associated_file if associated_file != 'files' else 'raw_file'
+                            source_file = entry['accession']
+                            source_file_type = entry['file_type_detailed']
+                            qc_info = {
+                                qc_uuid: {'values': qc_values,
+                                          'source_file_association': source_file_association,
+                                          'source_file': source_file,
+                                          'source_file_type': source_file_type
+                                          }
+                                        }
                             qc_metrics.update(qc_info)
 
                     else:
                         qc_uuid = entry['quality_metric']['uuid']
-                        qc_info = {qc_uuid: {}}
                         qc_meta = get_metadata(qc_uuid, key=key, ff_env=ff_env)
-                        qc_info[qc_uuid]['values'] = {k: v for k, v in qc_meta.items() if k not in ignored_qc_fields}
-                        qc_info[qc_uuid]['source_file_association'] = associated_file if associated_file != 'files' else 'raw_file'
-                        qc_info[qc_uuid]['source_file'] = entry['accession']
-                        qc_info[qc_uuid]['source_file_type'] = entry['file_type_detailed']
+                        qc_values = {k: v for k, v in qc_meta.items() if k not in ignorable_qc_fields}
+                        source_file_association = associated_file if associated_file != 'files' else 'raw_file'
+                        source_file = entry['accession']
+                        source_file_type = entry['file_type_detailed']
+                        qc_info = {
+                            qc_uuid: {'values': qc_values,
+                                      'source_file_association': source_file_association,
+                                      'source_file': source_file,
+                                      'source_file_type': source_file_type
+                                      }
+                                    }
                         qc_metrics.update(qc_info)
     return qc_metrics
 
@@ -528,17 +542,20 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
                                      non-processed files. Default: False
     Returns:
         a dictionary of dictionaries with the following structure:
-            {'qc_metric_uuid'}:{'values':'', The values of the qc_metric object
-                                'source_file_association': the file class (processed_file or raw_files)
-                                'source_file':, the accession of the file that the qc is linked to
-                                'source_file_type', the description of the file that the qc is linked to
-                                'experiment_description', the description of the experiment or experimentset
-                                'organism', the organism
-                                'experiment_type', the experiment type (in situ Hi-C, ChIP-seq)
-                                'experiment_subclass' (Hi-C)
-                                'source_experiment': the experiment the qc is linked to (if apply)
-                                'source_experimentSet': the experimentSet the qc is linked to
-                                'biosource_summary': the experiment biosource
+            {<qc_metric_uuid>}:{
+                'values': the values of the qc_metric object>,
+                'source_file_association': <the file class (processed_file or raw_files)>,
+                'source_file': <the accession of the file that the qc is linked to>,
+                'source_file_type': <the description of the file that the qc is linked to>,
+                'experiment_description': <the description of the experiment or experimentset>
+                'organism': <the organism>
+                'experiment_type': <the experiment type (in situ Hi-C, ChIP-seq)>,
+                'experiment_subclass': <the experiment subclass (Hi-C)>,
+                'source_experiment': <the experiment the qc is linked to (if apply)>,
+                'source_experimentSet': <the experimentSet the qc is linked to>,
+                'biosource_summary': <the experiment biosource>
+                }
+            }
     """
     result = {}
     associated_files = []
