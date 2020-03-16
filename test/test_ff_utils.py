@@ -738,7 +738,7 @@ def test_faceted_search_exp_set(integrated_ff):
     tissue_src = {'Tissue Source': 'endoderm'}
     tissue_src.update(for_all)
     resp = ff_utils.faceted_search(**tissue_src)
-    assert len(resp) == 1
+    assert len(resp) == 0
     pub = {'Publication': 'No value'}
     pub.update(for_all)
     resp = ff_utils.faceted_search(**pub)
@@ -817,7 +817,7 @@ def test_faceted_search_users(integrated_ff):
                        'ff_env': ff_env,
                        'item_facets': all_facets}
     resp = ff_utils.faceted_search(**neg_affiliation)
-    assert len(resp) == 23
+    assert len(resp) == 24
     neg_affiliation = {'item_type': 'user',
                        'Affiliation': '-4DN Testing Lab',
                        'key': key,
@@ -830,7 +830,7 @@ def test_faceted_search_users(integrated_ff):
 
 def test_fetch_qc_metrics_logic(mocked_replicate_experiment):
     """
-    Tests only 'fetch_qc_metrics'
+    Tests that the fetch_qc_metrics function is being used correctly inside the get_associated_qc_metrics function
     """
     with mock.patch("dcicutils.ff_utils.get_metadata") as mock_get_metadata:
         mock_get_metadata.return_value = {
@@ -843,7 +843,7 @@ def test_fetch_qc_metrics_logic(mocked_replicate_experiment):
 
 def test_get_qc_metrics_logic(mocked_replicate_experiment, qc_metrics):
     """
-    End to end test on 'get_associated_qc_metrics'
+    End to end test on 'get_associated_qc_metrics' to check the logic of the fuction
     """
     with mock.patch("dcicutils.ff_utils.get_metadata") as mock_get_metadata:
         mock_get_metadata.return_value = mocked_replicate_experiment
@@ -985,7 +985,7 @@ def test_search_es_metadata(integrated_ff):
     """ Tests search_es_metadata on mastertest """
     res = ff_utils.search_es_metadata('fourfront-mastertestuser', {'size': '1000'},
                                       key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
-    assert len(res) == 27
+    assert len(res) == 28
     test_query = {
         'query': {
             'bool': {

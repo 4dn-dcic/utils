@@ -463,12 +463,11 @@ def fetch_files_qc_metrics(data, associated_files=['processed_files'],
     """
     Utility function to grap all the qc metrics from associated types of file such as:
     'proccessed_files', 'other_processed_files', 'files'
-    inputs:
+    Args:
         data: the metadata of a ExperimentSet or Experiment
         associated_files: a list of the types of the files fields the qc metrics will be extracted from:
             examples are = ['files', 'processed_files', 'other_processed_files']
-    Args:
-        ignored_fields: flag to ignore 4DN custom fields from the qc metric object
+        ignore_typical_fields: flag to ignore 4DN custom fields from the qc metric object
 
     Returns:
         a dictionary of dictionaries containing the qc_metric information
