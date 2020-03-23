@@ -457,65 +457,179 @@ def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
     return search_metadata(search, ff_env=ff_env, key=key)
 
 
-def get_associated_qc_metrics(uuid, key=None, ff_env=None,
-                              exclude_raw_files=True,
-                              exclude_supplementary_files=True):
+def fetch_files_qc_metrics(data, associated_files=['processed_files'],
+                           ignore_typical_fields=True,
+                           key=None, ff_env=None):
     """
-    Given a uuid of an experiment set, return a dictionary of uuid : item
-    mappings of quality metric items.
+    Utility function to grap all the qc metrics from associated types of file such as:
+    'proccessed_files', 'other_processed_files', 'files'
+    Args:
+        data: the metadata of a ExperimentSet or Experiment
+        associated_files: a list of the types of the files fields the qc metrics will be extracted from:
+            examples are = ['files', 'processed_files', 'other_processed_files']
+        ignore_typical_fields: flag to ignore 4DN custom fields from the qc metric object
+
+    Returns:
+        a dictionary of dictionaries containing the qc_metric information
+    """
+    qc_metrics = {}
+
+    if ignore_typical_fields:
+        ignorable_qc_fields = ['contributing_labs', 'schema_version', 'external_references', '@context', 'aliases',
+                               'project_release', 'award', 'principals_allowed', 'validation-errors',
+                               'last_modified', 'slope', '@id', 'aggregated-items', 'status', 'public_release',
+                               'actions', 'submitted_by', 'convergence', 'lab', 'date_created', 'uuid']
+    else:
+        ignore_typical_fields = []
+    # for each file
+    for associated_file in associated_files:
+        if associated_file in data:
+            if associated_file == 'other_processed_files':
+                target_files = []
+                for entry in data[associated_file]:
+                    if 'files' in entry:
+                        target_files = target_files + entry['files']
+
+            else:
+                target_files = data[associated_file]
+
+            for entry in target_files:
+                if entry.get('quality_metric'):
+                    # check if it is a list of qc metrics
+                    if entry['quality_metric']['display_title'].startswith('QualityMetricQclist'):
+                        qc_metric_list = get_metadata(entry['quality_metric']['uuid'], key=key, ff_env=ff_env)
+                        if not qc_metric_list.get('qc_list'):
+                            continue
+                        for qc in qc_metric_list['qc_list']:
+                            qc_uuid = qc['value']['uuid']
+                            qc_meta = get_metadata(qc_uuid, key=key, ff_env=ff_env)
+                            qc_values = {k: v for k, v in qc_meta.items() if k not in ignorable_qc_fields}
+                            source_file_association = associated_file if associated_file != 'files' else 'raw_file'
+                            source_file = entry['accession']
+                            source_file_type = entry['file_type_detailed']
+                            qc_info = {
+                                qc_uuid: {'values': qc_values,
+                                          'source_file_association': source_file_association,
+                                          'source_file': source_file,
+                                          'source_file_type': source_file_type
+                                          }
+                                        }
+                            qc_metrics.update(qc_info)
+
+                    else:
+                        qc_uuid = entry['quality_metric']['uuid']
+                        qc_meta = get_metadata(qc_uuid, key=key, ff_env=ff_env)
+                        qc_values = {k: v for k, v in qc_meta.items() if k not in ignorable_qc_fields}
+                        source_file_association = associated_file if associated_file != 'files' else 'raw_file'
+                        source_file = entry['accession']
+                        source_file_type = entry['file_type_detailed']
+                        qc_info = {
+                            qc_uuid: {'values': qc_values,
+                                      'source_file_association': source_file_association,
+                                      'source_file': source_file,
+                                      'source_file_type': source_file_type
+                                      }
+                                    }
+                        qc_metrics.update(qc_info)
+    return qc_metrics
+
+
+def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_files=True,
+                              include_raw_files=False,
+                              include_supplementary_files=False):
+    """
+    Given a uuid of an experimentSet return a dictionary of dictionaries with each dictionary
+    representing a quality metric.
 
     Args:
-        exclude_raw_files: if False will provide QC metrics on raw files as well
-                           Default: True
-        exclude_supplementary_files: if False will also give QC's associated with
-                                     non-processed files. Default: True
+        include_processed_files: if False will exclude QC metrics on processed files
+                                Default: True
+        include_raw_files: if True will provide QC metrics on raw files as well
+                           Default: False
+        include_supplementary_files: if True will also give QC's associated with
+                                     non-processed files. Default: False
+    Returns:
+        a dictionary of dictionaries with the following structure:
+            {<qc_metric_uuid>}:{
+                'values': the values of the qc_metric object>,
+                'source_file_association': <the file class (processed_file or raw_files)>,
+                'source_file': <the accession of the file that the qc is linked to>,
+                'source_file_type': <the description of the file that the qc is linked to>,
+                'experiment_description': <the description of the experiment or experimentset>
+                'organism': <the organism>
+                'experiment_type': <the experiment type (in situ Hi-C, ChIP-seq)>,
+                'experiment_subclass': <the experiment subclass (Hi-C)>,
+                'source_experiment': <the experiment the qc is linked to (if apply)>,
+                'source_experimentSet': <the experimentSet the qc is linked to>,
+                'biosource_summary': <the experiment biosource>
+                }
+            }
     """
     result = {}
+    associated_files = []
+
+    # Additional information to include in the results for interpretation
+    organism = None
+    experiment_type = None
+    experiment_subclass = None
+    description = None
+    biosource_summary = None
+
     resp = get_metadata(uuid, key=key, ff_env=ff_env)
 
-    # handle all 'processed_files' by default
-    if 'processed_files' in resp:
-        for entry in resp['processed_files']:
-            if 'quality_metric' not in entry:
-                continue
-            uuid = entry['quality_metric']['uuid']
-            result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
+    # Checks wheter the input is a experiment or experimentset otherwise throws an error
+    if 'ExperimentSet' not in resp['@type']:
+        raise TypeError('Expected ExperimentSet')
 
-    # handle 'other_processed_files' if we are doing supplementary files
-    if 'other_processed_files' in resp and not exclude_supplementary_files:
-        for entry in resp['processed_files']:
-            if 'quality_metric' not in entry:
-                continue
-            uuid = entry['quality_metric']['uuid']
-            result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
+    # verifies what category of files to include (processed_files, other_processed_files, files)
+    if include_processed_files:
+        associated_files.append('processed_files')
+    if include_supplementary_files:
+        associated_files.append('other_processed_files')
+    if include_raw_files:
+        associated_files.append('files')
 
-    # check 'experiment_in_set' as these can contain things too
-    if 'experiments_in_set' in resp:
+    if not associated_files:
+        return result
+
+    # If it is an experimentset, get qc_metrics for the experiments in the experiment set
+    if resp.get('experiments_in_set'):
+        organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['individual']['organism']['name']
+        experiment_type = resp['experiments_in_set'][0]['experiment_type']['display_title']
+        experiment_subclass = resp['experiments_in_set'][0]['experiment_type']['assay_subclass_short']
+        biosource_summary = resp['experiments_in_set'][0]['biosample']['biosource_summary']
+
         for exp in resp['experiments_in_set']:
+            exp_description = exp['display_title']
+            exp_qc_metrics = fetch_files_qc_metrics(exp, associated_files, key=key, ff_env=ff_env)
+            meta_info = {'experiment_description': exp_description,
+                         'organism': organism,
+                         'experiment_type': experiment_type,
+                         'experiment_subclass': experiment_subclass,
+                         'source_experiment': exp['accession'],
+                         'source_experimentSet': resp['accession'],
+                         'biosource_summary': biosource_summary
+                         }
+            if exp_qc_metrics:
+                for exp_qc_metric in exp_qc_metrics.values():
+                    exp_qc_metric.update(meta_info)
+                result.update(exp_qc_metrics)
 
-            # handle all 'processed_files' by default
-            if 'processed_files' in exp:
-                for entry in exp['processed_files']:
-                    if 'quality_metric' not in entry:
-                        continue
-                    uuid = entry['quality_metric']['uuid']
-                    result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
+    description = resp.get('dataset_label', None)
+    ES_qc_metrics = fetch_files_qc_metrics(resp, associated_files, key=key, ff_env=ff_env)
+    if ES_qc_metrics:
+        meta_info = {'experiment_description': description,
+                     'organism': organism,
+                     'experiment_type': experiment_type,
+                     'experiment_subclass': experiment_subclass,
+                     'source_experiment': None,
+                     'source_experimentSet': resp['accession'],
+                     'biosource_summary': biosource_summary
+                     }
+        for qc_metric in ES_qc_metrics.values():
+            qc_metric.update(meta_info)
+        result.update(ES_qc_metrics)
 
-            # handle 'other_processed_files' if we're doing supplementary files
-            if 'other_processed_files' in exp and not exclude_supplementary_files:
-                for entry in exp['processed_files']:
-                    if 'quality_metric' not in entry:
-                        continue
-                    uuid = entry['quality_metric']['uuid']
-                    result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
-
-            # handle 'files' only if we are doing raw files
-            if 'files' in exp and not exclude_raw_files:
-                for entry in exp['files']:
-                    if 'quality_metric' not in entry:
-                        continue
-                    uuid = entry['quality_metric']['uuid']
-                    result[uuid] = get_metadata(uuid, key=key, ff_env=ff_env)
     return result
 
 
