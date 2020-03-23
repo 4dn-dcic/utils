@@ -484,7 +484,16 @@ def fetch_files_qc_metrics(data, associated_files=['processed_files'],
     # for each file
     for associated_file in associated_files:
         if associated_file in data:
-            for entry in data[associated_file]:
+            if associated_file == 'other_processed_files':
+                target_files = []
+                for entry in data[associated_file]:
+                    if 'files' in entry:
+                        target_files = target_files + entry['files']
+
+            else:
+                target_files = data[associated_file]
+
+            for entry in target_files:
                 if entry.get('quality_metric'):
                     # check if it is a list of qc metrics
                     if entry['quality_metric']['display_title'].startswith('QualityMetricQclist'):
@@ -593,28 +602,32 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
         for exp in resp['experiments_in_set']:
             exp_description = exp['display_title']
             exp_qc_metrics = fetch_files_qc_metrics(exp, associated_files, key=key, ff_env=ff_env)
+            meta_info = {'experiment_description': exp_description,
+                         'organism': organism,
+                         'experiment_type': experiment_type,
+                         'experiment_subclass': experiment_subclass,
+                         'source_experiment': exp['accession'],
+                         'source_experimentSet': resp['accession'],
+                         'biosource_summary': biosource_summary
+                         }
             if exp_qc_metrics:
                 for exp_qc_metric in exp_qc_metrics.values():
-                    exp_qc_metric['experiment_description'] = exp_description
-                    exp_qc_metric['organism'] = organism
-                    exp_qc_metric['experiment_type'] = experiment_type
-                    exp_qc_metric['experiment_subclass'] = experiment_subclass
-                    exp_qc_metric['source_experiment'] = exp['accession']
-                    exp_qc_metric['source_experimentSet'] = resp['accession']
-                    exp_qc_metric['biosource_summary'] = biosource_summary
+                    exp_qc_metric.update(meta_info)
                 result.update(exp_qc_metrics)
 
     description = resp.get('dataset_label', None)
     ES_qc_metrics = fetch_files_qc_metrics(resp, associated_files, key=key, ff_env=ff_env)
     if ES_qc_metrics:
+        meta_info = {'experiment_description': description,
+                     'organism': organism,
+                     'experiment_type': experiment_type,
+                     'experiment_subclass': experiment_subclass,
+                     'source_experiment': None,
+                     'source_experimentSet': resp['accession'],
+                     'biosource_summary': biosource_summary
+                     }
         for qc_metric in ES_qc_metrics.values():
-            qc_metric['experiment_description'] = description
-            qc_metric['organism'] = organism
-            qc_metric['experiment_type'] = experiment_type
-            qc_metric['experiment_subclass'] = experiment_subclass
-            qc_metric['source_experiment'] = None
-            qc_metric['source_experimentSet'] = resp['accession']
-            qc_metric['biosource_summary'] = biosource_summary
+            qc_metric.update(meta_info)
         result.update(ES_qc_metrics)
 
     return result
