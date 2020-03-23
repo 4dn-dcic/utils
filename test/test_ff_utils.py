@@ -843,7 +843,8 @@ def test_fetch_qc_metrics_logic(mocked_replicate_experiment):
 
 def test_get_qc_metrics_logic(mocked_replicate_experiment, qc_metrics):
     """
-    End to end test on 'get_associated_qc_metrics' to check the logic of the fuction
+    End to end test on 'get_associated_qc_metrics' to check the logic of the fuction to make sure
+    it is getting the qc metrics.
     """
     with mock.patch("dcicutils.ff_utils.get_metadata") as mock_get_metadata:
         mock_get_metadata.return_value = mocked_replicate_experiment
