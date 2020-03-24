@@ -25,8 +25,8 @@ except NameError:
 
 FOURSIGHT_URL = 'https://foursight.4dnucleome.org/'
 # magic CNAME corresponds to data.4dnucleome
-MAGIC_CNAME = 'fourfront-webprod.9wzadzju3p.us-east-1.elasticbeanstalk.com'
-GOLDEN_DB = "fourfront-webprod.co3gwj7b7tpq.us-east-1.rds.amazonaws.com"
+MAGIC_CNAME = 'fourfront-green.us-east-1.elasticbeanstalk.com'
+GOLDEN_DB = 'fourfront-production.co3gwj7b7tpq.us-east-1.rds.amazonaws.com'
 REGION = 'us-east-1'
 
 
@@ -48,7 +48,7 @@ def delete_db(db_identifier, take_snapshot=True, allow_delete_prod=False):
         dict: boto3 response from delete_db_instance
     """
     # safety. Do not allow accidental programmatic deletion of webprod DB
-    if 'webprod' in db_identifier and not allow_delete_prod:
+    if 'prod' in db_identifier and not allow_delete_prod:
         raise Exception('Must set allow_delete_prod to True to delete RDS instance' % db_identifier)
     client = boto3.client('rds')
     timestamp = datetime.strftime(datetime.utcnow(), "%Y-%m-%d")
@@ -246,7 +246,9 @@ def get_beanstalk_real_url(env):
     if env in urls:
         return urls[env]
 
-    if 'webprod' in env:
+    # TODO (C4-91): Reconsider environment names.
+    # This code is too fragile.
+    if 'webprod' in env or 'blue' in env or 'green' in env:
         data_env = whodaman()
 
         if data_env == env:
@@ -590,6 +592,8 @@ def update_bs_config(envname, template=None, keep_env_vars=False,
 
 def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
     """
+    XXX: Will not work currently, do NOT use on production
+
     Create a beanstalk environment given an envname. Use customized options,
     configuration template, and environment variables. If adding new env vars,
     make sure to overwrite them here.

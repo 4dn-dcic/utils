@@ -23,6 +23,10 @@ HIGLASS_BUCKETS = ['elasticbeanstalk-fourfront-webprod-wfoutput',
                    'elasticbeanstalk-fourfront-webdev-wfoutput']
 
 
+# TODO (C4-92): Centralize this information, it is repeated in other repos
+PRODUCTION_ENVS = ['fourfront-blue', 'fourfront-green']
+
+
 ##################################
 # Widely used metadata functions #
 ##################################
@@ -1062,8 +1066,11 @@ def unified_authentication(auth=None, ff_env=None):
     """
     # first see if key should be obtained from using ff_env
     if not auth and ff_env:
-        # webprod and webprod2 both use the fourfront-webprod bucket for keys
-        use_env = 'fourfront-webprod' if 'webprod' in ff_env else ff_env
+        # webprod, webprod2 and blue/green all use the fourfront-webprod bucket for keys
+        if 'webprod' in ff_env or ff_env in PRODUCTION_ENVS:
+            use_env = 'fourfront-webprod'
+        else:
+            use_env = ff_env
         auth = s3_utils.s3Utils(env=use_env).get_access_keys()
     # see if auth is directly from get_access_keys()
     use_auth = None
