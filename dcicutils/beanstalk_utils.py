@@ -48,7 +48,7 @@ def delete_db(db_identifier, take_snapshot=True, allow_delete_prod=False):
         dict: boto3 response from delete_db_instance
     """
     # safety. Do not allow accidental programmatic deletion of webprod DB
-    if ('webprod' in db_identifier or 'production' in db_identifier) and not allow_delete_prod:
+    if 'prod' in db_identifier and not allow_delete_prod:
         raise Exception('Must set allow_delete_prod to True to delete RDS instance' % db_identifier)
     client = boto3.client('rds')
     timestamp = datetime.strftime(datetime.utcnow(), "%Y-%m-%d")
@@ -246,6 +246,8 @@ def get_beanstalk_real_url(env):
     if env in urls:
         return urls[env]
 
+    # TODO (C4-91): Reconsider environment names.
+    # This code is too fragile.
     if 'webprod' in env or 'blue' in env or 'green' in env:
         data_env = whodaman()
 

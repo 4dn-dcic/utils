@@ -22,6 +22,8 @@ else:
 HIGLASS_BUCKETS = ['elasticbeanstalk-fourfront-webprod-wfoutput',
                    'elasticbeanstalk-fourfront-webdev-wfoutput']
 
+
+# TODO (C4-92): Centralize this information, it is repeated in other repos
 PRODUCTION_ENVS = ['fourfront-blue', 'fourfront-green']
 
 
