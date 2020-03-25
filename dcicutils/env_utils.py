@@ -5,10 +5,18 @@ CGAP_STG_OR_PRD_NAMES = ['fourfront-cgap', 'fourfront-cgap-green', 'fourfront-cg
 
 
 def is_cgap_env(envname):
+    """
+    Returns True of the given string looks like a CGAP elasticbeanstalk environment name.
+    Otherwise returns False.
+    """
     return 'cgap' in envname
 
 
 def is_fourfront_env(envname):
+    """
+    Returns True of the given string looks like a Fourfront elasticbeanstalk environment name.
+    Otherwise returns False.
+    """
     return 'cgap' not in envname
 
 
