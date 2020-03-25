@@ -13,6 +13,12 @@ def is_fourfront_env(envname):
 
 
 def is_stg_or_prd_env(envname):
+    """
+    Returns True if the given envname is the name of something that might be either live data or something
+    that is ready to be swapped in as live.  So things like 'staging' and either of 'blue/green' will return
+    True whether or not they are actually the currently live instance. (This function doesn't change its
+    state as blue or green is deployed, in other words.)
+    """
     stg_or_prd_tokens = CGAP_STG_OR_PRD_TOKENS if is_cgap_env(envname) else FOURFRONT_STG_OR_PRD_TOKENS
     stg_or_prd_names = CGAP_STG_OR_PRD_NAMES if is_cgap_env(envname) else FOURFRONT_STG_OR_PRD_NAMES
     if envname in stg_or_prd_names:
