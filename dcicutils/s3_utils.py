@@ -6,6 +6,7 @@ import mimetypes
 from zipfile import ZipFile
 from io import BytesIO
 import logging
+from .env_utils import is_stg_or_prd_env
 
 
 ###########################
@@ -29,7 +30,7 @@ class s3Utils(object):
         if sys_bucket is None:
             # staging and production share same buckets
             if env:
-                if 'webprod' in env or env in ['staging', 'stagging', 'data']:
+                if is_stg_or_prd_env(env):
                     self.url = get_beanstalk_real_url(env)
                     env = 'fourfront-webprod'
             # we use standardized naming schema, so s3 buckets always have same prefix
