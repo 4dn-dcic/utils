@@ -7,6 +7,7 @@ CGAP_STG_OR_PRD_NAMES = ['fourfront-cgap', 'fourfront-cgap-green', 'fourfront-cg
 def is_cgap_env(envname):
     return 'cgap' in envname
 
+
 def is_fourfront_env(envname):
     return 'cgap' not in envname
 
