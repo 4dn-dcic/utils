@@ -4,6 +4,15 @@ CGAP_STG_OR_PRD_TOKENS = []
 CGAP_STG_OR_PRD_NAMES = ['fourfront-cgap', 'fourfront-cgap-green', 'fourfront-cgap-blue']
 
 
+def blue_green_mirror_env(envname):
+    if 'blue' in envname:
+        return envname.replace('blue', 'green')
+    elif 'green' in envname:
+        return envname.replace('green', 'blue')
+    else:
+        return None
+
+
 def is_cgap_env(envname):
     """
     Returns True of the given string looks like a CGAP elasticbeanstalk environment name.

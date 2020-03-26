@@ -1,6 +1,32 @@
 import pytest
 
-from dcicutils.env_utils import is_stg_or_prd_env, is_cgap_env, is_fourfront_env
+from dcicutils.env_utils import is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env
+
+
+def test_blue_green_mirror_env():
+
+    # Should work for basic fourfront
+    assert blue_green_mirror_env('fourfront-blue') == 'fourfront-green'
+    assert blue_green_mirror_env('fourfront-green') == 'fourfront-blue'
+
+    # Should work for basic cgap
+    assert blue_green_mirror_env('cgap-blue') == 'cgap-green'
+    assert blue_green_mirror_env('cgap-green') == 'cgap-blue'
+
+    # Anticipated future cases
+    assert blue_green_mirror_env('cgap-test-blue') == 'cgap-test-green'
+    assert blue_green_mirror_env('cgap-test-green') == 'cgap-test-blue'
+
+    # Things with no mirror have no blue/green in them
+    assert blue_green_mirror_env('fourfront-cgap') is None
+    assert blue_green_mirror_env('fourfront-mastertest') is None
+    assert blue_green_mirror_env('fourfront-yellow') is None
+
+    # Edge cases
+    assert blue_green_mirror_env('xyz-green-1') == 'xyz-blue-1'
+    assert blue_green_mirror_env('xyz-blue-1') == 'xyz-green-1'
+    assert blue_green_mirror_env('xyz-blueish') == 'xyz-greenish'
+    assert blue_green_mirror_env('xyz-greenish') == 'xyz-blueish'
 
 
 def test_is_cgap_env():
