@@ -5,6 +5,10 @@ CGAP_STG_OR_PRD_NAMES = ['fourfront-cgap', 'fourfront-cgap-green', 'fourfront-cg
 
 
 def blue_green_mirror_env(envname):
+    """
+    Given a blue envname, returns its green counterpart, or vice versa.
+    For other envnames that aren't blue/green participants, this returns None.
+    """
     if 'blue' in envname:
         return envname.replace('blue', 'green')
     elif 'green' in envname:
