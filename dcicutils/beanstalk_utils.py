@@ -659,7 +659,6 @@ def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
     return res
 
 
-
 # location of environment variables on elasticbeanstalk
 BEANSTALK_ENV_PATH = "/opt/python/current/env"
 
