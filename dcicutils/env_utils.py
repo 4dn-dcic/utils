@@ -1,11 +1,7 @@
 import os
 
 
-FOURFRONT_STG_OR_PRD_TOKENS = ['webprod', 'blue', 'green']
-FOURFRONT_STG_OR_PRD_NAMES = ['staging', 'stagging', 'data']
-CGAP_STG_OR_PRD_TOKENS = []
-CGAP_STG_OR_PRD_NAMES = ['fourfront-cgap', 'fourfront-cgap-green', 'fourfront-cgap-blue']
-
+FF_ENV_DEV = 'fourfront-dev'  # Maybe not used
 FF_ENV_HOTSEAT = 'fourfront-hotseat'
 FF_ENV_MASTERTEST = 'fourfront-mastertest'
 FF_ENV_PRODUCTION_BLUE = 'fourfront-blue'
@@ -16,15 +12,36 @@ FF_ENV_WEBPROD = 'fourfront-webprod'
 FF_ENV_WEBPROD2 = 'fourfront-webprod2'
 FF_ENV_WOLF = 'fourfront-wolf'
 
-CGAP_ENV_HOTSEAT = 'fourfront-cgaphot'
+CGAP_ENV_DEV = 'fourfront-cgapdev'
+CGAP_ENV_HOTSEAT = 'fourfront-cgaphotseat'  # Maybe not used
 CGAP_ENV_MASTERTEST = 'fourfront-cgaptest'
-CGAP_ENV_PRODUCTION_BLUE = 'fourfront-cgapblue'
-CGAP_ENV_PRODUCTION_GREEN = 'fourfront-cgapgreen'
+CGAP_ENV_PRODUCTION_BLUE = 'fourfront-cgap-blue'  # reserved for transition use
+CGAP_ENV_PRODUCTION_GREEN = 'fourfront-cgap-green'  # reserved for transition use
 CGAP_ENV_STAGING = 'fourfront-cgapstaging'
-CGAP_ENV_WEBDEV = 'fourfront-cgapdev'
+CGAP_ENV_WEBDEV = 'fourfront-cgapwebdev'  # Maybe not used
 CGAP_ENV_WEBPROD = 'fourfront-cgap'
-# CGAP_ENV_WEBPROD2 doesn't have meaning in old CGAP naming. See ENV_STAGING.
-CGAP_ENV_WOLF = 'fourfront-cgapwolf'
+# CGAP_ENV_WEBPROD2 is meaningless here. See CGAP_ENV_STAGING.
+CGAP_ENV_WOLF = 'fourfront-cgapwolf'  # Maybe not used
+
+CGAP_ENV_DEV_NEW = 'cgap-dev'
+CGAP_ENV_HOTSEAT_NEW = 'cgap-hotseat'
+CGAP_ENV_MASTERTEST_NEW = 'cgap-test'
+CGAP_ENV_PRODUCTION_BLUE_NEW = 'cgap-blue'
+CGAP_ENV_PRODUCTION_GREEN_NEW = 'cgap-green'
+CGAP_ENV_STAGING_NEW = 'cgap-staging'
+CGAP_ENV_WEBDEV_NEW = 'cgap-webdev'  # Maybe not used
+CGAP_ENV_WEBPROD_NEW = 'cgap-green'
+# CGAP_ENV_WEBPROD2_NEW is meaningless here. See CGAP_ENV_STAGING_NEW.
+CGAP_ENV_WOLF_NEW = 'cgap-wolf'  # Maybe not used
+
+
+# Done this way to get maximally compatible behavior.
+FOURFRONT_STG_OR_PRD_TOKENS = ['webprod', 'blue', 'green']
+FOURFRONT_STG_OR_PRD_NAMES = ['staging', 'stagging', 'data']
+
+# Done this way because it's safer going forward.
+CGAP_STG_OR_PRD_TOKENS = []
+CGAP_STG_OR_PRD_NAMES = [CGAP_ENV_WEBPROD, CGAP_ENV_PRODUCTION_GREEN, CGAP_ENV_PRODUCTION_BLUE]
 
 
 # These operate as pairs. Don't add extras.
@@ -39,7 +56,11 @@ BEANSTALK_PROD_MIRRORS = {
     CGAP_ENV_PRODUCTION_GREEN: CGAP_ENV_PRODUCTION_BLUE,
     CGAP_ENV_WEBPROD: None,
 
+    CGAP_ENV_PRODUCTION_BLUE_NEW: CGAP_ENV_PRODUCTION_GREEN_NEW,
+    CGAP_ENV_PRODUCTION_GREEN_NEW: CGAP_ENV_PRODUCTION_BLUE_NEW,
+
 }
+
 
 BEANSTALK_TEST_ENVS = [
 
@@ -52,6 +73,11 @@ BEANSTALK_TEST_ENVS = [
     CGAP_ENV_MASTERTEST,
     CGAP_ENV_WEBDEV,
     CGAP_ENV_WOLF,
+
+    CGAP_ENV_HOTSEAT_NEW,
+    CGAP_ENV_MASTERTEST_NEW,
+    CGAP_ENV_WEBDEV_NEW,
+    CGAP_ENV_WOLF_NEW,
 
 ]
 
@@ -109,7 +135,10 @@ def is_hotseat_env(envname):
     return 'hot' in envname
 
 
-def get_env_from_context(settings, allow_environ=False):
+ALLOW_ENVIRON_BY_DEFAULT = True
+
+
+def get_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT):
     if allow_environ:
         environ_env_name = os.environ.get('ENV_NAME')
         if environ_env_name:
@@ -117,7 +146,7 @@ def get_env_from_context(settings, allow_environ=False):
     return settings.get('env.name')
 
 
-def get_mirror_env_from_context(settings, allow_environ=False, allow_guess=True, ):
+def get_mirror_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT, allow_guess=True, ):
     # TODO: I added allow_environ featurism here but did not yet enable it.
     #       Want to talk to Will about whether we should consider that a compatible or breaking hcange.
     #       -kmp 27-Mar-2020
