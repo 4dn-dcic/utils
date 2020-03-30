@@ -11,8 +11,9 @@ import requests
 import sys
 import time
 from datetime import datetime
-from dcicutils import ff_utils
+from . import ff_utils
 from botocore.exceptions import ClientError
+from .misc_utils import PRINT
 
 logging.basicConfig()
 logger = logging.getLogger('logger')
@@ -31,6 +32,7 @@ _python_major_version = sys.version_info[0]
 if _python_major_version < 3:
     raise EnvironmentError("The 'dcicutils.beanstalk_utils' package only works in Python 3.")
 use_input = input  # In Python 3, this does 'safe' input reading.
+
 
 FOURSIGHT_URL = 'https://foursight.4dnucleome.org/'
 # magic CNAME corresponds to data.4dnucleome
@@ -79,7 +81,7 @@ def delete_db(db_identifier, take_snapshot=True, allow_delete_prod=False):
             DBInstanceIdentifier=db_identifier,
             SkipFinalSnapshot=True,
         )
-    print(resp)
+    PRINT(resp)
     return resp
 
 
@@ -194,12 +196,12 @@ def swap_cname(src, dest):
         None
     """
     client = boto3.client('elasticbeanstalk', region_name=REGION)
-    print("Swapping CNAMEs %s and %s..." % (src, dest))
+    PRINT("Swapping CNAMEs %s and %s..." % (src, dest))
     client.swap_environment_cnames(SourceEnvironmentName=src,
                                    DestinationEnvironmentName=dest)
-    print("Giving CNAMEs 10 seconds to update...")
+    PRINT("Giving CNAMEs 10 seconds to update...")
     time.sleep(10)
-    print("Restarting app servers for %s and %s..." % (src, dest))
+    PRINT("Restarting app servers for %s and %s..." % (src, dest))
     client.restart_app_server(EnvironmentName=src)
     client.restart_app_server(EnvironmentName=dest)
 
@@ -315,10 +317,10 @@ def describe_beanstalk_environments(client, **kwargs):
         try:
             res = client.describe_environments(**kwargs)
         except ClientError as e:
-            print('Client exception encountered while getting BS info for %s. Error: %s' % (env_info, str(e)))
+            PRINT('Client exception encountered while getting BS info for %s. Error: %s' % (env_info, str(e)))
             time.sleep(retry)
         except Exception as e:
-            print('Unhandled exception encountered while getting BS info for %s. Error: %s' % (env_info, str(e)))
+            PRINT('Unhandled exception encountered while getting BS info for %s. Error: %s' % (env_info, str(e)))
             raise e
         else:
             return res
@@ -676,7 +678,6 @@ def source_beanstalk_env_vars(config_file=BEANSTALK_ENV_PATH):
         proc = subprocess.Popen(command, stdout=subprocess.PIPE, universal_newlines=True)
         for line in proc.stdout:
             key, _, value = line.partition("=")
-            print("key=", key, "value=", value)
             os.environ[key] = value[:-1]
         proc.communicate()
 
@@ -726,7 +727,7 @@ def log_to_foursight(event, lambda_name='', overrides=None):
         # fs['check'] should be in form: "<fs environment>/<check name>"
         url = FOURSIGHT_URL + 'checks/' + fs['check']
         res = requests.put(url, data=json.dumps(data), headers=headers)
-        print('Foursight response from %s: %s' % (url, res.text))
+        PRINT('Foursight response from %s: %s' % (url, res.text))
         try:
             return res.json()
         except Exception as exc:
@@ -865,10 +866,10 @@ def create_new_es(new):
             "VolumeSize": 50
         }
     )
-    print('=== CREATED NEW ES DOMAIN %s ===' % new)
-    print('NO MASTER INSTANCES ARE USED!')
-    print('MAKE SURE TO UPDATE COGNITO AND ACCESS POLICY USING THE GUI!')
-    print(resp)
+    PRINT('=== CREATED NEW ES DOMAIN %s ===' % new)
+    PRINT('NO MASTER INSTANCES ARE USED!')
+    PRINT('MAKE SURE TO UPDATE COGNITO AND ACCESS POLICY USING THE GUI!')
+    PRINT(resp)
 
     return resp
 
@@ -895,14 +896,14 @@ def get_es_build_status(new, max_tries=None):
         if max_tries is not None and tries >= max_tries:
             break
         if endpoint is None:
-            print(".")
+            PRINT(".")
             tries += 1
             time.sleep(10)
 
     # aws uses port 80 for es connection, lets be specific
     if endpoint:
         endpoint += ":80"
-    print('Found ES endpoint for %s: %s' % (new, endpoint))
+    PRINT('Found ES endpoint for %s: %s' % (new, endpoint))
     return endpoint
 
 
@@ -962,9 +963,9 @@ def delete_es_domain(env_name):
     es = boto3.client('es')
     try:
         res = es.delete_elasticsearch_domain(DomainName=env_name)
-        print(res)
+        PRINT(res)
     except:  # noqa: E722
-        print("es domain %s not found, skipping" % env_name)
+        PRINT("es domain %s not found, skipping" % env_name)
 
 
 def clone_bs_env_cli(old, new, load_prod, db_endpoint, es_url):
@@ -1024,8 +1025,8 @@ def create_s3_buckets(new):
     s3 = boto3.client('s3', region_name=REGION)
     for bucket in new_buckets:
         s3.create_bucket(Bucket=bucket)
-    print('=== CREATED NEW S3 BUCKETS ===' % new)
-    print('MAKE SURE TO UPDATE CORS POLICY FOR -files AND -wfoutput BUCKETS!')
+    PRINT('=== CREATED NEW S3 BUCKETS ===' % new)
+    PRINT('MAKE SURE TO UPDATE CORS POLICY FOR -files AND -wfoutput BUCKETS!')
 
 
 def delete_s3_buckets(env_name):
@@ -1048,12 +1049,12 @@ def delete_s3_buckets(env_name):
 
     s3 = boto3.resource('s3')
     for bucket in buckets:
-        print("deleting content for " + bucket)
+        PRINT("deleting content for " + bucket)
         try:
             s3.Bucket(bucket).objects.delete()
             s3.Bucket(bucket).delete()
         except:  # noqa: E722
-            print(bucket + " not found skipping...")
+            PRINT(bucket + " not found skipping...")
 
 
 def snapshot_and_clone_db(db_identifier, snapshot_name):
@@ -1075,23 +1076,23 @@ def snapshot_and_clone_db(db_identifier, snapshot_name):
             DBSnapshotIdentifier=snapshot_name,
             DBInstanceIdentifier=db_identifier
         )
-    print("Response from create db snapshot: %s" % snap_res)
-    print("Waiting for snapshot to create...")
+    PRINT("Response from create db snapshot: %s" % snap_res)
+    PRINT("Waiting for snapshot to create...")
     waiter = client.get_waiter('db_snapshot_completed')
     waiter.wait(DBSnapshotIdentifier=snapshot_name)
-    print("Done waiting, creating a new database with name %s" % snapshot_name)
+    PRINT("Done waiting, creating a new database with name %s" % snapshot_name)
     db_res = create_db_from_snapshot(snapshot_name, snapshot_name, False)
     if db_res == 'Error':
         raise Exception('Could not create DB %s; already exists' % snapshot_name)
-    print("Waiting for DB to be created from snapshot...")
+    PRINT("Waiting for DB to be created from snapshot...")
     endpoint = ''
     while not endpoint:
         resp = client.describe_db_instances(DBInstanceIdentifier=snapshot_name)
         endpoint = resp['DBInstances'][0].get('Endpoint')
         if endpoint and endpoint.get('Address'):
-            print("We got an endpoint:", endpoint['Address'])
+            PRINT("We got an endpoint:", endpoint['Address'])
             return endpoint['Address']
-        print(".")
+        PRINT(".")
         time.sleep(10)
 
 
@@ -1108,12 +1109,12 @@ def add_to_auth0_client(new):
     """
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     url = None
-    print("Getting beanstalk URL for env %s..." % new)
+    PRINT("Getting beanstalk URL for env %s..." % new)
     while url is None:
         env = describe_beanstalk_environments(client, EnvironmentNames=[new])
         url = env['Environments'][0].get('CNAME')
         if url is None:
-            print(".")
+            PRINT(".")
             time.sleep(10)
     auth0_client_update(url)
 
@@ -1131,12 +1132,12 @@ def remove_from_auth0_client(env_name):
     """
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     url = None
-    print("Getting beanstalk URL for env %s..." % env_name)
+    PRINT("Getting beanstalk URL for env %s..." % env_name)
     while url is None:
         env = client.describe_environments(EnvironmentNames=[env_name])
         url = env['Environments'][0].get('CNAME')
         if url is None:
-            print(".")
+            PRINT(".")
             time.sleep(10)
     auth0_client_remove(url)
 
@@ -1174,7 +1175,7 @@ def auth0_client_update(url):
     client_data = {'callbacks': callbacks}
 
     update_res = requests.patch(client_url, data=json.dumps(client_data), headers=headers)
-    print('auth0 callback urls are: %s' % update_res.json().get('callbacks'))
+    PRINT('auth0 callback urls are: %s' % update_res.json().get('callbacks'))
 
 
 def auth0_client_remove(url):
@@ -1209,14 +1210,14 @@ def auth0_client_remove(url):
     try:
         idx = callbacks.index(full_url)
     except ValueError:
-        print(full_url + " Not in auth0 auth, doesn't need to be removed")
+        PRINT(full_url + " Not in auth0 auth, doesn't need to be removed")
         return
     if idx:
         callbacks.pop(idx)
     client_data = {'callbacks': callbacks}
 
     update_res = requests.patch(client_url, data=json.dumps(client_data), headers=headers)
-    print('auth0 callback urls are: %s' % update_res.json().get('callbacks'))
+    PRINT('auth0 callback urls are: %s' % update_res.json().get('callbacks'))
 
 
 def copy_s3_buckets(new, old):
@@ -1249,7 +1250,7 @@ def copy_s3_buckets(new, old):
         try:
             s3.create_bucket(Bucket=bucket)
         except:  # noqa: E722
-            print("bucket %s already created..." % bucket)
+            PRINT("bucket %s already created..." % bucket)
 
     # now copy them
     # aws s3 sync s3://mybucket s3://backup-mybucket
@@ -1258,7 +1259,7 @@ def copy_s3_buckets(new, old):
     for old, new in zip(old_buckets, new_buckets):
         oldb = "s3://%s" % old
         newb = "s3://%s" % new
-        print("copying data from old %s to new %s" % (oldb, newb))
+        PRINT("copying data from old %s to new %s" % (oldb, newb))
         subprocess.call(['aws', 's3', 'sync', oldb, newb])
 
 
@@ -1286,37 +1287,37 @@ def clone_beanstalk_command_line(old, new, prod=False, copy_s3=False):
         None
     """
     if 'Auth0Client' not in os.environ or "Auth0Secret" not in os.environ:
-        print('Must set Auth0Client and Auth0Secret env variables! Exiting...')
+        PRINT('Must set Auth0Client and Auth0Secret env variables! Exiting...')
         return
-    print('### eb status (START)')
+    PRINT('### eb status (START)')
     eb_ret = subprocess.call(['eb', 'status'])
     if eb_ret != 0:
-        print('This command must be called from an eb initialized repo! Exiting...')
+        PRINT('This command must be called from an eb initialized repo! Exiting...')
         return
-    print('### eb status (END)')
+    PRINT('### eb status (END)')
     name = use_input("This will create an environment named %s, cloned from %s."
                      " This includes s3, ES, RDS, and Auth0 callbacks. If you "
                      "are sure, type the new env name to confirm: " % (new, old))
     if str(name) != new:
-        print("Could not confirm env. Exiting...")
+        PRINT("Could not confirm env. Exiting...")
         return
-    print("### start build ES service")
+    PRINT("### start build ES service")
     add_es(new)
-    print("### create the s3 buckets")
+    PRINT("### create the s3 buckets")
     create_s3_buckets(new)
-    print("### create snapshot and copy database")
+    PRINT("### create snapshot and copy database")
     db_endpoint = snapshot_and_clone_db(old, new)
-    print("### waiting for ES service")
+    PRINT("### waiting for ES service")
     es_endpoint = get_es_build_status(new)
-    print("### clone elasticbeanstalk envrionment")
+    PRINT("### clone elasticbeanstalk envrionment")
     # TODO, can we pass in github commit id here?
     clone_bs_env_cli(old, new, prod, db_endpoint, es_endpoint)
-    print("### allow auth-0 requests")
+    PRINT("### allow auth-0 requests")
     add_to_auth0_client(new)
     if copy_s3 is True:
-        print("### copy contents of s3")
+        PRINT("### copy contents of s3")
         copy_s3_buckets(new, old)
-    print("### All done! It may take some time for the beanstalk env to finish"
+    PRINT("### All done! It may take some time for the beanstalk env to finish"
           " initialization. You may want to deploy the most current FF branch.")
 
 
@@ -1340,28 +1341,28 @@ def delete_beanstalk_command_line(env):
         None
     """
     if 'Auth0Client' not in os.environ or "Auth0Secret" not in os.environ:
-        print('Must set Auth0Client and Auth0Secret env variables! Exiting...')
+        PRINT('Must set Auth0Client and Auth0Secret env variables! Exiting...')
         return
-    print('### eb status (START)')
+    PRINT('### eb status (START)')
     eb_ret = subprocess.call(['eb', 'status'])
     if eb_ret != 0:
-        print('This command must be called from an eb initialized repo! Exiting...')
+        PRINT('This command must be called from an eb initialized repo! Exiting...')
         return
-    print('### eb status (END)')
+    PRINT('### eb status (END)')
     name = use_input("This will totally blow away the environment, including s3,"
                      "ES, RDS, and Auth0 callbacks. If you are sure, type the "
                      "env name to confirm: ")
     if str(name) != env:
-        print("Could not confirm env. Exiting...")
+        PRINT("Could not confirm env. Exiting...")
         return
-    print("### Removing access to auth0")
+    PRINT("### Removing access to auth0")
     remove_from_auth0_client(env)
-    print("### Deleting beanstalk enviornment")
+    PRINT("### Deleting beanstalk enviornment")
     delete_bs_env_cli(env)
-    print("### Delete contents of s3")
+    PRINT("### Delete contents of s3")
     delete_s3_buckets(env)
-    print("### Delete es domain")
+    PRINT("### Delete es domain")
     delete_es_domain(env)
-    print("### Delete database")
+    PRINT("### Delete database")
     delete_db(env)
-    print('### All done!')
+    PRINT('### All done!')
