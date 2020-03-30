@@ -5,10 +5,11 @@ import os
 import time
 import random
 import boto3
-from dcicutils import (
+from . import (
     s3_utils,
     es_utils
 )
+from .misc_utils import PRINT
 import requests
 # urlparse import differs between py2 and 3
 if sys.version_info[0] < 3:
@@ -1138,7 +1139,7 @@ def stuff_in_queues(ff_env, check_secondary=False):
                 AttributeNames=['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible']
             ).get('Attributes', {})
         except Exception:
-            print('Error finding queue or its attributes: %s' % ff_env + queue_name)
+            PRINT('Error finding queue or its attributes: %s' % ff_env + queue_name)
             stuff_in_queue = True  # queue not found. use datastore=database
             break
         else:
@@ -1200,7 +1201,8 @@ def convert_param(parameter_dict, vals_as_string=False):
     converts dictionary format {argument_name: value, argument_name: value, ...}
     to {'workflow_argument_name': argument_name, 'value': value}
     '''
-    print(str(parameter_dict))
+    # Not needed? -kmp & Will 30-Mar-2020
+    # print(str(parameter_dict))
     metadata_parameters = []
     for k, v in parameter_dict.items():
         # we need this to be a float or integer if it really is, else a string
@@ -1216,7 +1218,8 @@ def convert_param(parameter_dict, vals_as_string=False):
 
         metadata_parameters.append({"workflow_argument_name": k, "value": v})
 
-    print(str(metadata_parameters))
+    # Not needed? -kmp & Will 30-Mar-2020
+    # print(str(metadata_parameters))
     return metadata_parameters
 
 

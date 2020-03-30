@@ -4,7 +4,8 @@ import types
 import os
 import sys
 from contextlib import contextmanager
-from dcicutils.ff_utils import *  # NOQA
+from .ff_utils import *  # NOQA
+from .misc_utils import PRINT
 # urllib is different between python2 and 3
 if sys.version_info[0] == 3:
     import urllib.request as use_urllib
@@ -171,7 +172,7 @@ def add_mounted_file_to_session(file_uuid):
     try:
         track_res = get_metadata(track_id)  # NOQA
     except Exception as e:
-        print("Error updating JH session: %s" % str(e))
+        PRINT("Error updating JH session: %s" % str(e))
         pass  # Nothing to do here
     else:
         session = track_res.get('jupyterhub_session')
@@ -182,7 +183,7 @@ def add_mounted_file_to_session(file_uuid):
             try:
                 patch_metadata({'jupyterhub_session': session}, track_res['uuid'])  # NOQA
             except Exception as e2:
-                print("Error updating JH session: %s" % str(e2))
+                PRINT("Error updating JH session: %s" % str(e2))
                 pass
 
 

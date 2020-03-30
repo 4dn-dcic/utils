@@ -7,6 +7,7 @@ from zipfile import ZipFile
 from io import BytesIO
 import logging
 from .env_utils import is_stg_or_prd_env
+from .misc_utils import PRINT
 
 
 ###########################
@@ -24,7 +25,7 @@ class s3Utils(object):
         if we pass in env set the outfile and sys bucket from the environment
         '''
         # avoid circular ref
-        from dcicutils.beanstalk_utils import get_beanstalk_real_url
+        from .beanstalk_utils import get_beanstalk_real_url
         self.url = ''
         self.s3 = boto3.client('s3', region_name='us-east-1')
         if sys_bucket is None:
@@ -93,8 +94,8 @@ class s3Utils(object):
             file_metadata = self.s3.head_object(Bucket=bucket, Key=key)
         except Exception as e:
             if print_error:
-                print("object %s not found on bucket %s" % (str(key), str(bucket)))
-                print(str(e))
+                PRINT("object %s not found on bucket %s" % (str(key), str(bucket)))
+                PRINT(str(e))
             return False
         return file_metadata
 
