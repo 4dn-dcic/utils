@@ -1,6 +1,17 @@
-import pytest
+# import pytest
+import os
 
-from dcicutils.env_utils import is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env
+from dcicutils.env_utils import (
+    is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env, BEANSTALK_PROD_MIRRORS,
+    FF_ENV_PRODUCTION_BLUE, FF_ENV_PRODUCTION_GREEN, FF_ENV_WEBPROD, FF_ENV_WEBPROD2, FF_ENV_MASTERTEST,
+    FF_ENV_HOTSEAT, FF_ENV_STAGING, FF_ENV_WEBDEV, FF_ENV_WOLF,
+    CGAP_ENV_PRODUCTION_BLUE, CGAP_ENV_PRODUCTION_GREEN, CGAP_ENV_WEBPROD, CGAP_ENV_MASTERTEST,
+    CGAP_ENV_HOTSEAT, CGAP_ENV_STAGING, CGAP_ENV_WEBDEV, CGAP_ENV_WOLF,
+    CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_WEBPROD_NEW, CGAP_ENV_MASTERTEST_NEW,
+    CGAP_ENV_HOTSEAT_NEW, CGAP_ENV_STAGING_NEW, CGAP_ENV_WEBDEV_NEW, CGAP_ENV_WOLF_NEW,
+    get_mirror_env_from_context, is_test_env, is_hotseat_env, guess_mirror_env,
+)
+from unittest import mock
 
 
 def test_blue_green_mirror_env():
@@ -63,3 +74,161 @@ def test_is_stg_or_prd_env():
     assert is_stg_or_prd_env("fourfront-cgap-yellow") is False
     assert is_stg_or_prd_env("fourfront-cgapwolf") is False
     assert is_stg_or_prd_env("fourfront-cgaptest") is False
+
+
+def test_is_test_env():
+
+    assert is_test_env(FF_ENV_HOTSEAT) is True
+    assert is_test_env(FF_ENV_MASTERTEST) is True
+    assert is_test_env(FF_ENV_WOLF) is True
+    assert is_test_env(FF_ENV_WEBDEV) is True
+
+    assert is_test_env(CGAP_ENV_HOTSEAT) is True
+    assert is_test_env(CGAP_ENV_MASTERTEST) is True
+    assert is_test_env(CGAP_ENV_WOLF) is True
+    assert is_test_env(CGAP_ENV_WEBDEV) is True
+
+
+def test_is_hotseat_env():
+
+    assert is_hotseat_env(FF_ENV_HOTSEAT) is True
+    assert is_hotseat_env(FF_ENV_MASTERTEST) is False
+    assert is_hotseat_env(FF_ENV_WOLF) is False
+    assert is_hotseat_env(FF_ENV_WEBDEV) is False
+
+    assert is_hotseat_env(CGAP_ENV_HOTSEAT) is True
+    assert is_hotseat_env(CGAP_ENV_MASTERTEST) is False
+    assert is_hotseat_env(CGAP_ENV_WOLF) is False
+    assert is_hotseat_env(CGAP_ENV_WEBDEV) is False
+
+    assert is_hotseat_env(CGAP_ENV_HOTSEAT_NEW) is True
+    assert is_hotseat_env(CGAP_ENV_MASTERTEST_NEW) is False
+    assert is_hotseat_env(CGAP_ENV_WOLF_NEW) is False
+    assert is_hotseat_env(CGAP_ENV_WEBDEV_NEW) is False
+
+
+def test_get_mirror_env_from_context_without_environ():
+    """ Tests that when getting mirror env on various envs returns the correct mirror """
+
+    for allow_environ in (False, True):
+        # If the environment doesn't have either the ENV_NAME or MIRROR_ENV_NAME environment variables,
+        # it won't matter what value we pass for allow_environ.
+
+        with mock.patch.object(os, "environ", {}):
+            settings = {'env.name': FF_ENV_WEBPROD, 'mirror.env.name': 'anything'}
+            mirror = get_mirror_env_from_context(settings, allow_environ=allow_environ)
+            assert mirror == 'anything'  # overrides any guess we might make
+
+            settings = {'env.name': FF_ENV_WEBPROD}
+            mirror = get_mirror_env_from_context(settings, allow_environ=allow_environ)
+            assert mirror == FF_ENV_WEBPROD2  # Not found in environment, but we can guess
+
+            settings = {'env.name': FF_ENV_WEBPROD}
+            mirror = get_mirror_env_from_context(settings, allow_environ=allow_environ, allow_guess=False)
+            assert mirror is None  # Guessing was suppressed
+
+            settings = {'env.name': FF_ENV_WEBPROD2}
+            mirror = get_mirror_env_from_context(settings, allow_environ=allow_environ)
+            assert mirror == FF_ENV_WEBPROD
+
+            settings = {'env.name': FF_ENV_PRODUCTION_GREEN}
+            mirror = get_mirror_env_from_context(settings, allow_environ=allow_environ)
+            assert mirror == FF_ENV_PRODUCTION_BLUE
+
+            settings = {'env.name': FF_ENV_PRODUCTION_BLUE}
+            mirror = get_mirror_env_from_context(settings, allow_environ=allow_environ)
+            assert mirror == FF_ENV_PRODUCTION_GREEN
+
+            settings = {'env.name': FF_ENV_MASTERTEST}
+            mirror = get_mirror_env_from_context(settings, allow_environ=allow_environ)
+            assert mirror is None
+
+
+def test_get_mirror_env_from_context_with_environ_has_env():
+    """ Tests override of env name from os.environ when getting mirror env on various envs """
+
+    with mock.patch.object(os, "environ", {'ENV_NAME': 'foo'}):
+        settings = {'env.name': FF_ENV_WEBPROD}
+        mirror = get_mirror_env_from_context(settings, allow_environ=True)
+        assert mirror is None  # "foo" has no mirror
+
+    with mock.patch.object(os, "environ", {"ENV_NAME": FF_ENV_WEBPROD2}):
+
+        settings = {}
+        mirror = get_mirror_env_from_context(settings, allow_environ=True)
+        assert mirror == FF_ENV_WEBPROD  # env name explicitly declared, then a guess
+
+        settings = {}
+        mirror = get_mirror_env_from_context(settings, allow_environ=True, allow_guess=False)
+        assert mirror is None  # env name explicitly declared, but guessing disallowed
+
+        settings = {'env.name': FF_ENV_WEBPROD}
+        mirror = get_mirror_env_from_context(settings, allow_environ=True)
+        assert mirror == FF_ENV_WEBPROD  # env name in environ overrides env name in file
+
+        settings = {'env.name': FF_ENV_WEBPROD}
+        mirror = get_mirror_env_from_context(settings, allow_environ=True, allow_guess=False)
+        assert mirror is None  # env name in environ overrides env name in file, but guessing disallowed
+
+        settings = {'env.name': FF_ENV_WEBPROD}
+        mirror = get_mirror_env_from_context(settings, allow_environ=False)
+        assert mirror == FF_ENV_WEBPROD2  # env name in environ suppressed
+
+        settings = {'env.name': FF_ENV_WEBPROD}
+        mirror = get_mirror_env_from_context(settings, allow_environ=False, allow_guess=False)
+        assert mirror == None  # env name in environ suppressed, but guessing disallowed
+
+
+def test_get_mirror_env_from_context_with_environ_has_mirror_env():
+    """ Tests override of mirror env name from os.environ when getting mirror env on various envs """
+
+    with mock.patch.object(os, "environ", {"MIRROR_ENV_NAME": 'bar'}):
+        settings = {}
+        mirror = get_mirror_env_from_context(settings, allow_environ=True)
+        assert mirror == 'bar'  # explicitly declared, even if nothing else ise
+
+
+def test_get_mirror_env_from_context_with_environ_has_env_and_mirror_env():
+    """ Tests override of env name and mirror env name from os.environ when getting mirror env on various envs """
+
+    with mock.patch.object(os, "environ", {'ENV_NAME': FF_ENV_WEBPROD2, "MIRROR_ENV_NAME": 'bar'}):
+        settings = {'env.name': FF_ENV_WEBPROD}
+        mirror = get_mirror_env_from_context(settings, allow_environ=True)
+        assert mirror == 'bar'  # mirror explicitly declared, ignoring env name
+
+
+def test_guess_mirror_env():
+
+    def assert_prod_mirrors(env, expected_mirror_env):
+        assert guess_mirror_env(env) is expected_mirror_env
+        assert BEANSTALK_PROD_MIRRORS.get(env) is expected_mirror_env
+
+    assert_prod_mirrors(FF_ENV_PRODUCTION_GREEN, FF_ENV_PRODUCTION_BLUE)
+    assert_prod_mirrors(FF_ENV_PRODUCTION_BLUE, FF_ENV_PRODUCTION_GREEN)
+
+    assert_prod_mirrors(FF_ENV_WEBPROD, FF_ENV_WEBPROD2)
+    assert_prod_mirrors(FF_ENV_WEBPROD2, FF_ENV_WEBPROD)
+
+    assert_prod_mirrors(FF_ENV_MASTERTEST, None)
+
+    assert_prod_mirrors(CGAP_ENV_PRODUCTION_GREEN, CGAP_ENV_PRODUCTION_BLUE)
+    assert_prod_mirrors(CGAP_ENV_PRODUCTION_BLUE, CGAP_ENV_PRODUCTION_GREEN)
+
+    assert_prod_mirrors(CGAP_ENV_STAGING, None)
+
+    assert_prod_mirrors(CGAP_ENV_WEBPROD, None)
+
+    assert_prod_mirrors(CGAP_ENV_MASTERTEST, None)
+
+    assert_prod_mirrors(CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_PRODUCTION_BLUE_NEW)
+    assert_prod_mirrors(CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_PRODUCTION_GREEN_NEW)
+
+    assert_prod_mirrors(CGAP_ENV_STAGING_NEW, None)
+
+    # A key difference between the CGAP old and new names is that
+    # the new naming assumes we have a blue/green deploy. -kmp 29-Mar-2020
+    assert CGAP_ENV_PRODUCTION_GREEN_NEW is CGAP_ENV_WEBPROD_NEW
+    assert_prod_mirrors(CGAP_ENV_WEBPROD_NEW, CGAP_ENV_PRODUCTION_BLUE_NEW)
+    assert_prod_mirrors(CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_WEBPROD_NEW)
+
+    assert_prod_mirrors(CGAP_ENV_MASTERTEST_NEW, None)

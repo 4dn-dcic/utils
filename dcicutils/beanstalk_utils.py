@@ -8,6 +8,7 @@ import boto3
 import os
 import json
 import requests
+import sys
 import time
 from datetime import datetime
 from dcicutils import ff_utils
@@ -17,11 +18,19 @@ logging.basicConfig()
 logger = logging.getLogger('logger')
 logger.setLevel(logging.INFO)
 
-# input vs. raw_input for python 2/3
-try:
-    use_input = raw_input
-except NameError:
-    use_input = input
+# In Python 2, the safe 'input' function was called 'raw_input'.  Also in Python 2, there was a function
+# named 'input' that did eval(raw_input(...)).  Python 3 made an incompatible change, renaming 'raw_input'
+# to 'input', and it no longer has a function that does an unsafe eval.  When we supported both Python 2 & 3,
+# use a 'try' expression to sort things out and call the safe function 'use_input' to avoid confusion.
+# But PyCharm found that 'try' expression confusing, so now that we are Python 3 only, we're phasing that
+# out. For a time, we'll retain the transitional naming, though, along with an affirmative error check, so
+# we don't open any security holes. We can remove this naming and check once we're we're only using Python 3.
+# -kmp 27-Mar-2020
+
+_python_major_version = sys.version_info[0]
+if _python_major_version < 3:
+    raise EnvironmentError("The 'dcicutils.beanstalk_utils' package only works in Python 3.")
+use_input = input  # In Python 3, this does 'safe' input reading.
 
 FOURSIGHT_URL = 'https://foursight.4dnucleome.org/'
 # magic CNAME corresponds to data.4dnucleome
@@ -648,6 +657,28 @@ def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
         res = update_bs_config(envname, template=template, keep_env_vars=True,
                                env_override=env_vars)
     return res
+
+
+# location of environment variables on elasticbeanstalk
+BEANSTALK_ENV_PATH = "/opt/python/current/env"
+
+
+def source_beanstalk_env_vars(config_file=BEANSTALK_ENV_PATH):
+    """
+    set environment variables if we are on Elastic Beanstalk
+    AWS_ACCESS_KEY_ID is indicative of whether or not env vars are sourced
+
+    Args:
+        config_file (str): filepath to load env vars from
+    """
+    if os.path.exists(config_file) and not os.environ.get("AWS_ACCESS_KEY_ID"):
+        command = ['bash', '-c', 'source ' + config_file + ' && env']
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE, universal_newlines=True)
+        for line in proc.stdout:
+            key, _, value = line.partition("=")
+            print("key=", key, "value=", value)
+            os.environ[key] = value[:-1]
+        proc.communicate()
 
 
 def log_to_foursight(event, lambda_name='', overrides=None):
