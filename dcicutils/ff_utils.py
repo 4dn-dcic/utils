@@ -7,7 +7,8 @@ import random
 import boto3
 from . import (
     s3_utils,
-    es_utils
+    es_utils,
+    env_utils,
 )
 from .misc_utils import PRINT
 import requests
@@ -1068,13 +1069,9 @@ def unified_authentication(auth=None, ff_env=None):
     use with your request.
     """
     # first see if key should be obtained from using ff_env
-    # TODO (C4-102): Still need to use better abstraction here, and figure out how to work for CGAP. -kmp 31-Mar-2020
     if not auth and ff_env:
-        # webprod, webprod2 and blue/green all use the fourfront-webprod bucket for keys
-        if 'webprod' in ff_env or ff_env in PRODUCTION_ENVS:
-            use_env = 'fourfront-webprod'
-        else:
-            use_env = ff_env
+        # TODO: The ff_env argument is mis-named, something we should fix sometime. It can be a cgap env, too.
+        use_env = env_utils.prod_bucket_env(ff_env) if env_utils.is_stg_or_prd_env(ff_env) else ff_env
         auth = s3_utils.s3Utils(env=use_env).get_access_keys()
     # see if auth is directly from get_access_keys()
     use_auth = None

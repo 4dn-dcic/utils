@@ -14,7 +14,7 @@ from datetime import datetime
 from . import ff_utils
 from botocore.exceptions import ClientError
 from .misc_utils import PRINT
-from .env_utils import is_cgap_env, is_stg_or_prd_env, public_url_mappings
+from .env_utils import is_cgap_env, is_stg_or_prd_env, public_url_mappings, blue_green_mirror_env
 
 logging.basicConfig()
 logger = logging.getLogger('logger')
@@ -285,12 +285,16 @@ def get_beanstalk_real_url(env):
     if is_stg_or_prd_env(env):
         # What counts as staging/prod depends on whether we're in the CGAP or Fourfront space.
         data_env = compute_cgap_prd_env() if is_cgap_env(env) else compute_ff_prd_env()
-        # There is only one production environment. Everything else is staging.
-        url = urls['data'] if data_env == env else urls['staging']
-    else:
-        bs_info = beanstalk_info(env)
-        url = "http://" + bs_info['CNAME']
+        # There is only one production environment. Everything else is staging, but everything
+        # else is not staging.4dnucleome.org. Only one is that.
+        if env == data_env:
+            return urls['data']
+        elif env == blue_green_mirror_env(data_env):
+            # Mirror env might be None, in which case this clause will not be entered
+            return urls['staging']
 
+    bs_info = beanstalk_info(env)
+    url = "http://" + bs_info['CNAME']
     return url
 
 

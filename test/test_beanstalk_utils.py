@@ -10,69 +10,6 @@ def _mocked_beanstalk_info(env):
     return {'CNAME': 'blah-%s.blahblah.us-east-1.elasticbeanstalk.com' % env}
 
 
-# Some of the legacy tests for get_beanstalk_real_url don't actually test the way prod works,
-# since we don't name anything webprod-1 or weprod-2.  I'm leaving those test in place for
-# historical stability (putting "fake" in the test name), but also adding some additional tests
-# that test the real names just to be sure. -kmp 30-Mar-2020
-
-def test_get_beanstalk_real_url_fake_prod():
-    with mock.patch('dcicutils.beanstalk_utils._compute_prd_env_for_project') as mock_whodaman:
-        with mock.patch('dcicutils.beanstalk_utils.beanstalk_info') as mock_beanstalk_info:
-            mock_whodaman.return_value = 'webprod-1'
-            mock_beanstalk_info.side_effect = _mocked_beanstalk_info  # mock_not_called('dcicutils.beanstalk_utils.beanstalk_info')
-            url = bs.get_beanstalk_real_url('webprod-1')
-            assert url == 'https://data.4dnucleome.org'
-
-
-def test_get_beanstalk_real_url_fake_staging():
-    with mock.patch('dcicutils.beanstalk_utils._compute_prd_env_for_project') as mock_whodaman:
-        with mock.patch('dcicutils.beanstalk_utils.beanstalk_info') as mock_beanstalk_info:
-            mock_whodaman.return_value = 'webprod-2'
-            mock_beanstalk_info.side_effect = _mocked_beanstalk_info  # mock_not_called('dcicutils.beanstalk_utils.beanstalk_info')
-            url = bs.get_beanstalk_real_url('webprod-1')
-            assert url == 'http://staging.4dnucleome.org'
-
-
-# These are more like the way it really works in the webprod/webprod2 space:
-
-def test_get_beanstalk_real_url_webprod_data():
-    with mock.patch('dcicutils.beanstalk_utils._compute_prd_env_for_project') as mock_whodaman:
-        with mock.patch('dcicutils.beanstalk_utils.beanstalk_info') as mock_beanstalk_info:
-            mock_whodaman.return_value = 'fourfront-webprod'
-            mock_beanstalk_info.side_effect = _mocked_beanstalk_info  # mock_not_called('dcicutils.beanstalk_utils.beanstalk_info')
-            url = bs.get_beanstalk_real_url('fourfront-webprod')
-            assert url == 'https://data.4dnucleome.org'
-
-
-def test_get_beanstalk_real_url_webprod2_data():
-    with mock.patch('dcicutils.beanstalk_utils._compute_prd_env_for_project') as mock_whodaman:
-        with mock.patch('dcicutils.beanstalk_utils.beanstalk_info') as mock_beanstalk_info:
-            mock_whodaman.return_value = 'fourfront-webprod2'
-            mock_beanstalk_info.side_effect = _mocked_beanstalk_info  # mock_not_called('dcicutils.beanstalk_utils.beanstalk_info')
-            url = bs.get_beanstalk_real_url('fourfront-webprod2')
-            assert url == 'https://data.4dnucleome.org'
-
-
-def test_get_beanstalk_real_url_webprod_staging():
-    with mock.patch('dcicutils.beanstalk_utils._compute_prd_env_for_project') as mock_whodaman:
-        with mock.patch('dcicutils.beanstalk_utils.beanstalk_info') as mock_beanstalk_info:
-            mock_whodaman.return_value = 'fourfront-webprod2'
-            mock_beanstalk_info.side_effect = _mocked_beanstalk_info  # mock_not_called('dcicutils.beanstalk_utils.beanstalk_info')
-            url = bs.get_beanstalk_real_url('fourfront-webprod')
-            assert url == 'http://staging.4dnucleome.org'
-
-
-def test_get_beanstalk_real_url_webprod2_staging():
-    with mock.patch('dcicutils.beanstalk_utils._compute_prd_env_for_project') as mock_whodaman:
-        with mock.patch('dcicutils.beanstalk_utils.beanstalk_info') as mock_beanstalk_info:
-            mock_whodaman.return_value = 'fourfront-webprod'
-            mock_beanstalk_info.side_effect = _mocked_beanstalk_info  # mock_not_called('dcicutils.beanstalk_utils.beanstalk_info')
-            url = bs.get_beanstalk_real_url('fourfront-webprod2')
-            assert url == 'http://staging.4dnucleome.org'
-
-
-# These are what the new environments will do in Fourfront:
-
 def test_get_beanstalk_real_url_blue_data():
     with mock.patch('dcicutils.beanstalk_utils._compute_prd_env_for_project') as mock_whodaman:
         with mock.patch('dcicutils.beanstalk_utils.beanstalk_info') as mock_beanstalk_info:
