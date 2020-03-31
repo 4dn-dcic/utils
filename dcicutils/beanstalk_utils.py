@@ -14,6 +14,7 @@ from datetime import datetime
 from . import ff_utils
 from botocore.exceptions import ClientError
 from .misc_utils import PRINT
+from .env_utils import is_cgap_env
 
 logging.basicConfig()
 logger = logging.getLogger('logger')

@@ -23,6 +23,22 @@ def test_s3Utils_creation_data():
     assert util.url == 'https://data.4dnucleome.org'
 
 
+def test_s3Utils_creation_cgap():
+    util = s3Utils(env='fourfront-cgap')
+    actual_props = {
+        'sys_bucket': util.sys_bucket,
+        'outfile_bucket': util.outfile_bucket,
+        'raw_file_bucket': util.raw_file_bucket,
+        'url': util.url,
+    }
+    assert actual_props == {
+        'sys_bucket': 'elasticbeanstalk-fourfront-cgap-system',
+        'outfile_bucket': 'elasticbeanstalk-fourfront-cgap-wfoutput',
+        'raw_file_bucket': 'elasticbeanstalk-fourfront-cgap-files',
+        'url': 'https://cgap.hms.harvard.edu',
+    }
+
+
 def test_s3Utils_get_keys_for_data():
     util = s3Utils(env='data')
     keys = util.get_access_keys()
