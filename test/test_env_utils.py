@@ -46,11 +46,11 @@ def test_public_url_mappings():
     assert public_url_mappings('fourfront-blue') == FF_PUBLIC_URLS
     assert public_url_mappings('fourfront-green') == FF_PUBLIC_URLS
 
-    assert public_url_mappings('fourfront-cgap') == FF_PUBLIC_URLS
-    assert public_url_mappings('fourfront-cgap-blue') == FF_PUBLIC_URLS
-    assert public_url_mappings('fourfront-cgap-green') == FF_PUBLIC_URLS
-    assert public_url_mappings('cgap-blue') == FF_PUBLIC_URLS
-    assert public_url_mappings('cgap-green') == FF_PUBLIC_URLS
+    assert public_url_mappings('fourfront-cgap') == CGAP_PUBLIC_URLS
+    assert public_url_mappings('fourfront-cgap-blue') == CGAP_PUBLIC_URLS
+    assert public_url_mappings('fourfront-cgap-green') == CGAP_PUBLIC_URLS
+    assert public_url_mappings('cgap-blue') == CGAP_PUBLIC_URLS
+    assert public_url_mappings('cgap-green') == CGAP_PUBLIC_URLS
 
 
 def test_blue_green_mirror_env():

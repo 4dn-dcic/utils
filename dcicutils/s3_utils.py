@@ -33,8 +33,7 @@ class s3Utils(object):
             if env:
                 if is_stg_or_prd_env(env):
                     self.url = get_beanstalk_real_url(env)
-                    # env = prod_bucket_env(env)
-                    env = 'fourfront-webprod'
+                    env = prod_bucket_env(env)
             # we use standardized naming schema, so s3 buckets always have same prefix
             sys_bucket = "elasticbeanstalk-%s-system" % env
             outfile_bucket = "elasticbeanstalk-%s-wfoutput" % env
