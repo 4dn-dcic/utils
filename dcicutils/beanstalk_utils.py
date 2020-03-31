@@ -36,11 +36,22 @@ use_input = input  # In Python 3, this does 'safe' input reading.
 
 
 FOURSIGHT_URL = 'https://foursight.4dnucleome.org/'
-# magic CNAME corresponds to data.4dnucleome
+
+# FF_MAGIC_CNAME corresponds to data.4dnucleome.org
 FF_MAGIC_CNAME = 'fourfront-green.us-east-1.elasticbeanstalk.com'
+# CGAP_MAGIC_CNAME corresponds to cgap.hms.harvard.edu
 CGAP_MAGIC_CNAME = 'fourfront-cgap.9wzadzju3p.us-east-1.elasticbeanstalk.com'
-MAGIC_CNAME = FF_MAGIC_CNAME  # The name MAGIC_CNAME is deprecated (retained for backward compatibility)
-GOLDEN_DB = 'fourfront-production.co3gwj7b7tpq.us-east-1.rds.amazonaws.com'  # Unused in dcicutils, but imported by Torb
+# The legacy name MAGIC_CNAME is deprecated (retained for backward compatibility until a major release boundary).
+MAGIC_CNAME = FF_MAGIC_CNAME
+
+# FF_GOLDEN_DB is the database behind data.4dnucleome.org (and shared by staging.4dnucleome.org)
+FF_GOLDEN_DB = 'fourfront-production.co3gwj7b7tpq.us-east-1.rds.amazonaws.com'
+# CGAP_GOLDEN_DB is the database behind cgap.hms.harvard.edu
+CGAP_GOLDEN_DB = 'fourfront-cgap.co3gwj7b7tpq.us-east-1.rds.amazonaws.com'
+# The name GOLDEN_DB is deprecated (retained for backward compatibility until a major release boundary).
+# Although not visibly used in this repository, this variable is imported by Torb.
+GOLDEN_DB = FF_GOLDEN_DB
+
 REGION = 'us-east-1'
 
 
