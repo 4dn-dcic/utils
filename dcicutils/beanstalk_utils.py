@@ -14,7 +14,7 @@ from datetime import datetime
 from . import ff_utils
 from botocore.exceptions import ClientError
 from .misc_utils import PRINT
-from .env_utils import is_cgap_env, prod_bucket_env, is_stg_or_prd_env, public_url_mappings
+from .env_utils import is_cgap_env, is_stg_or_prd_env, public_url_mappings
 
 logging.basicConfig()
 logger = logging.getLogger('logger')
