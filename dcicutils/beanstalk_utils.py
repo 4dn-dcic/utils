@@ -14,6 +14,7 @@ from datetime import datetime
 from . import ff_utils
 from botocore.exceptions import ClientError
 from .misc_utils import PRINT
+from .env_utils import is_cgap_env, is_stg_or_prd_env, public_url_mappings, blue_green_mirror_env
 
 logging.basicConfig()
 logger = logging.getLogger('logger')
@@ -35,9 +36,22 @@ use_input = input  # In Python 3, this does 'safe' input reading.
 
 
 FOURSIGHT_URL = 'https://foursight.4dnucleome.org/'
-# magic CNAME corresponds to data.4dnucleome
-MAGIC_CNAME = 'fourfront-green.us-east-1.elasticbeanstalk.com'
-GOLDEN_DB = 'fourfront-production.co3gwj7b7tpq.us-east-1.rds.amazonaws.com'
+
+# FF_MAGIC_CNAME corresponds to data.4dnucleome.org
+FF_MAGIC_CNAME = 'fourfront-green.us-east-1.elasticbeanstalk.com'
+# CGAP_MAGIC_CNAME corresponds to cgap.hms.harvard.edu
+CGAP_MAGIC_CNAME = 'fourfront-cgap.9wzadzju3p.us-east-1.elasticbeanstalk.com'
+# The legacy name MAGIC_CNAME is deprecated (retained for backward compatibility until a major release boundary).
+MAGIC_CNAME = FF_MAGIC_CNAME
+
+# FF_GOLDEN_DB is the database behind data.4dnucleome.org (and shared by staging.4dnucleome.org)
+FF_GOLDEN_DB = 'fourfront-production.co3gwj7b7tpq.us-east-1.rds.amazonaws.com'
+# CGAP_GOLDEN_DB is the database behind cgap.hms.harvard.edu
+CGAP_GOLDEN_DB = 'fourfront-cgap.co3gwj7b7tpq.us-east-1.rds.amazonaws.com'
+# The name GOLDEN_DB is deprecated (retained for backward compatibility until a major release boundary).
+# Although not visibly used in this repository, this variable is imported by Torb.
+GOLDEN_DB = FF_GOLDEN_DB
+
 REGION = 'us-east-1'
 
 
@@ -206,7 +220,7 @@ def swap_cname(src, dest):
     client.restart_app_server(EnvironmentName=dest)
 
 
-def whodaman():
+def _compute_prd_env_for_project(project):
     '''
     Determines which ElasticBeanstalk environment is currently hosting
     data.4dnucleome.org. Requires IAM permissions for EB!
@@ -214,14 +228,26 @@ def whodaman():
     Returns:
         str: EB environment name hosting data.4dnucleome
     '''
+    magic_cname = CGAP_MAGIC_CNAME if project == 'cgap' else FF_MAGIC_CNAME
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = describe_beanstalk_environments(client, ApplicationName="4dn-web")
     logger.info(res)
     for env in res['Environments']:
         logger.info(env)
-        if env.get('CNAME') == MAGIC_CNAME:
+        if env.get('CNAME') == magic_cname:
             # we found data
             return env.get('EnvironmentName')
+
+
+def compute_ff_prd_env():
+    return _compute_prd_env_for_project('ff')
+
+
+whodaman = compute_ff_prd_env  # This naming is deprecated but retained for compatibility.
+
+
+def compute_cgap_prd_env():
+    return _compute_prd_env_for_project('cgap')
 
 
 def beanstalk_info(env):
@@ -242,7 +268,7 @@ def beanstalk_info(env):
 def get_beanstalk_real_url(env):
     """
     Return the real url for the elasticbeanstalk with given environment name.
-    Name can be 'data', 'staging', or an actual environment.
+    Name can be 'cgap', 'data', 'staging', or an actual environment.
 
     Args:
         env (str): ElasticBeanstalk environment name
@@ -251,25 +277,24 @@ def get_beanstalk_real_url(env):
         str: url of the ElasticBeanstalk environment
     """
     url = ''
-    urls = {'staging': 'http://staging.4dnucleome.org',
-            'data': 'https://data.4dnucleome.org'}
+    urls = public_url_mappings(env)
 
-    if env in urls:
+    if env in urls:  # Special case handling of 'cgap', 'data', or 'staging' as an argument.
         return urls[env]
 
-    # TODO (C4-91): Reconsider environment names.
-    # This code is too fragile.
-    if 'webprod' in env or 'blue' in env or 'green' in env:
-        data_env = whodaman()
+    if is_stg_or_prd_env(env):
+        # What counts as staging/prod depends on whether we're in the CGAP or Fourfront space.
+        data_env = compute_cgap_prd_env() if is_cgap_env(env) else compute_ff_prd_env()
+        # There is only one production environment. Everything else is staging, but everything
+        # else is not staging.4dnucleome.org. Only one is that.
+        if env == data_env:
+            return urls['data']
+        elif env == blue_green_mirror_env(data_env):
+            # Mirror env might be None, in which case this clause will not be entered
+            return urls['staging']
 
-        if data_env == env:
-            url = urls['data']
-        else:
-            url = urls['staging']
-    else:
-        bs_info = beanstalk_info(env)
-        url = "http://" + bs_info['CNAME']
-
+    bs_info = beanstalk_info(env)
+    url = "http://" + bs_info['CNAME']
     return url
 
 

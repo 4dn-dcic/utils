@@ -7,7 +7,8 @@ import random
 import boto3
 from . import (
     s3_utils,
-    es_utils
+    es_utils,
+    env_utils,
 )
 from .misc_utils import PRINT
 import requests
@@ -20,11 +21,13 @@ else:
     from urllib.parse import urlencode
 
 
+# TODO (C4-92, C4-102): Probably to centralize this information in env_utils. Also figure out relation to CGAP.
 HIGLASS_BUCKETS = ['elasticbeanstalk-fourfront-webprod-wfoutput',
                    'elasticbeanstalk-fourfront-webdev-wfoutput']
 
 
 # TODO (C4-92): Centralize this information, it is repeated in other repos
+# TODO (C4-102): Does this need to include CGAP envs? As part of the same list, or as a separate list?
 PRODUCTION_ENVS = ['fourfront-blue', 'fourfront-green']
 
 
@@ -1067,11 +1070,8 @@ def unified_authentication(auth=None, ff_env=None):
     """
     # first see if key should be obtained from using ff_env
     if not auth and ff_env:
-        # webprod, webprod2 and blue/green all use the fourfront-webprod bucket for keys
-        if 'webprod' in ff_env or ff_env in PRODUCTION_ENVS:
-            use_env = 'fourfront-webprod'
-        else:
-            use_env = ff_env
+        # TODO: The ff_env argument is mis-named, something we should fix sometime. It can be a cgap env, too.
+        use_env = env_utils.prod_bucket_env(ff_env) if env_utils.is_stg_or_prd_env(ff_env) else ff_env
         auth = s3_utils.s3Utils(env=use_env).get_access_keys()
     # see if auth is directly from get_access_keys()
     use_auth = None

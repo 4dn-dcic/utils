@@ -2,25 +2,67 @@ from dcicutils.s3_utils import s3Utils
 import pytest
 
 
-def test_s3Utils_creation():
-    util = s3Utils(env='fourfront-mastertest')
-    assert util.sys_bucket == 'elasticbeanstalk-fourfront-mastertest-system'
+@pytest.mark.parametrize('ff_ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat'])
+def test_s3Utils_creation(ff_ordinary_envname):
+    util = s3Utils(env=ff_ordinary_envname)
+    assert util.sys_bucket == 'elasticbeanstalk-%s-system' % ff_ordinary_envname
 
 
-def test_s3Utils_creation_staging():
-    util = s3Utils(env='staging')
-    assert util.sys_bucket == 'elasticbeanstalk-fourfront-webprod-system'
-    assert util.outfile_bucket == 'elasticbeanstalk-fourfront-webprod-wfoutput'
-    assert util.raw_file_bucket == 'elasticbeanstalk-fourfront-webprod-files'
-    assert util.url == 'http://staging.4dnucleome.org'
+@pytest.mark.parametrize('ff_staging_envname', ['staging', 'fourfront-blue'])  # fourfront-webprod2 no longer exists
+def test_s3Utils_creation_staging(ff_staging_envname):
+    util = s3Utils(env=ff_staging_envname)
+    actual_props = {
+        'sys_bucket': util.sys_bucket,
+        'outfile_bucket': util.outfile_bucket,
+        'raw_file_bucket': util.raw_file_bucket,
+        'url': util.url,
+    }
+    assert actual_props == {
+        'sys_bucket': 'elasticbeanstalk-fourfront-webprod-system',
+        'outfile_bucket': 'elasticbeanstalk-fourfront-webprod-wfoutput',
+        'raw_file_bucket': 'elasticbeanstalk-fourfront-webprod-files',
+        'url': 'http://staging.4dnucleome.org',
+    }
 
 
-def test_s3Utils_creation_data():
-    util = s3Utils(env='data')
-    assert util.sys_bucket == 'elasticbeanstalk-fourfront-webprod-system'
-    assert util.outfile_bucket == 'elasticbeanstalk-fourfront-webprod-wfoutput'
-    assert util.raw_file_bucket == 'elasticbeanstalk-fourfront-webprod-files'
-    assert util.url == 'https://data.4dnucleome.org'
+@pytest.mark.parametrize('ff_production_envname', ['data', 'fourfront-green'])  # fourfront-webprod no longer exists
+def test_s3Utils_creation_data(ff_production_envname):
+    util = s3Utils(env=ff_production_envname)
+    actual_props = {
+        'sys_bucket': util.sys_bucket,
+        'outfile_bucket': util.outfile_bucket,
+        'raw_file_bucket': util.raw_file_bucket,
+        'url': util.url,
+    }
+    assert actual_props == {
+        'sys_bucket': 'elasticbeanstalk-fourfront-webprod-system',
+        'outfile_bucket': 'elasticbeanstalk-fourfront-webprod-wfoutput',
+        'raw_file_bucket': 'elasticbeanstalk-fourfront-webprod-files',
+        'url': 'https://data.4dnucleome.org',
+    }
+
+
+@pytest.mark.parametrize('cgap_production_envname', ['cgap', 'fourfront-cgap'])
+def test_s3Utils_creation_cgap(cgap_production_envname):
+    util = s3Utils(env=cgap_production_envname)
+    actual_props = {
+        'sys_bucket': util.sys_bucket,
+        'outfile_bucket': util.outfile_bucket,
+        'raw_file_bucket': util.raw_file_bucket,
+        'url': util.url,
+    }
+    assert actual_props == {
+        'sys_bucket': 'elasticbeanstalk-fourfront-cgap-system',
+        'outfile_bucket': 'elasticbeanstalk-fourfront-cgap-wfoutput',
+        'raw_file_bucket': 'elasticbeanstalk-fourfront-cgap-files',
+        'url': 'https://cgap.hms.harvard.edu',
+    }
+
+
+@pytest.mark.parametrize('cgap_ordinary_envname', ['fourfront-cgaptest', 'fourfront-cgapdev', 'fourfront-cgapwolf'])
+def test_s3Utils_creation(cgap_ordinary_envname):
+    util = s3Utils(env=cgap_ordinary_envname)
+    assert util.sys_bucket == 'elasticbeanstalk-%s-system' % cgap_ordinary_envname
 
 
 def test_s3Utils_get_keys_for_data():
