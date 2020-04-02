@@ -37,10 +37,10 @@ description = "The AWS SDK for Python"
 name = "boto3"
 optional = false
 python-versions = "*"
-version = "1.12.30"
+version = "1.12.34"
 
 [package.dependencies]
-botocore = ">=1.15.30,<1.16.0"
+botocore = ">=1.15.34,<1.16.0"
 jmespath = ">=0.7.1,<1.0.0"
 s3transfer = ">=0.3.0,<0.4.0"
 
@@ -50,7 +50,7 @@ description = "Low-level, data-driven core of boto 3."
 name = "botocore"
 optional = false
 python-versions = "*"
-version = "1.15.30"
+version = "1.15.34"
 
 [package.dependencies]
 docutils = ">=0.10,<0.16"
@@ -213,7 +213,7 @@ marker = "python_version < \"3.8\""
 name = "importlib-metadata"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
-version = "1.5.2"
+version = "1.6.0"
 
 [package.dependencies]
 zipp = ">=0.5"
@@ -428,6 +428,20 @@ dev = ["pre-commit", "tox"]
 
 [[package]]
 category = "dev"
+description = "Thin-wrapper around the mock package for easier use with pytest"
+name = "pytest-mock"
+optional = false
+python-versions = ">=3.5"
+version = "3.0.0"
+
+[package.dependencies]
+pytest = ">=2.7"
+
+[package.extras]
+dev = ["pre-commit", "tox", "pytest-asyncio"]
+
+[[package]]
+category = "dev"
 description = "Invoke py.test as distutils command with dependency resolution"
 name = "pytest-runner"
 optional = false
@@ -602,12 +616,12 @@ aws-requests-auth = [
     {file = "aws-requests-auth-0.4.2.tar.gz", hash = "sha256:112c85fe938a01e28f7e1a87168615b6977b28596362b1dcbafbf4f2cc69f720"},
 ]
 boto3 = [
-    {file = "boto3-1.12.30-py2.py3-none-any.whl", hash = "sha256:7f6d41d6e5b763914e867ece72b049476b75093bcb801afeae2aebd20d7f61c8"},
-    {file = "boto3-1.12.30.tar.gz", hash = "sha256:b464586003bdfb9ee92463013650f5b62935a7870ed3e8a32aa9111aa142c3f7"},
+    {file = "boto3-1.12.34-py2.py3-none-any.whl", hash = "sha256:52b8de35f6647e3b8ce81f6a745a67812623b5c4acc2d6bd5e814fddfa488321"},
+    {file = "boto3-1.12.34.tar.gz", hash = "sha256:5246caf509baa4716065e6bb78bdc516fdd6b0dfbd9098cc2a0f779fad789c6c"},
 ]
 botocore = [
-    {file = "botocore-1.15.30-py2.py3-none-any.whl", hash = "sha256:d71f22e81bb17d92a6c3aad9ff04ca79af5f053ac35f6d6f16e1f002aa0655af"},
-    {file = "botocore-1.15.30.tar.gz", hash = "sha256:38eef2271ab908979ad7ec7a5cdf334c2a5a0b5e8fe37937c8a76e3ed9c18940"},
+    {file = "botocore-1.15.34-py2.py3-none-any.whl", hash = "sha256:db0fba3f4adfb9bf3976aae10efa9acb59e3efe52ce8feac71ecac0b7be2fc2e"},
+    {file = "botocore-1.15.34.tar.gz", hash = "sha256:c799623598d04c66b0be4cb990c01a24bd3c06023f0c7221adead38a7431c994"},
 ]
 certifi = [
     {file = "certifi-2019.11.28-py2.py3-none-any.whl", hash = "sha256:017c25db2a153ce562900032d5bc68e9f191e44e9a0f762f373977de9df1fbb3"},
@@ -718,8 +732,8 @@ idna = [
 importlib-metadata = [
     {file = "importlib_metadata-1.1.3-py2.py3-none-any.whl", hash = "sha256:7c7f8ac40673f507f349bef2eed21a0e5f01ddf5b2a7356a6c65eb2099b53764"},
     {file = "importlib_metadata-1.1.3.tar.gz", hash = "sha256:7a99fb4084ffe6dae374961ba7a6521b79c1d07c658ab3a28aa264ee1d1b14e3"},
-    {file = "importlib_metadata-1.5.2-py2.py3-none-any.whl", hash = "sha256:298a914c82144c6b3b06c568a8973b89ad2176685f43cd1ea9ba968307300fa9"},
-    {file = "importlib_metadata-1.5.2.tar.gz", hash = "sha256:dfc83688553a91a786c6c91eeb5f3b1d31f24d71877bbd94ecbf5484e57690a2"},
+    {file = "importlib_metadata-1.6.0-py2.py3-none-any.whl", hash = "sha256:2a688cbaa90e0cc587f1df48bdc97a6eadccdcd9c35fb3f976a09e3b5016d90f"},
+    {file = "importlib_metadata-1.6.0.tar.gz", hash = "sha256:34513a8a0c4962bc66d35b359558fd8a5e10cd472d37aec5f66858addef32c1e"},
 ]
 jmespath = [
     {file = "jmespath-0.9.5-py2.py3-none-any.whl", hash = "sha256:695cb76fa78a10663425d5b73ddc5714eb711157e52704d69be03b1a02ba4fec"},
@@ -776,6 +790,8 @@ pytest-cov = [
 pytest-mock = [
     {file = "pytest-mock-2.0.0.tar.gz", hash = "sha256:b35eb281e93aafed138db25c8772b95d3756108b601947f89af503f8c629413f"},
     {file = "pytest_mock-2.0.0-py2.py3-none-any.whl", hash = "sha256:cb67402d87d5f53c579263d37971a164743dc33c159dfb4fb4a86f37c5552307"},
+    {file = "pytest-mock-3.0.0.tar.gz", hash = "sha256:a4494016753a30231f8519bfd160242a0f3c8fb82ca36e7b6f82a7fb602ac6b8"},
+    {file = "pytest_mock-3.0.0-py2.py3-none-any.whl", hash = "sha256:98e02534f170e4f37d7e1abdfc5973fd4207aa609582291717f643764e71c925"},
 ]
 pytest-runner = [
     {file = "pytest-runner-5.2.tar.gz", hash = "sha256:96c7e73ead7b93e388c5d614770d2bae6526efd997757d3543fe17b557a0942b"},
