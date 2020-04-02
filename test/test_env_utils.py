@@ -114,6 +114,13 @@ def test_is_stg_or_prd_env():
     assert is_stg_or_prd_env("fourfront-cgapwolf") is False
     assert is_stg_or_prd_env("fourfront-cgaptest") is False
 
+    assert is_stg_or_prd_env("cgap-green") is True
+    assert is_stg_or_prd_env("cgap-blue") is True
+    assert is_stg_or_prd_env("cgap-dev") is False
+    assert is_stg_or_prd_env("cgap-wolf") is False
+    assert is_stg_or_prd_env("cgap-test") is False
+    assert is_stg_or_prd_env("cgap-yellow") is False
+
 
 def test_is_test_env():
 
