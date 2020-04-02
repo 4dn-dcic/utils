@@ -46,7 +46,7 @@ FOURFRONT_STG_OR_PRD_NAMES = ['staging', 'stagging', 'data']
 # Done this way because it's safer going forward.
 CGAP_STG_OR_PRD_TOKENS = []
 CGAP_STG_OR_PRD_NAMES = [CGAP_ENV_WEBPROD, CGAP_ENV_PRODUCTION_GREEN, CGAP_ENV_PRODUCTION_BLUE,
-                         # CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_PRODUCTION_BLUE_NEW,
+                         CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_PRODUCTION_BLUE_NEW,
                          'cgap']
 
 
