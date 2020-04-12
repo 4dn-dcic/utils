@@ -224,10 +224,11 @@ def test_magic_cnames_by_cname_consistency():
 
 _FF_BLUEGREEN_CNAMES = {
     env_info['EnvironmentName']: env_info['CNAME']
-    for env_info in boto3.client('elasticbeanstalk').describe_environments(
-                                                     ApplicationName='4dn-web',
-                                                     EnvironmentNames=['fourfront-blue',
-                                                                       'fourfront-green'])['Environments']
+    for env_info in boto3.client('elasticbeanstalk',
+                                 region_name=bs.REGION).describe_environments(
+                                                          ApplicationName='4dn-web',
+                                                          EnvironmentNames=['fourfront-blue',
+                                                                            'fourfront-green'])['Environments']
 }
 
 
