@@ -2,10 +2,7 @@
 qa_utils: Tools for use in quality assurance testing.
 """
 
-import boto3
-import socket
 from .misc_utils import PRINT
-from .env_utils import get_standard_mirror_env
 
 
 def mock_not_called(name):
