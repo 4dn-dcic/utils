@@ -1,5 +1,5 @@
 import io
-from dcicutils.misc_utils import PRINT
+from dcicutils.misc_utils import PRINT, ignored
 
 
 def test_uppercase_print():
@@ -10,3 +10,12 @@ def test_uppercase_print():
     s = io.StringIO()
     PRINT("something", file=s)
     assert s.getvalue() == "something\n"
+
+
+def test_ignored():
+
+    def foo(x, y):
+        ignored(x, y)
+
+    # Check that no error occurs for having used this.
+    assert foo(3, 4) is None

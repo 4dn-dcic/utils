@@ -5,7 +5,8 @@ import os
 import socket
 from collections import defaultdict
 from dcicutils import beanstalk_utils as bs, env_utils, source_beanstalk_env_vars
-from dcicutils.qa_utils import mock_not_called, ignored
+from dcicutils.qa_utils import mock_not_called
+from dcicutils.misc_utils import ignored
 from unittest import mock
 
 

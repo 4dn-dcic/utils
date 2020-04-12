@@ -18,14 +18,3 @@ def mock_not_called(name):
         PRINT("kwargs=", kwargs)
         raise AssertionError("%s was called where not expected." % name)
     return mocked_function
-
-
-def ignored(*args):
-    """
-    This is useful for defeating flake warnings.
-    Call this function to use values that really should be ignored.
-
-    def foo(x, y):
-        ignored(x, y)
-    """
-    return args
