@@ -10,6 +10,9 @@ repository = "https://github.com/4dn-dcic/utils"
 packages = [
   { include="dcicutils", from="." }
 ]
+include = [
+  "nosuchfile"
+]
 
 [tool.poetry.dependencies]
 python = ">=3.4,<3.7"

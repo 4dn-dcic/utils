@@ -164,7 +164,7 @@ def is_cgap_env(envname):
     Returns True of the given string looks like a CGAP elasticbeanstalk environment name.
     Otherwise returns False.
     """
-    return 'cgap' in envname
+    return 'cgap' in envname if envname else False
 
 
 def is_fourfront_env(envname):
@@ -172,7 +172,7 @@ def is_fourfront_env(envname):
     Returns True of the given string looks like a Fourfront elasticbeanstalk environment name.
     Otherwise returns False.
     """
-    return 'cgap' not in envname
+    return 'cgap' not in envname if envname else False
 
 
 def is_stg_or_prd_env(envname):
@@ -182,6 +182,8 @@ def is_stg_or_prd_env(envname):
     True whether or not they are actually the currently live instance. (This function doesn't change its
     state as blue or green is deployed, in other words.)
     """
+    if not envname:
+        return False
     stg_or_prd_tokens = CGAP_STG_OR_PRD_TOKENS if is_cgap_env(envname) else FOURFRONT_STG_OR_PRD_TOKENS
     stg_or_prd_names = CGAP_STG_OR_PRD_NAMES if is_cgap_env(envname) else FOURFRONT_STG_OR_PRD_NAMES
     if envname in stg_or_prd_names:
@@ -192,11 +194,11 @@ def is_stg_or_prd_env(envname):
 
 
 def is_test_env(envname):
-    return envname in BEANSTALK_TEST_ENVS
+    return envname in BEANSTALK_TEST_ENVS if envname else False
 
 
 def is_hotseat_env(envname):
-    return 'hot' in envname
+    return 'hot' in envname if envname else False
 
 
 ALLOW_ENVIRON_BY_DEFAULT = True
@@ -211,9 +213,6 @@ def get_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT):
 
 
 def get_mirror_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT, allow_guess=True, ):
-    # TODO: I added allow_environ featurism here but did not yet enable it.
-    #       Want to talk to Will about whether we should consider that a compatible or breaking hcange.
-    #       -kmp 27-Mar-2020
     """
     Figures out who the mirror beanstalk Env is if applicable
     This is important in our production environment because in our
@@ -234,6 +233,34 @@ def get_mirror_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT
         return None
 
 
+def get_standard_mirror_env(envname):
+    """
+    This function knows about the standard mirroring rules and infers a mirror env only from that.
+    (In tha sense, it is not guessing and probably needs to be renamed.)
+    If there is no mirror, it returns None.
+
+    This is not the same as blue_green_mirror_env(envname), which is purely syntactic.
+
+    This is also not the same as get_mirror_env_from_context(...), which infers the mirror from contextual
+    information such as config files and environment variables.
+    """
+    return BEANSTALK_PROD_MIRRORS.get(envname, None)
+
+
 def guess_mirror_env(envname):
-    # TODO: Should this be BEANSTALK_PROD_MIRRORS.get(envname) or blue_green_mirror_env(envname)
-    return BEANSTALK_PROD_MIRRORS.get(envname)
+    """
+    Deprecated. This function returns what get_standard_mirror_env(envname) returns.
+    (The name guess_mirror_env is believed to be confusing.)
+    """
+    return get_standard_mirror_env(envname)
+
+
+def infer_repo_from_env(envname):
+    if not envname:
+        return None
+    if is_cgap_env(envname):
+        return 'cgap-portal'
+    elif is_fourfront_env(envname):
+        return 'fourfront'
+    else:
+        return None

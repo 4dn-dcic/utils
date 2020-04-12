@@ -9,8 +9,9 @@ from dcicutils.env_utils import (
     CGAP_ENV_HOTSEAT, CGAP_ENV_STAGING, CGAP_ENV_WEBDEV, CGAP_ENV_WOLF,
     CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_WEBPROD_NEW, CGAP_ENV_MASTERTEST_NEW,
     CGAP_ENV_HOTSEAT_NEW, CGAP_ENV_STAGING_NEW, CGAP_ENV_WEBDEV_NEW, CGAP_ENV_WOLF_NEW,
-    get_mirror_env_from_context, is_test_env, is_hotseat_env, guess_mirror_env,
+    get_mirror_env_from_context, is_test_env, is_hotseat_env, guess_mirror_env, get_standard_mirror_env,
     prod_bucket_env, public_url_mappings, CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
+    infer_repo_from_env
 )
 from unittest import mock
 
@@ -81,6 +82,8 @@ def test_blue_green_mirror_env():
 
 def test_is_cgap_env():
 
+    assert is_cgap_env(None) is False
+
     assert is_cgap_env('fourfront-cgap') is True
     assert is_cgap_env('cgap-prod') is True
     assert is_cgap_env('fourfront-blue') is False
@@ -91,6 +94,8 @@ def test_is_fourfront_env():
     assert is_fourfront_env('fourfront-cgap') is False
     assert is_fourfront_env('cgap-prod') is False
     assert is_fourfront_env('fourfront-blue') is True
+
+    assert is_fourfront_env(None) is False
 
 
 def test_is_stg_or_prd_env():
@@ -121,6 +126,8 @@ def test_is_stg_or_prd_env():
     assert is_stg_or_prd_env("cgap-test") is False
     assert is_stg_or_prd_env("cgap-yellow") is False
 
+    assert is_stg_or_prd_env(None) is False
+
 
 def test_is_test_env():
 
@@ -133,6 +140,8 @@ def test_is_test_env():
     assert is_test_env(CGAP_ENV_MASTERTEST) is True
     assert is_test_env(CGAP_ENV_WOLF) is True
     assert is_test_env(CGAP_ENV_WEBDEV) is True
+
+    assert is_test_env(None) is False
 
 
 def test_is_hotseat_env():
@@ -151,6 +160,8 @@ def test_is_hotseat_env():
     assert is_hotseat_env(CGAP_ENV_MASTERTEST_NEW) is False
     assert is_hotseat_env(CGAP_ENV_WOLF_NEW) is False
     assert is_hotseat_env(CGAP_ENV_WEBDEV_NEW) is False
+
+    assert is_hotseat_env(None) is False
 
 
 def test_get_mirror_env_from_context_without_environ():
@@ -189,6 +200,18 @@ def test_get_mirror_env_from_context_without_environ():
             mirror = get_mirror_env_from_context(settings, allow_environ=allow_environ)
             assert mirror is None
 
+            settings = {'env.name': CGAP_ENV_WEBPROD}
+            mirror = get_mirror_env_from_context(settings, allow_environ=allow_environ)
+            assert mirror is None
+
+            settings = {'env.name': CGAP_ENV_WEBDEV}
+            mirror = get_mirror_env_from_context(settings, allow_environ=allow_environ)
+            assert mirror is None
+
+            settings = {'env.name': CGAP_ENV_WOLF}
+            mirror = get_mirror_env_from_context(settings, allow_environ=allow_environ)
+            assert mirror is None
+
 
 def test_get_mirror_env_from_context_with_environ_has_env():
     """ Tests override of env name from os.environ when getting mirror env on various envs """
@@ -224,6 +247,16 @@ def test_get_mirror_env_from_context_with_environ_has_env():
         mirror = get_mirror_env_from_context(settings, allow_environ=False, allow_guess=False)
         assert mirror == None  # env name in environ suppressed, but guessing disallowed
 
+    with mock.patch.object(os, "environ", {"ENV_NAME": CGAP_ENV_WEBPROD}):
+
+        settings = {}
+        mirror = get_mirror_env_from_context(settings, allow_environ=True)
+        assert mirror == None  # env name explicitly declared, then a guess (but no CGAP mirror)
+
+        settings = {}
+        mirror = get_mirror_env_from_context(settings, allow_environ=True, allow_guess=False)
+        assert mirror is None  # env name explicitly declared, but guessing disallowed (but no CGAP mirror)
+
 
 def test_get_mirror_env_from_context_with_environ_has_mirror_env():
     """ Tests override of mirror env name from os.environ when getting mirror env on various envs """
@@ -243,10 +276,10 @@ def test_get_mirror_env_from_context_with_environ_has_env_and_mirror_env():
         assert mirror == 'bar'  # mirror explicitly declared, ignoring env name
 
 
-def test_guess_mirror_env():
+def _test_get_standard_mirror_env(lookup_function):
 
     def assert_prod_mirrors(env, expected_mirror_env):
-        assert guess_mirror_env(env) is expected_mirror_env
+        assert lookup_function(env) is expected_mirror_env
         assert BEANSTALK_PROD_MIRRORS.get(env) is expected_mirror_env
 
     assert_prod_mirrors(FF_ENV_PRODUCTION_GREEN, FF_ENV_PRODUCTION_BLUE)
@@ -278,3 +311,42 @@ def test_guess_mirror_env():
     assert_prod_mirrors(CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_WEBPROD_NEW)
 
     assert_prod_mirrors(CGAP_ENV_MASTERTEST_NEW, None)
+
+
+def test_get_standard_mirror_env():
+    _test_get_standard_mirror_env(get_standard_mirror_env)
+
+
+def test_guess_mirror_env():
+    _test_get_standard_mirror_env(guess_mirror_env)
+
+
+def test_infer_repo_from_env():
+
+    assert infer_repo_from_env(FF_ENV_PRODUCTION_BLUE) == 'fourfront'
+    assert infer_repo_from_env(FF_ENV_PRODUCTION_GREEN) == 'fourfront'
+
+    assert infer_repo_from_env(FF_ENV_WEBPROD) == 'fourfront'
+    assert infer_repo_from_env(FF_ENV_WEBPROD2) == 'fourfront'
+
+    assert infer_repo_from_env('fourfront-blue') == 'fourfront'
+    assert infer_repo_from_env('fourfront-mastertest') == 'fourfront'
+
+    assert infer_repo_from_env('fourfront-foo') == 'fourfront'
+
+    assert infer_repo_from_env(CGAP_ENV_PRODUCTION_BLUE) == 'cgap-portal'
+    assert infer_repo_from_env(CGAP_ENV_PRODUCTION_BLUE) == 'cgap-portal'
+
+    assert infer_repo_from_env(CGAP_ENV_WEBPROD) == 'cgap-portal'
+
+    assert infer_repo_from_env('fourfront-cgap') == 'cgap-portal'
+    assert infer_repo_from_env('fourfront-cgapwolf') == 'cgap-portal'
+    assert infer_repo_from_env('fourfront-cgapdev') == 'cgap-portal'
+
+    assert infer_repo_from_env('cgap-green') == 'cgap-portal'
+    assert infer_repo_from_env('cgap-blue') == 'cgap-portal'
+    assert infer_repo_from_env('cgap-wolf') == 'cgap-portal'
+    assert infer_repo_from_env('cgap-dev') == 'cgap-portal'
+
+    assert infer_repo_from_env('cgap-foo') == 'cgap-portal'
+    assert infer_repo_from_env('fourfront-cgapfoo') == 'cgap-portal'
