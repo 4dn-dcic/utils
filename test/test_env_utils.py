@@ -1,4 +1,4 @@
-# import pytest
+import pytest
 import os
 
 from dcicutils.env_utils import (
@@ -311,6 +311,11 @@ def _test_get_standard_mirror_env(lookup_function):
     assert_prod_mirrors(CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_WEBPROD_NEW)
 
     assert_prod_mirrors(CGAP_ENV_MASTERTEST_NEW, None)
+
+    # Special cases ...
+    assert_prod_mirrors('data', 'staging')
+    assert_prod_mirrors('staging', 'data')
+    assert_prod_mirrors('cgap', None)
 
 
 def test_get_standard_mirror_env():

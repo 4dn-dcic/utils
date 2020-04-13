@@ -89,12 +89,17 @@ BEANSTALK_PROD_MIRRORS = {
     FF_ENV_WEBPROD: FF_ENV_WEBPROD2,
     FF_ENV_WEBPROD2: FF_ENV_WEBPROD,
 
+    'staging': 'data',
+    'data': 'staging',
+
     CGAP_ENV_PRODUCTION_BLUE: CGAP_ENV_PRODUCTION_GREEN,
     CGAP_ENV_PRODUCTION_GREEN: CGAP_ENV_PRODUCTION_BLUE,
     CGAP_ENV_WEBPROD: None,
 
     CGAP_ENV_PRODUCTION_BLUE_NEW: CGAP_ENV_PRODUCTION_GREEN_NEW,
     CGAP_ENV_PRODUCTION_GREEN_NEW: CGAP_ENV_PRODUCTION_BLUE_NEW,
+
+    'cgap': None,
 
 }
 
@@ -172,7 +177,7 @@ def is_fourfront_env(envname):
     Returns True of the given string looks like a Fourfront elasticbeanstalk environment name.
     Otherwise returns False.
     """
-    return 'cgap' not in envname if envname else False
+    return ('fourfront' in envname and 'cgap' not in envname) if envname else False
 
 
 def is_stg_or_prd_env(envname):
@@ -238,6 +243,11 @@ def get_standard_mirror_env(envname):
     This function knows about the standard mirroring rules and infers a mirror env only from that.
     (In tha sense, it is not guessing and probably needs to be renamed.)
     If there is no mirror, it returns None.
+
+    An envname is usually a beanstalk environment name,
+    but this will also swap the special mirror names like 'staging' <=> 'data'.
+    For cgap, it may return None until/unless we start using a mirror for that, but the important thing
+    there is that again it will return a mirror if there is one, and otherwise None.
 
     This is not the same as blue_green_mirror_env(envname), which is purely syntactic.
 
