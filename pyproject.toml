@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "0.13.2"
+version = "0.14.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -9,6 +9,9 @@ homepage = "https://github.com/4dn-dcic/utils"
 repository = "https://github.com/4dn-dcic/utils"
 packages = [
   { include="dcicutils", from="." }
+]
+include = [
+  "nosuchfile"
 ]
 
 [tool.poetry.dependencies]

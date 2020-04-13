@@ -1,4 +1,6 @@
 from dcicutils.s3_utils import s3Utils
+from dcicutils.beanstalk_utils import compute_ff_prd_env
+from dcicutils.env_utils import get_standard_mirror_env
 import pytest
 
 
@@ -8,7 +10,7 @@ def test_s3Utils_creation(ff_ordinary_envname):
     assert util.sys_bucket == 'elasticbeanstalk-%s-system' % ff_ordinary_envname
 
 
-@pytest.mark.parametrize('ff_staging_envname', ['staging', 'fourfront-blue'])  # fourfront-webprod2 no longer exists
+@pytest.mark.parametrize('ff_staging_envname', ['staging', get_standard_mirror_env(compute_ff_prd_env())])
 def test_s3Utils_creation_staging(ff_staging_envname):
     util = s3Utils(env=ff_staging_envname)
     actual_props = {
@@ -25,7 +27,7 @@ def test_s3Utils_creation_staging(ff_staging_envname):
     }
 
 
-@pytest.mark.parametrize('ff_production_envname', ['data', 'fourfront-green'])  # fourfront-webprod no longer exists
+@pytest.mark.parametrize('ff_production_envname', ['data', compute_ff_prd_env()])
 def test_s3Utils_creation_data(ff_production_envname):
     util = s3Utils(env=ff_production_envname)
     actual_props = {
