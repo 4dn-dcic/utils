@@ -1,5 +1,5 @@
 import os
-
+from .misc_utils import get_setting_from_context
 
 FF_ENV_DEV = 'fourfront-dev'  # Maybe not used
 FF_ENV_HOTSEAT = 'fourfront-hotseat'
@@ -210,14 +210,10 @@ ALLOW_ENVIRON_BY_DEFAULT = True
 
 
 def get_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT):
-    if allow_environ:
-        environ_env_name = os.environ.get('ENV_NAME')
-        if environ_env_name:
-            return environ_env_name
-    return settings.get('env.name')
+    return get_setting_from_context(settings, ini_var='env.name', env_var=None if allow_environ else False)
 
 
-def get_mirror_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT, allow_guess=True, ):
+def get_mirror_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT, allow_guess=True):
     """
     Figures out who the mirror beanstalk Env is if applicable
     This is important in our production environment because in our
