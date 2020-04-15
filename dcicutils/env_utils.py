@@ -206,6 +206,8 @@ def is_hotseat_env(envname):
     return 'hot' in envname if envname else False
 
 
+# TODO: This variable and all the 'allow_environ=' arguments could go away in the next major version release.
+#       --Kent & Will 15-Apr-2020
 ALLOW_ENVIRON_BY_DEFAULT = True
 
 
