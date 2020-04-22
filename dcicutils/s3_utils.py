@@ -6,6 +6,8 @@ import mimetypes
 from zipfile import ZipFile
 from io import BytesIO
 import logging
+from .env_utils import is_stg_or_prd_env, prod_bucket_env
+from .misc_utils import PRINT
 
 
 ###########################
@@ -23,15 +25,15 @@ class s3Utils(object):
         if we pass in env set the outfile and sys bucket from the environment
         '''
         # avoid circular ref
-        from dcicutils.beanstalk_utils import get_beanstalk_real_url
+        from .beanstalk_utils import get_beanstalk_real_url
         self.url = ''
         self.s3 = boto3.client('s3', region_name='us-east-1')
         if sys_bucket is None:
             # staging and production share same buckets
             if env:
-                if 'webprod' in env or env in ['staging', 'stagging', 'data']:
+                if is_stg_or_prd_env(env):
                     self.url = get_beanstalk_real_url(env)
-                    env = 'fourfront-webprod'
+                    env = prod_bucket_env(env)
             # we use standardized naming schema, so s3 buckets always have same prefix
             sys_bucket = "elasticbeanstalk-%s-system" % env
             outfile_bucket = "elasticbeanstalk-%s-wfoutput" % env
@@ -92,8 +94,8 @@ class s3Utils(object):
             file_metadata = self.s3.head_object(Bucket=bucket, Key=key)
         except Exception as e:
             if print_error:
-                print("object %s not found on bucket %s" % (str(key), str(bucket)))
-                print(str(e))
+                PRINT("object %s not found on bucket %s" % (str(key), str(bucket)))
+                PRINT(str(e))
             return False
         return file_metadata
 
@@ -194,16 +196,25 @@ class s3Utils(object):
         bytestream = BytesIO(s3_stream)
         zipstream = ZipFile(bytestream, 'r')
 
-        # directory should be first name in the list
+        # The contents of zip can sometimes be like
+        # ["foo/", "file1", "file2", "file3"]
+        # and other times like
+        # ["file1", "file2", "file3"]
         file_list = zipstream.namelist()
-        basedir_name = file_list.pop(0)
-        assert basedir_name.endswith('/')
+        if file_list[0].endswith('/'):
+            # in case directory first name in the list
+            basedir_name = file_list.pop(0)
+        else:
+            basedir_name = ''
 
         ret_files = {}
         for file_name in file_list:
             # don't copy dirs just files
             if not file_name.endswith('/'):
-                s3_file_name = file_name.replace(basedir_name, dest_dir)
+                if basedir_name:
+                    s3_file_name = file_name.replace(basedir_name, dest_dir)
+                else:
+                    s3_file_name = dest_dir + file_name
                 s3_key = "https://s3.amazonaws.com/%s/%s" % (self.outfile_bucket, s3_file_name)
                 # just perf optimization so we don't have to copy
                 # files twice that we want to further interogate

@@ -2,6 +2,7 @@ import pytest
 import json
 import time
 from dcicutils import ff_utils
+from unittest import mock
 pytestmark = pytest.mark.working
 
 
@@ -77,6 +78,18 @@ def profiles():
             }
         }
     }
+
+
+@pytest.fixture
+def mocked_replicate_experiment():
+    with open('./test/data_files/test_experiment_set.json') as opf:
+        return json.load(opf)
+
+
+@pytest.fixture
+def qc_metrics():
+    with open('./test/data_files/qc_metrics.json') as opf:
+        return json.load(opf)
 
 
 def test_generate_rand_accession():
@@ -215,7 +228,7 @@ def test_authorized_request_integrated(integrated_ff):
 
 
 @pytest.mark.integrated
-@pytest.mark.flaky
+@pytest.mark.flaky(max_runs=3)  # very flaky for some reason
 def test_get_metadata(integrated_ff, basestring):
     # use this test biosource
     test_item = '331111bc-8535-4448-903e-854af460b254'
@@ -804,7 +817,7 @@ def test_faceted_search_users(integrated_ff):
                        'ff_env': ff_env,
                        'item_facets': all_facets}
     resp = ff_utils.faceted_search(**neg_affiliation)
-    assert len(resp) == 20
+    assert len(resp) == 24
     neg_affiliation = {'item_type': 'user',
                        'Affiliation': '-4DN Testing Lab',
                        'key': key,
@@ -815,28 +828,65 @@ def test_faceted_search_users(integrated_ff):
     assert len(resp) == 10
 
 
+def test_fetch_qc_metrics_logic(mocked_replicate_experiment):
+    """
+    Tests that the fetch_qc_metrics function is being used correctly inside the get_associated_qc_metrics function
+    """
+    with mock.patch("dcicutils.ff_utils.get_metadata") as mock_get_metadata:
+        mock_get_metadata.return_value = {
+            "uuid": "7a2d8f3d-2108-4b81-a09e-fdcf622a0392",
+            "display_title": "QualityMetricPairsqc from 2018-04-27"
+        }
+        result = ff_utils.fetch_files_qc_metrics(mocked_replicate_experiment, ['processed_files'])
+        assert "7a2d8f3d-2108-4b81-a09e-fdcf622a0392" in result
+
+
+def test_get_qc_metrics_logic(mocked_replicate_experiment, qc_metrics):
+    """
+    End to end test on 'get_associated_qc_metrics' to check the logic of the fuction to make sure
+    it is getting the qc metrics.
+    """
+    with mock.patch("dcicutils.ff_utils.get_metadata") as mock_get_metadata:
+        mock_get_metadata.return_value = mocked_replicate_experiment
+        with mock.patch("dcicutils.ff_utils.fetch_files_qc_metrics") as mock_fetch_qc:
+            mock_fetch_qc.return_value = qc_metrics
+            result = ff_utils.get_associated_qc_metrics("6ba6a5df-dac5-4111-b5f0-299b6bee0f38")
+            assert "762d3cc0-fcd4-4c1a-a99f-124b0f371690" in result
+            assert "9b0b1733-0f17-420e-9e38-1f58ba993c54" in result
+
+
 @pytest.mark.integrated
 def test_get_qc_metrics(integrated_ff):
     """
     Tests that we correctly extract qc metric uuids (and therefore items) from the helper
     """
+
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     uuid = '331106bc-8535-3338-903e-854af460b544'
     qc_metrics = ff_utils.get_associated_qc_metrics(uuid, key=key, ff_env=ff_env)
     assert len(qc_metrics.keys()) == 1
     assert '131106bc-8535-4448-903e-854abbbbbbbb' in qc_metrics
-    assert 'QualityMetric' in qc_metrics['131106bc-8535-4448-903e-854abbbbbbbb']['@type']
+    target_qc = qc_metrics['131106bc-8535-4448-903e-854abbbbbbbb']
+    assert 'QualityMetric' in target_qc['values']['@type']
+    assert target_qc['organism'] == 'human'
+    assert target_qc['experiment_type'] == 'Dilution Hi-C'
+    assert target_qc['experiment_subclass'] == 'Hi-C'
+    assert target_qc['source_file_association'] == 'processed_files'
+    assert target_qc['source_experiment'] == '4DNEXO67APV1'
+    assert target_qc['source_experimentSet'] == '4DNESOPFAAA1'
+    assert target_qc['biosource_summary'] == "GM12878"
+
     kwargs = {  # do same as above w/ kwargs, specify to include raw files this time
         'key': key,
         'ff_env': ff_env,
-        'exclude_raw_files': False
+        'include_raw_files': True
     }
     qc_metrics = ff_utils.get_associated_qc_metrics(uuid, **kwargs)
     assert len(qc_metrics.keys()) == 2
-    assert '4c9dabc6-61d6-4054-a951-c4fdd0023800' in qc_metrics
     assert '131106bc-8535-4448-903e-854abbbbbbbb' in qc_metrics
-    assert 'QualityMetric' in qc_metrics['131106bc-8535-4448-903e-854abbbbbbbb']['@type']
-    assert 'QualityMetric' in qc_metrics['4c9dabc6-61d6-4054-a951-c4fdd0023800']['@type']
+    assert '4c9dabc6-61d6-4054-a951-c4fdd0023800' in qc_metrics
+    assert 'QualityMetric' in qc_metrics['131106bc-8535-4448-903e-854abbbbbbbb']['values']['@type']
+    assert 'QualityMetric' in qc_metrics['4c9dabc6-61d6-4054-a951-c4fdd0023800']['values']['@type']
 
 
 @pytest.mark.integrated
@@ -929,6 +979,41 @@ def test_dump_results_to_json(integrated_ff):
     all_files = os.listdir(test_folder)
     assert len(all_files) == len_store
     clear_folder(test_folder)
+
+
+@pytest.mark.integrated
+def test_search_es_metadata(integrated_ff):
+    """ Tests search_es_metadata on mastertest """
+    res = ff_utils.search_es_metadata('fourfront-mastertestuser', {'size': '1000'},
+                                      key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
+    assert len(res) == 28
+    test_query = {
+        'query': {
+            'bool': {
+                'must': [  # search for will's user insert
+                    {'terms': {'_id': ['1a12362f-4eb6-4a9c-8173-776667226988']}}
+                ],
+                'must_not': []
+            }
+        },
+        'sort': [{'_uid': {'order': 'desc'}}]
+    }
+    res = ff_utils.search_es_metadata('fourfront-mastertestuser', test_query,
+                                      key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
+    assert len(res) == 1
+
+
+@pytest.mark.integrated
+def test_search_es_metadata_generator(integrated_ff):
+    """ Tests SearchESMetadataHandler both normally and with a generator, verifies consistent results """
+    handler = ff_utils.SearchESMetadataHandler(key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
+    no_gen_res = ff_utils.search_es_metadata('fourfront-mastertestuser', {'size': '1000'},
+                                      key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
+    res = handler.execute_search('fourfront-mastertestuser', {'size': '1000'}, is_generator=True, page_size=5)
+    count = 0
+    for _ in res:
+        count += 1
+    assert count == len(no_gen_res)
 
 
 def test_convert_param():

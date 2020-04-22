@@ -1,26 +1,70 @@
 from dcicutils.s3_utils import s3Utils
+from dcicutils.beanstalk_utils import compute_ff_prd_env
+from dcicutils.env_utils import get_standard_mirror_env
 import pytest
 
 
-def test_s3Utils_creation():
-    util = s3Utils(env='fourfront-mastertest')
-    assert util.sys_bucket == 'elasticbeanstalk-fourfront-mastertest-system'
+@pytest.mark.parametrize('ff_ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat'])
+def test_s3Utils_creation(ff_ordinary_envname):
+    util = s3Utils(env=ff_ordinary_envname)
+    assert util.sys_bucket == 'elasticbeanstalk-%s-system' % ff_ordinary_envname
 
 
-def test_s3Utils_creation_staging():
-    util = s3Utils(env='staging')
-    assert util.sys_bucket == 'elasticbeanstalk-fourfront-webprod-system'
-    assert util.outfile_bucket == 'elasticbeanstalk-fourfront-webprod-wfoutput'
-    assert util.raw_file_bucket == 'elasticbeanstalk-fourfront-webprod-files'
-    assert util.url == 'http://staging.4dnucleome.org'
+@pytest.mark.parametrize('ff_staging_envname', ['staging', get_standard_mirror_env(compute_ff_prd_env())])
+def test_s3Utils_creation_staging(ff_staging_envname):
+    util = s3Utils(env=ff_staging_envname)
+    actual_props = {
+        'sys_bucket': util.sys_bucket,
+        'outfile_bucket': util.outfile_bucket,
+        'raw_file_bucket': util.raw_file_bucket,
+        'url': util.url,
+    }
+    assert actual_props == {
+        'sys_bucket': 'elasticbeanstalk-fourfront-webprod-system',
+        'outfile_bucket': 'elasticbeanstalk-fourfront-webprod-wfoutput',
+        'raw_file_bucket': 'elasticbeanstalk-fourfront-webprod-files',
+        'url': 'http://staging.4dnucleome.org',
+    }
 
 
-def test_s3Utils_creation_data():
-    util = s3Utils(env='data')
-    assert util.sys_bucket == 'elasticbeanstalk-fourfront-webprod-system'
-    assert util.outfile_bucket == 'elasticbeanstalk-fourfront-webprod-wfoutput'
-    assert util.raw_file_bucket == 'elasticbeanstalk-fourfront-webprod-files'
-    assert util.url == 'https://data.4dnucleome.org'
+@pytest.mark.parametrize('ff_production_envname', ['data', compute_ff_prd_env()])
+def test_s3Utils_creation_data(ff_production_envname):
+    util = s3Utils(env=ff_production_envname)
+    actual_props = {
+        'sys_bucket': util.sys_bucket,
+        'outfile_bucket': util.outfile_bucket,
+        'raw_file_bucket': util.raw_file_bucket,
+        'url': util.url,
+    }
+    assert actual_props == {
+        'sys_bucket': 'elasticbeanstalk-fourfront-webprod-system',
+        'outfile_bucket': 'elasticbeanstalk-fourfront-webprod-wfoutput',
+        'raw_file_bucket': 'elasticbeanstalk-fourfront-webprod-files',
+        'url': 'https://data.4dnucleome.org',
+    }
+
+
+@pytest.mark.parametrize('cgap_production_envname', ['cgap', 'fourfront-cgap'])
+def test_s3Utils_creation_cgap(cgap_production_envname):
+    util = s3Utils(env=cgap_production_envname)
+    actual_props = {
+        'sys_bucket': util.sys_bucket,
+        'outfile_bucket': util.outfile_bucket,
+        'raw_file_bucket': util.raw_file_bucket,
+        'url': util.url,
+    }
+    assert actual_props == {
+        'sys_bucket': 'elasticbeanstalk-fourfront-cgap-system',
+        'outfile_bucket': 'elasticbeanstalk-fourfront-cgap-wfoutput',
+        'raw_file_bucket': 'elasticbeanstalk-fourfront-cgap-files',
+        'url': 'https://cgap.hms.harvard.edu',
+    }
+
+
+@pytest.mark.parametrize('cgap_ordinary_envname', ['fourfront-cgaptest', 'fourfront-cgapdev', 'fourfront-cgapwolf'])
+def test_s3Utils_creation(cgap_ordinary_envname):
+    util = s3Utils(env=cgap_ordinary_envname)
+    assert util.sys_bucket == 'elasticbeanstalk-%s-system' % cgap_ordinary_envname
 
 
 def test_s3Utils_get_keys_for_data():
@@ -110,6 +154,7 @@ def test_read_s3_zip(integrated_s3_info):
 
 
 def test_unzip_s3_to_s3(integrated_s3_info):
+    '''test for unzip_s3_to_s3 with case where there is a basdir'''
     prefix = '__test_data/extracted'
     filename = integrated_s3_info['zip_filename']
     integrated_s3_info['s3Obj'].s3_delete_dir(prefix)
@@ -122,6 +167,26 @@ def test_unzip_s3_to_s3(integrated_s3_info):
     # now copy to that dir we just deleted
     ret_files = integrated_s3_info['s3Obj'].unzip_s3_to_s3(filename, prefix)
     assert ret_files['fastqc_report.html']['s3key'].startswith("https://s3.amazonaws.com")
+
+    objs = integrated_s3_info['s3Obj'].s3_read_dir(prefix)
+    assert objs.get('Contents', None)
+
+
+def test_unzip_s3_to_s3_2(integrated_s3_info):
+    '''test for unzip_s3_to_s3 with case where there is no basdir'''
+    prefix = '__test_data/extracted'
+    filename = integrated_s3_info['zip_filename2']
+    integrated_s3_info['s3Obj'].s3_delete_dir(prefix)
+
+    # ensure this thing was deleted
+    # if no files there will be no Contents in response
+    objs = integrated_s3_info['s3Obj'].s3_read_dir(prefix)
+    assert [] == objs.get('Contents', [])
+
+    # now copy to that dir we just deleted
+    ret_files = integrated_s3_info['s3Obj'].unzip_s3_to_s3(filename, prefix)
+    assert ret_files['qc_report.html']['s3key'].startswith("https://s3.amazonaws.com")
+    assert ret_files['qc_report.html']['s3key'].endswith("qc_report.html")
 
     objs = integrated_s3_info['s3Obj'].s3_read_dir(prefix)
     assert objs.get('Contents', None)
