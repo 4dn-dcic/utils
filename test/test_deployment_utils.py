@@ -277,6 +277,43 @@ def test_deployment_utils_build_ini_file_from_template():
 
         MockFileStream.reset()
 
+        # For this test, we check if the 'indexer' option being set correctly sets the ENCODED.INDEXER option
+        with mock.patch("os.path.exists") as mock_exists:
+            mock_exists.return_value = True
+            with mock.patch("io.open", side_effect=mocked_open):
+                TestDeployer.build_ini_file_from_template(some_template_file_name, some_ini_file_name, indexer=True)
+
+        assert MockFileStream.FILE_SYSTEM[some_ini_file_name] == [
+            '[Foo]',
+            'DATABASE = "snow_white"',
+            'SOME_URL = "http://user@unittest:6543/"',
+            'OOPS = "$NOT_AN_ENV_VAR"',
+            'HMMM = "${NOT_AN_ENV_VAR_EITHER}"',
+            'SHHH = "my-secret"',
+            'VERSION = "v-12345-bundle-version"',
+            'PROJECT_VERSION = "11.22.33"',
+            'ENCODED.INDEXER = "true"'
+        ]
+
+        MockFileStream.reset()
+
+        with mock.patch("os.path.exists") as mock_exists:
+            mock_exists.return_value = True
+            with mock.patch("io.open", side_effect=mocked_open):
+
+                # for this test, we're going to pretend we deployed with bs_name == 'fourfront-indexer',
+                # which should throw an exception
+                def mocked_os_get(val, default):
+                    if val == 'ENCODED_BS_ENV':
+                        return 'fourfront-indexer'
+                    else:
+                        return default
+
+                with mock.patch("os.environ.get", side_effect=mocked_os_get):
+                    with pytest.raises(RuntimeError):
+                        TestDeployer.build_ini_file_from_template(some_template_file_name,
+                                                                  some_ini_file_name, indexer=True)
+
         # Uncomment this for debugging...
         # assert False, "PASSED"
 

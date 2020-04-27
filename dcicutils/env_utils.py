@@ -11,6 +11,7 @@ FF_ENV_WEBDEV = 'fourfront-webdev'
 FF_ENV_WEBPROD = 'fourfront-webprod'
 FF_ENV_WEBPROD2 = 'fourfront-webprod2'
 FF_ENV_WOLF = 'fourfront-wolf'
+FF_ENV_INDEXER = 'fourfront-indexer'  # to be used by ELB Indexer
 
 CGAP_ENV_DEV = 'fourfront-cgapdev'
 CGAP_ENV_HOTSEAT = 'fourfront-cgaphotseat'  # Maybe not used
@@ -22,6 +23,7 @@ CGAP_ENV_WEBDEV = 'fourfront-cgapwebdev'  # Maybe not used
 CGAP_ENV_WEBPROD = 'fourfront-cgap'
 # CGAP_ENV_WEBPROD2 is meaningless here. See CGAP_ENV_STAGING.
 CGAP_ENV_WOLF = 'fourfront-cgapwolf'  # Maybe not used
+CGAP_ENV_INDEXER = 'cgap-indexer'  # to be used by ELB Indexer
 
 CGAP_ENV_DEV_NEW = 'cgap-dev'
 CGAP_ENV_HOTSEAT_NEW = 'cgap-hotseat'
@@ -42,6 +44,9 @@ CGAP_PROD_BUCKET_ENV = CGAP_ENV_WEBPROD
 # Done this way to get maximally compatible behavior.
 FOURFRONT_STG_OR_PRD_TOKENS = ['webprod', 'blue', 'green']
 FOURFRONT_STG_OR_PRD_NAMES = ['staging', 'stagging', 'data']
+
+# We should know which BS Envs are indexing envs
+INDEXER_ENVS = [FF_ENV_INDEXER, CGAP_ENV_INDEXER]
 
 # Done this way because it's safer going forward.
 CGAP_STG_OR_PRD_TOKENS = []

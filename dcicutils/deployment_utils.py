@@ -30,7 +30,7 @@ import toml
 import argparse
 
 from dcicutils.env_utils import (
-    is_stg_or_prd_env, prod_bucket_env, get_standard_mirror_env, data_set_for_env,
+    is_stg_or_prd_env, prod_bucket_env, get_standard_mirror_env, data_set_for_env, INDEXER_ENVS
 )
 from dcicutils.misc_utils import PRINT
 
@@ -39,12 +39,13 @@ class Deployer:
 
     TEMPLATE_DIR = None
     INI_FILE_NAME = "production.ini"
+    INDEXER_ENTRY = 'ENCODED.INDEXER = "true"\n'
     PYPROJECT_FILE_NAME = None
 
     @classmethod
     def build_ini_file_from_template(cls, template_file_name, init_file_name,
                                      bs_env=None, bs_mirror_env=None, s3_bucket_env=None,
-                                     data_set=None, es_server=None, es_namespace=None):
+                                     data_set=None, es_server=None, es_namespace=None, indexer=False):
         """
         Builds a .ini file from a given template file.
 
@@ -57,6 +58,7 @@ class Deployer:
             data_set (str): An identifier for data to load (either 'prod' for prd/stg envs, or 'test' for others)
             es_server (str): The server name (or server:port) for the ElasticSearch server.
             es_namespace (str): The ElasticSearch namespace to use (probably but not necessarily same as bs_env).
+            indexer (bool): Whether or not we are building an ini file for an indexer.
         """
         with io.open(init_file_name, 'w') as init_file_fp:
             cls.build_ini_stream_from_template(template_file_name=template_file_name,
@@ -66,7 +68,8 @@ class Deployer:
                                                s3_bucket_env=s3_bucket_env,
                                                data_set=data_set,
                                                es_server=es_server,
-                                               es_namespace=es_namespace)
+                                               es_namespace=es_namespace,
+                                               indexer=indexer)
 
     # Ref: https://stackoverflow.com/questions/19911123/how-can-you-get-the-elastic-beanstalk-application-version-in-your-application  # noqa: E501
     EB_MANIFEST_FILENAME = "/opt/elasticbeanstalk/deploy/manifest"
@@ -104,7 +107,7 @@ class Deployer:
     @classmethod
     def build_ini_stream_from_template(cls, template_file_name, init_file_stream,
                                        bs_env=None, bs_mirror_env=None, s3_bucket_env=None, data_set=None,
-                                       es_server=None, es_namespace=None):
+                                       es_server=None, es_namespace=None, indexer=False):
         """
         Sends output to init_file_stream corresponding to the data noe would want in an ini file
         for the given template_file_name and available environment variables.
@@ -118,13 +121,13 @@ class Deployer:
             data_set: 'test' or 'prod'. Default is 'test' unless bs_env is a staging or production environment.
             es_server: The name of an es server to use.
             es_namespace: The namespace to use on the es server. If None, this uses the bs_env.
+            indexer: Whether or not we are building an ini file for an indexer.
 
         Returns: None
 
         """
 
         # print("data_set given = ", data_set)
-
         es_server = es_server or os.environ.get('ENCODED_ES_SERVER', "MISSING_ENCODED_ES_SERVER")
         bs_env = bs_env or os.environ.get("ENCODED_BS_ENV", "MISSING_ENCODED_BS_ENV")
         bs_mirror_env = bs_mirror_env or os.environ.get("ENCODED_BS_MIRROR_ENV", get_standard_mirror_env(bs_env)) or ""
@@ -135,6 +138,7 @@ class Deployer:
         data_set = data_set or os.environ.get("ENCODED_DATA_SET",
                                               data_set_for_env(bs_env) or "MISSING_ENCODED_DATA_SET")
         es_namespace = es_namespace or os.environ.get("ENCODED_ES_NAMESPACE", bs_env)
+        indexer = indexer or 'ENCODED.INDEXER' in os.environ  # set this env variable to deploy an indexer
 
         # print("data_set computed = ", data_set)
 
@@ -148,6 +152,12 @@ class Deployer:
             'DATA_SET': data_set,
             'ES_NAMESPACE': es_namespace,
         }
+
+        # if we specify an indexer name for bs_env, we did the deployment wrong and should bail
+        if bs_env in INDEXER_ENVS:
+            raise RuntimeError("Deployed with bs_env %s, which is an indexer env."
+                               "Re-deploy with the env you want to index and set the 'ENCODED.INDEXER'"
+                               "environment variable." % bs_env)
 
         # We assume these variables are not set, but best to check first. Confusion might result otherwise.
         for extra_var in extra_vars:
@@ -171,6 +181,10 @@ class Deployer:
                     #     print("expanded_line=", expanded_line)
                     if not cls.EMPTY_ASSIGNMENT.match(expanded_line):
                         init_file_stream.write(expanded_line)
+
+                # if we are an indexer, set the application.indexer option
+                if indexer:
+                    init_file_stream.write(cls.INDEXER_ENTRY)
 
         finally:
 
@@ -239,6 +253,8 @@ class Deployer:
             parser.add_argument("--es_namespace",
                                 help="an ElasticSearch namespace",
                                 default=None)
+            parser.add_argument("--indexer",
+                                help="")
             args = parser.parse_args()
             template_file_name = cls.environment_template_filename(args.env)
             ini_file_name = args.target
