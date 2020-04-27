@@ -325,7 +325,9 @@ def get_search_generator(search_url, auth=None, ff_env=None, page_limit=50):
     url_params = get_url_params(search_url)
     # indexing below is needed because url params are returned in lists
     curr_from = int(url_params.get('from', ['0'])[0])  # use query 'from' or 0 if not provided
+    initial_from = curr_from
     search_limit = url_params.get('limit', ['all'])[0]  # use limit=all by default
+
     if search_limit != 'all':
         search_limit = int(search_limit)
     url_params['limit'] = [str(page_limit)]
@@ -334,7 +336,7 @@ def get_search_generator(search_url, auth=None, ff_env=None, page_limit=50):
     # stop when fewer results than the limit are returned
     last_total = None
     while last_total is None or last_total == page_limit:
-        if search_limit != 'all' and curr_from >= search_limit:
+        if search_limit != 'all' and curr_from - initial_from >= search_limit:
             break
         url_params['from'] = [str(curr_from)]  # use from to drive search pagination
         search_url = update_url_params_and_unparse(search_url, url_params)
@@ -348,8 +350,8 @@ def get_search_generator(search_url, auth=None, ff_env=None, page_limit=50):
                   'status code is %s.' % (search_url, response.status_code))
         last_total = len(search_res)
         curr_from += last_total
-        if search_limit != 'all' and curr_from > search_limit:
-            limit_diff = curr_from - search_limit
+        if search_limit != 'all' and curr_from - initial_from > search_limit:
+            limit_diff = curr_from - initial_from - search_limit
             yield search_res[:-limit_diff]
         else:
             yield search_res
