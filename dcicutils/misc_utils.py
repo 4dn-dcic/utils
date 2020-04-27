@@ -3,12 +3,62 @@ This file contains functions that might be generally useful.
 """
 
 import os
+import logging
+from webtest import TestApp
 
 
 # Using PRINT(...) for debugging, rather than its more familiar lowercase form) for intended programmatic output,
 # makes it easier to find stray print statements that were left behind in debugging. -kmp 30-Mar-2020
 
 PRINT = print
+
+
+class VirtualApp(TestApp):
+    """ Wrapper class for TestApp, which we use a handler to the Encoded Application where we can submit
+        requests to it simulating a number of conditions, including permissions.
+    """
+    logging.basicConfig()
+
+
+    def __init__(self, app, environ):
+        """ Builds an encoded application, allowing you to submit requests to an encoded application
+
+        :param app: return value of get_app(config_uri, app_name)
+        :param environ: options to pass to the application. Usually permissions.
+        """
+        self.virtual_app = TestApp(app, environ)
+
+    def get(self, url, **kwargs):
+        """ Wrapper for TestApp.get that logs the outgoing GET
+
+        :param url: url to GET
+        :param kwargs: args to pass to the GET
+        :return: result of GET
+        """
+        logging.info('OUTGOING HTTP GET: %s' % url)
+        return self.virtual_app.get(url, **kwargs)
+
+    def post_json(self, url, obj, **kwargs):
+        """ Wrapper for TestApp.post_json that logs the outgoing POST
+
+        :param url: url to POST to
+        :param obj: object body to POST
+        :param kwargs: args to pass to the POST
+        :return: result of POST
+        """
+        logging.info('OUTGOING HTTP POST on url: %s with object: %s' % (url, obj))
+        return self.virtual_app.post_json(url, obj, **kwargs)
+
+    def patch_json(self, url, fields, **kwargs):
+        """ Wrapper for TestApp.patch_json that logs the outgoing PATCH
+
+        :param url: url to PATCH to, should contain an object uuid
+        :param fields: fields to PATCH on uuid in URL
+        :param kwargs: args to pass to the PATCH
+        :return: result of PATCH
+        """
+        logging.info('OUTGOING HTTP PATCH on url: %s with changes: %s' % (url, fields))
+        return self.virtual_app.patch_json(url, fields, **kwargs)
 
 
 def ignored(*args, **kwargs):
