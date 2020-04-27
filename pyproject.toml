@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "0.16.0"
+version = "0.17.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -9,9 +9,6 @@ homepage = "https://github.com/4dn-dcic/utils"
 repository = "https://github.com/4dn-dcic/utils"
 packages = [
   { include="dcicutils", from="." }
-]
-include = [
-  "nosuchfile"
 ]
 
 [tool.poetry.dependencies]
@@ -24,6 +21,7 @@ aws-requests-auth = ">=0.4.2,<1"
 urllib3 = "^1.24.3"
 structlog = "^19.2.0"
 requests = "^2.21.0"
+toml = ">=0.10.0,<1"
 
 [tool.poetry.dev-dependencies]
 pytest = ">=4.5.0"

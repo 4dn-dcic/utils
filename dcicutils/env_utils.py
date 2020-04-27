@@ -122,6 +122,35 @@ BEANSTALK_TEST_ENVS = [
 
 ]
 
+BEANSTALK_DEV_DATA_SETS = {
+
+    'fourfront-hotseat': 'prod',
+    'fourfront-mastertest': 'test',
+    'fourfront-webdev': 'prod',
+
+    'fourfront-cgapdev': 'test',
+    'fourfront-cgaptest': 'test',
+    'fourfront-cgapwolf': 'test',
+
+    'cgap-dev': 'test',
+    'cgap-test': 'test',
+    'cgap-wolf': 'test',
+
+}
+
+def data_set_for_env(envname, default=None):
+    """
+    This relates to which data set to load.
+    For production environments, really the null set is loaded because the data is already there and trusted.
+    This must always work for all production environments and there is deliberately no provision to override that.
+    In all other environments, the question is whether to load ADDITIONAL data, and that's a kind of custom choice,
+    so we consult a table for now, pending a better theory of organization.
+    """
+    if is_stg_or_prd_env(envname):
+        return 'prod'
+    else:
+        return BEANSTALK_DEV_DATA_SETS.get(envname, default)
+
 
 def blue_green_mirror_env(envname):
     """
