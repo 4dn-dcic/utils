@@ -75,6 +75,19 @@ def test_get_setting_from_context():
         assert get_setting_from_context(sample_settings, ini_var='pie.color', env_var=False, default='green') == 'green'
 
 
+class FakeResponse:
+
+    def __init__(self, json):
+        self._json = json
+
+    def json(self):
+        return self._json
+
+    @property
+    def content(self):
+        return json.dumps(self.json, indent=2, default=str)
+
+
 class FakeTestApp:
     def __init__(self, app, extra_environ=None):
         self.app = app
@@ -84,17 +97,17 @@ class FakeTestApp:
     def get(self, url, **kwargs):
         call_info = {'op': 'get', 'url': url, 'kwargs': kwargs}
         self.calls.append(call_info)
-        return json.dumps({"result_of": call_info})
+        return FakeResponse({'processed': call_info})
 
     def post_json(self, url, obj, **kwargs):
         call_info = {'op': 'post_json', 'url': url, 'obj': obj, 'kwargs': kwargs}
         self.calls.append(call_info)
-        return json.dumps({"result_of": call_info})
+        return FakeResponse({'processed': call_info})
 
     def patch_json(self, url, obj, **kwargs):
         call_info = {'op': 'patch_json', 'url': url, 'obj': obj, 'kwargs': kwargs}
         self.calls.append(call_info)
-        return json.dumps({"result_of": call_info})
+        return FakeResponse({'processed': call_info})
 
 
 class FakeApp:
@@ -129,8 +142,24 @@ def test_virtual_app_get():
 
     with mock.patch("logging.info") as mock_info:
         mock_info.side_effect = lambda msg: log_info.append(msg)
-        vapp.get("http://no.such.place/")
-        vapp.get("http://no.such.place/", params={'foo': 'bar'})
+
+        response1 = vapp.get("http://no.such.place/")
+        assert response1.json() == {
+            'processed': {
+                'op': 'get',
+                'url': 'http://no.such.place/',
+                'kwargs': {},
+            }
+        }
+
+        response2 = vapp.get("http://no.such.place/", params={'foo': 'bar'})
+        assert response2.json() == {
+            'processed': {
+                'op': 'get',
+                'url': 'http://no.such.place/',
+                'kwargs': {'params': {'foo': 'bar'}},
+            }
+        }
 
         assert log_info == [
             'OUTGOING HTTP GET: http://no.such.place/',
@@ -146,7 +175,8 @@ def test_virtual_app_get():
                 'op': 'get',
                 'url': 'http://no.such.place/',
                 'kwargs': {'params': {'foo': 'bar'}},
-            },
+            }
+            ,
         ]
 
 
@@ -161,8 +191,26 @@ def test_virtual_app_post_json():
 
     with mock.patch("logging.info") as mock_info:
         mock_info.side_effect = lambda msg: log_info.append(msg)
-        vapp.post_json("http://no.such.place/", {'beta': 'gamma'})
-        vapp.post_json("http://no.such.place/", {'alpha': 'omega'}, params={'foo': 'bar'})
+
+        response1 = vapp.post_json("http://no.such.place/", {'beta': 'gamma'})
+        assert response1.json() == {
+            'processed': {
+                'op': 'post_json',
+                'url': 'http://no.such.place/',
+                'obj': {'beta': 'gamma'},
+                'kwargs': {},
+            }
+        }
+
+        response2 = vapp.post_json("http://no.such.place/", {'alpha': 'omega'}, params={'foo': 'bar'})
+        assert response2.json() == {
+            'processed': {
+                'op': 'post_json',
+                'url': 'http://no.such.place/',
+                'obj': {'alpha': 'omega'},
+                'kwargs': {'params': {'foo': 'bar'}},
+            }
+        }
 
         assert log_info == [
             ("OUTGOING HTTP POST on url: %s with object: %s"
@@ -182,7 +230,8 @@ def test_virtual_app_post_json():
                 'url': 'http://no.such.place/',
                 'obj': {'alpha': 'omega'},
                 'kwargs': {'params': {'foo': 'bar'}},
-            },
+            }
+            ,
         ]
 
 
@@ -197,8 +246,26 @@ def test_virtual_app_patch_json():
 
     with mock.patch("logging.info") as mock_info:
         mock_info.side_effect = lambda msg: log_info.append(msg)
-        vapp.patch_json("http://no.such.place/", {'beta': 'gamma'})
-        vapp.patch_json("http://no.such.place/", {'alpha': 'omega'}, params={'foo': 'bar'})
+
+        response1 = vapp.patch_json("http://no.such.place/", {'beta': 'gamma'})
+        assert response1.json() == {
+            'processed': {
+                'op': 'patch_json',
+                'url': 'http://no.such.place/',
+                'obj': {'beta': 'gamma'},
+                'kwargs': {},
+            }
+        }
+
+        response2 = vapp.patch_json("http://no.such.place/", {'alpha': 'omega'}, params={'foo': 'bar'})
+        assert response2.json() == {
+            'processed': {
+                'op': 'patch_json',
+                'url': 'http://no.such.place/',
+                'obj': {'alpha': 'omega'},
+                'kwargs': {'params': {'foo': 'bar'}},
+            }
+        }
 
         assert log_info == [
             ("OUTGOING HTTP PATCH on url: %s with changes: %s"
@@ -218,5 +285,6 @@ def test_virtual_app_patch_json():
                 'url': 'http://no.such.place/',
                 'obj': {'alpha': 'omega'},
                 'kwargs': {'params': {'foo': 'bar'}},
-            },
+            }
+            ,
         ]
