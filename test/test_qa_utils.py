@@ -1,6 +1,8 @@
 import pytest
+import os
 import re
-from dcicutils.qa_utils import mock_not_called, local_attrs
+import uuid
+from dcicutils.qa_utils import mock_not_called, local_attrs, override_environ
 
 
 def test_mock_not_called():
@@ -129,3 +131,62 @@ def test_dynamic_properties():
         with local_attrs(thing):
             pass  # Just make sure no error occurs when no attributes given
 
+
+def test_override_environ():
+
+    unique_prop1 = str(uuid.uuid4())
+    unique_prop2 = str(uuid.uuid4())
+    unique_prop3 = str(uuid.uuid4())
+
+    assert unique_prop1 not in os.environ
+    assert unique_prop2 not in os.environ
+    assert unique_prop3 not in os.environ
+
+    with override_environ(**{unique_prop1: "something", unique_prop2: "anything"}):
+
+        assert unique_prop1 in os.environ # added
+        value1a = os.environ.get(unique_prop1)
+        assert value1a == "something"
+
+        assert unique_prop2 in os.environ # added
+        value2a = os.environ.get(unique_prop2)
+        assert value2a == "anything"
+
+        assert unique_prop3 not in os.environ
+
+        with override_environ(**{unique_prop1: "something_else", unique_prop3: "stuff"}):
+
+            assert unique_prop1 in os.environ  # updated
+            value1b = os.environ.get(unique_prop1)
+            assert value1b == "something_else"
+
+            assert unique_prop2 in os.environ  # unchanged
+            assert os.environ.get(unique_prop2) == value2a
+
+            assert unique_prop3 in os.environ  # added
+            assert os.environ.get(unique_prop3) == "stuff"
+
+            with override_environ(**{unique_prop1: None}):
+
+                assert unique_prop1 not in os.environ  # removed
+
+                with override_environ(**{unique_prop1: None}):
+
+                    assert unique_prop1 not in os.environ  # re-removed
+
+                assert unique_prop1 not in os.environ  # un-re-removed, but still removed
+
+            assert unique_prop1 in os.environ  # restored after double removal
+            assert os.environ.get(unique_prop1) == value1b
+
+        assert unique_prop1 in os.environ
+        assert os.environ.get(unique_prop1) == value1a
+
+        assert unique_prop2 in os.environ
+        assert os.environ.get(unique_prop2) == value2a
+
+        assert unique_prop3 not in os.environ
+
+    assert unique_prop1 not in os.environ
+    assert unique_prop2 not in os.environ
+    assert unique_prop3 not in os.environ

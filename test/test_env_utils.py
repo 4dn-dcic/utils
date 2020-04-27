@@ -11,7 +11,7 @@ from dcicutils.env_utils import (
     CGAP_ENV_HOTSEAT_NEW, CGAP_ENV_STAGING_NEW, CGAP_ENV_WEBDEV_NEW, CGAP_ENV_WOLF_NEW,
     get_mirror_env_from_context, is_test_env, is_hotseat_env, guess_mirror_env, get_standard_mirror_env,
     prod_bucket_env, public_url_mappings, CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
-    infer_repo_from_env
+    infer_repo_from_env, data_set_for_env,
 )
 from unittest import mock
 
@@ -38,6 +38,28 @@ def test_prod_bucket_env():
 
     assert prod_bucket_env('fourfront-cgapdev') is None
     assert prod_bucket_env('fourfront-cgapwolf') is None
+
+
+def test_data_set_for_env():
+
+    assert data_set_for_env('fourfront-blue') == 'prod'
+    assert data_set_for_env('fourfront-green') == 'prod'
+    assert data_set_for_env('fourfront-hotseat') == 'prod'
+    assert data_set_for_env('fourfront-mastertest') == 'test'
+    assert data_set_for_env('fourfront-webdev') == 'prod'
+    assert data_set_for_env('fourfront-webprod') == 'prod'
+    assert data_set_for_env('fourfront-webprod2') == 'prod'
+
+    assert data_set_for_env('fourfront-cgap') == 'prod'
+    assert data_set_for_env('fourfront-cgapdev') == 'test'
+    assert data_set_for_env('fourfront-cgaptest') == 'test'
+    assert data_set_for_env('fourfront-cgapwolf') == 'test'
+
+    assert data_set_for_env('cgap-blue') == 'prod'
+    assert data_set_for_env('cgap-green') == 'prod'
+    assert data_set_for_env('cgap-dev') == 'test'
+    assert data_set_for_env('cgap-test') == 'test'
+    assert data_set_for_env('cgap-wolf') == 'test'
 
 
 def test_public_url_mappings():

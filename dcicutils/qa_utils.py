@@ -3,6 +3,7 @@ qa_utils: Tools for use in quality assurance testing.
 """
 
 import contextlib
+import os
 from .misc_utils import PRINT
 
 
@@ -51,3 +52,26 @@ def local_attrs(obj, **kwargs):
     finally:
         for key in keys:
             setattr(obj, key, saved[key])
+
+
+@contextlib.contextmanager
+def override_environ(**overrides):
+    to_delete = []
+    to_restore = {}
+    env = os.environ
+    try:
+        for k, v in overrides.items():
+            if k in env:
+                to_restore[k] = env[k]
+            else:
+                to_delete.append(k)
+            if v is None:
+                env.pop(k, None)  # Delete key k, tolerating it being already gone
+            else:
+                env[k] = v
+        yield
+    finally:
+        for k in to_delete:
+            env.pop(k, None)  # Delete key k, tolerating it being already gone
+        for k, v in to_restore.items():
+            os.environ[k] = v
