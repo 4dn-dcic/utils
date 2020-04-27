@@ -30,7 +30,7 @@ import toml
 import argparse
 
 from dcicutils.env_utils import (
-    is_stg_or_prd_env, prod_bucket_env, get_standard_mirror_env, is_cgap_env, data_set_for_env,
+    is_stg_or_prd_env, prod_bucket_env, get_standard_mirror_env, data_set_for_env,
 )
 from dcicutils.misc_utils import PRINT
 
@@ -68,7 +68,7 @@ class Deployer:
                                                es_server=es_server,
                                                es_namespace=es_namespace)
 
-    # Ref: https://stackoverflow.com/questions/19911123/how-can-you-get-the-elastic-beanstalk-application-version-in-your-application
+    # Ref: https://stackoverflow.com/questions/19911123/how-can-you-get-the-elastic-beanstalk-application-version-in-your-application  # noqa: E501
     EB_MANIFEST_FILENAME = "/opt/elasticbeanstalk/deploy/manifest"
 
     @classmethod
@@ -129,7 +129,9 @@ class Deployer:
         bs_env = bs_env or os.environ.get("ENCODED_BS_ENV", "MISSING_ENCODED_BS_ENV")
         bs_mirror_env = bs_mirror_env or os.environ.get("ENCODED_BS_MIRROR_ENV", get_standard_mirror_env(bs_env)) or ""
         s3_bucket_env = s3_bucket_env or os.environ.get("ENCODED_S3_BUCKET_ENV",
-                                                        prod_bucket_env(bs_env) if is_stg_or_prd_env(bs_env) else bs_env)
+                                                        prod_bucket_env(bs_env)
+                                                        if is_stg_or_prd_env(bs_env)
+                                                        else bs_env)
         data_set = data_set or os.environ.get("ENCODED_DATA_SET",
                                               data_set_for_env(bs_env) or "MISSING_ENCODED_DATA_SET")
         es_namespace = es_namespace or os.environ.get("ENCODED_ES_NAMESPACE", bs_env)
