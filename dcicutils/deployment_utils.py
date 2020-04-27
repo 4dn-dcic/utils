@@ -254,7 +254,9 @@ class Deployer:
                                 help="an ElasticSearch namespace",
                                 default=None)
             parser.add_argument("--indexer",
-                                help="")
+                                help="whether or not to deploy an indexer",
+                                action='store_true',
+                                default=False)
             args = parser.parse_args()
             template_file_name = cls.environment_template_filename(args.env)
             ini_file_name = args.target
@@ -263,7 +265,8 @@ class Deployer:
             cls.build_ini_file_from_template(template_file_name, ini_file_name,
                                              bs_env=args.bs_env, bs_mirror_env=args.bs_mirror_env,
                                              s3_bucket_env=args.s3_bucket_env, data_set=args.data_set,
-                                             es_server=args.es_server, es_namespace=args.es_namespace)
+                                             es_server=args.es_server, es_namespace=args.es_namespace,
+                                             indexer=args.indexer)
         except Exception as e:
             PRINT("Error (%s): %s" % (e.__class__.__name__, e))
             sys.exit(1)
