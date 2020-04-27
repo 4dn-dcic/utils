@@ -96,6 +96,7 @@ class FakeTestApp:
         self.calls.append(call_info)
         return json.dumps({"result_of": call_info})
 
+
 class FakeApp:
     pass
 
@@ -148,6 +149,7 @@ def test_virtual_app_get():
             },
         ]
 
+
 def test_virtual_app_post_json():
 
     with mock.patch.object(webtest, "TestApp", FakeTestApp):
@@ -182,6 +184,7 @@ def test_virtual_app_post_json():
                 'kwargs': {'params': {'foo': 'bar'}},
             },
         ]
+
 
 def test_virtual_app_patch_json():
 
