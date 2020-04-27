@@ -390,7 +390,7 @@ def test_search_metadata(integrated_ff, url):
     search_res_limit = ff_utils.search_metadata(url + '/search/?limit=3&type=File', key=integrated_ff['ff_key'])
     assert len(search_res_limit) == 3
     # search with a limit from a certain entry
-    search_res_from_limit = ff_utils.search_metadata(url + '/search/?type=HiglassViewConfig&from=5&limit=53', key=integrated_ff['ff_key'])
+    search_res_from_limit = ff_utils.search_metadata(url + '/search/?type=File&from=5&limit=53', key=integrated_ff['ff_key'])
     assert len(search_res_from_limit) == 53
     # search with a filter
     search_res_filt = ff_utils.search_metadata(url + '/search/?limit=3&type=File&file_type=reads',
