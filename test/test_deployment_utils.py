@@ -10,8 +10,9 @@ from io import StringIO
 from unittest import mock
 
 from dcicutils.deployment_utils import Deployer
-from dcicutils.misc_utils import ignored
 from dcicutils.env_utils import is_cgap_env
+from dcicutils.misc_utils import ignored
+from dcicutils.qa_utils import override_environ
 
 
 _MY_DIR = os.path.dirname(__file__)
@@ -20,26 +21,6 @@ _MY_DIR = os.path.dirname(__file__)
 class TestDeployer(Deployer):
     TEMPLATE_DIR = os.path.join(_MY_DIR, "ini_files")
     PYPROJECT_FILE_NAME = os.path.join(os.path.dirname(_MY_DIR), "pyproject.toml")
-
-
-@contextmanager
-def override_environ(**overrides):
-    to_delete = []
-    to_restore = {}
-    env = os.environ
-    try:
-        for k, v in overrides.items():
-            if k in env:
-                to_restore[k] = env[k]
-            else:
-                to_delete.append(k)
-            env[k] = v
-        yield
-    finally:
-        for k in to_delete:
-            del os.environ[k]
-        for k, v in to_restore.items():
-            os.environ[k] = v
 
 
 def test_deployment_utils_environment_template_filename():
@@ -86,49 +67,89 @@ def make_mocked_check_output_for_get_version(simulate_git_command=True, simulate
 
 
 def test_deployment_utils_build_ini_file_from_template():
-    # NOTE: This implicitly also tests build_ini_file_from_stream.
+    """
+    Fully mocked test of building the ini file.
+    NOTE: This implicitly also tests build_ini_file_from_stream.
+    """
+
 
     some_template_file_name = "mydir/whatever"
     some_ini_file_name = "mydir/production.ini"
+
+    # This is our simulation of data that is coming in from ElasticBeanstalk
     env_vars = dict(RDS_DB_NAME='snow_white', RDS_USERNAME='user', RDS_PASSWORD='my-secret',
                     RDS_HOSTNAME='unittest', RDS_PORT="6543")
 
+    # Establish our environment variables
     with override_environ(**env_vars):
 
+        # Check that our abstraction is working. There is a bit of paranoia here,
+        # but since we'll be dealing with deployment configurations, the idea is to be sure
+        # we're in the land of mocking only.
         for env_var in env_vars:
             assert env_var in os.environ and os.environ[env_var] == env_vars[env_var], (
                     "os.environ[%r] did not get added correctly" % env_var
             )
 
+        # NOTE: With a small amount of extra effort, this might be possible to separate into a mock_utils for
+        #       other tests to use. But it's not quite there. -kmp 27-Apr-2020
         class MockFileStream:
+            """
+            This represents files in the file system so that other mocks can create them and we can later
+            inquire about their contents.
+            """
 
-            FILE_SYSTEM = {}
+            FILE_SYSTEM = {}  # A dictionary of files in our fake file system.
 
             @classmethod
             def reset(cls):
+                """Resets the fake file system to empty."""
                 cls.FILE_SYSTEM = {}
 
             def __init__(self, filename, mode):
                 assert 'w' in mode
                 self.filename = filename
-                self.output_string_stream = StringIO()
+                self.output_string_stream = StringIO()  # A string stream to use rather than a file stream.
 
             def __enter__(self):
+                """
+                When doing a mocked call to io.open, this arranges for a StringIO() object to gather file output.
+                """
                 return self.output_string_stream
 
             def __exit__(self, type_, value, traceback):
+                """
+                What we actually store in the file system is a list of lines, not a big string,
+                though that design choice might not stand up to scrutiny if this mock were ever reused.
+                In the current implementation, this takes care of getting the final data out of the string stream,
+                breaking it into lines, and storing the lines in the mock file system.
+                """
                 self.FILE_SYSTEM[self.filename] = self.output_string_stream.getvalue().strip().split('\n')
 
+        # NOTE: This mock_open might be simpler and more general if we just called our mock I/O to write the files.
+        #       In effect, it is pretending as if files are there which aren't, which weird because that pretense
+        #       is inside the pretense that we have a file system at all. But it will suffice for now. -kmp 27-Apr-2020
         def mocked_open(filename, mode='r', encoding=None):
+            """
+            On read (mode=='r'), this simulates the presence of several files in an ad hoc way, not by mock file system.
+            On write, this uses StringIO and stores the output in the mock file system as a list of lines.
+            """
+            # Our mock does nothing with the encoding, but wants to make sure no one is asking us for
+            # things we might have had to do something special with.
             assert encoding in (None, 'utf-8')
+
             # In this test there are two opens, one for read and one for write, so we discriminate on that basis.
             print("Enter mock_open", filename, mode)
             if mode == 'r':
+
                 if filename == TestDeployer.EB_MANIFEST_FILENAME:
+
                     print("reading mocked EB MANIFEST:", TestDeployer.EB_MANIFEST_FILENAME)
                     return StringIO('{"Some": "Stuff", "VersionLabel": "%s", "Other": "Stuff"}\n'
                                     % MOCKED_BUNDLE_VERSION)
+
                 elif filename == some_template_file_name:
+
                     print("reading mocked TEMPLATE FILE", some_ini_file_name)
                     return StringIO(
                         '[Foo]\n'
@@ -140,7 +161,9 @@ def test_deployment_utils_build_ini_file_from_template():
                         'VERSION = "${APP_VERSION}"\n'
                         'PROJECT_VERSION = "${PROJECT_VERSION}"\n'
                     )
+
                 elif filename == TestDeployer.PYPROJECT_FILE_NAME:
+
                     print("reading mocked TOML FILE", TestDeployer.PYPROJECT_FILE_NAME)
                     return StringIO(
                         '[something]\n'
@@ -149,22 +172,33 @@ def test_deployment_utils_build_ini_file_from_template():
                         'author = "somebody"\n'
                         'version = "%s"\n' % MOCKED_PROJECT_VERSION
                     )
+
                 else:
+
                     raise AssertionError("mocked_open(%r, %r) unsupported." % (filename, mode))
+
             else:
+
                 assert mode == 'w'
                 assert filename == some_ini_file_name
                 return MockFileStream(filename, mode)
+
 
         with mock.patch("subprocess.check_output") as mock_check_output:
             mock_check_output.side_effect = make_mocked_check_output_for_get_version()
             with mock.patch("os.path.exists") as mock_exists:
                 def mocked_exists(filename):
+                    # This cheats on the mock file system and just knows about two specific names we care about.
+                    # If we had used the mock file system to store the files, it would be a little cleaner.
+                    # But it's close enough for now. -kmp 27-Apr-2020
                     return filename in [TestDeployer.EB_MANIFEST_FILENAME, some_template_file_name]
                 mock_exists.side_effect = mocked_exists
                 with mock.patch("io.open", side_effect=mocked_open):
+                    # Here's where we finally call the builder. Output will be a list of lines in the mock file system.
                     TestDeployer.build_ini_file_from_template(some_template_file_name, some_ini_file_name)
 
+        # The subtle thing here is that if it were a multi-line string,
+        # all the "%" substitutions would have to be on the final line, not line-by-line where needed.
         assert MockFileStream.FILE_SYSTEM[some_ini_file_name] == [
             '[Foo]',
             'DATABASE = "snow_white"',
@@ -197,13 +231,15 @@ def test_deployment_utils_build_ini_file_from_template():
             'OOPS = "$NOT_AN_ENV_VAR"',
             'HMMM = "${NOT_AN_ENV_VAR_EITHER}"',
             'SHHH = "my-secret"',
-            'VERSION = "%s"' % MOCKED_LOCAL_GIT_VERSION,
+            'VERSION = "%s"' % MOCKED_LOCAL_GIT_VERSION,  # This is the result of no manifest file existing
             'PROJECT_VERSION = "%s"' % MOCKED_PROJECT_VERSION,
         ]
 
         MockFileStream.reset()
 
         with mock.patch("subprocess.check_output") as mock_check_output:
+            # Note that here we simulate the absence of the 'git' command, so we also can't expect a git tag
+            # as part of the version output.
             mock_check_output.side_effect = make_mocked_check_output_for_get_version(simulate_git_command=False)
             with mock.patch("os.path.exists") as mock_exists:
 
