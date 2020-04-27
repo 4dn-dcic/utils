@@ -4,7 +4,12 @@ This file contains functions that might be generally useful.
 
 import os
 import logging
-from webtest import TestApp
+import webtest  # importing the library makes it easier to mock testing
+
+
+# Is this the right place for this? I feel like this should be done in an application, not a library.
+# -kmp 27-Apr-2020
+logging.basicConfig()
 
 
 # Using PRINT(...) for debugging, rather than its more familiar lowercase form) for intended programmatic output,
@@ -13,20 +18,30 @@ from webtest import TestApp
 PRINT = print
 
 
-class VirtualApp(TestApp):
-    """ Wrapper class for TestApp, which we use a handler to the Encoded Application where we can submit
-        requests to it simulating a number of conditions, including permissions.
+class VirtualApp():
     """
-    logging.basicConfig()
+    Wrapper class for TestApp, to allow custom control over submitting Encoded requests,
+    simulating a number of conditions, including permissions.
 
+    IMPORTANT: We use webtest.TestApp is used as substrate technology here, but use of this class
+        occurs in the main application, not just in testing. Among other things, we have
+        renamed the app here in order to avoid confusions created by the name when it is used
+        in production settings.
+    """
 
     def __init__(self, app, environ):
-        """ Builds an encoded application, allowing you to submit requests to an encoded application
+        """
+        Builds an encoded application, allowing you to submit requests to an encoded application
 
         :param app: return value of get_app(config_uri, app_name)
         :param environ: options to pass to the application. Usually permissions.
         """
-        self.virtual_app = TestApp(app, environ)
+        #  NOTE: The TestApp class that we're wrapping takes a richer set of initialization parameters
+        #        (including relative_to, use_unicode, cookiejar, parser_features, json_encoder, and lint),
+        #        but we'll add them conservatively here. If there is a need for any of them, we should add
+        #        them explicitly here one-by-one as the need is shown so we have tight control of what
+        #        we're depending on and what we're not. -kmp 27-Apr-2020
+        self.wrapped_app = webtest.TestApp(app, environ)
 
     def get(self, url, **kwargs):
         """ Wrapper for TestApp.get that logs the outgoing GET
@@ -36,7 +51,7 @@ class VirtualApp(TestApp):
         :return: result of GET
         """
         logging.info('OUTGOING HTTP GET: %s' % url)
-        return self.virtual_app.get(url, **kwargs)
+        return self.wrapped_app.get(url, **kwargs)
 
     def post_json(self, url, obj, **kwargs):
         """ Wrapper for TestApp.post_json that logs the outgoing POST
@@ -47,7 +62,7 @@ class VirtualApp(TestApp):
         :return: result of POST
         """
         logging.info('OUTGOING HTTP POST on url: %s with object: %s' % (url, obj))
-        return self.virtual_app.post_json(url, obj, **kwargs)
+        return self.wrapped_app.post_json(url, obj, **kwargs)
 
     def patch_json(self, url, fields, **kwargs):
         """ Wrapper for TestApp.patch_json that logs the outgoing PATCH
@@ -58,7 +73,7 @@ class VirtualApp(TestApp):
         :return: result of PATCH
         """
         logging.info('OUTGOING HTTP PATCH on url: %s with changes: %s' % (url, fields))
-        return self.virtual_app.patch_json(url, fields, **kwargs)
+        return self.wrapped_app.patch_json(url, fields, **kwargs)
 
 
 def ignored(*args, **kwargs):
