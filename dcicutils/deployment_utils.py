@@ -39,7 +39,6 @@ class Deployer:
 
     TEMPLATE_DIR = None
     INI_FILE_NAME = "production.ini"
-    INDEXER_ENTRY = 'ENCODED.INDEXER = "true"\n'
     PYPROJECT_FILE_NAME = None
 
     @classmethod
@@ -138,7 +137,11 @@ class Deployer:
         data_set = data_set or os.environ.get("ENCODED_DATA_SET",
                                               data_set_for_env(bs_env) or "MISSING_ENCODED_DATA_SET")
         es_namespace = es_namespace or os.environ.get("ENCODED_ES_NAMESPACE", bs_env)
-        indexer = indexer or 'ENCODED.INDEXER' in os.environ  # set this env variable to deploy an indexer
+        # Set ENCODED_INDEXER to 'true' to deploy an indexer.
+        # If the value is missing, the empty string, or any other thing besides 'true' (in any case),
+        # this value will default to the empty string, causing the line not to appear in the output file
+        # because there is a special case that suppresses output of empty values. -kmp 27-Apr-2020
+        indexer = "true" if indexer or os.environ.get('ENCODED_INDEXER', "false").upper() == "TRUE" else ""
 
         # print("data_set computed = ", data_set)
 
@@ -151,6 +154,7 @@ class Deployer:
             'S3_BUCKET_ENV': s3_bucket_env,
             'DATA_SET': data_set,
             'ES_NAMESPACE': es_namespace,
+            'INDEXER': indexer,
         }
 
         # if we specify an indexer name for bs_env, we did the deployment wrong and should bail
@@ -181,10 +185,6 @@ class Deployer:
                     #     print("expanded_line=", expanded_line)
                     if not cls.EMPTY_ASSIGNMENT.match(expanded_line):
                         init_file_stream.write(expanded_line)
-
-                # if we are an indexer, set the application.indexer option
-                if indexer:
-                    init_file_stream.write(cls.INDEXER_ENTRY)
 
         finally:
 
