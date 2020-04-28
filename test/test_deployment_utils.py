@@ -153,13 +153,14 @@ def test_deployment_utils_build_ini_file_from_template():
                     print("reading mocked TEMPLATE FILE", some_ini_file_name)
                     return StringIO(
                         '[Foo]\n'
-                        'DATABASE = "${RDS_DB_NAME}"\n'
-                        'SOME_URL = "http://${RDS_USERNAME}@$RDS_HOSTNAME:$RDS_PORT/"\n'
-                        'OOPS = "$NOT_AN_ENV_VAR"\n'
-                        'HMMM = "${NOT_AN_ENV_VAR_EITHER}"\n'
-                        'SHHH = "$RDS_PASSWORD"\n'
-                        'VERSION = "${APP_VERSION}"\n'
-                        'PROJECT_VERSION = "${PROJECT_VERSION}"\n'
+                        'database = "${RDS_DB_NAME}"\n'
+                        'some_url = "http://${RDS_USERNAME}@$RDS_HOSTNAME:$RDS_PORT/"\n'
+                        'oops = "$NOT_AN_ENV_VAR"\n'
+                        'hmmm = "${NOT_AN_ENV_VAR_EITHER}"\n'
+                        'shhh = "$RDS_PASSWORD"\n'
+                        'version = "${APP_VERSION}"\n'
+                        'project_version = "${PROJECT_VERSION}"\n'
+                        'indexer = ${INDEXER}'
                     )
 
                 elif filename == TestDeployer.PYPROJECT_FILE_NAME:
@@ -201,13 +202,13 @@ def test_deployment_utils_build_ini_file_from_template():
         # all the "%" substitutions would have to be on the final line, not line-by-line where needed.
         assert MockFileStream.FILE_SYSTEM[some_ini_file_name] == [
             '[Foo]',
-            'DATABASE = "snow_white"',
-            'SOME_URL = "http://user@unittest:6543/"',
-            'OOPS = "$NOT_AN_ENV_VAR"',
-            'HMMM = "${NOT_AN_ENV_VAR_EITHER}"',
-            'SHHH = "my-secret"',
-            'VERSION = "%s"' % MOCKED_BUNDLE_VERSION,
-            'PROJECT_VERSION = "%s"' % MOCKED_PROJECT_VERSION,
+            'database = "snow_white"',
+            'some_url = "http://user@unittest:6543/"',
+            'oops = "$NOT_AN_ENV_VAR"',
+            'hmmm = "${NOT_AN_ENV_VAR_EITHER}"',
+            'shhh = "my-secret"',
+            'version = "%s"' % MOCKED_BUNDLE_VERSION,
+            'project_version = "%s"' % MOCKED_PROJECT_VERSION,
         ]
 
         MockFileStream.reset()
@@ -226,13 +227,13 @@ def test_deployment_utils_build_ini_file_from_template():
 
         assert MockFileStream.FILE_SYSTEM[some_ini_file_name] == [
             '[Foo]',
-            'DATABASE = "snow_white"',
-            'SOME_URL = "http://user@unittest:6543/"',
-            'OOPS = "$NOT_AN_ENV_VAR"',
-            'HMMM = "${NOT_AN_ENV_VAR_EITHER}"',
-            'SHHH = "my-secret"',
-            'VERSION = "%s"' % MOCKED_LOCAL_GIT_VERSION,  # This is the result of no manifest file existing
-            'PROJECT_VERSION = "%s"' % MOCKED_PROJECT_VERSION,
+            'database = "snow_white"',
+            'some_url = "http://user@unittest:6543/"',
+            'oops = "$NOT_AN_ENV_VAR"',
+            'hmmm = "${NOT_AN_ENV_VAR_EITHER}"',
+            'shhh = "my-secret"',
+            'version = "%s"' % MOCKED_LOCAL_GIT_VERSION,  # This is the result of no manifest file existing
+            'project_version = "%s"' % MOCKED_PROJECT_VERSION,
         ]
 
         MockFileStream.reset()
@@ -266,16 +267,62 @@ def test_deployment_utils_build_ini_file_from_template():
 
         assert MockFileStream.FILE_SYSTEM[some_ini_file_name] == [
             '[Foo]',
-            'DATABASE = "snow_white"',
-            'SOME_URL = "http://user@unittest:6543/"',
-            'OOPS = "$NOT_AN_ENV_VAR"',
-            'HMMM = "${NOT_AN_ENV_VAR_EITHER}"',
-            'SHHH = "my-secret"',
-            'VERSION = "unknown-version-at-20010203045506000000"',  # We mocked datetime.datetime.now() to get this
-            'PROJECT_VERSION = "%s"' % MOCKED_PROJECT_VERSION,
+            'database = "snow_white"',
+            'some_url = "http://user@unittest:6543/"',
+            'oops = "$NOT_AN_ENV_VAR"',
+            'hmmm = "${NOT_AN_ENV_VAR_EITHER}"',
+            'shhh = "my-secret"',
+            'version = "unknown-version-at-20010203045506000000"',  # We mocked datetime.datetime.now() to get this
+            'project_version = "%s"' % MOCKED_PROJECT_VERSION,
         ]
 
         MockFileStream.reset()
+
+        for truth in ["TRUE", "True", "true"]:
+
+            # For this test, we check if the 'indexer' option being set correctly sets the ENCODED.INDEXER option
+            with mock.patch("os.path.exists") as mock_exists:
+                mock_exists.return_value = True
+                with mock.patch("io.open", side_effect=mocked_open):
+                    with override_environ(ENCODED_INDEXER=truth):
+                        TestDeployer.build_ini_file_from_template(some_template_file_name, some_ini_file_name)
+
+            assert MockFileStream.FILE_SYSTEM[some_ini_file_name] == [
+                '[Foo]',
+                'database = "snow_white"',
+                'some_url = "http://user@unittest:6543/"',
+                'oops = "$NOT_AN_ENV_VAR"',
+                'hmmm = "${NOT_AN_ENV_VAR_EITHER}"',
+                'shhh = "my-secret"',
+                'version = "v-12345-bundle-version"',
+                'project_version = "11.22.33"',
+                'indexer = true',  # the value will have been canonicalized
+            ]
+
+            MockFileStream.reset()
+
+        for falsity in ["FALSE", "False", "false", "", None, "misspelling"]:
+
+            # For this test, we check if the 'indexer' option being set correctly sets the ENCODED.INDEXER option
+            with mock.patch("os.path.exists") as mock_exists:
+                mock_exists.return_value = True
+                with mock.patch("io.open", side_effect=mocked_open):
+                    with override_environ(ENCODED_INDEXER=falsity):
+                        TestDeployer.build_ini_file_from_template(some_template_file_name, some_ini_file_name)
+
+            assert MockFileStream.FILE_SYSTEM[some_ini_file_name] == [
+                '[Foo]',
+                'database = "snow_white"',
+                'some_url = "http://user@unittest:6543/"',
+                'oops = "$NOT_AN_ENV_VAR"',
+                'hmmm = "${NOT_AN_ENV_VAR_EITHER}"',
+                'shhh = "my-secret"',
+                'version = "v-12345-bundle-version"',
+                'project_version = "11.22.33"',
+                # (The 'indexer =' line will be suppressed.)
+            ]
+
+            MockFileStream.reset()
 
         # For this test, we check if the 'indexer' option being set correctly sets the ENCODED.INDEXER option
         with mock.patch("os.path.exists") as mock_exists:
@@ -285,34 +332,48 @@ def test_deployment_utils_build_ini_file_from_template():
 
         assert MockFileStream.FILE_SYSTEM[some_ini_file_name] == [
             '[Foo]',
-            'DATABASE = "snow_white"',
-            'SOME_URL = "http://user@unittest:6543/"',
-            'OOPS = "$NOT_AN_ENV_VAR"',
-            'HMMM = "${NOT_AN_ENV_VAR_EITHER}"',
-            'SHHH = "my-secret"',
-            'VERSION = "v-12345-bundle-version"',
-            'PROJECT_VERSION = "11.22.33"',
-            'ENCODED.INDEXER = "true"'
+            'database = "snow_white"',
+            'some_url = "http://user@unittest:6543/"',
+            'oops = "$NOT_AN_ENV_VAR"',
+            'hmmm = "${NOT_AN_ENV_VAR_EITHER}"',
+            'shhh = "my-secret"',
+            'version = "v-12345-bundle-version"',
+            'project_version = "11.22.33"',
+            'indexer = true',
         ]
 
         MockFileStream.reset()
 
-        with mock.patch("os.path.exists") as mock_exists:
-            mock_exists.return_value = True
-            with mock.patch("io.open", side_effect=mocked_open):
+        # For these next three tests, we're going to pretend we deployed with
+        # bs_name == 'fourfront-indexer' in various ways. We expect an exception to be raised.
 
-                # for this test, we're going to pretend we deployed with bs_name == 'fourfront-indexer',
-                # which should throw an exception
-                def mocked_os_get(val, default):
-                    if val == 'ENCODED_BS_ENV':
-                        return 'fourfront-indexer'
-                    else:
-                        return default
-
-                with mock.patch("os.environ.get", side_effect=mocked_os_get):
-                    with pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError):
+            with mock.patch("os.path.exists") as mock_exists:
+                mock_exists.return_value = True
+                with mock.patch("io.open", side_effect=mocked_open):
+                    with override_environ(ENCODED_BS_ENV='fourfront-indexer'):
                         TestDeployer.build_ini_file_from_template(some_template_file_name,
                                                                   some_ini_file_name, indexer=True)
+
+        MockFileStream.reset()
+
+        with pytest.raises(RuntimeError):
+            with mock.patch("os.path.exists") as mock_exists:
+                mock_exists.return_value = True
+                with mock.patch("io.open", side_effect=mocked_open):
+                    TestDeployer.build_ini_file_from_template(some_template_file_name,
+                                                              some_ini_file_name,
+                                                              bs_env='fourfront-indexer', indexer=True)
+
+        MockFileStream.reset()
+
+        with pytest.raises(RuntimeError):
+            with mock.patch("os.path.exists") as mock_exists:
+                mock_exists.return_value = True
+                with mock.patch("io.open", side_effect=mocked_open):
+                    TestDeployer.build_ini_file_from_template(some_template_file_name,
+                                                              some_ini_file_name,
+                                                              bs_env='fourfront-indexer')
 
         # Uncomment this for debugging...
         # assert False, "PASSED"
