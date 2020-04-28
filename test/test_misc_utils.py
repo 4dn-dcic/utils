@@ -2,7 +2,7 @@ import io
 import json
 import os
 import webtest
-from dcicutils.misc_utils import PRINT, ignored, get_setting_from_context, VirtualApp
+from dcicutils.misc_utils import PRINT, ignored, get_setting_from_context, VirtualApp, _VirtualAppHelper
 from unittest import mock
 
 
@@ -115,7 +115,7 @@ class FakeApp:
 
 
 def test_virtual_app_creation():
-    with mock.patch.object(webtest, "TestApp", FakeTestApp):
+    with mock.patch.object(VirtualApp, "HELPER_CLASS", FakeTestApp):
         app = FakeApp()
         environ = {'some': 'stuff'}
 
@@ -123,8 +123,9 @@ def test_virtual_app_creation():
 
         assert isinstance(vapp, VirtualApp)
         assert not isinstance(vapp, webtest.TestApp)
+        assert not isinstance(vapp, _VirtualAppHelper)
 
-        assert isinstance(vapp.wrapped_app, webtest.TestApp)  # the mocked one, anyway.
+        assert isinstance(vapp.wrapped_app, FakeTestApp)  # the mocked one, anyway.
         assert vapp.wrapped_app.app is app
         assert vapp.wrapped_app.extra_environ is environ
 
@@ -133,7 +134,7 @@ def test_virtual_app_creation():
 
 def test_virtual_app_get():
 
-    with mock.patch.object(webtest, "TestApp", FakeTestApp):
+    with mock.patch.object(VirtualApp, "HELPER_CLASS", FakeTestApp):
         app = FakeApp()
         environ = {'some': 'stuff'}
         vapp = VirtualApp(app, environ)
@@ -182,7 +183,7 @@ def test_virtual_app_get():
 
 def test_virtual_app_post_json():
 
-    with mock.patch.object(webtest, "TestApp", FakeTestApp):
+    with mock.patch.object(VirtualApp, "HELPER_CLASS", FakeTestApp):
         app = FakeApp()
         environ = {'some': 'stuff'}
         vapp = VirtualApp(app, environ)
@@ -237,7 +238,7 @@ def test_virtual_app_post_json():
 
 def test_virtual_app_patch_json():
 
-    with mock.patch.object(webtest, "TestApp", FakeTestApp):
+    with mock.patch.object(VirtualApp, "HELPER_CLASS", FakeTestApp):
         app = FakeApp()
         environ = {'some': 'stuff'}
         vapp = VirtualApp(app, environ)
