@@ -3,12 +3,112 @@ This file contains functions that might be generally useful.
 """
 
 import os
+import logging
+import webtest  # importing the library makes it easier to mock testing
+
+
+# Is this the right place for this? I feel like this should be done in an application, not a library.
+# -kmp 27-Apr-2020
+logging.basicConfig()
 
 
 # Using PRINT(...) for debugging, rather than its more familiar lowercase form) for intended programmatic output,
 # makes it easier to find stray print statements that were left behind in debugging. -kmp 30-Mar-2020
 
 PRINT = print
+
+
+class VirtualAppError(Exception):
+    """ Special Exception to be raised by VirtualApp that contains some additional info """
+
+    def __init__(self, msg, url, body, e):
+        super(VirtualAppError, self).__init__(msg)
+        self.msg = msg
+        self.query_url = url
+        self.query_body = body
+        self.raw_exception = e
+
+    def __repr__(self):
+        return "Exception encountered on VirtualApp\n" \
+               "URL: %s\n" \
+               "BODY: %s\n" \
+               "MSG: %s\n" \
+               "Raw Exception: %s\n" % (self.query_url, self.query_body, self.msg, self.raw_exception)
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class _VirtualAppHelper(webtest.TestApp):  # effectively disguises 'TestApp'
+    pass
+
+
+class VirtualApp:
+    """
+    Wrapper class for TestApp, to allow custom control over submitting Encoded requests,
+    simulating a number of conditions, including permissions.
+
+    IMPORTANT: We use webtest.TestApp is used as substrate technology here, but use of this class
+        occurs in the main application, not just in testing. Among other things, we have
+        renamed the app here in order to avoid confusions created by the name when it is used
+        in production settings.
+    """
+    HELPER_CLASS = _VirtualAppHelper
+
+    def __init__(self, app, environ):
+        """
+        Builds an encoded application, allowing you to submit requests to an encoded application
+
+        :param app: return value of get_app(config_uri, app_name)
+        :param environ: options to pass to the application. Usually permissions.
+        """
+        #  NOTE: The TestApp class that we're wrapping takes a richer set of initialization parameters
+        #        (including relative_to, use_unicode, cookiejar, parser_features, json_encoder, and lint),
+        #        but we'll add them conservatively here. If there is a need for any of them, we should add
+        #        them explicitly here one-by-one as the need is shown so we have tight control of what
+        #        we're depending on and what we're not. -kmp 27-Apr-2020
+        self.wrapped_app = self.HELPER_CLASS(app, environ)
+
+    def get(self, url, **kwargs):
+        """ Wrapper for TestApp.get that logs the outgoing GET
+
+        :param url: url to GET
+        :param kwargs: args to pass to the GET
+        :return: result of GET
+        """
+        logging.info('OUTGOING HTTP GET: %s' % url)
+        try:
+            return self.wrapped_app.get(url, **kwargs)
+        except webtest.AppError as e:
+            raise VirtualAppError(msg='HTTP GET failed.', url=url, body='<empty>', e=str(e))
+
+    def post_json(self, url, obj, **kwargs):
+        """ Wrapper for TestApp.post_json that logs the outgoing POST
+
+        :param url: url to POST to
+        :param obj: object body to POST
+        :param kwargs: args to pass to the POST
+        :return: result of POST
+        """
+        logging.info('OUTGOING HTTP POST on url: %s with object: %s' % (url, obj))
+        try:
+            return self.wrapped_app.post_json(url, obj, **kwargs)
+        except webtest.AppError as e:
+            raise VirtualAppError(msg='HTTP POST failed.', url=url, body=obj, e=str(e))
+
+    def patch_json(self, url, fields, **kwargs):
+        """ Wrapper for TestApp.patch_json that logs the outgoing PATCH
+
+        :param url: url to PATCH to, should contain an object uuid
+        :param fields: fields to PATCH on uuid in URL
+        :param kwargs: args to pass to the PATCH
+        :return: result of PATCH
+        """
+        logging.info('OUTGOING HTTP PATCH on url: %s with changes: %s' % (url, fields))
+        try:
+            return self.wrapped_app.patch_json(url, fields, **kwargs)
+        except webtest.AppError as e:
+            raise VirtualAppError(msg='HTTP PATCH failed.', url=url, body=fields, e=str(e))
 
 
 def ignored(*args, **kwargs):

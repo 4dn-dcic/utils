@@ -12,6 +12,7 @@ from . import (
 )
 from .misc_utils import PRINT
 import requests
+from elasticsearch.exceptions import AuthorizationException
 # urlparse import differs between py2 and 3
 if sys.version_info[0] < 3:
     import urlparse
@@ -697,7 +698,7 @@ def delete_field(obj_id, del_field, key=None, ff_env=None):
 
 def get_es_search_generator(es_client, index, body, page_size=200):
     """
-    Simple generator behind get_es_metada which takes an es_client (from
+    Simple generator behind get_es_metadata which takes an es_client (from
     es_utils create_es_client), a string index, and a dict query body.
     Also takes an optional string page_size, which controls pagination size
     NOTE: 'index' must be namespaced
@@ -883,7 +884,8 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
         add_pc_wfr (bool):               Include workflow_runs and linked items (processed/ref files, wf, software...)
         ignore_field(list):              Remove keys from items, so any linking through these fields, ie relations
         use_generator (bool):            Use a generator when getting es. Less memory used but takes longer
-        es_client:                       optional result from es_utils.create_es_client
+        es_client:                       optional result from es_utils.create_es_client - note this could be regenerated
+                                         in this method if the signature expires
     Returns:
         dict: contains all item types as keys, and with values of list of dictionaries
               i.e.
@@ -930,8 +932,21 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
 
     while uuid_list:
         uuids_to_check = []  # uuids to add to uuid_list if not if not in item_uuids
-        for es_item in get_es_metadata(uuid_list, es_client=es_client, chunk_size=chunk,
-                                       is_generator=use_generator, key=auth):
+
+        # get the next page of data, recreating the es_client if need be
+        try:
+            current_page = get_es_metadata(uuid_list, es_client=es_client, chunk_size=chunk,
+                                           is_generator=use_generator, key=auth)
+        except AuthorizationException:  # our signature expired, recreate the es_client with a fresh signature
+            if es_url:
+                es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
+            else:  # recreate client and try again - if we fail here, exception should propagate
+                es_url = get_health_page(key=auth)['elasticsearch']
+                es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
+
+            current_page = get_es_metadata(uuid_list, es_client=es_client, chunk_size=chunk,
+                                           is_generator=use_generator, key=auth)
+        for es_item in current_page:
             # get object type via es result and schema for storing
             obj_type = es_item['object']['@type'][0]
             obj_key = schema_name[obj_type]
