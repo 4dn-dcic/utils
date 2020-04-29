@@ -10,6 +10,9 @@ build:  # builds
 	make configure
 	poetry install
 
+update:  # updates dependencies
+    poetry update
+
 test:
 	pytest -vv
 
