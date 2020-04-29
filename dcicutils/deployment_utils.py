@@ -23,6 +23,7 @@ import glob
 import io
 import json
 import os
+import pkg_resources
 import re
 import subprocess
 import sys
@@ -30,7 +31,7 @@ import toml
 import argparse
 
 from dcicutils.env_utils import (
-    is_stg_or_prd_env, prod_bucket_env, get_standard_mirror_env, data_set_for_env, INDEXER_ENVS
+    is_stg_or_prd_env, prod_bucket_env, get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS,
 )
 from dcicutils.misc_utils import PRINT
 
@@ -130,10 +131,7 @@ class Deployer:
         es_server = es_server or os.environ.get('ENCODED_ES_SERVER', "MISSING_ENCODED_ES_SERVER")
         bs_env = bs_env or os.environ.get("ENCODED_BS_ENV", "MISSING_ENCODED_BS_ENV")
         bs_mirror_env = bs_mirror_env or os.environ.get("ENCODED_BS_MIRROR_ENV", get_standard_mirror_env(bs_env)) or ""
-        s3_bucket_env = s3_bucket_env or os.environ.get("ENCODED_S3_BUCKET_ENV",
-                                                        prod_bucket_env(bs_env)
-                                                        if is_stg_or_prd_env(bs_env)
-                                                        else bs_env)
+        s3_bucket_env = s3_bucket_env or os.environ.get("ENCODED_S3_BUCKET_ENV", get_bucket_env(bs_env))
         data_set = data_set or os.environ.get("ENCODED_DATA_SET",
                                               data_set_for_env(bs_env) or "MISSING_ENCODED_DATA_SET")
         es_namespace = es_namespace or os.environ.get("ENCODED_ES_NAMESPACE", bs_env)
@@ -148,6 +146,8 @@ class Deployer:
         extra_vars = {
             'APP_VERSION': cls.get_app_version(),
             'PROJECT_VERSION': toml.load(cls.PYPROJECT_FILE_NAME)['tool']['poetry']['version'],
+            'SNOVAULT_VERSION': pkg_resources.get_distribution("dcicsnovault").version,
+            'UTILS_VERSION': pkg_resources.get_distribution("dcicutils").version,
             'ES_SERVER': es_server,
             'BS_ENV': bs_env,
             'BS_MIRROR_ENV': bs_mirror_env,
@@ -192,6 +192,13 @@ class Deployer:
                 # Let's be tidy and put things back the way they were before.
                 # Most things probably don't care, but testing might.
                 del os.environ[key]
+
+    @classmethod
+    def any_environment_template_filename(cls):
+        file = os.path.join(cls.TEMPLATE_DIR, "any.ini")
+        if not os.path.exists(file):
+            raise ValueError("Special template any.ini was not found.")
+        return file
 
     @classmethod
     def environment_template_filename(cls, env_name):
@@ -259,6 +266,7 @@ class Deployer:
                                 default=False)
             args = parser.parse_args()
             template_file_name = cls.environment_template_filename(args.env)
+            # template_file_name = cls.any_environment_template_filename()
             ini_file_name = args.target
             # print("template_file_name=", template_file_name)
             # print("ini_file_name=", ini_file_name)

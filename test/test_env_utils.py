@@ -11,9 +11,33 @@ from dcicutils.env_utils import (
     CGAP_ENV_HOTSEAT_NEW, CGAP_ENV_STAGING_NEW, CGAP_ENV_WEBDEV_NEW, CGAP_ENV_WOLF_NEW,
     get_mirror_env_from_context, is_test_env, is_hotseat_env, guess_mirror_env, get_standard_mirror_env,
     prod_bucket_env, public_url_mappings, CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
-    infer_repo_from_env, data_set_for_env,
+    infer_repo_from_env, data_set_for_env, get_bucket_env
 )
 from unittest import mock
+
+
+def test_get_bucket_env():
+
+    # Fourfront tests
+
+    assert get_bucket_env('fourfront-webprod') == FF_PROD_BUCKET_ENV
+    assert get_bucket_env('fourfront-webprod2') == FF_PROD_BUCKET_ENV
+
+    assert get_bucket_env('fourfront-blue') == FF_PROD_BUCKET_ENV
+    assert get_bucket_env('fourfront-green') == FF_PROD_BUCKET_ENV
+
+    assert get_bucket_env('fourfront-mastertest') == 'fourfront-mastertest'
+    assert get_bucket_env('fourfront-webdev') == 'fourfront-webdev'
+
+    # CGAP tests
+
+    assert get_bucket_env('fourfront-cgap') == CGAP_PROD_BUCKET_ENV
+
+    assert get_bucket_env('fourfront-cgap-blue') == CGAP_PROD_BUCKET_ENV
+    assert get_bucket_env('fourfront-cgap-green') == CGAP_PROD_BUCKET_ENV
+
+    assert get_bucket_env('fourfront-cgapdev') == 'fourfront-cgapdev'
+    assert get_bucket_env('fourfront-cgapwolf') == 'fourfront-cgapwolf'
 
 
 def test_prod_bucket_env():
