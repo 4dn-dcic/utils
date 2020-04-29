@@ -30,9 +30,7 @@ import sys
 import toml
 import argparse
 
-from dcicutils.env_utils import (
-    is_stg_or_prd_env, prod_bucket_env, get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS,
-)
+from dcicutils.env_utils import get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS
 from dcicutils.misc_utils import PRINT
 
 
