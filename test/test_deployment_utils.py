@@ -26,6 +26,42 @@ class TestDeployer(Deployer):
     PYPROJECT_FILE_NAME = os.path.join(os.path.dirname(_MY_DIR), "pyproject.toml")
 
 
+def test_deployment_utils_omittable():
+
+    assert not TestDeployer.omittable("foo", "foo")
+    assert not TestDeployer.omittable(" foo", " foo")
+    assert not TestDeployer.omittable("foo=", "foo=")
+    assert not TestDeployer.omittable(" foo=", " foo=")
+    assert not TestDeployer.omittable("foo =", "foo=")
+    assert not TestDeployer.omittable(" foo =", " foo=")
+    assert not TestDeployer.omittable("foo=$X", "foo=bar")
+    assert not TestDeployer.omittable(" foo=$X", " foo=$X")
+    assert not TestDeployer.omittable("foo = $X", "foo = bar")
+    assert not TestDeployer.omittable(" foo = $X", " foo = $X")
+    assert not TestDeployer.omittable("foo=${X}", "foo=bar")
+    assert not TestDeployer.omittable(" foo=${X}", " foo=${X}")
+    assert not TestDeployer.omittable("foo = ${X}", "foo = bar")
+    assert not TestDeployer.omittable(" foo = ${X}", " foo = ${X}")
+    assert TestDeployer.omittable("foo=$X", "foo=")
+    assert TestDeployer.omittable("foo=$X", "foo= ")
+    assert TestDeployer.omittable("foo=$X", "foo= ")
+    assert TestDeployer.omittable("foo=$X", "foo= \r")
+    assert TestDeployer.omittable("foo=$X", "foo= \r\n")
+    assert TestDeployer.omittable("foo=$X", "foo=   \r\n \r\n ")
+    assert TestDeployer.omittable("foo=${X}", "foo=")
+    assert TestDeployer.omittable("foo=${X}", "foo=")
+    assert TestDeployer.omittable("foo=${X}", "foo= ")
+    assert TestDeployer.omittable("foo=${X}", "foo= \r")
+    assert TestDeployer.omittable("foo=${X}", "foo= \r\n")
+    assert TestDeployer.omittable("foo=${X}", "foo=   \r\n \r\n ")
+    assert TestDeployer.omittable(" foo = $X", " foo =")
+    assert TestDeployer.omittable(" foo = $X", " foo = ")
+    assert TestDeployer.omittable(" foo = $X", " foo = ")
+    assert TestDeployer.omittable(" foo = $X", " foo = \r")
+    assert TestDeployer.omittable(" foo = $X", " foo = \r\n")
+    assert TestDeployer.omittable(" foo = $X", " foo =   \r\n \r\n ")
+
+
 def test_deployment_utils_environment_template_filename():
 
     with pytest.raises(ValueError):
@@ -457,6 +493,11 @@ def test_deployment_utils_transitional_equivalence():
     #       can either be removed (and these transitional tests removed) or transitioned to be test data.
 
     def tester(ref_ini, bs_env, data_set, es_server, es_namespace=None):
+        """
+        This common tester program checks that the any.ini does the same thing as a given ref ini,
+        given a particular set of environment variables.  It does the output to a string in both cases
+        and then compares the result.
+        """
 
         assert ref_ini[:-4] == bs_env[10:]  # "xxx.ini" needs to match "fourfront-xxx"
 

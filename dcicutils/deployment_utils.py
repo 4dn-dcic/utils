@@ -100,7 +100,12 @@ class Deployer:
         except Exception:
             return 'unknown-version-at-' + datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
 
+    PARAMETERIZED_ASSIGNMENT = re.compile(r'^[ \t]*[A-Za-z][A-Za-z0-9.-_]*[ \t]*=[ \t]*[$][{]?[A-Za-z].*$')
     EMPTY_ASSIGNMENT = re.compile(r'^[ \t]*[A-Za-z][A-Za-z0-9.-_]*[ \t]*=[ \t\r\n]*$')
+
+    @classmethod
+    def omittable(cls, line, expanded_line):
+        return cls.PARAMETERIZED_ASSIGNMENT.match(line) and cls.EMPTY_ASSIGNMENT.match(expanded_line)
 
     @classmethod
     def build_ini_stream_from_template(cls, template_file_name, init_file_stream,
@@ -181,7 +186,7 @@ class Deployer:
                     # if '$' in line:
                     #     print("line=", line)
                     #     print("expanded_line=", expanded_line)
-                    if not cls.EMPTY_ASSIGNMENT.match(expanded_line):
+                    if not cls.omittable(line, expanded_line):
                         init_file_stream.write(expanded_line)
 
         finally:
