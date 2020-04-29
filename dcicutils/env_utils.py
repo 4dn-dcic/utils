@@ -188,6 +188,10 @@ def prod_bucket_env(envname):
     return BEANSTALK_PROD_BUCKET_ENVS.get(envname)
 
 
+def get_bucket_env(envname):
+    return prod_bucket_env(envname) if is_stg_or_prd_env(envname) else envname
+
+
 def public_url_mappings(envname):
     """
     Returns a table of the public URLs we use for the ecosystem in which the envname resides.
