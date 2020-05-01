@@ -807,20 +807,31 @@ def test_faceted_search_users(integrated_ff):
     """
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     all_facets = ff_utils.get_item_facets('user', key=key, ff_env=ff_env)
+    any_affiliation = {'item_type': 'user',
+                       'key': key,
+                       'ff_env': ff_env,
+                       'item_facets': all_facets}
+    resp = ff_utils.faceted_search(**any_affiliation)
+    total = len(resp)
+    print("total=", total)  # Probably a number somewhere near 30
+    assert total > 10 and total < 50
     affiliation = {'item_type': 'user',
                    'Affiliation': '4DN Testing Lab',
                    'key': key,
                    'ff_env': ff_env,
                    'item_facets': all_facets}
     resp = ff_utils.faceted_search(**affiliation)
-    assert len(resp) == 4
+    affiliated = len(resp)
+    print("affiliated=", affiliated)  # Probably a number near 5
+    assert affiliated < 10
     neg_affiliation = {'item_type': 'user',
                        'Affiliation': '-4DN Testing Lab',
                        'key': key,
                        'ff_env': ff_env,
                        'item_facets': all_facets}
     resp = ff_utils.faceted_search(**neg_affiliation)
-    assert len(resp) == 24
+    unaffiliated = len(resp)  # Probably a number near 25, but in any case the length of the complement set
+    assert unaffiliated == total - affiliated
     neg_affiliation = {'item_type': 'user',
                        'Affiliation': '-4DN Testing Lab',
                        'key': key,
@@ -989,7 +1000,12 @@ def test_search_es_metadata(integrated_ff):
     """ Tests search_es_metadata on mastertest """
     res = ff_utils.search_es_metadata('fourfront-mastertestuser', {'size': '1000'},
                                       key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
-    assert len(res) == 28
+    # The exact number may vary, so just do some random plausibility checking of result.
+    n_users = len(res)  # Probably a bit more than 20, since 20 are in the master inserts
+    assert n_users > 20 and n_users < 100
+    assert all(item["_type"] == "user" for item in res)  # Make sure they are all users
+    assert all("@" in item["_source"]["embedded"]["email"] for item in res) # Make sure all have an email address
+    assert len(res) == len({ item["_id"] for item in res })  # Make sure ids are unique
     test_query = {
         'query': {
             'bool': {
@@ -1004,7 +1020,9 @@ def test_search_es_metadata(integrated_ff):
     res = ff_utils.search_es_metadata('fourfront-mastertestuser', test_query,
                                       key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
     assert len(res) == 1
-
+    # Do some plausibility checking that it's Will and that he has data.
+    assert res[0]["_source"]["embedded"]["first_name"] == "Will"
+    assert res[0]["_source"]["embedded"]["groups"] == ["admin"]
 
 @pytest.mark.integrated
 def test_search_es_metadata_generator(integrated_ff):

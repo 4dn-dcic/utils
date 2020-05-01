@@ -1,4 +1,5 @@
 import datetime
+import io
 import os
 
 import pytest
@@ -200,7 +201,8 @@ def test_deployment_utils_build_ini_file_from_template():
                             'shhh = "$RDS_PASSWORD"\n'
                             'version = "${APP_VERSION}"\n'
                             'project_version = "${PROJECT_VERSION}"\n'
-                            'indexer = ${INDEXER}'
+                            'indexer = ${INDEXER}\n'
+                            'index_server = ${INDEX_SERVER}\n'
                         )
 
                     elif filename == TestDeployer.PYPROJECT_FILE_NAME:
@@ -249,6 +251,7 @@ def test_deployment_utils_build_ini_file_from_template():
                 'shhh = "my-secret"',
                 'version = "%s"' % MOCKED_BUNDLE_VERSION,
                 'project_version = "%s"' % MOCKED_PROJECT_VERSION,
+                'indexer = true',
             ]
 
             MockFileStream.reset()
@@ -274,6 +277,7 @@ def test_deployment_utils_build_ini_file_from_template():
                 'shhh = "my-secret"',
                 'version = "%s"' % MOCKED_LOCAL_GIT_VERSION,  # This is the result of no manifest file existing
                 'project_version = "%s"' % MOCKED_PROJECT_VERSION,
+                'indexer = true',
             ]
 
             MockFileStream.reset()
@@ -314,53 +318,63 @@ def test_deployment_utils_build_ini_file_from_template():
                 'shhh = "my-secret"',
                 'version = "unknown-version-at-20010203045506000000"',  # We mocked datetime.datetime.now() to get this
                 'project_version = "%s"' % MOCKED_PROJECT_VERSION,
+                'indexer = true',
             ]
 
             MockFileStream.reset()
 
-            for truth in ["TRUE", "True", "true"]:
+            truth = ["TRUE", "True", "true", "something"]
+            falsity = ["FALSE", "False", "false"]
 
-                # For this test, we check if the 'indexer' option being set correctly sets the ENCODED.INDEXER option
-                with mock.patch("os.path.exists") as mock_exists:
-                    mock_exists.return_value = True
-                    with mock.patch("io.open", side_effect=mocked_open):
-                        with override_environ(ENCODED_INDEXER=truth):
-                            TestDeployer.build_ini_file_from_template(some_template_file_name, some_ini_file_name)
+            for indexer_truth in truth:
+                for index_server_truth in truth:
+                    print("indexer_truth=", indexer_truth, "index_server_truth=", index_server_truth)
+                    # For this test, we check if the 'indexer' option being set correctly sets the ENCODED.INDEXER option
+                    with mock.patch("os.path.exists") as mock_exists:
+                        mock_exists.return_value = True
+                        with mock.patch("io.open", side_effect=mocked_open):
+                            with override_environ(ENCODED_INDEXER=indexer_truth,
+                                                  ENCODED_INDEX_SERVER=index_server_truth):
+                                TestDeployer.build_ini_file_from_template(some_template_file_name, some_ini_file_name)
 
-                assert MockFileStream.FILE_SYSTEM[some_ini_file_name] == [
-                    '[Foo]',
-                    'database = "snow_white"',
-                    'some_url = "http://user@unittest:6543/"',
-                    'oops = "$NOT_AN_ENV_VAR"',
-                    'hmmm = "${NOT_AN_ENV_VAR_EITHER}"',
-                    'shhh = "my-secret"',
-                    'version = "%s"' % MOCKED_BUNDLE_VERSION,
-                    'project_version = "11.22.33"',
-                    'indexer = true',  # the value will have been canonicalized
-                ]
+                    assert MockFileStream.FILE_SYSTEM[some_ini_file_name] == [
+                        '[Foo]',
+                        'database = "snow_white"',
+                        'some_url = "http://user@unittest:6543/"',
+                        'oops = "$NOT_AN_ENV_VAR"',
+                        'hmmm = "${NOT_AN_ENV_VAR_EITHER}"',
+                        'shhh = "my-secret"',
+                        'version = "%s"' % MOCKED_BUNDLE_VERSION,
+                        'project_version = "11.22.33"',
+                        'indexer = true',  # the value will have been canonicalized
+                        'index_server = true',
+                    ]
 
-                MockFileStream.reset()
+                    MockFileStream.reset()
 
-            for falsity in ["FALSE", "False", "false", "", None, "misspelling"]:
+            for indexer_falsity in falsity:
+                for index_server_falsity in falsity:
+                    print("indexer_falsity=", indexer_falsity, "index_server_falsity=", index_server_falsity)
+                    # For this test, we check if the 'indexer' option being set correctly sets the ENCODED.INDEXER option
+                    with mock.patch("os.path.exists") as mock_exists:
+                        mock_exists.return_value = True
+                        with mock.patch("io.open", side_effect=mocked_open):
+                            with override_environ(ENCODED_INDEXER=indexer_falsity,
+                                                  ENCODED_INDEX_SERVER=index_server_falsity):
+                                TestDeployer.build_ini_file_from_template(some_template_file_name, some_ini_file_name)
 
-                # For this test, we check if the 'indexer' option being set correctly sets the ENCODED.INDEXER option
-                with mock.patch("os.path.exists") as mock_exists:
-                    mock_exists.return_value = True
-                    with mock.patch("io.open", side_effect=mocked_open):
-                        with override_environ(ENCODED_INDEXER=falsity):
-                            TestDeployer.build_ini_file_from_template(some_template_file_name, some_ini_file_name)
-
-                assert MockFileStream.FILE_SYSTEM[some_ini_file_name] == [
-                    '[Foo]',
-                    'database = "snow_white"',
-                    'some_url = "http://user@unittest:6543/"',
-                    'oops = "$NOT_AN_ENV_VAR"',
-                    'hmmm = "${NOT_AN_ENV_VAR_EITHER}"',
-                    'shhh = "my-secret"',
-                    'version = "%s"' % MOCKED_BUNDLE_VERSION,
-                    'project_version = "11.22.33"',
-                    # (The 'indexer =' line will be suppressed.)
-                ]
+                    assert MockFileStream.FILE_SYSTEM[some_ini_file_name] == [
+                        '[Foo]',
+                        'database = "snow_white"',
+                        'some_url = "http://user@unittest:6543/"',
+                        'oops = "$NOT_AN_ENV_VAR"',
+                        'hmmm = "${NOT_AN_ENV_VAR_EITHER}"',
+                        'shhh = "my-secret"',
+                        'version = "%s"' % MOCKED_BUNDLE_VERSION,
+                        'project_version = "11.22.33"',
+                        # (The 'indexer =' line will be suppressed.)
+                        # (The 'indexer_server =' line will be suppressed.)
+                    ]
 
                 MockFileStream.reset()
 
@@ -492,7 +506,7 @@ def test_deployment_utils_transitional_equivalence():
     # TODO: Once this mechanism is in place, the files cgap.ini, cgapdev.ini, cgaptest.ini, and cgapwolf.ini
     #       can either be removed (and these transitional tests removed) or transitioned to be test data.
 
-    def tester(ref_ini, bs_env, data_set, es_server, es_namespace=None):
+    def tester(ref_ini, bs_env, data_set, es_server, es_namespace=None, line_checker=None):
         """
         This common tester program checks that the any.ini does the same thing as a given ref ini,
         given a particular set of environment variables.  It does the output to a string in both cases
@@ -535,40 +549,138 @@ def test_deployment_utils_transitional_equivalence():
         new_content = new_output.getvalue()
         assert old_content == new_content
 
+        problems = []
+
+        if line_checker:
+
+            for raw_line in io.StringIO(new_content):
+                line = raw_line.rstrip()
+                problem = line_checker.check(line)
+                if problem:
+                    problems.append(problem)
+
+            line_checker.check_finally()
+
+            assert problems == [], "Problems found:\n%s" % "\n".join(problems)
+
     with mock.patch("pkg_resources.get_distribution", return_value=FakeDistribution()):
         with mock.patch.object(TestDeployer, "get_app_version", return_value=MOCKED_PROJECT_VERSION):
             with mock.patch("toml.load", return_value={"tool": {"poetry": {"version": MOCKED_LOCAL_GIT_VERSION}}}):
+                with override_environ(ENCODED_INDEXER=None, ENCODED_INDEX_SERVER=None):
 
-                # CGAP uses data_set='prod' for 'fourfront-cgap' and data_set='test' for all others.
+                    class Checker:
 
-                tester(ref_ini="cgap.ini", bs_env="fourfront-cgap", data_set="prod",
-                       es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.us-east-1.es.amazonaws.com:80")
+                        def __init__(self, expect_indexer, expect_index_server):
+                            self.indexer = None
+                            self.expect_indexer = expect_indexer
+                            self.expect_index_server = expect_index_server
+                            self.indexer = None
+                            self.index_server = None
 
-                tester(ref_ini="cgapdev.ini", bs_env="fourfront-cgapdev", data_set="test",
-                       es_server="search-fourfront-cgapdev-gnv2sgdngkjbcemdadmaoxcsae.us-east-1.es.amazonaws.com:80")
+                        def check_any(self, line):
+                            if line.startswith('indexer ='):
+                                print("saw indexer line:", repr(line))
+                                self.indexer = line.split('=')[1].strip()
+                            if line.startswith('index_server ='):
+                                print("saw index server line:", repr(line))
+                                self.index_server = line.split('=')[1].strip()
 
-                tester(ref_ini="cgaptest.ini", bs_env="fourfront-cgaptest", data_set="test",
-                       es_server="search-fourfront-cgaptest-dxiczz2zv7f3nshshvevcvmpmy.us-east-1.es.amazonaws.com:80")
+                        def check(self, line):
+                            self.check_any(line)
 
-                tester(ref_ini="cgapwolf.ini", bs_env="fourfront-cgapwolf", data_set="test",
-                       es_server="search-fourfront-cgapwolf-r5kkbokabymtguuwjzspt2kiqa.us-east-1.es.amazonaws.com:80")
+                        def check_finally(self):
+                            assert self.indexer == self.expect_indexer
+                            assert self.index_server == self.expect_index_server
 
-                # Fourfront uses data_set='prod' for everything but 'fourfront-mastertest', which uses data_set='test'
+                    class CGAPProdChecker(Checker):
+                        pass
 
-                tester(ref_ini="webprod.ini", bs_env="fourfront-webprod", data_set="prod",
-                       es_server="search-fourfront-webprod-hmrrlalm4ifyhl4bzbvl73hwv4.us-east-1.es.amazonaws.com:80")
+                    class FFProdChecker(Checker):
 
-                tester(ref_ini="webprod2.ini", bs_env="fourfront-webprod2", data_set="prod",
-                       es_server="search-fourfront-webprod2-fkav4x4wjvhgejtcg6ilrmczpe.us-east-1.es.amazonaws.com:80")
+                        def check(self, line):
+                            if 'bucket =' in line:
+                                fragment = 'fourfront-webprod'
+                                if fragment not in line:
+                                    return "'%s' missing in '%s'" % (fragment, line)
+                            self.check_any(line)
 
-                tester(ref_ini="blue.ini", bs_env="fourfront-blue", data_set="prod",
-                       es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.us-east-1.es.amazonaws.com:80")
+                    # CGAP uses data_set='prod' for 'fourfront-cgap' and data_set='test' for all others.
 
-                tester(ref_ini="green.ini", bs_env="fourfront-green", data_set="prod",
-                       es_server="search-fourfront-green-cghpezl64x4uma3etijfknh7ja.us-east-1.es.amazonaws.com:80")
+                    us_east = "us-east-1.es.amazonaws.com:80"
+                    index_default = "true"
+                    index_server_default = None
 
-                tester(ref_ini="webdev.ini", bs_env="fourfront-webdev", data_set="prod",
-                       es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.us-east-1.es.amazonaws.com:80")
+                    tester(ref_ini="cgap.ini", bs_env="fourfront-cgap", data_set="prod",
+                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                           line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                        expect_index_server=index_server_default))
 
-                tester(ref_ini="mastertest.ini", bs_env="fourfront-mastertest", data_set="test",
-                       es_server="search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.us-east-1.es.amazonaws.com:80")
+                    tester(ref_ini="cgapdev.ini", bs_env="fourfront-cgapdev", data_set="test",
+                           es_server="search-fourfront-cgapdev-gnv2sgdngkjbcemdadmaoxcsae.%s" % us_east,
+                           line_checker=Checker(expect_indexer=index_default,
+                                                expect_index_server=index_server_default))
+
+                    tester(ref_ini="cgaptest.ini", bs_env="fourfront-cgaptest", data_set="test",
+                           es_server="search-fourfront-cgaptest-dxiczz2zv7f3nshshvevcvmpmy.%s" % us_east,
+                           line_checker=Checker(expect_indexer=index_default,
+                                                expect_index_server=index_server_default))
+
+                    tester(ref_ini="cgapwolf.ini", bs_env="fourfront-cgapwolf", data_set="test",
+                           es_server="search-fourfront-cgapwolf-r5kkbokabymtguuwjzspt2kiqa.%s" % us_east,
+                           line_checker=Checker(expect_indexer=index_default,
+                                                expect_index_server=index_server_default))
+
+                    # Fourfront uses data_set='prod' for everything but 'fourfront-mastertest',
+                    # which uses data_set='test'
+
+                    tester(ref_ini="blue.ini", bs_env="fourfront-blue", data_set="prod",
+                           es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                           line_checker=FFProdChecker(expect_indexer=index_default,
+                                                      expect_index_server=index_server_default))
+
+                    tester(ref_ini="green.ini", bs_env="fourfront-green", data_set="prod",
+                           es_server="search-fourfront-green-cghpezl64x4uma3etijfknh7ja.%s" % us_east,
+                           line_checker=FFProdChecker(expect_indexer=index_default,
+                                                      expect_index_server=index_server_default))
+
+                    tester(ref_ini="hotseat.ini", bs_env="fourfront-hotseat", data_set="prod",
+                           es_server="search-fourfront-hotseat-f3oxd2wjxw3h2wsxxbcmzhhd4i.%s" % us_east,
+                           line_checker=Checker(expect_indexer=index_default,
+                                                expect_index_server=index_server_default))
+
+                    tester(ref_ini="mastertest.ini", bs_env="fourfront-mastertest", data_set="test",
+                           es_server="search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.%s" % us_east,
+                           line_checker=Checker(expect_indexer=index_default,
+                                                expect_index_server=index_server_default))
+
+                    tester(ref_ini="webdev.ini", bs_env="fourfront-webdev", data_set="prod",
+                           es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                           line_checker=Checker(expect_indexer=index_default,
+                                                expect_index_server=index_server_default))
+
+                    tester(ref_ini="webprod.ini", bs_env="fourfront-webprod", data_set="prod",
+                           es_server="search-fourfront-webprod-hmrrlalm4ifyhl4bzbvl73hwv4.%s" % us_east,
+                           line_checker=FFProdChecker(expect_indexer=index_default,
+                                                      expect_index_server=index_server_default))
+
+                    tester(ref_ini="webprod2.ini", bs_env="fourfront-webprod2", data_set="prod",
+                           es_server="search-fourfront-webprod2-fkav4x4wjvhgejtcg6ilrmczpe.%s" % us_east,
+                           line_checker=FFProdChecker(expect_indexer=index_default,
+                                                      expect_index_server=index_server_default))
+
+                    with override_environ(ENCODED_INDEXER="FALSE", ENCODED_INDEX_SERVER="TRUE"):
+
+                        tester(ref_ini="cgap.ini", bs_env="fourfront-cgap", data_set="prod",
+                               es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               line_checker=CGAPProdChecker(expect_indexer=None,
+                                                            expect_index_server="true"))
+
+                        tester(ref_ini="blue.ini", bs_env="fourfront-blue", data_set="prod",
+                               es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                               line_checker=FFProdChecker(expect_indexer=None,
+                                                          expect_index_server="true"))
+
+                        tester(ref_ini="webdev.ini", bs_env="fourfront-webdev", data_set="prod",
+                               es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                               line_checker=Checker(expect_indexer=None,
+                                                    expect_index_server="true"))
