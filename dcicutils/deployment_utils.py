@@ -43,7 +43,8 @@ class Deployer:
     @classmethod
     def build_ini_file_from_template(cls, template_file_name, init_file_name,
                                      bs_env=None, bs_mirror_env=None, s3_bucket_env=None,
-                                     data_set=None, es_server=None, es_namespace=None, indexer=False):
+                                     data_set=None, es_server=None, es_namespace=None,
+                                     indexer=None, index_server=None):
         """
         Builds a .ini file from a given template file.
 
@@ -57,6 +58,7 @@ class Deployer:
             es_server (str): The server name (or server:port) for the ElasticSearch server.
             es_namespace (str): The ElasticSearch namespace to use (probably but not necessarily same as bs_env).
             indexer (bool): Whether or not we are building an ini file for an indexer.
+            index_server (bool): Whether or not we are building an ini file for an index server.
         """
         with io.open(init_file_name, 'w') as init_file_fp:
             cls.build_ini_stream_from_template(template_file_name=template_file_name,
@@ -110,7 +112,7 @@ class Deployer:
     @classmethod
     def build_ini_stream_from_template(cls, template_file_name, init_file_stream,
                                        bs_env=None, bs_mirror_env=None, s3_bucket_env=None, data_set=None,
-                                       es_server=None, es_namespace=None, indexer=False):
+                                       es_server=None, es_namespace=None, indexer=None, index_server=None):
         """
         Sends output to init_file_stream corresponding to the data noe would want in an ini file
         for the given template_file_name and available environment variables.
@@ -125,12 +127,12 @@ class Deployer:
             es_server: The name of an es server to use.
             es_namespace: The namespace to use on the es server. If None, this uses the bs_env.
             indexer: Whether or not we are building an ini file for an indexer.
+            indexer: Whether or not we are building an ini file for an index server.
 
         Returns: None
 
         """
 
-        # print("data_set given = ", data_set)
         es_server = es_server or os.environ.get('ENCODED_ES_SERVER', "MISSING_ENCODED_ES_SERVER")
         bs_env = bs_env or os.environ.get("ENCODED_BS_ENV", "MISSING_ENCODED_BS_ENV")
         bs_mirror_env = bs_mirror_env or os.environ.get("ENCODED_BS_MIRROR_ENV", get_standard_mirror_env(bs_env)) or ""
@@ -142,9 +144,22 @@ class Deployer:
         # If the value is missing, the empty string, or any other thing besides 'true' (in any case),
         # this value will default to the empty string, causing the line not to appear in the output file
         # because there is a special case that suppresses output of empty values. -kmp 27-Apr-2020
-        indexer = "true" if indexer or os.environ.get('ENCODED_INDEXER', "false").upper() == "TRUE" else ""
 
-        # print("data_set computed = ", data_set)
+        if indexer is None:  # If argument is not None, then it's True or False. Use that.
+            env_var_val = os.environ.get('ENCODED_INDEXER', "true").upper()
+            if env_var_val == "FALSE":
+                indexer = False
+            else:
+                indexer = True
+        indexer = "true" if indexer else ""  # this will omit the line if it's going to be False
+
+        if index_server is None:  # If argument is not None, then it's True or False. Use that.
+            server_env_var_val = os.environ.get('ENCODED_INDEX_SERVER', "false").upper()
+            if server_env_var_val == "FALSE":
+                index_server = False
+            else:
+                index_server = True
+        index_server = "true" if index_server else ""  # this will omit the line if it's going to be False
 
         extra_vars = {
             'APP_VERSION': cls.get_app_version(),
@@ -158,12 +173,13 @@ class Deployer:
             'DATA_SET': data_set,
             'ES_NAMESPACE': es_namespace,
             'INDEXER': indexer,
+            'INDEX_SERVER': index_server,
         }
 
         # if we specify an indexer name for bs_env, we did the deployment wrong and should bail
         if bs_env in INDEXER_ENVS:
             raise RuntimeError("Deployed with bs_env %s, which is an indexer env."
-                               "Re-deploy with the env you want to index and set the 'ENCODED.INDEXER'"
+                               "Re-deploy with the env you want to index and set the 'ENCODED_INDEXER'"
                                "environment variable." % bs_env)
 
         # We assume these variables are not set, but best to check first. Confusion might result otherwise.
@@ -271,9 +287,12 @@ class Deployer:
                                 help="an ElasticSearch namespace",
                                 default=None)
             parser.add_argument("--indexer",
-                                help="whether or not to deploy an indexer",
+                                help="whether this system does indexing",
                                 action='store_true',
                                 default=False)
+            parser.add_argument("--index_server",
+                                help="whether this is a standalone indexing server",
+                                default=None)
             args = parser.parse_args()
             template_file_name = (cls.any_environment_template_filename()
                                   if args.use_any
@@ -285,7 +304,7 @@ class Deployer:
                                              bs_env=args.bs_env, bs_mirror_env=args.bs_mirror_env,
                                              s3_bucket_env=args.s3_bucket_env, data_set=args.data_set,
                                              es_server=args.es_server, es_namespace=args.es_namespace,
-                                             indexer=args.indexer)
+                                             indexer=args.indexer, index_server=args.index_server)
         except Exception as e:
             PRINT("Error (%s): %s" % (e.__class__.__name__, e))
             sys.exit(1)
