@@ -1,5 +1,7 @@
-from .misc_utils import ignored
+import datetime
 import re
+
+from .misc_utils import ignored
 
 
 class EnglishUtils:
@@ -49,6 +51,12 @@ class EnglishUtils:
 
     @classmethod
     def string_pluralize(cls, word: str) -> str:
+        """
+        Returns the probable plural of the given word.
+        This is an ad hoc string pluralizer intended for situations where being mostly right is good enough.
+        e.g., string_pluralize('sample') => 'sample'
+              string_pluralize('community') => 'communities'
+        """
         charn = word[-1]
         char1 = word[0]
         capitalize = char1.isupper()
@@ -92,15 +100,31 @@ class EnglishUtils:
 
     @classmethod
     def select_a_or_an(cls, word):
+        """
+        Uses a heuristic to try to select the appropriate article ('a' or 'an') for a given English noun.
+        select_a_or_an("gene") => 'a'
+        select_a_or_an("accession") => 'an'
+        """
+
         return "a" if cls._PREFIX_PATTERN_FOR_A.match(word) else "an"
 
     @classmethod
     def a_or_an(cls, word):
+        """
+        Heuristically attaches either "a" or "an" to a given English noun.
+        a_or_an("gene") => "a gene"
+        a_or_an("accession") => "an accession"
+        """
         article = cls.select_a_or_an(word)
         return "%s %s" % (article, word)
 
     @classmethod
     def n_of(cls, n, thing, num_format=None):
+        """
+        Given a number and a noun, returns the name for that many of that noun.
+        e.g., n_of(7, "variant") => "7 variants"
+              n_of(1, "accession") => "1 accession"
+        """
         display_n = n
         if num_format:
             res = num_format(n, thing)
@@ -118,7 +142,13 @@ class EnglishUtils:
 
     @classmethod
     def relative_time_string(cls, seconds, detailed=True):
+        """
+        Given a number of seconds, expresses that number of seconds in English.
+        The seconds can be expressed either as a number or a datetime.timedelta.
+        """
         result = []
+        if isinstance(seconds, datetime.timedelta):
+            seconds = seconds.total_seconds()
         remaining_seconds = seconds
         units_seen = False
         for unit_info in cls._TIME_UNITS:

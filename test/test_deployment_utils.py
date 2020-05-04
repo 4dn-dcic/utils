@@ -1,16 +1,16 @@
 import datetime
 import io
 import os
-
 import pytest
 import re
 import subprocess
+import sys
 
 from contextlib import contextmanager
 from io import StringIO
 from unittest import mock
 
-from dcicutils.deployment_utils import Deployer
+from dcicutils.deployment_utils import Deployer, boolean_setting
 from dcicutils.env_utils import is_cgap_env
 from dcicutils.misc_utils import ignored
 from dcicutils.qa_utils import override_environ
@@ -684,3 +684,70 @@ def test_deployment_utils_transitional_equivalence():
                                es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
                                line_checker=Checker(expect_indexer=None,
                                                     expect_index_server="true"))
+
+
+def test_deployment_utils_main():
+
+    fake_template = "something.ini"
+    with override_environ(ENV_NAME='fourfront-foo'):
+        with mock.patch.object(Deployer, "build_ini_file_from_template") as mock_build:
+            with mock.patch.object(Deployer, "environment_template_filename", return_value=fake_template):
+                with mock.patch.object(Deployer, "template_environment_names", return_value=["something, foo"]):
+
+                    def check_for_mocked_build(expected_kwargs=None, expected_code=0):
+                        def mocked_build(*args, **kwargs):
+                            assert args == (fake_template, 'production.ini')
+                            assert kwargs == (expected_kwargs or {})
+                        mock_build.side_effect = mocked_build
+                        try:
+                            Deployer.main()
+                        except SystemExit as e:
+                            assert e.code == expected_code
+
+                    with mock.patch.object(sys, "argv", ['']):
+                        check_for_mocked_build({
+                            'bs_env': None,
+                            'bs_mirror_env': None,
+                            'data_set': None,
+                            'es_namespace': None,
+                            'es_server': None,
+                            'index_server': None,
+                            'indexer': None,
+                            's3_bucket_env': None
+                        })
+
+                    with mock.patch.object(sys, "argv", ['', '--indexer', 'false', '--index_server', 'true']):
+                        check_for_mocked_build({
+                            'bs_env': None,
+                            'bs_mirror_env': None,
+                            'data_set': None,
+                            'es_namespace': None,
+                            'es_server': None,
+                            'index_server': 'true',
+                            'indexer': 'false',
+                            's3_bucket_env': None
+                        })
+
+                    with mock.patch.object(sys, "argv", ['', '--indexer', 'foo']):
+                        with pytest.raises(Exception):
+                            check_for_mocked_build({
+                                'bs_env': None,
+                                'bs_mirror_env': None,
+                                'data_set': None,
+                                'es_namespace': None,
+                                'es_server': None,
+                                'index_server': 'true',
+                                'indexer': 'false',
+                                's3_bucket_env': None
+                            })
+
+
+def test_deployment_utils_boolean_setting():
+
+    assert boolean_setting({'foo': 'true'}, 'foo') == True
+    assert boolean_setting({'foo': 'false'}, 'foo') == False
+    assert boolean_setting({'foo': ''}, 'foo') == False
+    assert boolean_setting({'foo': None}, 'foo') == None
+    assert boolean_setting({'foo': 'maybe'}, 'foo') == 'maybe'
+    assert boolean_setting({}, 'foo') == None
+    assert boolean_setting({}, 'foo', default='surprise') == 'surprise'
