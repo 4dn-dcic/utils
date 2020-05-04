@@ -218,4 +218,3 @@ def test_custom_a_or_an():
     assert EnglishUtils.n_of(0, "egg", num_format=maybe_a_or_n) == "no eggs"
     assert EnglishUtils.n_of(1, "egg", num_format=maybe_a_or_n) == "an egg"
     assert EnglishUtils.n_of(3, "egg", num_format=maybe_a_or_n) == "some eggs"
-
