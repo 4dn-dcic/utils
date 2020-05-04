@@ -688,12 +688,19 @@ def test_deployment_utils_transitional_equivalence():
 
 def test_deployment_utils_main():
 
-    fake_template = "something.ini"
+    # This is just a standard unit test that mocks out all the callouts and tests that the arguments are coming
+    # in and being passed along correctly to the underlying program.
+
+    fake_template = "something.ini"  # It doesn't matter what we use as a template for this test. we don't open it.
     with override_environ(ENV_NAME='fourfront-foo'):
         with mock.patch.object(Deployer, "build_ini_file_from_template") as mock_build:
+            # These next two mocks are just incidental to offering help in arg parsing.
+            # Those functions are tested elsewhere and are just plain bypassed here.
             with mock.patch.object(Deployer, "environment_template_filename", return_value=fake_template):
                 with mock.patch.object(Deployer, "template_environment_names", return_value=["something, foo"]):
 
+                    # This function is the core fo the testing, which just sets up a deployer to get called
+                    # with an input template name and a target filename, and then calls the Deployer.
                     def check_for_mocked_build(expected_kwargs=None, expected_code=0):
                         def mocked_build(*args, **kwargs):
                             assert args == (fake_template, 'production.ini')
@@ -704,6 +711,11 @@ def test_deployment_utils_main():
                         except SystemExit as e:
                             assert e.code == expected_code
 
+                    # sys.argv gets as its first element the command name, and the rest is command line args.
+                    # The '' is just an ignored command name, so [''] is no args. Command line args start with arg 1.
+
+                    # This tests that when given no command line args, all the kwargs passed through
+                    # to build_ini_file_from_template default to None.
                     with mock.patch.object(sys, "argv", ['']):
                         check_for_mocked_build({
                             'bs_env': None,
@@ -715,6 +727,9 @@ def test_deployment_utils_main():
                             'indexer': None,
                             's3_bucket_env': None
                         })
+
+                    # Next 2 tests some sample settings, in particular the settings of indexer and index_server
+                    # when given on the command line, and what gets passed through to build_ini_file_from_template.
 
                     with mock.patch.object(sys, "argv", ['', '--indexer', 'false', '--index_server', 'true']):
                         check_for_mocked_build({
