@@ -152,3 +152,5 @@ select_a_or_an = EnglishUtils.select_a_or_an
 a_or_an = EnglishUtils.a_or_an
 
 string_pluralize = EnglishUtils.string_pluralize
+
+relative_time_string = EnglishUtils.relative_time_string
