@@ -183,7 +183,7 @@ class Deployer:
 
         if index_server is None:  # If argument is not None, then it's True or False. Use that.
 
-            if not "ENCODED_INDEX_SERVER" in os.environ and cls.AUTO_INDEX_SERVER_TOKEN in app_version:
+            if "ENCODED_INDEX_SERVER" not in os.environ and cls.AUTO_INDEX_SERVER_TOKEN in app_version:
                 index_server = True
             else:
                 server_env_var_val = os.environ.get('ENCODED_INDEX_SERVER', "false").upper()
