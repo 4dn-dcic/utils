@@ -564,7 +564,8 @@ def test_deployment_utils_transitional_equivalence():
             assert problems == [], "Problems found:\n%s" % "\n".join(problems)
 
     with mock.patch("pkg_resources.get_distribution", return_value=FakeDistribution()):
-        with mock.patch.object(TestDeployer, "get_app_version", return_value=MOCKED_PROJECT_VERSION):
+        with mock.patch.object(TestDeployer, "get_app_version",
+                               return_value=MOCKED_PROJECT_VERSION) as mock_get_app_version:
             with mock.patch("toml.load", return_value={"tool": {"poetry": {"version": MOCKED_LOCAL_GIT_VERSION}}}):
                 with override_environ(ENCODED_INDEXER=None, ENCODED_INDEX_SERVER=None):
 
@@ -685,6 +686,73 @@ def test_deployment_utils_transitional_equivalence():
                                line_checker=Checker(expect_indexer=None,
                                                     expect_index_server="true"))
 
+                    # === Beyond this is auot-indexer tests ===
+
+                    # If the app version name contains the special token in AUTO_INDEX_SERVER_TOKEN,
+                    # AND if there is no explicit argument OR environment variable setting,
+                    # then use index_server=True.
+
+                    # In other words, the app_version will be something like "foo__index_server",
+                    # which has magic effect of becoming an index server when not specified otherwise.
+                    mock_get_app_version.return_value = "foo" + TestDeployer.AUTO_INDEX_SERVER_TOKEN
+
+                    # The next three cases test the useful case where those conditions are met.
+
+                    tester(ref_ini="cgap.ini", bs_env="fourfront-cgap", data_set="prod",
+                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                           line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                        expect_index_server="true"))
+
+                    tester(ref_ini="blue.ini", bs_env="fourfront-blue", data_set="prod",
+                           es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                           line_checker=FFProdChecker(expect_indexer=index_default,
+                                                      expect_index_server="true"))
+
+                    tester(ref_ini="webdev.ini", bs_env="fourfront-webdev", data_set="prod",
+                           es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                           line_checker=Checker(expect_indexer=index_default,
+                                                expect_index_server="true"))
+
+                    # The next 6 tests just test that the other cases are not perturbed.
+
+                    with override_environ(ENCODED_INDEX_SERVER="FALSE"):
+
+                        # This tests we can override the app version by setting an explicit env variable value.
+
+                        tester(ref_ini="cgap.ini", bs_env="fourfront-cgap", data_set="prod",
+                               es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                            expect_index_server=None))
+
+                        tester(ref_ini="blue.ini", bs_env="fourfront-blue", data_set="prod",
+                               es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                               line_checker=FFProdChecker(expect_indexer=index_default,
+                                                          expect_index_server=None))
+
+                        tester(ref_ini="webdev.ini", bs_env="fourfront-webdev", data_set="prod",
+                               es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                               line_checker=Checker(expect_indexer=index_default,
+                                                    expect_index_server=None))
+
+                    with override_environ(ENCODED_INDEX_SERVER="TRUE"):
+
+                        # We can override the app version by setting an explicit env variable value,
+                        # although we wouldn't know the difference here because it's true either way.
+
+                        tester(ref_ini="cgap.ini", bs_env="fourfront-cgap", data_set="prod",
+                               es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                            expect_index_server="true"))
+
+                        tester(ref_ini="blue.ini", bs_env="fourfront-blue", data_set="prod",
+                               es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                               line_checker=FFProdChecker(expect_indexer=index_default,
+                                                          expect_index_server="true"))
+
+                        tester(ref_ini="webdev.ini", bs_env="fourfront-webdev", data_set="prod",
+                               es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                               line_checker=Checker(expect_indexer=index_default,
+                                                    expect_index_server="true"))
 
 def test_deployment_utils_main():
 
