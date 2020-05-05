@@ -133,6 +133,8 @@ class Deployer:
     def omittable(cls, line, expanded_line):
         return cls.PARAMETERIZED_ASSIGNMENT.match(line) and cls.EMPTY_ASSIGNMENT.match(expanded_line)
 
+    AUTO_INDEX_SERVER_TOKEN = "__index_server"
+
     @classmethod
     def build_ini_stream_from_template(cls, template_file_name, init_file_stream,
                                        bs_env=None, bs_mirror_env=None, s3_bucket_env=None, data_set=None,
@@ -177,16 +179,22 @@ class Deployer:
                 indexer = True
         indexer = "true" if indexer else ""  # this will omit the line if it's going to be False
 
+        app_version = cls.get_app_version()
+
         if index_server is None:  # If argument is not None, then it's True or False. Use that.
-            server_env_var_val = os.environ.get('ENCODED_INDEX_SERVER', "false").upper()
-            if server_env_var_val == "FALSE":
-                index_server = False
-            else:
+
+            if "ENCODED_INDEX_SERVER" not in os.environ and cls.AUTO_INDEX_SERVER_TOKEN in app_version:
                 index_server = True
+            else:
+                server_env_var_val = os.environ.get('ENCODED_INDEX_SERVER', "false").upper()
+                if server_env_var_val == "FALSE":
+                    index_server = False
+                else:
+                    index_server = True
         index_server = "true" if index_server else ""  # this will omit the line if it's going to be False
 
         extra_vars = {
-            'APP_VERSION': cls.get_app_version(),
+            'APP_VERSION': app_version,
             'PROJECT_VERSION': toml.load(cls.PYPROJECT_FILE_NAME)['tool']['poetry']['version'],
             'SNOVAULT_VERSION': pkg_resources.get_distribution("dcicsnovault").version,
             'UTILS_VERSION': pkg_resources.get_distribution("dcicutils").version,
