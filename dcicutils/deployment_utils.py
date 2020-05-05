@@ -18,6 +18,7 @@ For example, fourfront/deploy/generate_production_ini.py might contain:
 
 """
 
+import argparse
 import datetime
 import glob
 import io
@@ -28,10 +29,33 @@ import re
 import subprocess
 import sys
 import toml
-import argparse
 
-from dcicutils.env_utils import get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS
-from dcicutils.misc_utils import PRINT
+from .env_utils import get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS
+from .misc_utils import PRINT
+
+
+def boolean_setting(settings, key, default=None):
+    """
+    Given a setting from a .ini file and returns a boolean interpretation of it.
+    - Treats an actual python boolean as itself
+    - Using case-insensitive comparison, treats the string 'true' as True and both 'false' and '' as False.
+    - If an element is missing,
+    - Treats None the same as the option being missing, so returns the given default.
+    - Raises an error for any non-standard value. This is harsh, but it should not happen.
+    """
+    if key not in settings:
+        return default
+    setting = settings[key]
+    if isinstance(setting, str):
+        setting_lower = setting.lower()
+        if setting_lower in ("", "false"):
+            return False
+        elif setting_lower == "true":
+            return True
+        else:
+            return setting
+    else:  # booleans, None, and odd types (though we might want to consider making other types an error).
+        return setting
 
 
 class Deployer:
@@ -287,11 +311,12 @@ class Deployer:
                                 help="an ElasticSearch namespace",
                                 default=None)
             parser.add_argument("--indexer",
-                                help="whether this system does indexing",
-                                action='store_true',
-                                default=False)
+                                help="whether this server does indexing at all",
+                                choices=["true", "false"],
+                                default=None)
             parser.add_argument("--index_server",
-                                help="whether this is a standalone indexing server",
+                                help="whether this is a standalone indexing server, only doing indexing",
+                                choices=["true", "false"],
                                 default=None)
             args = parser.parse_args()
             template_file_name = (cls.any_environment_template_filename()

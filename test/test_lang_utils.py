@@ -1,3 +1,5 @@
+import datetime
+
 from dcicutils.lang_utils import EnglishUtils, a_or_an, select_a_or_an, string_pluralize
 
 
@@ -91,6 +93,12 @@ def test_relative_time_string():
     test(2 * WEEK + 3 * HOUR + 2 * MINUTE + 3 * SECOND, "2 weeks, 3 hours, 2 minutes, 3 seconds", "2 weeks")
     test(4 * DAY + 1 * HOUR + 5.2 * SECOND, "4 days, 1 hour, 5.2 seconds", "4 days, 1 hour")
     test(5.2 * SECOND, "5.2 seconds", "5.2 seconds")
+
+    relative_time = datetime.timedelta(hours=1, seconds=3)
+    test(relative_time, "1 hour, 3 seconds", "1 hour")
+    t1 = datetime.datetime.now()
+    t2 = t1 + relative_time
+    test(t2 - t1, "1 hour, 3 seconds", "1 hour")
 
 
 def test_time_count_formatter():
