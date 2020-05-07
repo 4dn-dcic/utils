@@ -177,10 +177,14 @@ class EnglishUtils:
         return result
 
 
-select_a_or_an = EnglishUtils.select_a_or_an
+# Export specific useful functions
 
 a_or_an = EnglishUtils.a_or_an
 
-string_pluralize = EnglishUtils.string_pluralize
+n_of = EnglishUtils.n_of
 
 relative_time_string = EnglishUtils.relative_time_string
+
+select_a_or_an = EnglishUtils.select_a_or_an
+
+string_pluralize = EnglishUtils.string_pluralize

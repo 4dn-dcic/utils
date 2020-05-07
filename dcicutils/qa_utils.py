@@ -2,8 +2,10 @@
 qa_utils: Tools for use in quality assurance testing.
 """
 
+import datetime
 import contextlib
 import os
+import pytz
 from .misc_utils import PRINT
 
 
@@ -75,3 +77,47 @@ def override_environ(**overrides):
             env.pop(k, None)  # Delete key k, tolerating it being already gone
         for k, v in to_restore.items():
             os.environ[k] = v
+
+
+class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
+
+    # A randomly chosen but reproducible date 2010-07-01 12:00:00
+    INITIAL_TIME = datetime.datetime(2010, 1, 1, 12, 0, 0)
+    HMS_TIMEZONE = pytz.timezone("US/Eastern")
+    _DATETIME = datetime.datetime
+
+    def __init__(self, initial_time: datetime.datetime = INITIAL_TIME, tick_seconds: float = 1,
+                 local_timezone: pytz.timezone = HMS_TIMEZONE):
+        if not isinstance(initial_time, datetime.datetime):
+            raise ValueError("Expected initial_time to be a datetime: %r" % initial_time)
+        if not isinstance(tick_seconds, (int, float)):
+            raise ValueError("Expected tick_seconds to be an int or a float: %r" % tick_seconds)
+
+        self._initial_time = initial_time
+        self._just_now = initial_time
+        self._tick_timedelta = datetime.timedelta(seconds=tick_seconds)
+        self._local_timezone = local_timezone
+
+    def set_datetime(self, dt):
+        if not isinstance(dt, datetime.datetime):
+            raise ValueError("Expected a datetime: %r" % dt)
+        if dt.tzinfo:
+            raise ValueError("Expected a naive datetime (no timezone): %r" % dt)
+        self._just_now = dt
+
+    def reset_datetime(self):
+        self.set_datetime(self._initial_time)
+
+    def just_now(self) -> datetime.datetime:
+        return self._just_now
+
+    def now(self) -> datetime.datetime:
+        self._just_now += self._tick_timedelta
+        return self._just_now
+
+    def utcnow(self) -> datetime.datetime:
+        now = self.now()
+        return self._local_timezone.localize(now).astimezone(pytz.UTC).replace(tzinfo=None)
+
+    def sleep(self, secs: float):
+        self._just_now += datetime.timedelta(seconds=secs)
