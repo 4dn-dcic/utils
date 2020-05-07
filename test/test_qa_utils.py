@@ -3,7 +3,10 @@ import os
 import pytest
 import pytz
 import re
+import time
+import unittest
 import uuid
+
 from dcicutils.qa_utils import mock_not_called, local_attrs, override_environ, ControlledTime
 
 
@@ -254,6 +257,12 @@ def test_controlled_time_set_datetime():
     t.set_datetime(t0 + datetime.timedelta(seconds=5))
     assert (t.just_now() - t0).total_seconds() == 5
 
+    with pytest.raises(ValueError):
+        t.set_datetime(17)  # Not a datetime
+
+    with pytest.raises(ValueError):
+        t.set_datetime(datetime.datetime(2015, 1, 1, 1, 2, 3, tzinfo=pytz.timezone("US/Pacific")))
+
 
 def test_controlled_time_sleep():
 
@@ -263,3 +272,23 @@ def test_controlled_time_sleep():
     t.sleep(10)
 
     assert (t.just_now() - t0).total_seconds() == 10
+
+
+def test_controlled_time_documentation_scenario():
+
+    start_time = datetime.datetime.now()
+
+    def sleepy_function():
+        time.sleep(10)
+
+    dt = ControlledTime()
+    with unittest.mock.patch("datetime.datetime", dt):
+        with unittest.mock.patch("time.sleep", dt.sleep):
+            t0 = datetime.datetime.now()
+            sleepy_function()  # sleeps 10 seconds
+            t1 = datetime.datetime.now()  # 1 more second increments
+            assert (t1 - t0).total_seconds() == 11  # 11 virtual seconds have passed
+
+    end_time = datetime.datetime.now()
+    # In reality, whole test takes much less than one second...
+    assert (end_time - start_time).total_seconds() < 0.5
