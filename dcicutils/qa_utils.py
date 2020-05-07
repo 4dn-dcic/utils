@@ -111,6 +111,8 @@ class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
                  local_timezone: pytz.timezone = HMS_TIMEZONE):
         if not isinstance(initial_time, datetime.datetime):
             raise ValueError("Expected initial_time to be a datetime: %r" % initial_time)
+        if initial_time.tzinfo is not None:
+            raise ValueError("Expected initial_time to be a naive datetime (no timezone): %r" % initial_time)
         if not isinstance(tick_seconds, (int, float)):
             raise ValueError("Expected tick_seconds to be an int or a float: %r" % tick_seconds)
 

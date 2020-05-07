@@ -197,6 +197,22 @@ def test_override_environ():
     assert unique_prop3 not in os.environ
 
 
+def test_controlled_time_creation():
+
+    t = ControlledTime()
+
+    assert t.just_now() == t.INITIAL_TIME
+
+    with pytest.raises(ValueError):  # expecting a datetime
+        ControlledTime(initial_time=1)  # noqa
+
+    with pytest.raises(ValueError):  # expecting the datetime has no timezone
+        ControlledTime(initial_time=datetime.datetime(2019, 1, 1, tzinfo=pytz.UTC))
+
+    with pytest.raises(ValueError):  # expecting an int or float
+        ControlledTime(tick_seconds="whatever")  # noqa
+
+
 def test_controlled_time_just_now():
 
     t = ControlledTime()
