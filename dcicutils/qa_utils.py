@@ -6,7 +6,7 @@ import datetime
 import contextlib
 import os
 import pytz
-from .misc_utils import PRINT
+from .misc_utils import PRINT, ignored
 
 
 def mock_not_called(name):
@@ -179,3 +179,39 @@ class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
         """
 
         self._just_now += datetime.timedelta(seconds=secs)
+
+
+def notice_pytest_fixtures(*fixtures):
+    """
+    This declares its arguments to be pytest fixtures in use by surrounding code.
+
+    This useful for assuring tools like flake8 and PyCharm that the arguments it is given are not being
+    ignored but instead may just have usage patterns that don't make uses apparent.
+
+    For example, in a file test_file.py, we might see uses of my_fixture and my_autoused_fixture
+    that wrongly appear both globally unused AND also locally unused in the test_something function.
+
+      from module_a import foo, bar
+      from module_b import mock_application  # <-- sample fixture, to be used explicitly
+      from module_c import mock_database     # <-- sample fixture to be used implicitly
+
+      def test_something(mock_application):  # <-- sample of fixture used explicitly
+          assert foo() = bar()
+
+    In both cases, the apparently unused variables may cause flake8, PyCharm, and other
+    'lint' programs to complain that some repair action is needed, such as removing the unused
+    variables, even though such an action might break code. Using this declaration will
+    guard against that, while providing useful documentation for the code:
+
+      from module_a import foo, bar
+      from module_b import mock_application
+      from module_c import mock_database
+      from dcicutils.qa_utils import notice_pytest_fixtures
+
+      notice_pytest_fixtures(application, database_session)
+
+      def test_something(mock_application):
+          notice_pytest_fixtures(mock_application)  # <-- protects bound variable from seeming unused
+          assert foo() = bar()
+    """
+    ignored(fixtures)  # we don't use the given fixtures, but now the tools will think we do
