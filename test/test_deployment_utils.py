@@ -484,13 +484,34 @@ def test_deployment_utils_get_eb_bundled_version():
             assert TestDeployer.get_eb_bundled_version() == MOCKED_BUNDLE_VERSION
 
     with mock.patch("os.path.exists") as mock_exists:
-        mock_exists.return_value = False
+        mock_exists.return_value = True
         with mock.patch("io.open") as mock_open:
             def mocked_open_error(filename, mode='r'):
                 ignored(filename, mode)
                 raise Exception("Simulated file error (file not found or permissions problem).")
             mock_open.side_effect = mocked_open_error
             assert TestDeployer.get_eb_bundled_version() is None
+
+    with mock.patch("os.path.exists") as mock_exists:
+        mock_exists.return_value = False
+        with mock.patch("io.open") as mock_open:
+            def mocked_open_error(filename, mode='r'):
+                ignored(filename, mode)
+                raise AssertionError("This shouldn't happen but will get caught.")
+            mock_open.side_effect = mocked_open_error
+            assert TestDeployer.get_eb_bundled_version() is None  # Because of os.path.exists returned False
+            assert mock_open.call_count == 0  # This proves that we didn't try to open the file
+
+
+def test_deployment_utils_any_environment_template_filename():
+
+    with mock.patch("os.path.exists", return_value=True):
+        any_ini = TestDeployer.any_environment_template_filename()
+        assert any_ini.endswith("any.ini")
+
+    with mock.patch("os.path.exists", return_value=False):
+        with pytest.raises(ValueError):
+            TestDeployer.any_environment_template_filename()
 
 
 def test_deployment_utils_transitional_equivalence():
@@ -525,7 +546,16 @@ def test_deployment_utils_transitional_equivalence():
 
         any_ini = os.path.join(TestDeployer.TEMPLATE_DIR, "cg_any.ini" if is_cgap_env(bs_env) else "ff_any.ini")
 
-        TestDeployer.build_ini_stream_from_template(os.path.join(TestDeployer.TEMPLATE_DIR, ref_ini), old_output)
+        ref_ini_path = os.path.join(TestDeployer.TEMPLATE_DIR, ref_ini)
+
+        with override_environ(APP_VERSION= 'externally_defined'):
+            # We don't expect variables like APP_VERSION to be globally available because
+            # we'd end up shadowing them and confusion could result about which variable
+            # the template wanted to reference, ours or theirs. -kmp 9-May-2020
+            with pytest.raises(RuntimeError):
+                TestDeployer.build_ini_stream_from_template(ref_ini_path, "this shouldn't get used")
+
+        TestDeployer.build_ini_stream_from_template(ref_ini_path, old_output)
         TestDeployer.build_ini_stream_from_template(any_ini, new_output,
                                                     # data_env & es_namespace are something we should be able to default
                                                     bs_env=bs_env, es_server=es_server)
@@ -753,6 +783,20 @@ def test_deployment_utils_transitional_equivalence():
                                es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server="true"))
+
+
+def test_deployment_utils_main_no_env_name():
+
+    # If there were no ENV_NAME, nothing
+    with override_environ(ENV_NAME=None):
+        with mock.patch("argparse.ArgumentParser") as mock_argparser:
+            def mocked_fail(*arg, **kwargs):
+                raise AssertionError("ENV_NAME=None did not get noticed.")
+            mock_argparser.side_effect = mocked_fail
+            with pytest.raises(SystemExit):
+                Deployer.main()
+            assert mock_argparser.call_count == 0
+
 
 def test_deployment_utils_main():
 

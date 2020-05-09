@@ -344,4 +344,4 @@ class Deployer:
 
 
 if __name__ == "__main__":
-    Deployer.main()
+    Deployer.main()  # noqa - this is just for debugging
