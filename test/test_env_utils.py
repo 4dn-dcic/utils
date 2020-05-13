@@ -11,7 +11,8 @@ from dcicutils.env_utils import (
     CGAP_ENV_HOTSEAT_NEW, CGAP_ENV_STAGING_NEW, CGAP_ENV_WEBDEV_NEW, CGAP_ENV_WOLF_NEW,
     get_mirror_env_from_context, is_test_env, is_hotseat_env, guess_mirror_env, get_standard_mirror_env,
     prod_bucket_env, public_url_mappings, CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
-    infer_repo_from_env, data_set_for_env, get_bucket_env
+    infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env, FF_PRODUCTION_IDENTIFIER,
+    FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV
 )
 from unittest import mock
 
@@ -401,3 +402,33 @@ def test_infer_repo_from_env():
 
     assert infer_repo_from_env('cgap-foo') == 'cgap-portal'
     assert infer_repo_from_env('fourfront-cgapfoo') == 'cgap-portal'
+
+
+def test_infer_foursight_env():
+
+    class MockedRequest:
+        def __init__(self, domain):
+            self.domain = domain
+
+    def mock_request(domain=None):  # build a dummy request with the 'domain' member, checked in the method
+        if domain is None:
+            return None
+        else:
+            return MockedRequest(domain)
+
+    # (active) fourfront testing environments
+    assert infer_foursight_from_env(mock_request(), FF_ENV_MASTERTEST) == 'mastertest'
+    assert infer_foursight_from_env(mock_request(), FF_ENV_WEBDEV) == 'webdev'
+    assert infer_foursight_from_env(mock_request(), FF_ENV_HOTSEAT) == 'hotseat'
+
+    # (active) fourfront production environments
+    assert infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_PRD), 'fourfront-blue') == FF_PRODUCTION_IDENTIFIER
+    assert infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_PRD), 'fourfront-green') == FF_PRODUCTION_IDENTIFIER
+    assert infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), 'fourfront-blue') == FF_STAGING_IDENTIFIER
+    assert infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), 'fourfront-green') == FF_STAGING_IDENTIFIER
+
+    # (active) cgap environments
+    assert infer_foursight_from_env(mock_request(), CGAP_ENV_DEV) == 'cgapdev'
+    assert infer_foursight_from_env(mock_request(), CGAP_ENV_MASTERTEST) == 'cgaptest'
+    assert infer_foursight_from_env(mock_request(), CGAP_ENV_WOLF) == 'cgapwolf'
+    assert infer_foursight_from_env(mock_request(), CGAP_ENV_WEBPROD) == 'cgap'
