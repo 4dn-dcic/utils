@@ -57,6 +57,10 @@ CGAP_STG_OR_PRD_NAMES = [CGAP_ENV_WEBPROD, CGAP_ENV_PRODUCTION_GREEN, CGAP_ENV_P
 
 FF_PUBLIC_URL_STG = 'http://staging.4dnucleome.org'
 FF_PUBLIC_URL_PRD = 'https://data.4dnucleome.org'
+FF_PUBLIC_DOMAIN_STG = 'staging.4dnucleome.org'
+FF_PUBLIC_DOMAIN_PRD = 'data.4dnucleome.org'
+FF_PRODUCTION_IDENTIFIER = 'data'
+FF_STAGING_IDENTIFIER = 'staging'
 
 FF_PUBLIC_URLS = {
     'staging': FF_PUBLIC_URL_STG,
@@ -311,3 +315,22 @@ def infer_repo_from_env(envname):
         return 'fourfront'
     else:
         return None
+
+
+def infer_foursight_from_env(request, envname):
+    """  Infers the Foursight environment to view based on the given envname and request context
+
+    :param request: the current request (or an object that has member 'domain')
+    :param envname: name of the environment we are on
+    :return: Foursight env at the end of the url ie: for fourfront-green, could be either 'data' or 'staging'
+    """
+    if is_cgap_env(envname):
+        return envname[len('fourfront-'):]  # all cgap envs are prefixed and the FS envs directly match
+    else:
+        if is_stg_or_prd_env(envname):
+            if FF_PUBLIC_DOMAIN_PRD in request.domain:
+                return FF_PRODUCTION_IDENTIFIER
+            else:
+                return FF_STAGING_IDENTIFIER
+        else:
+            return envname[len('fourfront-'):]  # if not data/staging, behaves exactly like CGAP
