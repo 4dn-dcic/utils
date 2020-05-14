@@ -22,9 +22,9 @@ script:
   - coveralls
 deploy:
   provider: script
-    script: poetry publish --build --username=$PYPI_USER --password=$PYPI_PASSWORD
-    on:
-      tags: true
+  script: poetry publish --build --username=$PYPI_USER --password=$PYPI_PASSWORD
+  on:
+    tags: true
 after_success:
   - echo "Finished running tests"
   - |
