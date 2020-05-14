@@ -29,8 +29,12 @@ import re
 import subprocess
 import sys
 import toml
+import boto3
+from git import Repo
 
-from .env_utils import get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS
+from .env_utils import (
+    get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS, is_fourfront_env, is_cgap_env
+)
 from .misc_utils import PRINT
 
 
@@ -58,7 +62,135 @@ def boolean_setting(settings, key, default=None):
         return setting
 
 
-class Deployer:
+class EBDeployer:
+
+    S3_BUCKET = 'application_versions'
+    EB_APPLICATION = '4dn-web'  # XXX: will need to change if this changes -Will
+
+    @staticmethod
+    def archive_repository(path_to_repo, application_version_name, branch='master'):
+        """ Creates an application archive of the maser
+
+        :param path_to_repo: path to repository
+        :param application_version_name: name to give application version
+        :param branch: branch to archive
+        :return: path to application archive
+        """
+        repo = Repo(path_to_repo)
+        repo.git.checkout(branch)
+        zip_location = os.path.join(path_to_repo, (application_version_name + '.zip'))
+        with open(zip_location, 'wb') as fp:
+            repo.archive(fp)
+        return zip_location
+
+    @classmethod
+    def upload_application_to_s3(cls, zip_location):
+        """ Uploads the zip file at zip_location to the specified S3 bucket
+
+        :param zip_location: where to find zip file to upload
+        :return: True in success, False otherwise
+        """
+        s3_client = boto3.client('s3')
+        return s3_client.put_object(
+            ACL='public-read',
+            Body=zip_location,
+            Bucket=cls.S3_BUCKET,
+            Key=os.path.basename(zip_location)  # application_version_name.zip
+        )
+
+    @classmethod
+    def _build_application_version(cls, key, name):
+        """ Uploads the application version at Bucket:Key to Elastic Beanstalk
+
+        :param key: s3 key
+        :param name: name of application
+        :return: True in success, False otherwise
+        """
+        eb_client = boto3.client('elasticbeanstalk')
+        return eb_client.create_application_version(
+            ApplicationName=cls.EB_APPLICATION,
+            VersionLabel=name,  # application_version_name
+            SourceBundle={
+                "S3Bucket": cls.S3_BUCKET,
+                "S3Key": key  # application_version_name.zip
+            },
+            Process=True
+        )
+
+    @classmethod
+    def build_application_version(cls, path_to_repo, application_version_name, branch='master'):
+        """ Builds and uploads an application version to S3
+
+        :param path_to_repo: path to repository
+        :param application_version_name: name to give application version
+        :param branch: branch to checkout on repo, default 'master'
+        :return: True in success, False otherwise
+        """
+        if not os.path.exists(path_to_repo):
+            raise RuntimeError('Gave a non-existent path to repository: %s' % path_to_repo)
+
+        # Archive repository
+        zip_location = cls.archive_repository(path_to_repo, application_version_name, branch=branch)
+
+        # Upload to s3
+        success = cls.upload_application_to_s3(zip_location)
+        if not success:  # XXX: how to correctly detect error? docs are not clear - Will
+            print(success)  # look at response
+            return False
+
+        # Build application version
+        key = os.path.basename(zip_location)
+        return cls._build_application_version(key, key[:key.index('.zip')])
+
+    @classmethod
+    def _deploy(cls, app_version, env_name):
+        """ Deploys the application at s3://application_versions/key to the given env_name
+
+        :param app_version: name of application version
+        :param env_name: env to deploy to
+        :return: True in success
+        """
+        eb_client = boto3.client('elasticbeanstalk')
+        return eb_client.update_environment(
+            ApplicationName=cls.EB_APPLICATION,
+            EnvironmentName=env_name,
+            VersionLabel=app_version
+        )
+
+    @classmethod
+    def deploy_new_version(cls, env_name, path_to_repo, application_version_name):
+        """ Deploys a new version to EB env_name, where env_name must be one of the valid environments """
+        if is_fourfront_env(env_name):
+            if 'fourfront' not in path_to_repo:
+                raise RuntimeError('Tried to deploy fourfront env but path to repo does not contain "fourfront",'
+                                   ' aborting: %s' % path_to_repo)
+            cls._deploy(application_version_name, env_name)
+        elif is_cgap_env(env_name):
+            if 'cgap-portal' not in path_to_repo:
+                raise RuntimeError('Tried to deploy cgap env but path to repo does not contain "cgap-portal",'
+                                   ' aborting: %s' % path_to_repo)
+            cls._deploy(application_version_name, env_name)
+        else:
+            raise RuntimeError('Tried to deploy to invalid environment: %s' % env_name)
+
+    @classmethod
+    def main(cls):
+        """ Deploys a version to an Elastic Beanstalk environment based on arguments """
+        parser = argparse.ArgumentParser(
+            description='Deploys an application to Elastic Beanstalk'
+        )
+        parser.add_argument('env', help='Environment to deploy to')
+        parser.add_argument('repo', help='Path to repository to deploy')
+        parser.add_argument('version_name', help='Name of new application version we are generating')
+        parser.add_argument('--branch', help='Branch of repo to deploy', default='master')
+        args = parser.parse_args()
+
+        packaging_was_successful = cls.build_application_version(args.repo, args.version_name, branch=args.branch)
+        if packaging_was_successful:  # XXX: how to best detect?
+            cls.deploy_new_version(args.env_name, args.repo, args.version_name)
+
+
+class Deployer:  # XXX: this should change. It is not a deployer, it is a configuration file generator. - Will
 
     TEMPLATE_DIR = None
     INI_FILE_NAME = "production.ini"
