@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from io import StringIO
 from unittest import mock
 
-from dcicutils.deployment_utils import Deployer, boolean_setting
+from dcicutils.deployment_utils import EBDeployer, Deployer, boolean_setting
 from dcicutils.env_utils import is_cgap_env
 from dcicutils.misc_utils import ignored
 from dcicutils.qa_utils import override_environ
@@ -878,3 +878,9 @@ def test_deployment_utils_boolean_setting():
     assert boolean_setting({'foo': 'maybe'}, 'foo') == 'maybe'
     assert boolean_setting({}, 'foo') == None
     assert boolean_setting({}, 'foo', default='surprise') == 'surprise'
+
+
+@pytest.mark.integrated
+def test_eb_deployer():
+    """ Tests some basic aspects of EBDeployer """
+    pass  # write this test!

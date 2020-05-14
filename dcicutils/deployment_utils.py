@@ -33,7 +33,8 @@ import boto3
 from git import Repo
 
 from .env_utils import (
-    get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS, is_fourfront_env, is_cgap_env
+    get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS, is_fourfront_env, is_cgap_env,
+    FF_ENV_INDEXER, CGAP_ENV_INDEXER
 )
 from .misc_utils import PRINT
 
@@ -66,6 +67,12 @@ class EBDeployer:
 
     S3_BUCKET = 'application_versions'
     EB_APPLICATION = '4dn-web'  # XXX: will need to change if this changes -Will
+    EB_CONFIGURATION_SETTINGS = 'ConfigurationSettings'
+    EB_OPTION_SETTINGS = 'OptionSettings'
+    EB_ENV_VARIABLE_NAMESPACE = 'aws:elasticbeanstalk:application:environment'
+    DEFAULT_INDEXER_SIZE = 'c5.4xlarge'
+    UPDATING = 'Updating'
+    STATUS = 'Status'
 
     @staticmethod
     def archive_repository(path_to_repo, application_version_name, branch='master'):
@@ -159,7 +166,13 @@ class EBDeployer:
 
     @classmethod
     def deploy_new_version(cls, env_name, path_to_repo, application_version_name):
-        """ Deploys a new version to EB env_name, where env_name must be one of the valid environments """
+        """  Deploys a new version to EB env_name, where env_name must be one of the valid environments
+
+        :param env_name: env to deploy to
+        :param path_to_repo: path to repo to deploy
+        :param application_version_name: application version name to give this version
+        :raises: RuntimeError if repo does not match env
+        """
         if is_fourfront_env(env_name):
             if 'fourfront' not in path_to_repo:
                 raise RuntimeError('Tried to deploy fourfront env but path to repo does not contain "fourfront",'
@@ -174,6 +187,92 @@ class EBDeployer:
             raise RuntimeError('Tried to deploy to invalid environment: %s' % env_name)
 
     @classmethod
+    def create_indexer_configuration_template(cls, env_name, size=None):
+        """ Uploads an indexer configuration template to EB
+
+        :param env_name: env to create an indexer for
+        :return: True if successful, False otherwise
+        """
+        eb_client = boto3.client('elasticbeanstalk')
+        configuration = eb_client.describe_configuration_settings(
+            ApplicationName=cls.EB_APPLICATION,
+            EnvironmentName=env_name
+        )[cls.EB_CONFIGURATION_SETTINGS][0][cls.EB_OPTION_SETTINGS]
+
+        # Add ENCODED_INDEX_SERVER env variable
+        configuration.append({
+            'Namespace': cls.EB_ENV_VARIABLE_NAMESPACE,
+            'OptionName': 'ENCODED_INDEX_SERVER',
+            'Value': 'True'
+        })
+
+        # make additional updates as needed
+        # XXX: Make worker tier?
+        for option in configuration:
+
+            # make it a big machine (or not if we say so)
+            if option['OptionName'] == 'InstanceType':
+                option['Value'] = cls.DEFAULT_INDEXER_SIZE if not size else size
+
+            # add the additional env variable here as well
+            if option['OptionName'] == 'EnvironmentVariables':
+                option['Value'] += ',ENCODED_INDEX_SERVER=True'
+
+        # upload the template
+        if is_cgap_env(env_name):
+            return eb_client.create_configuration_template(
+                ApplicationName=cls.EB_APPLICATION,
+                TemplateName=CGAP_ENV_INDEXER,
+                OptionSettings=configuration
+            )
+        else:
+            return eb_client.create_configuration_template(
+                ApplicationName=cls.EB_APPLICATION,
+                TemplateName=FF_ENV_INDEXER,
+                OptionSettings=configuration,
+            )
+
+    @classmethod
+    def create_indexer_environment(cls, env_name, app_version):
+        """ Creates a new environment for indexing based on the given env_name
+
+        :param env_name: env to base template off of
+        :param app_version: application version to deploy, MUST match that running on env_name
+        :return: result of EB env creation
+        :raises RuntimeError if bad env given
+        """
+        template_creation_was_successful = cls.create_indexer_configuration_template(env_name)
+        if template_creation_was_successful:
+            eb_client = boto3.client('elasticbeanstalk')
+            if is_cgap_env(env_name):
+                return eb_client.create_environment(
+                    ApplicationName=cls.EB_APPLICATION,
+                    EnvironmentName=CGAP_ENV_INDEXER,
+                    TemplateName=CGAP_ENV_INDEXER,
+                    VersionLabel=app_version
+                )[cls.STATUS] == cls.UPDATING
+            elif is_fourfront_env(env_name):
+                return eb_client.create_environment(
+                    ApplicationName=cls.EB_APPLICATION,
+                    EnvironmentName=FF_ENV_INDEXER,
+                    TemplateName=FF_ENV_INDEXER,
+                    VersionLabel=app_version
+                )[cls.STATUS] == cls.UPDATING
+            else:  # should never get here, but for good measure
+                raise RuntimeError('Tried to deploy indexer from an unknown environment: %s' % env_name)
+
+    @classmethod
+    def deploy_indexer(cls, env_name, app_version):
+        """ Deploys an indexer application based on the given env_name
+
+        :param env_name: env_name to deploy an indexer to
+        :param app_version: version of application to deploy, MUST match that running on env_name
+        :return: True in success, False otherwise
+        """
+        return cls.create_indexer_configuration_template(env_name) and \
+               cls.create_indexer_environment(env_name, app_version)
+
+    @classmethod
     def main(cls):
         """ Deploys a version to an Elastic Beanstalk environment based on arguments """
         parser = argparse.ArgumentParser(
@@ -182,12 +281,20 @@ class EBDeployer:
         parser.add_argument('env', help='Environment to deploy to')
         parser.add_argument('repo', help='Path to repository to deploy')
         parser.add_argument('version_name', help='Name of new application version we are generating')
+        parser.add_argument('application_version', help='Application version to deploy, not used if not deploying'
+                                                        'an indexer application.')
         parser.add_argument('--branch', help='Branch of repo to deploy', default='master')
+        parser.add_argument('--indexer', help='Whether or not to deploy an indexer server. Note that only'
+                                              'one can be active per HMS Domain.', action='store_true',
+                            default=False)
         args = parser.parse_args()
 
-        packaging_was_successful = cls.build_application_version(args.repo, args.version_name, branch=args.branch)
-        if packaging_was_successful:  # XXX: how to best detect?
-            cls.deploy_new_version(args.env_name, args.repo, args.version_name)
+        if not args.indexer:
+            packaging_was_successful = cls.build_application_version(args.repo, args.version_name, branch=args.branch)
+            if packaging_was_successful:  # XXX: how to best detect?
+                exit(cls.deploy_new_version(args.env_name, args.repo, args.version_name))
+        else:
+            exit(cls.deploy_indexer(args.env_name, args.application_version))
 
 
 class Deployer:  # XXX: this should change. It is not a deployer, it is a configuration file generator. - Will
