@@ -148,6 +148,15 @@ BEANSTALK_DEV_DATA_SETS = {
 }
 
 
+def is_indexer_env(envname):
+    """ Checks whether envname is an indexer environment.
+
+    :param envname:  envname to check
+    :return: True if envname is an indexer application, False otherwise
+    """
+    return envname in [FF_ENV_INDEXER, CGAP_ENV_INDEXER]
+
+
 def data_set_for_env(envname, default=None):
     """
     This relates to which data set to load.

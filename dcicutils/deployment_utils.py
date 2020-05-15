@@ -35,9 +35,17 @@ from git import Repo
 
 from dcicutils.env_utils import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS, is_fourfront_env, is_cgap_env,
-    FF_ENV_INDEXER, CGAP_ENV_INDEXER
+    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env
 )
 from dcicutils.misc_utils import PRINT
+
+# constants associated with EB-related APIs
+EB_CONFIGURATION_SETTINGS = 'ConfigurationSettings'
+EB_OPTION_SETTINGS = 'OptionSettings'
+EB_ENV_VARIABLE_NAMESPACE = 'aws:elasticbeanstalk:application:environment'
+STATUS = 'Status'
+UPDATING = 'Updating'
+TERMINATING = 'Terminating'
 
 
 def boolean_setting(settings, key, default=None):
@@ -66,15 +74,10 @@ def boolean_setting(settings, key, default=None):
 
 class EBDeployer:
 
+    # Options specifically related to our deployment
     S3_BUCKET = 'dcic-application-versions'
     EB_APPLICATION = '4dn-web'  # XXX: will need to change if this changes -Will
-    EB_CONFIGURATION_SETTINGS = 'ConfigurationSettings'
-    EB_OPTION_SETTINGS = 'OptionSettings'
-    EB_ENV_VARIABLE_NAMESPACE = 'aws:elasticbeanstalk:application:environment'
     DEFAULT_INDEXER_SIZE = 'c5.4xlarge'
-    UPDATING = 'Updating'
-    STATUS = 'Status'
-    SOLUTION_STACK = "64bit Amazon Linux 2018.03 v2.9.10 running Python 3.6"
 
     @staticmethod
     def archive_repository(path_to_repo, application_version_name, branch='master'):
@@ -89,6 +92,9 @@ class EBDeployer:
         repo.git.checkout(branch)
         assert not repo.bare  # noqa doing this to catch a common problem -Will
         zip_location = os.path.join(path_to_repo, (application_version_name + '.zip'))
+        if os.path.exists(zip_location):
+            raise RuntimeError('zip_location already exists: %s - Please "rm" this file to use this name.'
+                               % zip_location)
         with open(zip_location, 'wb') as fp:
             repo.archive(fp, format='zip')
         return zip_location
@@ -177,12 +183,12 @@ class EBDeployer:
         :raises: RuntimeError if repo does not match env
         """
         if is_fourfront_env(env_name):
-            if 'fourfront' not in path_to_repo:
+            if '/fourfront' not in path_to_repo:
                 raise RuntimeError('Tried to deploy fourfront env but path to repo does not contain "fourfront",'
                                    ' aborting: %s' % path_to_repo)
             cls._deploy(application_version_name, env_name)
         elif is_cgap_env(env_name):
-            if 'cgap-portal' not in path_to_repo:
+            if '/cgap-portal' not in path_to_repo:
                 raise RuntimeError('Tried to deploy cgap env but path to repo does not contain "cgap-portal",'
                                    ' aborting: %s' % path_to_repo)
             cls._deploy(application_version_name, env_name)
@@ -205,28 +211,42 @@ class EBDeployer:
         return None
 
     @classmethod
-    def create_indexer_configuration_template(cls, env_name, size='c5.large'):  # XXX: Change to none when done testing
+    def extract_env_name_configuration(cls, client, env_name):
+        """ Extracts the EB Configuration options corresponding to 'env_name'.
+
+        :param client: boto3 elasticbeanstalk client
+        :param env_name: env_name whose configuration we'd like to download
+        :return: dictionary of configuration options. See boto3 docs for more info.
+        """
+        all_settings = client.describe_configuration_settings(
+            ApplicationName=cls.EB_APPLICATION,
+            EnvironmentName=env_name
+        )
+        env_settings = all_settings[EB_CONFIGURATION_SETTINGS][0]
+        configurable_options = env_settings[EB_OPTION_SETTINGS]
+        return configurable_options
+
+    @classmethod
+    def create_indexer_configuration_template(cls, env_name, size=DEFAULT_INDEXER_SIZE):  # XXX: Change to none when done testing
         """ Uploads an indexer configuration template to EB
 
         :param env_name: env to create an indexer for
+        :param size: Machine size to use, see AWS docs for valid values. When in doubt the default should work well.
         :return: True if successful, False otherwise
         """
         eb_client = boto3.client('elasticbeanstalk')
-        configuration = eb_client.describe_configuration_settings(
-            ApplicationName=cls.EB_APPLICATION,
-            EnvironmentName=env_name
-        )[cls.EB_CONFIGURATION_SETTINGS][0][cls.EB_OPTION_SETTINGS]
+        configuration = cls.extract_env_name_configuration(eb_client, env_name)
 
         # Add ENCODED_INDEX_SERVER env variable
         configuration.append({
-            'Namespace': cls.EB_ENV_VARIABLE_NAMESPACE,
+            'Namespace': EB_ENV_VARIABLE_NAMESPACE,
             'OptionName': 'ENCODED_INDEX_SERVER',
             'Value': 'True'
         })
 
         # make additional updates as needed
         # XXX: Make worker tier perhaps?
-        for idx, option in enumerate(configuration):
+        for option in configuration:
 
             # make it a big machine (or not if we say so)
             if option['OptionName'] == 'InstanceType':
@@ -239,8 +259,8 @@ class EBDeployer:
         # filter '' option settings and known 'bad' options
         # XXX: Refactor into the above loop? Don't think it really matters since this code doesn't need
         # to be high performance and it's convenient to organize logic like this.
-        configuration = list(filter(lambda d: (d.get('Value', '') != '' and d['OptionName'] not in ['AppSource'],
-                                    configuration)))
+        configuration = list(filter(lambda d: (d.get('Value', '') != '' and d['OptionName'] not in ['AppSource']),
+                                    configuration))
 
         # upload the template
         if is_cgap_env(env_name):
@@ -275,14 +295,14 @@ class EBDeployer:
                 EnvironmentName=CGAP_ENV_INDEXER,
                 TemplateName=CGAP_ENV_INDEXER,
                 VersionLabel=app_version
-            )[cls.STATUS] == cls.UPDATING and cls.delete_indexer_template(eb_client, FF_ENV_INDEXER)
+            )[STATUS] == UPDATING and cls.delete_indexer_template(eb_client, CGAP_ENV_INDEXER)
         elif is_fourfront_env(env_name):
             return eb_client.create_environment(
                 ApplicationName=cls.EB_APPLICATION,
                 EnvironmentName=FF_ENV_INDEXER,
                 TemplateName=FF_ENV_INDEXER,
                 VersionLabel=app_version
-            )[cls.STATUS] == cls.UPDATING and cls.delete_indexer_template(eb_client, FF_ENV_INDEXER)
+            )[STATUS] == UPDATING and cls.delete_indexer_template(eb_client, FF_ENV_INDEXER)
         else:  # should never get here, but for good measure
             raise RuntimeError('Tried to deploy indexer from an unknown environment: %s' % env_name)
 
@@ -294,7 +314,7 @@ class EBDeployer:
         :param template_name: template to delete, will only accept indexer env templates
         :return: True in success, False otherwise
         """
-        if template_name not in [FF_ENV_INDEXER, CGAP_ENV_INDEXER]:
+        if not is_indexer_env(template_name):
             raise RuntimeError('Tried to delete non-indexer configuration template: %s. '
                                'Please use boto3 directly or the AWS Console to do this.' % template_name)
         return client.delete_configuration_template(
@@ -319,15 +339,15 @@ class EBDeployer:
             NOTE: there is 1 hr timeout before you can recreate one of these for the same application.
 
         :param client: boto3 elasticbeanstalk client
-        :param env_name:
+        :param env_name: one of: FF_ENV_INDEXER or CGAP_ENV_INDEXER
         :return: True in success, False otherwise
         """
-        if env_name not in [FF_ENV_INDEXER, CGAP_ENV_INDEXER]:
+        if not is_indexer_env(env_name):
             raise RuntimeError('Tried to terminate non-indexer environment: %s. '
                                'Please use boto3 directly or the AWS Console to do this.' % env_name)
         return client.terminate_environment(
             EnvironmentName=env_name,
-        )['Status'] == 'Terminating'
+        )[STATUS] == TERMINATING
 
     @classmethod
     def main(cls):
