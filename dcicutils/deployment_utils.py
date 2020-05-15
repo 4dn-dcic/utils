@@ -295,7 +295,7 @@ class EBDeployer:
         :return: True in success, False otherwise
         """
         if template_name not in [FF_ENV_INDEXER, CGAP_ENV_INDEXER]:
-            raise RuntimeError('Tried to delete non-indexer configuration template: %s'
+            raise RuntimeError('Tried to delete non-indexer configuration template: %s. '
                                'Please use boto3 directly or the AWS Console to do this.' % template_name)
         return client.delete_configuration_template(
             ApplicationName=cls.EB_APPLICATION,
@@ -312,6 +312,22 @@ class EBDeployer:
         """
         return cls.create_indexer_configuration_template(env_name) and \
                cls.create_indexer_environment(env_name, app_version)
+
+    @staticmethod
+    def terminate_indexer_env(client, env_name):
+        """ Wrapper for "terminate_environment" that will only accept an indexer env.
+            NOTE: there is 1 hr timeout before you can recreate one of these for the same application.
+
+        :param client: boto3 elasticbeanstalk client
+        :param env_name:
+        :return: True in success, False otherwise
+        """
+        if env_name not in [FF_ENV_INDEXER, CGAP_ENV_INDEXER]:
+            raise RuntimeError('Tried to terminate non-indexer environment: %s. '
+                               'Please use boto3 directly or the AWS Console to do this.' % env_name)
+        return client.terminate_environment(
+            EnvironmentName=env_name,
+        )['Status'] == 'Terminating'
 
     @classmethod
     def main(cls):
