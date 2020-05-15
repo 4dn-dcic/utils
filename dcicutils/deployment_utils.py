@@ -29,6 +29,7 @@ import re
 import subprocess
 import sys
 import toml
+import time
 import boto3
 from git import Repo
 
@@ -85,9 +86,10 @@ class EBDeployer:
         """
         repo = Repo(path_to_repo)
         repo.git.checkout(branch)
+        assert not repo.bare  # noqa doing this to catch a common problem -Will
         zip_location = os.path.join(path_to_repo, (application_version_name + '.zip'))
         with open(zip_location, 'wb') as fp:
-            repo.archive(fp)
+            repo.archive(fp, format='zip')
         return zip_location
 
     @classmethod
@@ -100,7 +102,7 @@ class EBDeployer:
         s3_client = boto3.client('s3')
         return s3_client.put_object(
             ACL='public-read',
-            Body=zip_location,
+            Body=open(zip_location, 'rb'),
             Bucket=cls.S3_BUCKET,
             Key=os.path.basename(zip_location)  # application_version_name.zip
         )
@@ -292,7 +294,8 @@ class EBDeployer:
         if not args.indexer:
             packaging_was_successful = cls.build_application_version(args.repo, args.version_name, branch=args.branch)
             if packaging_was_successful:  # XXX: how to best detect?
-                exit(cls.deploy_new_version(args.env_name, args.repo, args.version_name))
+                time.sleep(5)  # give EB a second to catch up
+                exit(cls.deploy_new_version(args.env, args.repo, args.version_name))
         else:
             exit(cls.deploy_indexer(args.env_name, args.application_version))
 
