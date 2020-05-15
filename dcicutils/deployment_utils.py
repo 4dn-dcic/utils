@@ -32,11 +32,11 @@ import toml
 import boto3
 from git import Repo
 
-from .env_utils import (
+from dcicutils.env_utils import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS, is_fourfront_env, is_cgap_env,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER
 )
-from .misc_utils import PRINT
+from dcicutils.misc_utils import PRINT
 
 
 def boolean_setting(settings, key, default=None):
@@ -65,7 +65,7 @@ def boolean_setting(settings, key, default=None):
 
 class EBDeployer:
 
-    S3_BUCKET = 'application_versions'
+    S3_BUCKET = 'dcic-application-versions'
     EB_APPLICATION = '4dn-web'  # XXX: will need to change if this changes -Will
     EB_CONFIGURATION_SETTINGS = 'ConfigurationSettings'
     EB_OPTION_SETTINGS = 'OptionSettings'
@@ -583,4 +583,4 @@ class Deployer:  # XXX: this should change. It is not a deployer, it is a config
 
 
 if __name__ == "__main__":
-    Deployer.main()  # noqa - this is just for debugging
+    EBDeployer.main()  # noqa - this is just for debugging
