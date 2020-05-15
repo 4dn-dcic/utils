@@ -74,6 +74,7 @@ class EBDeployer:
     DEFAULT_INDEXER_SIZE = 'c5.4xlarge'
     UPDATING = 'Updating'
     STATUS = 'Status'
+    SOLUTION_STACK = "64bit Amazon Linux 2018.03 v2.9.10 running Python 3.6"
 
     @staticmethod
     def archive_repository(path_to_repo, application_version_name, branch='master'):
@@ -188,8 +189,23 @@ class EBDeployer:
         else:
             raise RuntimeError('Tried to deploy to invalid environment: %s' % env_name)
 
+    @staticmethod
+    def extract_environment_id(env_name):
+        """ Grabs the environment ID of the given env_name (to be used to base the new configuration
+            template off of).
+
+        :param env_name: name of environment you need the ID of
+        :return: env_name's ID or None if env_name does not exist
+        """
+        eb_client = boto3.client('elasticbeanstalk')
+        envs = eb_client.describe_environments()['Environments']
+        for env in envs:
+            if env['EnvironmentName'] == env_name:
+                return env['EnvironmentId']
+        return None
+
     @classmethod
-    def create_indexer_configuration_template(cls, env_name, size=None):
+    def create_indexer_configuration_template(cls, env_name, size='c5.large'):  # XXX: Change to none when done testing
         """ Uploads an indexer configuration template to EB
 
         :param env_name: env to create an indexer for
@@ -209,8 +225,8 @@ class EBDeployer:
         })
 
         # make additional updates as needed
-        # XXX: Make worker tier?
-        for option in configuration:
+        # XXX: Make worker tier perhaps?
+        for idx, option in enumerate(configuration):
 
             # make it a big machine (or not if we say so)
             if option['OptionName'] == 'InstanceType':
@@ -220,48 +236,71 @@ class EBDeployer:
             if option['OptionName'] == 'EnvironmentVariables':
                 option['Value'] += ',ENCODED_INDEX_SERVER=True'
 
+        # filter '' option settings and known 'bad' options
+        # XXX: Refactor into the above loop? Don't think it really matters since this code doesn't need
+        # to be high performance and it's convenient to organize logic like this.
+        configuration = list(filter(lambda d: (d.get('Value', '') != '' and d['OptionName'] not in ['AppSource'],
+                                    configuration)))
+
         # upload the template
         if is_cgap_env(env_name):
             return eb_client.create_configuration_template(
                 ApplicationName=cls.EB_APPLICATION,
                 TemplateName=CGAP_ENV_INDEXER,
-                OptionSettings=configuration
+                OptionSettings=configuration,
+                EnvironmentId=cls.extract_environment_id(env_name)
             )
         else:
             return eb_client.create_configuration_template(
                 ApplicationName=cls.EB_APPLICATION,
                 TemplateName=FF_ENV_INDEXER,
                 OptionSettings=configuration,
+                EnvironmentId=cls.extract_environment_id(env_name)
             )
 
     @classmethod
     def create_indexer_environment(cls, env_name, app_version):
-        """ Creates a new environment for indexing based on the given env_name
+        """ Creates a new environment for indexing based on the given env_name. Will look for a template
+            called FF_ENV_INDEXER or CGAP_ENV_INDEXER, if that does not exist this call will fail.
 
         :param env_name: env to base template off of
         :param app_version: application version to deploy, MUST match that running on env_name
         :return: result of EB env creation
         :raises RuntimeError if bad env given
         """
-        template_creation_was_successful = cls.create_indexer_configuration_template(env_name)
-        if template_creation_was_successful:
-            eb_client = boto3.client('elasticbeanstalk')
-            if is_cgap_env(env_name):
-                return eb_client.create_environment(
-                    ApplicationName=cls.EB_APPLICATION,
-                    EnvironmentName=CGAP_ENV_INDEXER,
-                    TemplateName=CGAP_ENV_INDEXER,
-                    VersionLabel=app_version
-                )[cls.STATUS] == cls.UPDATING
-            elif is_fourfront_env(env_name):
-                return eb_client.create_environment(
-                    ApplicationName=cls.EB_APPLICATION,
-                    EnvironmentName=FF_ENV_INDEXER,
-                    TemplateName=FF_ENV_INDEXER,
-                    VersionLabel=app_version
-                )[cls.STATUS] == cls.UPDATING
-            else:  # should never get here, but for good measure
-                raise RuntimeError('Tried to deploy indexer from an unknown environment: %s' % env_name)
+        eb_client = boto3.client('elasticbeanstalk')
+        if is_cgap_env(env_name):
+            return eb_client.create_environment(
+                ApplicationName=cls.EB_APPLICATION,
+                EnvironmentName=CGAP_ENV_INDEXER,
+                TemplateName=CGAP_ENV_INDEXER,
+                VersionLabel=app_version
+            )[cls.STATUS] == cls.UPDATING and cls.delete_indexer_template(eb_client, FF_ENV_INDEXER)
+        elif is_fourfront_env(env_name):
+            return eb_client.create_environment(
+                ApplicationName=cls.EB_APPLICATION,
+                EnvironmentName=FF_ENV_INDEXER,
+                TemplateName=FF_ENV_INDEXER,
+                VersionLabel=app_version
+            )[cls.STATUS] == cls.UPDATING and cls.delete_indexer_template(eb_client, FF_ENV_INDEXER)
+        else:  # should never get here, but for good measure
+            raise RuntimeError('Tried to deploy indexer from an unknown environment: %s' % env_name)
+
+    @classmethod
+    def delete_indexer_template(cls, client, template_name):
+        """ Wrapper for "delete_configuration_template" that will only accept indexer_envs
+
+        :param client: boto3 elasticbeanstalk client
+        :param template_name: template to delete, will only accept indexer env templates
+        :return: True in success, False otherwise
+        """
+        if template_name not in [FF_ENV_INDEXER, CGAP_ENV_INDEXER]:
+            raise RuntimeError('Tried to delete non-indexer configuration template: %s'
+                               'Please use boto3 directly or the AWS Console to do this.' % template_name)
+        return client.delete_configuration_template(
+            ApplicationName=cls.EB_APPLICATION,
+            TemplateName=template_name
+        )
 
     @classmethod
     def deploy_indexer(cls, env_name, app_version):
@@ -294,10 +333,10 @@ class EBDeployer:
         if not args.indexer:
             packaging_was_successful = cls.build_application_version(args.repo, args.version_name, branch=args.branch)
             if packaging_was_successful:  # XXX: how to best detect?
-                time.sleep(5)  # give EB a second to catch up
+                time.sleep(5)  # give EB a second to catch up (it needs it)
                 exit(cls.deploy_new_version(args.env, args.repo, args.version_name))
         else:
-            exit(cls.deploy_indexer(args.env_name, args.application_version))
+            exit(cls.deploy_indexer(args.env, args.application_version))
 
 
 class Deployer:  # XXX: this should change. It is not a deployer, it is a configuration file generator. - Will
