@@ -2,9 +2,13 @@
 This file contains functions that might be generally useful.
 """
 
+import contextlib
 import os
 import logging
+import warnings
 import webtest  # importing the library makes it easier to mock testing
+
+from typing import Type
 
 
 # Is this the right place for this? I feel like this should be done in an application, not a library.
@@ -152,3 +156,24 @@ def get_setting_from_context(settings, ini_var, env_var=None, default=None):
         if env_var in os.environ:
             return os.environ.get(env_var)
     return settings.get(ini_var, default)
+
+
+@contextlib.contextmanager
+def filtered_warnings(action, message: str = "", category: Type[Warning] = Warning,
+                      module: str = "", lineno: int = 0, append: bool = False):
+    """
+    Context manager temporarily filters deprecation messages for the duration of the body.
+    Used otherwise the same as warnings.filterwarnings would be used.
+
+    For example:
+
+           with filtered_warnings('ignore', category=DeprecationWarning):
+               ... use something that's deprecated without a lot of fuss ...
+
+    Note: This is not threadsafe. It's OK while loading system and during testing,
+          but not in worker threads.
+    """
+    with warnings.catch_warnings():
+        warnings.filterwarnings(action, message=message, category=category, module=module,
+                                lineno=lineno, append=append)
+        yield
