@@ -227,7 +227,7 @@ class EBDeployer:
         return configurable_options
 
     @classmethod
-    def create_indexer_configuration_template(cls, env_name, size=DEFAULT_INDEXER_SIZE):  # XXX: Change to none when done testing
+    def create_indexer_configuration_template(cls, env_name, size=None):
         """ Uploads an indexer configuration template to EB
 
         :param env_name: env to create an indexer for
@@ -330,8 +330,11 @@ class EBDeployer:
         :param app_version: version of application to deploy, MUST match that running on env_name
         :return: True in success, False otherwise
         """
-        return cls.create_indexer_configuration_template(env_name) and \
-               cls.create_indexer_environment(env_name, app_version)
+        template_creation_was_successful = cls.create_indexer_configuration_template(env_name)
+        if template_creation_was_successful:
+            return cls.create_indexer_environment(env_name, app_version)
+        else:
+            raise RuntimeError('Template creation unsuccessful with response: %s' % template_creation_was_successful)
 
     @staticmethod
     def terminate_indexer_env(client, env_name):
