@@ -45,6 +45,7 @@ EB_OPTION_SETTINGS = 'OptionSettings'
 EB_ENV_VARIABLE_NAMESPACE = 'aws:elasticbeanstalk:application:environment'
 STATUS = 'Status'
 UPDATING = 'Updating'
+LAUNCHING = 'Launching'
 TERMINATING = 'Terminating'
 
 
@@ -295,14 +296,14 @@ class EBDeployer:
                 EnvironmentName=CGAP_ENV_INDEXER,
                 TemplateName=CGAP_ENV_INDEXER,
                 VersionLabel=app_version
-            )[STATUS] == UPDATING and cls.delete_indexer_template(eb_client, CGAP_ENV_INDEXER)
+            )[STATUS] == LAUNCHING and cls.delete_indexer_template(eb_client, CGAP_ENV_INDEXER)
         elif is_fourfront_env(env_name):
             return eb_client.create_environment(
                 ApplicationName=cls.EB_APPLICATION,
                 EnvironmentName=FF_ENV_INDEXER,
                 TemplateName=FF_ENV_INDEXER,
                 VersionLabel=app_version
-            )[STATUS] == UPDATING and cls.delete_indexer_template(eb_client, FF_ENV_INDEXER)
+            )[STATUS] == LAUNCHING and cls.delete_indexer_template(eb_client, FF_ENV_INDEXER)
         else:  # should never get here, but for good measure
             raise RuntimeError('Tried to deploy indexer from an unknown environment: %s' % env_name)
 

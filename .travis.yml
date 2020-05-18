@@ -19,16 +19,16 @@ install:
 script:
   - flake8 dcicutils
   - travis_wait coverage run --source=dcicutils -m pytest -vv test
-  - coveralls
+  - if [ "$TRAVIS_PYTHON_VERSION" == "3.6" ]; then coveralls; fi;
 deploy:
   provider: script
-  script: poetry publish --build --username=$PYPI_USER --password=$PYPI_PASSWORD
+  script: if [ "$TRAVIS_PYTHON_VERSION" == "3.6" ]; then poetry publish --build --username=$PYPI_USER --password=$PYPI_PASSWORD; fi
   on:
     tags: true
 after_success:
   - echo "Finished running tests"
   - |
-      if [[ $TRAVIS_BRANCH == 'master' ]]; then
+      if [[ $TRAVIS_BRANCH == 'master' && "$TRAVIS_PYTHON_VERSION" == "3.6" ]]; then
         echo 'Triggering docs build'
         curl -X POST -d "branches=master" -d "token=$DOCS_TOKEN" https://readthedocs.org/api/v2/webhook/dcic-utils/99616/
       fi
