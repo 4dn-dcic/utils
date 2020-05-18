@@ -166,7 +166,7 @@ def filtered_warnings(action, message: str = "", category: Type[Warning] = Warni
     Used otherwise the same as warnings.filterwarnings would be used.
 
     For example:
-    
+
            with filtered_warnings('ignore', category=DeprecationWarning):
                ... use something that's deprecated without a lot of fuss ...
 
