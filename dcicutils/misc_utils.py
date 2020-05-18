@@ -158,13 +158,17 @@ def get_setting_from_context(settings, ini_var, env_var=None, default=None):
     return settings.get(ini_var, default)
 
 
-# This should move to dcicutils.misc_utils for better sharing
 @contextlib.contextmanager
 def filtered_warnings(action, message: str = "", category: Type[Warning] = Warning,
                       module: str = "", lineno: int = 0, append: bool = False):
     """
     Context manager temporarily filters deprecation messages for the duration of the body.
     Used otherwise the same as warnings.filterwarnings would be used.
+
+    For example:
+    
+           with filtered_warnings('ignore', category=DeprecationWarning):
+               ... use something that's deprecated without a lot of fuss ...
 
     Note: This is not threadsafe. It's OK while loading system and during testing,
           but not in worker threads.
