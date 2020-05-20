@@ -163,9 +163,9 @@ def indexer_env_for_env(envname):
     :param envname: envname we want to determine the indexer for
     :returns: either FF_ENV_INDEXER or CGAP_ENV_INDEXER or None
     """
-    if is_fourfront_env(envname):
+    if is_fourfront_env(envname) and envname != FF_ENV_INDEXER:
         return FF_ENV_INDEXER
-    elif is_cgap_env(envname):
+    elif is_cgap_env(envname) and envname != CGAP_ENV_INDEXER:
         return CGAP_ENV_INDEXER
     else:
         return None
