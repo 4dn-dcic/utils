@@ -7,11 +7,13 @@ import subprocess
 import time
 import uuid
 
-from dcicutils.qa_utils import mock_not_called, local_attrs, override_environ, ControlledTime
-from unittest import mock
-
+from dcicutils.misc_utils import RetryManager
+from dcicutils.qa_utils import (
+    mock_not_called, local_attrs, override_environ, ControlledTime, Occasionally, RetryManagerForTesting
+)
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
+from unittest import mock
 from .fixtures.sample_fixtures import MockMathError, MockMath, math_enabled
 
 
@@ -374,3 +376,199 @@ def test_notice_pytest_fixtures_part_3():
     assert len(warnings) == 2  # a global warning about the import, and a local warning about a bound variable
     for line in warnings:
         assert "unused" in line  # allow for some variability in message wording, but should be about something unused
+
+
+def test_occasionally():
+
+    def add1(x):
+        return x + 1
+
+    # This is the same as supplying failure_frequency=2.
+    # It works on try 0, 2, 4, ... and it fails on try 1, 3, 5, ...
+    flaky_add1 = Occasionally(add1)
+
+    assert flaky_add1(1) == 2
+
+    # Won't work second time.
+    with pytest.raises(Exception):
+        assert flaky_add1(1) == 2
+
+    assert flaky_add1(2) == 3
+
+    # Won't work fourth time.
+    with pytest.raises(Exception):
+        assert flaky_add1(2) == 3
+
+    sometimes_add1 = Occasionally(add1, success_frequency=2)
+
+    # Our function sometimes_add1 will work every other time, since the default frequency is 2.
+
+    try:
+        assert sometimes_add1(1) == 2
+    except Exception as e:
+        msg = str(e)
+        assert msg == Occasionally.DEFAULT_ERROR_MESSAGE
+
+    # This time it will work.
+    assert sometimes_add1(1) == 2
+
+    # And this time it will fail.
+    with pytest.raises(Exception):
+        assert sometimes_add1(2) == 3
+
+    # And this time it will work again.
+    assert sometimes_add1(2) == 3
+
+    # This is only going to work every third time.
+    occasionally_add1 = Occasionally(add1, success_frequency=3)
+
+    # Nope (first of three)
+    with pytest.raises(Exception):
+        assert occasionally_add1(2) == 3
+
+    # Nope (second of three)
+    with pytest.raises(Exception):
+        assert occasionally_add1(2) == 3
+
+    # Finally!
+    assert occasionally_add1(2) == 3
+
+    mostly_add1 = Occasionally(add1, failure_frequency=3)
+
+    # This will work for a while...
+    assert mostly_add1(1) == 2
+    assert mostly_add1(2) == 3
+    # But third time is going to fail...
+    with pytest.raises(Exception):
+        assert mostly_add1(3) == 4
+
+    # This will work for a while...
+    assert mostly_add1(1) == 2
+    assert mostly_add1(2) == 3
+    mostly_add1.reset()
+    # With the object reset, it'll work a bit longer
+    assert mostly_add1(3) == 4
+    assert mostly_add1(4) == 5
+    # But third time is going to fail...
+    with pytest.raises(Exception):
+        assert mostly_add1(5) == 6
+
+
+def test_occasionally_errors():
+
+    try:
+        # The first call to this function will err.
+        fail_for_a_while = Occasionally(lambda x: x + 1, success_frequency=10,
+                                        error_class=SyntaxError,
+                                        error_message="something")
+        fail_for_a_while(1)
+    except Exception as e:
+        assert type(e) == SyntaxError
+        assert str(e) == "something"
+
+
+def test_retry_manager():
+
+    def adder(n):
+        def addn(x):
+            return x + n
+        return addn
+
+    sometimes_add2 = Occasionally(adder(2), success_frequency=2)
+
+    try:
+        assert sometimes_add2(1) == 3
+    except Exception as e:
+        msg = str(e)
+        assert msg == Occasionally.DEFAULT_ERROR_MESSAGE
+    assert sometimes_add2(1) == 3
+    with pytest.raises(Exception):
+        assert sometimes_add2(2) == 4
+    assert sometimes_add2(2) == 4
+
+    sometimes_add2.reset()
+
+    @RetryManager.retry_allowed(retries_allowed=1)
+    def reliably_add2(x):
+        return sometimes_add2(x)
+
+    assert reliably_add2(1) == 3
+    assert reliably_add2(2) == 4
+    assert reliably_add2(3) == 5
+
+    rarely_add3 = Occasionally(adder(3), success_frequency=5)
+
+    with pytest.raises(Exception):
+        assert rarely_add3(1) == 4
+    with pytest.raises(Exception):
+        assert rarely_add3(1) == 4
+    with pytest.raises(Exception):
+        assert rarely_add3(1) == 4
+    with pytest.raises(Exception):
+        assert rarely_add3(1) == 4
+    assert rarely_add3(1) == 4  # 5th time's a charm
+
+    rarely_add3.reset()
+
+    # NOTE WELL: For testing, we chose 1.25 to use factors of 2 so floating point can exactly compare
+
+    @RetryManager.retry_allowed(retries_allowed=4, wait_seconds=2, wait_multiplier=1.25)
+    def reliably_add3(x):
+        return rarely_add3(x)
+
+    ARGS = 1  # We have to access a random place out of a tuple structure for mock data on time.sleep's arg
+
+    with mock.patch("time.sleep") as mock_sleep:
+
+        assert reliably_add3(1) == 4
+
+        assert mock_sleep.call_count == 4
+
+        assert mock_sleep.mock_calls[0][ARGS][0] == 2
+        assert mock_sleep.mock_calls[1][ARGS][0] == 2.5      # 2 * 1.25
+        assert mock_sleep.mock_calls[2][ARGS][0] == 3.125    # 2 * 1.25 ** 2
+        assert mock_sleep.mock_calls[3][ARGS][0] == 3.90625  # 2 * 1.25 ** 3
+
+        assert reliably_add3(2) == 5
+        assert mock_sleep.call_count == 8
+
+        assert mock_sleep.mock_calls[4][ARGS][0] == 2
+        assert mock_sleep.mock_calls[5][ARGS][0] == 2.5      # 2 * 1.25
+        assert mock_sleep.mock_calls[6][ARGS][0] == 3.125    # 2 * 1.25 ** 2
+        assert mock_sleep.mock_calls[7][ARGS][0] == 3.90625  # 2 * 1.25 ** 3
+
+        with RetryManagerForTesting.retry_options('reliably_add3', retries_allowed=3, wait_seconds=5):
+
+            mock_sleep.reset_mock()
+            assert mock_sleep.call_count == 0
+
+            for i in range(10):
+                # In this context, we won't retry enough to succeed...
+                rarely_add3.reset()
+                with pytest.raises(Exception):
+                    reliably_add3(1)
+
+            # All the sleep calls will be the same 5, 6.25, 7.8125 progression
+            assert mock_sleep.call_count == 30
+            for i in range(0, 30, 3):  # start, stop, step
+                assert mock_sleep.mock_calls[i][ARGS][0] == 5
+                assert mock_sleep.mock_calls[i + 1][ARGS][0] == 6.25
+                assert mock_sleep.mock_calls[i + 2][ARGS][0] == 7.8125
+
+            mock_sleep.reset_mock()
+            assert mock_sleep.call_count == 0
+
+            with RetryManagerForTesting.retry_options('reliably_add3', wait_seconds=7):
+
+                for i in range(10):
+                    # In this context, we won't retry enough to succeed...
+                    rarely_add3.reset()
+                    with pytest.raises(Exception):
+                        reliably_add3(1)
+
+                # Now the sleep calls will be the same 7,  8.75, 10.9375 progression
+                assert mock_sleep.call_count == 30
+                for i in range(0, 30, 3):  # start, stop, step
+                    assert mock_sleep.mock_calls[i][ARGS][0] == 7
+                    assert mock_sleep.mock_calls[i + 1][ARGS][0] == 8.75
+                    assert mock_sleep.mock_calls[i + 2][ARGS][0] == 10.9375

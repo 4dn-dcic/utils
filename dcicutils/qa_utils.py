@@ -6,7 +6,7 @@ import datetime
 import contextlib
 import os
 import pytz
-from .misc_utils import PRINT, ignored
+from .misc_utils import PRINT, ignored, RetryManager
 
 
 def mock_not_called(name):
@@ -215,3 +215,69 @@ def notice_pytest_fixtures(*fixtures):
           assert foo() = bar()
     """
     ignored(fixtures)  # we don't use the given fixtures, but now the tools will think we do
+
+
+class Occasionally:
+    """
+    This class is useful for testing flakey things.
+
+    Occasionally(function) returns a function that works the first time but fails every other time.
+    Occasionally(function, success_frequency=N) returns a function that fails N-1 times, then works.
+    Occasionally(function, failure_frequency=N) returns a function that works N-1 times, then fails.
+
+    The counting phase can be reset by calling .reset() on the function.
+    """
+    # More examples of this can be seen in the tests for misc_utils.RetryManager
+
+    DEFAULT_ERROR_CLASS = Exception
+
+    DEFAULT_ERROR_MESSAGE = "Oops. Occasionally this fails."
+
+    def __init__(self, function, failure_frequency=None, success_frequency=None,
+                 error_class=None, error_message=None):
+        if not failure_frequency and not success_frequency:
+            # Arbitrary. Setting success_frequency would amount to the same, but on other 'phase'.
+            # This will succeed once, then fail.
+            failure_frequency = 2
+        self.frequency = failure_frequency or success_frequency
+        self.frequently_fails = True if success_frequency else False
+        self.count = 0
+        self.function = function
+        self.error_class = error_class or self.DEFAULT_ERROR_CLASS
+        self.error_message = error_message or self.DEFAULT_ERROR_MESSAGE
+
+    def reset(self):
+        self.count = 0
+
+    def __call__(self, *args, **kwargs):
+        self.count = (self.count + 1) % self.frequency
+        if ((self.count == 0 and not self.frequently_fails) or (self.count != 0 and self.frequently_fails)):
+            raise self.error_class(self.error_message)
+        else:
+            return self.function(*args, **kwargs)
+
+
+class RetryManagerForTesting(RetryManager):
+
+    @classmethod
+    @contextlib.contextmanager
+    def retry_options(cls, key, retries_allowed=None, wait_seconds=None,
+                      wait_increment=None, wait_multiplier=None):
+        if not isinstance(key, str):
+            raise ValueError("The required 'key' argument to the RetryManager.retry_options context manager"
+                             " must be a string: %r" % key)
+        function_profile = cls.RETRY_PROFILES.get(key)
+        if not function_profile:
+            raise ValueError("The 'key' argument to RetryManager.retry_options"
+                             " did not name a registered function: %r" % key)
+        assert isinstance(function_profile, cls.RetryProfile)
+        options = {}
+        if retries_allowed is not None:
+            options['retries_allowed'] = retries_allowed
+        if wait_seconds is not None:
+            options['wait_seconds'] = wait_seconds
+        if wait_increment is not None or wait_multiplier is not None:
+            options['wait_adjustor'] = cls._wait_adjustor(wait_increment=wait_increment,
+                                                          wait_multiplier=wait_multiplier)
+        with local_attrs(function_profile, **options):
+            yield

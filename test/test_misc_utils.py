@@ -9,6 +9,7 @@ from dcicutils.misc_utils import (
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
     RetryManager,
 )
+from dcicutils.qa_utils import Occasionally
 from unittest import mock
 
 
@@ -324,39 +325,18 @@ def test_filtered_warnings():
 
 def test_retry_manager():
 
-    class Occasionally:
-
-        ERROR_CLASS = Exception
-
-        OOPS_MESSAGE = "Well, sometimes this fails."
-
-        def __init__(self, function, frequency=2, error_class=None):
-            self.frequency = frequency
-            self.count = 0
-            self.function = function
-            self.error_class = error_class or self.ERROR_CLASS
-
-        def reset(self):
-            self.count = 0
-
-        def __call__(self, *args, **kwargs):
-            self.count = (self.count + 1) % self.frequency
-            if self.count == 0:
-                return self.function(*args, **kwargs)
-            raise self.error_class(self.OOPS_MESSAGE)
-
     def adder(n):
         def addn(x):
             return x + n
         return addn
 
-    sometimes_add2 = Occasionally(adder(2))
+    sometimes_add2 = Occasionally(adder(2), success_frequency=2)
 
     try:
         assert sometimes_add2(1) == 3
     except Exception as e:
         msg = str(e)
-        assert msg == Occasionally.OOPS_MESSAGE
+        assert msg == Occasionally.DEFAULT_ERROR_MESSAGE
     assert sometimes_add2(1) == 3
     with pytest.raises(Exception):
         assert sometimes_add2(2) == 4
@@ -372,7 +352,7 @@ def test_retry_manager():
     assert reliably_add2(2) == 4
     assert reliably_add2(3) == 5
 
-    rarely_add3 = Occasionally(adder(3), frequency=5)
+    rarely_add3 = Occasionally(adder(3), success_frequency=5)
 
     with pytest.raises(Exception):
         assert rarely_add3(1) == 4

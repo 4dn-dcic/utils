@@ -180,6 +180,7 @@ def filtered_warnings(action, message: str = "", category: Type[Warning] = Warni
                                 lineno=lineno, append=append)
         yield
 
+
 class RetryManager:
 
     class RetryProfile:
@@ -198,9 +199,21 @@ class RetryManager:
     DEFAULT_WAIT_SECONDS = 0
 
     @classmethod
-    def retry_allowed(cls, retries_allowed=None, wait_seconds=None,
-                      wait_increment=None, wait_multiplier=None,
-                      key=None):
+    def _wait_adjustor(cls, wait_increment, wait_multiplier):
+
+        if wait_increment and wait_multiplier:
+            raise SyntaxError("You may not specify both wait_increment and wait_multiplier.")
+
+        if wait_increment:
+            return lambda x: x + wait_increment
+        elif wait_multiplier:
+            return lambda x: x * wait_multiplier
+        else:
+            return lambda x: x
+
+    @classmethod
+    def retry_allowed(cls, key=None, retries_allowed=None, wait_seconds=None,
+                      wait_increment=None, wait_multiplier=None):
         """
         Used as a decorator on a function definition, makes that function do retrying before really failing.
         For example:
@@ -213,8 +226,7 @@ class RetryManager:
         either using the same wait each time or, if given a wait_multiplier or wait_increment, using
         that advice to adjust the wait time upward on each time.
         """
-        if wait_increment and wait_multiplier:
-            raise SyntaxError("You may not specify both wait_increment and wait_multiplier.")
+
         def decorator(function):
             function_name = key or function.__name__
             function_profile = cls.RetryProfile(
@@ -225,12 +237,9 @@ class RetryManager:
             cls.RETRY_PROFILES[function_name] = function_profile  # Only for debugging.
             function_profile.retries_allowed = retries_allowed
             function_profile.wait_seconds = wait_seconds or cls.DEFAULT_WAIT_SECONDS
-            if wait_increment:
-                function_profile.wait_adjustor = lambda x: x + wait_increment
-            elif wait_multiplier:
-                function_profile.wait_adjustor = lambda x: x * wait_multiplier
-            else:
-                function_profile.wait_adjustor = lambda x: x
+            function_profile.wait_adjustor = cls._wait_adjustor(wait_increment=wait_increment,
+                                                                wait_multiplier=wait_multiplier)
+
             @functools.wraps(function)
             def wrapped_function(*args, **kwargs):
                 tries_allowed = function_profile.tries_allowed
@@ -244,8 +253,10 @@ class RetryManager:
                     try:
                         success = function(*args, **kwargs)
                         return success
-                    except Exception as e:
+                    except Exception:
                         pass
                 raise
+
             return wrapped_function
+
         return decorator
