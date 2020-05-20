@@ -242,9 +242,12 @@ class EBDeployer:
                 ApplicationName=cls.EB_APPLICATION,
                 TemplateName=template_name
             )
-        except Exception as e:
-            raise RuntimeError('Got exception trying to get configuration template %s, error: %s' %
-                               (template_name, e))
+        except Exception:  # catch all exceptions here
+            time.sleep(5)  # wait 5 seconds, try again (and raise exception if it fails)
+            client.describe_configuration_settings(
+                ApplicationName=cls.EB_APPLICATION,
+                TemplateName=template_name
+            )
         return True
 
     @classmethod
