@@ -157,6 +157,20 @@ def is_indexer_env(envname):
     return envname in [FF_ENV_INDEXER, CGAP_ENV_INDEXER]
 
 
+def indexer_env_for_env(envname):
+    """ Returns the corresponding indexer-env name for the given env.
+
+    :param envname: envname we want to determine the indexer for
+    :returns: either FF_ENV_INDEXER or CGAP_ENV_INDEXER or None
+    """
+    if is_fourfront_env(envname):
+        return FF_ENV_INDEXER
+    elif is_cgap_env(envname):
+        return CGAP_ENV_INDEXER
+    else:
+        return None
+
+
 def data_set_for_env(envname, default=None):
     """
     This relates to which data set to load.

@@ -35,7 +35,7 @@ from git import Repo
 
 from dcicutils.env_utils import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS, is_fourfront_env, is_cgap_env,
-    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env
+    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env
 )
 from dcicutils.misc_utils import PRINT
 
@@ -237,17 +237,17 @@ class EBDeployer:
         :returns: True if template can be acquired
         :raises: Exception if one is encountered
         """
-        try:
-            client.describe_configuration_settings(
-                ApplicationName=cls.EB_APPLICATION,
-                TemplateName=template_name
-            )
-        except Exception:  # catch all exceptions here
-            time.sleep(10)  # wait 10 seconds, try again (and raise exception if it fails)
-            client.describe_configuration_settings(
-                ApplicationName=cls.EB_APPLICATION,
-                TemplateName=template_name
-            )
+        for retrying in (True, False):
+            try:
+                client.describe_configuration_settings(
+                    ApplicationName=cls.EB_APPLICATION,
+                    TemplateName=template_name
+                )
+            except Exception:
+                if not retrying:
+                    raise
+                else:
+                    time.sleep(10)
         return True
 
     @classmethod
@@ -287,22 +287,14 @@ class EBDeployer:
                                     configuration))
 
         # upload the template
-        if is_cgap_env(env_name):
-            eb_client.create_configuration_template(
-                ApplicationName=cls.EB_APPLICATION,
-                TemplateName=CGAP_ENV_INDEXER,
-                OptionSettings=configuration,
-                EnvironmentId=cls.extract_environment_id(env_name)
-            )
-            return cls.verify_template_creation(eb_client, CGAP_ENV_INDEXER)
-        else:
-            eb_client.create_configuration_template(
-                ApplicationName=cls.EB_APPLICATION,
-                TemplateName=FF_ENV_INDEXER,
-                OptionSettings=configuration,
-                EnvironmentId=cls.extract_environment_id(env_name)
-            )
-            return cls.verify_template_creation(eb_client, FF_ENV_INDEXER)
+        indexer_env = indexer_env_for_env(env_name)
+        eb_client.create_configuration_template(
+            ApplicationName=cls.EB_APPLICATION,
+            TemplateName=indexer_env,
+            OptionSettings=configuration,
+            EnvironmentId=cls.extract_environment_id(env_name)
+        )
+        return cls.verify_template_creation(eb_client, indexer_env)
 
     @classmethod
     def create_indexer_environment(cls, env_name, app_version):
