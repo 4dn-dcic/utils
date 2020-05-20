@@ -243,7 +243,7 @@ class EBDeployer:
                 TemplateName=template_name
             )
         except Exception:  # catch all exceptions here
-            time.sleep(5)  # wait 5 seconds, try again (and raise exception if it fails)
+            time.sleep(10)  # wait 10 seconds, try again (and raise exception if it fails)
             client.describe_configuration_settings(
                 ApplicationName=cls.EB_APPLICATION,
                 TemplateName=template_name
