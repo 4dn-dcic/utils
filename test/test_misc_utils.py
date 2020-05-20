@@ -1,11 +1,13 @@
 import io
 import json
 import os
+import pytest
 import warnings
 import webtest
 from dcicutils.misc_utils import (
     PRINT, ignored, filtered_warnings, get_setting_from_context, VirtualApp,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
+    RetryManager,
 )
 from unittest import mock
 
@@ -318,3 +320,95 @@ def test_filtered_warnings():
 
     with filtered_warnings("ignore", category=SyntaxWarning):
         expect_warnings([(1, Warning), (1, DeprecationWarning), (0, SyntaxWarning)])
+
+
+def test_retry_manager():
+
+    class Occasionally:
+
+        ERROR_CLASS = Exception
+
+        OOPS_MESSAGE = "Well, sometimes this fails."
+
+        def __init__(self, function, frequency=2, error_class=None):
+            self.frequency = frequency
+            self.count = 0
+            self.function = function
+            self.error_class = error_class or self.ERROR_CLASS
+
+        def reset(self):
+            self.count = 0
+
+        def __call__(self, *args, **kwargs):
+            self.count = (self.count + 1) % self.frequency
+            if self.count == 0:
+                return self.function(*args, **kwargs)
+            raise self.error_class(self.OOPS_MESSAGE)
+
+    def adder(n):
+        def addn(x):
+            return x + n
+        return addn
+
+    sometimes_add2 = Occasionally(adder(2))
+
+    try:
+        assert sometimes_add2(1) == 3
+    except Exception as e:
+        msg = str(e)
+        assert msg == Occasionally.OOPS_MESSAGE
+    assert sometimes_add2(1) == 3
+    with pytest.raises(Exception):
+        assert sometimes_add2(2) == 4
+    assert sometimes_add2(2) == 4
+
+    sometimes_add2.reset()
+
+    @RetryManager.retry_allowed(retries_allowed=1)
+    def reliably_add2(x):
+        return sometimes_add2(x)
+
+    assert reliably_add2(1) == 3
+    assert reliably_add2(2) == 4
+    assert reliably_add2(3) == 5
+
+    rarely_add3 = Occasionally(adder(3), frequency=5)
+
+    with pytest.raises(Exception):
+        assert rarely_add3(1) == 4
+    with pytest.raises(Exception):
+        assert rarely_add3(1) == 4
+    with pytest.raises(Exception):
+        assert rarely_add3(1) == 4
+    with pytest.raises(Exception):
+        assert rarely_add3(1) == 4
+    assert rarely_add3(1) == 4  # 5th time's a charm
+
+    rarely_add3.reset()
+
+    # NOTE WELL: For testing, we chose 1.25 to use factors of 2 so floating point can exactly compare
+
+    @RetryManager.retry_allowed(retries_allowed=4, wait_seconds=2, wait_multiplier=1.25)
+    def reliably_add3(x):
+        return rarely_add3(x)
+
+    ARGS = 1  # We have to access a random place out of a tuple structure for mock data on time.sleep's arg
+
+    with mock.patch("time.sleep") as mock_sleep:
+
+        assert reliably_add3(1) == 4
+
+        assert mock_sleep.call_count == 4
+
+        assert mock_sleep.mock_calls[0][ARGS][0] == 2
+        assert mock_sleep.mock_calls[1][ARGS][0] == 2.5      # 2 * 1.25
+        assert mock_sleep.mock_calls[2][ARGS][0] == 3.125    # 2 * 1.25 ** 2
+        assert mock_sleep.mock_calls[3][ARGS][0] == 3.90625  # 2 * 1.25 ** 3
+
+        assert reliably_add3(2) == 5
+        assert mock_sleep.call_count == 8
+
+        assert mock_sleep.mock_calls[4][ARGS][0] == 2
+        assert mock_sleep.mock_calls[5][ARGS][0] == 2.5      # 2 * 1.25
+        assert mock_sleep.mock_calls[6][ARGS][0] == 3.125    # 2 * 1.25 ** 2
+        assert mock_sleep.mock_calls[7][ARGS][0] == 3.90625  # 2 * 1.25 ** 3
