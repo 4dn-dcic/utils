@@ -228,6 +228,26 @@ class EBDeployer:
         return configurable_options
 
     @classmethod
+    def verify_template_creation(cls, client, template_name):
+        """ Does a get for the given template_name to verify EB has recognized that it is
+            available.
+
+        :param client: boto3 elasticbeanstalk client
+        :param template_name: name of template to check
+        :returns: True if template can be acquired
+        :raises: Exception if one is encountered
+        """
+        try:
+            client.describe_configuration_settings(
+                ApplicationName=cls.EB_APPLICATION,
+                TemplateName=template_name
+            )
+        except Exception as e:
+            raise RuntimeError('Got exception trying to get configuration template %s, error: %s' %
+                               (template_name, e))
+        return True
+
+    @classmethod
     def create_indexer_configuration_template(cls, env_name, size=None):
         """ Uploads an indexer configuration template to EB
 
@@ -265,19 +285,21 @@ class EBDeployer:
 
         # upload the template
         if is_cgap_env(env_name):
-            return eb_client.create_configuration_template(
+            eb_client.create_configuration_template(
                 ApplicationName=cls.EB_APPLICATION,
                 TemplateName=CGAP_ENV_INDEXER,
                 OptionSettings=configuration,
                 EnvironmentId=cls.extract_environment_id(env_name)
             )
+            return cls.verify_template_creation(eb_client, CGAP_ENV_INDEXER)
         else:
-            return eb_client.create_configuration_template(
+            eb_client.create_configuration_template(
                 ApplicationName=cls.EB_APPLICATION,
                 TemplateName=FF_ENV_INDEXER,
                 OptionSettings=configuration,
                 EnvironmentId=cls.extract_environment_id(env_name)
             )
+            return cls.verify_template_creation(eb_client, FF_ENV_INDEXER)
 
     @classmethod
     def create_indexer_environment(cls, env_name, app_version):
