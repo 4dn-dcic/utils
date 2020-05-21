@@ -559,7 +559,9 @@ def test_retry_manager():
         assert mock_sleep.mock_calls[6][ARGS][0] == 3.125    # 2 * 1.25 ** 2
         assert mock_sleep.mock_calls[7][ARGS][0] == 3.90625  # 2 * 1.25 ** 3
 
-        with RetryManager.retry_options('reliably_add3', retries_allowed=3, wait_seconds=5):
+        # Note that this does not change the wait multiplier, but does exercise the code that processes it,
+        # showing that it is doing the same thing as before.
+        with RetryManager.retry_options('reliably_add3', retries_allowed=3, wait_seconds=5, wait_multiplier=1.25):
 
             mock_sleep.reset_mock()
             assert mock_sleep.call_count == 0
@@ -594,3 +596,21 @@ def test_retry_manager():
                     assert mock_sleep.mock_calls[i][ARGS][0] == 7
                     assert mock_sleep.mock_calls[i + 1][ARGS][0] == 8.75
                     assert mock_sleep.mock_calls[i + 2][ARGS][0] == 10.9375
+
+        with pytest.raises(ValueError):
+
+            # The name-key must not be a number.
+            with RetryManager.retry_options(name_key=17, retries_allowed=3, wait_seconds=5):
+                pass
+
+        with pytest.raises(ValueError):
+
+            # The name-key must not be a number.
+            with RetryManager.retry_options(17, retries_allowed=3, wait_seconds=5):
+                pass
+
+        with pytest.raises(ValueError):
+
+            # The name-key must be registered
+            with RetryManager.retry_options(name_key="not-a-registered-name", retries_allowed=3, wait_seconds=5):
+                pass
