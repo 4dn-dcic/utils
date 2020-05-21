@@ -3,8 +3,10 @@ This file contains functions that might be generally useful.
 """
 
 import contextlib
+import functools
 import os
 import logging
+import time
 import warnings
 import webtest  # importing the library makes it easier to mock testing
 
@@ -177,3 +179,92 @@ def filtered_warnings(action, message: str = "", category: Type[Warning] = Warni
         warnings.filterwarnings(action, message=message, category=category, module=module,
                                 lineno=lineno, append=append)
         yield
+
+
+class Retry:
+
+    """
+    This class exists primarily to hold onto data relevant to the Retry.retry_allowed decorator.
+    There is no need to instantiate the class in order for it to work.
+
+    This class also has a subclass qa_utils.RetryManager that adds the ability to locally bind data
+    that has been declared with this decorator.
+    """
+
+    class RetryOptions:
+
+        def __init__(self, retries_allowed=None, wait_seconds=None):
+            self.retries_allowed = retries_allowed
+            self.wait_seconds = wait_seconds or wait_seconds
+
+        @property
+        def tries_allowed(self):
+            return 1 + self.retries_allowed
+
+    _RETRY_OPTIONS_CATALOG = {}
+
+    DEFAULT_RETRIES_ALLOWED = 1
+    DEFAULT_WAIT_SECONDS = 0
+
+    @classmethod
+    def _wait_adjustor(cls, wait_increment, wait_multiplier):
+
+        if wait_increment and wait_multiplier:
+            raise SyntaxError("You may not specify both wait_increment and wait_multiplier.")
+
+        if wait_increment:
+            return lambda x: x + wait_increment
+        elif wait_multiplier:
+            return lambda x: x * wait_multiplier
+        else:
+            return lambda x: x
+
+    @classmethod
+    def retry_allowed(cls, name_key=None, retries_allowed=None, wait_seconds=None,
+                      wait_increment=None, wait_multiplier=None):
+        """
+        Used as a decorator on a function definition, makes that function do retrying before really failing.
+        For example:
+
+            @Retry.retry_allowed(retries_allowed=4, wait_seconds=2, wait_multiplier=1.25)
+            def something_that_fails_a_lot(...):
+                ... flaky code ...
+
+        will cause the something_that_fails_a_lot(...) code to retry several times before giving up,
+        either using the same wait each time or, if given a wait_multiplier or wait_increment, using
+        that advice to adjust the wait time upward on each time.
+        """
+
+        def decorator(function):
+            function_name = name_key or function.__name__
+            function_profile = cls.RetryOptions(
+                retries_allowed=cls.DEFAULT_RETRIES_ALLOWED if retries_allowed is None else retries_allowed,
+                wait_seconds=cls.DEFAULT_WAIT_SECONDS if wait_seconds is None else wait_seconds
+            )
+
+            cls._RETRY_OPTIONS_CATALOG[function_name] = function_profile  # Only for debugging.
+            function_profile.retries_allowed = retries_allowed
+            function_profile.wait_seconds = wait_seconds or cls.DEFAULT_WAIT_SECONDS
+            function_profile.wait_adjustor = cls._wait_adjustor(wait_increment=wait_increment,
+                                                                wait_multiplier=wait_multiplier)
+
+            @functools.wraps(function)
+            def wrapped_function(*args, **kwargs):
+                tries_allowed = function_profile.tries_allowed
+                wait_seconds = function_profile.wait_seconds or 0
+                for i in range(tries_allowed):
+                    if i > 0:
+                        if i > 1:
+                            wait_seconds = function_profile.wait_adjustor(wait_seconds)
+                        if wait_seconds > 0:
+                            time.sleep(wait_seconds)
+                    try:
+                        success = function(*args, **kwargs)
+                        return success
+                    except Exception:
+                        pass
+                raise
+
+            return wrapped_function
+
+        return decorator
