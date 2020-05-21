@@ -323,7 +323,7 @@ def test_filtered_warnings():
         expect_warnings([(1, Warning), (1, DeprecationWarning), (0, SyntaxWarning)])
 
 
-def test_retry_manager():
+def test_retry():
 
     def adder(n):
         def addn(x):
@@ -366,13 +366,13 @@ def test_retry_manager():
 
     rarely_add3.reset()
 
+    ARGS = 1  # We have to access a random place out of a tuple structure for mock data on time.sleep's arg
+
     # NOTE WELL: For testing, we chose 1.25 to use factors of 2 so floating point can exactly compare
 
     @Retry.retry_allowed(retries_allowed=4, wait_seconds=2, wait_multiplier=1.25)
     def reliably_add3(x):
         return rarely_add3(x)
-
-    ARGS = 1  # We have to access a random place out of a tuple structure for mock data on time.sleep's arg
 
     with mock.patch("time.sleep") as mock_sleep:
 
@@ -386,9 +386,44 @@ def test_retry_manager():
         assert mock_sleep.mock_calls[3][ARGS][0] == 3.90625  # 2 * 1.25 ** 3
 
         assert reliably_add3(2) == 5
+
         assert mock_sleep.call_count == 8
 
         assert mock_sleep.mock_calls[4][ARGS][0] == 2
         assert mock_sleep.mock_calls[5][ARGS][0] == 2.5      # 2 * 1.25
         assert mock_sleep.mock_calls[6][ARGS][0] == 3.125    # 2 * 1.25 ** 2
         assert mock_sleep.mock_calls[7][ARGS][0] == 3.90625  # 2 * 1.25 ** 3
+
+    rarely_add3.reset()
+
+    @Retry.retry_allowed(retries_allowed=4, wait_seconds=2, wait_increment=3)
+    def reliably_add_three(x):
+        return rarely_add3(x)
+
+    with mock.patch("time.sleep") as mock_sleep:
+
+        assert reliably_add_three(1) == 4
+
+        assert mock_sleep.call_count == 4
+
+        assert mock_sleep.mock_calls[0][ARGS][0] == 2
+        assert mock_sleep.mock_calls[1][ARGS][0] == 5   # 2 + 3
+        assert mock_sleep.mock_calls[2][ARGS][0] == 8   # 2 + 3 * 2
+        assert mock_sleep.mock_calls[3][ARGS][0] == 11  # 2 + 3 * 3
+
+        assert reliably_add_three(2) == 5
+
+        assert mock_sleep.call_count == 8
+
+        assert mock_sleep.mock_calls[4][ARGS][0] == 2
+        assert mock_sleep.mock_calls[5][ARGS][0] == 5   # 2 + 3
+        assert mock_sleep.mock_calls[6][ARGS][0] == 8   # 2 + 3 * 2
+        assert mock_sleep.mock_calls[7][ARGS][0] == 11  # 2 + 3 * 3
+
+    rarely_add3.reset()
+
+    with pytest.raises(SyntaxError):
+
+        @Retry.retry_allowed(retries_allowed=4, wait_seconds=2, wait_increment=3, wait_multiplier=1.25)
+        def reliably_add_three(x):
+            return rarely_add3(x)
