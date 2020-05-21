@@ -181,9 +181,17 @@ def filtered_warnings(action, message: str = "", category: Type[Warning] = Warni
         yield
 
 
-class RetryManager:
+class Retry:
 
-    class RetryProfile:
+    """
+    This class exists primarily to hold onto data relevant to the Retry.retry_allowed decorator.
+    There is no need to instantiate the class in order for it to work.
+
+    This class also has a subclass qa_utils.RetryManager that adds the ability to locally bind data
+    that has been declared with this decorator.
+    """
+
+    class RetryOptions:
 
         def __init__(self, retries_allowed=None, wait_seconds=None):
             self.retries_allowed = retries_allowed
@@ -193,7 +201,7 @@ class RetryManager:
         def tries_allowed(self):
             return 1 + self.retries_allowed
 
-    RETRY_PROFILES = {}
+    _RETRY_OPTIONS_CATALOG = {}
 
     DEFAULT_RETRIES_ALLOWED = 1
     DEFAULT_WAIT_SECONDS = 0
@@ -212,15 +220,15 @@ class RetryManager:
             return lambda x: x
 
     @classmethod
-    def retry_allowed(cls, key=None, retries_allowed=None, wait_seconds=None,
+    def retry_allowed(cls, name_key=None, retries_allowed=None, wait_seconds=None,
                       wait_increment=None, wait_multiplier=None):
         """
         Used as a decorator on a function definition, makes that function do retrying before really failing.
         For example:
 
-            @RetryManager.retry_allowed(retries_allowed=4, wait_seconds=2, wait_multiplier=1.25)
+            @Retry.retry_allowed(retries_allowed=4, wait_seconds=2, wait_multiplier=1.25)
             def something_that_fails_a_lot(...):
-                ... flakey code ...
+                ... flaky code ...
 
         will cause the something_that_fails_a_lot(...) code to retry several times before giving up,
         either using the same wait each time or, if given a wait_multiplier or wait_increment, using
@@ -228,13 +236,13 @@ class RetryManager:
         """
 
         def decorator(function):
-            function_name = key or function.__name__
-            function_profile = cls.RetryProfile(
+            function_name = name_key or function.__name__
+            function_profile = cls.RetryOptions(
                 retries_allowed=cls.DEFAULT_RETRIES_ALLOWED if retries_allowed is None else retries_allowed,
                 wait_seconds=cls.DEFAULT_WAIT_SECONDS if wait_seconds is None else wait_seconds
             )
 
-            cls.RETRY_PROFILES[function_name] = function_profile  # Only for debugging.
+            cls._RETRY_OPTIONS_CATALOG[function_name] = function_profile  # Only for debugging.
             function_profile.retries_allowed = retries_allowed
             function_profile.wait_seconds = wait_seconds or cls.DEFAULT_WAIT_SECONDS
             function_profile.wait_adjustor = cls._wait_adjustor(wait_increment=wait_increment,

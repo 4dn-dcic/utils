@@ -7,9 +7,9 @@ import subprocess
 import time
 import uuid
 
-from dcicutils.misc_utils import RetryManager
+from dcicutils.misc_utils import Retry
 from dcicutils.qa_utils import (
-    mock_not_called, local_attrs, override_environ, ControlledTime, Occasionally, RetryManagerForTesting
+    mock_not_called, local_attrs, override_environ, ControlledTime, Occasionally, RetryManager
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -383,56 +383,68 @@ def test_occasionally():
     def add1(x):
         return x + 1
 
-    # This is the same as supplying failure_frequency=2.
-    # It works on try 0, 2, 4, ... and it fails on try 1, 3, 5, ...
+    # Test that Occasionally(fn) == Occasionally(fn, failure_frequency=2)
+
+    # This is the same as supplying failure_frequency=2, implementing succeed, fail, succeed, fail, ...
+    # So it works on try 0, 2, 4, ... and it fails on try 1, 3, 5, ...
+
     flaky_add1 = Occasionally(add1)
 
+    # SUCCESS (first attempt)
     assert flaky_add1(1) == 2
 
-    # Won't work second time.
+    # FAILURE (second attempt)
     with pytest.raises(Exception):
         assert flaky_add1(1) == 2
 
+    # SUCCESS (third attempt)
     assert flaky_add1(2) == 3
 
-    # Won't work fourth time.
+    # FAILURE (fourth attempt)
     with pytest.raises(Exception):
         assert flaky_add1(2) == 3
 
+    # Test that Occasionally(fn, success_frequency=2) does fail, succeess, fail, succeed, ...
+
+    # Our function sometimes_add1 will WORK every other time, since the default frequency is 2.
     sometimes_add1 = Occasionally(add1, success_frequency=2)
 
-    # Our function sometimes_add1 will work every other time, since the default frequency is 2.
-
+    # FAILURE (first attempt)
     try:
         assert sometimes_add1(1) == 2
     except Exception as e:
         msg = str(e)
         assert msg == Occasionally.DEFAULT_ERROR_MESSAGE
 
-    # This time it will work.
+    # SUCCESS (second attempt)
     assert sometimes_add1(1) == 2
 
-    # And this time it will fail.
+    # FAILURE (third attempt)
     with pytest.raises(Exception):
         assert sometimes_add1(2) == 3
 
-    # And this time it will work again.
+    # SUCCESS (fourth attempt)
     assert sometimes_add1(2) == 3
 
-    # This is only going to work every third time.
+    # Test that Occasionally(fn, success_frequency=3) does fail, fail, succeed, fail, fail, succeed, ...
+
+    # Our function occasionally_add1 will WORK every third time, since the default frequency is 3.
     occasionally_add1 = Occasionally(add1, success_frequency=3)
 
-    # Nope (first of three)
+    # FAILURE (first time)
     with pytest.raises(Exception):
         assert occasionally_add1(2) == 3
 
-    # Nope (second of three)
+    # FAILURE (second time)
     with pytest.raises(Exception):
         assert occasionally_add1(2) == 3
 
-    # Finally!
+    # SUCCESS (third time)
     assert occasionally_add1(2) == 3
 
+    # Test that Occasionally(fn, failure_frequency=3) does succeed, succeed, fail, succeed, succeed, fail, ...
+
+    # Our function mostly_add1 will FAIL every third time, since the default frequency is 3.
     mostly_add1 = Occasionally(add1, failure_frequency=3)
 
     # This will work for a while...
@@ -445,11 +457,16 @@ def test_occasionally():
     # This will work for a while...
     assert mostly_add1(1) == 2
     assert mostly_add1(2) == 3
+
+    # Interrupt the sequence before it fails, and reset the sequence.
     mostly_add1.reset()
-    # With the object reset, it'll work a bit longer
+
+    # Now that the object has been reset, it'll work a bit longer
+
     assert mostly_add1(3) == 4
     assert mostly_add1(4) == 5
-    # But third time is going to fail...
+
+    # But third attempt is going to fail...
     with pytest.raises(Exception):
         assert mostly_add1(5) == 6
 
@@ -488,7 +505,7 @@ def test_retry_manager():
 
     sometimes_add2.reset()
 
-    @RetryManager.retry_allowed(retries_allowed=1)
+    @Retry.retry_allowed(retries_allowed=1)
     def reliably_add2(x):
         return sometimes_add2(x)
 
@@ -512,11 +529,16 @@ def test_retry_manager():
 
     # NOTE WELL: For testing, we chose 1.25 to use factors of 2 so floating point can exactly compare
 
-    @RetryManager.retry_allowed(retries_allowed=4, wait_seconds=2, wait_multiplier=1.25)
+    @Retry.retry_allowed(retries_allowed=4, wait_seconds=2, wait_multiplier=1.25)
     def reliably_add3(x):
         return rarely_add3(x)
 
-    ARGS = 1  # We have to access a random place out of a tuple structure for mock data on time.sleep's arg
+    # We have to access a random place out of a tuple structure for mock data on time.sleep's arg.
+    # Documentation says we should be able to access the call with .call_args[n] but that doesn't work
+    # and it's also documented to work by tuple, so .mock_calls[n][1][m] substitutes for
+    # .mock_calls[n].call_args[m], but using .mock_calls[n][ARGS][m] as the compromise. -kmp 20-May-2020
+
+    ARGS = 1  # noqa - yeah, this is all uppercase, but we only need this constant locally
 
     with mock.patch("time.sleep") as mock_sleep:
 
@@ -537,7 +559,7 @@ def test_retry_manager():
         assert mock_sleep.mock_calls[6][ARGS][0] == 3.125    # 2 * 1.25 ** 2
         assert mock_sleep.mock_calls[7][ARGS][0] == 3.90625  # 2 * 1.25 ** 3
 
-        with RetryManagerForTesting.retry_options('reliably_add3', retries_allowed=3, wait_seconds=5):
+        with RetryManager.retry_options('reliably_add3', retries_allowed=3, wait_seconds=5):
 
             mock_sleep.reset_mock()
             assert mock_sleep.call_count == 0
@@ -558,7 +580,7 @@ def test_retry_manager():
             mock_sleep.reset_mock()
             assert mock_sleep.call_count == 0
 
-            with RetryManagerForTesting.retry_options('reliably_add3', wait_seconds=7):
+            with RetryManager.retry_options('reliably_add3', wait_seconds=7):
 
                 for i in range(10):
                     # In this context, we won't retry enough to succeed...

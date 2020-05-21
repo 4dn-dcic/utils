@@ -37,7 +37,7 @@ from dcicutils.env_utils import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS, is_fourfront_env, is_cgap_env,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env
 )
-from dcicutils.misc_utils import PRINT, RetryManager
+from dcicutils.misc_utils import PRINT, Retry
 
 # constants associated with EB-related APIs
 EB_CONFIGURATION_SETTINGS = 'ConfigurationSettings'
@@ -228,7 +228,7 @@ class EBDeployer:
         return configurable_options
 
     @classmethod
-    @RetryManager.retry_allowed(retries_allowed=1, wait_seconds=10)
+    @Retry.retry_allowed(retries_allowed=1, wait_seconds=10)
     def verify_template_creation(cls, client, template_name):
         """ Does a get for the given template_name to verify EB has recognized that it is
             available.

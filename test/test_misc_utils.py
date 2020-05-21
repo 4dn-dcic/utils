@@ -7,7 +7,7 @@ import webtest
 from dcicutils.misc_utils import (
     PRINT, ignored, filtered_warnings, get_setting_from_context, VirtualApp,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
-    RetryManager,
+    Retry,
 )
 from dcicutils.qa_utils import Occasionally
 from unittest import mock
@@ -344,7 +344,7 @@ def test_retry_manager():
 
     sometimes_add2.reset()
 
-    @RetryManager.retry_allowed(retries_allowed=1)
+    @Retry.retry_allowed(retries_allowed=1)
     def reliably_add2(x):
         return sometimes_add2(x)
 
@@ -368,7 +368,7 @@ def test_retry_manager():
 
     # NOTE WELL: For testing, we chose 1.25 to use factors of 2 so floating point can exactly compare
 
-    @RetryManager.retry_allowed(retries_allowed=4, wait_seconds=2, wait_multiplier=1.25)
+    @Retry.retry_allowed(retries_allowed=4, wait_seconds=2, wait_multiplier=1.25)
     def reliably_add3(x):
         return rarely_add3(x)
 
