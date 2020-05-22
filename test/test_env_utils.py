@@ -404,6 +404,10 @@ def test_infer_repo_from_env():
     assert infer_repo_from_env('cgap-foo') == 'cgap-portal'
     assert infer_repo_from_env('fourfront-cgapfoo') == 'cgap-portal'
 
+    # Edge cases that the code specifically looks for:
+    assert infer_repo_from_env(None) is None
+    assert infer_repo_from_env('who-knows') is None
+
 
 def test_infer_foursight_env():
 
