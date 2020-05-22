@@ -35,11 +35,11 @@ class VirtualAppError(Exception):
         self.raw_exception = e
 
     def __repr__(self):
-        return "Exception encountered on VirtualApp\n" \
-               "URL: %s\n" \
-               "BODY: %s\n" \
-               "MSG: %s\n" \
-               "Raw Exception: %s\n" % (self.query_url, self.query_body, self.msg, self.raw_exception)
+        return ("Exception encountered on VirtualApp\n"
+                "URL: %s\n"
+                "BODY: %s\n"
+                "MSG: %s\n"
+                "Raw Exception: %s\n" % (self.query_url, self.query_body, self.msg, self.raw_exception))
 
     def __str__(self):
         return self.__repr__()
