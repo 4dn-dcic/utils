@@ -12,8 +12,8 @@ from dcicutils.env_utils import (
     get_mirror_env_from_context, is_test_env, is_hotseat_env, guess_mirror_env, get_standard_mirror_env,
     prod_bucket_env, public_url_mappings, CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
     infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env, FF_PRODUCTION_IDENTIFIER,
-    FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV, indexer_env_for_env,
-    FF_ENV_INDEXER, CGAP_ENV_INDEXER,
+    FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV,
+    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
 )
 from unittest import mock
 
@@ -436,6 +436,7 @@ def test_infer_foursight_env():
 
 
 def test_indexer_env_for_env():
+
     assert indexer_env_for_env('fourfront-mastertest') == FF_ENV_INDEXER
     assert indexer_env_for_env('fourfront-blue') == FF_ENV_INDEXER
     assert indexer_env_for_env('fourfront-green') == FF_ENV_INDEXER
@@ -450,3 +451,19 @@ def test_indexer_env_for_env():
     assert indexer_env_for_env('fourfront-indexer') is None
     assert indexer_env_for_env('cgap-indexer') is None
     assert indexer_env_for_env('blah-env') is None
+
+
+def test_is_indexer_env():
+
+    assert is_indexer_env('fourfront-indexer')
+    assert is_indexer_env(FF_ENV_INDEXER)
+
+    assert is_indexer_env('cgap-indexer')
+    assert is_indexer_env(CGAP_ENV_INDEXER)
+
+    # Try a few non-indexers ...
+    assert not is_indexer_env('fourfront-cgap')
+    assert not is_indexer_env('fourfront-blue')
+    assert not is_indexer_env('fourfront-green')
+    assert not is_indexer_env('fourfront-mastertest')
+    assert not is_indexer_env('fourfront-cgapwolf')
