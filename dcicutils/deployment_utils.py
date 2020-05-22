@@ -680,6 +680,10 @@ class IniFileManager:
 Deployer = IniFileManager
 
 
+class DeploymentFailure(RuntimeError):
+    pass
+
+
 class DeployConfigManager:
 
     # Set SKIP to True to skip the create_mapping step.
@@ -700,8 +704,8 @@ class DeployConfigManager:
             apply_dict_overrides(deploy_cfg, **cls.STAGING_DEPLOYMENT_OPTION_OVERRIDES)
         elif is_stg_or_prd_env(env):
             log.info('This looks like an uncorrelated production environment. Something is definitely wrong.')
-            raise RuntimeError(
-                'Tried to run CMOD on production - error\'ing deployment')  # note that this will cause any deployments to production to fail!
+            raise DeploymentFailure(
+                'Tried to run CMOD on production - error\'ing deployment')
         elif is_test_env(env):
             if is_hotseat_env(env):
                 log.info('Looks like we are on hotseat -- do nothing to ES')
