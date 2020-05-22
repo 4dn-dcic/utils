@@ -334,7 +334,7 @@ def test_virtual_app_crud_failure():
 
     simulated_error_message = "simulated error"
 
-    class FakeTestApp(VirtualAppError):
+    class FakeTestApp:
 
         def __init__(self, app, environ):
             ignored(app, environ)
@@ -371,28 +371,6 @@ def test_virtual_app_crud_failure():
                 assert str(e.raw_exception) == simulated_error_message
                 # assert isinstance(e.raw_exception, webtest.AppError)
                 assert isinstance(e.raw_exception, str)  # <-- TODO: This seems like a bug to me. -kmp 22-May-2020
-
-
-def test_virtual_app_post_failure():
-
-    class FakeTestApp(VirtualAppError):
-
-        def __init__(self, app, environ):
-            ignored(app, environ)
-
-        def get(self, url, **kwargs):
-            raise webtest.AppError("simulated error")
-
-    with mock.patch.object(VirtualApp, "HELPER_CLASS", FakeTestApp):
-
-        app = FakeApp()
-        environ = {'some': 'stuff'}
-
-        vapp = VirtualApp(app, environ)
-
-        with pytest.raises(VirtualAppError):
-            vapp.get("http://fixture.4dnucleome.org/some/url")
-
 
 
 def test_filtered_warnings():
