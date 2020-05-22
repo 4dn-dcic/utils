@@ -243,7 +243,7 @@ def _compute_prd_env_for_project(project):
 
 def compute_ff_prd_env():
     """Returns the name of the current Fourfront production environment."""
-    return _compute_prd_env_for_project('ff')
+    return _compute_prd_env_for_project('fourfront')
 
 
 def compute_ff_stg_env():
