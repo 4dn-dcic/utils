@@ -369,8 +369,7 @@ def test_virtual_app_crud_failure():
             except Exception as e:
                 assert isinstance(e, VirtualAppError)  # NOTE: not webtest.AppError, which is what was raised
                 assert str(e.raw_exception) == simulated_error_message
-                # assert isinstance(e.raw_exception, webtest.AppError)
-                assert isinstance(e.raw_exception, str)  # <-- TODO: This seems like a bug to me. -kmp 22-May-2020
+                assert isinstance(e.raw_exception, webtest.AppError)
 
 
 def test_filtered_warnings():

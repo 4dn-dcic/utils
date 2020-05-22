@@ -86,7 +86,7 @@ class VirtualApp:
         try:
             return self.wrapped_app.get(url, **kwargs)
         except webtest.AppError as e:
-            raise VirtualAppError(msg='HTTP GET failed.', url=url, body='<empty>', raw_exception=str(e))
+            raise VirtualAppError(msg='HTTP GET failed.', url=url, body='<empty>', raw_exception=e)
 
     def post_json(self, url, obj, **kwargs):
         """ Wrapper for TestApp.post_json that logs the outgoing POST
@@ -100,7 +100,7 @@ class VirtualApp:
         try:
             return self.wrapped_app.post_json(url, obj, **kwargs)
         except webtest.AppError as e:
-            raise VirtualAppError(msg='HTTP POST failed.', url=url, body=obj, raw_exception=str(e))
+            raise VirtualAppError(msg='HTTP POST failed.', url=url, body=obj, raw_exception=e)
 
     def patch_json(self, url, fields, **kwargs):
         """ Wrapper for TestApp.patch_json that logs the outgoing PATCH
@@ -114,7 +114,7 @@ class VirtualApp:
         try:
             return self.wrapped_app.patch_json(url, fields, **kwargs)
         except webtest.AppError as e:
-            raise VirtualAppError(msg='HTTP PATCH failed.', url=url, body=fields, raw_exception=str(e))
+            raise VirtualAppError(msg='HTTP PATCH failed.', url=url, body=fields, raw_exception=e)
 
 
 def ignored(*args, **kwargs):
