@@ -2,10 +2,11 @@ import io
 import json
 import os
 import pytest
+import re
 import warnings
 import webtest
 from dcicutils.misc_utils import (
-    PRINT, ignored, filtered_warnings, get_setting_from_context, VirtualApp,
+    PRINT, ignored, filtered_warnings, get_setting_from_context, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
     Retry,
 )
@@ -293,6 +294,84 @@ def test_virtual_app_patch_json():
         ]
 
 
+def test_virtual_app_error():
+
+    error_message = "You did a bad thing."
+    offending_url = "http://fixture.4dnucleome.org/offending/url"
+    body_text = '{"alpha": "omega"}'
+    body_json = {"alpha": "omega"}
+    wrapped_error = Exception("Some other exception")
+
+    e = VirtualAppError(error_message, offending_url, body_text, wrapped_error)
+    m = str(e)
+
+    assert error_message in m
+    assert offending_url in m
+    assert body_text in m
+    assert str(wrapped_error) in m
+
+    # And the repr is the same.
+    assert repr(e) == str(e)
+
+    # NOTE: Weirdly, I think we'd have had complete code coverage even without this next test, but that illustrates
+    #  why code coverage counts aren't always the right metric. With different data, the same code paths sometimes
+    #  does different things in ways that code coverage tools don't register. -kmp 21-May-2020
+
+    e2 = VirtualAppError(error_message, offending_url, body_json, wrapped_error)
+    m2 = str(e2)
+
+    assert error_message in m2
+    assert offending_url in m2
+    assert str(body_json) in m2             # body_json will be rendered as a Python dict (e.g., with single quotes)
+    assert not json.dumps(body_json) in m2  # So body_json will NOT be rendered as JSON via json.dumps
+    assert str(wrapped_error) in m2
+
+    # And the repr is the same.
+    assert repr(e2) == str(e2)
+
+
+def test_virtual_app_crud_failure():
+
+    simulated_error_message = "simulated error"
+
+    class FakeTestApp:
+
+        def __init__(self, app, environ):
+            ignored(app, environ)
+
+        def get(self, url, **kwargs):
+            raise webtest.AppError(simulated_error_message)
+
+        def post_json(self, url, object, **kwargs):
+            raise webtest.AppError(simulated_error_message)
+
+        def patch_json(self, url, fields, **kwargs):
+            raise webtest.AppError(simulated_error_message)
+
+    with mock.patch.object(VirtualApp, "HELPER_CLASS", FakeTestApp):
+
+        app = FakeApp()
+        environ = {'some': 'stuff'}
+
+        vapp = VirtualApp(app, environ)
+
+        some_url = "http://fixture.4dnucleome.org/some/url"
+
+        operations = [
+            lambda: vapp.get(some_url),
+            lambda: vapp.post_json(some_url, {'a': 1, 'b': 2, 'c': 3}),
+            lambda: vapp.patch_json(some_url, {'b': 5})
+        ]
+
+        for operation in operations:
+            try:
+                operation()
+            except Exception as e:
+                assert isinstance(e, VirtualAppError)  # NOTE: not webtest.AppError, which is what was raised
+                assert str(e.raw_exception) == simulated_error_message
+                assert isinstance(e.raw_exception, webtest.AppError)
+
+
 def test_filtered_warnings():
 
     def expect_warnings(pairs):
@@ -323,14 +402,15 @@ def test_filtered_warnings():
         expect_warnings([(1, Warning), (1, DeprecationWarning), (0, SyntaxWarning)])
 
 
+def _adder(n):
+    def addn(x):
+        return x + n
+    return addn
+
+
 def test_retry():
 
-    def adder(n):
-        def addn(x):
-            return x + n
-        return addn
-
-    sometimes_add2 = Occasionally(adder(2), success_frequency=2)
+    sometimes_add2 = Occasionally(_adder(2), success_frequency=2)
 
     try:
         assert sometimes_add2(1) == 3
@@ -352,7 +432,7 @@ def test_retry():
     assert reliably_add2(2) == 4
     assert reliably_add2(3) == 5
 
-    rarely_add3 = Occasionally(adder(3), success_frequency=5)
+    rarely_add3 = Occasionally(_adder(3), success_frequency=5)
 
     with pytest.raises(Exception):
         assert rarely_add3(1) == 4
@@ -364,7 +444,10 @@ def test_retry():
         assert rarely_add3(1) == 4
     assert rarely_add3(1) == 4  # 5th time's a charm
 
-    rarely_add3.reset()
+
+def test_retry_timeouts():
+
+    rarely_add3 = Occasionally(_adder(3), success_frequency=5)
 
     ARGS = 1  # We have to access a random place out of a tuple structure for mock data on time.sleep's arg
 
@@ -420,7 +503,10 @@ def test_retry():
         assert mock_sleep.mock_calls[6][ARGS][0] == 8   # 2 + 3 * 2
         assert mock_sleep.mock_calls[7][ARGS][0] == 11  # 2 + 3 * 3
 
-    rarely_add3.reset()
+
+def test_retry_error_handling():
+
+    rarely_add3 = Occasionally(_adder(3), success_frequency=5)
 
     with pytest.raises(SyntaxError):
 

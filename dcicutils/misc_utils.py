@@ -27,19 +27,19 @@ PRINT = print
 class VirtualAppError(Exception):
     """ Special Exception to be raised by VirtualApp that contains some additional info """
 
-    def __init__(self, msg, url, body, e):
+    def __init__(self, msg, url, body, raw_exception):
         super(VirtualAppError, self).__init__(msg)
         self.msg = msg
         self.query_url = url
         self.query_body = body
-        self.raw_exception = e
+        self.raw_exception = raw_exception
 
     def __repr__(self):
-        return "Exception encountered on VirtualApp\n" \
-               "URL: %s\n" \
-               "BODY: %s\n" \
-               "MSG: %s\n" \
-               "Raw Exception: %s\n" % (self.query_url, self.query_body, self.msg, self.raw_exception)
+        return ("Exception encountered on VirtualApp\n"
+                "URL: %s\n"
+                "BODY: %s\n"
+                "MSG: %s\n"
+                "Raw Exception: %s\n" % (self.query_url, self.query_body, self.msg, self.raw_exception))
 
     def __str__(self):
         return self.__repr__()
@@ -86,7 +86,7 @@ class VirtualApp:
         try:
             return self.wrapped_app.get(url, **kwargs)
         except webtest.AppError as e:
-            raise VirtualAppError(msg='HTTP GET failed.', url=url, body='<empty>', e=str(e))
+            raise VirtualAppError(msg='HTTP GET failed.', url=url, body='<empty>', raw_exception=e)
 
     def post_json(self, url, obj, **kwargs):
         """ Wrapper for TestApp.post_json that logs the outgoing POST
@@ -100,7 +100,7 @@ class VirtualApp:
         try:
             return self.wrapped_app.post_json(url, obj, **kwargs)
         except webtest.AppError as e:
-            raise VirtualAppError(msg='HTTP POST failed.', url=url, body=obj, e=str(e))
+            raise VirtualAppError(msg='HTTP POST failed.', url=url, body=obj, raw_exception=e)
 
     def patch_json(self, url, fields, **kwargs):
         """ Wrapper for TestApp.patch_json that logs the outgoing PATCH
@@ -114,7 +114,7 @@ class VirtualApp:
         try:
             return self.wrapped_app.patch_json(url, fields, **kwargs)
         except webtest.AppError as e:
-            raise VirtualAppError(msg='HTTP PATCH failed.', url=url, body=fields, e=str(e))
+            raise VirtualAppError(msg='HTTP PATCH failed.', url=url, body=fields, raw_exception=e)
 
 
 def ignored(*args, **kwargs):
