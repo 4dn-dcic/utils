@@ -34,10 +34,11 @@ import boto3
 from git import Repo
 
 from dcicutils.env_utils import (
-    get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS, is_fourfront_env, is_cgap_env,
-    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env
+    get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS,
+    is_fourfront_env, is_cgap_env, is_stg_or_prd_env, is_test_env, is_hotseat_env,
+    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
 )
-from dcicutils.misc_utils import PRINT, Retry
+from dcicutils.misc_utils import PRINT, Retry, apply_dict_overrides
 
 # constants associated with EB-related APIs
 EB_CONFIGURATION_SETTINGS = 'ConfigurationSettings'
@@ -390,7 +391,7 @@ class EBDeployer:
             exit(cls.deploy_indexer(args.env, args.application_version))
 
 
-class Deployer:  # XXX: this should change. It is not a deployer, it is a configuration file generator. - Will
+class IniFileManager:
 
     TEMPLATE_DIR = None
     INI_FILE_NAME = "production.ini"
@@ -673,6 +674,50 @@ class Deployer:  # XXX: this should change. It is not a deployer, it is a config
         except Exception as e:
             PRINT("Error (%s): %s" % (e.__class__.__name__, e))
             sys.exit(1)
+
+
+# The name Deployer is deprecated. Please use IniFileManager instead of Deployer.
+Deployer = IniFileManager
+
+
+class DeployConfigManager:
+
+    # Set SKIP to True to skip the create_mapping step.
+
+    DEFAULT_DEPLOYMENT_OPTIONS = {'SKIP': False, 'STRICT': False, 'WIPE_ES': False}
+    STAGING_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': True, 'STRICT': True}
+    HOTSEAT_DEPLOYMENT_OPTION_OVERRIDES = {'SKIP': True, 'STRICT': True}
+    OTHER_TEST_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': True}
+
+    @classmethod
+    def resolve_config_options(cls, *, deploy_cfg, args, env, current_prod_env, log):
+
+        apply_dict_overrides(deploy_cfg, **cls.DEFAULT_DEPLOYMENT_OPTIONS)
+        apply_dict_overrides(deploy_cfg, WIPE_ES=args.wipe_es, SKIP=args.skip, STRICT=args.strict)
+
+        if env == get_standard_mirror_env(current_prod_env):
+            log.info('This looks like our staging environment -- wipe ES')
+            apply_dict_overrides(deploy_cfg, **cls.STAGING_DEPLOYMENT_OPTION_OVERRIDES)
+        elif is_stg_or_prd_env(env):
+            log.info('This looks like an uncorrelated production environment. Something is definitely wrong.')
+            raise RuntimeError(
+                'Tried to run CMOD on production - error\'ing deployment')  # note that this will cause any deployments to production to fail!
+        elif is_test_env(env):
+            if is_hotseat_env(env):
+                log.info('Looks like we are on hotseat -- do nothing to ES')
+                apply_dict_overrides(deploy_cfg, **cls.HOTSEAT_DEPLOYMENT_OPTION_OVERRIDES)
+            else:
+                log.info('Looks like we are on webdev or mastertest -- wipe ES')
+                apply_dict_overrides(deploy_cfg, **cls.OTHER_TEST_DEPLOYMENT_OPTION_OVERRIDES)
+        else:
+            log.warning('This environment is not recognized: %s' % env)
+            log.warning('Proceeding without wiping ES')
+        return deploy_cfg
+
+    def add_config_options(self, parser):
+        parser.add_argument('--wipe-es', help="Specify to wipe ES", action='store_true', default=None)
+        parser.add_argument('--skip', help='Specify to skip this step altogether', default=None)
+        parser.add_argument('--strict', help='Specify to do a strict reindex', default=False)
 
 
 if __name__ == "__main__":

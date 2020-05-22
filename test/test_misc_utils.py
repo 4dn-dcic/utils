@@ -8,7 +8,7 @@ import webtest
 from dcicutils.misc_utils import (
     PRINT, ignored, filtered_warnings, get_setting_from_context, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
-    Retry,
+    Retry, apply_dict_overrides,
 )
 from dcicutils.qa_utils import Occasionally
 from unittest import mock
@@ -513,3 +513,19 @@ def test_retry_error_handling():
         @Retry.retry_allowed(retries_allowed=4, wait_seconds=2, wait_increment=3, wait_multiplier=1.25)
         def reliably_add_three(x):
             return rarely_add3(x)
+
+
+def test_apply_dict_overrides():
+
+    x = {'a': 1, 'b': 2}
+
+    actual = apply_dict_overrides(x, a=11, c=33)
+    expected = {'a': 11, 'b': 2, 'c': 33}
+    assert isinstance(actual, dict)
+    assert actual == expected
+    assert x == expected
+
+    actual = apply_dict_overrides(x, b=22, c=None)
+    expected = {'a': 11, 'b': 22, 'c': 33}
+    assert actual == expected
+    assert x == expected

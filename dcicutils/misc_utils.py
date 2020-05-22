@@ -268,3 +268,11 @@ class Retry:
             return wrapped_function
 
         return decorator
+
+
+def apply_dict_overrides(dictionary: dict, **overrides) -> dict:
+    for k, v in overrides.items():
+        if v is not None:
+            dictionary[k] = v
+    # This function works by side effect, but getting back the changed dict may be sometimes useful.
+    return dictionary
