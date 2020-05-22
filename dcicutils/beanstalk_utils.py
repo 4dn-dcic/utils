@@ -15,7 +15,8 @@ from . import ff_utils
 from botocore.exceptions import ClientError
 from .misc_utils import PRINT
 from .env_utils import (
-    is_cgap_env, is_stg_or_prd_env, public_url_mappings, blue_green_mirror_env, get_standard_mirror_env
+    is_fourfront_env, is_cgap_env, is_stg_or_prd_env, public_url_mappings,
+    blue_green_mirror_env, get_standard_mirror_env,
 )
 
 logging.basicConfig()
@@ -262,6 +263,16 @@ def compute_cgap_prd_env():
 def compute_cgap_stg_env():
     """Returns the name of the current CGAP staging environment, or None if there is none."""
     return get_standard_mirror_env(compute_cgap_prd_env())
+
+
+def compute_prd_env_for_env(envname):
+    """Given an environment, returns the name of the prod environment for its owning project."""
+    if is_cgap_env(envname):
+        return compute_cgap_prd_env()
+    elif is_fourfront_env(envname):
+        return compute_ff_prd_env()
+    else:
+        raise ValueError("Unknown environment: %s" % envname)
 
 
 def beanstalk_info(env):
