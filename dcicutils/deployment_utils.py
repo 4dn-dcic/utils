@@ -33,6 +33,7 @@ import time
 import boto3
 from git import Repo
 
+from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env
 from dcicutils.env_utils import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS,
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, is_test_env, is_hotseat_env,
@@ -694,7 +695,13 @@ class DeployConfigManager:
     OTHER_TEST_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': True}
 
     @classmethod
-    def resolve_config_options(cls, *, deploy_cfg, args, env, current_prod_env, log):
+    def get_deploy_config(cls, *, env, args, log):
+
+        deploy_cfg = {
+            'ENV_NAME': env
+        }
+
+        current_prod_env = compute_ff_prd_env() if is_fourfront_env(env) else compute_cgap_prd_env()
 
         apply_dict_overrides(deploy_cfg, **cls.DEFAULT_DEPLOYMENT_OPTIONS)
         apply_dict_overrides(deploy_cfg, WIPE_ES=args.wipe_es, SKIP=args.skip, STRICT=args.strict)
@@ -718,7 +725,8 @@ class DeployConfigManager:
             log.warning('Proceeding without wiping ES')
         return deploy_cfg
 
-    def add_config_options(self, parser):
+    @staticmethod
+    def add_argparse_arguments(parser):
         parser.add_argument('--wipe-es', help="Specify to wipe ES", action='store_true', default=None)
         parser.add_argument('--skip', help='Specify to skip this step altogether', default=None)
         parser.add_argument('--strict', help='Specify to do a strict reindex', default=False)
