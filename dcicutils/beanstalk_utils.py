@@ -234,9 +234,7 @@ def _compute_prd_env_for_project(project):
     magic_cname = CGAP_MAGIC_CNAME if project == 'cgap' else FF_MAGIC_CNAME
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = describe_beanstalk_environments(client, ApplicationName="4dn-web")
-    # logger.info(res)
     for env in res['Environments']:
-        # logger.info(env)
         if env.get('CNAME') == magic_cname:
             # we found data
             return env.get('EnvironmentName')
