@@ -6,11 +6,10 @@ import re
 import subprocess
 import sys
 
-from contextlib import contextmanager
 from io import StringIO
 from unittest import mock
 
-from dcicutils.deployment_utils import EBDeployer, Deployer, boolean_setting
+from dcicutils.deployment_utils import EBDeployer, Deployer, boolean_setting, CreateMappingOnDeployManager
 from dcicutils.env_utils import is_cgap_env
 from dcicutils.misc_utils import ignored
 from dcicutils.qa_utils import override_environ
@@ -21,6 +20,7 @@ _MY_DIR = os.path.dirname(__file__)
 
 class FakeDistribution:
     version = "simulated"
+
 
 class TestDeployer(Deployer):
     TEMPLATE_DIR = os.path.join(_MY_DIR, "ini_files")
@@ -169,10 +169,10 @@ def test_deployment_utils_build_ini_file_from_template():
 
             # NOTE: This mock_open might be simpler and more general if we just called our mock I/O to write the files.
             #       In effect, it is pretending as if files are there which aren't, which weird because that pretense
-            #       is inside the pretense that we have a file system at all. But it will suffice for now. -kmp 27-Apr-2020
+            #       is inside the pretense that we have a file system at all. But it suffices for now. -kmp 27-Apr-2020
             def mocked_open(filename, mode='r', encoding=None):
                 """
-                On read (mode=='r'), this simulates the presence of several files in an ad hoc way, not by mock file system.
+                On read (mode=='r'), this simulates presence of several files in an ad hoc way, not by mock file system.
                 On write, this uses StringIO and stores the output in the mock file system as a list of lines.
                 """
                 # Our mock does nothing with the encoding, but wants to make sure no one is asking us for
@@ -226,7 +226,6 @@ def test_deployment_utils_build_ini_file_from_template():
                     assert filename == some_ini_file_name
                     return MockFileStream(filename, mode)
 
-
             with mock.patch("subprocess.check_output") as mock_check_output:
                 mock_check_output.side_effect = make_mocked_check_output_for_get_version()
                 with mock.patch("os.path.exists") as mock_exists:
@@ -237,7 +236,7 @@ def test_deployment_utils_build_ini_file_from_template():
                         return filename in [TestDeployer.EB_MANIFEST_FILENAME, some_template_file_name]
                     mock_exists.side_effect = mocked_exists
                     with mock.patch("io.open", side_effect=mocked_open):
-                        # Here's where we finally call the builder. Output will be a list of lines in the mock file system.
+                        # Here we finally call the builder. Output will be a list of lines in the mock file system.
                         TestDeployer.build_ini_file_from_template(some_template_file_name, some_ini_file_name)
 
             # The subtle thing here is that if it were a multi-line string,
@@ -329,7 +328,7 @@ def test_deployment_utils_build_ini_file_from_template():
             for indexer_truth in truth:
                 for index_server_truth in truth:
                     print("indexer_truth=", indexer_truth, "index_server_truth=", index_server_truth)
-                    # For this test, we check if the 'indexer' option being set correctly sets the ENCODED.INDEXER option
+                    # For this test, we check if the 'indexer' option being set correctly sets ENCODED.INDEXER
                     with mock.patch("os.path.exists") as mock_exists:
                         mock_exists.return_value = True
                         with mock.patch("io.open", side_effect=mocked_open):
@@ -355,7 +354,7 @@ def test_deployment_utils_build_ini_file_from_template():
             for indexer_falsity in falsity:
                 for index_server_falsity in falsity:
                     print("indexer_falsity=", indexer_falsity, "index_server_falsity=", index_server_falsity)
-                    # For this test, we check if the 'indexer' option being set correctly sets the ENCODED.INDEXER option
+                    # For this test, we check if the 'indexer' option being set correctly sets ENCODED.INDEXER
                     with mock.patch("os.path.exists") as mock_exists:
                         mock_exists.return_value = True
                         with mock.patch("io.open", side_effect=mocked_open):
@@ -548,7 +547,7 @@ def test_deployment_utils_transitional_equivalence():
 
         ref_ini_path = os.path.join(TestDeployer.TEMPLATE_DIR, ref_ini)
 
-        with override_environ(APP_VERSION= 'externally_defined'):
+        with override_environ(APP_VERSION='externally_defined'):
             # We don't expect variables like APP_VERSION to be globally available because
             # we'd end up shadowing them and confusion could result about which variable
             # the template wanted to reference, ours or theirs. -kmp 9-May-2020
@@ -791,6 +790,7 @@ def test_deployment_utils_main_no_env_name():
     with override_environ(ENV_NAME=None):
         with mock.patch("argparse.ArgumentParser") as mock_argparser:
             def mocked_fail(*arg, **kwargs):
+                ignored(arg, kwargs)
                 raise AssertionError("ENV_NAME=None did not get noticed.")
             mock_argparser.side_effect = mocked_fail
             with pytest.raises(SystemExit):
@@ -871,12 +871,12 @@ def test_deployment_utils_main():
 
 def test_deployment_utils_boolean_setting():
 
-    assert boolean_setting({'foo': 'true'}, 'foo') == True
-    assert boolean_setting({'foo': 'false'}, 'foo') == False
-    assert boolean_setting({'foo': ''}, 'foo') == False
-    assert boolean_setting({'foo': None}, 'foo') == None
+    assert boolean_setting({'foo': 'true'}, 'foo') is True
+    assert boolean_setting({'foo': 'false'}, 'foo') is False
+    assert boolean_setting({'foo': ''}, 'foo') is False
+    assert boolean_setting({'foo': None}, 'foo') is None
     assert boolean_setting({'foo': 'maybe'}, 'foo') == 'maybe'
-    assert boolean_setting({}, 'foo') == None
+    assert boolean_setting({}, 'foo') is None
     assert boolean_setting({}, 'foo', default='surprise') == 'surprise'
 
 
@@ -884,3 +884,161 @@ def test_deployment_utils_boolean_setting():
 def test_eb_deployer():
     """ Tests some basic aspects of EBDeployer """
     pass  # write this test!
+
+
+class MockedNoCommandArgs:
+
+    wipe_es = None
+    skip = None
+    strict = None
+
+
+class MockedLog:
+
+    def __init__(self):
+        self.last_msg = None
+
+    def info(self, msg):
+        self.last_msg = msg
+
+
+def _get_deploy_config(env, log=None):
+    return CreateMappingOnDeployManager.get_deploy_config(env=env,
+                                                          args=MockedNoCommandArgs,
+                                                          log=log or MockedLog(),
+                                                          client='create_mapping_on_deploy')
+
+
+@mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-webprod2'))
+def test_get_deployment_config_ff_staging_old():
+    """ Tests get_deployment_config in the old staging case """
+    my_env = 'fourfront-webprod'
+    my_log = MockedLog()
+    cfg = _get_deploy_config(my_env, my_log)
+    assert cfg['ENV_NAME'] == my_env  # sanity
+    assert cfg['WIPE_ES'] is True  # wipe
+    assert my_log.last_msg == ('Environment fourfront-webprod is currently the staging environment.'
+                               ' Processing mode: STRICT,WIPE_ES')
+
+
+@mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-green'))
+def test_get_deployment_config_ff_staging_new():
+    """ Tests get_deployment_config in the new staging case """
+    my_env = 'fourfront-blue'
+    my_log = MockedLog()
+    cfg = _get_deploy_config(my_env, my_log)
+    assert cfg['ENV_NAME'] == my_env  # sanity
+    assert cfg['WIPE_ES'] is True  # wipe
+    assert my_log.last_msg == ('Environment fourfront-blue is currently the staging environment.'
+                               ' Processing mode: STRICT,WIPE_ES')
+
+
+@mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-webprod2'))
+def test_get_deployment_config_ff_prod_old():
+    """ Tests get_deployment_config in the old production case """
+    my_env = 'fourfront-webprod2'
+    my_log = MockedLog()
+    with pytest.raises(RuntimeError):
+        _get_deploy_config(my_env, my_log)
+    assert my_log.last_msg == ('Environment fourfront-webprod2 is an uncorrelated production environment.'
+                               ' Something is definitely wrong.')
+
+
+@mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-green'))
+def test_get_deployment_config_ff_prod_new():
+    """ Tests get_deployment_config in the new production case """
+    my_env = 'fourfront-green'
+    my_log = MockedLog()
+    with pytest.raises(RuntimeError):
+        _get_deploy_config(my_env, my_log)
+    assert my_log.last_msg == ('Environment fourfront-green is an uncorrelated production environment.'
+                               ' Something is definitely wrong.')
+
+
+@mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-webprod2'))
+def test_get_deployment_config_ff_mastertest_old():
+    """ Tests get_deployment_config in the mastertest case with an old-style ecosystem. """
+    my_env = 'fourfront-mastertest'
+    my_log = MockedLog()
+    cfg = _get_deploy_config(my_env, my_log)
+    assert cfg['ENV_NAME'] == my_env  # sanity
+    assert cfg['WIPE_ES'] is True  # wipe
+    assert my_log.last_msg == ('Environment fourfront-mastertest is a non-hotseat test environment.'
+                               ' Processing mode: WIPE_ES')
+
+
+@mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-green'))
+def test_get_deployment_config_ff_mastertest_new():
+    """ Tests get_deployment_config in the mastertest case with a new-style ecosystem. """
+    my_env = 'fourfront-mastertest'
+    my_log = MockedLog()
+    cfg = _get_deploy_config(my_env, my_log)
+    assert cfg['ENV_NAME'] == my_env  # sanity
+    assert cfg['WIPE_ES'] is True  # wipe
+    assert my_log.last_msg == ('Environment fourfront-mastertest is a non-hotseat test environment.'
+                               ' Processing mode: WIPE_ES')
+
+
+@mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-webprod2'))
+def test_get_deployment_config_ff_hotseat_old():
+    """ Tests get_deployment_config in the hotseat case with an old-style ecosystem. """
+    my_env = 'fourfront-hotseat'
+    my_log = MockedLog()
+    cfg = _get_deploy_config(my_env, my_log)
+    assert cfg['ENV_NAME'] == my_env  # sanity
+    assert cfg['WIPE_ES'] is False  # no wipe
+    assert my_log.last_msg == ('Environment fourfront-hotseat is a hotseat test environment.'
+                               ' Processing mode: SKIP')
+
+
+
+@mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-green'))
+def test_get_deployment_config_ff_hotseat_new():
+    """ Tests get_deployment_config in the hotseat case with a new-style ecosystem. """
+    my_env = 'fourfront-hotseat'
+    my_log = MockedLog()
+    cfg = _get_deploy_config(my_env, my_log)
+    assert cfg['ENV_NAME'] == my_env  # sanity
+    assert cfg['WIPE_ES'] is False  # no wipe
+    assert my_log.last_msg == ('Environment fourfront-hotseat is a hotseat test environment.'
+                               ' Processing mode: SKIP')
+
+
+
+# There is no old-style cgap staging
+
+# Eventually cgap staging will look like this.
+@mock.patch('dcicutils.deployment_utils.compute_cgap_prd_env', mock.MagicMock(return_value='cgap-green'))
+def test_get_deployment_config_cgap_staging_new():
+    """ Tests get_deployment_config in the new staging case """
+    my_env = 'cgap-blue'
+    my_log = MockedLog()
+    cfg = _get_deploy_config(my_env, my_log)
+    assert cfg['ENV_NAME'] == my_env  # sanity
+    assert cfg['WIPE_ES'] is True  # wipe
+    assert my_log.last_msg == ('Environment cgap-blue is currently the staging environment.'
+                               ' Processing mode: STRICT,WIPE_ES')
+
+
+
+@mock.patch('dcicutils.deployment_utils.compute_cgap_prd_env', mock.MagicMock(return_value='fourfront-cgap'))
+def test_get_deployment_config_cgap_prod_old():
+    """ Tests get_deployment_config in the old production case """
+    my_env = 'fourfront-cgap'
+    my_log = MockedLog()
+    with pytest.raises(RuntimeError):
+        _get_deploy_config(my_env, my_log)
+    assert my_log.last_msg == ('Environment fourfront-cgap is an uncorrelated production environment.'
+                               ' Something is definitely wrong.')
+
+
+# Eventually cgap production will look like this.
+@mock.patch('dcicutils.deployment_utils.compute_cgap_prd_env', mock.MagicMock(return_value='cgap-green'))
+def test_get_deployment_config_cgap_prod_new():
+    """ Tests get_deployment_config in the new production case """
+    my_env = 'cgap-green'
+    my_log = MockedLog()
+    with pytest.raises(RuntimeError):
+        _get_deploy_config(my_env, my_log)
+    assert my_log.last_msg == ('Environment cgap-green is an uncorrelated production environment.'
+                               ' Something is definitely wrong.')

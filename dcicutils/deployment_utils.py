@@ -685,7 +685,7 @@ class DeploymentFailure(RuntimeError):
     pass
 
 
-class DeployConfigManager:
+class CreateMappingOnDeployManager:
 
     # Set SKIP to True to skip the create_mapping step.
 
@@ -695,7 +695,21 @@ class DeployConfigManager:
     OTHER_TEST_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': True}
 
     @classmethod
-    def get_deploy_config(cls, *, env, args, log):
+    def _summarize_deploy_options(cls, options):
+        return "SKIP" if options['SKIP'] else ",".join(k for k in ('STRICT', 'WIPE_ES') if options[k]) or "default"
+
+    @classmethod
+    def get_deploy_config(cls, *, env, args, log, client=None):
+        """
+        Returns a dictionary describing appropriate options for creating mapping on deploy of a non-prd server.
+            {)
+                "ENV_NAME": env,    # what environment we're working with
+                "WIPE_ES": <bool>,  # whether to wipe ElasticSearch before reindex
+                "STRICT": <bool>,   # whether to do a 'strict' reindex
+                "SKIP": <bool>,     # whether to skip this step (notwithstanding other options)
+            }
+        NOTE WELL: This method will fail (raising DeploymentFailure) if called on production.
+        """
 
         deploy_cfg = {
             'ENV_NAME': env
@@ -707,22 +721,23 @@ class DeployConfigManager:
         apply_dict_overrides(deploy_cfg, WIPE_ES=args.wipe_es, SKIP=args.skip, STRICT=args.strict)
 
         if env == get_standard_mirror_env(current_prod_env):
-            log.info('This looks like our staging environment -- wipe ES')
+            description = "currently the staging environment"
             apply_dict_overrides(deploy_cfg, **cls.STAGING_DEPLOYMENT_OPTION_OVERRIDES)
         elif is_stg_or_prd_env(env):
-            log.info('This looks like an uncorrelated production environment. Something is definitely wrong.')
-            raise DeploymentFailure(
-                'Tried to run CMOD on production - error\'ing deployment')
+            # TODO: Reconsider error-raising behavior. Is there some reason we shouldn't just return {'SKIP': True}?
+            log.info('Environment %s is an uncorrelated production environment. Something is definitely wrong.' % env)
+            raise DeploymentFailure('Tried to run %s on production.' % client or cls.__name__)
         elif is_test_env(env):
             if is_hotseat_env(env):
-                log.info('Looks like we are on hotseat -- do nothing to ES')
+                description = "a hotseat test environment"
                 apply_dict_overrides(deploy_cfg, **cls.HOTSEAT_DEPLOYMENT_OPTION_OVERRIDES)
-            else:
-                log.info('Looks like we are on webdev or mastertest -- wipe ES')
+            else:  # webdev or mastertest
+                description = "a non-hotseat test environment"
                 apply_dict_overrides(deploy_cfg, **cls.OTHER_TEST_DEPLOYMENT_OPTION_OVERRIDES)
         else:
-            log.warning('This environment is not recognized: %s' % env)
-            log.warning('Proceeding without wiping ES')
+            description = "an unrecognized environment"
+        log.info('Environment %s is %s. Processing mode: %s'
+                 % (env, description, cls._summarize_deploy_options(deploy_cfg)))
         return deploy_cfg
 
     @staticmethod
