@@ -33,11 +33,13 @@ import time
 import boto3
 from git import Repo
 
+from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env
 from dcicutils.env_utils import (
-    get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS, is_fourfront_env, is_cgap_env,
-    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env
+    get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS,
+    is_fourfront_env, is_cgap_env, is_stg_or_prd_env, is_test_env, is_hotseat_env,
+    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
 )
-from dcicutils.misc_utils import PRINT, Retry
+from dcicutils.misc_utils import PRINT, Retry, apply_dict_overrides
 
 # constants associated with EB-related APIs
 EB_CONFIGURATION_SETTINGS = 'ConfigurationSettings'
@@ -390,7 +392,7 @@ class EBDeployer:
             exit(cls.deploy_indexer(args.env, args.application_version))
 
 
-class Deployer:  # XXX: this should change. It is not a deployer, it is a configuration file generator. - Will
+class IniFileManager:
 
     TEMPLATE_DIR = None
     INI_FILE_NAME = "production.ini"
@@ -673,6 +675,88 @@ class Deployer:  # XXX: this should change. It is not a deployer, it is a config
         except Exception as e:
             PRINT("Error (%s): %s" % (e.__class__.__name__, e))
             sys.exit(1)
+
+
+# The name Deployer is deprecated. Please use IniFileManager instead of Deployer.
+Deployer = IniFileManager
+
+
+class DeploymentFailure(RuntimeError):
+    pass
+
+
+class CreateMappingOnDeployManager:
+
+    # Set SKIP to True to skip the create_mapping step.
+
+    DEFAULT_DEPLOYMENT_OPTIONS = {'SKIP': False, 'STRICT': False, 'WIPE_ES': False}
+    STAGING_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': True, 'STRICT': True}
+    HOTSEAT_DEPLOYMENT_OPTION_OVERRIDES = {'SKIP': True, 'STRICT': True}
+    OTHER_TEST_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': True}
+    OTHER_PROD_DEPLOYMENT_OPTION_OVERRIDES = {'SKIP': True}
+
+    @classmethod
+    def _summarize_deploy_options(cls, options):
+        return "SKIP" if options['SKIP'] else ",".join(k for k in ('STRICT', 'WIPE_ES') if options[k]) or "default"
+
+    @classmethod
+    def get_deploy_config(cls, *, env, args, log, client=None, allow_other_prod=False):
+        """
+        Returns a dictionary describing appropriate options for creating mapping on deploy of a non-prd server.
+            {)
+                "ENV_NAME": env,    # what environment we're working with
+                "WIPE_ES": <bool>,  # whether to wipe ElasticSearch before reindex
+                "STRICT": <bool>,   # whether to do a 'strict' reindex
+                "SKIP": <bool>,     # whether to skip this step (notwithstanding other options)
+            }
+        NOTE WELL: This method will fail (raising DeploymentFailure) if called on production.
+        """
+
+        deploy_cfg = {
+            'ENV_NAME': env
+        }
+
+        current_prod_env = compute_ff_prd_env() if is_fourfront_env(env) else compute_cgap_prd_env()
+
+        apply_dict_overrides(deploy_cfg, **cls.DEFAULT_DEPLOYMENT_OPTIONS)
+        apply_dict_overrides(deploy_cfg, WIPE_ES=args.wipe_es, SKIP=args.skip, STRICT=args.strict)
+
+        if env == get_standard_mirror_env(current_prod_env):
+            description = "currently the staging environment"
+            apply_dict_overrides(deploy_cfg, **cls.STAGING_DEPLOYMENT_OPTION_OVERRIDES)
+        elif is_stg_or_prd_env(env):
+            if env == current_prod_env:
+                log.info("Environment %s is currently the production environment."
+                         " Something is definitely wrong. We never deploy there, we always CNAME swap."
+                         " This deploy cannot proceed. DeploymentFailure will be raised." % env)
+                raise DeploymentFailure('Tried to run %s on production.' % client or cls.__name__)
+            elif allow_other_prod:
+                description = "an uncorrelated production-class environment (neither production nor its staging mirror)"
+                apply_dict_overrides(deploy_cfg, **cls.OTHER_PROD_DEPLOYMENT_OPTION_OVERRIDES)
+            else:
+                log.info("Environment %s is an uncorrelated production-class environment."
+                         " Something is definitely wrong."
+                         " This deploy cannot proceed. DeploymentFailure will be raised." % env)
+                raise DeploymentFailure("Tried to run %s on a production-class environment"
+                                        " (neither production nor its staging mirror)." % client or cls.__name__)
+        elif is_test_env(env):
+            if is_hotseat_env(env):
+                description = "a hotseat test environment"
+                apply_dict_overrides(deploy_cfg, **cls.HOTSEAT_DEPLOYMENT_OPTION_OVERRIDES)
+            else:  # webdev or mastertest
+                description = "a non-hotseat test environment"
+                apply_dict_overrides(deploy_cfg, **cls.OTHER_TEST_DEPLOYMENT_OPTION_OVERRIDES)
+        else:
+            description = "an unrecognized environment"
+        log.info('Environment %s is %s. Processing mode: %s'
+                 % (env, description, cls._summarize_deploy_options(deploy_cfg)))
+        return deploy_cfg
+
+    @staticmethod
+    def add_argparse_arguments(parser):
+        parser.add_argument('--wipe-es', help="Specify to wipe ES", action='store_true', default=None)
+        parser.add_argument('--skip', help='Specify to skip this step altogether', default=None)
+        parser.add_argument('--strict', help='Specify to do a strict reindex', default=False)
 
 
 if __name__ == "__main__":

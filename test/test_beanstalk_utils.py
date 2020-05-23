@@ -4,7 +4,8 @@ import json
 import os
 import socket
 from collections import defaultdict
-from dcicutils import beanstalk_utils as bs, env_utils, source_beanstalk_env_vars
+from dcicutils import beanstalk_utils as bs, env_utils, source_beanstalk_env_vars, compute_prd_env_for_env
+from dcicutils.env_utils import is_fourfront_env, is_cgap_env, is_stg_or_prd_env
 from dcicutils.qa_utils import mock_not_called
 from dcicutils.misc_utils import ignored
 from unittest import mock
@@ -300,6 +301,18 @@ def test_compute_cgap_stg_env_by_alternate_means():
         expected_prd_options = {env_utils.CGAP_ENV_PRODUCTION_BLUE_NEW, env_utils.CGAP_ENV_PRODUCTION_GREEN_NEW}
         assert actual_cgap_prd in expected_prd_options
         assert bs.compute_cgap_stg_env() == (expected_prd_options - {actual_cgap_prd}).pop()
+
+
+def test_compute_prd_env_for_env():
+
+    computed_ff_prd = compute_prd_env_for_env('fourfront-mastertest')
+    assert is_fourfront_env(computed_ff_prd)
+    assert is_stg_or_prd_env(computed_ff_prd)
+
+    computed_cgap_prd = compute_prd_env_for_env('fourfront-cgapwolf')
+    assert is_cgap_env(computed_cgap_prd)
+    assert is_stg_or_prd_env(computed_cgap_prd)
+
 
 
 def _mocked_describe_beanstalk_environments(*args, **kwargs):
