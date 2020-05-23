@@ -902,11 +902,12 @@ class MockedLog:
         self.last_msg = msg
 
 
-def _get_deploy_config(env, log=None):
+def _get_deploy_config(env, log=None, allow_other_prod=False):
     return CreateMappingOnDeployManager.get_deploy_config(env=env,
                                                           args=MockedNoCommandArgs,
                                                           log=log or MockedLog(),
-                                                          client='create_mapping_on_deploy')
+                                                          client='create_mapping_on_deploy',
+                                                          allow_other_prod=allow_other_prod)
 
 
 @mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-webprod2'))
@@ -916,9 +917,11 @@ def test_get_deployment_config_ff_staging_old():
     my_log = MockedLog()
     cfg = _get_deploy_config(my_env, my_log)
     assert cfg['ENV_NAME'] == my_env  # sanity
-    assert cfg['WIPE_ES'] is True  # wipe
-    assert my_log.last_msg == ('Environment fourfront-webprod is currently the staging environment.'
-                               ' Processing mode: STRICT,WIPE_ES')
+    assert cfg['SKIP'] is False
+    assert cfg['WIPE_ES'] is True
+    assert cfg['STRICT'] is True
+    assert my_log.last_msg == ("Environment fourfront-webprod is currently the staging environment."
+                               " Processing mode: STRICT,WIPE_ES")
 
 
 @mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-green'))
@@ -928,9 +931,11 @@ def test_get_deployment_config_ff_staging_new():
     my_log = MockedLog()
     cfg = _get_deploy_config(my_env, my_log)
     assert cfg['ENV_NAME'] == my_env  # sanity
-    assert cfg['WIPE_ES'] is True  # wipe
-    assert my_log.last_msg == ('Environment fourfront-blue is currently the staging environment.'
-                               ' Processing mode: STRICT,WIPE_ES')
+    assert cfg['SKIP'] is False
+    assert cfg['WIPE_ES'] is True
+    assert cfg['STRICT'] is True
+    assert my_log.last_msg == ("Environment fourfront-blue is currently the staging environment."
+                               " Processing mode: STRICT,WIPE_ES")
 
 
 @mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-webprod2'))
@@ -940,8 +945,9 @@ def test_get_deployment_config_ff_prod_old():
     my_log = MockedLog()
     with pytest.raises(RuntimeError):
         _get_deploy_config(my_env, my_log)
-    assert my_log.last_msg == ('Environment fourfront-webprod2 is an uncorrelated production environment.'
-                               ' Something is definitely wrong.')
+    assert my_log.last_msg == ("Environment fourfront-webprod2 is currently the production environment."
+                               " Something is definitely wrong. We never deploy there, we always CNAME swap."
+                               " This deploy cannot proceed. DeploymentFailure will be raised.")
 
 
 @mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-green'))
@@ -951,8 +957,35 @@ def test_get_deployment_config_ff_prod_new():
     my_log = MockedLog()
     with pytest.raises(RuntimeError):
         _get_deploy_config(my_env, my_log)
-    assert my_log.last_msg == ('Environment fourfront-green is an uncorrelated production environment.'
-                               ' Something is definitely wrong.')
+    assert my_log.last_msg == ("Environment fourfront-green is currently the production environment."
+                               " Something is definitely wrong. We never deploy there, we always CNAME swap."
+                               " This deploy cannot proceed. DeploymentFailure will be raised.")
+
+
+@mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-green'))
+def test_get_deployment_config_ff_prod_uncorrelated():
+    """ Tests get_deployment_config in the new production case """
+    my_env = 'fourfront-webprod2'
+    my_log = MockedLog()
+    with pytest.raises(RuntimeError):
+        _get_deploy_config(my_env, my_log)
+    assert my_log.last_msg == ("Environment fourfront-webprod2 is an uncorrelated production-class environment."
+                               " Something is definitely wrong. This deploy cannot proceed."
+                               " DeploymentFailure will be raised.")
+
+
+@mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-green'))
+def test_get_deployment_config_ff_prod_uncorrelated_but_allowed():
+    """ Tests get_deployment_config in the new production case """
+    my_env = 'fourfront-webprod2'
+    my_log = MockedLog()
+    cfg = _get_deploy_config(my_env, my_log, allow_other_prod=True)
+    assert cfg['ENV_NAME'] == my_env  # sanity
+    assert cfg['SKIP'] is True  # If SKIP is returned, the other values don't really matter.
+    # assert cfg['WIPE_ES'] is ...
+    # assert cfg['STRICT'] is ...
+    assert my_log.last_msg == ("Environment fourfront-webprod2 is an uncorrelated production-class environment"
+                               " (neither production nor its staging mirror). Processing mode: SKIP")
 
 
 @mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-webprod2'))
@@ -962,7 +995,9 @@ def test_get_deployment_config_ff_mastertest_old():
     my_log = MockedLog()
     cfg = _get_deploy_config(my_env, my_log)
     assert cfg['ENV_NAME'] == my_env  # sanity
-    assert cfg['WIPE_ES'] is True  # wipe
+    assert cfg['SKIP'] is False
+    assert cfg['WIPE_ES'] is True
+    assert cfg['STRICT'] is False
     assert my_log.last_msg == ('Environment fourfront-mastertest is a non-hotseat test environment.'
                                ' Processing mode: WIPE_ES')
 
@@ -974,7 +1009,9 @@ def test_get_deployment_config_ff_mastertest_new():
     my_log = MockedLog()
     cfg = _get_deploy_config(my_env, my_log)
     assert cfg['ENV_NAME'] == my_env  # sanity
-    assert cfg['WIPE_ES'] is True  # wipe
+    assert cfg['SKIP'] is False
+    assert cfg['WIPE_ES'] is True
+    assert cfg['STRICT'] is False
     assert my_log.last_msg == ('Environment fourfront-mastertest is a non-hotseat test environment.'
                                ' Processing mode: WIPE_ES')
 
@@ -986,7 +1023,9 @@ def test_get_deployment_config_ff_hotseat_old():
     my_log = MockedLog()
     cfg = _get_deploy_config(my_env, my_log)
     assert cfg['ENV_NAME'] == my_env  # sanity
-    assert cfg['WIPE_ES'] is False  # no wipe
+    assert cfg['SKIP'] is True  # If SKIP is returned, the other values don't really matter.
+    # assert cfg['WIPE_ES'] is ...
+    # assert cfg['STRICT'] is ...
     assert my_log.last_msg == ('Environment fourfront-hotseat is a hotseat test environment.'
                                ' Processing mode: SKIP')
 
@@ -999,7 +1038,9 @@ def test_get_deployment_config_ff_hotseat_new():
     my_log = MockedLog()
     cfg = _get_deploy_config(my_env, my_log)
     assert cfg['ENV_NAME'] == my_env  # sanity
-    assert cfg['WIPE_ES'] is False  # no wipe
+    assert cfg['SKIP'] is True  # If SKIP is returned, the other values don't really matter.
+    # assert cfg['WIPE_ES'] is ...
+    # assert cfg['STRICT'] is ...
     assert my_log.last_msg == ('Environment fourfront-hotseat is a hotseat test environment.'
                                ' Processing mode: SKIP')
 
@@ -1015,7 +1056,9 @@ def test_get_deployment_config_cgap_staging_new():
     my_log = MockedLog()
     cfg = _get_deploy_config(my_env, my_log)
     assert cfg['ENV_NAME'] == my_env  # sanity
-    assert cfg['WIPE_ES'] is True  # wipe
+    assert cfg['SKIP'] is False
+    assert cfg['WIPE_ES'] is True
+    assert cfg['STRICT'] is True
     assert my_log.last_msg == ('Environment cgap-blue is currently the staging environment.'
                                ' Processing mode: STRICT,WIPE_ES')
 
@@ -1028,8 +1071,9 @@ def test_get_deployment_config_cgap_prod_old():
     my_log = MockedLog()
     with pytest.raises(RuntimeError):
         _get_deploy_config(my_env, my_log)
-    assert my_log.last_msg == ('Environment fourfront-cgap is an uncorrelated production environment.'
-                               ' Something is definitely wrong.')
+    assert my_log.last_msg == ("Environment fourfront-cgap is currently the production environment."
+                               " Something is definitely wrong. We never deploy there, we always CNAME swap."
+                               " This deploy cannot proceed. DeploymentFailure will be raised.")
 
 
 # Eventually cgap production will look like this.
@@ -1040,5 +1084,32 @@ def test_get_deployment_config_cgap_prod_new():
     my_log = MockedLog()
     with pytest.raises(RuntimeError):
         _get_deploy_config(my_env, my_log)
-    assert my_log.last_msg == ('Environment cgap-green is an uncorrelated production environment.'
-                               ' Something is definitely wrong.')
+    assert my_log.last_msg == ("Environment cgap-green is currently the production environment."
+                               " Something is definitely wrong. We never deploy there, we always CNAME swap."
+                               " This deploy cannot proceed. DeploymentFailure will be raised.")
+
+
+@mock.patch('dcicutils.deployment_utils.compute_cgap_prd_env', mock.MagicMock(return_value='fourfront-cgap'))
+def test_get_deployment_config_cgap_prod_uncorrelated():
+    """ Tests get_deployment_config in the new production case """
+    my_env = 'cgap-blue'
+    my_log = MockedLog()
+    with pytest.raises(RuntimeError):
+        _get_deploy_config(my_env, my_log)
+    assert my_log.last_msg == ("Environment cgap-blue is an uncorrelated production-class environment."
+                               " Something is definitely wrong. This deploy cannot proceed."
+                               " DeploymentFailure will be raised.")
+
+
+@mock.patch('dcicutils.deployment_utils.compute_cgap_prd_env', mock.MagicMock(return_value='fourfront-cgap'))
+def test_get_deployment_config_cgap_prod_uncorrelated_but_allowed():
+    """ Tests get_deployment_config in the new production case """
+    my_env = 'cgap-blue'
+    my_log = MockedLog()
+    cfg = _get_deploy_config(my_env, my_log, allow_other_prod=True)
+    assert cfg['ENV_NAME'] == my_env  # sanity
+    assert cfg['SKIP'] is True  # If SKIP is returned, the other values don't really matter.
+    # assert cfg['WIPE_ES'] is ...
+    # assert cfg['STRICT'] is ...
+    assert my_log.last_msg == ("Environment cgap-blue is an uncorrelated production-class environment"
+                               " (neither production nor its staging mirror). Processing mode: SKIP")

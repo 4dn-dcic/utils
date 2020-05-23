@@ -693,13 +693,14 @@ class CreateMappingOnDeployManager:
     STAGING_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': True, 'STRICT': True}
     HOTSEAT_DEPLOYMENT_OPTION_OVERRIDES = {'SKIP': True, 'STRICT': True}
     OTHER_TEST_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': True}
+    OTHER_PROD_DEPLOYMENT_OPTION_OVERRIDES = {'SKIP': True}
 
     @classmethod
     def _summarize_deploy_options(cls, options):
         return "SKIP" if options['SKIP'] else ",".join(k for k in ('STRICT', 'WIPE_ES') if options[k]) or "default"
 
     @classmethod
-    def get_deploy_config(cls, *, env, args, log, client=None):
+    def get_deploy_config(cls, *, env, args, log, client=None, allow_other_prod=False):
         """
         Returns a dictionary describing appropriate options for creating mapping on deploy of a non-prd server.
             {)
@@ -724,9 +725,20 @@ class CreateMappingOnDeployManager:
             description = "currently the staging environment"
             apply_dict_overrides(deploy_cfg, **cls.STAGING_DEPLOYMENT_OPTION_OVERRIDES)
         elif is_stg_or_prd_env(env):
-            # TODO: Reconsider error-raising behavior. Is there some reason we shouldn't just return {'SKIP': True}?
-            log.info('Environment %s is an uncorrelated production environment. Something is definitely wrong.' % env)
-            raise DeploymentFailure('Tried to run %s on production.' % client or cls.__name__)
+            if env == current_prod_env:
+                log.info("Environment %s is currently the production environment."
+                         " Something is definitely wrong. We never deploy there, we always CNAME swap."
+                         " This deploy cannot proceed. DeploymentFailure will be raised." % env)
+                raise DeploymentFailure('Tried to run %s on production.' % client or cls.__name__)
+            elif allow_other_prod:
+                description = "an uncorrelated production-class environment (neither production nor its staging mirror)"
+                apply_dict_overrides(deploy_cfg, **cls.OTHER_PROD_DEPLOYMENT_OPTION_OVERRIDES)
+            else:
+                log.info("Environment %s is an uncorrelated production-class environment."
+                         " Something is definitely wrong."
+                         " This deploy cannot proceed. DeploymentFailure will be raised." % env)
+                raise DeploymentFailure("Tried to run %s on a production-class environment"
+                                        " (neither production nor its staging mirror)." % client or cls.__name__)
         elif is_test_env(env):
             if is_hotseat_env(env):
                 description = "a hotseat test environment"
