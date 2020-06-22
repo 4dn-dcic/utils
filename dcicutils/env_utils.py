@@ -1,5 +1,6 @@
 import os
 from .misc_utils import get_setting_from_context
+from . import beanstalk_utils as bs_utils
 
 FF_ENV_DEV = 'fourfront-dev'  # Maybe not used
 FF_ENV_HOTSEAT = 'fourfront-hotseat'
@@ -213,6 +214,18 @@ def prod_bucket_env(envname):
     that ecosystem.
     """
     return BEANSTALK_PROD_BUCKET_ENVS.get(envname)
+
+
+def get_prd_or_stg_env(envname):
+    if envname == 'data':
+        use_env = bs_utils.compute_ff_prd_env()
+    elif envname == 'staging':
+        use_env = bs_utils.compute_ff_stg_env()
+    elif envname in ['fourfront-green', 'fourfront-blue']:
+        use_env = envname
+    else:
+        use_env = prod_bucket_env(envname)
+    return use_env
 
 
 def get_bucket_env(envname):

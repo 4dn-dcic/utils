@@ -1089,14 +1089,7 @@ def unified_authentication(auth=None, ff_env=None):
     # first see if key should be obtained from using ff_env
     if not auth and ff_env:
         # TODO: The ff_env argument is mis-named, something we should fix sometime. It can be a cgap env, too.
-        if ff_env == 'data':
-            use_env = beanstalk_utils.compute_ff_prd_env()
-        elif ff_env == 'staging':
-            use_env = beanstalk_utils.compute_ff_stg_env()
-        elif ff_env in ['fourfront-green', 'fourfront-blue']:
-            use_env = ff_env
-        else:
-            use_env = env_utils.prod_bucket_env(ff_env) if env_utils.is_stg_or_prd_env(ff_env) else ff_env
+        use_env = env_utils.get_prd_or_stg_env(ff_env) if env_utils.is_stg_or_prd_env(ff_env) else ff_env
         auth = s3_utils.s3Utils(env=use_env).get_access_keys()
     # see if auth is directly from get_access_keys()
     use_auth = None
