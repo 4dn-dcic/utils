@@ -1093,6 +1093,8 @@ def unified_authentication(auth=None, ff_env=None):
             use_env = beanstalk_utils.compute_ff_prd_env()
         elif ff_env == 'staging':
             use_env = beanstalk_utils.compute_ff_stg_env()
+        elif ff_env in ['fourfront-green', 'fourfront-blue']:
+            use_env = ff_env
         else:
             use_env = env_utils.prod_bucket_env(ff_env) if env_utils.is_stg_or_prd_env(ff_env) else ff_env
         auth = s3_utils.s3Utils(env=use_env).get_access_keys()
