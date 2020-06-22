@@ -206,7 +206,7 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     OR
     authorized_request('https://data.4dnucleome.org/<some path>', ff_env='fourfront-webprod')
     """
-    use_auth = _authentication(auth, ff_env)
+    use_auth = unified_authentication(auth, ff_env)
     headers = kwargs.get('headers')
     if not headers:
         kwargs['headers'] = {'content-type': 'application/json', 'accept': 'application/json'}
