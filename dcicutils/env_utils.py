@@ -217,6 +217,17 @@ def prod_bucket_env(envname):
 
 
 def get_prd_or_stg_env(envname):
+    """
+    Given a production-class env label, returns the env name.
+    For other envnames that aren't production envs, this returns None.
+
+    The envname is something that is either a staging or production env, in particular something
+    that is_stg_or_prd_env returns True for.
+
+    The purpose is to return the envname when shorthand env labels like 'data' or 'staging' are
+    used in place of env names like fourfront-blue or fourfront-green. Should work for fourfront
+    as well as CGAP.
+    """
     if envname == 'data':
         use_env = bs_utils.compute_ff_prd_env()
     elif envname == 'staging':
