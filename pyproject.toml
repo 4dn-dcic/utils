@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "0.17.0b0"
+version = "0.32.0b0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -10,12 +10,9 @@ repository = "https://github.com/4dn-dcic/utils"
 packages = [
   { include="dcicutils", from="." }
 ]
-include = [
-  "nosuchfile"
-]
 
 [tool.poetry.dependencies]
-python = ">=3.4,<3.7"
+python = ">=3.4,<3.8"
 boto3 = "^1.10.46"
 botocore = "^1.13.46"
 # TODO: elasticsearch is on version 7. -kmp 15-Feb-2020
@@ -24,6 +21,10 @@ aws-requests-auth = ">=0.4.2,<1"
 urllib3 = "^1.24.3"
 structlog = "^19.2.0"
 requests = "^2.21.0"
+toml = ">=0.10.0,<1"
+webtest = "^2.0.34"
+pytz = ">=2016.4"
+gitpython = "^3.1.2"
 
 [tool.poetry.dev-dependencies]
 pytest = ">=4.5.0"

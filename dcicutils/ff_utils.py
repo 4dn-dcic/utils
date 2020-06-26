@@ -8,10 +8,11 @@ import boto3
 from . import (
     s3_utils,
     es_utils,
-    env_utils,
+    env_utils
 )
 from .misc_utils import PRINT
 import requests
+from elasticsearch.exceptions import AuthorizationException
 # urlparse import differs between py2 and 3
 if sys.version_info[0] < 3:
     import urlparse
@@ -325,7 +326,9 @@ def get_search_generator(search_url, auth=None, ff_env=None, page_limit=50):
     url_params = get_url_params(search_url)
     # indexing below is needed because url params are returned in lists
     curr_from = int(url_params.get('from', ['0'])[0])  # use query 'from' or 0 if not provided
+    initial_from = curr_from
     search_limit = url_params.get('limit', ['all'])[0]  # use limit=all by default
+
     if search_limit != 'all':
         search_limit = int(search_limit)
     url_params['limit'] = [str(page_limit)]
@@ -334,7 +337,7 @@ def get_search_generator(search_url, auth=None, ff_env=None, page_limit=50):
     # stop when fewer results than the limit are returned
     last_total = None
     while last_total is None or last_total == page_limit:
-        if search_limit != 'all' and curr_from >= search_limit:
+        if search_limit != 'all' and curr_from - initial_from >= search_limit:
             break
         url_params['from'] = [str(curr_from)]  # use from to drive search pagination
         search_url = update_url_params_and_unparse(search_url, url_params)
@@ -348,8 +351,8 @@ def get_search_generator(search_url, auth=None, ff_env=None, page_limit=50):
                   'status code is %s.' % (search_url, response.status_code))
         last_total = len(search_res)
         curr_from += last_total
-        if search_limit != 'all' and curr_from > search_limit:
-            limit_diff = curr_from - search_limit
+        if search_limit != 'all' and curr_from - initial_from > search_limit:
+            limit_diff = curr_from - initial_from - search_limit
             yield search_res[:-limit_diff]
         else:
             yield search_res
@@ -695,7 +698,7 @@ def delete_field(obj_id, del_field, key=None, ff_env=None):
 
 def get_es_search_generator(es_client, index, body, page_size=200):
     """
-    Simple generator behind get_es_metada which takes an es_client (from
+    Simple generator behind get_es_metadata which takes an es_client (from
     es_utils create_es_client), a string index, and a dict query body.
     Also takes an optional string page_size, which controls pagination size
     NOTE: 'index' must be namespaced
@@ -881,7 +884,8 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
         add_pc_wfr (bool):               Include workflow_runs and linked items (processed/ref files, wf, software...)
         ignore_field(list):              Remove keys from items, so any linking through these fields, ie relations
         use_generator (bool):            Use a generator when getting es. Less memory used but takes longer
-        es_client:                       optional result from es_utils.create_es_client
+        es_client:                       optional result from es_utils.create_es_client - note this could be regenerated
+                                         in this method if the signature expires
     Returns:
         dict: contains all item types as keys, and with values of list of dictionaries
               i.e.
@@ -928,8 +932,21 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
 
     while uuid_list:
         uuids_to_check = []  # uuids to add to uuid_list if not if not in item_uuids
-        for es_item in get_es_metadata(uuid_list, es_client=es_client, chunk_size=chunk,
-                                       is_generator=use_generator, key=auth):
+
+        # get the next page of data, recreating the es_client if need be
+        try:
+            current_page = get_es_metadata(uuid_list, es_client=es_client, chunk_size=chunk,
+                                           is_generator=use_generator, key=auth)
+        except AuthorizationException:  # our signature expired, recreate the es_client with a fresh signature
+            if es_url:
+                es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
+            else:  # recreate client and try again - if we fail here, exception should propagate
+                es_url = get_health_page(key=auth)['elasticsearch']
+                es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
+
+            current_page = get_es_metadata(uuid_list, es_client=es_client, chunk_size=chunk,
+                                           is_generator=use_generator, key=auth)
+        for es_item in current_page:
             # get object type via es result and schema for storing
             obj_type = es_item['object']['@type'][0]
             obj_key = schema_name[obj_type]
@@ -1071,7 +1088,7 @@ def unified_authentication(auth=None, ff_env=None):
     # first see if key should be obtained from using ff_env
     if not auth and ff_env:
         # TODO: The ff_env argument is mis-named, something we should fix sometime. It can be a cgap env, too.
-        use_env = env_utils.prod_bucket_env(ff_env) if env_utils.is_stg_or_prd_env(ff_env) else ff_env
+        use_env = env_utils.get_prd_or_stg_env(ff_env) if env_utils.is_stg_or_prd_env(ff_env) else ff_env
         auth = s3_utils.s3Utils(env=use_env).get_access_keys()
     # see if auth is directly from get_access_keys()
     use_auth = None

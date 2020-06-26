@@ -4,7 +4,8 @@ import json
 import os
 import socket
 from collections import defaultdict
-from dcicutils import beanstalk_utils as bs, env_utils, source_beanstalk_env_vars
+from dcicutils import beanstalk_utils as bs, env_utils, source_beanstalk_env_vars, compute_prd_env_for_env
+from dcicutils.env_utils import is_fourfront_env, is_cgap_env, is_stg_or_prd_env
 from dcicutils.qa_utils import mock_not_called
 from dcicutils.misc_utils import ignored
 from unittest import mock
@@ -256,20 +257,62 @@ def test_compute_ff_prod_env_by_alternate_computation():
     assert bs.compute_ff_prd_env() == _ff_production_env_for_testing()
 
 
-def test_compute_ff_pred_env():
+def test_compute_ff_and_cgap_prd_and_stg_envs():
+
+    def mocked_compute_prd_env_for_project(project):
+        return project + "-prd-env"
+
+    def mocked_standard_mirror_env(envname):
+        assert envname.endswith("-prd-env"), "mocked_standard_mirror_env does nto handle %r." % envname
+        if env_utils.is_fourfront_env(envname):
+            return "fourfront-stg-env"
+        elif env_utils.is_cgap_env(envname):
+            return None
+        else:
+            raise AssertionError("mocked_standard_mirror_env does not handle %r." % envname)
+
     with mock.patch("dcicutils.beanstalk_utils._compute_prd_env_for_project") as mock_compute:
-        def mocked_compute_prd_env_for_project(project):
-            return project + "-prod-env"
-        mock_compute.side_effect = mocked_compute_prd_env_for_project
-        assert bs.compute_ff_prd_env() == 'ff-prod-env'
+        with mock.patch("dcicutils.beanstalk_utils.get_standard_mirror_env") as mock_mirror:
+            mock_compute.side_effect = mocked_compute_prd_env_for_project
+            mock_mirror.side_effect = mocked_standard_mirror_env
+
+            assert bs.compute_ff_prd_env() == 'fourfront-prd-env'
+            assert bs.compute_ff_stg_env() == 'fourfront-stg-env'
+
+            assert bs.compute_cgap_prd_env() == 'cgap-prd-env'
+            assert bs.compute_cgap_stg_env() is None
 
 
-def test_compute_cgap_pred_env():
-    with mock.patch("dcicutils.beanstalk_utils._compute_prd_env_for_project") as mock_compute:
-        def mocked_compute_prd_env_for_project(project):
-            return project + "-prod-env"
-        mock_compute.side_effect = mocked_compute_prd_env_for_project
-        assert bs.compute_cgap_prd_env() == 'cgap-prod-env'
+def test_compute_ff_stg_env_by_alternate_means():
+    # NOTE: bs.compute_ff_prd_env is tested elsewhere in this file. If that test is failing, debug that problem first!
+    actual_ff_prd = bs.compute_ff_prd_env()
+    expected_prd_options = {env_utils.FF_ENV_PRODUCTION_BLUE, env_utils.FF_ENV_PRODUCTION_GREEN}
+    assert actual_ff_prd in expected_prd_options
+    assert bs.compute_ff_stg_env() == (expected_prd_options - {actual_ff_prd}).pop()
+
+
+def test_compute_cgap_stg_env_by_alternate_means():
+    # NOTE: bs.compute_cgap_prd_env is tested elsewhere in this file. If that test is failing, debug that problem first!
+    actual_cgap_prd = bs.compute_cgap_prd_env()
+    if actual_cgap_prd == 'fourfront-cgap':
+        assert env_utils.get_standard_mirror_env('fourfront-cgap') is None
+        assert bs.compute_cgap_stg_env() is None
+    else:
+        expected_prd_options = {env_utils.CGAP_ENV_PRODUCTION_BLUE_NEW, env_utils.CGAP_ENV_PRODUCTION_GREEN_NEW}
+        assert actual_cgap_prd in expected_prd_options
+        assert bs.compute_cgap_stg_env() == (expected_prd_options - {actual_cgap_prd}).pop()
+
+
+def test_compute_prd_env_for_env():
+
+    computed_ff_prd = compute_prd_env_for_env('fourfront-mastertest')
+    assert is_fourfront_env(computed_ff_prd)
+    assert is_stg_or_prd_env(computed_ff_prd)
+
+    computed_cgap_prd = compute_prd_env_for_env('fourfront-cgapwolf')
+    assert is_cgap_env(computed_cgap_prd)
+    assert is_stg_or_prd_env(computed_cgap_prd)
+
 
 
 def _mocked_describe_beanstalk_environments(*args, **kwargs):

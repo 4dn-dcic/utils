@@ -1,5 +1,6 @@
 import os
 from .misc_utils import get_setting_from_context
+from . import beanstalk_utils as bs_utils
 
 FF_ENV_DEV = 'fourfront-dev'  # Maybe not used
 FF_ENV_HOTSEAT = 'fourfront-hotseat'
@@ -11,6 +12,7 @@ FF_ENV_WEBDEV = 'fourfront-webdev'
 FF_ENV_WEBPROD = 'fourfront-webprod'
 FF_ENV_WEBPROD2 = 'fourfront-webprod2'
 FF_ENV_WOLF = 'fourfront-wolf'
+FF_ENV_INDEXER = 'fourfront-indexer'  # to be used by ELB Indexer
 
 CGAP_ENV_DEV = 'fourfront-cgapdev'
 CGAP_ENV_HOTSEAT = 'fourfront-cgaphotseat'  # Maybe not used
@@ -22,6 +24,7 @@ CGAP_ENV_WEBDEV = 'fourfront-cgapwebdev'  # Maybe not used
 CGAP_ENV_WEBPROD = 'fourfront-cgap'
 # CGAP_ENV_WEBPROD2 is meaningless here. See CGAP_ENV_STAGING.
 CGAP_ENV_WOLF = 'fourfront-cgapwolf'  # Maybe not used
+CGAP_ENV_INDEXER = 'cgap-indexer'  # to be used by ELB Indexer
 
 CGAP_ENV_DEV_NEW = 'cgap-dev'
 CGAP_ENV_HOTSEAT_NEW = 'cgap-hotseat'
@@ -43,6 +46,9 @@ CGAP_PROD_BUCKET_ENV = CGAP_ENV_WEBPROD
 FOURFRONT_STG_OR_PRD_TOKENS = ['webprod', 'blue', 'green']
 FOURFRONT_STG_OR_PRD_NAMES = ['staging', 'stagging', 'data']
 
+# We should know which BS Envs are indexing envs
+INDEXER_ENVS = [FF_ENV_INDEXER, CGAP_ENV_INDEXER]
+
 # Done this way because it's safer going forward.
 CGAP_STG_OR_PRD_TOKENS = []
 CGAP_STG_OR_PRD_NAMES = [CGAP_ENV_WEBPROD, CGAP_ENV_PRODUCTION_GREEN, CGAP_ENV_PRODUCTION_BLUE,
@@ -52,6 +58,10 @@ CGAP_STG_OR_PRD_NAMES = [CGAP_ENV_WEBPROD, CGAP_ENV_PRODUCTION_GREEN, CGAP_ENV_P
 
 FF_PUBLIC_URL_STG = 'http://staging.4dnucleome.org'
 FF_PUBLIC_URL_PRD = 'https://data.4dnucleome.org'
+FF_PUBLIC_DOMAIN_STG = 'staging.4dnucleome.org'
+FF_PUBLIC_DOMAIN_PRD = 'data.4dnucleome.org'
+FF_PRODUCTION_IDENTIFIER = 'data'
+FF_STAGING_IDENTIFIER = 'staging'
 
 FF_PUBLIC_URLS = {
     'staging': FF_PUBLIC_URL_STG,
@@ -122,6 +132,59 @@ BEANSTALK_TEST_ENVS = [
 
 ]
 
+BEANSTALK_DEV_DATA_SETS = {
+
+    'fourfront-hotseat': 'prod',
+    'fourfront-mastertest': 'test',
+    'fourfront-webdev': 'prod',
+
+    'fourfront-cgapdev': 'test',
+    'fourfront-cgaptest': 'test',
+    'fourfront-cgapwolf': 'test',
+
+    'cgap-dev': 'test',
+    'cgap-test': 'test',
+    'cgap-wolf': 'test',
+
+}
+
+
+def is_indexer_env(envname):
+    """ Checks whether envname is an indexer environment.
+
+    :param envname:  envname to check
+    :return: True if envname is an indexer application, False otherwise
+    """
+    return envname in [FF_ENV_INDEXER, CGAP_ENV_INDEXER]
+
+
+def indexer_env_for_env(envname):
+    """ Returns the corresponding indexer-env name for the given env.
+
+    :param envname: envname we want to determine the indexer for
+    :returns: either FF_ENV_INDEXER or CGAP_ENV_INDEXER or None
+    """
+    if is_fourfront_env(envname) and envname != FF_ENV_INDEXER:
+        return FF_ENV_INDEXER
+    elif is_cgap_env(envname) and envname != CGAP_ENV_INDEXER:
+        return CGAP_ENV_INDEXER
+    else:
+        return None
+
+
+def data_set_for_env(envname, default=None):
+    """
+    This relates to which data set to load.
+    For production environments, really the null set is loaded because the data is already there and trusted.
+    This must always work for all production environments and there is deliberately no provision to override that.
+    In all other environments, the question is whether to load ADDITIONAL data, and that's a kind of custom choice,
+    so we consult a table for now, pending a better theory of organization.
+    """
+    if is_stg_or_prd_env(envname):
+        return 'prod'
+    else:
+        return BEANSTALK_DEV_DATA_SETS.get(envname, default)
+
 
 def blue_green_mirror_env(envname):
     """
@@ -151,6 +214,33 @@ def prod_bucket_env(envname):
     that ecosystem.
     """
     return BEANSTALK_PROD_BUCKET_ENVS.get(envname)
+
+
+def get_prd_or_stg_env(envname):
+    """
+    Given a production-class env label, returns the env name.
+    For other envnames that aren't production envs, this returns None.
+
+    The envname is something that is either a staging or production env, in particular something
+    that is_stg_or_prd_env returns True for.
+
+    The purpose is to return the envname when shorthand env labels like 'data' or 'staging' are
+    used in place of env names like fourfront-blue or fourfront-green. Should work for fourfront
+    as well as CGAP.
+    """
+    if envname == 'data':
+        use_env = bs_utils.compute_ff_prd_env()
+    elif envname == 'staging':
+        use_env = bs_utils.compute_ff_stg_env()
+    elif envname in ['fourfront-green', 'fourfront-blue']:
+        use_env = envname
+    else:
+        use_env = prod_bucket_env(envname)
+    return use_env
+
+
+def get_bucket_env(envname):
+    return prod_bucket_env(envname) if is_stg_or_prd_env(envname) else envname
 
 
 def public_url_mappings(envname):
@@ -272,3 +362,22 @@ def infer_repo_from_env(envname):
         return 'fourfront'
     else:
         return None
+
+
+def infer_foursight_from_env(request, envname):
+    """  Infers the Foursight environment to view based on the given envname and request context
+
+    :param request: the current request (or an object that has member 'domain')
+    :param envname: name of the environment we are on
+    :return: Foursight env at the end of the url ie: for fourfront-green, could be either 'data' or 'staging'
+    """
+    if is_cgap_env(envname):
+        return envname[len('fourfront-'):]  # all cgap envs are prefixed and the FS envs directly match
+    else:
+        if is_stg_or_prd_env(envname):
+            if FF_PUBLIC_DOMAIN_PRD in request.domain:
+                return FF_PRODUCTION_IDENTIFIER
+            else:
+                return FF_STAGING_IDENTIFIER
+        else:
+            return envname[len('fourfront-'):]  # if not data/staging, behaves exactly like CGAP

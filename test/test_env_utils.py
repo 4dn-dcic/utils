@@ -11,9 +11,35 @@ from dcicutils.env_utils import (
     CGAP_ENV_HOTSEAT_NEW, CGAP_ENV_STAGING_NEW, CGAP_ENV_WEBDEV_NEW, CGAP_ENV_WOLF_NEW,
     get_mirror_env_from_context, is_test_env, is_hotseat_env, guess_mirror_env, get_standard_mirror_env,
     prod_bucket_env, public_url_mappings, CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
-    infer_repo_from_env
+    infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env, FF_PRODUCTION_IDENTIFIER,
+    FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV,
+    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
 )
 from unittest import mock
+
+
+def test_get_bucket_env():
+
+    # Fourfront tests
+
+    assert get_bucket_env('fourfront-webprod') == FF_PROD_BUCKET_ENV
+    assert get_bucket_env('fourfront-webprod2') == FF_PROD_BUCKET_ENV
+
+    assert get_bucket_env('fourfront-blue') == FF_PROD_BUCKET_ENV
+    assert get_bucket_env('fourfront-green') == FF_PROD_BUCKET_ENV
+
+    assert get_bucket_env('fourfront-mastertest') == 'fourfront-mastertest'
+    assert get_bucket_env('fourfront-webdev') == 'fourfront-webdev'
+
+    # CGAP tests
+
+    assert get_bucket_env('fourfront-cgap') == CGAP_PROD_BUCKET_ENV
+
+    assert get_bucket_env('fourfront-cgap-blue') == CGAP_PROD_BUCKET_ENV
+    assert get_bucket_env('fourfront-cgap-green') == CGAP_PROD_BUCKET_ENV
+
+    assert get_bucket_env('fourfront-cgapdev') == 'fourfront-cgapdev'
+    assert get_bucket_env('fourfront-cgapwolf') == 'fourfront-cgapwolf'
 
 
 def test_prod_bucket_env():
@@ -38,6 +64,28 @@ def test_prod_bucket_env():
 
     assert prod_bucket_env('fourfront-cgapdev') is None
     assert prod_bucket_env('fourfront-cgapwolf') is None
+
+
+def test_data_set_for_env():
+
+    assert data_set_for_env('fourfront-blue') == 'prod'
+    assert data_set_for_env('fourfront-green') == 'prod'
+    assert data_set_for_env('fourfront-hotseat') == 'prod'
+    assert data_set_for_env('fourfront-mastertest') == 'test'
+    assert data_set_for_env('fourfront-webdev') == 'prod'
+    assert data_set_for_env('fourfront-webprod') == 'prod'
+    assert data_set_for_env('fourfront-webprod2') == 'prod'
+
+    assert data_set_for_env('fourfront-cgap') == 'prod'
+    assert data_set_for_env('fourfront-cgapdev') == 'test'
+    assert data_set_for_env('fourfront-cgaptest') == 'test'
+    assert data_set_for_env('fourfront-cgapwolf') == 'test'
+
+    assert data_set_for_env('cgap-blue') == 'prod'
+    assert data_set_for_env('cgap-green') == 'prod'
+    assert data_set_for_env('cgap-dev') == 'test'
+    assert data_set_for_env('cgap-test') == 'test'
+    assert data_set_for_env('cgap-wolf') == 'test'
 
 
 def test_public_url_mappings():
@@ -355,3 +403,71 @@ def test_infer_repo_from_env():
 
     assert infer_repo_from_env('cgap-foo') == 'cgap-portal'
     assert infer_repo_from_env('fourfront-cgapfoo') == 'cgap-portal'
+
+    # Edge cases that the code specifically looks for:
+    assert infer_repo_from_env(None) is None
+    assert infer_repo_from_env('who-knows') is None
+
+
+def test_infer_foursight_env():
+
+    class MockedRequest:
+        def __init__(self, domain):
+            self.domain = domain
+
+    def mock_request(domain=None):  # build a dummy request with the 'domain' member, checked in the method
+        if domain is None:
+            return None
+        else:
+            return MockedRequest(domain)
+
+    # (active) fourfront testing environments
+    assert infer_foursight_from_env(mock_request(), FF_ENV_MASTERTEST) == 'mastertest'
+    assert infer_foursight_from_env(mock_request(), FF_ENV_WEBDEV) == 'webdev'
+    assert infer_foursight_from_env(mock_request(), FF_ENV_HOTSEAT) == 'hotseat'
+
+    # (active) fourfront production environments
+    assert infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_PRD), 'fourfront-blue') == FF_PRODUCTION_IDENTIFIER
+    assert infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_PRD), 'fourfront-green') == FF_PRODUCTION_IDENTIFIER
+    assert infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), 'fourfront-blue') == FF_STAGING_IDENTIFIER
+    assert infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), 'fourfront-green') == FF_STAGING_IDENTIFIER
+
+    # (active) cgap environments
+    assert infer_foursight_from_env(mock_request(), CGAP_ENV_DEV) == 'cgapdev'
+    assert infer_foursight_from_env(mock_request(), CGAP_ENV_MASTERTEST) == 'cgaptest'
+    assert infer_foursight_from_env(mock_request(), CGAP_ENV_WOLF) == 'cgapwolf'
+    assert infer_foursight_from_env(mock_request(), CGAP_ENV_WEBPROD) == 'cgap'
+
+
+def test_indexer_env_for_env():
+
+    assert indexer_env_for_env('fourfront-mastertest') == FF_ENV_INDEXER
+    assert indexer_env_for_env('fourfront-blue') == FF_ENV_INDEXER
+    assert indexer_env_for_env('fourfront-green') == FF_ENV_INDEXER
+    assert indexer_env_for_env('fourfront-webdev') == FF_ENV_INDEXER
+    assert indexer_env_for_env('fourfront-hotseat') == FF_ENV_INDEXER
+
+    assert indexer_env_for_env('fourfront-cgap') == CGAP_ENV_INDEXER
+    assert indexer_env_for_env('fourfront-cgapdev') == CGAP_ENV_INDEXER
+    assert indexer_env_for_env('fourfront-cgaptest') == CGAP_ENV_INDEXER
+    assert indexer_env_for_env('fourfront-cgapwolf') == CGAP_ENV_INDEXER
+
+    assert indexer_env_for_env('fourfront-indexer') is None
+    assert indexer_env_for_env('cgap-indexer') is None
+    assert indexer_env_for_env('blah-env') is None
+
+
+def test_is_indexer_env():
+
+    assert is_indexer_env('fourfront-indexer')
+    assert is_indexer_env(FF_ENV_INDEXER)
+
+    assert is_indexer_env('cgap-indexer')
+    assert is_indexer_env(CGAP_ENV_INDEXER)
+
+    # Try a few non-indexers ...
+    assert not is_indexer_env('fourfront-cgap')
+    assert not is_indexer_env('fourfront-blue')
+    assert not is_indexer_env('fourfront-green')
+    assert not is_indexer_env('fourfront-mastertest')
+    assert not is_indexer_env('fourfront-cgapwolf')

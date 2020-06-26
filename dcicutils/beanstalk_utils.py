@@ -14,7 +14,10 @@ from datetime import datetime
 from . import ff_utils
 from botocore.exceptions import ClientError
 from .misc_utils import PRINT
-from .env_utils import is_cgap_env, is_stg_or_prd_env, public_url_mappings, blue_green_mirror_env
+from .env_utils import (
+    is_fourfront_env, is_cgap_env, is_stg_or_prd_env, public_url_mappings,
+    blue_green_mirror_env, get_standard_mirror_env,
+)
 
 logging.basicConfig()
 logger = logging.getLogger('logger')
@@ -231,23 +234,43 @@ def _compute_prd_env_for_project(project):
     magic_cname = CGAP_MAGIC_CNAME if project == 'cgap' else FF_MAGIC_CNAME
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = describe_beanstalk_environments(client, ApplicationName="4dn-web")
-    logger.info(res)
     for env in res['Environments']:
-        logger.info(env)
         if env.get('CNAME') == magic_cname:
             # we found data
             return env.get('EnvironmentName')
 
 
 def compute_ff_prd_env():
-    return _compute_prd_env_for_project('ff')
+    """Returns the name of the current Fourfront production environment."""
+    return _compute_prd_env_for_project('fourfront')
+
+
+def compute_ff_stg_env():
+    """Returns the name of the current Fourfront staging environment."""
+    return get_standard_mirror_env(compute_ff_prd_env())
 
 
 whodaman = compute_ff_prd_env  # This naming is deprecated but retained for compatibility.
 
 
 def compute_cgap_prd_env():
+    """Returns the name of the current CGAP production environment."""
     return _compute_prd_env_for_project('cgap')
+
+
+def compute_cgap_stg_env():
+    """Returns the name of the current CGAP staging environment, or None if there is none."""
+    return get_standard_mirror_env(compute_cgap_prd_env())
+
+
+def compute_prd_env_for_env(envname):
+    """Given an environment, returns the name of the prod environment for its owning project."""
+    if is_cgap_env(envname):
+        return compute_cgap_prd_env()
+    elif is_fourfront_env(envname):
+        return compute_ff_prd_env()
+    else:
+        raise ValueError("Unknown environment: %s" % envname)
 
 
 def beanstalk_info(env):
