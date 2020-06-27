@@ -156,7 +156,7 @@ def test_unified_authentication(integrated_ff):
     assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
 
-def test_unified_authentication_data_staging():
+def test_unified_authentication_more_envs():
     key1 = ff_utils.unified_authentication(ff_env="data")
     assert len(key1) == 2
     key2 = ff_utils.unified_authentication(ff_env="staging")
@@ -171,7 +171,6 @@ def test_unified_authentication_data_staging():
         ff_utils.unified_authentication(ff_env="fourfront-data")
         print(exec_info.value)
     assert 'The specified bucket does not exist' in str(exec_info.value)
-
 
 
 @pytest.mark.integrated
