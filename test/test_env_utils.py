@@ -13,7 +13,7 @@ from dcicutils.env_utils import (
     prod_bucket_env, public_url_mappings, CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
     infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env, FF_PRODUCTION_IDENTIFIER,
     FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV,
-    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
+    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env, get_prd_or_stg_env
 )
 from unittest import mock
 
@@ -64,6 +64,22 @@ def test_prod_bucket_env():
 
     assert prod_bucket_env('fourfront-cgapdev') is None
     assert prod_bucket_env('fourfront-cgapwolf') is None
+
+
+def test_get_prd_or_stg_env():
+    assert get_prd_or_stg_env('data') in ['fourfront-green', 'fourfront-blue']
+    assert get_prd_or_stg_env('staging') in ['fourfront-green', 'fourfront-blue']
+    assert get_prd_or_stg_env('fourfront-green') == 'fourfront-green'
+    assert get_prd_or_stg_env('fourfront-blue') == 'fourfront-blue'
+
+    assert get_prd_or_stg_env('fourfront-hotseat') is None
+
+    assert get_prd_or_stg_env('fourfront-cgap') == CGAP_PROD_BUCKET_ENV
+    assert get_prd_or_stg_env('fourfront-cgap-blue') == CGAP_PROD_BUCKET_ENV
+    assert get_prd_or_stg_env('fourfront-cgap-green') == CGAP_PROD_BUCKET_ENV
+
+    assert get_prd_or_stg_env('fourfront-cgapdev') is None
+    assert get_prd_or_stg_env('fourfront-cgapwolf') is None
 
 
 def test_data_set_for_env():
