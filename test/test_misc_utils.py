@@ -510,9 +510,47 @@ def test_retry_error_handling():
 
     with pytest.raises(SyntaxError):
 
+        # Can't actually specify both wait_increment and wait_multiplier, so we'll get a SyntaxError here.
         @Retry.retry_allowed(retries_allowed=4, wait_seconds=2, wait_increment=3, wait_multiplier=1.25)
         def reliably_add_three(x):
             return rarely_add3(x)
+
+    with pytest.raises(SyntaxError):
+
+        # Can't specify a non-integer for retries_allowed
+        @Retry.retry_allowed(retries_allowed=None)
+        def reliably_add_three(x):
+            return rarely_add3(x)
+
+    with pytest.raises(SyntaxError):
+
+        # Can't specify a non-integer for retries_allowed
+        @Retry.retry_allowed(retries_allowed=0)
+        def reliably_add_three(x):
+            return rarely_add3(x)
+
+
+def test_retry_error_class():
+
+    hardly_ever_add3 = Occasionally(_adder(3), success_frequency=100, error_class=ValueError)
+
+    # This will only retry on an error we don't expect to see, so mostly we'll just get an error
+    @Retry.retry_allowed(retries_allowed=100, wait_seconds=0.001, error_class=SyntaxError)
+    def rarely_add3(x):
+        return hardly_ever_add3(x)
+
+    with pytest.raises(ValueError):
+        rarely_add3(5)
+
+    with pytest.raises(ValueError):
+        rarely_add3(5)
+
+    @Retry.retry_allowed(retries_allowed=100, wait_seconds=0.001, error_class=ValueError)
+    def eventually_add3(x):
+        return hardly_ever_add3(x)
+
+    assert eventually_add3(5) == 8
+    assert eventually_add3(5) == 8
 
 
 def test_apply_dict_overrides():

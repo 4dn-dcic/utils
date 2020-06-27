@@ -7,6 +7,8 @@ import functools
 import os
 import logging
 import time
+import six
+import sys
 import warnings
 import webtest  # importing the library makes it easier to mock testing
 
@@ -221,7 +223,8 @@ class Retry:
 
     @classmethod
     def retry_allowed(cls, name_key=None, retries_allowed=None, wait_seconds=None,
-                      wait_increment=None, wait_multiplier=None):
+                      wait_increment=None, wait_multiplier=None,
+                      error_class: Type[Exception] = Exception):
         """
         Used as a decorator on a function definition, makes that function do retrying before really failing.
         For example:
@@ -234,6 +237,9 @@ class Retry:
         either using the same wait each time or, if given a wait_multiplier or wait_increment, using
         that advice to adjust the wait time upward on each time.
         """
+
+        if not isinstance(retries_allowed, int) or retries_allowed < 1:
+            raise SyntaxError("retries_allowed must be a positive integer: %r" % retries_allowed)
 
         def decorator(function):
             function_name = name_key or function.__name__
@@ -252,6 +258,7 @@ class Retry:
             def wrapped_function(*args, **kwargs):
                 tries_allowed = function_profile.tries_allowed
                 wait_seconds = function_profile.wait_seconds or 0
+                exc_info = (None, None, None)  # This will never be used, but will make type linters happier
                 for i in range(tries_allowed):
                     if i > 0:
                         if i > 1:
@@ -261,9 +268,10 @@ class Retry:
                     try:
                         success = function(*args, **kwargs)
                         return success
-                    except Exception:
+                    except error_class:
+                        exc_info = sys.exc_info()
                         pass
-                raise
+                six.reraise(*exc_info)
 
             return wrapped_function
 
