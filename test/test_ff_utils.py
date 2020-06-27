@@ -156,6 +156,24 @@ def test_unified_authentication(integrated_ff):
     assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
 
+def test_unified_authentication_data_staging():
+    key1 = ff_utils.unified_authentication(ff_env="data")
+    assert len(key1) == 2
+    key2 = ff_utils.unified_authentication(ff_env="staging")
+    assert len(key2) == 2
+    key3 = ff_utils.unified_authentication(ff_env="fourfront-green")
+    assert len(key3) == 2
+    key4 = ff_utils.unified_authentication(ff_env="fourfront-blue")
+    assert len(key4) == 2
+    key5 = ff_utils.unified_authentication(ff_env="fourfront-cgap")
+    assert len(key5) == 2
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.unified_authentication(ff_env="fourfront-data")
+        print(exec_info.value)
+    assert 'The specified bucket does not exist' in str(exec_info.value)
+
+
+
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_get_authentication_with_server(integrated_ff):
