@@ -3,6 +3,7 @@ This file contains functions that might be generally useful.
 """
 
 import contextlib
+import datetime
 import functools
 import os
 import logging
@@ -193,9 +194,24 @@ class Retry:
 
     class RetryOptions:
 
-        def __init__(self, retries_allowed=None, wait_seconds=None):
+        def __init__(self, retries_allowed=None, wait_seconds=None, wait_increment=None, wait_multiplier=None):
             self.retries_allowed = retries_allowed
-            self.wait_seconds = wait_seconds or wait_seconds
+            self.wait_seconds = wait_seconds or 0  # None or False mean 0 seconds
+            self.wait_increment = wait_increment
+            self.wait_multiplier = wait_multiplier
+            self.wait_adjustor = self.make_wait_adjustor(wait_increment=wait_increment, wait_multiplier=wait_multiplier)
+
+        def make_wait_adjustor(self, wait_increment=None, wait_multiplier=None):
+
+            if wait_increment and wait_multiplier:
+                raise SyntaxError("You may not specify both wait_increment and wait_multiplier.")
+
+            if wait_increment:
+                return lambda x: x + wait_increment
+            elif wait_multiplier:
+                return lambda x: x * wait_multiplier
+            else:
+                return lambda x: x
 
         @property
         def tries_allowed(self):
@@ -205,19 +221,13 @@ class Retry:
 
     DEFAULT_RETRIES_ALLOWED = 1
     DEFAULT_WAIT_SECONDS = 0
+    DEFAULT_WAIT_INCREMENT = None
+    DEFAULT_WAIT_MULTIPLIER = None
 
     @classmethod
-    def _wait_adjustor(cls, wait_increment, wait_multiplier):
-
-        if wait_increment and wait_multiplier:
-            raise SyntaxError("You may not specify both wait_increment and wait_multiplier.")
-
-        if wait_increment:
-            return lambda x: x + wait_increment
-        elif wait_multiplier:
-            return lambda x: x * wait_multiplier
-        else:
-            return lambda x: x
+    def _defaulted(cls, value, default):
+        """ Triages between argument values and class-declared defaults. """
+        return default if value is None else value
 
     @classmethod
     def retry_allowed(cls, name_key=None, retries_allowed=None, wait_seconds=None,
@@ -238,15 +248,13 @@ class Retry:
         def decorator(function):
             function_name = name_key or function.__name__
             function_profile = cls.RetryOptions(
-                retries_allowed=cls.DEFAULT_RETRIES_ALLOWED if retries_allowed is None else retries_allowed,
-                wait_seconds=cls.DEFAULT_WAIT_SECONDS if wait_seconds is None else wait_seconds
+                retries_allowed=cls._defaulted(retries_allowed, cls.DEFAULT_RETRIES_ALLOWED),
+                wait_seconds=cls._defaulted(wait_seconds, cls.DEFAULT_WAIT_SECONDS),
+                wait_increment=cls._defaulted(wait_increment, cls.DEFAULT_WAIT_INCREMENT),
+                wait_multiplier=cls._defaulted(wait_multiplier, cls.DEFAULT_WAIT_MULTIPLIER),
             )
 
             cls._RETRY_OPTIONS_CATALOG[function_name] = function_profile  # Only for debugging.
-            function_profile.retries_allowed = retries_allowed
-            function_profile.wait_seconds = wait_seconds or cls.DEFAULT_WAIT_SECONDS
-            function_profile.wait_adjustor = cls._wait_adjustor(wait_increment=wait_increment,
-                                                                wait_multiplier=wait_multiplier)
 
             @functools.wraps(function)
             def wrapped_function(*args, **kwargs):
@@ -269,6 +277,36 @@ class Retry:
 
         return decorator
 
+    @classmethod
+    def retrying(cls, fn, name_key=None,
+                 retries_allowed=None, wait_seconds=None, wait_increment=None, wait_multiplier=None):
+        """
+        Similar to the @Retry.retry_allowed decorator, but used around individual calls. e.g.,
+
+            res = Retry.retrying(testapp.get)(url)
+
+        If you don't like the defaults, you can override them with arguments:
+
+            res = Retry.retrying(testapp.get, retries_allowed=5, wait_seconds=1)(url)
+
+        but if you need to do it a lot, you can make a subclass:
+
+            class MyRetry(Retry):
+                DEFAULT_RETRIES_ALLOWED = 5
+                DEFAULT_WAIT_SECONDS = 1
+            retrying = MyRetry.retrying  # Avoids saying MyRetry.retrying(...) everywhere
+            ...
+            res1 = retrying(testapp.get)(url)
+            res2 = retrying(testapp.get)(url)
+            ...etc.
+
+        """
+        decorator_function = Retry.retry_allowed(
+            name_key=name_key, retries_allowed=retries_allowed, wait_seconds=wait_seconds,
+            wait_increment=wait_increment, wait_multiplier=wait_multiplier
+        )
+        return decorator_function(fn)
+
 
 def apply_dict_overrides(dictionary: dict, **overrides) -> dict:
     for k, v in overrides.items():
@@ -276,3 +314,7 @@ def apply_dict_overrides(dictionary: dict, **overrides) -> dict:
             dictionary[k] = v
     # This function works by side effect, but getting back the changed dict may be sometimes useful.
     return dictionary
+
+
+def utc_today_str():
+    return datetime.datetime.strftime(datetime.datetime.utcnow(), "%Y-%m-%d")

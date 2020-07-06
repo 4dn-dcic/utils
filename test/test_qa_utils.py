@@ -1,4 +1,5 @@
 import datetime
+import io
 import os
 import pytest
 import pytz
@@ -9,7 +10,7 @@ import uuid
 
 from dcicutils.misc_utils import Retry
 from dcicutils.qa_utils import (
-    mock_not_called, local_attrs, override_environ, ControlledTime, Occasionally, RetryManager
+    mock_not_called, local_attrs, override_environ, ControlledTime, Occasionally, RetryManager, MockFileSystem,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -614,3 +615,43 @@ def test_retry_manager():
             # The name-key must be registered
             with RetryManager.retry_options(name_key="not-a-registered-name", retries_allowed=3, wait_seconds=5):
                 pass
+
+
+def test_mock_file_system():
+
+    fs = MockFileSystem()
+
+    with mock.patch.object(io, "open") as mock_open:
+        with mock.patch.object(os.path, "exists") as mock_exists:
+            with mock.patch.object(os, "remove") as mock_remove:
+
+                mock_open.side_effect = fs.open
+                mock_exists.side_effect = fs.exists
+                mock_remove.side_effect = fs.remove
+
+                filename = "no.such.file"
+                assert os.path.exists(filename) is False
+
+                with io.open(filename, 'w') as fp:
+                    fp.write("foo")
+                    fp.write("bar")
+
+                assert os.path.exists(filename) is True
+
+                with io.open(filename, 'r') as fp:
+                    assert fp.read() == 'foobar'
+
+                with io.open(filename, 'r') as fp:
+                    assert fp.read() == 'foobar'
+
+                assert os.path.exists(filename) is True
+
+                os.remove(filename)
+
+                assert os.path.exists(filename) is False
+
+                with pytest.raises(FileNotFoundError):
+                    os.remove(filename)
+
+                with pytest.raises(FileNotFoundError):
+                    io.open(filename, 'r')
