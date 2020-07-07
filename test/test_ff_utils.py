@@ -160,17 +160,20 @@ def test_unified_authentication_more_envs():
     key1 = ff_utils.unified_authentication(ff_env="data")
     assert len(key1) == 2
     key2 = ff_utils.unified_authentication(ff_env="staging")
-    assert len(key2) == 2
+    assert key2 == key1
     key3 = ff_utils.unified_authentication(ff_env="fourfront-green")
-    assert len(key3) == 2
+    assert key3 == key1
     key4 = ff_utils.unified_authentication(ff_env="fourfront-blue")
-    assert len(key4) == 2
+    assert key4 == key1
     key5 = ff_utils.unified_authentication(ff_env="fourfront-cgap")
     assert len(key5) == 2
-    with pytest.raises(Exception) as exec_info:
+    assert key5 != key1
+    try:
         ff_utils.unified_authentication(ff_env="fourfront-data")
-        print(exec_info.value)
-    assert 'The specified bucket does not exist' in str(exec_info.value)
+    except Exception as e:
+        assert "The specified bucket does not exist" in str(e)
+    else:
+        raise AssertionError("An exception was expected but did not occur.")
 
 
 @pytest.mark.integrated
