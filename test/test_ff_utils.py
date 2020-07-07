@@ -3,6 +3,7 @@ import json
 import time
 from dcicutils import ff_utils
 from unittest import mock
+from botocore.exceptions import ClientError
 pytestmark = pytest.mark.working
 
 
@@ -170,7 +171,7 @@ def test_unified_authentication_more_envs():
     assert key5 != key1
     try:
         ff_utils.unified_authentication(ff_env="fourfront-data")
-    except Exception as e:
+    except ClientError as e:
         assert "The specified bucket does not exist" in str(e)
     else:
         raise AssertionError("An exception was expected but did not occur.")
