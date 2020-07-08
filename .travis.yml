@@ -19,7 +19,7 @@ install:
 script:
   - flake8 dcicutils
   - travis_wait coverage run --source=dcicutils -m pytest -vv test
-  - if [ "$TRAVIS_PYTHON_VERSION" == "3.6" ]; then coveralls; fi;
+  - if [ "$TRAVIS_PYTHON_VERSION" == "3.6" ]; then coveralls || echo "coveralls FAILED"; fi;
 deploy:
   provider: script
   script: if [ "$TRAVIS_PYTHON_VERSION" = "3.6" ]; then poetry publish --build --username=$PYPI_USER --password=$PYPI_PASSWORD; fi
