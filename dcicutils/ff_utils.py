@@ -8,7 +8,6 @@ import boto3
 from . import (
     s3_utils,
     es_utils,
-    env_utils
 )
 from .misc_utils import PRINT
 import requests
