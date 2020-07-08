@@ -254,7 +254,9 @@ class Retry:
                 wait_multiplier=cls._defaulted(wait_multiplier, cls.DEFAULT_WAIT_MULTIPLIER),
             )
 
-            cls._RETRY_OPTIONS_CATALOG[function_name] = function_profile  # Only for debugging.
+            # See the 'retrying' method to understand what this is about. -kmp 8-Jul-2020
+            if function_name != 'anonymous':
+                cls._RETRY_OPTIONS_CATALOG[function_name] = function_profile  # Only for debugging.
 
             @functools.wraps(function)
             def wrapped_function(*args, **kwargs):
@@ -278,8 +280,7 @@ class Retry:
         return decorator
 
     @classmethod
-    def retrying(cls, fn, name_key=None,
-                 retries_allowed=None, wait_seconds=None, wait_increment=None, wait_multiplier=None):
+    def retrying(cls, fn, retries_allowed=None, wait_seconds=None, wait_increment=None, wait_multiplier=None):
         """
         Similar to the @Retry.retry_allowed decorator, but used around individual calls. e.g.,
 
@@ -301,8 +302,11 @@ class Retry:
             ...etc.
 
         """
+        # A special name_key of 'anonymous' is the default, which causes there not to be a name key.
+        # This cannot work in conjunction with RetryManager because different calls may result in different
+        # function values at the same point in code. -kmp 8-Jul-2020
         decorator_function = Retry.retry_allowed(
-            name_key=name_key, retries_allowed=retries_allowed, wait_seconds=wait_seconds,
+            name_key='anonymous', retries_allowed=retries_allowed, wait_seconds=wait_seconds,
             wait_increment=wait_increment, wait_multiplier=wait_multiplier
         )
         return decorator_function(fn)
