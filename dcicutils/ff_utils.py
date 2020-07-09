@@ -1072,35 +1072,74 @@ def search_es_metadata(index, query, key=None, ff_env=None, is_generator=False):
 #####################
 # Utility functions #
 #####################
-def unified_authentication(auth=None, ff_env=None):
-    """
-    One authentication function to rule them all.
-    Has several options for authentication, which are:
-    - manually provided tuple auth key (pass to key param)
-    - manually provided dict key, like output of
-      s3Utils.get_access_keys() (pass to key param)
-    - string name of the fourfront environment (pass to ff_env param)
-    (They are checked in this order).
-    Handles errors for authentication and returns the tuple key to
-    use with your request.
-    """
-    # first see if key should be obtained from using ff_env
-    if not auth and ff_env:
-        # TODO: The ff_env argument is mis-named, something we should fix sometime. It can be a cgap env, too.
-        auth = s3_utils.s3Utils(env=ff_env).get_access_keys()
-    # see if auth is directly from get_access_keys()
-    use_auth = None
-    # needed for old form of auth from get_key()
-    if isinstance(auth, dict) and isinstance(auth.get('default'), dict):
-        auth = auth['default']
-    if isinstance(auth, dict) and 'key' in auth and 'secret' in auth:
-        use_auth = (auth['key'], auth['secret'])
-    elif isinstance(auth, tuple) and len(auth) == 2:
-        use_auth = auth
-    if not use_auth:
-        raise Exception("Must provide a valid authorization key or ff "
-                        "environment. You gave: %s (key), %s (ff_env)" % (auth, ff_env))
-    return use_auth
+
+class UnifiedAuthenticator:
+
+    class AuthenticationError(Exception):
+
+        def __init__(self, message, auth, ff_env):
+            self.auth = auth
+            self.ff_env = ff_env
+            super().__init__(message + (" You gave auth=%s, ff_env=%s" % (auth, ff_env)))
+
+    @classmethod
+    def unified_authentication(cls, auth=None, ff_env=None):
+        """
+        One authentication function to rule them all.
+        Has several options for authentication, which are:
+        - manually provided tuple auth key (pass to key param)
+        - manually provided dict key, like output of
+          s3Utils.get_access_keys() (pass to key param)
+        - string name of the fourfront environment (pass to ff_env param)
+        (They are checked in this order).
+        Handles errors for authentication and returns the tuple key to
+        use with your request.
+        """
+
+        # If no auth is provided, we have to fetch it from s3 according to the indicated ff_env.
+        if not auth:
+            if ff_env:
+                # TODO: The ff_env argument is mis-named, something we should fix sometime. It can be a cgap env, too.
+                auth = cls.get_auth_from_s3(env=ff_env)
+            else:
+                raise cls.AuthenticationError("unified_authentication requires either auth or an ff_env.",
+                                              auth=auth, ff_env=ff_env)
+
+        # The result might be in a legacy format, so fix that if needed.
+        auth = cls.maybe_unwrap_legacy_auth(auth)
+
+        # There are also still multiple formats we intend to support, but normalize result to (key, secret) or None.
+        key_and_secret = cls.normalize_auth(auth)
+
+        if key_and_secret:  # Yay. We got a (key, secret) pair.
+            return key_and_secret
+        else:  # Oops, we got things in some bad format.
+            raise cls.AuthenticationError("Must provide a valid authorization key or ff environment.",
+                                          auth=auth, ff_env=ff_env)
+
+    @classmethod
+    def get_auth_from_s3(cls, env):
+        return s3_utils.s3Utils(env=env).get_access_keys()
+
+    @classmethod
+    def maybe_unwrap_legacy_auth(cls, auth):
+        # Compatibility with old form of auth from get_key()
+        # If {"default": {...auth...}, ...} is given, peel off outer wrapper and use the inner {...auth...} part.
+        if isinstance(auth, dict) and isinstance(auth.get('default'), dict):
+            return auth['default']
+        return auth
+
+    @classmethod
+    def normalize_auth(cls, auth):
+        if isinstance(auth, dict) and 'key' in auth and 'secret' in auth:
+            return (auth['key'], auth['secret'])
+        elif isinstance(auth, tuple) and len(auth) == 2:
+            return auth
+        else:
+            return None
+
+
+unified_authentication = UnifiedAuthenticator.unified_authentication
 
 
 def get_authentication_with_server(auth=None, ff_env=None):

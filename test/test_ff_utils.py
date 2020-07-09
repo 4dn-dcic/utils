@@ -177,10 +177,8 @@ def test_unified_authentication_decoding(integrated_ff):
 
             # This error can be raised without using s3Utils because we don't know what env to use anyway.
 
-            with pytest.raises(Exception) as exec_info:
+            with pytest.raises(ff_utils.UnifiedAuthenticator.AuthenticationError):
                 ff_utils.unified_authentication(None, None)
-
-            assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
         class MockS3Utils:
             def __init__(self, env):
@@ -199,9 +197,8 @@ def test_unified_authentication_decoding(integrated_ff):
     for any_bogus_key in [any_old_bogus_key1, any_old_bogus_key2, any_old_bogus_key3, any_old_bogus_key4]:
 
         with mock.patch.object(s3_utils, "s3Utils", UnusedS3Utils):
-            with pytest.raises(Exception) as exec_info:
+            with pytest.raises(ff_utils.UnifiedAuthenticator.AuthenticationError):
                 ff_utils.unified_authentication(any_bogus_key, None)
-            assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
         class MockS3Utils:
             def __init__(self, env):
@@ -211,9 +208,42 @@ def test_unified_authentication_decoding(integrated_ff):
                 return any_bogus_key
 
         with mock.patch.object(s3_utils, "s3Utils", MockS3Utils):
-            with pytest.raises(Exception) as exec_info:
+            with pytest.raises(ff_utils.UnifiedAuthenticator.AuthenticationError):
                 ff_utils.unified_authentication(None, any_env)
-            assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
+
+
+def test_unified_authenticator_get_auth_from_s3():
+    # TODO: Write test of UnifiedAuthenticator.get_auth_from_s3
+    pass
+
+
+def test_unified_authenticator_maybe_unwrap_legacy_auth():
+    key_tuple = ('foo', 'bar')
+    key_dict = {'key': 'foo', 'secret': 'bar'}
+
+    # All this function does is unwrap legacy keys
+    legacy_key_dict = {'default': key_dict}
+    assert ff_utils.UnifiedAuthenticator.maybe_unwrap_legacy_auth(legacy_key_dict) == key_dict
+
+    # Things that are not wrapped get returned.
+    assert ff_utils.UnifiedAuthenticator.maybe_unwrap_legacy_auth(key_tuple) == key_tuple
+    assert ff_utils.UnifiedAuthenticator.maybe_unwrap_legacy_auth(key_dict) == key_dict
+    bogus_legacy = {'default': key_tuple}
+    assert ff_utils.UnifiedAuthenticator.maybe_unwrap_legacy_auth(bogus_legacy) == bogus_legacy
+
+    # Really ANYTHING that isn't the specifically wrapped dictionary just gets returned.
+    assert ff_utils.UnifiedAuthenticator.maybe_unwrap_legacy_auth(666) == 666
+
+
+def test_unified_authenticator_normalize_auth():
+    key_tuple = ('foo', 'bar')
+    key_dict = {'key': 'foo', 'secret': 'bar'}
+
+    assert ff_utils.UnifiedAuthenticator.normalize_auth(key_tuple) == key_tuple
+    assert ff_utils.UnifiedAuthenticator.normalize_auth(key_dict) == key_tuple
+
+    # Things that don't match the format just cause None to be returned.
+    assert ff_utils.UnifiedAuthenticator.normalize_auth(666) == None
 
 
 # Integration tests
@@ -230,9 +260,8 @@ def test_unified_authentication(integrated_ff):
     assert key1 == key3
     key4 = ff_utils.unified_authentication(key1, None)
     assert key1 == key4
-    with pytest.raises(Exception) as exec_info:
+    with pytest.raises(ff_utils.UnifiedAuthenticator.AuthenticationError):
         ff_utils.unified_authentication(None, None)
-    assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
 
 def test_unified_authentication_more_envs():
