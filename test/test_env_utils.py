@@ -13,7 +13,7 @@ from dcicutils.env_utils import (
     prod_bucket_env, public_url_mappings, CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
     infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env, FF_PRODUCTION_IDENTIFIER,
     FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV,
-    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
+    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env
 )
 from unittest import mock
 
