@@ -202,7 +202,10 @@ class Retry:
             self.wait_adjustor = self.make_wait_adjustor(wait_increment=wait_increment, wait_multiplier=wait_multiplier)
 
         def make_wait_adjustor(self, wait_increment=None, wait_multiplier=None):
-
+            """
+            Returns a function that can be called to adjust wait_seconds based on wait_increment or wait_multiplier
+            before doing a retry at each step.
+            """
             if wait_increment and wait_multiplier:
                 raise SyntaxError("You may not specify both wait_increment and wait_multiplier.")
 
