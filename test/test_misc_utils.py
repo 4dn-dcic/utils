@@ -8,7 +8,7 @@ import webtest
 from dcicutils.misc_utils import (
     PRINT, ignored, filtered_warnings, get_setting_from_context, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
-    Retry, apply_dict_overrides,
+    Retry, apply_dict_overrides, utc_today_str,
 )
 from dcicutils.qa_utils import Occasionally
 from unittest import mock
@@ -515,6 +515,71 @@ def test_retry_error_handling():
             return rarely_add3(x)
 
 
+def test_retrying_timeouts():
+
+    rarely_add3 = Occasionally(_adder(3), success_frequency=5)
+
+    ARGS = 1  # We have to access a random place out of a tuple structure for mock data on time.sleep's arg
+
+    # NOTE WELL: For testing, we chose 1.25 to use factors of 2 so floating point can exactly compare
+
+    reliably_add3 = Retry.retrying(rarely_add3, retries_allowed=4, wait_seconds=2, wait_multiplier=1.25)
+
+    with mock.patch("time.sleep") as mock_sleep:
+
+        assert reliably_add3(1) == 4
+
+        assert mock_sleep.call_count == 4
+
+        assert mock_sleep.mock_calls[0][ARGS][0] == 2
+        assert mock_sleep.mock_calls[1][ARGS][0] == 2.5      # 2 * 1.25
+        assert mock_sleep.mock_calls[2][ARGS][0] == 3.125    # 2 * 1.25 ** 2
+        assert mock_sleep.mock_calls[3][ARGS][0] == 3.90625  # 2 * 1.25 ** 3
+
+        assert reliably_add3(2) == 5
+
+        assert mock_sleep.call_count == 8
+
+        assert mock_sleep.mock_calls[4][ARGS][0] == 2
+        assert mock_sleep.mock_calls[5][ARGS][0] == 2.5      # 2 * 1.25
+        assert mock_sleep.mock_calls[6][ARGS][0] == 3.125    # 2 * 1.25 ** 2
+        assert mock_sleep.mock_calls[7][ARGS][0] == 3.90625  # 2 * 1.25 ** 3
+
+    rarely_add3.reset()
+
+    reliably_add_three = Retry.retrying(rarely_add3, retries_allowed=4, wait_seconds=2, wait_increment=3)
+
+    with mock.patch("time.sleep") as mock_sleep:
+
+        assert reliably_add_three(1) == 4
+
+        assert mock_sleep.call_count == 4
+
+        assert mock_sleep.mock_calls[0][ARGS][0] == 2
+        assert mock_sleep.mock_calls[1][ARGS][0] == 5   # 2 + 3
+        assert mock_sleep.mock_calls[2][ARGS][0] == 8   # 2 + 3 * 2
+        assert mock_sleep.mock_calls[3][ARGS][0] == 11  # 2 + 3 * 3
+
+        assert reliably_add_three(2) == 5
+
+        assert mock_sleep.call_count == 8
+
+        assert mock_sleep.mock_calls[4][ARGS][0] == 2
+        assert mock_sleep.mock_calls[5][ARGS][0] == 5   # 2 + 3
+        assert mock_sleep.mock_calls[6][ARGS][0] == 8   # 2 + 3 * 2
+        assert mock_sleep.mock_calls[7][ARGS][0] == 11  # 2 + 3 * 3
+
+
+def test_retrying_error_handling():
+
+    rarely_add3 = Occasionally(_adder(3), success_frequency=5)
+
+    with pytest.raises(SyntaxError):
+
+        Retry.retrying(rarely_add3, retries_allowed=4, wait_seconds=2,
+                       wait_increment=3, wait_multiplier=1.25)
+
+
 def test_apply_dict_overrides():
 
     x = {'a': 1, 'b': 2}
@@ -529,3 +594,9 @@ def test_apply_dict_overrides():
     expected = {'a': 11, 'b': 22, 'c': 33}
     assert actual == expected
     assert x == expected
+
+
+def test_utc_today_str():
+    pattern = "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+    actual = utc_today_str()
+    assert re.match(pattern, actual), "utc_today_str() result %s did not match format: %s" % (actual, pattern)

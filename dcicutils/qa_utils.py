@@ -2,10 +2,12 @@
 qa_utils: Tools for use in quality assurance testing.
 """
 
-import datetime
 import contextlib
+import datetime
+import io
 import os
 import pytz
+
 from .misc_utils import PRINT, ignored, Retry
 
 
@@ -256,6 +258,10 @@ class Occasionally:
         else:
             return self.function(*args, **kwargs)
 
+    @property
+    def __name__(self):
+        return "{}.occassionally".format(self.function.__name__)
+
 
 class RetryManager(Retry):
     """
@@ -287,8 +293,67 @@ class RetryManager(Retry):
             options['retries_allowed'] = retries_allowed
         if wait_seconds is not None:
             options['wait_seconds'] = wait_seconds
+        if wait_increment is not None:
+            options['wait_increment'] = wait_increment
+        if wait_multiplier is not None:
+            options['wait_multiplier'] = wait_multiplier
         if wait_increment is not None or wait_multiplier is not None:
-            options['wait_adjustor'] = cls._wait_adjustor(wait_increment=wait_increment,
-                                                          wait_multiplier=wait_multiplier)
+            options['wait_adjustor'] = function_profile.make_wait_adjustor(wait_increment=wait_increment,
+                                                                           wait_multiplier=wait_multiplier)
         with local_attrs(function_profile, **options):
             yield
+
+
+FILE_SYSTEM_VERBOSE = True
+
+
+class MockFileSystem:
+    """Extremely low-tech mock file system."""
+
+    def __init__(self):
+        self.files = {}
+
+    def exists(self, file):
+        return bool(self.files.get(file))
+
+    def remove(self, file):
+        if not self.files.pop(file, None):
+            raise FileNotFoundError("No such file or directory: %s" % file)
+
+    def open(self, file, mode='r'):
+        if FILE_SYSTEM_VERBOSE:
+            print("Opening %r in mode %r." % (file, mode))
+        if mode == 'w':
+            return self._open_for_write(file_system=self, file=file)
+        elif mode == 'r':
+            return self._open_for_read(file)
+        else:
+            raise AssertionError("Mocked io.open doesn't handle mode=%r." % mode)
+
+    def _open_for_read(self, file):
+        text = self.files.get(file)
+        if text is None:
+            raise FileNotFoundError("No such file or directory: %s" % file)
+        if FILE_SYSTEM_VERBOSE:
+            print("Read %s to %s." % (text, file))
+        return io.StringIO(text)
+
+    def _open_for_write(self, file_system, file):
+
+        class MockFileWriter:
+
+            def __init__(self, file_system, file):
+                self.file_system = file_system
+                self.file = file
+                self.stream = io.StringIO()
+
+            def __enter__(self):
+                return self.stream
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                text = self.stream.getvalue()
+                if FILE_SYSTEM_VERBOSE:
+                    print("Writing %s to %s." % (text, file))
+                self.file_system.files[file] = text
+
+        return MockFileWriter(file_system=file_system, file=file)
