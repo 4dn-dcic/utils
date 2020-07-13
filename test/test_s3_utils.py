@@ -80,10 +80,11 @@ def test_s3Utils_creation_cgap():
     test_prd('fourfront-cgap')
 
 
-@pytest.mark.parametrize('cgap_ordinary_envname', ['fourfront-cgaptest', 'fourfront-cgapdev', 'fourfront-cgapwolf'])
-def test_s3Utils_creation(cgap_ordinary_envname):
-    util = s3Utils(env=cgap_ordinary_envname)
-    assert util.sys_bucket == 'elasticbeanstalk-%s-system' % cgap_ordinary_envname
+@pytest.mark.parametrize('ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev',
+                                              'fourfront-cgaptest', 'fourfront-cgapdev', 'fourfront-cgapwolf'])
+def test_s3Utils_creation(ordinary_envname):
+    util = s3Utils(env=ordinary_envname)
+    assert util.sys_bucket == 'elasticbeanstalk-%s-system' % ordinary_envname
 
 
 def test_s3Utils_get_keys_for_data():
