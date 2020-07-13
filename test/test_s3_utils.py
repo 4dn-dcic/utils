@@ -2,8 +2,8 @@ import datetime
 import pytest
 
 from dcicutils.s3_utils import s3Utils
-from dcicutils.beanstalk_utils import compute_ff_prd_env
-from dcicutils.env_utils import get_standard_mirror_env
+from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
+from dcicutils.env_utils import get_standard_mirror_env, FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, CGAP_PUBLIC_URL_PRD
 
 
 @pytest.mark.parametrize('ff_ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat'])
@@ -12,8 +12,8 @@ def test_s3Utils_creation(ff_ordinary_envname):
     assert util.sys_bucket == 'elasticbeanstalk-%s-system' % ff_ordinary_envname
 
 
-def test_s3Utils_creation_staging():
-    print("In test_s3Utils_creation_staging. It is now", str(datetime.datetime.now()))
+def test_s3Utils_creation_ff_stg():
+    print("In test_s3Utils_creation_ff_stg. It is now", str(datetime.datetime.now()))
     def test_stg(ff_staging_envname):
         util = s3Utils(env=ff_staging_envname)
         actual_props = {
@@ -26,7 +26,7 @@ def test_s3Utils_creation_staging():
             'sys_bucket': 'elasticbeanstalk-fourfront-webprod-system',
             'outfile_bucket': 'elasticbeanstalk-fourfront-webprod-wfoutput',
             'raw_file_bucket': 'elasticbeanstalk-fourfront-webprod-files',
-            'url': 'http://staging.4dnucleome.org',
+            'url': FF_PUBLIC_URL_STG,
         }
     test_stg('staging')
     # NOTE: These values should not be parameters because we don't know how long PyTest caches the
@@ -36,8 +36,8 @@ def test_s3Utils_creation_staging():
     test_stg(stg_beanstalk_env)
 
 
-def test_s3Utils_creation_data():
-    print("In test_s3Utils_creation_data. It is now", str(datetime.datetime.now()))
+def test_s3Utils_creation_ff_prd():
+    print("In test_s3Utils_creation_ff_prd. It is now", str(datetime.datetime.now()))
     def test_prd(ff_production_envname):
         util = s3Utils(env=ff_production_envname)
         actual_props = {
@@ -50,7 +50,7 @@ def test_s3Utils_creation_data():
             'sys_bucket': 'elasticbeanstalk-fourfront-webprod-system',
             'outfile_bucket': 'elasticbeanstalk-fourfront-webprod-wfoutput',
             'raw_file_bucket': 'elasticbeanstalk-fourfront-webprod-files',
-            'url': 'https://data.4dnucleome.org',
+            'url': FF_PUBLIC_URL_PRD,
         }
     test_prd('data')
     # NOTE: These values should not be parameters because we don't know how long PyTest caches the
@@ -60,8 +60,8 @@ def test_s3Utils_creation_data():
     test_prd(prd_beanstalk_env)
 
 
-def test_s3Utils_creation_cgap():
-    print("In test_s3Utils_creation_staging. It is now", str(datetime.datetime.now()))
+def test_s3Utils_creation_cgap_prd():
+    print("In test_s3Utils_creation_cgap_prd. It is now", str(datetime.datetime.now()))
     def test_prd(cgap_production_envname):
         util = s3Utils(env=cgap_production_envname)
         actual_props = {
@@ -74,10 +74,20 @@ def test_s3Utils_creation_cgap():
             'sys_bucket': 'elasticbeanstalk-fourfront-cgap-system',
             'outfile_bucket': 'elasticbeanstalk-fourfront-cgap-wfoutput',
             'raw_file_bucket': 'elasticbeanstalk-fourfront-cgap-files',
-            'url': 'https://cgap.hms.harvard.edu',
+            'url': CGAP_PUBLIC_URL_PRD,
         }
     test_prd('cgap')
+    # NOTE: These values should not be parameters because we don't know how long PyTest caches the
+    #       parameter values before using them. By doing the test this way, we hold the value for as
+    #       little time as possible, making it least risk of being stale. -kmp 13-Jul-2020
     test_prd('fourfront-cgap')
+    test_prd(compute_cgap_prd_env())  # Hopefully returns 'fourfront-cgap' but just in case we're into new naming
+
+
+def test_s3Utils_creation_cgap_stg():
+    print("In test_s3Utils_creation_cgap_prd. It is now", str(datetime.datetime.now()))
+    # For now there is no CGAP stg...
+    assert compute_cgap_stg_env() is None
 
 
 @pytest.mark.parametrize('ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev',
