@@ -87,7 +87,7 @@ def test_s3Utils_creation_cgap_prd():
 def test_s3Utils_creation_cgap_stg():
     print("In test_s3Utils_creation_cgap_prd. It is now", str(datetime.datetime.now()))
     # For now there is no CGAP stg...
-    assert compute_cgap_stg_env() is None
+    assert compute_cgap_stg_env() is None, "There seems to be a CGAP staging environment. Tests need updating."
 
 
 @pytest.mark.parametrize('ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev',
