@@ -60,21 +60,24 @@ def test_s3Utils_creation_data():
     test_prd(prd_beanstalk_env)
 
 
-@pytest.mark.parametrize('cgap_production_envname', ['cgap', 'fourfront-cgap'])
-def test_s3Utils_creation_cgap(cgap_production_envname):
-    util = s3Utils(env=cgap_production_envname)
-    actual_props = {
-        'sys_bucket': util.sys_bucket,
-        'outfile_bucket': util.outfile_bucket,
-        'raw_file_bucket': util.raw_file_bucket,
-        'url': util.url,
-    }
-    assert actual_props == {
-        'sys_bucket': 'elasticbeanstalk-fourfront-cgap-system',
-        'outfile_bucket': 'elasticbeanstalk-fourfront-cgap-wfoutput',
-        'raw_file_bucket': 'elasticbeanstalk-fourfront-cgap-files',
-        'url': 'https://cgap.hms.harvard.edu',
-    }
+def test_s3Utils_creation_cgap():
+    print("In test_s3Utils_creation_staging. It is now", str(datetime.datetime.now()))
+    def test_prd(cgap_production_envname):
+        util = s3Utils(env=cgap_production_envname)
+        actual_props = {
+            'sys_bucket': util.sys_bucket,
+            'outfile_bucket': util.outfile_bucket,
+            'raw_file_bucket': util.raw_file_bucket,
+            'url': util.url,
+        }
+        assert actual_props == {
+            'sys_bucket': 'elasticbeanstalk-fourfront-cgap-system',
+            'outfile_bucket': 'elasticbeanstalk-fourfront-cgap-wfoutput',
+            'raw_file_bucket': 'elasticbeanstalk-fourfront-cgap-files',
+            'url': 'https://cgap.hms.harvard.edu',
+        }
+    test_prd('cgap')
+    test_prd('fourfront-cgap')
 
 
 @pytest.mark.parametrize('cgap_ordinary_envname', ['fourfront-cgaptest', 'fourfront-cgapdev', 'fourfront-cgapwolf'])
