@@ -325,3 +325,100 @@ def apply_dict_overrides(dictionary: dict, **overrides) -> dict:
 
 def utc_today_str():
     return datetime.datetime.strftime(datetime.datetime.utcnow(), "%Y-%m-%d")
+
+
+class LockoutManager:
+
+    EARLIEST_TIMESTAMP = datetime.datetime(datetime.MINYEAR, 1, 1)  # maybe useful for testing
+
+    def __init__(self, *, lockout_seconds, safety_seconds=0, action="metered action", enabled=True, log=None):
+        # This makes it easy to turn off the feature
+        self.lockout_enabled = enabled
+        self.lockout_seconds = lockout_seconds
+        self.safety_seconds = safety_seconds
+        self.action = action
+        self._timestamp = self.EARLIEST_TIMESTAMP
+        self.log = log
+
+    @property
+    def timestamp(self):
+        """The timestamp is read-only. Use update_timestamp() to set it."""
+        return self._timestamp
+
+    @property
+    def effective_lockout_seconds(self):
+        return self.lockout_seconds + self.safety_seconds
+
+    def wait_if_needed(self):
+        now = datetime.datetime.now()
+        # Note that this quantity is always positive because now is always bigger than the timestamp.
+        seconds_since_last_purge = (now - self._timestamp).total_seconds()
+        # Note again that because seconds_since_last_attempt is positive, the wait seconds will
+        # never exceed self.effective_lockout_seconds, so
+        #   0 <= wait_seconds <= self.effective_lockout_seconds
+        wait_seconds = max(0.0, self.effective_lockout_seconds - seconds_since_last_purge)
+        if wait_seconds > 0.0:
+            shared_message = ("Last %s attempt was at %s (%s seconds ago)."
+                              % (self.action, self._timestamp, seconds_since_last_purge))
+            if self.lockout_enabled:
+                action_message = "Waiting %s seconds before attempting another." % wait_seconds
+                if self.log:
+                    self.log.warning("%s %s" % (shared_message, action_message))
+                time.sleep(wait_seconds)
+            else:
+                action_message = "Continuing anyway because lockout is disabled."
+                if self.log:
+                    self.log.warning("%s %s" % (shared_message, action_message))
+        self.update_timestamp()
+
+    def update_timestamp(self):
+        """
+        Explicitly sets the reference time point for computation of our lockout.
+        This is called implicitly by .wait_if_needed(), and for some situations that may be sufficient.
+        """
+        self._timestamp = datetime.datetime.now()
+
+
+class RateManager:
+
+    EARLIEST_TIMESTAMP = datetime.datetime(datetime.MINYEAR, 1, 1)  # maybe useful for testing
+
+    def __init__(self, *, interval_seconds, safety_seconds=0, allowed_attempts=1,
+                 action="metered action", enabled=True, log=None, wait_hook=None):
+        if not (isinstance(allowed_attempts, int) and allowed_attempts >= 1):
+            raise TypeError("The allowed_attempts must be a positive integer: %s" % allowed_attempts)
+        # This makes it easy to turn off the feature
+        self.enabled = enabled
+        self.interval_seconds = interval_seconds
+        self.safety_seconds = safety_seconds
+        self.allowed_attempts = allowed_attempts
+        self.action = action
+        self.timestamps = [self.EARLIEST_TIMESTAMP] * allowed_attempts
+        self.log = log
+        self.wait_hook = wait_hook
+
+    def set_wait_hook(self, noticer):
+        """
+        Use this to set the wait hook, which will be a function that notices we had to wait.
+        """
+        self.wait_hook = noticer
+
+    def wait_if_needed(self):
+        now = datetime.datetime.now()
+        expiration_delta = datetime.timedelta(seconds=self.interval_seconds)
+        latest_expiration = now + expiration_delta
+        soonest_expiration = latest_expiration
+        soonest_expiration_pos = None
+        for i, expiration_time in enumerate(self.timestamps):
+            if expiration_time <= now:  # This slot was unused or has expired
+                self.timestamps[i] = latest_expiration
+                return
+            elif expiration_time <= soonest_expiration:
+                soonest_expiration = expiration_time
+                soonest_expiration_pos = i
+        sleep_time_needed = (soonest_expiration - now).total_seconds() + self.safety_seconds
+        if self.wait_hook:  # Hook primarily for testing
+            self.wait_hook(wait_seconds=sleep_time_needed, next_expiration=soonest_expiration)
+        time.sleep(sleep_time_needed)
+        # It will have expired now, so grab that slot
+        self.timestamps[soonest_expiration_pos] = datetime.datetime.now() + expiration_delta

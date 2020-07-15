@@ -1,3 +1,4 @@
+import datetime as datetime_module
 import io
 import json
 import os
@@ -5,12 +6,13 @@ import pytest
 import re
 import warnings
 import webtest
+
 from dcicutils.misc_utils import (
     PRINT, ignored, filtered_warnings, get_setting_from_context, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
-    Retry, apply_dict_overrides, utc_today_str,
+    Retry, apply_dict_overrides, utc_today_str, LockoutManager, RateManager
 )
-from dcicutils.qa_utils import Occasionally
+from dcicutils.qa_utils import Occasionally, ControlledTime
 from unittest import mock
 
 
@@ -342,7 +344,7 @@ def test_virtual_app_crud_failure():
         def get(self, url, **kwargs):
             raise webtest.AppError(simulated_error_message)
 
-        def post_json(self, url, object, **kwargs):
+        def post_json(self, url, object, **kwargs):  # noqa - the name of this argument is not chosen by us here
             raise webtest.AppError(simulated_error_message)
 
         def patch_json(self, url, fields, **kwargs):
@@ -449,7 +451,7 @@ def test_retry_timeouts():
 
     rarely_add3 = Occasionally(_adder(3), success_frequency=5)
 
-    ARGS = 1  # We have to access a random place out of a tuple structure for mock data on time.sleep's arg
+    ARGS = 1  # noqa - We have to access a random place out of a tuple structure for mock data on time.sleep's arg
 
     # NOTE WELL: For testing, we chose 1.25 to use factors of 2 so floating point can exactly compare
 
@@ -519,7 +521,7 @@ def test_retrying_timeouts():
 
     rarely_add3 = Occasionally(_adder(3), success_frequency=5)
 
-    ARGS = 1  # We have to access a random place out of a tuple structure for mock data on time.sleep's arg
+    ARGS = 1  # noqa - We have to access a random place out of a tuple structure for mock data on time.sleep's arg
 
     # NOTE WELL: For testing, we chose 1.25 to use factors of 2 so floating point can exactly compare
 
@@ -600,3 +602,258 @@ def test_utc_today_str():
     pattern = "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
     actual = utc_today_str()
     assert re.match(pattern, actual), "utc_today_str() result %s did not match format: %s" % (actual, pattern)
+
+
+def test_lockout_manager():
+
+    protected_action = "simulated action"
+
+    # The function now() will get us the time. This assure us that binding datetime.datetime
+    # will not be affecting us.
+    now = datetime_module.datetime.now
+
+    # real_t0 is the actual wallclock time at the start of this test. We use it only to make sure
+    # that all these other tests are really going through our mock. In spite of longer mocked
+    # timescales, this test should run quickly.
+    real_t0 = now()
+    print("Starting test at", real_t0)
+
+    # dt will be our substitute for datetime.datetime.
+    # (it also has a sleep method that we can substitute for time.sleep)
+    dt = ControlledTime(tick_seconds=1)
+
+    class MockLogger:
+
+        def __init__(self):
+            self.log = []
+
+        def warning(self, msg):
+            self.log.append(msg)
+
+    with mock.patch("datetime.datetime", dt):
+        with mock.patch("time.sleep", dt.sleep):
+            my_log = MockLogger()
+
+            assert isinstance(datetime_module.datetime, ControlledTime)
+
+            lockout_manager = LockoutManager(action=protected_action,
+                                             lockout_seconds=60,
+                                             safety_seconds=1,
+                                             log=my_log)
+            assert not hasattr(lockout_manager, 'client')  # Just for safety, we don't need a client for this test
+
+            t0 = dt.just_now()
+
+            lockout_manager.wait_if_needed()
+
+            t1 = dt.just_now()
+
+            print("t0=", t0)
+            print("t1=", t1)
+
+            # We've set the clock to increment 1 second on every call to datetime.datetime.now(),
+            # and we expect exactly two calls to be made in the called function:
+            #  - Once on entry to get the current time prior to the protected action
+            #  - Once on exit to set the timestamp after the protected action.
+            # We expect no sleeps, so that doesn't play in.
+            assert (t1 - t0).total_seconds() == 2
+
+            assert my_log.log == []
+
+            lockout_manager.wait_if_needed()
+
+            t2 = dt.just_now()
+
+            print("t2=", t2)
+
+            # We've set the clock to increment 1 second on every call to datetime.datetime.now(),
+            # and we expect exactly two calls to be made in the called function, plus we also
+            # expect to sleep for 60 seconds of the 61 seconds it wants to reserve (one second having
+            # passed since the last protected action).
+
+            assert (t2 - t1).total_seconds() == 62
+
+            assert my_log.log == ['Last %s attempt was at 2010-01-01 12:00:02 (1.0 seconds ago).'
+                                  ' Waiting 60.0 seconds before attempting another.' % protected_action]
+
+            my_log.log = []  # Reset the log
+
+            dt.sleep(30)  # Simulate 30 seconds of time passing
+
+            t3 = dt.just_now()
+            print("t3=", t3)
+
+            lockout_manager.wait_if_needed()
+
+            t4 = dt.just_now()
+            print("t4=", t4)
+
+            # We've set the clock to increment 1 second on every call to datetime.datetime.now(),
+            # and we expect exactly two calls to be made in the called function, plus we also
+            # expect to sleep for 30 seconds of the 61 seconds it wants to reserve (31 seconds having
+            # passed since the last protected action).
+
+            assert (t4 - t3).total_seconds() == 32
+
+            assert my_log.log == ['Last %s attempt was at 2010-01-01 12:01:04 (31.0 seconds ago).'
+                                  ' Waiting 30.0 seconds before attempting another.' % protected_action]
+
+    real_t1 = now()
+    print("Done testing at", real_t1)
+    # Whole test should happen much faster, less than a half second
+    assert (real_t1 - real_t0).total_seconds() < 0.5
+
+
+def test_rate_manager():
+
+    metered_action = "simulated action"
+
+    r = RateManager(interval_seconds=60, safety_seconds=1, allowed_attempts=4)
+
+    # The function now() will get us the time. This assure us that binding datetime.datetime
+    # will not be affecting us.
+    now = datetime_module.datetime.now
+
+    # real_t0 is the actual wallclock time at the start of this test. We use it only to make sure
+    # that all these other tests are really going through our mock. In spite of longer mocked
+    # timescales, this test should run quickly.
+    real_t0 = now()
+    print("Starting test at", real_t0)
+
+    # dt will be our substitute for datetime.datetime.
+    # (it also has a sleep method that we can substitute for time.sleep)
+    tick = 1/128  # 0.0078125 seconds (a little less than a hundredth, but precisely representable in base 2 AND base 10
+    dt = ControlledTime(tick_seconds=tick)  #
+
+    class MockLogger:
+
+        def __init__(self):
+            self.log = []
+
+        def warning(self, msg):
+            self.log.append(msg)
+
+    with mock.patch("datetime.datetime", dt):
+        with mock.patch("time.sleep", dt.sleep):
+            my_log = MockLogger()
+
+            class WaitTester:
+
+                def __init__(self, rate_manager):
+                    self.count = 0
+                    self.expected_wait_max_seconds = 0
+                    self.rate_manager = rate_manager
+                    rate_manager.set_wait_hook(self.noticer)
+
+                def expect_to_wait(self, max_seconds):
+                    self.expected_wait_max_seconds = max_seconds
+
+                def noticer(self, wait_seconds, next_expiration):
+                    self.count += 1
+                    print("-----")
+                    for i, item in enumerate(self.rate_manager.timestamps):
+                        print("* " if item == next_expiration else "  ", "Slot", i, "is", item, )
+                    print("Expected wait is", self.expected_wait_max_seconds)
+                    print("Actual wait is", wait_seconds)
+                    assert wait_seconds < self.expected_wait_max_seconds
+                    print("-----")
+
+            rate_manager = RateManager(interval_seconds=60, safety_seconds=1, action=metered_action,
+                                       allowed_attempts=4, log=my_log)
+
+            wait_tester = WaitTester(rate_manager)
+
+            print("Part A")
+
+            t0 = dt.just_now()
+            rate_manager.wait_if_needed()  #
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            t1 = dt.now()  # Consumes 1 clock tick
+            print("t0=", t0)
+            print("t1=", t1)
+            assert (t1 - t0).total_seconds() <= 1  # 4 ticks is MUCH less than one second, even with roundoff error
+            assert wait_tester.count == 0
+
+            print("Part B")
+
+            t0 = dt.just_now()
+            wait_tester.expect_to_wait(62)
+            rate_manager.wait_if_needed()  # This will have to wait approximately 61 seconds.
+            wait_tester.expect_to_wait(0)
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            t1 = dt.now()  # Consumes 1 clock tick
+            print("t0=", t0)
+            print("t1=", t1)
+            wait_seconds = (t1 - t0).total_seconds()
+            assert wait_seconds >  55, "Wait time (%s seconds) was shorter than expected." % wait_seconds
+            assert wait_seconds <= 65, "Wait time (%s seconds) was longer than expected." % wait_seconds
+            assert wait_tester.count == 1
+
+            print("Part C")
+
+            dt.sleep(120)  # This will clear all previous uses
+            t0 = dt.just_now()
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            dt.sleep(30)
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            wait_tester.expect_to_wait(32)
+            rate_manager.wait_if_needed()  # This should have to wait 32 seconds
+            wait_tester.expect_to_wait(0)
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            dt.sleep(35)
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick, consuming an expired item
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick, because we just waited
+            t1 = dt.now()  # Consumes 1 clock tick
+            print("t0=", t0)
+            print("t1=", t1)
+            expected_wait = 30 + 32 + 35
+            print("expected_wait=", expected_wait)
+            wait_seconds = (t1 - t0).total_seconds()
+            print("actual_wait=", wait_seconds)
+            assert wait_seconds > expected_wait - 5, "Wait time (%s seconds) was shorter than expected." % wait_seconds
+            assert wait_seconds <= expected_wait + 5, "Wait time (%s seconds) was longer than expected." % wait_seconds
+            assert wait_tester.count == 2
+
+            print("Part D")
+
+            dt.sleep(120)  # This will clear all previous uses
+            t0 = dt.just_now()
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            dt.sleep(25)
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            wait_tester.expect_to_wait(37)
+            rate_manager.wait_if_needed()  # This should have to wait 37 seconds
+            wait_tester.expect_to_wait(0)
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick. This would've had to wait, but we already did.
+            dt.sleep(25)
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            dt.sleep(25)
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            wait_tester.expect_to_wait(12)
+            rate_manager.wait_if_needed()  # This should have to wait 12 seconds.
+            rate_manager.wait_if_needed()  # Consumes 1 clock tick
+            t1 = dt.now()  # Consumes 1 clock tick
+            print("t0=", t0)
+            print("t1=", t1)
+            expected_wait = 25 + 37 + 25 + 25 + 12
+            print("expected_wait=", expected_wait)
+            wait_seconds = (t1 - t0).total_seconds()
+            print("actual_wait=", wait_seconds)
+            assert wait_seconds > expected_wait - 5, "Wait time (%s seconds) was shorter than expected." % wait_seconds
+            assert wait_seconds <= expected_wait + 5, "Wait time (%s seconds) was longer than expected." % wait_seconds
+            assert wait_tester.count == 4
+
+            print("End of Parts")
+
+    real_t1 = now()
+    print("Done testing at", real_t1)
+    # Whole test should happen much faster, less than a half second
+    assert (real_t1 - real_t0).total_seconds() < 0.5
