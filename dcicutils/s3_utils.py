@@ -189,7 +189,7 @@ class s3Utils(object):
 
     def unzip_s3_to_s3(self, zipped_s3key, dest_dir, acl=None, do_not_store=False):
         """stream the content of a zipped key on S3 to another location on S3.
-        if no_not_store=false, it saves the content and return it in the dictionary format
+        if do_not_store=false, it saves the content and return it in the dictionary format
         (default)
         """
 
@@ -225,7 +225,7 @@ class s3Utils(object):
                 # files twice that we want to further interogate
                 the_file = zipstream.open(file_name, 'r').read()
                 file_to_find = file_name.split('/')[-1]
-                if not no_not_store:
+                if not do_not_store:
                     ret_files[file_to_find] = {'s3key': s3_key,
                                                'data': the_file}
                 self.s3_put(the_file, s3_file_name, acl=acl)
