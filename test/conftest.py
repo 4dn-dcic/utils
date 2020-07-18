@@ -51,9 +51,9 @@ def integrated_s3_info():
     # for now, always upload these files
     s3Obj.s3.put_object(Bucket=s3Obj.outfile_bucket, Key=test_filename,
                           Body=str.encode('thisisatest'))
-    zip_path = os.path.join(TEST_DIR, 'data_files', zip_filename.split('/')[-1])
+    zip_path = os.path.join(TEST_DIR, 'data_files', os.path.basename(zip_filename))
     s3Obj.s3.upload_file(Filename=str(zip_path), Bucket=s3Obj.outfile_bucket, Key=zip_filename)
-    zip_path2 = os.path.join(TEST_DIR, 'data_files', zip_filename2.split('/')[-1])
+    zip_path2 = os.path.join(TEST_DIR, 'data_files', os.path.basename(zip_filename2))
     s3Obj.s3.upload_file(Filename=str(zip_path2), Bucket=s3Obj.outfile_bucket, Key=zip_filename2)
 
     return {'s3Obj': s3Obj, 'filename': test_filename, 'zip_filename': zip_filename,
