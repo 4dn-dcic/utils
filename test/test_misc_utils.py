@@ -728,6 +728,9 @@ def test_rate_manager():
     class MockLogger:
 
         def __init__(self):
+            self.reset()
+
+        def reset(self):
             self.log = []
 
         def warning(self, msg):
@@ -776,6 +779,11 @@ def test_rate_manager():
             assert (t1 - t0).total_seconds() <= 1  # 4 ticks is MUCH less than one second, even with roundoff error
             assert wait_tester.count == 0
 
+            print(json.dumps(my_log.log, indent=2))
+            assert my_log.log == []
+
+            my_log.reset()
+
             print("Part B")
 
             t0 = dt.just_now()
@@ -792,6 +800,12 @@ def test_rate_manager():
             assert wait_seconds >  55, "Wait time (%s seconds) was shorter than expected." % wait_seconds
             assert wait_seconds <= 65, "Wait time (%s seconds) was longer than expected." % wait_seconds
             assert wait_tester.count == 1
+
+            print(json.dumps(my_log.log, indent=2))
+            [log_msg_1] = my_log.log
+            assert re.match("Waiting 6[0-9][.][0-9]* seconds before attempting simulated action[.]", log_msg_1)
+
+            my_log.reset()
 
             print("Part C")
 
@@ -819,6 +833,12 @@ def test_rate_manager():
             assert wait_seconds > expected_wait - 5, "Wait time (%s seconds) was shorter than expected." % wait_seconds
             assert wait_seconds <= expected_wait + 5, "Wait time (%s seconds) was longer than expected." % wait_seconds
             assert wait_tester.count == 2
+
+            print(json.dumps(my_log.log, indent=2))
+            [log_msg_1] = my_log.log
+            assert re.match("Waiting 3[0-9][.][0-9]* seconds before attempting simulated action[.]", log_msg_1)
+
+            my_log.reset()
 
             print("Part D")
 
@@ -850,6 +870,13 @@ def test_rate_manager():
             assert wait_seconds > expected_wait - 5, "Wait time (%s seconds) was shorter than expected." % wait_seconds
             assert wait_seconds <= expected_wait + 5, "Wait time (%s seconds) was longer than expected." % wait_seconds
             assert wait_tester.count == 4
+
+            print(json.dumps(my_log.log, indent=2))
+            [log_msg_1, log_msg_2] = my_log.log
+            assert re.match("Waiting 3[0-9][.][0-9]* seconds before attempting simulated action[.]", log_msg_1)
+            assert re.match("Waiting 1[0-9][.][0-9]* seconds before attempting simulated action[.]", log_msg_2)
+
+            my_log.reset()
 
             print("End of Parts")
 

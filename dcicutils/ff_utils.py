@@ -109,7 +109,8 @@ def search_request_with_retries(request_fxn, url, auth, verb, **kwargs):
         try:
             res_json = res.json()
         except ValueError:
-            res_json = {}
+            # PyCharm notes this is unused. -kmp 17-Jul-2020
+            # res_json = {}
             try:
                 res.raise_for_status()
             except Exception as e:
@@ -251,12 +252,12 @@ def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
 
 
 def patch_metadata(patch_item, obj_id='', key=None, ff_env=None, add_on=''):
-    '''
+    """
     Patch metadata given the patch body and an optional obj_id (if not provided,
     will attempt to use accession or uuid from patch_item body).
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
-    '''
+    """
     auth = get_authentication_with_server(key, ff_env)
     obj_id = obj_id if obj_id else patch_item.get('accession', patch_item.get('uuid'))
     if not obj_id:
@@ -270,13 +271,13 @@ def patch_metadata(patch_item, obj_id='', key=None, ff_env=None, add_on=''):
 
 
 def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
-    '''
+    """
     Post metadata given the post body and a string schema name.
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
     add_on is the string that will be appended to the post url (used
     with tibanna)
-    '''
+    """
     auth = get_authentication_with_server(key, ff_env)
     post_url = '/'.join([auth['server'], schema_name]) + process_add_on(add_on)
     # format item to json
@@ -286,7 +287,7 @@ def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
 
 
 def upsert_metadata(upsert_item, schema_name, key=None, ff_env=None, add_on=''):
-    '''
+    """
     UPSERT metadata given the upsert body and a string schema name.
     UPSERT means POST or PATCH on conflict.
     Either takes a dictionary form authentication (MUST include 'server')
@@ -295,7 +296,7 @@ def upsert_metadata(upsert_item, schema_name, key=None, ff_env=None, add_on=''):
     with the same body, and if so, runs a patch instead.
     add_on is the string that will be appended to the upsert url (used
     with tibanna)
-    '''
+    """
     auth = get_authentication_with_server(key, ff_env)
     upsert_url = '/'.join([auth['server'], schema_name]) + process_add_on(add_on)
     # format item to json
@@ -381,7 +382,7 @@ def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=F
     if search.startswith('/'):
         search = search[1:]
     parsed_search = urlparse(search)
-    if ((parsed_search.scheme == '') and (parsed_search.netloc == '')):  # both will be empty for non-urls
+    if parsed_search.scheme == '' and parsed_search.netloc == '':  # both will be empty for non-urls
         search_url = '/'.join([auth['server'], search])
     else:
         search_url = search  # assume full url is correct
@@ -467,7 +468,7 @@ def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
     return search_metadata(search, ff_env=ff_env, key=key)
 
 
-def fetch_files_qc_metrics(data, associated_files=['processed_files'],
+def fetch_files_qc_metrics(data, associated_files=None,
                            ignore_typical_fields=True,
                            key=None, ff_env=None):
     """
@@ -478,10 +479,15 @@ def fetch_files_qc_metrics(data, associated_files=['processed_files'],
         associated_files: a list of the types of the files fields the qc metrics will be extracted from:
             examples are = ['files', 'processed_files', 'other_processed_files']
         ignore_typical_fields: flag to ignore 4DN custom fields from the qc metric object
+        key: authentication key for ff_env (see get_authentication_with_server)
+        ff_env: The relevant ff beanstalk environment name.
 
     Returns:
         a dictionary of dictionaries containing the qc_metric information
     """
+    if associated_files is None:
+        associated_files = ['processed_files']
+
     qc_metrics = {}
 
     if ignore_typical_fields:
@@ -490,7 +496,7 @@ def fetch_files_qc_metrics(data, associated_files=['processed_files'],
                                'last_modified', 'slope', '@id', 'aggregated-items', 'status', 'public_release',
                                'actions', 'submitted_by', 'convergence', 'lab', 'date_created', 'uuid']
     else:
-        ignore_typical_fields = []
+        ignorable_qc_fields = []
     # for each file
     for associated_file in associated_files:
         if associated_file in data:
@@ -552,6 +558,8 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
     representing a quality metric.
 
     Args:
+        key: authentication key for ff_env (see get_authentication_with_server)
+        ff_env: The relevant ff beanstalk environment name.
         include_processed_files: if False will exclude QC metrics on processed files
                                 Default: True
         include_raw_files: if True will provide QC metrics on raw files as well
@@ -713,7 +721,7 @@ def get_es_search_generator(es_client, index, body, page_size=200):
         yield es_hits
 
 
-def get_es_metadata(uuids, es_client=None, filters={}, sources=[], chunk_size=200,
+def get_es_metadata(uuids, es_client=None, filters=None, sources=None, chunk_size=200,
                     is_generator=False, key=None, ff_env=None):
     """
     Given a list of string item uuids, will return a
@@ -770,11 +778,11 @@ def get_es_metadata(uuids, es_client=None, filters={}, sources=[], chunk_size=20
         is_generator:
             Boolean is_generator will return a generator for individual results if True;
             if False (default), returns a list of results.
-        key: autentication key
+        key: authentication key for ff_env (see get_authentication_with_server)
         ff_env: authentication by env (needs system variables)
     """
     auth = get_authentication_with_server(key, ff_env)
-    meta = _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth)
+    meta = _get_es_metadata(uuids, es_client, filters or {}, sources or [], chunk_size, auth)
     if is_generator:
         return meta
     return list(meta)
@@ -1212,10 +1220,10 @@ def update_url_params_and_unparse(url, url_params):
 
 
 def convert_param(parameter_dict, vals_as_string=False):
-    '''
+    """
     converts dictionary format {argument_name: value, argument_name: value, ...}
     to {'workflow_argument_name': argument_name, 'value': value}
-    '''
+    """
     # Not needed? -kmp & Will 30-Mar-2020
     # print(str(parameter_dict))
     metadata_parameters = []
