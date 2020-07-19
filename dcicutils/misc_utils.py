@@ -546,7 +546,11 @@ class RateManager:
         expiration_delta = datetime.timedelta(seconds=self.interval_seconds)
         latest_expiration = now + expiration_delta
         soonest_expiration = latest_expiration
-        soonest_expiration_pos = None
+        # This initial value of soonest_expiration_pos is arbitrarily chosen, but it will normally be superseded.
+        # The only case where it's not overridden is where there were no better values than the latest_expiration,
+        # so if we wait that amount, all of the slots will be ready to be reused and we might as well use 0 as any.
+        # -kmp 19-Jul-2020
+        soonest_expiration_pos = 0
         for i, expiration_time in enumerate(self.timestamps):
             if expiration_time <= now:  # This slot was unused or has expired
                 self.timestamps[i] = latest_expiration
@@ -560,5 +564,5 @@ class RateManager:
                 self.wait_hook(wait_seconds=sleep_time_needed, next_expiration=soonest_expiration)
             self.log.warning("Waiting %s seconds before attempting %s." % (sleep_time_needed, self.action))
             time.sleep(sleep_time_needed)
-        # It will have expired now, so grab that slot
+        # It will have expired now, so grab that slot. We have to recompute the 'now' time because we slept in between.
         self.timestamps[soonest_expiration_pos] = datetime.datetime.now() + expiration_delta
