@@ -10,7 +10,8 @@ import webtest
 from dcicutils.misc_utils import (
     PRINT, ignored, filtered_warnings, get_setting_from_context, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
-    Retry, apply_dict_overrides, utc_today_str, LockoutManager, RateManager
+    Retry, apply_dict_overrides, utc_today_str, RateManager,
+    # LockoutManager,
 )
 from dcicutils.qa_utils import Occasionally, ControlledTime
 from unittest import mock
