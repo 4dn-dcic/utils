@@ -188,9 +188,9 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 ret_files[name] = zipstream.open(zipped_filename).read()
         return ret_files
 
-    def unzip_s3_to_s3(self, zipped_s3key, dest_dir, acl=None, do_not_store=False):
+    def unzip_s3_to_s3(self, zipped_s3key, dest_dir, acl=None, store_results=True):
         """stream the content of a zipped key on S3 to another location on S3.
-        if do_not_store=false, it saves the content and returns it in the dictionary format
+        if store_results=True, it saves the content and returns it in the dictionary format
         (default)
         """
 
@@ -226,7 +226,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 # files twice that we want to further interrogate
                 the_file = zipstream.open(file_name, 'r').read()
                 file_to_find = os.path.basename(file_name)
-                if not do_not_store:
+                if store_results:
                     ret_files[file_to_find] = {'s3key': s3_key,
                                                'data': the_file}
                 self.s3_put(the_file, s3_file_name, acl=acl)
