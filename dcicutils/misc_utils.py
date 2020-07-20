@@ -193,6 +193,12 @@ class Retry:
     """
 
     class RetryOptions:
+        """
+        A helper class used internally by the Retry class.
+
+        One of these objects is created and registered for each decorated function unless the name_key is 'anonymous'.
+        See Retry._RETRY_OPTIONS_CATALOG.
+        """
 
         def __init__(self, retries_allowed=None, wait_seconds=None, wait_increment=None, wait_multiplier=None):
             self.retries_allowed = retries_allowed
@@ -246,6 +252,15 @@ class Retry:
         will cause the something_that_fails_a_lot(...) code to retry several times before giving up,
         either using the same wait each time or, if given a wait_multiplier or wait_increment, using
         that advice to adjust the wait time upward on each time.
+
+        Args:
+
+            name_key: An optional key that can be used by qa_utils.RetryManager to adjust these parameters in testing.
+                      If the argument is 'anonymous', no record will be created.
+            retries_allowed: The number of retries allowed. Default is cls.DEFAULT_RETRIES_ALLOWED.
+            wait_seconds: The number of wait_seconds between retries. Default is cls.DEFAULT_WAIT_SECONDS.
+            wait_increment: A fixed increment by which the number of wait_seconds is adjusted on each retry.
+            wait_multiplier: A multiplier by which the number of wait_seconds is adjusted on each retry.
         """
 
         def decorator(function):
@@ -304,6 +319,15 @@ class Retry:
             res2 = retrying(testapp.get)(url)
             ...etc.
 
+        Args:
+
+            fn: A function that will be retried on failure.
+            retries_allowed: The number of retries allowed. Default is cls.DEFAULT_RETRIES_ALLOWED.
+            wait_seconds: The number of wait_seconds between retries. Default is cls.DEFAULT_WAIT_SECONDS.
+            wait_increment: A fixed increment by which the number of wait_seconds is adjusted on each retry.
+            wait_multiplier: A multiplier by which the number of wait_seconds is adjusted on each retry.
+
+        Returns: whatever the fn returns, assuming it returns normally/successfully.
         """
         # A special name_key of 'anonymous' is the default, which causes there not to be a name key.
         # This cannot work in conjunction with RetryManager because different calls may result in different
@@ -316,6 +340,13 @@ class Retry:
 
 
 def apply_dict_overrides(dictionary: dict, **overrides) -> dict:
+    """
+    Assigns a given set of overrides to a dictionary, ignoring any entries with None values, which it leaves alone.
+    """
+    # I'm not entirely sure the treatment of None is the right thing. Need to look into that.
+    # Then again, if None were stored, then apply_dict_overrides(d, var1=1, var2=2, var3=None)
+    # would be no different than (dict(d, var1=1, var2=2, var3=None). It might be more useful
+    # and/or interesting if it would actually remove the key instead. -kmp 18-Jul-2020
     for k, v in overrides.items():
         if v is not None:
             dictionary[k] = v
@@ -324,4 +355,218 @@ def apply_dict_overrides(dictionary: dict, **overrides) -> dict:
 
 
 def utc_today_str():
+    """Returns a YYYY-mm-dd date string, relative to the UTC timezone."""
     return datetime.datetime.strftime(datetime.datetime.utcnow(), "%Y-%m-%d")
+
+
+# I think we will not need LockoutManager. It's really just a special case of RateManager,
+# though its operations are a little different. This commented-out code should be removed
+# once we have successfully installed a system based on RateManager. -kmp 20-Jul-2020
+#
+# class LockoutManager:
+#     """
+#     This class is used as a guard of a critical operation that can only be called within a certain frequency.
+#     e.g.,
+#
+#         class Foo:
+#             def __init__(self):
+#                 # 60 seconds required between calls, with a 1 second margin of error (overhead, clocks varying, etc)
+#                 self.lockout_manager = LockoutManager(action="foo", lockout_seconds=1, safety_seconds=1)
+#             def foo():
+#                 self.lockout_manager.wait_if_needed()
+#                 do_guarded_action()
+#
+#         f = Foo()     # make a Foo
+#         v1 = f.foo()  # will immediately get a value
+#         time.sleep(58)
+#         v2 = f.foo()  # will wait about 2 seconds, then get a value
+#         v3 = f.foo()  # will wait about 60 seconds, then get a value
+#
+#     Conceptually this is a special case of RateManager for n=1, though in practice it arose differently and
+#     the supplementary methods (which we happen to use mostly for testing) differ because the n=1 case is simpler
+#     and admits more questions. So, for now at least, this is not a subclass of RateManager but a separate
+#     implementation.
+#     """
+#
+#     EARLIEST_TIMESTAMP = datetime.datetime(datetime.MINYEAR, 1, 1)  # maybe useful for testing
+#
+#     def __init__(self, *, lockout_seconds, safety_seconds=0, action="metered action", enabled=True, log=None):
+#         """
+#         Creates a LockoutManager that cooperates in assuring a guarded operation is only happens at a certain rate.
+#
+#         The rate is once person lockout_seconds. This is a special case of RateManager and might get phased out
+#         as redundant, but has slightly different operations available for testing.
+#
+#         Args:
+#
+#         lockout_seconds int: A theoretical number of seconds allowed between calls to the guarded operation.
+#         safety_seconds int: An amount added to interval_seconds to accommodate real world coordination fuzziness.
+#         action str: A noun or noun phrase describing the action being guarded.
+#         enabled bool: A boolean controlling whether this facility is enabled. If False, waiting is disabled.
+#         log object: A logger object (supporting operations like .debug, .info, .warning, and .error).
+#         """
+#
+#         # This makes it easy to turn off the feature
+#         self.lockout_enabled = enabled
+#         self.lockout_seconds = lockout_seconds
+#         self.safety_seconds = safety_seconds
+#         self.action = action
+#         self._timestamp = self.EARLIEST_TIMESTAMP
+#         self.log = log or logging
+#
+#     @property
+#     def timestamp(self):
+#         """The timestamp is read-only. Use update_timestamp() to set it."""
+#         return self._timestamp
+#
+#     @property
+#     def effective_lockout_seconds(self):
+#         """
+#         The effective time between calls
+#
+#         Returns: the sum of the lockout and the safety seconds
+#         """
+#         return self.lockout_seconds + self.safety_seconds
+#
+#     def wait_if_needed(self):
+#         """
+#         This function is intended to be called immediately prior to each guarded operation.
+#
+#         This function will wait (using time.sleep) only if necessary, and for the amount necessary,
+#         to comply with rate-limiting declared in the creation of this LockoutManager.
+#
+#         NOTE WELL: It is presumed that all calls are coming from this source. This doesn't have ESP that would
+#         detect or otherwise accommodate externally generated calls, so violations of rate-limiting can still
+#         happen that way. This should be sufficient for sequential testing, and better than nothing for
+#         production operation.  This is not a substitute for responding to server-initiated throttling protocols.
+#         """
+#         now = datetime.datetime.now()
+#         # Note that this quantity is always positive because now is always bigger than the timestamp.
+#         seconds_since_last_purge = (now - self._timestamp).total_seconds()
+#         # Note again that because seconds_since_last_attempt is positive, the wait seconds will
+#         # never exceed self.effective_lockout_seconds, so
+#         #   0 <= wait_seconds <= self.effective_lockout_seconds
+#         wait_seconds = max(0.0, self.effective_lockout_seconds - seconds_since_last_purge)
+#         if wait_seconds > 0.0:
+#             shared_message = ("Last %s attempt was at %s (%s seconds ago)."
+#                               % (self.action, self._timestamp, seconds_since_last_purge))
+#             if self.lockout_enabled:
+#                 action_message = "Waiting %s seconds before attempting another." % wait_seconds
+#                 self.log.warning("%s %s" % (shared_message, action_message))
+#                 time.sleep(wait_seconds)
+#             else:
+#                 action_message = "Continuing anyway because lockout is disabled."
+#                 self.log.warning("%s %s" % (shared_message, action_message))
+#         self.update_timestamp()
+#
+#     def update_timestamp(self):
+#         """
+#         Explicitly sets the reference time point for computation of our lockout.
+#         This is called implicitly by .wait_if_needed(), and for some situations that may be sufficient.
+#         """
+#         self._timestamp = datetime.datetime.now()
+
+
+class RateManager:
+    """
+    This class is used for functions that can only be called at a certain rate, described by calls per unit time.
+    e.g.,
+
+        class Foo:
+            def __init__(self):
+                # 60 seconds required between calls, with a 1 second margin of error (overhead, clocks varying, etc)
+                self.rate_manager = RateManager(action="foo", interval_seconds=1, safety_seconds=1)
+            def foo():
+                self.lockout_manager.wait_if_needed()
+                do_guarded_action()
+
+        f = Foo()     # make a Foo
+        v1 = f.foo()  # will immediately get a value
+        time.sleep(58)
+        v2 = f.foo()  # will wait about 2 seconds, then get a value
+        v3 = f.foo()  # will wait about 60 seconds, then get a value
+
+    Conceptually this is a special case of RateManager for n=1, though in practice it arose differently and
+    the supplementary methods (which we happen to use mostly for testing) differ because the n=1 case is simpler
+    and admits more questions. So, for now at least, this is not a subclass of RateManager but a separate
+    implementation.
+    """
+
+    EARLIEST_TIMESTAMP = datetime.datetime(datetime.MINYEAR, 1, 1)  # maybe useful for testing
+
+    def __init__(self, *, interval_seconds, safety_seconds=0, allowed_attempts=1,
+                 action="metered action", enabled=True, log=None, wait_hook=None):
+        """
+        Creates a RateManager that cooperates in assuring that a guarded operation happens only at a certain rate.
+
+        The rate is measured as allowed_attempts per interval_seconds.
+
+        Args:
+
+        interval_seconds int: A number of seconds (the theoretical denominator of the allowed rate)
+        safety_seconds int: An amount added to interval_seconds to accommodate real world coordination fuzziness.
+        allowed_attempts int: A number of attempts allowed for every interval_seconds.
+        action str: A noun or noun phrase describing the action being guarded.
+        enabled bool: A boolean controlling whether this facility is enabled. If False, waiting is disabled.
+        log object: A logger object (supporting operations like .debug, .info, .warning, and .error).
+        wait_hook: A hook not recommended for production, but intended for testing to know when waiting happens.
+
+        """
+        if not (isinstance(allowed_attempts, int) and allowed_attempts >= 1):
+            raise TypeError("The allowed_attempts must be a positive integer: %s" % allowed_attempts)
+        # This makes it easy to turn off the feature
+        self.enabled = enabled
+        self.interval_seconds = interval_seconds
+        self.safety_seconds = safety_seconds
+        self.allowed_attempts = allowed_attempts
+        self.action = action
+        self.timestamps = [self.EARLIEST_TIMESTAMP] * allowed_attempts
+        self.log = log or logging
+        self.wait_hook = wait_hook
+
+    def set_wait_hook(self, wait_hook):
+        """
+        Use this to set the wait hook, which will be a function that notices we had to wait.
+
+        Args:
+
+        wait_hook: a function of two arguments (wait_seconds and next_expiration)
+        """
+        self.wait_hook = wait_hook
+
+    def wait_if_needed(self):
+        """
+        This function is intended to be called immediately prior to each guarded operation.
+
+        This function will wait (using time.sleep) only if necessary, and for the amount necessary,
+        to comply with rate-limiting declared in the creation of this RateManager.
+
+        NOTE WELL: It is presumed that all calls are coming from this source. This doesn't have ESP that would
+        detect or otherwise accommodate externally generated calls, so violations of rate-limiting can still
+        happen that way. This should be sufficient for sequential testing, and better than nothing for
+        production operation.  This is not a substitute for responding to server-initiated throttling protocols.
+        """
+        now = datetime.datetime.now()
+        expiration_delta = datetime.timedelta(seconds=self.interval_seconds)
+        latest_expiration = now + expiration_delta
+        soonest_expiration = latest_expiration
+        # This initial value of soonest_expiration_pos is arbitrarily chosen, but it will normally be superseded.
+        # The only case where it's not overridden is where there were no better values than the latest_expiration,
+        # so if we wait that amount, all of the slots will be ready to be reused and we might as well use 0 as any.
+        # -kmp 19-Jul-2020
+        soonest_expiration_pos = 0
+        for i, expiration_time in enumerate(self.timestamps):
+            if expiration_time <= now:  # This slot was unused or has expired
+                self.timestamps[i] = latest_expiration
+                return
+            elif expiration_time <= soonest_expiration:
+                soonest_expiration = expiration_time
+                soonest_expiration_pos = i
+        sleep_time_needed = (soonest_expiration - now).total_seconds() + self.safety_seconds
+        if self.enabled:
+            if self.wait_hook:  # Hook primarily for testing
+                self.wait_hook(wait_seconds=sleep_time_needed, next_expiration=soonest_expiration)
+            self.log.warning("Waiting %s seconds before attempting %s." % (sleep_time_needed, self.action))
+            time.sleep(sleep_time_needed)
+        # It will have expired now, so grab that slot. We have to recompute the 'now' time because we slept in between.
+        self.timestamps[soonest_expiration_pos] = datetime.datetime.now() + expiration_delta
