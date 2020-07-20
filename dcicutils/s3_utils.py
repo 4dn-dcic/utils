@@ -17,13 +17,13 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 
 
-class s3Utils(object):
+class s3Utils(object):  # NOQA - This class name violates style rules, but a lot of things might break if we change it.
 
     def __init__(self, outfile_bucket=None, sys_bucket=None, raw_file_bucket=None,
                  blob_bucket=None, env=None):
-        '''
+        """
         if we pass in env set the outfile and sys bucket from the environment
-        '''
+        """
         # avoid circular ref
         from .beanstalk_utils import get_beanstalk_real_url
         self.url = ''
@@ -101,10 +101,10 @@ class s3Utils(object):
 
     def get_file_size(self, key, bucket=None, add_bytes=0, add_gb=0,
                       size_in_gb=False):
-        '''
+        """
         default returns file size in bytes,
         unless size_in_gb = True
-        '''
+        """
         meta = self.does_key_exist(key, bucket)
         if not meta:
             raise Exception("key not found")
@@ -120,15 +120,16 @@ class s3Utils(object):
             bucket = self.outfile_bucket
         self.s3.delete_object(Bucket=bucket, Key=key)
 
-    def size(self, bucket):
+    @classmethod
+    def size(cls, bucket):
         sbuck = boto3.resource('s3').Bucket(bucket)
         # get only head of objects so we can count them
         return sum(1 for _ in sbuck.objects.all())
 
     def s3_put(self, obj, upload_key, acl=None):
-        '''
+        """
         try to guess content type
-        '''
+        """
         content_type = mimetypes.guess_type(upload_key)[0]
         if content_type is None:
             content_type = 'binary/octet-stream'
@@ -165,9 +166,9 @@ class s3Utils(object):
         files = obj_list.get('Contents', [])
 
         # morph file list into format that boto3 wants
-        delete_keys = {'Objects': []}
-        delete_keys['Objects'] = [{'Key': k} for k in
-                                  [obj['Key'] for obj in files]]
+        delete_keys = {'Objects': [{'Key': k}
+                                   for k in [obj['Key']
+                                             for obj in files]]}
 
         # second query deletes all the files, NOTE: Max 1000 files
         if delete_keys['Objects']:
@@ -189,7 +190,7 @@ class s3Utils(object):
 
     def unzip_s3_to_s3(self, zipped_s3key, dest_dir, acl=None, do_not_store=False):
         """stream the content of a zipped key on S3 to another location on S3.
-        if do_not_store=false, it saves the content and return it in the dictionary format
+        if do_not_store=false, it saves the content and returns it in the dictionary format
         (default)
         """
 
@@ -222,9 +223,9 @@ class s3Utils(object):
                     s3_file_name = dest_dir + file_name
                 s3_key = "https://s3.amazonaws.com/%s/%s" % (self.outfile_bucket, s3_file_name)
                 # just perf optimization so we don't have to copy
-                # files twice that we want to further interogate
+                # files twice that we want to further interrogate
                 the_file = zipstream.open(file_name, 'r').read()
-                file_to_find = file_name.split('/')[-1]
+                file_to_find = os.path.basename(file_name)
                 if not do_not_store:
                     ret_files[file_to_find] = {'s3key': s3_key,
                                                'data': the_file}
