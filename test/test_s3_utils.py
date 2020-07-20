@@ -229,8 +229,8 @@ def test_unzip_s3_to_s3_2(integrated_s3_info):
     assert objs.get('Contents')
 
 
-def test_unzip_s3_to_s3_do_not_store(integrated_s3_info):
-    """test for unzip_s3_to_s3 with case where there is a basdir and do_not_store=True"""
+def test_unzip_s3_to_s3_store_results(integrated_s3_info):
+    """test for unzip_s3_to_s3 with case where there is a basdir and store_results=False"""
     prefix = '__test_data/extracted'
     filename = integrated_s3_info['zip_filename']
     s3_connection = integrated_s3_info['s3Obj']
@@ -243,7 +243,7 @@ def test_unzip_s3_to_s3_do_not_store(integrated_s3_info):
     assert not objs.get('Contents')
 
     # now copy to that dir we just deleted
-    ret_files = s3_connection.unzip_s3_to_s3(filename, prefix, do_not_store=True)
+    ret_files = s3_connection.unzip_s3_to_s3(filename, prefix, store_results=False)
     assert len(ret_files) == 0  # no returned content
 
     objs = s3_connection.s3_read_dir(prefix)
