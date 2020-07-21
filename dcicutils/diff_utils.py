@@ -68,18 +68,23 @@ class DiffManager:
         {"a": {"b": 1, "c": 2}, "b": 3} => {'a["b"]': 1, 'a["c"]': 2, 'b': 3}         # python style
         {"a": {"b": 1, "c": 2}, "b": 3} => {('a', 'b'): 1, ('a', 'c'): 2, ('b',): 3}  # list style
         """
+
         result = {}
-        def traverse(item, label):
+
+        def traverse(item, result, label):
             if isinstance(item, dict):
                 for k, v in item.items():
-                    traverse(v, self._merge_label_key(label=label, key=k))
+                    traverse(v, result, self._merge_label_key(label=label, key=k))
             elif isinstance(item, list):
                 for i, elem in enumerate(item):
                     # TODO: Would it be simpler to just omit subscripts here?
-                    traverse(elem, label=self._merge_label_elem(label=label, pos=i, _omit_subscripts=_omit_subscripts))
+                    traverse(elem, result,
+                             self._merge_label_elem(label=label, pos=i, _omit_subscripts=_omit_subscripts))
             else:
                 result[label] = True if _omit_subscripts else item
-        traverse(item, self.label)
+
+        traverse(item, result, self.label)
+
         return result
 
     def diffs(self, item1, item2, _omit_subscripts=False):
