@@ -1,9 +1,10 @@
+import pytest
 from dcicutils.diff_utils import DiffManager
 
 
 def test_unroll():
 
-    dm = DiffManager()
+    dm = DiffManager(label="item")
 
     assert dm.unroll(3) == {
         "item": 3,
@@ -68,9 +69,10 @@ def test_unroll():
         "item.map[1].b": "beta",
     }
 
+
 def test_diffs():
 
-    dm = DiffManager()
+    dm = DiffManager(label="item")
 
     assert dm.diffs(1, 1) == {"same": ["item"]}
 
@@ -81,9 +83,10 @@ def test_diffs():
         "same": ["item.a"],
     }
 
+
 def test_comparison():
 
-    dm = DiffManager()
+    dm = DiffManager(label="item")
 
     assert dm.comparison(1, 1) == []
 
@@ -114,7 +117,7 @@ def test_comparison():
 
 def test_comparison_python():
 
-    dm = DiffManager(style='python')
+    dm = DiffManager(style='python', label="item")
 
     assert dm.comparison(1, 1) == []
 
@@ -141,4 +144,92 @@ def test_comparison_python():
         {"a": "foo", "b": "baz"}
     ) == [
         'item["b"] : "bar" => "baz"'
+    ]
+
+    assert dm.comparison(
+        {"a": "foo", "b": "bar"},
+        {"a": "foo", "b": "baz"}
+    ) == [
+        'item["b"] : "bar" => "baz"'
+    ]
+
+
+def test_maybe_sorted():
+
+    dm = DiffManager(sort_by_change_type=True)
+
+    assert dm._maybe_sorted(['b', 'a'], for_change_type=True) == ['a', 'b']
+    assert dm._maybe_sorted(['b', 'a'], for_change_type=False) == ['b', 'a']
+
+    dm = DiffManager(sort_by_change_type=False)
+
+    assert dm._maybe_sorted(['b', 'a'], for_change_type=True) == ['b', 'a']
+    assert dm._maybe_sorted(['b', 'a'], for_change_type=False) == ['a', 'b']
+
+
+# Not supporting this case for now.
+#
+# def test_patch_diffs():
+#
+#     dm = DiffManager(style='list')
+#
+#     assert dm.patch_diffs({
+#         'a': {
+#             'b': 3,
+#             'c': ['a', 'b']
+#         }
+#     }) == [
+#         ('a', 'b'),
+#         ('a', 'c', 0),
+#         ('a', 'c', 1),
+#     ]
+
+def test_patch_diffs_with_omitted_subscripts_list_style():
+
+    dm = DiffManager(style='list')
+
+    assert dm.patch_diffs({
+        'a': {
+            'b': 3,
+            'c': [{'alpha': 11, 'beta': 22}, {'alpha': 33, 'gamma': 44}]
+        }
+    }) == [
+        ('a', 'b'),
+        ('a', 'c', 'alpha'),
+        ('a', 'c', 'beta'),
+        ('a', 'c', 'gamma'),
+    ]
+
+def test_patch_diffs_with_omitted_subscripts_javascript_style():
+
+    dm = DiffManager(style='javascript')
+
+    diffs = dm.patch_diffs({
+        'a': {
+            'b': 3,
+            'c': [{'alpha': 11, 'beta': 22}, {'alpha': 33, 'gamma': 44}]
+        }
+    })
+    assert diffs == [
+        'a.b',
+        'a.c.alpha',
+        'a.c.beta',
+        'a.c.gamma',
+    ]
+
+def test_patch_diffs_with_omitted_subscripts_python_style():
+
+    dm = DiffManager(style='python')
+
+    diffs = dm.patch_diffs({
+        'a': {
+            'b': 3,
+            'c': [{'alpha': 11, 'beta': 22}, {'alpha': 33, 'gamma': 44}]
+        }
+    })
+    assert diffs == [
+        'a["b"]',
+        'a["c"]["alpha"]',
+        'a["c"]["beta"]',
+        'a["c"]["gamma"]',
     ]
