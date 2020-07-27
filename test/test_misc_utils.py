@@ -10,10 +10,10 @@ import webtest
 from dcicutils.misc_utils import (
     PRINT, ignored, filtered_warnings, get_setting_from_context, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
-    Retry, apply_dict_overrides, utc_today_str, RateManager,
+    Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool,
     # LockoutManager,
 )
-from dcicutils.qa_utils import Occasionally, ControlledTime
+from dcicutils.qa_utils import Occasionally, ControlledTime, override_environ
 from unittest import mock
 
 
@@ -137,6 +137,8 @@ def test_virtual_app_creation():
         assert isinstance(vapp.wrapped_app, FakeTestApp)  # the mocked one, anyway.
         assert vapp.wrapped_app.app is app
         assert vapp.wrapped_app.extra_environ is environ
+
+        assert vapp.app is vapp.wrapped_app.app
 
         return vapp
 
@@ -713,7 +715,8 @@ def test_rate_manager():
 
     metered_action = "simulated action"
 
-    r = RateManager(interval_seconds=60, safety_seconds=1, allowed_attempts=4)
+    # PyCharm thinks this is not used. -kmp 26-Jul-2020
+    # r = RateManager(interval_seconds=60, safety_seconds=1, allowed_attempts=4)
 
     # The function now() will get us the time. This assure us that binding datetime.datetime
     # will not be affecting us.
@@ -733,7 +736,7 @@ def test_rate_manager():
     class MockLogger:
 
         def __init__(self):
-            self.reset()
+            self.log = []
 
         def reset(self):
             self.log = []
@@ -802,7 +805,7 @@ def test_rate_manager():
             print("t0=", t0)
             print("t1=", t1)
             wait_seconds = (t1 - t0).total_seconds()
-            assert wait_seconds >  55, "Wait time (%s seconds) was shorter than expected." % wait_seconds
+            assert wait_seconds > 55, "Wait time (%s seconds) was shorter than expected." % wait_seconds
             assert wait_seconds <= 65, "Wait time (%s seconds) was longer than expected." % wait_seconds
             assert wait_tester.count == 1
 
@@ -889,3 +892,36 @@ def test_rate_manager():
     print("Done testing at", real_t1)
     # Whole test should happen much faster, less than a half second
     assert (real_t1 - real_t0).total_seconds() < 0.5
+
+
+def test_environ_bool():
+
+    with override_environ(FOO=None):
+        assert environ_bool("FOO") is False
+        assert environ_bool("FOO", default=None) is None
+        assert environ_bool("FOO", None) is None
+
+    with override_environ(FOO="TRUE"):
+        assert environ_bool("FOO") is True
+        assert environ_bool("FOO", default=None) is True
+        assert environ_bool("FOO", None) is True
+
+    with override_environ(FOO="TrUe"):  # Actually, any case should work
+        assert environ_bool("FOO") is True
+        assert environ_bool("FOO", default=None) is True
+        assert environ_bool("FOO", None) is True
+
+    with override_environ(FOO="FALSE"):
+        assert environ_bool("FOO") is False
+        assert environ_bool("FOO", default=None) is False
+        assert environ_bool("FOO", None) is False
+
+    with override_environ(FOO="anything"):
+        assert environ_bool("FOO") is False
+        assert environ_bool("FOO", default=None) is False
+        assert environ_bool("FOO", None) is False
+
+    with override_environ(FOO=""):
+        assert environ_bool("FOO") is False
+        assert environ_bool("FOO", default=None) is False
+        assert environ_bool("FOO", None) is False

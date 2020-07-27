@@ -117,6 +117,15 @@ class VirtualApp:
         except webtest.AppError as e:
             raise VirtualAppError(msg='HTTP PATCH failed.', url=url, body=fields, raw_exception=e)
 
+    @property
+    def app(self):
+        """ Returns the .app of the wrapped_app.
+
+            For example, this allows one to refer to myapp.app.registry without having to know
+            if myapp is a TestApp or a VirtualApp.
+        """
+        return self.wrapped_app.app
+
 
 def ignored(*args, **kwargs):
     """
@@ -570,3 +579,24 @@ class RateManager:
             time.sleep(sleep_time_needed)
         # It will have expired now, so grab that slot. We have to recompute the 'now' time because we slept in between.
         self.timestamps[soonest_expiration_pos] = datetime.datetime.now() + expiration_delta
+
+
+def environ_bool(var, default=False):
+    """
+    Returns True if the named environment variable is set to 'true' (in any alphabetic case), False if something else.
+
+    If the variable value is not set, the default is returned. False is the default default.
+    This function is intended to allow boolean parameters to be initialized from environment variables.
+    e.g.,
+        DEBUG_FOO = environ_bool("FOO")
+    or. if a special value is desired when the variable is not set:
+        DEBUG_FOO = environ_bool("FOO", default=None)
+
+    Args:
+        var str: The name of an environment variable.
+        default object: Any object.
+    """
+    if var not in os.environ:
+        return default
+    else:
+        return os.environ[var].lower() == "true"
