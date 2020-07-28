@@ -4,11 +4,25 @@ qa_utils: Tools for use in quality assurance testing.
 
 import contextlib
 import datetime
+import time
 import io
 import os
 import pytz
 
 from .misc_utils import PRINT, ignored, Retry
+
+
+@contextlib.contextmanager
+def timed():
+    """ A simple context manager that will time how long it spends in context. Useful for debugging. """
+    start = time.time()
+    try:
+        yield
+    except Exception:
+        raise
+    finally:
+        end = time.time()
+        print('Elapsed: %s' % (end - start))
 
 
 def mock_not_called(name):

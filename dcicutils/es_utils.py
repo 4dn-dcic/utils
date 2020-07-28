@@ -86,3 +86,32 @@ def execute_lucene_query_on_es(client, index, query):
     except KeyError:
         logger.error('Searching index %s with query %s gave no results' % (index, query))
         return None
+
+
+def get_bulk_uuids_embedded(client, index, uuids):
+    """
+    Gets the embedded view for all uuids in an index with a single multi-get ES request.
+
+    NOTE: because an index is required, when passing uuids to this method they must all be
+    of the same item type. The index can be determined by:
+            ''.join([eb_env_name, item_type])
+            ex: fourfront-mastertestuser or fourfront-mastertestfile_format
+
+    :param client: elasticsearch client
+    :param index: index to search
+    :param uuids: list of uuids (all of the same type)
+
+    :returns: list of embedded views of the given uuids, if any
+    """
+    final_result = []
+    try:
+        response = client.mget(body={
+            'docs': [{'_id': _id,
+                      'source': ['embedded.*'],
+                      '_index': index} for _id in uuids]
+        })
+        for doc in response['docs']:
+            final_result.append(doc['_source']['embedded'])
+    except Exception as e:
+        raise e
+    return final_result
