@@ -57,4 +57,4 @@ def test_get_bulk_uuids_outperforms_expand_es_metadata(integrated_ff, es_client_
     # this gets 19 total uuids in 1700ms (~850 ms adjusted, so roughly 4x slower)
     with timed():
         expand_es_metadata(uuids, key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
-    raise Exception  # uncomment this to prove to yourself that the new method is much faster - Will
+    #raise Exception  # uncomment this to prove to yourself that the new method is much faster - Will
