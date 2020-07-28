@@ -448,14 +448,14 @@ class LockoutManager:
         """
         now = datetime.datetime.now()
         # Note that this quantity is always positive because now is always bigger than the timestamp.
-        seconds_since_last_purge = (now - self._timestamp).total_seconds()
+        seconds_since_last_attempt = (now - self._timestamp).total_seconds()
         # Note again that because seconds_since_last_attempt is positive, the wait seconds will
         # never exceed self.effective_lockout_seconds, so
         #   0 <= wait_seconds <= self.effective_lockout_seconds
-        wait_seconds = max(0.0, self.effective_lockout_seconds - seconds_since_last_purge)
+        wait_seconds = max(0.0, self.effective_lockout_seconds - seconds_since_last_attempt)
         if wait_seconds > 0.0:
             shared_message = ("Last %s attempt was at %s (%s seconds ago)."
-                              % (self.action, self._timestamp, seconds_since_last_purge))
+                              % (self.action, self._timestamp, seconds_since_last_attempt))
             if self.lockout_enabled:
                 action_message = "Waiting %s seconds before attempting another." % wait_seconds
                 self.log.warning("%s %s" % (shared_message, action_message))
