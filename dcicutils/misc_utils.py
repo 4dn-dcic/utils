@@ -216,7 +216,8 @@ class Retry:
             self.wait_multiplier = wait_multiplier
             self.wait_adjustor = self.make_wait_adjustor(wait_increment=wait_increment, wait_multiplier=wait_multiplier)
 
-        def make_wait_adjustor(self, wait_increment=None, wait_multiplier=None):
+        @staticmethod
+        def make_wait_adjustor(wait_increment=None, wait_multiplier=None):
             """
             Returns a function that can be called to adjust wait_seconds based on wait_increment or wait_multiplier
             before doing a retry at each step.
@@ -368,112 +369,108 @@ def utc_today_str():
     return datetime.datetime.strftime(datetime.datetime.utcnow(), "%Y-%m-%d")
 
 
-# I think we will not need LockoutManager. It's really just a special case of RateManager,
-# though its operations are a little different. This commented-out code should be removed
-# once we have successfully installed a system based on RateManager. -kmp 20-Jul-2020
-#
-# class LockoutManager:
-#     """
-#     This class is used as a guard of a critical operation that can only be called within a certain frequency.
-#     e.g.,
-#
-#         class Foo:
-#             def __init__(self):
-#                 # 60 seconds required between calls, with a 1 second margin of error (overhead, clocks varying, etc)
-#                 self.lockout_manager = LockoutManager(action="foo", lockout_seconds=1, safety_seconds=1)
-#             def foo():
-#                 self.lockout_manager.wait_if_needed()
-#                 do_guarded_action()
-#
-#         f = Foo()     # make a Foo
-#         v1 = f.foo()  # will immediately get a value
-#         time.sleep(58)
-#         v2 = f.foo()  # will wait about 2 seconds, then get a value
-#         v3 = f.foo()  # will wait about 60 seconds, then get a value
-#
-#     Conceptually this is a special case of RateManager for n=1, though in practice it arose differently and
-#     the supplementary methods (which we happen to use mostly for testing) differ because the n=1 case is simpler
-#     and admits more questions. So, for now at least, this is not a subclass of RateManager but a separate
-#     implementation.
-#     """
-#
-#     EARLIEST_TIMESTAMP = datetime.datetime(datetime.MINYEAR, 1, 1)  # maybe useful for testing
-#
-#     def __init__(self, *, lockout_seconds, safety_seconds=0, action="metered action", enabled=True, log=None):
-#         """
-#         Creates a LockoutManager that cooperates in assuring a guarded operation is only happens at a certain rate.
-#
-#         The rate is once person lockout_seconds. This is a special case of RateManager and might get phased out
-#         as redundant, but has slightly different operations available for testing.
-#
-#         Args:
-#
-#         lockout_seconds int: A theoretical number of seconds allowed between calls to the guarded operation.
-#         safety_seconds int: An amount added to interval_seconds to accommodate real world coordination fuzziness.
-#         action str: A noun or noun phrase describing the action being guarded.
-#         enabled bool: A boolean controlling whether this facility is enabled. If False, waiting is disabled.
-#         log object: A logger object (supporting operations like .debug, .info, .warning, and .error).
-#         """
-#
-#         # This makes it easy to turn off the feature
-#         self.lockout_enabled = enabled
-#         self.lockout_seconds = lockout_seconds
-#         self.safety_seconds = safety_seconds
-#         self.action = action
-#         self._timestamp = self.EARLIEST_TIMESTAMP
-#         self.log = log or logging
-#
-#     @property
-#     def timestamp(self):
-#         """The timestamp is read-only. Use update_timestamp() to set it."""
-#         return self._timestamp
-#
-#     @property
-#     def effective_lockout_seconds(self):
-#         """
-#         The effective time between calls
-#
-#         Returns: the sum of the lockout and the safety seconds
-#         """
-#         return self.lockout_seconds + self.safety_seconds
-#
-#     def wait_if_needed(self):
-#         """
-#         This function is intended to be called immediately prior to each guarded operation.
-#
-#         This function will wait (using time.sleep) only if necessary, and for the amount necessary,
-#         to comply with rate-limiting declared in the creation of this LockoutManager.
-#
-#         NOTE WELL: It is presumed that all calls are coming from this source. This doesn't have ESP that would
-#         detect or otherwise accommodate externally generated calls, so violations of rate-limiting can still
-#         happen that way. This should be sufficient for sequential testing, and better than nothing for
-#         production operation.  This is not a substitute for responding to server-initiated throttling protocols.
-#         """
-#         now = datetime.datetime.now()
-#         # Note that this quantity is always positive because now is always bigger than the timestamp.
-#         seconds_since_last_purge = (now - self._timestamp).total_seconds()
-#         # Note again that because seconds_since_last_attempt is positive, the wait seconds will
-#         # never exceed self.effective_lockout_seconds, so
-#         #   0 <= wait_seconds <= self.effective_lockout_seconds
-#         wait_seconds = max(0.0, self.effective_lockout_seconds - seconds_since_last_purge)
-#         if wait_seconds > 0.0:
-#             shared_message = ("Last %s attempt was at %s (%s seconds ago)."
-#                               % (self.action, self._timestamp, seconds_since_last_purge))
-#             if self.lockout_enabled:
-#                 action_message = "Waiting %s seconds before attempting another." % wait_seconds
-#                 self.log.warning("%s %s" % (shared_message, action_message))
-#                 time.sleep(wait_seconds)
-#             else:
-#                 action_message = "Continuing anyway because lockout is disabled."
-#                 self.log.warning("%s %s" % (shared_message, action_message))
-#         self.update_timestamp()
-#
-#     def update_timestamp(self):
-#         """
-#         Explicitly sets the reference time point for computation of our lockout.
-#         This is called implicitly by .wait_if_needed(), and for some situations that may be sufficient.
-#         """
-#         self._timestamp = datetime.datetime.now()
+class LockoutManager:
+    """
+    This class is used as a guard of a critical operation that can only be called within a certain frequency.
+    e.g.,
+
+        class Foo:
+            def __init__(self):
+                # 60 seconds required between calls, with a 1 second margin of error (overhead, clocks varying, etc)
+                self.lockout_manager = LockoutManager(action="foo", lockout_seconds=1, safety_seconds=1)
+            def foo():
+                self.lockout_manager.wait_if_needed()
+                do_guarded_action()
+
+        f = Foo()     # make a Foo
+        v1 = f.foo()  # will immediately get a value
+        time.sleep(58)
+        v2 = f.foo()  # will wait about 2 seconds, then get a value
+        v3 = f.foo()  # will wait about 60 seconds, then get a value
+
+    Conceptually this is a special case of RateManager for n=1, though in practice it arose differently and
+    the supplementary methods (which we happen to use mostly for testing) differ because the n=1 case is simpler
+    and admits more questions. So, for now at least, this is not a subclass of RateManager but a separate
+    implementation.
+    """
+
+    EARLIEST_TIMESTAMP = datetime.datetime(datetime.MINYEAR, 1, 1)  # maybe useful for testing
+
+    def __init__(self, *, lockout_seconds, safety_seconds=0, action="metered action", enabled=True, log=None):
+        """
+        Creates a LockoutManager that cooperates in assuring a guarded operation is only happens at a certain rate.
+
+        The rate is once person lockout_seconds. This is a special case of RateManager and might get phased out
+        as redundant, but has slightly different operations available for testing.
+
+        Args:
+
+        lockout_seconds int: A theoretical number of seconds allowed between calls to the guarded operation.
+        safety_seconds int: An amount added to interval_seconds to accommodate real world coordination fuzziness.
+        action str: A noun or noun phrase describing the action being guarded.
+        enabled bool: A boolean controlling whether this facility is enabled. If False, waiting is disabled.
+        log object: A logger object (supporting operations like .debug, .info, .warning, and .error).
+        """
+
+        # This makes it easy to turn off the feature
+        self.lockout_enabled = enabled
+        self.lockout_seconds = lockout_seconds
+        self.safety_seconds = safety_seconds
+        self.action = action
+        self._timestamp = self.EARLIEST_TIMESTAMP
+        self.log = log or logging
+
+    @property
+    def timestamp(self):
+        """The timestamp is read-only. Use update_timestamp() to set it."""
+        return self._timestamp
+
+    @property
+    def effective_lockout_seconds(self):
+        """
+        The effective time between calls
+
+        Returns: the sum of the lockout and the safety seconds
+        """
+        return self.lockout_seconds + self.safety_seconds
+
+    def wait_if_needed(self):
+        """
+        This function is intended to be called immediately prior to each guarded operation.
+
+        This function will wait (using time.sleep) only if necessary, and for the amount necessary,
+        to comply with rate-limiting declared in the creation of this LockoutManager.
+
+        NOTE WELL: It is presumed that all calls are coming from this source. This doesn't have ESP that would
+        detect or otherwise accommodate externally generated calls, so violations of rate-limiting can still
+        happen that way. This should be sufficient for sequential testing, and better than nothing for
+        production operation.  This is not a substitute for responding to server-initiated throttling protocols.
+        """
+        now = datetime.datetime.now()
+        # Note that this quantity is always positive because now is always bigger than the timestamp.
+        seconds_since_last_attempt = (now - self._timestamp).total_seconds()
+        # Note again that because seconds_since_last_attempt is positive, the wait seconds will
+        # never exceed self.effective_lockout_seconds, so
+        #   0 <= wait_seconds <= self.effective_lockout_seconds
+        wait_seconds = max(0.0, self.effective_lockout_seconds - seconds_since_last_attempt)
+        if wait_seconds > 0.0:
+            shared_message = ("Last %s attempt was at %s (%s seconds ago)."
+                              % (self.action, self._timestamp, seconds_since_last_attempt))
+            if self.lockout_enabled:
+                action_message = "Waiting %s seconds before attempting another." % wait_seconds
+                self.log.warning("%s %s" % (shared_message, action_message))
+                time.sleep(wait_seconds)
+            else:
+                action_message = "Continuing anyway because lockout is disabled."
+                self.log.warning("%s %s" % (shared_message, action_message))
+        self.update_timestamp()
+
+    def update_timestamp(self):
+        """
+        Explicitly sets the reference time point for computation of our lockout.
+        This is called implicitly by .wait_if_needed(), and for some situations that may be sufficient.
+        """
+        self._timestamp = datetime.datetime.now()
 
 
 class RateManager:
