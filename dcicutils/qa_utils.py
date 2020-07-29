@@ -14,7 +14,7 @@ from .misc_utils import PRINT, ignored, Retry
 
 def show_elapsed_time(start, end):
     """ Helper method for below that is the default - just prints the elapsed time. """
-    print('Elapsed: %s' % (end - start))
+    PRINT('Elapsed: %s' % (end - start))
 
 
 @contextlib.contextmanager

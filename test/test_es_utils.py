@@ -55,18 +55,18 @@ def test_get_bulk_uuids_outperforms_expand_es_metadata(integrated_ff, es_client_
     """ Tests that the new method out performs the new one. """
     users = execute_lucene_query_on_es(client=es_client_fixture, index='fourfront-mastertestuser', query={})
     uuids = [doc['_id'] for doc in users]
-    current_time = [None]  # pass by reference
+    times = []
 
-    def set_current_time(start, end, t=current_time):  # noqa I want this default argument to be mutable
-        t[0] = end - start
+    def set_current_time(start, end):  # noqa I want this default argument to be mutable
+        times.append(end - start)
 
     # this extracts the 10 desired uuids in embedded view using mget in ~200 ms
     with timed(reporter=set_current_time):
         get_bulk_uuids_embedded(es_client_fixture, 'fourfront-mastertestuser', uuids)
-    assert current_time is not None
-    time1 = copy.deepcopy(current_time)  # store the actual result
+    assert len(times) == 1
 
     # this gets 19 total uuids in 1700ms (~850 ms adjusted, so roughly 4x slower)
     with timed(reporter=set_current_time):
         expand_es_metadata(uuids, key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
-    assert time1[0] < (current_time[0] / 2)  # noqa should always be much faster
+    assert len(times) == 2
+    assert times[0] < (times[1] / 2)  # should always be much faster (normalized for # of uuids retrieved)
