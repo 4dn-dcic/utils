@@ -12,17 +12,30 @@ import pytz
 from .misc_utils import PRINT, ignored, Retry
 
 
+def show_elapsed_time(start, end):
+    """ Helper method for below that is the default - just prints the elapsed time. """
+    print('Elapsed: %s' % (end - start))
+
+
 @contextlib.contextmanager
-def timed():
-    """ A simple context manager that will time how long it spends in context. Useful for debugging. """
+def timed(reporter=None, debug=None):
+    """ A simple context manager that will time how long it spends in context. Useful for debugging.
+
+        :param reporter: lambda x, y where x and y are the start and finish times respectively, default PRINT
+        :param debug: lambda x where x is an exception, default NO ACTION
+    """
+    if reporter is None:
+        reporter = show_elapsed_time
     start = time.time()
     try:
         yield
-    except Exception:
+    except Exception as e:
+        if debug is not None:
+            debug(e)
         raise
     finally:
         end = time.time()
-        print('Elapsed: %s' % (end - start))
+        reporter(start, end)
 
 
 def mock_not_called(name):
