@@ -41,7 +41,6 @@ def test_get_bulk_uuids_embedded(es_client_fixture):
     assert result[0]['lab']['awards'] is not None  # check embedding
     assert result[0]['lab']['awards'][0]['project'] is not None
 
-
     # one page of results, should give us 10
     users = execute_lucene_query_on_es(client=es_client_fixture, index='fourfront-mastertestuser', query={})
     uuids = [doc['_id'] for doc in users]
