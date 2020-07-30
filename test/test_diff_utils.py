@@ -1,5 +1,43 @@
 import pytest
+
 from dcicutils.diff_utils import DiffManager
+
+
+def test_diffmanager_unknown_style():
+
+    err = DiffManager.UnknownStyle('foo')
+
+    assert isinstance(err, Exception)
+    assert isinstance(err, DiffManager.UnknownStyle)
+
+    assert str(err) == "foo is not a known style."
+
+
+def test_merge_label_key():
+
+    jdm = DiffManager('javascript')
+
+    assert jdm._merge_label_key(None, 'foo') == 'foo'
+    assert jdm._merge_label_key('foo', 'bar') == 'foo.bar'
+
+    pdm = DiffManager('python')
+
+    assert pdm._merge_label_key(None, 'foo') == 'foo'
+    assert pdm._merge_label_key('foo', 'bar') == 'foo["bar"]'
+
+    ldm = DiffManager('list')
+
+    assert ldm._merge_label_key(None, 'foo') == ('foo',)
+    assert ldm._merge_label_key(('foo',), 'bar') == ('foo', 'bar')
+
+    fdm = DiffManager('foo')
+
+    # TODO: Probably better to raise an error here, but this is an internal function
+    #       and this isn't likely to happen. This is here for code coverage to know what does happen.
+    assert fdm._merge_label_key(None, 'bar') == 'bar'
+
+    with pytest.raises(DiffManager.UnknownStyle):
+        fdm._merge_label_key('foo', 'bar')
 
 
 def test_unroll():
@@ -115,6 +153,7 @@ def test_comparison():
         'item.b : "bar" => "baz"'
     ]
 
+
 def test_comparison_python():
 
     dm = DiffManager(style='python', label="item")
@@ -200,6 +239,7 @@ def test_patch_diffs_with_omitted_subscripts_list_style():
         ('a', 'c', 'gamma'),
     ]
 
+
 def test_patch_diffs_with_omitted_subscripts_javascript_style():
 
     dm = DiffManager(style='javascript')
@@ -216,6 +256,7 @@ def test_patch_diffs_with_omitted_subscripts_javascript_style():
         'a.c.beta',
         'a.c.gamma',
     ]
+
 
 def test_patch_diffs_with_omitted_subscripts_python_style():
 
