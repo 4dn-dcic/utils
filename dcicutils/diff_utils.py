@@ -37,7 +37,7 @@ class DiffManager:
         elif self.style == 'javascript':
             return "{label}.{key}".format(label=label, key=key)
         elif self.style == 'python':
-            return '{label}[{key}]'.format(label=label, key=self._q(key))
+            return '{label}[{key}]'.format(label=label, key=json.dumps(key))
         elif self.style == 'list':
             return label + (key,)
         else:
@@ -61,7 +61,7 @@ class DiffManager:
 
     def unroll(self, item, _omit_subscripts=False):
         """
-        Unrolls a JSON structure into a dictionary of keys.
+        Unrolls a JSON structure (a multi-level Python dictionary) into a (flat) dictionary of dotted keys.
         The keys in the dictionary depend on the DiffManager's style attribute.
         e.g.,
         {"a": {"b": 1, "c": 2}, "b": 3} => {"a.b": 1, "a.c": 2, "b": 3}               # javascript style
@@ -90,8 +90,9 @@ class DiffManager:
     def diffs(self, item1, item2, _omit_subscripts=False):
         """
         Args:
-            item1: a JSON object
-            item2: a JSON object
+            item1: a python dictionary (representing its JSON equivalent)
+            item2: a python dictionary (representing its JSON equivalent)
+            _omit_subscripts: Used INTERNALLY ONLY by .patch_diffs to cause some detail to be elided.
         Returns:
             a dictionary of with keys "added", "changed", "same", and "removed" containing names of keys of each kind.
         """
@@ -100,7 +101,8 @@ class DiffManager:
         d2 = self.unroll(item2, _omit_subscripts=_omit_subscripts)
         return self._diffs(d1, d2)
 
-    def _diffs(self, d1, d2):
+    @classmethod
+    def _diffs(cls, d1, d2):
         removed = []
         added = []
         same = []
@@ -129,7 +131,7 @@ class DiffManager:
 
     def patch_diffs(self, item):
         """
-        Returns a list of keys for would-be-affected properties if item were a patch request for a piece of JSON
+        Returns a list of keys for would-be-affected properties if item were a patch request for a piece of JSON.
         """
         result = self.diffs({}, item, _omit_subscripts=True)
         return sorted(result.get('added', []))
@@ -142,7 +144,7 @@ class DiffManager:
 
     def comparison(self, item1, item2):
         """
-        Returns a description of the changes between two JSON items.
+        Returns a description of the changes between two JSON items (represented as Python dictionaries).
         Each line is a string of the form "<key-path>: <old> => <new>".
         For additions, the <old> will be absent.
         For removals, the <new> will be absent.
@@ -155,21 +157,19 @@ class DiffManager:
 
         subresult = []
         for k in diffs.get('removed', []):
-            subresult.append("{label} : {value1} =>".format(label=k, value1=self._q(d1[k])))
+            subresult.append("{label} : {value1} =>".format(label=k, value1=json.dumps(d1[k])))
         result = result + self._maybe_sorted(subresult, for_change_type=True)
 
         subresult = []
         for k in diffs.get('changed', []):
             subresult.append("{label} : {value1} => {value2}".format(label=k,
-                                                                     value1=self._q(d1[k]), value2=self._q(d2[k])))
+                                                                     value1=json.dumps(d1[k]),
+                                                                     value2=json.dumps(d2[k])))
         result = result + self._maybe_sorted(subresult, for_change_type=True)
 
         subresult = []
         for k in diffs.get('added', []):
-            subresult.append("{label} : => {value2}".format(label=k, value2=self._q(d2[k])))
+            subresult.append("{label} : => {value2}".format(label=k, value2=json.dumps(d2[k])))
         result = result + self._maybe_sorted(subresult, for_change_type=True)
 
         return self._maybe_sorted(result, for_change_type=False)
-
-    def _q(self, datum):
-        return json.dumps(datum)
