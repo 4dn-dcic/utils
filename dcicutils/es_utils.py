@@ -88,7 +88,7 @@ def execute_lucene_query_on_es(client, index, query):
         return None
 
 
-def get_bulk_uuids_embedded(client, index, uuids):
+def get_bulk_uuids_embedded(client, index, uuids, is_generator=False):
     """
     Gets the embedded view for all uuids in an index with a single multi-get ES request.
 
@@ -100,18 +100,20 @@ def get_bulk_uuids_embedded(client, index, uuids):
     :param client: elasticsearch client
     :param index: index to search
     :param uuids: list of uuids (all of the same type)
+    :param is_generator: whether to use a generator over the response (NOT paginate)
 
     :returns: list of embedded views of the given uuids, if any
     """
     final_result = []
-    try:
-        response = client.mget(body={
-            'docs': [{'_id': _id,
-                      'source': ['embedded.*'],
-                      '_index': index} for _id in uuids]
+    response = client.mget(body={  # XXX: this could still be slow even if you use is_generator
+        'docs': [{'_id': _id,
+                  'source': ['embedded.*'],
+                  '_index': index} for _id in uuids]
         })
+    if is_generator:
+        for doc in response['docs']:
+            yield doc['_source']['embedded']
+    else:
         for doc in response['docs']:
             final_result.append(doc['_source']['embedded'])
-    except Exception as e:
-        raise e
-    return final_result
+        return final_result
