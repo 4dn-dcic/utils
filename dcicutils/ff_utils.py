@@ -882,7 +882,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
     returns a dictionary with item types (schema name), and list of items in defined frame
     Sometimes, certain fields need to be skipped (i.e. relations), you can use ignore fields.
     Args:
-        uuid_list (array):               Starting node for search, only use uuids.
+        uuid_list (list):                Starting node for search, only use uuids.
         key (dict):                      standard ff_utils authentication key
         ff_env (str):                    standard ff environment string
         store_frame (str, default 'raw'):Depending on use case, can store frame raw or object or embedded
