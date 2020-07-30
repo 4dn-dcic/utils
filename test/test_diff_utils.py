@@ -40,6 +40,33 @@ def test_merge_label_key():
         fdm._merge_label_key('foo', 'bar')
 
 
+def test_merge_label_elem():
+
+    jdm = DiffManager('javascript')
+
+    assert jdm._merge_label_elem(None, 0) == '[0]'
+    assert jdm._merge_label_elem('foo', 0) == 'foo[0]'
+
+    pdm = DiffManager('python')
+
+    assert pdm._merge_label_elem(None, 0) == '[0]'
+    assert pdm._merge_label_elem('foo', 0) == 'foo[0]'
+
+    ldm = DiffManager('list')
+
+    assert ldm._merge_label_elem(None, 0) == (0,)
+    assert ldm._merge_label_elem(('foo',), 0) == ('foo', 0)
+
+    fdm = DiffManager('foo')
+
+    # TODO: Probably better to raise an error here, but this is an internal function
+    #       and this isn't likely to happen. This is here for code coverage to know what does happen.
+    assert fdm._merge_label_elem(None, 0) == '[0]'
+
+    with pytest.raises(DiffManager.UnknownStyle):
+        fdm._merge_label_elem('foo', 0)
+
+
 def test_unroll():
 
     dm = DiffManager(label="item")
@@ -121,6 +148,22 @@ def test_diffs():
         "same": ["item.a"],
     }
 
+    assert dm.diffs({"a": "foo"}, {"a": "foo", "b": "baz"}) == {
+        "added": ["item.b"],
+        "same": ["item.a"],
+    }
+
+    assert dm.diffs({"a": "foo", "b": "bar", "c": "zzz"}, {"a": "foo", "b": "bar"}) == {
+        "removed": ["item.c"],
+        "same": ["item.a", "item.b"],
+    }
+
+    assert dm.diffs({"a": "foo", "b": "bar", "c": "zzz"}, {"a": "foo", "b": "baz"}) == {
+        "removed": ["item.c"],
+        "changed": ["item.b"],
+        "same": ["item.a"],
+    }
+
 
 def test_comparison():
 
@@ -151,6 +194,21 @@ def test_comparison():
         {"a": "foo", "b": "baz"}
     ) == [
         'item.b : "bar" => "baz"'
+    ]
+
+    assert dm.comparison(
+        {"b": "bar"},
+        {"a": "foo", "b": "baz"}
+    ) == [
+        'item.a : => "foo"',
+        'item.b : "bar" => "baz"'
+    ]
+
+    assert dm.comparison(
+        {"a": "foo", "b": "bar"},
+        {"a": "foo"}
+    ) == [
+        'item.b : "bar" =>'
     ]
 
 
@@ -190,6 +248,21 @@ def test_comparison_python():
         {"a": "foo", "b": "baz"}
     ) == [
         'item["b"] : "bar" => "baz"'
+    ]
+
+    assert dm.comparison(
+        {"b": "bar"},
+        {"a": "foo", "b": "baz"}
+    ) == [
+        'item["a"] : => "foo"',
+        'item["b"] : "bar" => "baz"'
+    ]
+
+    assert dm.comparison(
+        {"a": "foo", "b": "bar"},
+        {"a": "foo"}
+    ) == [
+        'item["b"] : "bar" =>'
     ]
 
 
