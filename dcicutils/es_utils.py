@@ -104,15 +104,18 @@ def get_bulk_uuids_embedded(client, index, uuids, is_generator=False):
 
     :returns: list of embedded views of the given uuids, if any
     """
+    def return_generator(resp):
+        for d in resp['docs']:
+            yield d['_source']['embedded']
+
     final_result = []
     response = client.mget(body={  # XXX: this could still be slow even if you use is_generator
         'docs': [{'_id': _id,
                   'source': ['embedded.*'],
                   '_index': index} for _id in uuids]
         })
-    if is_generator:
-        for doc in response['docs']:
-            yield doc['_source']['embedded']
+    if is_generator is True:
+        return return_generator(response)
     else:
         for doc in response['docs']:
             final_result.append(doc['_source']['embedded'])
