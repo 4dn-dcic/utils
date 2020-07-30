@@ -34,7 +34,6 @@ def test_lucene_query_basic(es_client_fixture):
 def test_get_bulk_uuids_embedded(es_client_fixture):
     """ Tests getting some bulk uuids acquired from search. """
     uuids = ['1a12362f-4eb6-4a9c-8173-776667226988']  # only one uuid first
-    pytest.set_trace()
     result1 = get_bulk_uuids_embedded(es_client_fixture, 'fourfront-mastertestuser', uuids, is_generator=False)
     assert len(result1) == 1
     assert result1[0]['uuid'] == uuids[0]  # check uuid
