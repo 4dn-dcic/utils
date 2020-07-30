@@ -30,7 +30,8 @@ def test_merge_label_key():
     assert ldm._merge_label_key(None, 'foo') == ('foo',)
     assert ldm._merge_label_key(('foo',), 'bar') == ('foo', 'bar')
 
-    fdm = DiffManager('foo')
+    fdm = DiffManager('javascript')  # redefined on next line
+    fdm.style = 'no-such-style'
 
     # TODO: Probably better to raise an error here, but this is an internal function
     #       and this isn't likely to happen. This is here for code coverage to know what does happen.
@@ -47,21 +48,32 @@ def test_merge_label_elem():
     assert jdm._merge_label_elem(None, 0) == '[0]'
     assert jdm._merge_label_elem('foo', 0) == 'foo[0]'
 
+    assert jdm._merge_label_elem(None, 0, _omit_subscripts=True) is None
+    assert jdm._merge_label_elem('foo', 0, _omit_subscripts=True) == 'foo'
+
     pdm = DiffManager('python')
 
     assert pdm._merge_label_elem(None, 0) == '[0]'
     assert pdm._merge_label_elem('foo', 0) == 'foo[0]'
+
+    assert pdm._merge_label_elem(None, 0, _omit_subscripts=True) is None
+    assert pdm._merge_label_elem('foo', 0, _omit_subscripts=True) == 'foo'
 
     ldm = DiffManager('list')
 
     assert ldm._merge_label_elem(None, 0) == (0,)
     assert ldm._merge_label_elem(('foo',), 0) == ('foo', 0)
 
-    fdm = DiffManager('foo')
+    assert ldm._merge_label_elem(None, 0, _omit_subscripts=True) is None
+    assert ldm._merge_label_elem(('foo',), 0, _omit_subscripts=True) == ('foo',)
+
+    fdm = DiffManager('javascript')  # redefined on next line
+    fdm.style = 'no-such-style'
 
     # TODO: Probably better to raise an error here, but this is an internal function
     #       and this isn't likely to happen. This is here for code coverage to know what does happen.
     assert fdm._merge_label_elem(None, 0) == '[0]'
+    assert fdm._merge_label_elem(None, 0, _omit_subscripts=True) is None
 
     with pytest.raises(DiffManager.UnknownStyle):
         fdm._merge_label_elem('foo', 0)
