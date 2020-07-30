@@ -86,3 +86,37 @@ def execute_lucene_query_on_es(client, index, query):
     except KeyError:
         logger.error('Searching index %s with query %s gave no results' % (index, query))
         return None
+
+
+def get_bulk_uuids_embedded(client, index, uuids, is_generator=False):
+    """
+    Gets the embedded view for all uuids in an index with a single multi-get ES request.
+
+    NOTE: because an index is required, when passing uuids to this method they must all be
+    of the same item type. The index can be determined by:
+            ''.join([eb_env_name, item_type])
+            ex: fourfront-mastertestuser or fourfront-mastertestfile_format
+
+    :param client: elasticsearch client
+    :param index: index to search
+    :param uuids: list of uuids (all of the same type)
+    :param is_generator: whether to use a generator over the response (NOT paginate)
+
+    :returns: list of embedded views of the given uuids, if any
+    """
+    def return_generator(resp):
+        for d in resp['docs']:
+            yield d['_source']['embedded']
+
+    final_result = []
+    response = client.mget(body={  # XXX: this could still be slow even if you use is_generator
+        'docs': [{'_id': _id,
+                  'source': ['embedded.*'],
+                  '_index': index} for _id in uuids]
+        })
+    if is_generator is True:
+        return return_generator(response)
+    else:
+        for doc in response['docs']:
+            final_result.append(doc['_source']['embedded'])
+        return final_result
