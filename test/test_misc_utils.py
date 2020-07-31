@@ -4,6 +4,7 @@ import json
 import os
 import pytest
 import re
+import time
 import warnings
 import webtest
 
@@ -607,6 +608,51 @@ def test_utc_today_str():
     assert re.match(pattern, actual), "utc_today_str() result %s did not match format: %s" % (actual, pattern)
 
 
+def test_lockout_manager_timestamp():
+
+    tick = 0.1
+    dt = ControlledTime(tick_seconds=tick)
+    timedelta = datetime_module.timedelta
+
+    with mock.patch.object(datetime_module, "datetime", dt):
+        with mock.patch.object(time, "sleep", dt.sleep):
+
+            manager = LockoutManager(lockout_seconds=60, safety_seconds=1, action="simulated action")
+
+            assert manager.timestamp == manager.EARLIEST_TIMESTAMP
+
+            manager.wait_if_needed()
+
+            assert manager.timestamp == dt.just_now()
+
+            manager = LockoutManager(lockout_seconds=60, safety_seconds=1, action="simulated action", enabled=False)
+
+            assert manager.timestamp == manager.EARLIEST_TIMESTAMP
+
+            manager.wait_if_needed()
+
+            t0 = dt.just_now()
+
+            assert manager.timestamp == t0
+
+            # This will check time twice but not sleep when disabled.
+            # The internal timestamp will be set to the second of those time checks.
+            manager.wait_if_needed()
+
+            assert manager.timestamp == t0 + timedelta(seconds=2 * tick)
+
+            time.sleep(30)
+
+            # The passage of time doesn't change the timestamp value, only waiting or update_timestamp does.
+            assert manager.timestamp == t0 + timedelta(seconds=2 * tick)
+
+            t1 = dt.just_now()
+
+            manager.update_timestamp()  # Reads time once to set it.
+
+            assert manager.timestamp == t1 + timedelta(seconds=1 * tick)
+
+
 def test_lockout_manager():
 
     protected_action = "simulated action"
@@ -743,6 +789,15 @@ def test_rate_manager():
     with mock.patch("datetime.datetime", dt):
         with mock.patch("time.sleep", dt.sleep):
             my_log = MockLogger()
+
+            with pytest.raises(TypeError):
+                RateManager(allowed_attempts=3.2)
+
+            with pytest.raises(TypeError):
+                RateManager(allowed_attempts=0)
+
+            with pytest.raises(TypeError):
+                RateManager(allowed_attempts=-3)
 
             class WaitTester:
 
