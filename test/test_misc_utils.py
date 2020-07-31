@@ -790,14 +790,12 @@ def test_rate_manager():
         with mock.patch("time.sleep", dt.sleep):
             my_log = MockLogger()
 
-            with pytest.raises(TypeError):
-                RateManager(allowed_attempts=3.2)
-
-            with pytest.raises(TypeError):
-                RateManager(allowed_attempts=0)
-
-            with pytest.raises(TypeError):
-                RateManager(allowed_attempts=-3)
+            try:
+                RateManager(allowed_attempts=-7, interval_seconds=60)
+            except TypeError as e:
+                assert str(e) == "The allowed_attempts must be a positive integer: -7"
+            else:
+                raise AssertionError("Error not raised.")
 
             class WaitTester:
 

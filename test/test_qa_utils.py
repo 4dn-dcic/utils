@@ -600,6 +600,24 @@ def test_retry_manager():
                     assert mock_sleep.mock_calls[i + 1][ARGS][0] == 8.75
                     assert mock_sleep.mock_calls[i + 2][ARGS][0] == 10.9375
 
+            mock_sleep.reset_mock()
+            assert mock_sleep.call_count == 0
+
+            with RetryManager.retry_options('reliably_add3', wait_seconds=7, wait_increment=1):
+
+                for i in range(10):
+                    # In this context, we won't retry enough to succeed...
+                    rarely_add3.reset()
+                    with pytest.raises(Exception):
+                        reliably_add3(1)
+
+                # Now the sleep calls will be the same 7,  8.75, 10.9375 progression
+                assert mock_sleep.call_count == 30
+                for i in range(0, 30, 3):  # start, stop, step
+                    assert mock_sleep.mock_calls[i][ARGS][0] == 7
+                    assert mock_sleep.mock_calls[i + 1][ARGS][0] == 8
+                    assert mock_sleep.mock_calls[i + 2][ARGS][0] == 9
+
         with pytest.raises(ValueError):
 
             # The name-key must not be a number.
@@ -633,6 +651,10 @@ def test_mock_file_system():
 
                 filename = "no.such.file"
                 assert os.path.exists(filename) is False
+
+                with pytest.raises(AssertionError):
+                    with io.open(filename, 'q'):
+                        pass
 
                 with io.open(filename, 'w') as fp:
                     fp.write("foo")
