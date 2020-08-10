@@ -304,8 +304,8 @@ class Retry:
                     try:
                         success = function(*args, **kwargs)
                         return success
-                    except Exception as last_error:
-                        pass
+                    except Exception as e:
+                        last_error = e
                 if last_error is not None:
                     raise last_error
 
