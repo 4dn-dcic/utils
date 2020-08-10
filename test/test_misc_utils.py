@@ -12,7 +12,7 @@ from dcicutils.misc_utils import (
     PRINT, ignored, filtered_warnings, get_setting_from_context, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
     Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool,
-    LockoutManager,
+    LockoutManager, check_true
 )
 from dcicutils.qa_utils import Occasionally, ControlledTime, override_environ
 from unittest import mock
@@ -974,3 +974,14 @@ def test_environ_bool():
         assert environ_bool("FOO") is False
         assert environ_bool("FOO", default=None) is False
         assert environ_bool("FOO", None) is False
+
+
+def test_check_true():
+
+    x = [1, 2, 3]
+    check_true(x == [1, 2, 3], "x is not a list of one, two, and three.")
+
+    msg = "x is not a list of four, five, and six."
+    with pytest.raises(RuntimeError) as e:
+        check_true(x == [4, 5, 6], msg)
+    assert msg in str(e)
