@@ -282,6 +282,10 @@ class Retry:
                 wait_multiplier=cls._defaulted(wait_multiplier, cls.DEFAULT_WAIT_MULTIPLIER),
             )
 
+            check_true(isinstance(retries_allowed, int) and retries_allowed >= 0,
+                       "The retries_allowed must be a non-negative integer.",
+                       error_class=ValueError)
+
             # See the 'retrying' method to understand what this is about. -kmp 8-Jul-2020
             if function_name != 'anonymous':
                 cls._RETRY_OPTIONS_CATALOG[function_name] = function_profile  # Only for debugging.
@@ -290,6 +294,7 @@ class Retry:
             def wrapped_function(*args, **kwargs):
                 tries_allowed = function_profile.tries_allowed
                 wait_seconds = function_profile.wait_seconds or 0
+                last_error = None
                 for i in range(tries_allowed):
                     if i > 0:
                         if i > 1:
@@ -299,9 +304,10 @@ class Retry:
                     try:
                         success = function(*args, **kwargs)
                         return success
-                    except Exception:
-                        pass
-                raise
+                    except Exception as e:
+                        last_error = e
+                if last_error is not None:
+                    raise last_error
 
             return wrapped_function
 
@@ -597,3 +603,16 @@ def environ_bool(var, default=False):
         return default
     else:
         return os.environ[var].lower() == "true"
+
+
+def check_true(test_value: object,
+               message: str,
+               error_class: Type[Exception] = RuntimeError):
+    """
+    If the first argument does not evaluate to a true value, an error is raised.
+
+    The error, if one is raised, will be of type error_class, and its message will be given by message.
+    The error_class defaults to RuntimeError, but may be any Exception class.
+    """
+    if not test_value:
+        raise error_class(message)

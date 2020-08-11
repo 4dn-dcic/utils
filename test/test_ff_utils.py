@@ -844,7 +844,7 @@ def test_faceted_search_exp_set(integrated_ff):
     pub = {'Publication': 'No value'}
     pub.update(for_all)
     resp = ff_utils.faceted_search(**pub)
-    assert len(resp) == 10
+    assert len(resp) == 9
     mods = {'Modifications': 'Stable Transfection'}
     mods.update(for_all)
     resp = ff_utils.faceted_search(**mods)
