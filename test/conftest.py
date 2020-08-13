@@ -3,13 +3,12 @@ import pytest
 import os
 from dcicutils.s3_utils import s3Utils
 from dcicutils.ff_utils import authorized_request
+from .conftest_settings import TEST_DIR
 
 # XXX: Refactor to config
 INTEGRATED_ENV = 'fourfront-mastertest'
 INTEGRATED_ES = 'https://search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.us-east-1.es.amazonaws.com'
 
-
-TEST_DIR = os.path.join(os.path.dirname(__file__))
 
 @pytest.fixture(scope='session')
 def basestring():

@@ -12,7 +12,7 @@ from dcicutils import qa_utils
 from dcicutils.misc_utils import Retry
 from dcicutils.qa_utils import (
     mock_not_called, local_attrs, override_environ, show_elapsed_time, timed,
-    ControlledTime, Occasionally, RetryManager, MockFileSystem,
+    ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -763,3 +763,9 @@ def test_timed():
             assert mocked_printer.printed == []
             assert stuff == [2.0]
             assert success, "RuntimeError was not caught."
+
+
+def test_not_really_random():
+
+    r = NotReallyRandom()
+    assert [r.randint(3, 5) for _ in range(10)] == [3, 4, 5, 3, 4, 5, 3, 4, 5, 3]

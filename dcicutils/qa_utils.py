@@ -384,3 +384,24 @@ class MockFileSystem:
                 self.file_system.files[file] = text
 
         return MockFileWriter(file_system=file_system, file=file)
+
+
+class NotReallyRandom:
+
+    def __init__(self):
+        self.counter = 0
+
+    def _random_int(self, n):
+        """Returns an integer between 0 and n, upper-exclusive, not one of the published 'random' operations."""
+        result = self.counter % n
+        self.counter += 1
+        return result
+
+    def randint(self, a, b):
+        """Returns a number between a and b, inclusive at both ends, though not especially randomly."""
+        assert isinstance(a, int) and isinstance(b, int) and a < b, "Arguments must be two strictly ascending ints."
+        rangesize = int(abs(b-a))+1
+        return a + self._random_int(rangesize)
+
+    def choice(self, things):
+        return things[self._random_int(len(things))]
