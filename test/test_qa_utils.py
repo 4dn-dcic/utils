@@ -680,6 +680,26 @@ def test_mock_file_system():
                 with pytest.raises(FileNotFoundError):
                     io.open(filename, 'r')
 
+                with io.open(filename, 'wb') as fp:
+                    fp.write(b'foo')
+                    fp.write(b'bar')
+                    fp.write(bytes((10, 65, 66, 67, 10)))  # Unicode Newline, A, B, C, Newline
+                    fp.write(b'a b c')
+                    fp.write(b'\n')
+
+                assert os.path.exists(filename)
+
+                with io.open(filename, 'rb') as fp:
+                    assert fp.read() == b'foobar\nABC\na b c\n'
+
+                with io.open(filename, 'r') as fp:
+                    assert [line.rstrip('\n') for line in fp] == ['foobar', 'ABC', 'a b c']
+
+                os.remove(filename)
+
+                assert not os.path.exists(filename)
+
+
 
 class _MockPrinter:
 
