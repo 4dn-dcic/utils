@@ -3,15 +3,16 @@ import boto3
 import pytest
 import os
 import requests
+import time
 
 from dcicutils.misc_utils import check_true
 from dcicutils.s3_utils import s3Utils
-from dcicutils.ff_utils import authorized_request
+from dcicutils.ff_utils import authorized_request, get_health_page
 from dcicutils.beanstalk_utils import describe_beanstalk_environments, REGION
 from .conftest_settings import TEST_DIR
 
 
-def _discover_es_info(envname):
+def _discover_es_health(envname):
     try:
         eb_client = boto3.client('elasticbeanstalk', region_name=REGION)
         # Calling describe_beanstalk_environments is pretty much the same as doing eb_client.describe_environments(...)
@@ -23,9 +24,21 @@ def _discover_es_info(envname):
                 # TODO: It would be nice if we were using https: for everything. -kmp 14-Aug-2020
                 res = requests.get("http://%s/health?format=json" % cname)
                 health_json = res.json()
-                return health_json['elasticsearch'], health_json['namespace']
+                return health_json
     except Exception as e:
         raise RuntimeError("Unable to discover elasticsearch info for %s:\n%s: %s" % (envname, e.__class__.__name__, e))
+
+
+def _discover_es_info(envname):
+    discovered_health_json = _discover_es_health(envname)
+    time.sleep(1)  # Reduce throttling risk
+    ff_health_json = get_health_page(ff_env=envname)
+    # Consistency check that both utilities are returning the same info.
+    assert discovered_health_json['beanstalk_env'] == ff_health_json['beanstalk_env']
+    assert discovered_health_json['elasticsearch'] == ff_health_json['elasticsearch']
+    assert discovered_health_json['namespace'] == ff_health_json['namespace']
+    # This should be all we actually need:
+    return discovered_health_json['elasticsearch'], discovered_health_json['namespace']
 
 
 # XXX: Refactor to config
@@ -42,7 +55,7 @@ check_true(INTEGRATED_ENV == INTEGRATED_ES_NAMESPACE, "INTEGRATED_ENV and INTEGR
 @pytest.fixture(scope='session')
 def basestring():
     try:
-        basestring = basestring  # noQA
+        basestring = basestring  # noQA - PyCharm static analysis doesn't understand this Python 2.7 compatibility issue
     except NameError:
         basestring = str
     return basestring
