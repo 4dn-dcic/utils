@@ -37,6 +37,7 @@ def generate_sample_fastq_content(num=10, length=10):
 
 FASTQ_SUFFIXES = [".fastq", ".fq"]
 
+
 def generate_sample_fastq_file(filename, num=10, length=10, compressed=None):
     """
     Creates a new fastq file with the given name, containing (pseudo)randomly generated content.
