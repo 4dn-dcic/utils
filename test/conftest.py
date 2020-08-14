@@ -1,15 +1,44 @@
 # flake8: noqa
+import boto3
 import pytest
 import os
+import requests
+
+from dcicutils.misc_utils import check_true
 from dcicutils.s3_utils import s3Utils
 from dcicutils.ff_utils import authorized_request
+from dcicutils.beanstalk_utils import describe_beanstalk_environments, REGION
+
+
+def _discover_es_info(envname):
+    try:
+        eb_client = boto3.client('elasticbeanstalk', region_name=REGION)
+        # Calling describe_beanstalk_environments is pretty much the same as doing eb_client.describe_environments(...)
+        # except it's robust against AWS throttling us for calling it too often.
+        envs = describe_beanstalk_environments(eb_client, EnvironmentNames=[envname])['Environments']
+        for env in envs:
+            if env.get('EnvironmentName') == envname:
+                cname = env.get('CNAME')
+                # TODO: It would be nice if we were using https: for everything. -kmp 14-Aug-2020
+                res = requests.get("http://%s/health?format=json" % cname)
+                health_json = res.json()
+                return health_json['elasticsearch'], health_json['namespace']
+    except Exception as e:
+        raise RuntimeError("Unable to discover elasticsearch info for %s:\n%s: %s" % (envname, e.__class__.__name__, e))
+
 
 # XXX: Refactor to config
 INTEGRATED_ENV = 'fourfront-mastertest'
-INTEGRATED_ES = 'https://search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.us-east-1.es.amazonaws.com'
+# This used to be:
+# INTEGRATED_ES = 'https://search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.us-east-1.es.amazonaws.com'
+# but it changes too much, so now we discover it from the 'elasticsearch' and 'namespace' parts of health page...
+INTEGRATED_ES, INTEGRATED_ES_NAMESPACE = _discover_es_info(INTEGRATED_ENV)
 
+# We _think_ these are always the same, but maybe not. Perhaps worth noting if/when they diverge.
+check_true(INTEGRATED_ENV == INTEGRATED_ES_NAMESPACE, "INTEGRATED_ENV and INTEGRATED_ES_NAMESPACE are not the same.")
 
 TEST_DIR = os.path.join(os.path.dirname(__file__))
+
 
 @pytest.fixture(scope='session')
 def basestring():
