@@ -1,9 +1,12 @@
 import datetime
+import io
 import pytest
 
+from dcicutils.qa_utils import ignored, override_environ
 from dcicutils.s3_utils import s3Utils
 from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
 from dcicutils.env_utils import get_standard_mirror_env, FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, CGAP_PUBLIC_URL_PRD
+from unittest import mock
 
 
 @pytest.mark.parametrize('ff_ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat'])
@@ -138,6 +141,133 @@ def test_s3Utils_get_google_key():
     assert keys["project_id"] == "fourdn-fourfront"
     for dict_key in ['private_key_id', 'private_key', 'client_email', 'client_id', 'auth_uri', 'client_x509_cert_url']:
         assert keys[dict_key]
+
+
+def test_s3Utils_get_access_keys_with_old_style_default():
+    util = s3Utils(env='fourfront-mastertest')
+    with mock.patch.object(util, "get_key") as mock_get_key:
+        actual_key = {'key': 'some-key', 'server': 'some-server'}
+        def mocked_get_key(keyfile_name):
+            ignored(keyfile_name)
+            key_wrapper = {'default': actual_key}
+            return key_wrapper
+        mock_get_key.side_effect = mocked_get_key
+        key = util.get_access_keys()
+        assert key == actual_key
+
+
+def test_s3Utils_get_key_non_json_data():
+
+    util = s3Utils(env='fourfront-mastertest')
+
+    non_json_string = '1 { 2 3 >'
+
+    with mock.patch.object(util.s3, "get_object") as mock_get_object:
+        mock_get_object.return_value = {'Body': io.BytesIO(bytes(non_json_string, encoding='utf-8'))}
+        assert util.get_key() == non_json_string
+
+    with mock.patch.object(util.s3, "get_object") as mock_get_object:
+        mock_get_object.return_value = {'Body': io.StringIO(non_json_string)}
+        assert util.get_key() == non_json_string
+
+
+def test_s3Utils_delete_key():
+
+    sample_key_name = "--- reserved_key_name_for_unit_testing ---"
+
+    util = s3Utils(env='fourfront-mastertest')
+
+    with mock.patch.object(util.s3, "delete_object") as mock_delete_object:
+
+        def make_mocked_delete_object(expected_bucket, expected_key):
+
+            def mocked_delete_object(Bucket, Key):
+                assert Bucket == expected_bucket
+                assert Key == expected_key
+
+            return mocked_delete_object
+
+        mock_delete_object.side_effect = make_mocked_delete_object(expected_bucket=util.outfile_bucket,
+                                                                   expected_key=sample_key_name)
+
+        util.delete_key(sample_key_name)  # This won't err if everything went well
+
+        assert mock_delete_object.call_count == 1
+
+        explicit_bucket = '--- reserved_bucket_name_for_unit_testing ---'
+
+        mock_delete_object.side_effect = make_mocked_delete_object(expected_bucket=explicit_bucket,
+                                                                   expected_key=sample_key_name)
+
+        util.delete_key(sample_key_name, bucket=explicit_bucket)
+
+        assert mock_delete_object.call_count == 2
+
+
+def test_s3Utils_s3_put():
+
+    util = s3Utils(env='fourfront-mastertest')
+
+    some_content_type = "text/plain"
+    with mock.patch("mimetypes.guess_type") as mock_guess_type:
+        mock_guess_type.return_value = [some_content_type]
+        with mock.patch.object(util.s3, "put_object") as mock_put_object:
+            def mocked_put_object(**kwargs):
+                return kwargs
+            mock_put_object.side_effect = mocked_put_object
+            item = {'a': 1, 'b': 2}
+            some_key = 'some-key'
+            assert util.s3_put(item, upload_key=some_key) == {
+                "Body": item,
+                "Bucket": util.outfile_bucket,
+                "Key": some_key,
+                "ContentType": some_content_type,
+            }
+            some_acl = 'some-acl'
+            assert util.s3_put(item, upload_key=some_key, acl=some_acl) == {
+                "Body": item,
+                "Bucket": util.outfile_bucket,
+                "Key": some_key,
+                "ContentType": some_content_type,
+                "ACL": some_acl,
+            }
+
+
+def test_s3Utils_s3_put_secret():
+
+    util = s3Utils(env='fourfront-mastertest')
+    standard_algorithm = "AES256"
+    environmental_key = 'environmental-key'
+    with override_environ(S3_ENCRYPT_KEY=environmental_key):
+        with mock.patch.object(util.s3, "put_object") as mock_put_object:
+            def mocked_put_object(**kwargs):
+                return kwargs
+            mock_put_object.side_effect = mocked_put_object
+            item = {'a': 1, 'b': 2}
+            some_key = 'some-key'
+            some_secret = 'some-secret'
+            assert util.s3_put_secret(item, keyname=some_key) == {
+                "Body": item,
+                "Bucket": util.sys_bucket,
+                "Key": some_key,
+                "SSECustomerKey": environmental_key,
+                "SSECustomerAlgorithm": standard_algorithm,
+            }
+            some_bucket = 'some-bucket'
+            assert util.s3_put_secret(item, keyname=some_key, bucket=some_bucket) == {
+                "Body": item,
+                "Bucket": some_bucket,
+                "Key": some_key,
+                "SSECustomerKey": environmental_key,
+                "SSECustomerAlgorithm": standard_algorithm,
+            }
+            assert util.s3_put_secret(item, keyname=some_key, secret=some_secret) == {
+                "Body": item,
+                "Bucket": util.sys_bucket,
+                "Key": some_key,
+                "SSECustomerKey": some_secret,
+                "SSECustomerAlgorithm": standard_algorithm,
+            }
 
 
 def test_does_key_exist():
