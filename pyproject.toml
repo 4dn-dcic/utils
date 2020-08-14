@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "0.38.2"
+version = "0.39.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -27,6 +27,9 @@ pytz = ">=2016.4"
 gitpython = "^3.1.2"
 
 [tool.poetry.dev-dependencies]
+# PyCharm says boto3-stubs contains useful type hints
+# This version will work in our Python 3.4 to Python 3.7 span:
+boto3-stubs = "1.10.40.0"
 pytest = ">=4.5.0"
 pytest-cov = ">=2.7.1"
 pytest-mock = ">=1.10.4"

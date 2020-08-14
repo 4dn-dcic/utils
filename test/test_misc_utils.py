@@ -12,7 +12,7 @@ from dcicutils.misc_utils import (
     PRINT, ignored, filtered_warnings, get_setting_from_context, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
     Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool,
-    LockoutManager, check_true
+    LockoutManager, check_true, remove_prefix, remove_suffix
 )
 from dcicutils.qa_utils import Occasionally, ControlledTime, override_environ
 from unittest import mock
@@ -985,3 +985,39 @@ def test_check_true():
     with pytest.raises(RuntimeError) as e:
         check_true(x == [4, 5, 6], msg)
     assert msg in str(e)
+
+
+def test_remove_prefix():
+    assert remove_prefix("foo:", "foo:bar") == "bar"
+    assert remove_prefix("foo:", "foo:bar", required=False) == "bar"
+    assert remove_prefix("foo:", "foo:bar", required=True) == "bar"
+
+    assert remove_prefix("foo:", "baz:bar") == "baz:bar"
+    assert remove_prefix("foo:", "baz:bar", required=False) == "baz:bar"
+    with pytest.raises(ValueError):
+        assert remove_prefix("foo:", "baz:bar", required=True)
+
+    assert remove_prefix("foo:", "foo:foo:bar") == "foo:bar"
+    assert remove_prefix("foo:", "baz:foo:bar") == "baz:foo:bar"
+
+    assert remove_prefix("", "foo") == "foo"
+    assert remove_prefix("", "foo", required=False) == "foo"
+    assert remove_prefix("", "foo", required=True) == "foo"
+
+
+def test_remove_suffix():
+    assert remove_suffix(":bar", "foo:bar") == "foo"
+    assert remove_suffix(":bar", "foo:bar", required=False) == "foo"
+    assert remove_suffix(":bar", "foo:bar", required=True) == "foo"
+
+    assert remove_suffix(":baz", "foo:bar") == "foo:bar"
+    assert remove_suffix(":baz", "foo:bar", required=False) == "foo:bar"
+    with pytest.raises(ValueError):
+        assert remove_suffix(":baz", "foo:bar", required=True)
+
+    assert remove_suffix(":bar", "foo:bar:bar") == "foo:bar"
+    assert remove_suffix(":bar", "foo:bar:baz") == "foo:bar:baz"
+
+    assert remove_suffix("", "foo") == "foo"
+    assert remove_suffix("", "foo", required=False) == "foo"
+    assert remove_suffix("", "foo", required=True) == "foo"

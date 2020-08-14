@@ -12,7 +12,7 @@ from dcicutils import qa_utils
 from dcicutils.misc_utils import Retry
 from dcicutils.qa_utils import (
     mock_not_called, local_attrs, override_environ, show_elapsed_time, timed,
-    ControlledTime, Occasionally, RetryManager, MockFileSystem,
+    ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -680,6 +680,26 @@ def test_mock_file_system():
                 with pytest.raises(FileNotFoundError):
                     io.open(filename, 'r')
 
+                with io.open(filename, 'wb') as fp:
+                    fp.write(b'foo')
+                    fp.write(b'bar')
+                    fp.write(bytes((10, 65, 66, 67, 10)))  # Unicode Newline, A, B, C, Newline
+                    fp.write(b'a b c')
+                    fp.write(b'\n')
+
+                assert os.path.exists(filename)
+
+                with io.open(filename, 'rb') as fp:
+                    assert fp.read() == b'foobar\nABC\na b c\n'
+
+                with io.open(filename, 'r') as fp:
+                    assert [line.rstrip('\n') for line in fp] == ['foobar', 'ABC', 'a b c']
+
+                os.remove(filename)
+
+                assert not os.path.exists(filename)
+
+
 
 class _MockPrinter:
 
@@ -763,3 +783,9 @@ def test_timed():
             assert mocked_printer.printed == []
             assert stuff == [2.0]
             assert success, "RuntimeError was not caught."
+
+
+def test_not_really_random():
+
+    r = NotReallyRandom()
+    assert [r.randint(3, 5) for _ in range(10)] == [3, 4, 5, 3, 4, 5, 3, 4, 5, 3]

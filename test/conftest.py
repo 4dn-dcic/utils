@@ -9,6 +9,7 @@ from dcicutils.misc_utils import check_true
 from dcicutils.s3_utils import s3Utils
 from dcicutils.ff_utils import authorized_request, get_health_page
 from dcicutils.beanstalk_utils import describe_beanstalk_environments, REGION
+from .conftest_settings import TEST_DIR
 
 
 def _discover_es_health(envname):
@@ -49,8 +50,6 @@ INTEGRATED_ES, INTEGRATED_ES_NAMESPACE = _discover_es_info(INTEGRATED_ENV)
 
 # We _think_ these are always the same, but maybe not. Perhaps worth noting if/when they diverge.
 check_true(INTEGRATED_ENV == INTEGRATED_ES_NAMESPACE, "INTEGRATED_ENV and INTEGRATED_ES_NAMESPACE are not the same.")
-
-TEST_DIR = os.path.join(os.path.dirname(__file__))
 
 
 @pytest.fixture(scope='session')

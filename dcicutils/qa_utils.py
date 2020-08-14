@@ -334,11 +334,30 @@ class RetryManager(Retry):
 FILE_SYSTEM_VERBOSE = True
 
 
+class MockFileWriter:
+
+    def __init__(self, file_system, file, binary=False, encoding='utf-8'):
+        self.file_system = file_system
+        self.file = file
+        self.encoding = encoding
+        self.stream = io.BytesIO() if binary else io.StringIO()
+
+    def __enter__(self):
+        return self.stream
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        content = self.stream.getvalue()
+        if FILE_SYSTEM_VERBOSE:
+            print("Writing %r to %s." % (content, self.file))
+        self.file_system.files[self.file] = content if isinstance(content, bytes) else content.encode(self.encoding)
+
+
 class MockFileSystem:
     """Extremely low-tech mock file system."""
 
-    def __init__(self):
-        self.files = {}
+    def __init__(self, files=None, default_encoding='utf-8'):
+        self.default_encoding = default_encoding
+        self.files = {filename: content.encode(default_encoding) for filename, content in (files or {}).items()}
 
     def exists(self, file):
         return bool(self.files.get(file))
@@ -351,36 +370,45 @@ class MockFileSystem:
         if FILE_SYSTEM_VERBOSE:
             print("Opening %r in mode %r." % (file, mode))
         if mode == 'w':
-            return self._open_for_write(file_system=self, file=file)
+            return self._open_for_write(file_system=self, file=file, binary=False)
+        elif mode == 'wb':
+            return self._open_for_write(file_system=self, file=file, binary=True)
         elif mode == 'r':
-            return self._open_for_read(file)
+            return self._open_for_read(file, binary=False)
+        elif mode == 'rb':
+            return self._open_for_read(file, binary=True)
         else:
             raise AssertionError("Mocked io.open doesn't handle mode=%r." % mode)
 
-    def _open_for_read(self, file):
-        text = self.files.get(file)
-        if text is None:
+    def _open_for_read(self, file, binary=False, encoding=None):
+        content = self.files.get(file)
+        if content is None:
             raise FileNotFoundError("No such file or directory: %s" % file)
         if FILE_SYSTEM_VERBOSE:
-            print("Read %s to %s." % (text, file))
-        return io.StringIO(text)
+            print("Read %r to %s." % (content, file))
+        return io.BytesIO(content) if binary else io.StringIO(content.decode(encoding or self.default_encoding))
 
-    def _open_for_write(self, file_system, file):
+    def _open_for_write(self, file_system, file, binary=False, encoding=None):
+        return MockFileWriter(file_system=file_system, file=file, binary=binary,
+                              encoding=encoding or self.default_encoding)
 
-        class MockFileWriter:
 
-            def __init__(self, file_system, file):
-                self.file_system = file_system
-                self.file = file
-                self.stream = io.StringIO()
+class NotReallyRandom:
 
-            def __enter__(self):
-                return self.stream
+    def __init__(self):
+        self.counter = 0
 
-            def __exit__(self, exc_type, exc_val, exc_tb):
-                text = self.stream.getvalue()
-                if FILE_SYSTEM_VERBOSE:
-                    print("Writing %s to %s." % (text, file))
-                self.file_system.files[file] = text
+    def _random_int(self, n):
+        """Returns an integer between 0 and n, upper-exclusive, not one of the published 'random' operations."""
+        result = self.counter % n
+        self.counter += 1
+        return result
 
-        return MockFileWriter(file_system=file_system, file=file)
+    def randint(self, a, b):
+        """Returns a number between a and b, inclusive at both ends, though not especially randomly."""
+        assert isinstance(a, int) and isinstance(b, int) and a < b, "Arguments must be two strictly ascending ints."
+        rangesize = int(abs(b-a))+1
+        return a + self._random_int(rangesize)
+
+    def choice(self, things):
+        return things[self._random_int(len(things))]

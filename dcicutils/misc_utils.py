@@ -616,3 +616,21 @@ def check_true(test_value: object,
     """
     if not test_value:
         raise error_class(message)
+
+
+def remove_prefix(prefix, text, required=False):
+    if not text.startswith(prefix):
+        if required:
+            raise ValueError('Prefix %s is not the initial substring of %s' % (prefix, text))
+        else:
+            return text
+    return text[len(prefix):]
+
+
+def remove_suffix(suffix, text, required=False):
+    if not text.endswith(suffix):
+        if required:
+            raise ValueError('Suffix %s is not the final substring of %s' % (suffix, text))
+        else:
+            return text
+    return text[:len(text)-len(suffix)]
