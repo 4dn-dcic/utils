@@ -13,7 +13,8 @@ from dcicutils.env_utils import (
     prod_bucket_env, public_url_mappings, CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
     infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env, FF_PRODUCTION_IDENTIFIER,
     FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV,
-    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env
+    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
+    full_env_name, full_cgap_env_name, full_fourfront_env_name,
 )
 from unittest import mock
 
@@ -471,3 +472,72 @@ def test_is_indexer_env():
     assert not is_indexer_env('fourfront-green')
     assert not is_indexer_env('fourfront-mastertest')
     assert not is_indexer_env('fourfront-cgapwolf')
+
+
+def test_full_env_name():
+
+    assert full_env_name('cgapdev') == 'fourfront-cgapdev'
+    assert full_env_name('mastertest') == 'fourfront-mastertest'
+
+    assert full_env_name('fourfront-cgapdev') == 'fourfront-cgapdev'
+    assert full_env_name('fourfront-mastertest') == 'fourfront-mastertest'
+
+    # Does not require a registered env
+    assert full_env_name('foo') == 'fourfront-foo'
+    assert full_env_name('cgapfoo') == 'fourfront-cgapfoo'
+
+    # But 'staging' and 'data' are special and don't work here.
+    with pytest.raises(ValueError):
+        full_env_name('staging')
+
+    with pytest.raises(ValueError):
+        full_env_name('data')
+
+
+def test_full_cgap_env_name():
+    assert full_cgap_env_name('cgapdev') == 'fourfront-cgapdev'
+    assert full_cgap_env_name('fourfront-cgapdev') == 'fourfront-cgapdev'
+
+    # Does not require a registered env
+    assert full_cgap_env_name('cgapfoo') == 'fourfront-cgapfoo'
+
+    with pytest.raises(ValueError):
+        full_cgap_env_name('mastertest')
+
+    with pytest.raises(ValueError):
+        full_cgap_env_name('fourfront-mastertest')
+
+    with pytest.raises(ValueError):
+        full_cgap_env_name('foo')
+
+    # Special names 'staging' and 'data' don't work here.
+    with pytest.raises(ValueError):
+        full_cgap_env_name('staging')
+
+    with pytest.raises(ValueError):
+        full_cgap_env_name('data')
+
+
+def test_full_fourfront_env_name():
+
+    assert full_fourfront_env_name('mastertest') == 'fourfront-mastertest'
+    assert full_fourfront_env_name('fourfront-mastertest') == 'fourfront-mastertest'
+
+    # Does not require a registered env
+    assert full_fourfront_env_name('foo') == 'fourfront-foo'
+
+    with pytest.raises(ValueError):
+        full_fourfront_env_name('cgapdev')
+
+    with pytest.raises(ValueError):
+        full_fourfront_env_name('fourfront-cgapdev')
+
+    with pytest.raises(ValueError):
+        full_fourfront_env_name('cgapfoo')
+
+    # Special names 'staging' and 'data' don't work here.
+    with pytest.raises(ValueError):
+        full_fourfront_env_name('staging')
+
+    with pytest.raises(ValueError):
+        full_fourfront_env_name('data')
