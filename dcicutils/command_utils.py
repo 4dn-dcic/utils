@@ -1,7 +1,7 @@
 from .misc_utils import PRINT
 
 
-def yes_or_no(question, quick=None, default=None):
+def _ask_boolean_question(question, quick=None, default=None):
     """
     Loops asking a question interactively until it gets a 'yes' or 'no' response. Returns True or False accordingly.
 
@@ -29,10 +29,35 @@ def yes_or_no(question, quick=None, default=None):
             return True
         elif answer in negatives:
             return False
-        elif answer is "" and default is not None:
+        elif answer == "" and default is not None:
             return default
         else:
             PRINT("Please answer '%s' or '%s'." % (affirmative, negative))
             if default is not None:
                 PRINT("The default if you just press Enter is '%s'."
                       % (affirmative if default else negative))
+
+
+def yes_or_no(question):
+    """
+    Asks a 'yes' or 'no' question.
+
+    Either 'y' or 'yes' (in any case) is an acceptable affirmative.
+    Either 'n' or 'no' (in any case) is an acceptable negative.
+    The response must be confirmed by pressing Enter.
+    There is no default. If Enter is pressed after other text than the valid responses, the user is reprompted.
+    """
+    return _ask_boolean_question(question, quick=False)
+
+
+def y_or_n(question, default=None):
+    """
+    Asks a 'y' or 'n' question.
+
+    Either 'y' or 'yes' (in any case) is an acceptable affirmative.
+    Either 'n' or 'no' (in any case) is an acceptable negative.
+    The response must be confirmed by pressing Enter.
+    If Enter is pressed with no input text, the default is returned if there is one, or else the user is re-prompted.
+    If Enter is pressed after other text than the valid responses, the user is reprompted.
+    """
+    return _ask_boolean_question(question, quick=True, default=default)
