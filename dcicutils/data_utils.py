@@ -59,22 +59,39 @@ def generate_sample_fastq_file(filename, num=10, length=10, compressed=None):
         the filename
 
     """
-    if compressed is None:
-        if filename.endswith('.gz'):
-            compressed = True
-            filename = remove_suffix(".gz", filename)
-        else:
-            compressed = False
-    _, ext = os.path.splitext(filename)
-    if ext not in FASTQ_SUFFIXES:
-        filename = filename + ".fastq"
+    filename, compressed = normalize_suffixes(filename, FASTQ_SUFFIXES, compressed=compressed)
     check_true(isinstance(compressed, bool), "compressed must be one of True, False, or None (for autoselection)")
     content = generate_sample_fastq_content(num=num, length=length)
     if compressed:
-        filename += ".gz"
         with gzip.open(filename, 'w') as zipfile:
             zipfile.write(content.encode('ascii'))
     else:
         with io.open(filename, 'w') as outfile:
             outfile.write(content)
     return filename
+
+
+def normalize_suffixes(filename, suffixes, compressed=None):
+    """
+    Assures that filename has one of the suffix endings, and maybe also a compression ending.
+
+    The file is assumed to need compression if compression is requested or is implied by the given filename.
+    If one of the suffixes is not present (possibly followed by a compression suffix),
+    the first of the suffixes is added.
+
+    See unit tests for examples.
+    """
+    if filename.endswith('.gz'):
+        check_true(compressed is not False,
+                   "compressed cannot be False if .gz is given explicitly.",
+                   error_class=RuntimeError)
+        compressed = True
+        filename = remove_suffix(".gz", filename)
+    elif compressed is None:
+        compressed = False
+    _, ext = os.path.splitext(filename)
+    if ext not in suffixes:
+        filename = filename + suffixes[0]
+    if compressed:
+        filename += ".gz"
+    return filename, compressed

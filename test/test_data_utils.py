@@ -1,10 +1,12 @@
 import io
+import pytest
 import os
 import tempfile
 
-from dcicutils.data_utils import gunzip_content, generate_sample_fastq_file, generate_sample_fastq_content
-from dcicutils.misc_utils import ignored
-from dcicutils.qa_utils import NotReallyRandom
+from dcicutils.data_utils import (
+    gunzip_content, generate_sample_fastq_file, generate_sample_fastq_content, normalize_suffixes, FASTQ_SUFFIXES,
+)
+from dcicutils.qa_utils import NotReallyRandom, MockFileSystem
 from unittest import mock
 from .conftest_settings import TEST_DIR
 
@@ -109,3 +111,76 @@ def test_generate_sample_fastq_gzip_content_with_gunzip():
             binary_content = fp.read()
         unzipped = gunzip_content(content=binary_content)
         assert unzipped == SAMPLE_CONTENT_2x10
+
+
+def test_normalize_suffixes():
+    """Test normalize_suffixes, which assures a certain suffix is present, possibly also with a compression suffix."""
+
+    assert normalize_suffixes("foo", FASTQ_SUFFIXES) == ("foo.fastq", False)
+    assert normalize_suffixes("foo", FASTQ_SUFFIXES, compressed=None) == ("foo.fastq", False)
+    assert normalize_suffixes("foo", FASTQ_SUFFIXES, compressed=False) == ("foo.fastq", False)
+    assert normalize_suffixes("foo", FASTQ_SUFFIXES, compressed=True) == ("foo.fastq.gz", True)
+
+    assert normalize_suffixes("foo.gz", FASTQ_SUFFIXES) == ("foo.fastq.gz", True)
+    assert normalize_suffixes("foo.gz", FASTQ_SUFFIXES, compressed=None) == ("foo.fastq.gz", True)
+    assert normalize_suffixes("foo.gz", FASTQ_SUFFIXES, compressed=True) == ("foo.fastq.gz", True)
+
+    with pytest.raises(RuntimeError):  # This case is self-contradictory so raises an error.
+        normalize_suffixes("foo.gz", FASTQ_SUFFIXES, compressed=False)
+
+    assert normalize_suffixes("foo.fastq", FASTQ_SUFFIXES) == ("foo.fastq", False)
+    assert normalize_suffixes("foo.fastq", FASTQ_SUFFIXES, compressed=None) == ("foo.fastq", False)
+    assert normalize_suffixes("foo.fastq", FASTQ_SUFFIXES, compressed=False) == ("foo.fastq", False)
+    assert normalize_suffixes("foo.fastq", FASTQ_SUFFIXES, compressed=True) == ("foo.fastq.gz", True)
+
+
+def test_fix_for_jira_ticket_c4_278():
+    """Test that C4-278 is fixed."""
+
+    # These tests came from C4-278
+    # These next two tests are probably enough to test the bug.
+
+    assert normalize_suffixes('test1.fastq.gz', FASTQ_SUFFIXES, compressed=True) == ("test1.fastq.gz", True)
+
+    with pytest.raises(RuntimeError):
+        normalize_suffixes('test1.fastq.gz', FASTQ_SUFFIXES, compressed=False)
+
+    # What follows here is probably overkill, but it illustrates some useful techniques in mocking, and it serves
+    # as a practical test that the recent support for opening byte streams in the MockFileSystem works.
+    # -kmp 18-Aug-2020
+
+    mfs = MockFileSystem()
+
+    def mock_didnt_compress(file, mode):
+        """We don't expect to call this function, but should complain if it does get called."""
+        raise AssertionError("Compression was not attempted: io.open(%r, %r)" % (file, mode))
+
+    def mock_gzip_open_for_write(file, mode):
+        """Writes a prefix followed by an ordinary bytes stream of uncompressed data for mocking purposes."""
+        assert mode == 'w'
+        opener = mfs.open(file, 'wb')
+        opener.stream.write(b"MockCompressed:")
+        return opener
+
+    with mock.patch("random.choice", NotReallyRandom().choice):
+        # By using a separate copy of NotReallyRandom(), we can simulate the inner core of what the call to
+        # generate_sample_fastq_file will return in the next code block.
+        # Note that our mock will NOT do compression at the internal level, regardless of the filename.
+        expected_content_1 = ("MockCompressed:%s" % generate_sample_fastq_content(num=20, length=25)).encode('utf-8')
+
+    with mock.patch("random.choice", NotReallyRandom().choice):
+        # In principle, depending on whether the bug is fixed, we don't know which of io.open or gzip.open will be used.
+        with mock.patch("io.open", mock_didnt_compress):
+            with mock.patch("gzip.open", mock_gzip_open_for_write):
+
+                # The bug report specifies two situations.
+                # The first is that generate_sample_fastq_file(input_filename, num=20, length=25, compressed=True)
+                # genenerates the file "test1.fastq.gz.fastq.gz" rather than just "test1.fastq.gz".
+                input_filename = 'test1.fastq.gz'
+                generated_filename = generate_sample_fastq_file(input_filename, num=20, length=25, compressed=True)
+                assert generated_filename == input_filename  # The bug was that it generated a different name
+                assert mfs.files.get(generated_filename) == expected_content_1
+
+                # The bug report specifies that this gives a wrong result, too,
+                with pytest.raises(RuntimeError):
+                    generate_sample_fastq_file(input_filename, num=20, length=25, compressed=False)

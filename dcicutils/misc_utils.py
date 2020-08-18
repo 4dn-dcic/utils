@@ -11,8 +11,6 @@ import time
 import warnings
 import webtest  # importing the library makes it easier to mock testing
 
-from typing import Type
-
 
 # Is this the right place for this? I feel like this should be done in an application, not a library.
 # -kmp 27-Apr-2020
@@ -171,11 +169,13 @@ def get_setting_from_context(settings, ini_var, env_var=None, default=None):
 
 
 @contextlib.contextmanager
-def filtered_warnings(action, message: str = "", category: Type[Warning] = Warning,
-                      module: str = "", lineno: int = 0, append: bool = False):
+def filtered_warnings(action, message="", category=None, module="", lineno=0, append=False):
     """
     Context manager temporarily filters deprecation messages for the duration of the body.
-    Used otherwise the same as warnings.filterwarnings would be used.
+
+    Except for its dynamic scope, this is used otherwise the same as warnings.filterwarnings would be used.
+
+    If category is unsupplied, it should be a class object that is Warning (the default) or one of its subclasses.
 
     For example:
 
@@ -185,6 +185,8 @@ def filtered_warnings(action, message: str = "", category: Type[Warning] = Warni
     Note: This is not threadsafe. It's OK while loading system and during testing,
           but not in worker threads.
     """
+    if category is None:
+        category = Warning
     with warnings.catch_warnings():
         warnings.filterwarnings(action, message=message, category=category, module=module,
                                 lineno=lineno, append=append)
@@ -605,15 +607,15 @@ def environ_bool(var, default=False):
         return os.environ[var].lower() == "true"
 
 
-def check_true(test_value: object,
-               message: str,
-               error_class: Type[Exception] = RuntimeError):
+def check_true(test_value, message, error_class=None):
     """
     If the first argument does not evaluate to a true value, an error is raised.
 
     The error, if one is raised, will be of type error_class, and its message will be given by message.
     The error_class defaults to RuntimeError, but may be any Exception class.
     """
+    if error_class is None:
+        error_class = RuntimeError
     if not test_value:
         raise error_class(message)
 
