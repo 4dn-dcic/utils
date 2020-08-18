@@ -668,9 +668,12 @@ def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
     Returns:
         dict: boto3 res from create_environment/update_environment
     """
+    if is_stg_or_prd_env(envname):
+        raise RuntimeError("beanstalk_utils.create_bs is not approved for production use.")
+
     client = boto3.client('elasticbeanstalk', region_name=REGION)
 
-    # deterimine the configuration template for Elasticbeanstal
+    # determine the configuration template for Elasticbeanstalk
     template = 'fourfront-base'
     if for_indexing:
         template = 'fourfront-indexing'
@@ -688,6 +691,7 @@ def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
     # logic for mirrorEsEnv, which is used to coordinate elasticsearch
     # changes between fourfront data and staging
     if 'fourfront-webprod' in envname:
+        # TODO: This code is obsolete and needs to be upgraded. For now, the use of this on production is disabled.
         other_env = 'fourfront-webprod2' if envname == 'fourfront-webprod' else 'fourfront-webprod'
         mirror_es = get_es_build_status(other_env, max_tries=3)
         if mirror_es:
