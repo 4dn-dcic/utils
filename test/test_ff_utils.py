@@ -1,9 +1,12 @@
 import pytest
 import json
 import time
+
 from dcicutils import ff_utils, s3_utils
 from unittest import mock
 from botocore.exceptions import ClientError
+
+
 pytestmark = pytest.mark.working
 
 
@@ -1053,7 +1056,7 @@ def test_expand_es_metadata_ignore_fields(integrated_ff):
     for pos_case in ['workflow_run_awsem', 'workflow', 'file_reference', 'software', 'workflow_run_sbg']:
         assert pos_case in store
     for neg_case in ['quality_metric_pairsqc',  'quality_metric_fastqc']:
-        neg_case not in store
+        assert neg_case not in store
 
 
 @pytest.mark.integrated
