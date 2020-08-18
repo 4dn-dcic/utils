@@ -114,6 +114,7 @@ def test_generate_sample_fastq_gzip_content_with_gunzip():
 
 
 def test_normalize_suffixes():
+    """Test normalize_suffixes, which assures a certain suffix is present, possibly also with a compression suffix."""
 
     assert normalize_suffixes("foo", FASTQ_SUFFIXES) == ("foo.fastq", False)
     assert normalize_suffixes("foo", FASTQ_SUFFIXES, compressed=None) == ("foo.fastq", False)
@@ -133,7 +134,8 @@ def test_normalize_suffixes():
     assert normalize_suffixes("foo.fastq", FASTQ_SUFFIXES, compressed=True) == ("foo.fastq.gz", True)
 
 
-def test_c4_278():
+def test_fix_for_jira_ticket_c4_278():
+    """Test that C4-278 is fixed."""
 
     # These tests came from C4-278
     # These next two tests are probably enough to test the bug.

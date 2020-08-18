@@ -668,6 +668,7 @@ def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
     Returns:
         dict: boto3 res from create_environment/update_environment
     """
+    # TODO (C4-280): Reconsider this and other functionality.
     if is_stg_or_prd_env(envname):
         raise RuntimeError("beanstalk_utils.create_bs is not approved for production use.")
 
