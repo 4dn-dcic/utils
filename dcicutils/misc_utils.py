@@ -101,6 +101,20 @@ class VirtualApp:
         except webtest.AppError as e:
             raise VirtualAppError(msg='HTTP POST failed.', url=url, body=obj, raw_exception=e)
 
+    def put_json(self, url, obj, **kwargs):
+        """ Wrapper for TestApp.put_json that logs the outgoing PUT
+
+        :param url: url to PUT to
+        :param obj: object body to PUT
+        :param kwargs: args to pass to the PUT
+        :return: result of PUT
+        """
+        logging.info('OUTGOING HTTP PUT on url: %s with object: %s' % (url, obj))
+        try:
+            return self.wrapped_app.put_json(url, obj, **kwargs)
+        except webtest.AppError as e:
+            raise VirtualAppError(msg='HTTP PUT failed.', url=url, body=obj, raw_exception=e)
+
     def patch_json(self, url, fields, **kwargs):
         """ Wrapper for TestApp.patch_json that logs the outgoing PATCH
 
