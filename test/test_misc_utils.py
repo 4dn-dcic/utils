@@ -114,6 +114,11 @@ class FakeTestApp:
         self.calls.append(call_info)
         return FakeResponse({'processed': call_info})
 
+    def put_json(self, url, obj, **kwargs):
+        call_info = {'op': 'put_json', 'url': url, 'obj': obj, 'kwargs': kwargs}
+        self.calls.append(call_info)
+        return FakeResponse({'processed': call_info})
+
     def patch_json(self, url, obj, **kwargs):
         call_info = {'op': 'patch_json', 'url': url, 'obj': obj, 'kwargs': kwargs}
         self.calls.append(call_info)
@@ -239,6 +244,60 @@ def test_virtual_app_post_json():
             },
             {
                 'op': 'post_json',
+                'url': 'http://no.such.place/',
+                'obj': {'alpha': 'omega'},
+                'kwargs': {'params': {'foo': 'bar'}},
+            },
+        ]
+
+
+def test_virtual_app_put_json():
+
+    with mock.patch.object(VirtualApp, "HELPER_CLASS", FakeTestApp):
+        app = FakeApp()
+        environ = {'some': 'stuff'}
+        vapp = VirtualApp(app, environ)
+
+    log_info = []
+
+    with mock.patch("logging.info") as mock_info:
+        mock_info.side_effect = lambda msg: log_info.append(msg)
+
+        response1 = vapp.put_json("http://no.such.place/", {'beta': 'gamma'})
+        assert response1.json() == {
+            'processed': {
+                'op': 'put_json',
+                'url': 'http://no.such.place/',
+                'obj': {'beta': 'gamma'},
+                'kwargs': {},
+            }
+        }
+
+        response2 = vapp.put_json("http://no.such.place/", {'alpha': 'omega'}, params={'foo': 'bar'})
+        assert response2.json() == {
+            'processed': {
+                'op': 'put_json',
+                'url': 'http://no.such.place/',
+                'obj': {'alpha': 'omega'},
+                'kwargs': {'params': {'foo': 'bar'}},
+            }
+        }
+
+        assert log_info == [
+            ("OUTGOING HTTP PUT on url: %s with object: %s"
+             % ("http://no.such.place/", {'beta': 'gamma'})),
+            ("OUTGOING HTTP PUT on url: %s with object: %s"
+             % ("http://no.such.place/", {'alpha': 'omega'})),
+        ]
+        assert vapp.wrapped_app.calls == [
+            {
+                'op': 'put_json',
+                'url': 'http://no.such.place/',
+                'obj': {'beta': 'gamma'},
+                'kwargs': {},
+            },
+            {
+                'op': 'put_json',
                 'url': 'http://no.such.place/',
                 'obj': {'alpha': 'omega'},
                 'kwargs': {'params': {'foo': 'bar'}},
