@@ -2,11 +2,40 @@
 qa_utils: Tools for use in quality assurance testing.
 """
 
-import datetime
 import contextlib
+import datetime
+import time
+import io
 import os
 import pytz
+
 from .misc_utils import PRINT, ignored, Retry
+
+
+def show_elapsed_time(start, end):
+    """ Helper method for below that is the default - just prints the elapsed time. """
+    PRINT('Elapsed: %s' % (end - start))
+
+
+@contextlib.contextmanager
+def timed(reporter=None, debug=None):
+    """ A simple context manager that will time how long it spends in context. Useful for debugging.
+
+        :param reporter: lambda x, y where x and y are the start and finish times respectively, default PRINT
+        :param debug: lambda x where x is an exception, default NO ACTION
+    """
+    if reporter is None:
+        reporter = show_elapsed_time
+    start = time.time()
+    try:
+        yield
+    except Exception as e:
+        if debug is not None:
+            debug(e)
+        raise
+    finally:
+        end = time.time()
+        reporter(start, end)
 
 
 def mock_not_called(name):
@@ -256,6 +285,10 @@ class Occasionally:
         else:
             return self.function(*args, **kwargs)
 
+    @property
+    def __name__(self):
+        return "{}.occassionally".format(self.function.__name__)
+
 
 class RetryManager(Retry):
     """
@@ -287,8 +320,95 @@ class RetryManager(Retry):
             options['retries_allowed'] = retries_allowed
         if wait_seconds is not None:
             options['wait_seconds'] = wait_seconds
+        if wait_increment is not None:
+            options['wait_increment'] = wait_increment
+        if wait_multiplier is not None:
+            options['wait_multiplier'] = wait_multiplier
         if wait_increment is not None or wait_multiplier is not None:
-            options['wait_adjustor'] = cls._wait_adjustor(wait_increment=wait_increment,
-                                                          wait_multiplier=wait_multiplier)
+            options['wait_adjustor'] = function_profile.make_wait_adjustor(wait_increment=wait_increment,
+                                                                           wait_multiplier=wait_multiplier)
         with local_attrs(function_profile, **options):
             yield
+
+
+FILE_SYSTEM_VERBOSE = True
+
+
+class MockFileWriter:
+
+    def __init__(self, file_system, file, binary=False, encoding='utf-8'):
+        self.file_system = file_system
+        self.file = file
+        self.encoding = encoding
+        self.stream = io.BytesIO() if binary else io.StringIO()
+
+    def __enter__(self):
+        return self.stream
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        content = self.stream.getvalue()
+        if FILE_SYSTEM_VERBOSE:
+            print("Writing %r to %s." % (content, self.file))
+        self.file_system.files[self.file] = content if isinstance(content, bytes) else content.encode(self.encoding)
+
+
+class MockFileSystem:
+    """Extremely low-tech mock file system."""
+
+    def __init__(self, files=None, default_encoding='utf-8'):
+        self.default_encoding = default_encoding
+        self.files = {filename: content.encode(default_encoding) for filename, content in (files or {}).items()}
+
+    def exists(self, file):
+        return bool(self.files.get(file))
+
+    def remove(self, file):
+        if not self.files.pop(file, None):
+            raise FileNotFoundError("No such file or directory: %s" % file)
+
+    def open(self, file, mode='r'):
+        if FILE_SYSTEM_VERBOSE:
+            print("Opening %r in mode %r." % (file, mode))
+        if mode == 'w':
+            return self._open_for_write(file_system=self, file=file, binary=False)
+        elif mode == 'wb':
+            return self._open_for_write(file_system=self, file=file, binary=True)
+        elif mode == 'r':
+            return self._open_for_read(file, binary=False)
+        elif mode == 'rb':
+            return self._open_for_read(file, binary=True)
+        else:
+            raise AssertionError("Mocked io.open doesn't handle mode=%r." % mode)
+
+    def _open_for_read(self, file, binary=False, encoding=None):
+        content = self.files.get(file)
+        if content is None:
+            raise FileNotFoundError("No such file or directory: %s" % file)
+        if FILE_SYSTEM_VERBOSE:
+            print("Read %r to %s." % (content, file))
+        return io.BytesIO(content) if binary else io.StringIO(content.decode(encoding or self.default_encoding))
+
+    def _open_for_write(self, file_system, file, binary=False, encoding=None):
+        return MockFileWriter(file_system=file_system, file=file, binary=binary,
+                              encoding=encoding or self.default_encoding)
+
+
+class NotReallyRandom:
+
+    def __init__(self):
+        self.counter = 0
+
+    def _random_int(self, n):
+        """Returns an integer between 0 and n, upper-exclusive, not one of the published 'random' operations."""
+        result = self.counter % n
+        self.counter += 1
+        return result
+
+    def randint(self, a, b):
+        """Returns a number between a and b, inclusive at both ends, though not especially randomly."""
+        assert isinstance(a, int) and isinstance(b, int) and a < b, "Arguments must be two strictly ascending ints."
+        rangesize = int(abs(b-a))+1
+        return a + self._random_int(rangesize)
+
+    def choice(self, things):
+        return things[self._random_int(len(things))]

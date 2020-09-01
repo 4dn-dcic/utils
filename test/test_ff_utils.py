@@ -1,8 +1,12 @@
 import pytest
 import json
 import time
-from dcicutils import ff_utils
+
+from dcicutils import ff_utils, s3_utils
 from unittest import mock
+from botocore.exceptions import ClientError
+
+
 pytestmark = pytest.mark.working
 
 
@@ -137,6 +141,84 @@ def test_url_params_functions():
     assert 'test3=abc' in new_fake_url
 
 
+def test_unified_authentication_decoding(integrated_ff):
+    """
+    Test that we decode the various formats and locations of keys and secrets in an uniform way.
+    """
+
+    any_id, any_secret, any_env = 'any-id', 'any-secret', 'any-env'
+
+    any_key_tuple = (any_id, any_secret)
+    any_key_dict = {"key": any_id, "secret": any_secret}
+    any_old_key = {'default': any_key_dict}
+    any_old_bogus_key1 = {'default': [any_id, any_secret]}  # The legacy format requires a dictionary in "default"
+    any_old_bogus_key2 = {}
+    any_old_bogus_key3 = 17
+    any_old_bogus_key4 = any_secret
+
+    # In the end, all of the above key formats need to turn into the tuple format.
+    # (key, secret) == {"key": key, "secret": secret} = {"default": {"key": key, "secret", secret}}
+    any_key_normalized = any_key_tuple
+
+    class UnusedS3Utils:
+
+        def __init__(self, env):
+            raise AssertionError("s3Utils() got used.")
+
+    for any_key in [any_key_tuple, any_key_dict, any_old_key]:
+
+        with mock.patch.object(s3_utils, "s3Utils", UnusedS3Utils):
+
+            # These keys can be entirely canonicalized locally, without s3Utils getting involved, because
+            # the caller has given the auth directly and all we have to do is syntax-check it
+
+            key1 = ff_utils.unified_authentication(any_key_tuple, any_env)
+            assert key1 == any_key_normalized
+
+            key2 = ff_utils.unified_authentication(any_key, None)
+            assert key2 == any_key_normalized
+
+            # This error can be raised without using s3Utils because we don't know what env to use anyway.
+
+            with pytest.raises(Exception) as exec_info:
+                ff_utils.unified_authentication(None, None)
+
+            assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
+
+        class MockS3Utils:
+            def __init__(self, env):
+                assert env == any_env
+                self.env = env
+            def get_access_keys(self):
+                return any_key
+
+        with mock.patch.object(s3_utils, "s3Utils", MockS3Utils):
+
+            # If no auth is given locally, we have to fetch it from s3, so that's where s3Utils is needed.
+
+            key3 = ff_utils.unified_authentication(None, any_env)
+            assert key3 == any_key_normalized
+
+    for any_bogus_key in [any_old_bogus_key1, any_old_bogus_key2, any_old_bogus_key3, any_old_bogus_key4]:
+
+        with mock.patch.object(s3_utils, "s3Utils", UnusedS3Utils):
+            with pytest.raises(Exception) as exec_info:
+                ff_utils.unified_authentication(any_bogus_key, None)
+            assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
+
+        class MockS3Utils:
+            def __init__(self, env):
+                assert env == any_env
+                self.env = env
+            def get_access_keys(self):
+                return any_bogus_key
+
+        with mock.patch.object(s3_utils, "s3Utils", MockS3Utils):
+            with pytest.raises(Exception) as exec_info:
+                ff_utils.unified_authentication(None, any_env)
+            assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
+
+
 # Integration tests
 
 
@@ -154,6 +236,26 @@ def test_unified_authentication(integrated_ff):
     with pytest.raises(Exception) as exec_info:
         ff_utils.unified_authentication(None, None)
     assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
+
+
+def test_unified_authentication_more_envs():
+    key1 = ff_utils.unified_authentication(ff_env="data")
+    assert len(key1) == 2
+    key2 = ff_utils.unified_authentication(ff_env="staging")
+    assert key2 == key1
+    key3 = ff_utils.unified_authentication(ff_env="fourfront-green")
+    assert key3 == key1
+    key4 = ff_utils.unified_authentication(ff_env="fourfront-blue")
+    assert key4 == key1
+    key5 = ff_utils.unified_authentication(ff_env="fourfront-cgap")
+    assert len(key5) == 2
+    assert key5 != key1
+    try:
+        ff_utils.unified_authentication(ff_env="fourfront-data")
+    except ClientError as e:
+        assert "The specified bucket does not exist" in str(e)
+    else:
+        raise AssertionError("An exception was expected but did not occur.")
 
 
 @pytest.mark.integrated
@@ -745,7 +847,7 @@ def test_faceted_search_exp_set(integrated_ff):
     pub = {'Publication': 'No value'}
     pub.update(for_all)
     resp = ff_utils.faceted_search(**pub)
-    assert len(resp) == 10
+    assert len(resp) == 9
     mods = {'Modifications': 'Stable Transfection'}
     mods.update(for_all)
     resp = ff_utils.faceted_search(**mods)
@@ -954,7 +1056,7 @@ def test_expand_es_metadata_ignore_fields(integrated_ff):
     for pos_case in ['workflow_run_awsem', 'workflow', 'file_reference', 'software', 'workflow_run_sbg']:
         assert pos_case in store
     for neg_case in ['quality_metric_pairsqc',  'quality_metric_fastqc']:
-        neg_case not in store
+        assert neg_case not in store
 
 
 @pytest.mark.integrated

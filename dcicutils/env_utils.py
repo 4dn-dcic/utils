@@ -1,6 +1,6 @@
 import os
-from .misc_utils import get_setting_from_context
-from . import beanstalk_utils as bs_utils
+from .misc_utils import get_setting_from_context, check_true
+
 
 FF_ENV_DEV = 'fourfront-dev'  # Maybe not used
 FF_ENV_HOTSEAT = 'fourfront-hotseat'
@@ -216,29 +216,6 @@ def prod_bucket_env(envname):
     return BEANSTALK_PROD_BUCKET_ENVS.get(envname)
 
 
-def get_prd_or_stg_env(envname):
-    """
-    Given a production-class env label, returns the env name.
-    For other envnames that aren't production envs, this returns None.
-
-    The envname is something that is either a staging or production env, in particular something
-    that is_stg_or_prd_env returns True for.
-
-    The purpose is to return the envname when shorthand env labels like 'data' or 'staging' are
-    used in place of env names like fourfront-blue or fourfront-green. Should work for fourfront
-    as well as CGAP.
-    """
-    if envname == 'data':
-        use_env = bs_utils.compute_ff_prd_env()
-    elif envname == 'staging':
-        use_env = bs_utils.compute_ff_stg_env()
-    elif envname in ['fourfront-green', 'fourfront-blue']:
-        use_env = envname
-    else:
-        use_env = prod_bucket_env(envname)
-    return use_env
-
-
 def get_bucket_env(envname):
     return prod_bucket_env(envname) if is_stg_or_prd_env(envname) else envname
 
@@ -381,3 +358,39 @@ def infer_foursight_from_env(request, envname):
                 return FF_STAGING_IDENTIFIER
         else:
             return envname[len('fourfront-'):]  # if not data/staging, behaves exactly like CGAP
+
+
+def full_env_name(envname):
+    """
+    Given the possibly-short name of a Fourfront or CGAP beanstalk environment, return the long name.
+
+    The short name is allowed to omit 'fourfront-' but the long name is not.
+
+    Examples:
+        full_env_name('cgapdev') => 'fourfront-cgapdev'
+        full_env_name('fourfront-cgapdev') => 'fourfront-cgapdev'
+
+    Args:
+        envname str: the short or long name of a beanstalk environment
+
+    Returns:
+        a string that is the long name of the specified beanstalk environment
+    """
+    if envname in ('data', 'staging'):
+        raise ValueError("The special token '%s' is not a beanstalk environment name." % envname)
+    elif not envname.startswith('fourfront-'):
+        return 'fourfront-' + envname
+    else:
+        return envname
+
+
+def full_cgap_env_name(envname):
+    check_true(isinstance(envname, str) and "cgap" in envname, "The envname is not a CGAP env name.",
+               error_class=ValueError)
+    return full_env_name(envname)
+
+
+def full_fourfront_env_name(envname):
+    check_true(isinstance(envname, str) and "cgap" not in envname, "The envname is not a Fourfront env name.",
+               error_class=ValueError)
+    return full_env_name(envname)

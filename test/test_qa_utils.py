@@ -1,4 +1,5 @@
 import datetime
+import io
 import os
 import pytest
 import pytz
@@ -7,9 +8,11 @@ import subprocess
 import time
 import uuid
 
+from dcicutils import qa_utils
 from dcicutils.misc_utils import Retry
 from dcicutils.qa_utils import (
-    mock_not_called, local_attrs, override_environ, ControlledTime, Occasionally, RetryManager
+    mock_not_called, local_attrs, override_environ, show_elapsed_time, timed,
+    ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -597,6 +600,24 @@ def test_retry_manager():
                     assert mock_sleep.mock_calls[i + 1][ARGS][0] == 8.75
                     assert mock_sleep.mock_calls[i + 2][ARGS][0] == 10.9375
 
+            mock_sleep.reset_mock()
+            assert mock_sleep.call_count == 0
+
+            with RetryManager.retry_options('reliably_add3', wait_seconds=7, wait_increment=1):
+
+                for i in range(10):
+                    # In this context, we won't retry enough to succeed...
+                    rarely_add3.reset()
+                    with pytest.raises(Exception):
+                        reliably_add3(1)
+
+                # Now the sleep calls will be the same 7,  8.75, 10.9375 progression
+                assert mock_sleep.call_count == 30
+                for i in range(0, 30, 3):  # start, stop, step
+                    assert mock_sleep.mock_calls[i][ARGS][0] == 7
+                    assert mock_sleep.mock_calls[i + 1][ARGS][0] == 8
+                    assert mock_sleep.mock_calls[i + 2][ARGS][0] == 9
+
         with pytest.raises(ValueError):
 
             # The name-key must not be a number.
@@ -614,3 +635,157 @@ def test_retry_manager():
             # The name-key must be registered
             with RetryManager.retry_options(name_key="not-a-registered-name", retries_allowed=3, wait_seconds=5):
                 pass
+
+
+def test_mock_file_system():
+
+    fs = MockFileSystem()
+
+    with mock.patch.object(io, "open") as mock_open:
+        with mock.patch.object(os.path, "exists") as mock_exists:
+            with mock.patch.object(os, "remove") as mock_remove:
+
+                mock_open.side_effect = fs.open
+                mock_exists.side_effect = fs.exists
+                mock_remove.side_effect = fs.remove
+
+                filename = "no.such.file"
+                assert os.path.exists(filename) is False
+
+                with pytest.raises(AssertionError):
+                    with io.open(filename, 'q'):
+                        pass
+
+                with io.open(filename, 'w') as fp:
+                    fp.write("foo")
+                    fp.write("bar")
+
+                assert os.path.exists(filename) is True
+
+                with io.open(filename, 'r') as fp:
+                    assert fp.read() == 'foobar'
+
+                with io.open(filename, 'r') as fp:
+                    assert fp.read() == 'foobar'
+
+                assert os.path.exists(filename) is True
+
+                os.remove(filename)
+
+                assert os.path.exists(filename) is False
+
+                with pytest.raises(FileNotFoundError):
+                    os.remove(filename)
+
+                with pytest.raises(FileNotFoundError):
+                    io.open(filename, 'r')
+
+                with io.open(filename, 'wb') as fp:
+                    fp.write(b'foo')
+                    fp.write(b'bar')
+                    fp.write(bytes((10, 65, 66, 67, 10)))  # Unicode Newline, A, B, C, Newline
+                    fp.write(b'a b c')
+                    fp.write(b'\n')
+
+                assert os.path.exists(filename)
+
+                with io.open(filename, 'rb') as fp:
+                    assert fp.read() == b'foobar\nABC\na b c\n'
+
+                with io.open(filename, 'r') as fp:
+                    assert [line.rstrip('\n') for line in fp] == ['foobar', 'ABC', 'a b c']
+
+                os.remove(filename)
+
+                assert not os.path.exists(filename)
+
+
+
+class _MockPrinter:
+
+    def __init__(self):
+        self.printed = []
+
+    def mock_print(self, *args):
+        self.printed.append(" ".join(args))
+
+    def reset(self):
+        self.printed = []
+
+
+def test_show_elapsed_time():
+
+    mock_printer = _MockPrinter()
+
+    with mock.patch.object(qa_utils, "PRINT", mock_printer.mock_print):
+        show_elapsed_time(1.0, 5.625)
+        show_elapsed_time(6, 7)
+
+        assert mock_printer.printed == ["Elapsed: 4.625", "Elapsed: 1"]
+
+
+class _MockTime:
+
+    def __init__(self, start=0.0, tick=1.0):
+        self.elapsed = start
+        self.tick = tick
+
+    def time(self):
+        self.elapsed = now = self.elapsed + self.tick
+        return now
+
+
+def test_timed():
+
+    mocked_printer = _MockPrinter()
+    mocked_time = _MockTime()
+
+    with mock.patch.object(qa_utils, "PRINT", mocked_printer.mock_print):
+        with mock.patch.object(time, 'time', mocked_time.time):
+
+            with timed():
+                pass
+            assert mocked_printer.printed == ["Elapsed: 1.0"]
+
+            mocked_printer.reset()
+
+            with timed():
+                time.time()
+                time.time()
+            assert mocked_printer.printed == ["Elapsed: 3.0"]
+
+            mocked_printer.reset()
+
+            stuff = []
+
+            with timed(reporter=lambda x, y: stuff.append(y - x)):
+                time.time()
+                time.time()
+            assert mocked_printer.printed == []
+            assert stuff == [3.0]
+
+            mocked_printer.reset()
+
+            stuff = []
+
+            def my_debugger(x):
+                assert isinstance(x, RuntimeError)
+                assert str(x) == "Foo"
+
+            success = False
+            try:
+                with timed(reporter=lambda x, y: stuff.append(y - x), debug=my_debugger):
+                    time.time()
+                    raise RuntimeError("Foo")
+            except RuntimeError:
+                success = True
+
+            assert mocked_printer.printed == []
+            assert stuff == [2.0]
+            assert success, "RuntimeError was not caught."
+
+
+def test_not_really_random():
+
+    r = NotReallyRandom()
+    assert [r.randint(3, 5) for _ in range(10)] == [3, 4, 5, 3, 4, 5, 3, 4, 5, 3]
