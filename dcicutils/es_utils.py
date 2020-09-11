@@ -24,6 +24,8 @@ def create_es_client(es_url, use_aws_auth=True, **options):
     es_options = {'retry_on_timeout': True,
                   'maxsize': 50,  # parallellism...
                   'connection_class': RequestsHttpConnection}
+
+    # build http_auth kwarg
     if use_aws_auth:
         host = es_url.split('//')  # remove schema from url
         host = host[-1].split(":")
@@ -31,8 +33,13 @@ def create_es_client(es_url, use_aws_auth=True, **options):
                                    aws_region='us-east-1',
                                    aws_service='es')
         es_options['http_auth'] = auth
-    es_options.update(**options)  # add any given keyword options at the end
 
+    # use SSL if port 443 is specified (REQUIRED on new clusters)
+    port = es_url[-3:]  # last 3 characters must be 443 if HTTPS is desired!
+    if port == '443':
+        es_options['use_ssl'] = True
+
+    es_options.update(**options)  # add any given keyword options at the end
     return Elasticsearch(es_url, **es_options)
 
 
@@ -111,7 +118,7 @@ def get_bulk_uuids_embedded(client, index, uuids, is_generator=False):
     final_result = []
     response = client.mget(body={  # XXX: this could still be slow even if you use is_generator
         'docs': [{'_id': _id,
-                  'source': ['embedded.*'],
+                  '_source': ['embedded.*'],
                   '_index': index} for _id in uuids]
         })
     if is_generator is True:
