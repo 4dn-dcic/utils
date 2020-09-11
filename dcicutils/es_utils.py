@@ -118,7 +118,7 @@ def get_bulk_uuids_embedded(client, index, uuids, is_generator=False):
     final_result = []
     response = client.mget(body={  # XXX: this could still be slow even if you use is_generator
         'docs': [{'_id': _id,
-                  'source': ['embedded.*'],
+                  '_source': ['embedded.*'],
                   '_index': index} for _id in uuids]
         })
     if is_generator is True:
