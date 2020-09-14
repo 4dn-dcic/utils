@@ -682,11 +682,7 @@ def full_class_name(obj):
     """
 
     # Source: https://stackoverflow.com/questions/2020014/get-fully-qualified-class-name-of-an-object-in-python
-    module = obj.__class__.__module__
-    if module is None or module == str.__class__.__module__:
-        return obj.__class__.__name__  # Avoid reporting __builtin__
-    else:
-        return module + '.' + obj.__class__.__name__
+    return full_object_name(obj.__class__)
 
 
 def full_object_name(obj):
