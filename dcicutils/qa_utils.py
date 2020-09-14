@@ -457,7 +457,7 @@ class MockResponse:
 
 class _PrintCapturer:
     """
-    This class is used internally to the 'printed_lines' context manager to maintain state information
+    This class is used internally to the 'printed_output' context manager to maintain state information
     on what has been printed so far by PRINT within the indicated context.
     """
 
@@ -475,7 +475,7 @@ class _PrintCapturer:
 
 
 @contextlib.contextmanager
-def printed_lines():
+def printed_output():
     """
     This context manager is used to capture output from dcicutils.PRINT for testing.
 
@@ -493,7 +493,7 @@ def printed_lines():
             PRINT("The successor of %s is %s." % (n, n+1))
 
         def test_show_successor():
-            with printed_lines() as printed:
+            with printed_output() as printed:
                 assert printed.last is None
                 assert printed.lines == []
                 show_successor(3)

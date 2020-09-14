@@ -13,7 +13,7 @@ from dcicutils.misc_utils import Retry, PRINT
 from dcicutils.qa_utils import (
     mock_not_called, local_attrs, override_environ, show_elapsed_time, timed,
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom,
-    MockResponse, printed_lines,
+    MockResponse, printed_output,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -837,7 +837,7 @@ def test_mock_response():
 
 def test_uppercase_print_with_printed_output():
 
-    with printed_lines() as printed:
+    with printed_output() as printed:
 
         assert printed.lines == []
 
@@ -853,7 +853,7 @@ def test_uppercase_print_with_printed_output():
 def test_uppercase_print_with_time():
 
     # Test uses WITHOUT timestamps
-    with printed_lines() as printed:
+    with printed_output() as printed:
 
         assert printed.lines == []
         assert printed.last is None
@@ -871,7 +871,7 @@ def test_uppercase_print_with_time():
     timestamp_pattern = re.compile(r'^[0-9][0-9]:[0-9][0-9]:[0-9][0-9] (.*)$')
 
     # Test uses WITH timestamps
-    with printed_lines() as printed:
+    with printed_output() as printed:
 
         PRINT("This", "is", "a", "test.", timestamped=True)
         PRINT("This, too.", timestamped=True)
@@ -884,7 +884,7 @@ def test_uppercase_print_with_time():
 
         assert trimmed == ["This is a test.", "This, too."]
 
-    with printed_lines() as printed:
+    with printed_output() as printed:
 
         PRINT("This", "is", "a", "test.", timestamped=True)
         PRINT("This, too.")

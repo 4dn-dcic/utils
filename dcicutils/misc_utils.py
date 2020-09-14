@@ -21,12 +21,10 @@ logging.basicConfig()
 # Using PRINT(...) for debugging, rather than its more familiar lowercase form) for intended programmatic output,
 # makes it easier to find stray print statements that were left behind in debugging. -kmp 30-Mar-2020
 
-_print = print  # Necessary indirection for qa_utils.printed_lines
-
 class _PRINT:
 
     def __init__(self):
-        self._printer = print
+        self._printer = print  # necessary indirection for sake of qa_utils.printed_output
 
     def __call__(self, *args, timestamped=False, **kwargs):
         """
@@ -44,6 +42,7 @@ class _PRINT:
 
 PRINT = _PRINT()
 PRINT.__name__ = 'PRINT'
+
 
 class VirtualAppError(Exception):
     """ Special Exception to be raised by VirtualApp that contains some additional info """
