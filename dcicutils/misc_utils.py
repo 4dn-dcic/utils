@@ -5,6 +5,7 @@ This file contains functions that might be generally useful.
 import contextlib
 import datetime
 import functools
+import io
 import os
 import logging
 import time
@@ -732,3 +733,8 @@ def keyword_as_title(keyword):
     """
 
     return keyword.replace("_", " ").title()
+
+
+def file_contents(filename, binary=False):
+    with io.open(filename, 'rb' if binary else 'r') as fp:
+        return fp.read()

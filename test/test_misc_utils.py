@@ -15,9 +15,9 @@ from dcicutils.misc_utils import (
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
     Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool,
     LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
-    keyword_as_title,
+    keyword_as_title, file_contents,
 )
-from dcicutils.qa_utils import Occasionally, ControlledTime, override_environ
+from dcicutils.qa_utils import Occasionally, ControlledTime, override_environ, MockFileSystem
 from unittest import mock
 
 
@@ -1129,3 +1129,26 @@ def test_keyword_as_title():
     # Hyphens are unchanged.
     assert keyword_as_title('SOME-TEXT') == 'Some-Text'
     assert keyword_as_title('mary_smith-jones') == 'Mary Smith-Jones'
+
+
+def test_file_contents():
+
+    mfs = MockFileSystem()
+
+    with mock.patch("io.open", mfs.open):
+
+        with io.open("foo.txt", 'w') as fp:
+            print("foo", file=fp)
+            print("bar", file=fp)
+
+        assert file_contents("foo.txt") == "foo\nbar\n"
+        assert file_contents("foo.txt", binary=True) == 'foo\nbar\n'.encode('utf-8')
+        assert file_contents("foo.txt", binary=True) == b'\x66\x6f\x6f\x0a\x62\x61\x72\x0a'
+
+        with io.open("foo.bin", 'wb') as fp:
+            fp.write(bytes([72, 101]))
+            fp.write(bytes([108, 108, 111, 33, 10]))
+
+        assert file_contents("foo.bin", binary=True) == b'\x48\x65\x6c\x6c\x6f\x21\x0a'
+        assert file_contents("foo.bin", binary=False) == b'\x48\x65\x6c\x6c\x6f\x21\x0a'.decode('utf-8')
+        assert file_contents("foo.bin", binary=False) == 'Hello!\n'
