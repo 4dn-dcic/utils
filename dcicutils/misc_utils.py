@@ -20,8 +20,29 @@ logging.basicConfig()
 # Using PRINT(...) for debugging, rather than its more familiar lowercase form) for intended programmatic output,
 # makes it easier to find stray print statements that were left behind in debugging. -kmp 30-Mar-2020
 
-PRINT = print
+_print = print  # Necessary indirection for qa_utils.printed_lines
 
+class _PRINT:
+
+    def __init__(self):
+        self._printer = print
+
+    def __call__(self, *args, timestamped=False, **kwargs):
+        """
+        Prints its args space-separated, as 'print' would, possibly with an hh:mm:ss timestamp prepended.
+
+        :param args: an object to be printed
+        :param with_time: a boolean specifying whether to prepend a timestamp
+        """
+        if timestamped:
+            hh_mm_ss = str(datetime.datetime.now().strftime("%H:%M:%S"))
+            self._printer(hh_mm_ss, *args, **kwargs)
+        else:
+            self._printer(*args, **kwargs)
+
+
+PRINT = _PRINT()
+PRINT.__name__ = 'PRINT'
 
 class VirtualAppError(Exception):
     """ Special Exception to be raised by VirtualApp that contains some additional info """
@@ -650,3 +671,68 @@ def remove_suffix(suffix, text, required=False):
         else:
             return text
     return text[:len(text)-len(suffix)]
+
+
+def full_class_name(obj):
+    """
+    Returns the fully-qualified name of the class of the given obj (an object).
+
+    For built-in classes, just the class name is returned.
+    For other classes, the class name with the module name prepended (separated by a dot) is returned.
+    """
+
+    # Source: https://stackoverflow.com/questions/2020014/get-fully-qualified-class-name-of-an-object-in-python
+    module = obj.__class__.__module__
+    if module is None or module == str.__class__.__module__:
+        return obj.__class__.__name__  # Avoid reporting __builtin__
+    else:
+        return module + '.' + obj.__class__.__name__
+
+
+def full_object_name(obj):
+    """
+    Returns the fully-qualified name the given obj, if it has a name, or None otherwise.
+
+    For built-in classes, just the class name is returned.
+    For other objects, the name with the module name prepended (separated by a dot) is returned.
+    If the object has no __module__ or __name__ attribute, None is returned.
+    """
+
+    try:
+        module = obj.__module__
+        if module is None or module == str.__class__.__module__:
+            return obj.__name__  # Avoid reporting __builtin__
+        else:
+            return module + '.' + obj.__name__
+    except Exception:
+        return None
+
+
+def constantly(value):
+    def fn(*args, **kwargs):
+        ignored(args, kwargs)
+        return value
+    return fn
+
+
+def keyword_as_title(keyword):
+    """
+    Given a dictionary key or other token-like keyword, return a prettier form of it use as a display title.
+
+    Underscores are replaced by spaces, but hyphens are not.
+    It is assumed that underscores are word-separators but a hyphenated word is still a hyphenated word.
+
+    Examples:
+
+        >>> keyword_as_title('foo')
+        'Foo'
+        >>> keyword_as_title('some_text')
+        'Some Text'
+        >>> keyword_as_title('mary_smith-jones')
+        'Mary Smith-Jones'
+
+    :param keyword: a string to be used as a keyword, for example a dictionary key
+    :return: a string to be used in a title: text in title case with underscores replaced by spaces.
+    """
+
+    return keyword.replace("_", " ").title()

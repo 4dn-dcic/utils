@@ -1,8 +1,10 @@
+import botocore.exceptions
 import datetime as datetime_module
 import io
 import json
 import os
 import pytest
+import random
 import re
 import time
 import warnings
@@ -12,7 +14,8 @@ from dcicutils.misc_utils import (
     PRINT, ignored, filtered_warnings, get_setting_from_context, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
     Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool,
-    LockoutManager, check_true, remove_prefix, remove_suffix
+    LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
+    keyword_as_title,
 )
 from dcicutils.qa_utils import Occasionally, ControlledTime, override_environ
 from unittest import mock
@@ -20,7 +23,7 @@ from unittest import mock
 
 def test_uppercase_print():
     # This is just a synonym, so the easiest thing is just to test that fact.
-    assert PRINT == print
+    assert PRINT._printer == print
 
     # But also a basic test that it does something
     s = io.StringIO()
@@ -1080,3 +1083,49 @@ def test_remove_suffix():
     assert remove_suffix("", "foo") == "foo"
     assert remove_suffix("", "foo", required=False) == "foo"
     assert remove_suffix("", "foo", required=True) == "foo"
+
+
+def test_full_class_name():
+
+    assert full_class_name(3) == 'int'
+    assert full_class_name(botocore.exceptions.BotoCoreError()) == "botocore.exceptions.BotoCoreError"
+
+
+def test_full_object_name():
+
+    assert full_object_name(type(3)) == 'int'
+    assert full_object_name(botocore.exceptions.BotoCoreError) == "botocore.exceptions.BotoCoreError"
+    assert full_object_name(3) is None
+    assert full_object_name('foo') is None
+    assert full_object_name(full_object_name) == 'dcicutils.misc_utils.full_object_name'
+
+
+def test_constantly():
+
+    five = constantly(5)
+
+    assert five() == 5
+    assert five(13) == 5
+    assert five(nobody='cares') == 5
+    assert five(0, 1, 2, fourth=3, fifth=4) == 5
+
+    assert five() + five() == 10
+
+    arbitrariness = 1000000
+    randomness = constantly(random.randint(1, arbitrariness))
+    assert randomness() < arbitrariness + 1
+    assert randomness() > 0
+    assert randomness() - randomness() == 0
+    assert randomness() == randomness()
+
+
+def test_keyword_as_title():
+
+    assert keyword_as_title('foo') == 'Foo'
+    assert keyword_as_title('some_text') == 'Some Text'
+    assert keyword_as_title('some text') == 'Some Text'
+    assert keyword_as_title('SOME_TEXT') == 'Some Text'
+
+    # Hyphens are unchanged.
+    assert keyword_as_title('SOME-TEXT') == 'Some-Text'
+    assert keyword_as_title('mary_smith-jones') == 'Mary Smith-Jones'
