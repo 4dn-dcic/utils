@@ -1037,8 +1037,14 @@ def test_mock_boto_s3_client_limitations():
 
         with pytest.raises(MockKeysNotImplemented):
             mock_s3_client.download_file(Filename="foo", Bucket="bucketname", Key="keyname",
-                                          Config='not-implemented')
+                                         Config='not-implemented')
 
         with pytest.raises(MockKeysNotImplemented):
             mock_s3_client.download_fileobj(Fileobj=io.BytesIO(), Bucket="bucketname", Key="keyname",
                                             Config='not-implemented')
+
+
+def test_mock_keys_not_implemented():
+
+    err = MockKeysNotImplemented(keys=['foo', 'bar'], operation="some-operation")
+    assert str(err) == 'Mocked some-operation does not implement keywords: foo, bar'
