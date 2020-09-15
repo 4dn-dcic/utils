@@ -9,6 +9,7 @@ import io
 import os
 import pytz
 
+from json import dumps as json_dumps, loads as json_loads
 from .misc_utils import PRINT, ignored, Retry
 
 
@@ -394,6 +395,9 @@ class MockFileSystem:
 
 
 class NotReallyRandom:
+    """
+    This can be used as a substitute for random to return numbers in a more predictable order.
+    """
 
     def __init__(self):
         self.counter = 0
@@ -412,3 +416,143 @@ class NotReallyRandom:
 
     def choice(self, things):
         return things[self._random_int(len(things))]
+
+
+class MockResponse:
+    """
+    This class is useful for mocking requests.Response (the class that comes back from requests.get and friends).
+
+    This mock is useful because requests.Response is a pain to initialize and the common cases are simple to set
+    up here by just passing arguments.
+
+    Note, too, that requests.Response differs from pyramid.Response in that in requests.Response the way to get
+    the JSON out of a response is to use the .json() method, whereas in pyramid.Response it would just be
+    a .json property access. So since this is for mocking requests.Response, we implement the function.
+    """
+
+    def __init__(self, status_code=200, json=None, content=None):
+        self.status_code = status_code
+        if json is not None and content is not None:
+            raise Exception("MockResponse cannot have both content and json.")
+        elif content is not None:
+            self.content = content
+        elif json is None:
+            self.content = ""
+        else:
+            self.content = json_dumps(json)
+
+    def __str__(self):
+        if self.content:
+            return "<MockResponse %s %s>" % (self.status_code, self.content)
+        else:
+            return "<MockResponse %s>" % (self.status_code,)
+
+    def json(self):
+        return json_loads(self.content)
+
+    def raise_for_status(self):
+        if self.status_code >= 300:
+            raise Exception("%s raised for status." % self)
+
+
+class _PrintCapturer:
+    """
+    This class is used internally to the 'printed_output' context manager to maintain state information
+    on what has been printed so far by PRINT within the indicated context.
+    """
+
+    def __init__(self):
+        self.lines = []
+        self.last = None
+
+    def mock_print_handler(self, *args, **kwargs):
+        text = " ".join(map(str, args))
+        print(text, **kwargs)
+        # This only captures non-file output output.
+        if kwargs.get('file') is None:
+            self.last = text
+            self.lines.append(text)
+
+
+@contextlib.contextmanager
+def printed_output():
+    """
+    This context manager is used to capture output from dcicutils.PRINT for testing.
+
+    The 'printed' object obtained in the 'as' clause of this context manager has two attributes of note:
+
+    * .last contains the last (i.e., most recent) line of output
+    * .lines contains all the lines of output in a list
+
+    These values are updated dynamically as output occurs.
+    (Only output that is not to a file will be captured.)
+
+    Example:
+
+        def show_succcessor(n):
+            PRINT("The successor of %s is %s." % (n, n+1))
+
+        def test_show_successor():
+            with printed_output() as printed:
+                assert printed.last is None
+                assert printed.lines == []
+                show_successor(3)
+                assert printed.last = 'The successor of 3 is 4.'
+                assert printed.lines == ['The successor of 3 is 4.']
+                show_successor(4)
+                assert printed.last == 'The successor of 4 is 5.'
+                assert printed.lines == ['The successor of 3 is 4.', 'The successor of 4 is 5.']
+    """
+
+    printed = _PrintCapturer()
+    with local_attrs(PRINT, _printer=printed.mock_print_handler):
+        yield printed
+
+
+class MockKeysNotImplemented(NotImplementedError):
+
+    def __init__(self, operation, keys):
+        self.operation = operation
+        self.keys = keys
+        super().__init__("Mocked %s does not implement keywords: %s" % (operation, ", ".join(keys)))
+
+
+class MockBotoS3Client:
+    """
+    This is a mock of certain S3 functionality.
+    """
+
+    def __init__(self):
+        self.s3_files = MockFileSystem()
+
+    def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+        if kwargs:
+            raise MockKeysNotImplemented("upload_fileobj", kwargs.keys())
+        data = Fileobj.read()
+        print("Uploading %s (%s bytes) to bucket %s key %s"
+              % (Fileobj, len(data), Bucket, Key))
+        with self.s3_files.open(os.path.join(Bucket, Key), 'wb') as fp:
+            fp.write(data)
+
+    def upload_file(self, Filename, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+        if kwargs:
+            raise MockKeysNotImplemented("upload_file", kwargs.keys())
+
+        with io.open(Filename, 'rb') as fp:
+            self.upload_fileobj(Fileobj=fp, Bucket=Bucket, Key=Key)
+
+    def download_fileobj(self, Bucket, Key, Fileobj, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+        if kwargs:
+            raise MockKeysNotImplemented("upload_file", kwargs.keys())
+
+        with self.s3_files.open(os.path.join(Bucket, Key), 'rb') as fp:
+            data = fp.read()
+        print("Downloading bucket %s key %s (%s bytes) to %s"
+              % (Bucket, Key, len(data), Fileobj))
+        Fileobj.write(data)
+
+    def download_file(self, Bucket, Key, Filename, **kwargs):
+        if kwargs:
+            raise MockKeysNotImplemented("upload_file", kwargs.keys())
+        with io.open(Filename, 'wb') as fp:
+            self.download_fileobj(Bucket=Bucket, Key=Key, Fileobj=fp)

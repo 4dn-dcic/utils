@@ -14,7 +14,7 @@ from dcicutils.env_utils import (
     infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env, FF_PRODUCTION_IDENTIFIER,
     FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
-    full_env_name, full_cgap_env_name, full_fourfront_env_name,
+    full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
 )
 from unittest import mock
 
@@ -127,6 +127,71 @@ def test_blue_green_mirror_env():
     assert blue_green_mirror_env('xyz-blue-1') == 'xyz-green-1'
     assert blue_green_mirror_env('xyz-blueish') == 'xyz-greenish'
     assert blue_green_mirror_env('xyz-greenish') == 'xyz-blueish'
+
+
+def test_is_cgap_server():
+
+    with pytest.raises(ValueError):
+        is_cgap_server(None)
+
+    assert is_cgap_server("https://data.4dnucleome.org") is False
+    assert is_cgap_server("https://staging.4dnucleome.org") is False
+    assert is_cgap_server("https://cgap.hms.harvard.edu") is True
+
+    assert is_cgap_server("http://data.4dnucleome.org") is False
+    assert is_cgap_server("http://staging.4dnucleome.org") is False
+    assert is_cgap_server("http://cgap.hms.harvard.edu") is True
+
+    assert is_cgap_server("data.4dnucleome.org") is False
+    assert is_cgap_server("staging.4dnucleome.org") is False
+    assert is_cgap_server("cgap.hms.harvard.edu") is True
+
+    assert is_cgap_server("fourfront-mastertest.something.elasticsomething.com") is False
+    assert is_cgap_server("fourfront-webdev.something.elasticsomething.com") is False
+    assert is_cgap_server("fourfront-hotseat.something.elasticsomething.com") is False
+    assert is_cgap_server("fourfront-foo.something.elasticsomething.com") is False
+    assert is_cgap_server("fourfront-cgap.something.elasticsomething.com") is True
+    assert is_cgap_server("fourfront-cgapdev.something.elasticsomething.com") is True
+    assert is_cgap_server("fourfront-cgaptest.something.elasticsomething.com") is True
+    assert is_cgap_server("fourfront-cgapwolf.something.elasticsomething.com") is True
+    assert is_cgap_server("fourfront-cgapfoo.something.elasticsomething.com") is True
+
+    assert is_cgap_server("localhost") is False
+    assert is_cgap_server("localhost", allow_localhost=True) is True
+
+    assert is_cgap_server("www.google.com") is False
+
+
+def test_is_fourfront_server():
+    with pytest.raises(ValueError):
+        is_fourfront_server(None)
+
+    assert is_fourfront_server("https://data.4dnucleome.org") is True
+    assert is_fourfront_server("https://staging.4dnucleome.org") is True
+    assert is_fourfront_server("https://cgap.hms.harvard.edu") is False
+
+    assert is_fourfront_server("http://data.4dnucleome.org") is True
+    assert is_fourfront_server("http://staging.4dnucleome.org") is True
+    assert is_fourfront_server("http://cgap.hms.harvard.edu") is False
+
+    assert is_fourfront_server("data.4dnucleome.org") is True
+    assert is_fourfront_server("staging.4dnucleome.org") is True
+    assert is_fourfront_server("cgap.hms.harvard.edu") is False
+
+    assert is_fourfront_server("fourfront-mastertest.something.elasticsomething.com") is True
+    assert is_fourfront_server("fourfront-webdev.something.elasticsomething.com") is True
+    assert is_fourfront_server("fourfront-hotseat.something.elasticsomething.com") is True
+    assert is_fourfront_server("fourfront-foo.something.elasticsomething.com") is True
+    assert is_fourfront_server("fourfront-cgap.something.elasticsomething.com") is False
+    assert is_fourfront_server("fourfront-cgapdev.something.elasticsomething.com") is False
+    assert is_fourfront_server("fourfront-cgaptest.something.elasticsomething.com") is False
+    assert is_fourfront_server("fourfront-cgapwolf.something.elasticsomething.com") is False
+    assert is_fourfront_server("fourfront-cgapfoo.something.elasticsomething.com") is False
+
+    assert is_fourfront_server("localhost") is False
+    assert is_fourfront_server("localhost", allow_localhost=True) is True
+
+    assert is_fourfront_server("www.google.com") is False
 
 
 def test_is_cgap_env():
