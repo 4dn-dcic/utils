@@ -534,8 +534,25 @@ class MockBotoS3Client:
         with self.s3_files.open(os.path.join(Bucket, Key), 'wb') as fp:
             fp.write(data)
 
-    def upload_file(self, Filename, Bucket, Key, **kwargs):
+    def upload_file(self, Filename, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
         if kwargs:
             raise MockKeysNotImplemented("upload_file", kwargs.keys())
+
         with io.open(Filename, 'rb') as fp:
             self.upload_fileobj(Fileobj=fp, Bucket=Bucket, Key=Key)
+
+    def download_fileobj(self, Bucket, Key, Fileobj, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+        if kwargs:
+            raise MockKeysNotImplemented("upload_file", kwargs.keys())
+
+        with self.s3_files.open(os.path.join(Bucket, Key), 'rb') as fp:
+            data = fp.read()
+        print("Downloading bucket %s key %s (%s bytes) to %s"
+              % (Bucket, Key, len(data), Fileobj))
+        Fileobj.write(data)
+
+    def download_file(self, Bucket, Key, Filename, **kwargs):
+        if kwargs:
+            raise MockKeysNotImplemented("upload_file", kwargs.keys())
+        with io.open(Filename, 'wb') as fp:
+            self.download_fileobj(Bucket=Bucket, Key=Key, Fileobj=fp)

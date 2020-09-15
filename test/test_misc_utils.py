@@ -413,6 +413,9 @@ def test_virtual_app_crud_failure():
         def post_json(self, url, object, **kwargs):  # noqa - the name of this argument is not chosen by us here
             raise webtest.AppError(simulated_error_message)
 
+        def put_json(self, url, object, **kwargs):  # noqa - the name of this argument is not chosen by us here
+            raise webtest.AppError(simulated_error_message)
+
         def patch_json(self, url, fields, **kwargs):
             raise webtest.AppError(simulated_error_message)
 
@@ -428,6 +431,7 @@ def test_virtual_app_crud_failure():
         operations = [
             lambda: vapp.get(some_url),
             lambda: vapp.post_json(some_url, {'a': 1, 'b': 2, 'c': 3}),
+            lambda: vapp.put_json(some_url, {'a': 1, 'b': 2, 'c': 3}),
             lambda: vapp.patch_json(some_url, {'b': 5})
         ]
 

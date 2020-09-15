@@ -9,11 +9,11 @@ import time
 import uuid
 
 from dcicutils import qa_utils
-from dcicutils.misc_utils import Retry, PRINT
+from dcicutils.misc_utils import Retry, PRINT, file_contents
 from dcicutils.qa_utils import (
     mock_not_called, local_attrs, override_environ, show_elapsed_time, timed,
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom,
-    MockResponse, printed_output,
+    MockResponse, printed_output, MockBotoS3Client,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -893,3 +893,127 @@ def test_uppercase_print_with_time():
 
         assert timestamp_pattern.match(line0)
         assert not timestamp_pattern.match(line1)
+
+
+def test_mock_boto_s3_client_upload_file_and_download_file_positional():
+
+    c = MockBotoS3Client()
+    local_mfs = MockFileSystem()
+
+    # Check positionally
+
+    with mock.patch("io.open", local_mfs.open):
+
+        with io.open("file1.txt", 'w') as fp:
+            fp.write('Hello!\n')
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert c.s3_files.files == {}
+
+        c.upload_file("file1.txt", "MyBucket", "MyFile")
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert c.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        c.download_file("MyBucket", "MyFile", "file2.txt")
+
+        assert local_mfs.files == {
+            "file1.txt": b"Hello!\n",
+            "file2.txt": b"Hello!\n",
+        }
+        assert c.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        assert file_contents("file1.txt") == file_contents("file2.txt")
+
+
+def test_mock_boto_s3_client_upload_file_and_download_file_keyworded():
+
+    c = MockBotoS3Client()
+    local_mfs = MockFileSystem()
+
+    with mock.patch("io.open", local_mfs.open):
+
+        with io.open("file1.txt", 'w') as fp:
+            fp.write('Hello!\n')
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert c.s3_files.files == {}
+
+        c.upload_file(Filename="file1.txt", Bucket="MyBucket", Key="MyFile")
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert c.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        c.download_file(Bucket="MyBucket", Key="MyFile", Filename="file2.txt")
+
+        assert local_mfs.files == {
+            "file1.txt": b"Hello!\n",
+            "file2.txt": b"Hello!\n",
+        }
+        assert c.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        assert file_contents("file1.txt") == file_contents("file2.txt")
+
+
+def test_mock_boto_s3_client_upload_fileobj_and_download_fileobj_positional():
+
+    c = MockBotoS3Client()
+    local_mfs = MockFileSystem()
+
+    # Check positionally
+
+    with mock.patch("io.open", local_mfs.open):
+
+        with io.open("file1.txt", 'w') as fp:
+            fp.write('Hello!\n')
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert c.s3_files.files == {}
+
+        with io.open("file1.txt", 'rb') as fp:
+            c.upload_fileobj(fp, "MyBucket", "MyFile")
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert c.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        with io.open("file2.txt", 'wb') as fp:
+            c.download_fileobj("MyBucket", "MyFile", fp)
+
+        assert local_mfs.files == {
+            "file1.txt": b"Hello!\n",
+            "file2.txt": b"Hello!\n",
+        }
+        assert c.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        assert file_contents("file1.txt") == file_contents("file2.txt")
+
+
+def test_mock_boto_s3_client_upload_fileobj_and_download_fileobj_keyworded():
+
+    c = MockBotoS3Client()
+    local_mfs = MockFileSystem()
+
+    with mock.patch("io.open", local_mfs.open):
+
+        with io.open("file1.txt", 'w') as fp:
+            fp.write('Hello!\n')
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert c.s3_files.files == {}
+
+        with io.open("file1.txt", 'rb') as fp:
+            c.upload_fileobj(Fileobj=fp, Bucket="MyBucket", Key="MyFile")
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert c.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        with io.open("file2.txt", 'wb') as fp:
+            c.download_fileobj(Bucket="MyBucket", Key="MyFile", Fileobj=fp)
+
+        assert local_mfs.files == {
+            "file1.txt": b"Hello!\n",
+            "file2.txt": b"Hello!\n",
+        }
+        assert c.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        assert file_contents("file1.txt") == file_contents("file2.txt")
