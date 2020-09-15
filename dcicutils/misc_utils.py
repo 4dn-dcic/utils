@@ -650,3 +650,19 @@ def remove_suffix(suffix, text, required=False):
         else:
             return text
     return text[:len(text)-len(suffix)]
+
+
+class DeprecationError(Exception):
+    pass
+
+
+def deprecated(func, fail=True):
+    """ Decorator that allows you to deprecate methods by raising an exception """
+
+    def inner(*args, **kwargs):
+        if not fail:
+            logging.error('Called deprecated function %s' % func.__name__)
+            return func(*args, **kwargs)
+        raise DeprecationError('Tried to call function %s but it is marked as deprecated' % func.__name__)
+
+    return inner

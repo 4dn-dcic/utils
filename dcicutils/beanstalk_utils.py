@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 from . import ff_utils
 from botocore.exceptions import ClientError
-from .misc_utils import PRINT
+from .misc_utils import PRINT, deprecated
 from .env_utils import (
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, public_url_mappings,
     blue_green_mirror_env, get_standard_mirror_env,
@@ -102,6 +102,7 @@ def delete_db(db_identifier, take_snapshot=True, allow_delete_prod=False):
     return resp
 
 
+@deprecated
 def get_es_from_bs_config(env):
     """
     Given an ElasticBeanstalk environment name, get the corresponding
@@ -119,6 +120,7 @@ def get_es_from_bs_config(env):
             return item.split('=')[1].strip(':80')
 
 
+@deprecated
 def is_indexing_finished(env, prev_version=None, travis_build_id=None):
     """
     Checker function used with torb waitfor lambda; output must be standarized.
@@ -199,7 +201,7 @@ def is_indexing_finished(env, prev_version=None, travis_build_id=None):
     return is_ready, totals
 
 
-def swap_cname(src, dest):
+def _swap_cname(src, dest):
     """
     Swap the CNAMEs of two ElasticBeanstalk (EB) environments, given by
     src and dest. Will restart the app servers after swapping.
@@ -221,6 +223,35 @@ def swap_cname(src, dest):
     PRINT("Restarting app servers for %s and %s..." % (src, dest))
     client.restart_app_server(EnvironmentName=src)
     client.restart_app_server(EnvironmentName=dest)
+
+
+def _create_foursight_new(dest_env):
+    """ Helper function that does what create_foursight_auto used to do but slightly differently """
+    fs = {'dest_env': dest_env, 'bs_url': get_beanstalk_real_url(dest_env)}
+
+    # Get information, pass to create_foursight
+    fs['fs_url'] = get_foursight_env(dest_env, fs['bs_url'])
+    fs['es_url'] = ff_utils.get_health_page(ff_env=dest_env)['elasticsearch']
+    fs['foursight'] = create_foursight(**fs)
+
+    # delete initial checks (? not clear why this was happening before)
+    if fs['foursight'].get('initial_checks'):
+        del fs['foursight']['initial_checks']
+
+    return fs
+
+
+def swap_cname(src, dest):
+    """ Does a CNAME swap and foursight configuration (pulled in from Torb)
+        NOTE: this is the mechanism by which CNAME swaps must occur now!
+    """
+    _swap_cname(src, dest)
+    res_data = _create_foursight_new(src)
+    print('Updated foursight %s environment to use %s. Foursight response: %s'
+          % (res_data['fs_url'], res_data['dest_env'], res_data['foursight']))
+    res_stag = _create_foursight_new(dest)
+    print('Updated foursight %s environment to use %s. Foursight response: %s'
+          % (res_stag['fs_url'], res_stag['dest_env'], res_stag['foursight']))
 
 
 def _compute_prd_env_for_project(project):
@@ -321,6 +352,7 @@ def get_beanstalk_real_url(env):
     return url
 
 
+@deprecated
 def is_beanstalk_ready(env):
     """
     Checker function used with torb waitfor lambda; output must be standarized.
@@ -393,6 +425,7 @@ def is_snapshot_ready(snapshot_name):
     return is_ready, resp['DBSnapshots'][0]['DBSnapshotIdentifier']
 
 
+@deprecated
 def is_es_ready(es_name):
     """
     Checker function used with torb waitfor lambda; output must be standarized.
@@ -438,6 +471,7 @@ def is_db_ready(db_identifier):
     return is_ready, details
 
 
+@deprecated
 def create_db_snapshot(db_identifier, snapshot_name):
     """
     Given an RDS instance indentifier, create a snapshot using the given name.
@@ -505,6 +539,7 @@ def create_db_from_snapshot(db_identifier, snapshot_name, delete_db=True):
     return response['DBInstance']['DBInstanceArn']
 
 
+@deprecated
 def is_travis_started(request_url):
     """
     Checker function used with torb waitfor lambda; output must be standarized.
@@ -538,6 +573,7 @@ def is_travis_started(request_url):
     return is_ready, details
 
 
+@deprecated
 def is_travis_finished(build_id):
     """
     Checker function used with torb waitfor lambda; output must be standarized.
@@ -603,6 +639,7 @@ def get_bs_env(envname):
     return env_vars.split(',')
 
 
+@deprecated
 def update_bs_config(envname, template=None, keep_env_vars=False,
                      env_override=None):
     """
@@ -649,6 +686,7 @@ def update_bs_config(envname, template=None, keep_env_vars=False,
                                          OptionSettings=options)
 
 
+@deprecated
 def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
     """
     XXX: Will not work currently, do NOT use on production
@@ -789,6 +827,7 @@ def log_to_foursight(event, lambda_name='', overrides=None):
                             % (url, data, exc, res.text))
 
 
+@deprecated
 def create_foursight_auto(dest_env):
     """
     Call `create_foursight` to create a Foursight environment based off a
@@ -865,7 +904,11 @@ def create_foursight(dest_env, bs_url, es_url, fs_url=None):
     if not bs_url.endswith("/"):
         bs_url += "/"
 
-    es_url = es_url.rstrip(":80")
+    if ':80' in es_url:
+        es_url = es_url.rstrip(":80")
+    elif ':443' in es_url:
+        es_url = es_url.rstrip(":443")
+
     if not es_url.startswith("http"):
         es_url = "https://" + es_url
     if not es_url.endswith("/"):
@@ -891,6 +934,7 @@ def create_foursight(dest_env, bs_url, es_url, fs_url=None):
                         % (foursight_url, payload, exc, res.text))
 
 
+@deprecated
 def create_new_es(new):
     """
     Create a new Elasticsearch domain with given name. See the
@@ -927,6 +971,7 @@ def create_new_es(new):
     return resp
 
 
+@deprecated
 def get_es_build_status(new, max_tries=None):
     """
     Check the build status of an Elasticsearch instance with given name.
