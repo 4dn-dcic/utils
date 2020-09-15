@@ -57,6 +57,10 @@ def test_n_of():
     assert EnglishUtils.n_of(2, "day") == "2 days"
     assert EnglishUtils.n_of(2.5, "day") == "2.5 days"
 
+    assert EnglishUtils.n_of(7, "variant") == '7 variants'
+    assert EnglishUtils.n_of(1, "accession") == '1 accession'
+    assert EnglishUtils.n_of(['alpha', 'beta', 'gamma'], 'Greek letter') == '3 Greek letters'
+
 
 def test_relative_time_string():
 

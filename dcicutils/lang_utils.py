@@ -1,7 +1,7 @@
 import datetime
 import re
 
-from .misc_utils import ignored
+from .qa_utils import ignored
 
 
 class EnglishUtils:
@@ -122,9 +122,18 @@ class EnglishUtils:
     def n_of(cls, n, thing, num_format=None):
         """
         Given a number and a noun, returns the name for that many of that noun.
-        e.g., n_of(7, "variant") => "7 variants"
-              n_of(1, "accession") => "1 accession"
+
+        Examples:
+
+            >>> n_of(7, "variant")
+            '7 variants'
+            >>> n_of(1, "accession")
+            '1 accession'
+            >>> n_of(['alpha', 'beta', 'gamma'], 'Greek letter')
+            '3 Greek letters'
         """
+        if isinstance(n, (list, tuple, set, dict)):
+            n = len(n)
         display_n = n
         if num_format:
             res = num_format(n, thing)

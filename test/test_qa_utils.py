@@ -9,10 +9,11 @@ import time
 import uuid
 
 from dcicutils import qa_utils
-from dcicutils.misc_utils import Retry
+from dcicutils.misc_utils import Retry, PRINT, file_contents
 from dcicutils.qa_utils import (
     mock_not_called, local_attrs, override_environ, show_elapsed_time, timed,
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom,
+    MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -700,7 +701,6 @@ def test_mock_file_system():
                 assert not os.path.exists(filename)
 
 
-
 class _MockPrinter:
 
     def __init__(self):
@@ -789,3 +789,262 @@ def test_not_really_random():
 
     r = NotReallyRandom()
     assert [r.randint(3, 5) for _ in range(10)] == [3, 4, 5, 3, 4, 5, 3, 4, 5, 3]
+
+
+def test_mock_response():
+
+    # Cannot specify both json and content
+    with pytest.raises(Exception):
+        MockResponse(200, content="foo", json={"foo": "bar"})
+
+    ok_empty_response = MockResponse(status_code=200)
+
+    assert ok_empty_response.content == ""
+
+    with pytest.raises(Exception):
+        ok_empty_response.json()
+
+    assert str(ok_empty_response) == '<MockResponse 200>'
+
+    ok_empty_response.raise_for_status()  # This should raise no error
+
+    ok_response = MockResponse(status_code=200, json={'foo': 'bar'})
+
+    assert ok_response.status_code == 200
+    assert ok_response.json() == {'foo': 'bar'}
+
+    assert str(ok_response) == '<MockResponse 200 {"foo": "bar"}>'
+
+    ok_response.raise_for_status()  # This should raise no error
+
+    ok_non_json_response = MockResponse(status_code=200, content="foo")
+
+    assert ok_non_json_response.status_code == 200
+    assert ok_non_json_response.content == "foo"
+    with pytest.raises(Exception):
+        ok_non_json_response.json()
+
+    error_response = MockResponse(status_code=400, json={'message': 'bad stuff'})
+
+    assert error_response.status_code == 400
+    assert error_response.json() == {'message': "bad stuff"}
+
+    assert str(error_response) == '<MockResponse 400 {"message": "bad stuff"}>'
+
+    with pytest.raises(Exception):
+        error_response.raise_for_status()
+
+
+def test_uppercase_print_with_printed_output():
+
+    with printed_output() as printed:
+
+        assert printed.lines == []
+
+        PRINT("foo")
+        assert printed.lines == ["foo"]
+        assert printed.last == "foo"
+
+        PRINT("bar")
+        assert printed.lines == ["foo", "bar"]
+        assert printed.last == "bar"
+
+
+def test_uppercase_print_with_time():
+
+    # Test uses WITHOUT timestamps
+    with printed_output() as printed:
+
+        assert printed.lines == []
+        assert printed.last is None
+
+        PRINT("This", "is", "a", "test.")
+
+        assert printed.lines == ["This is a test."]
+        assert printed.last == "This is a test."
+
+        PRINT("This, too.")
+
+        assert printed.lines == ["This is a test.", "This, too."]
+        assert printed.last == "This, too."
+
+    timestamp_pattern = re.compile(r'^[0-9][0-9]:[0-9][0-9]:[0-9][0-9] (.*)$')
+
+    # Test uses WITH timestamps
+    with printed_output() as printed:
+
+        PRINT("This", "is", "a", "test.", timestamped=True)
+        PRINT("This, too.", timestamped=True)
+
+        trimmed = []
+        for line in printed.lines:
+            matched = timestamp_pattern.match(line)
+            assert matched, "Timestamp missing or in bad form: %s" % line
+            trimmed.append(matched.group(1))
+
+        assert trimmed == ["This is a test.", "This, too."]
+
+    with printed_output() as printed:
+
+        PRINT("This", "is", "a", "test.", timestamped=True)
+        PRINT("This, too.")
+
+        line0, line1 = printed.lines
+
+        assert timestamp_pattern.match(line0)
+        assert not timestamp_pattern.match(line1)
+
+
+def test_mock_boto_s3_client_upload_file_and_download_file_positional():
+
+    mock_s3_client = MockBotoS3Client()
+    local_mfs = MockFileSystem()
+
+    # Check positionally
+
+    with mock.patch("io.open", local_mfs.open):
+
+        with io.open("file1.txt", 'w') as fp:
+            fp.write('Hello!\n')
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {}
+
+        mock_s3_client.upload_file("file1.txt", "MyBucket", "MyFile")
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        mock_s3_client.download_file("MyBucket", "MyFile", "file2.txt")
+
+        assert local_mfs.files == {
+            "file1.txt": b"Hello!\n",
+            "file2.txt": b"Hello!\n",
+        }
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        assert file_contents("file1.txt") == file_contents("file2.txt")
+
+
+def test_mock_boto_s3_client_upload_file_and_download_file_keyworded():
+
+    mock_s3_client = MockBotoS3Client()
+    local_mfs = MockFileSystem()
+
+    with mock.patch("io.open", local_mfs.open):
+
+        with io.open("file1.txt", 'w') as fp:
+            fp.write('Hello!\n')
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {}
+
+        mock_s3_client.upload_file(Filename="file1.txt", Bucket="MyBucket", Key="MyFile")
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        mock_s3_client.download_file(Bucket="MyBucket", Key="MyFile", Filename="file2.txt")
+
+        assert local_mfs.files == {
+            "file1.txt": b"Hello!\n",
+            "file2.txt": b"Hello!\n",
+        }
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        assert file_contents("file1.txt") == file_contents("file2.txt")
+
+
+def test_mock_boto_s3_client_upload_fileobj_and_download_fileobj_positional():
+
+    mock_s3_client = MockBotoS3Client()
+    local_mfs = MockFileSystem()
+
+    # Check positionally
+
+    with mock.patch("io.open", local_mfs.open):
+
+        with io.open("file1.txt", 'w') as fp:
+            fp.write('Hello!\n')
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {}
+
+        with io.open("file1.txt", 'rb') as fp:
+            mock_s3_client.upload_fileobj(fp, "MyBucket", "MyFile")
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        with io.open("file2.txt", 'wb') as fp:
+            mock_s3_client.download_fileobj("MyBucket", "MyFile", fp)
+
+        assert local_mfs.files == {
+            "file1.txt": b"Hello!\n",
+            "file2.txt": b"Hello!\n",
+        }
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        assert file_contents("file1.txt") == file_contents("file2.txt")
+
+
+def test_mock_boto_s3_client_upload_fileobj_and_download_fileobj_keyworded():
+
+    mock_s3_client = MockBotoS3Client()
+    local_mfs = MockFileSystem()
+
+    with mock.patch("io.open", local_mfs.open):
+
+        with io.open("file1.txt", 'w') as fp:
+            fp.write('Hello!\n')
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {}
+
+        with io.open("file1.txt", 'rb') as fp:
+            mock_s3_client.upload_fileobj(Fileobj=fp, Bucket="MyBucket", Key="MyFile")
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        with io.open("file2.txt", 'wb') as fp:
+            mock_s3_client.download_fileobj(Bucket="MyBucket", Key="MyFile", Fileobj=fp)
+
+        assert local_mfs.files == {
+            "file1.txt": b"Hello!\n",
+            "file2.txt": b"Hello!\n",
+        }
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        assert file_contents("file1.txt") == file_contents("file2.txt")
+
+
+def test_mock_boto_s3_client_limitations():
+
+    mock_s3_client = MockBotoS3Client()
+
+    local_fs = MockFileSystem()
+
+    with mock.patch("io.open", local_fs.open):
+
+        with pytest.raises(MockKeysNotImplemented):
+            mock_s3_client.upload_file(Filename="foo", Bucket="bucketname", Key="keyname",
+                                       Config='not-implemented')
+
+        with pytest.raises(MockKeysNotImplemented):
+            mock_s3_client.upload_fileobj(Fileobj=io.BytesIO(), Bucket="bucketname", Key="keyname",
+                                          Config='not-implemented')
+
+        with pytest.raises(MockKeysNotImplemented):
+            mock_s3_client.download_file(Filename="foo", Bucket="bucketname", Key="keyname",
+                                         Config='not-implemented')
+
+        with pytest.raises(MockKeysNotImplemented):
+            mock_s3_client.download_fileobj(Fileobj=io.BytesIO(), Bucket="bucketname", Key="keyname",
+                                            Config='not-implemented')
+
+
+def test_mock_keys_not_implemented():
+
+    err = MockKeysNotImplemented(keys=['foo', 'bar'], operation="some-operation")
+    assert str(err) == 'Mocked some-operation does not implement keywords: foo, bar'

@@ -1,8 +1,10 @@
+import botocore.exceptions
 import datetime as datetime_module
 import io
 import json
 import os
 import pytest
+import random
 import re
 import time
 import warnings
@@ -12,15 +14,16 @@ from dcicutils.misc_utils import (
     PRINT, ignored, filtered_warnings, get_setting_from_context, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
     Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool,
-    LockoutManager, check_true, remove_prefix, remove_suffix
+    LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
+    keyword_as_title, file_contents,
 )
-from dcicutils.qa_utils import Occasionally, ControlledTime, override_environ
+from dcicutils.qa_utils import Occasionally, ControlledTime, override_environ, MockFileSystem
 from unittest import mock
 
 
 def test_uppercase_print():
     # This is just a synonym, so the easiest thing is just to test that fact.
-    assert PRINT == print
+    assert PRINT._printer == print
 
     # But also a basic test that it does something
     s = io.StringIO()
@@ -410,6 +413,9 @@ def test_virtual_app_crud_failure():
         def post_json(self, url, object, **kwargs):  # noqa - the name of this argument is not chosen by us here
             raise webtest.AppError(simulated_error_message)
 
+        def put_json(self, url, object, **kwargs):  # noqa - the name of this argument is not chosen by us here
+            raise webtest.AppError(simulated_error_message)
+
         def patch_json(self, url, fields, **kwargs):
             raise webtest.AppError(simulated_error_message)
 
@@ -425,6 +431,7 @@ def test_virtual_app_crud_failure():
         operations = [
             lambda: vapp.get(some_url),
             lambda: vapp.post_json(some_url, {'a': 1, 'b': 2, 'c': 3}),
+            lambda: vapp.put_json(some_url, {'a': 1, 'b': 2, 'c': 3}),
             lambda: vapp.patch_json(some_url, {'b': 5})
         ]
 
@@ -1080,3 +1087,72 @@ def test_remove_suffix():
     assert remove_suffix("", "foo") == "foo"
     assert remove_suffix("", "foo", required=False) == "foo"
     assert remove_suffix("", "foo", required=True) == "foo"
+
+
+def test_full_class_name():
+
+    assert full_class_name(3) == 'int'
+    assert full_class_name(botocore.exceptions.BotoCoreError()) == "botocore.exceptions.BotoCoreError"
+
+
+def test_full_object_name():
+
+    assert full_object_name(type(3)) == 'int'
+    assert full_object_name(botocore.exceptions.BotoCoreError) == "botocore.exceptions.BotoCoreError"
+    assert full_object_name(3) is None
+    assert full_object_name('foo') is None
+    assert full_object_name(full_object_name) == 'dcicutils.misc_utils.full_object_name'
+
+
+def test_constantly():
+
+    five = constantly(5)
+
+    assert five() == 5
+    assert five(13) == 5
+    assert five(nobody='cares') == 5
+    assert five(0, 1, 2, fourth=3, fifth=4) == 5
+
+    assert five() + five() == 10
+
+    arbitrariness = 1000000
+    randomness = constantly(random.randint(1, arbitrariness))
+    assert randomness() < arbitrariness + 1
+    assert randomness() > 0
+    assert randomness() - randomness() == 0
+    assert randomness() == randomness()
+
+
+def test_keyword_as_title():
+
+    assert keyword_as_title('foo') == 'Foo'
+    assert keyword_as_title('some_text') == 'Some Text'
+    assert keyword_as_title('some text') == 'Some Text'
+    assert keyword_as_title('SOME_TEXT') == 'Some Text'
+
+    # Hyphens are unchanged.
+    assert keyword_as_title('SOME-TEXT') == 'Some-Text'
+    assert keyword_as_title('mary_smith-jones') == 'Mary Smith-Jones'
+
+
+def test_file_contents():
+
+    mfs = MockFileSystem()
+
+    with mock.patch("io.open", mfs.open):
+
+        with io.open("foo.txt", 'w') as fp:
+            print("foo", file=fp)
+            print("bar", file=fp)
+
+        assert file_contents("foo.txt") == "foo\nbar\n"
+        assert file_contents("foo.txt", binary=True) == 'foo\nbar\n'.encode('utf-8')
+        assert file_contents("foo.txt", binary=True) == b'\x66\x6f\x6f\x0a\x62\x61\x72\x0a'
+
+        with io.open("foo.bin", 'wb') as fp:
+            fp.write(bytes([72, 101]))
+            fp.write(bytes([108, 108, 111, 33, 10]))
+
+        assert file_contents("foo.bin", binary=True) == b'\x48\x65\x6c\x6c\x6f\x21\x0a'
+        assert file_contents("foo.bin", binary=False) == b'\x48\x65\x6c\x6c\x6f\x21\x0a'.decode('utf-8')
+        assert file_contents("foo.bin", binary=False) == 'Hello!\n'
