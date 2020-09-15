@@ -231,6 +231,27 @@ def public_url_mappings(envname):
     return CGAP_PUBLIC_URLS if is_cgap_env(envname) else FF_PUBLIC_URLS
 
 
+def is_cgap_server(server, allow_localhost=False):
+    """
+    Returns True if the given string looks like a CGAP server name. Otherwise returns False.
+
+    If allow_localhost (default False) is True, then 'localhost' will be treated as a CGAP host.
+    """
+    check_true(isinstance(server, str), "Server name must be a string.", error_class=ValueError)
+    return 'cgap' in server or (allow_localhost and 'localhost' in server)
+
+
+def is_fourfront_server(server, allow_localhost=False):
+    """
+    Returns True if the given string looks like a Fourfront server name. Otherwise returns False.
+
+    If allow_localhost (default False) is True, then 'localhost' will be treated as a Fourfront host.
+    """
+    check_true(isinstance(server, str), "Server name must be a string.", error_class=ValueError)
+    return (("fourfront" in server or "4dnucleome" in server) and not is_cgap_server(server)
+            or (allow_localhost and 'localhost' in server))
+
+
 def is_cgap_env(envname):
     """
     Returns True of the given string looks like a CGAP elasticbeanstalk environment name.
