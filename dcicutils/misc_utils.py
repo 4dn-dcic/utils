@@ -678,7 +678,9 @@ class ObsoleteError(Exception):
 
 
 def obsolete(func, fail=True):
-    """ Decorator that allows you to deprecate methods by raising an exception """
+    """ Decorator that allows you to mark methods as obsolete and raise an exception if called.
+        You can also pass fail=False to the decorator to just emit an error log statement.
+    """
 
     def inner(*args, **kwargs):
         if not fail:
