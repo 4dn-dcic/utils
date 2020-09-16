@@ -449,7 +449,7 @@ def test_filtered_warnings():
     def expect_warnings(pairs):
         with warnings.catch_warnings(record=True) as w:
             # Trigger a warning.
-            warnings.warn("oh, this is deprecated for sure", DeprecationWarning)  # noqa
+            warnings.warn("oh, this is obsolete for sure", DeprecationWarning)  # noqa
             warnings.warn("tsk, tsk, tsk, what ugly code", SyntaxWarning)  # noqa
             # Verify some things
             for expected_count, expected_type in pairs:

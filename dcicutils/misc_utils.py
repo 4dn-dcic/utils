@@ -215,7 +215,7 @@ def filtered_warnings(action, message="", category=None, module="", lineno=0, ap
     For example:
 
            with filtered_warnings('ignore', category=DeprecationWarning):
-               ... use something that's deprecated without a lot of fuss ...
+               ... use something that's obsolete without a lot of fuss ...
 
     Note: This is not threadsafe. It's OK while loading system and during testing,
           but not in worker threads.
@@ -673,21 +673,21 @@ def remove_suffix(suffix, text, required=False):
     return text[:len(text)-len(suffix)]
 
 
-class DeprecationError(Exception):
+class ObsoleteError(Exception):
     pass
 
 
-def deprecated(func, fail=True):
+def obsolete(func, fail=True):
     """ Decorator that allows you to deprecate methods by raising an exception """
 
     def inner(*args, **kwargs):
         if not fail:
-            logging.error('Called deprecated function %s' % func.__name__)
+            logging.error('Called obsolete function %s' % func.__name__)
             return func(*args, **kwargs)
-        raise DeprecationError('Tried to call function %s but it is marked as deprecated' % func.__name__)
+        raise ObsoleteError('Tried to call function %s but it is marked as obsolete' % func.__name__)
 
     return inner
-  
+
 
 def full_class_name(obj):
     """

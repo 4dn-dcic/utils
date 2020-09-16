@@ -677,7 +677,7 @@ class IniFileManager:
             sys.exit(1)
 
 
-# The name Deployer is deprecated. Please use IniFileManager instead of Deployer.
+# The name Deployer is obsolete. Please use IniFileManager instead of Deployer.
 Deployer = IniFileManager
 
 
