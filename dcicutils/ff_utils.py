@@ -1010,19 +1010,49 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
     return store, list(item_uuids)
 
 
-def get_health_page(key=None, ff_env=None):
-    """
-    Simple function to return the json for a FF health page given keys or
-    ff_env. Will return json containing an error rather than raising an
-    exception if this fails, since this function should tolerate failure
-    """
+def _get_page(page='/health', key=None, ff_env=None):
+    """ Wrapper for commonly used code to GET a page from an environment
+        Given keys or ff_env, will return json containing an error rather than raising an
+        exception if this fails, since this function should tolerate failure """
     try:
         auth = get_authentication_with_server(key, ff_env)
-        health_res = authorized_request(auth['server'] + '/health', auth=auth, verb='GET')
+        health_res = authorized_request(auth['server'] + page, auth=auth, verb='GET')
         ret = get_response_json(health_res)
     except Exception as exc:
         ret = {'error': str(exc)}
     return ret
+
+
+def get_health_page(key=None, ff_env=None):
+    """
+    Simple function to return the json for a FF health page
+    """
+    return _get_page(page='/health', key=key, ff_env=ff_env)
+
+
+def get_counts_page(key=None, ff_env=None):
+    """ Gets DB/ES counts page in JSON """
+    return _get_page(page='/counts', key=key, ff_env=ff_env)
+
+
+def get_indexing_status(key=None, ff_env=None):
+    """ Gets indexing status counts page in JSON """
+    return _get_page(page='/indexing_status', key=key, ff_env=ff_env)
+
+
+def are_counts_even(env):
+    """ Returns 2-tuple of boolean on whether or not counts are even the value of the counts """
+    totals = get_counts_page(ff_env=env)
+    if 'error' in totals:  # error encountered getting page, assume false and return error
+        return False, totals
+    totals = totals['db_es_total'].split()
+
+    # example value of split totals: ["DB:", "74048", "ES:", "74048"]
+    db_total = totals[1]
+    es_total = totals[3]
+    if int(db_total) > int(es_total):
+        return False, totals
+    return True, totals
 
 
 class SearchESMetadataHandler(object):

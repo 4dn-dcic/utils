@@ -755,3 +755,50 @@ def keyword_as_title(keyword):
 def file_contents(filename, binary=False):
     with io.open(filename, 'rb' if binary else 'r') as fp:
         return fp.read()
+
+
+class CachedField:
+    def __init__(self, name, update_function, timeout=600):
+        """ Provides a named field that is cached for a certain period of time. The value is computed
+            on calls to __init__, after which the get() method should be used.
+
+        :param name: name of property
+        :param update_function: lambda to be invoked to update the value
+        :param timeout: TTL of this field, in seconds
+        """
+        self.name = name
+        self._update_function = update_function
+        self.timeout = timeout
+        self.value = update_function()
+        self.time_of_next_update = datetime.datetime.utcnow() + datetime.timedelta(seconds=timeout)
+
+    def _update_timestamp(self):
+        self.time_of_next_update = datetime.datetime.utcnow() + datetime.timedelta(seconds=self.timeout)
+
+    def _update_value(self):
+        self.value = self._update_function()
+        self._update_timestamp()
+
+    def get(self):
+        """ Intended for normal use - to get the value subject to the given TTL on creation. """
+        now = datetime.datetime.utcnow()
+        if now > self.time_of_next_update:
+            self._update_value()
+        return self.value
+
+    def get_updated(self, push_ttl=False):
+        """ Intended to force an update to the value and potentially push back the timeout from now. """
+        self.value = self._update_function()
+        if push_ttl:
+            self.time_of_next_update = datetime.datetime.utcnow() + datetime.timedelta(seconds=self.timeout)
+        return self.value
+
+    def set_timeout(self, new_timeout):
+        """ Sets a new value for timeout and restarts the timeout counter."""
+        self.timeout = new_timeout
+        self._update_timestamp()
+
+    def __repr__(self):
+        return 'CachedField %s with update function %s on timeout %s' % (
+            self.name, self._update_function, self.timeout
+        )

@@ -285,7 +285,7 @@ def test_stuff_in_queues(integrated_ff):
     # just take the first handful
     for item in search_res[:8]:
         ff_utils.patch_metadata({}, obj_id=item['uuid'], key=integrated_ff['ff_key'])
-    time.sleep(5)  # let queues catch up
+    time.sleep(3)  # let queues catch up
     stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env'], check_secondary=True)
     assert stuff_in_queue
     with pytest.raises(Exception) as exec_info:
@@ -1126,6 +1126,7 @@ def test_search_es_metadata(integrated_ff):
     assert res[0]["_source"]["embedded"]["first_name"] == "Will"
     assert res[0]["_source"]["embedded"]["groups"] == ["admin"]
 
+
 @pytest.mark.integrated
 def test_search_es_metadata_generator(integrated_ff):
     """ Tests SearchESMetadataHandler both normally and with a generator, verifies consistent results """
@@ -1148,3 +1149,25 @@ def test_convert_param():
     converted_params2 = ff_utils.convert_param(params, vals_as_string=True)
     assert expected1 == converted_params1
     assert expected2 == converted_params2
+
+
+@pytest.mark.integrated
+def test_get_page(integrated_ff):
+    ff_env = integrated_ff['ff_env']
+    health_res = ff_utils.get_health_page(ff_env=ff_env)
+    assert health_res['namespace'] == ff_env
+    counts_res = ff_utils.get_counts_page(ff_env=ff_env)['db_es_total']
+    assert 'DB' in counts_res
+    assert 'ES' in counts_res
+    indexing_status_res = ff_utils.get_indexing_status(ff_env=ff_env)
+    assert 'primary_waiting' in indexing_status_res
+
+
+@pytest.mark.integrated
+def test_are_counts_even(integrated_ff):
+    ff_env = integrated_ff['ff_env']
+    counts_are_even, totals = ff_utils.are_counts_even(ff_env)
+    if counts_are_even:
+        assert 'more items' not in totals
+    else:
+        assert 'more items' in totals
