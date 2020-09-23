@@ -15,7 +15,7 @@ from dcicutils.misc_utils import (
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
     Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool,
     LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
-    keyword_as_title, file_contents, CachedField,
+    keyword_as_title, file_contents, CachedField, camel_case_to_snake_case,
 )
 from dcicutils.qa_utils import Occasionally, ControlledTime, override_environ, MockFileSystem
 from unittest import mock
@@ -1256,3 +1256,15 @@ class TestCachedField:
         assert field.timeout == self.DEFAULT_TIMEOUT
         field.set_timeout(30)
         assert field.timeout == 30
+
+
+@pytest.mark.parametrize('input, expected', [
+    ('VariantSample', 'variant_sample'),
+    ('Variant', 'variant'),
+    ('HiglassViewConfig', 'higlass_view_config'),
+    ('ABCD', 'a_b_c_d'),
+    ('', ''),
+    ('Oneverylongthing1234567895D', 'oneverylongthing1234567895_d')
+])
+def test_camel_case_to_snake_case(input, expected):
+    assert camel_case_to_snake_case(input) == expected

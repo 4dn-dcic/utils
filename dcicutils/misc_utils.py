@@ -757,6 +757,11 @@ def file_contents(filename, binary=False):
         return fp.read()
 
 
+def camel_case_to_snake_case(s):
+    """ Converts CamelCase to snake_case """
+    return ''.join('_' + c.lower() if c.isupper() else c for c in s).lstrip('_')
+
+
 class CachedField:
     def __init__(self, name, update_function, timeout=600):
         """ Provides a named field that is cached for a certain period of time. The value is computed
