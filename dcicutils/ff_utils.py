@@ -1041,7 +1041,7 @@ def get_indexing_status(key=None, ff_env=None):
     return _get_page(page='/indexing_status', key=key, ff_env=ff_env)
 
 
-def are_counts_even(env):
+def get_counts_summary(env):
     """ Returns a named tuple given an FF name to check representing the counts state.
             CountSummary
                 are_even: boolean on whether or not counts are even

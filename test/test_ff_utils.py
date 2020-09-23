@@ -1166,7 +1166,7 @@ def test_get_page(integrated_ff):
 @pytest.mark.integrated
 def test_are_counts_even(integrated_ff):
     ff_env = integrated_ff['ff_env']
-    counts_are_even, totals = ff_utils.are_counts_even(ff_env)
+    counts_are_even, totals = ff_utils.get_counts_summary(ff_env)
     if counts_are_even:
         assert 'more items' not in ' '.join(totals)
     else:
