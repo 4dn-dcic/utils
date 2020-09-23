@@ -5,6 +5,7 @@ import os
 import time
 import random
 import boto3
+from collections import namedtuple
 from . import (
     s3_utils,
     es_utils,
@@ -1010,7 +1011,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
     return store, list(item_uuids)
 
 
-def _get_page(page='/health', key=None, ff_env=None):
+def _get_page(*, page, key=None, ff_env=None):
     """ Wrapper for commonly used code to GET a page from an environment
         Given keys or ff_env, will return json containing an error rather than raising an
         exception if this fails, since this function should tolerate failure """
@@ -1041,18 +1042,24 @@ def get_indexing_status(key=None, ff_env=None):
 
 
 def are_counts_even(env):
-    """ Returns 2-tuple of boolean on whether or not counts are even the value of the counts """
+    """ Returns a named tuple given an FF name to check representing the counts state.
+            CountSummary
+                are_even: boolean on whether or not counts are even
+                summary_total: raw value of counts
+    """
+    CountSummary = namedtuple('CountSummary', ['are_even', 'summary_total'])
     totals = get_counts_page(ff_env=env)
     if 'error' in totals:  # error encountered getting page, assume false and return error
-        return False, totals
+        return CountSummary(are_even=False, summary_total=totals)
     totals = totals['db_es_total'].split()
 
-    # example value of split totals: ["DB:", "74048", "ES:", "74048"]
-    db_total = totals[1]
-    es_total = totals[3]
-    if int(db_total) > int(es_total):
-        return False, totals
-    return True, totals
+    # example value of split totals: ['DB:', '74048', 'ES:', '74048']
+    # or ['DB:', '887', 'ES:', '888', '<', 'ES', 'has', '1', 'more', 'items', '>']
+    db_total = int(totals[1])
+    es_total = int(totals[3])
+    if db_total > es_total or es_total > db_total:
+        return CountSummary(are_even=False, summary_total=totals)
+    return CountSummary(are_even=True, summary_total=totals)
 
 
 class SearchESMetadataHandler(object):

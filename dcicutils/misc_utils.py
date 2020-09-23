@@ -762,6 +762,11 @@ def camel_case_to_snake_case(s):
     return ''.join('_' + c.lower() if c.isupper() else c for c in s).lstrip('_')
 
 
+def snake_case_to_camel_case(s):
+    """ Converts snake_case to CamelCase - note that "our" CamelCase always capitalizes the first character. """
+    return s.title().replace('_', '')
+
+
 class CachedField:
     def __init__(self, name, update_function, timeout=600):
         """ Provides a named field that is cached for a certain period of time. The value is computed
@@ -807,3 +812,14 @@ class CachedField:
         return 'CachedField %s with update function %s on timeout %s' % (
             self.name, self._update_function, self.timeout
         )
+
+
+def make_counter(start=0):
+    storage = [start]
+
+    def counter():
+        value = storage[0]
+        storage[0] += 1
+        return value
+
+    return counter

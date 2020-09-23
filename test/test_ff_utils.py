@@ -1168,6 +1168,6 @@ def test_are_counts_even(integrated_ff):
     ff_env = integrated_ff['ff_env']
     counts_are_even, totals = ff_utils.are_counts_even(ff_env)
     if counts_are_even:
-        assert 'more items' not in totals
+        assert 'more items' not in ' '.join(totals)
     else:
-        assert 'more items' in totals
+        assert 'more items' in ' '.join(totals)
