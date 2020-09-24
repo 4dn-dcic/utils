@@ -5,6 +5,7 @@ import os
 import time
 import random
 import boto3
+from collections import namedtuple
 from . import (
     s3_utils,
     es_utils,
@@ -1010,19 +1011,58 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
     return store, list(item_uuids)
 
 
-def get_health_page(key=None, ff_env=None):
-    """
-    Simple function to return the json for a FF health page given keys or
-    ff_env. Will return json containing an error rather than raising an
-    exception if this fails, since this function should tolerate failure
-    """
+def _get_page(*, page, key=None, ff_env=None):
+    """ Wrapper for commonly used code to GET a page from an environment
+        Given keys or ff_env, will return json containing an error rather than raising an
+        exception if this fails, since this function should tolerate failure """
     try:
         auth = get_authentication_with_server(key, ff_env)
-        health_res = authorized_request(auth['server'] + '/health', auth=auth, verb='GET')
+        health_res = authorized_request(auth['server'] + page, auth=auth, verb='GET')
         ret = get_response_json(health_res)
     except Exception as exc:
         ret = {'error': str(exc)}
     return ret
+
+
+def get_health_page(key=None, ff_env=None):
+    """
+    Simple function to return the json for a FF health page
+    """
+    return _get_page(page='/health', key=key, ff_env=ff_env)
+
+
+def get_counts_page(key=None, ff_env=None):
+    """ Gets DB/ES counts page in JSON """
+    return _get_page(page='/counts', key=key, ff_env=ff_env)
+
+
+def get_indexing_status(key=None, ff_env=None):
+    """ Gets indexing status counts page in JSON """
+    return _get_page(page='/indexing_status', key=key, ff_env=ff_env)
+
+
+# namedtuple definition used below and can be imported elsewhere
+CountSummary = namedtuple('CountSummary', ['are_even', 'summary_total'])
+
+
+def get_counts_summary(env):
+    """ Returns a named tuple given an FF name to check representing the counts state.
+            CountSummary
+                are_even: boolean on whether or not counts are even
+                summary_total: raw value of counts
+    """
+    totals = get_counts_page(ff_env=env)
+    if 'error' in totals:  # error encountered getting page, assume false and return error
+        return CountSummary(are_even=False, summary_total=totals)
+    totals = totals['db_es_total'].split()
+
+    # example value of split totals: ['DB:', '74048', 'ES:', '74048']
+    # or ['DB:', '887', 'ES:', '888', '<', 'ES', 'has', '1', 'more', 'items', '>']
+    db_total = int(totals[1])
+    es_total = int(totals[3])
+    if db_total > es_total or es_total > db_total:
+        return CountSummary(are_even=False, summary_total=totals)
+    return CountSummary(are_even=True, summary_total=totals)
 
 
 class SearchESMetadataHandler(object):

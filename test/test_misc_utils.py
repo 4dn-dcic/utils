@@ -15,7 +15,7 @@ from dcicutils.misc_utils import (
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
     Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool,
     LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
-    keyword_as_title, file_contents,
+    keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
 )
 from dcicutils.qa_utils import Occasionally, ControlledTime, override_environ, MockFileSystem
 from unittest import mock
@@ -1156,3 +1156,129 @@ def test_file_contents():
         assert file_contents("foo.bin", binary=True) == b'\x48\x65\x6c\x6c\x6f\x21\x0a'
         assert file_contents("foo.bin", binary=False) == b'\x48\x65\x6c\x6c\x6f\x21\x0a'.decode('utf-8')
         assert file_contents("foo.bin", binary=False) == 'Hello!\n'
+
+
+def test_make_counter():
+
+    counter = make_counter()
+    assert counter() == 0
+    assert counter() == 1
+    assert counter() == 2
+
+    array_counter = make_counter([], step=[0])
+    assert array_counter() == [0]
+    assert array_counter() == [0, 0]
+    assert array_counter() == [0, 0, 0]
+
+    string_counter = make_counter('', step='.')
+    assert string_counter() == ''
+    assert string_counter() == '.'
+    assert string_counter() == '..'
+
+
+class TestCachedField:
+
+    DEFAULT_TIMEOUT = 600
+
+    def test_cached_field_basic(self):
+        def simple_update_function():
+            return random.choice(range(10000))
+
+        field = CachedField('simple1', update_function=simple_update_function)
+        assert field.value is not None
+        current = field.get()
+        assert current == field.value
+        assert field.get_updated() != current
+        assert field.timeout == self.DEFAULT_TIMEOUT
+        field.set_timeout(30)
+        assert field.timeout == 30
+
+    def test_cached_field_mocked(self):
+        dt = ControlledTime()
+
+        with mock.patch.object(datetime_module, "datetime", dt):
+            field = CachedField('simple1', update_function=make_counter())
+
+            assert field.value is not None
+
+            # Get a value, which should not be changing over short periods of time.
+            val1 = field.get()
+
+            assert field.value == val1
+            assert field.get() == val1
+
+            assert field.value == val1
+            assert field.get() == val1
+
+            # Forcing an update even though not much time has passed. Field value should be updated.
+            val2 = field.get_updated()
+
+            assert val2 != val1
+            assert field.value != val1
+            assert field.value == val2
+
+            # Immediately recheck value, but accepting cache value. Field value should be unchanged.
+            val3 = field.get()
+
+            assert val3 == val2
+            assert field.value == val2
+            assert field.value == val3
+
+            # Wait a while, but not enough to trigger cache update. Field value should be unchanged.
+            dt.sleep(self.DEFAULT_TIMEOUT / 2)
+            val4 = field.get()
+
+            assert val2 == val4
+            assert val2 == field.value
+            assert val4 == field.value
+
+            # Wait a bit longer, enough to trigger cache update. Field value should be updated.
+
+            dt.sleep(self.DEFAULT_TIMEOUT / 2)  # This should push us into the cache refill time
+            val5 = field.get()
+
+            assert val2 != val5
+            assert field.value != val2
+            assert field.value == val5
+
+            assert field.get() == val5  # This is the new stable value until next cache timeout
+            assert field.get() == val5
+            assert field.get() == val5
+            assert field.get() == val5
+
+            dt.sleep(self.DEFAULT_TIMEOUT)  # Fast forward to where we're going to refill again
+            assert field.get() != val5
+
+    def test_cached_field_timeout(self):
+        field = CachedField('simple1', update_function=make_counter())
+
+        assert field.timeout == self.DEFAULT_TIMEOUT
+        field.set_timeout(30)
+        assert field.timeout == 30
+
+
+@pytest.mark.parametrize('input, expected', [
+    ('VariantSample', 'variant_sample'),
+    ('Variant', 'variant'),
+    ('HiglassViewConfig', 'higlass_view_config'),
+    ('ABCD', 'a_b_c_d'),
+    ('', ''),
+    ('Oneverylongthing1234567895D', 'oneverylongthing1234567895_d'),
+    ('XMLContainer', 'x_m_l_container'),
+])
+def test_camel_case_to_snake_case(input, expected):
+    assert camel_case_to_snake_case(input) == expected
+
+
+@pytest.mark.parametrize('input, expected', [
+    ('variant_sample', 'VariantSample'),
+    ('variant', 'Variant'),
+    ('higlass_view_config', 'HiglassViewConfig'),
+    ('a_b_c_d', 'ABCD'),
+    ('', ''),
+    ('oneverylongthing1234567895_d', 'Oneverylongthing1234567895D'),
+    ('x_m_l_container', 'XMLContainer'),
+    ('X_M_L_Container', 'XMLContainer'),
+])
+def test_snake_case_to_camel_case(input, expected):
+    assert snake_case_to_camel_case(input) == expected
