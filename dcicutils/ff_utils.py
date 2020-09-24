@@ -1041,13 +1041,16 @@ def get_indexing_status(key=None, ff_env=None):
     return _get_page(page='/indexing_status', key=key, ff_env=ff_env)
 
 
+# namedtuple definition used below and can be imported elsewhere
+CountSummary = namedtuple('CountSummary', ['are_even', 'summary_total'])
+
+
 def get_counts_summary(env):
     """ Returns a named tuple given an FF name to check representing the counts state.
             CountSummary
                 are_even: boolean on whether or not counts are even
                 summary_total: raw value of counts
     """
-    CountSummary = namedtuple('CountSummary', ['are_even', 'summary_total'])
     totals = get_counts_page(ff_env=env)
     if 'error' in totals:  # error encountered getting page, assume false and return error
         return CountSummary(are_even=False, summary_total=totals)

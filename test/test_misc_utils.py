@@ -1165,6 +1165,16 @@ def test_make_counter():
     assert counter() == 1
     assert counter() == 2
 
+    array_counter = make_counter([], step=[0])
+    assert array_counter() == [0]
+    assert array_counter() == [0, 0]
+    assert array_counter() == [0, 0, 0]
+
+    string_counter = make_counter('', step='.')
+    assert string_counter() == ''
+    assert string_counter() == '.'
+    assert string_counter() == '..'
+
 
 class TestCachedField:
 

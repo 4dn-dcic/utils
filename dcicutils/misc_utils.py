@@ -814,12 +814,12 @@ class CachedField:
         )
 
 
-def make_counter(start=0):
+def make_counter(start=0, step=1):
     storage = [start]
 
     def counter():
         value = storage[0]
-        storage[0] += 1
+        storage[0] += step
         return value
 
     return counter
