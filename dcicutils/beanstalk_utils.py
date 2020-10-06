@@ -1,6 +1,8 @@
-'''Utilities related to ElasticBeanstalk deployment and management.
+"""
+Utilities related to ElasticBeanstalk deployment and management.
 This includes, but is not limited to: ES, s3, RDS, Auth0, and Foursight.
-'''
+"""
+
 from __future__ import print_function
 import subprocess
 import logging
@@ -18,6 +20,7 @@ from .env_utils import (
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, public_url_mappings,
     blue_green_mirror_env, get_standard_mirror_env,
 )
+
 
 logging.basicConfig()
 logger = logging.getLogger('logger')
@@ -75,6 +78,13 @@ def delete_db(db_identifier, take_snapshot=True, allow_delete_prod=False):
     Returns:
         dict: boto3 response from delete_db_instance
     """
+    return _delete_db(db_identifier=db_identifier,
+                      take_snapshot=take_snapshot,
+                      allow_delete_prod=allow_delete_prod)
+
+
+def _delete_db(db_identifier, take_snapshot=True, allow_delete_prod=False):
+    """Internal version of delete_db."""
     # safety. Do not allow accidental programmatic deletion of webprod DB
     if 'prod' in db_identifier and not allow_delete_prod:
         raise Exception('Must set allow_delete_prod to True to delete RDS instance' % db_identifier)
@@ -130,7 +140,7 @@ def is_indexing_finished(env, prev_version=None, travis_build_id=None):
     Args:
         env (str): ElasticBeanstalk environment name
         prev_version (str): optional EB version of the previous configuration
-        travis_build_id (int): optional ID for a Travis build
+        travis_build_id (int or str): optional ID for a Travis build
 
     Returns:
         bool, list: True if done, results from /counts page
@@ -330,7 +340,6 @@ def get_beanstalk_real_url(env):
     Returns:
         str: url of the ElasticBeanstalk environment
     """
-    url = ''
     urls = public_url_mappings(env)
 
     if env in urls:  # Special case handling of 'cgap', 'data', or 'staging' as an argument.
@@ -530,7 +539,7 @@ def create_db_from_snapshot(db_identifier, snapshot_name, delete_db_if_present=T
         if delete_db_if_present and 'production' not in db_identifier:
             # Drop target database with final snapshot
             try:
-                delete_db(db_identifier, True)
+                _delete_db(db_identifier, take_snapshot=True)
             except ClientError:
                 pass
             return "Deleting"
@@ -580,7 +589,7 @@ def is_travis_finished(build_id):
     Check to see if a given travis build has passed
 
     Args:
-        build_id (str): Travis build identifier
+        build_id (int or str): Travis build identifier
 
     Returns:
         bool, dict: True if done, Travis response JSON
@@ -613,9 +622,11 @@ def is_travis_finished(build_id):
 
 
 def make_envvar_option(name, value):
-    return {'Namespace': 'aws:elasticbeanstalk:application:environment',
-            'OptionName': name,
-            'Value': value}
+    return {
+        'Namespace': 'aws:elasticbeanstalk:application:environment',
+        'OptionName': name,
+        'Value': value
+    }
 
 
 def get_bs_env(envname):

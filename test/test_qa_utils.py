@@ -11,9 +11,10 @@ import uuid
 from dcicutils import qa_utils
 from dcicutils.misc_utils import Retry, PRINT, file_contents
 from dcicutils.qa_utils import (
-    mock_not_called, local_attrs, override_environ, show_elapsed_time, timed,
+    mock_not_called, local_attrs, override_environ, override_dict, show_elapsed_time, timed, ignored,
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented,
+    UncustomizedInstance, CustomizableProperty, getattr_customized, raises_regexp,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -151,6 +152,71 @@ def test_dynamic_properties():
     for thing in [3, "foo", None]:
         with local_attrs(thing):
             pass  # Just make sure no error occurs when no attributes given
+
+
+def test_override_dict():
+
+    d = {'foo': 'bar'}
+    d_copy = d.copy()
+
+    unique_prop1 = str(uuid.uuid4())
+    unique_prop2 = str(uuid.uuid4())
+    unique_prop3 = str(uuid.uuid4())
+
+    assert unique_prop1 not in d
+    assert unique_prop2 not in d
+    assert unique_prop3 not in d
+
+    with override_dict(d, **{unique_prop1: "something", unique_prop2: "anything"}):
+
+        assert unique_prop1 in d  # added
+        value1a = d.get(unique_prop1)
+        assert value1a == "something"
+
+        assert unique_prop2 in d  # added
+        value2a = d.get(unique_prop2)
+        assert value2a == "anything"
+
+        assert unique_prop3 not in d
+
+        with override_dict(d, **{unique_prop1: "something_else", unique_prop3: "stuff"}):
+
+            assert unique_prop1 in d  # updated
+            value1b = d.get(unique_prop1)
+            assert value1b == "something_else"
+
+            assert unique_prop2 in d  # unchanged
+            assert d.get(unique_prop2) == value2a
+
+            assert unique_prop3 in d  # added
+            assert d.get(unique_prop3) == "stuff"
+
+            with override_dict(d, **{unique_prop1: None}):
+
+                assert unique_prop1 not in d  # removed
+
+                with override_dict(d, **{unique_prop1: None}):
+
+                    assert unique_prop1 not in d  # re-removed
+
+                assert unique_prop1 not in d  # un-re-removed, but still removed
+
+            assert unique_prop1 in d  # restored after double removal
+            assert d.get(unique_prop1) == value1b
+
+        assert unique_prop1 in d
+        assert d.get(unique_prop1) == value1a
+
+        assert unique_prop2 in d
+        assert d.get(unique_prop2) == value2a
+
+        assert unique_prop3 not in d
+
+    assert unique_prop1 not in d
+    assert unique_prop2 not in d
+    assert unique_prop3 not in d
+
+    assert d == d_copy
 
 
 def test_override_environ():
@@ -1048,3 +1114,144 @@ def test_mock_keys_not_implemented():
 
     err = MockKeysNotImplemented(keys=['foo', 'bar'], operation="some-operation")
     assert str(err) == 'Mocked some-operation does not implement keywords: foo, bar'
+
+
+class SampleClass:
+
+    def __init__(self, favorite_fruit):
+        self.favorite_fruit = favorite_fruit
+
+    FAVORITE_COLOR = CustomizableProperty('FAVORITE_COLOR', description="the string name of a color")
+
+
+class SampleClass2(SampleClass):
+
+    FAVORITE_SONG = CustomizableProperty('FAVORITE_SONG', description="the string name of a song")
+
+
+class SampleClass3(SampleClass2):
+
+    FAVORITE_COLOR = 'blue'
+    FAVORITE_SONG = 'Jingle Bells'
+
+
+def test_find_field_declared_class():
+
+    thing = SampleClass2(favorite_fruit='orange')
+
+    [kind, value] = UncustomizedInstance._find_field_declared_class(thing, 'favorite_fruit')
+    assert kind == 'instance'
+    assert value == 'orange'
+
+    [kind, value] = UncustomizedInstance._find_field_declared_class(thing, 'FAVORITE_SONG')
+    assert kind == SampleClass2
+    ignored(value)
+
+    [kind, value] = UncustomizedInstance._find_field_declared_class(thing, 'FAVORITE_COLOR')
+    assert kind == SampleClass
+    ignored(value)
+
+    with pytest.raises(RuntimeError):
+        # If we were to search for something that simply wasn't a property, customizable or not,
+        # the search would fail and a RuntimeError would be raised.
+        UncustomizedInstance._find_field_declared_class(thing, 'FAVORITE_SHOW')
+
+
+def test_uncustomized_instance():
+
+    thing = SampleClass2(favorite_fruit=CustomizableProperty('favorite_fruit',
+                                                             description="the string name of a fruit"))
+
+    assert str(UncustomizedInstance(thing, field='FAVORITE_SONG')) == (
+        "Attempt to access field FAVORITE_SONG from class test.test_qa_utils.SampleClass2."
+        " It was expected to be given a custom value in a subclass: the string name of a song."
+    )
+
+    assert str(UncustomizedInstance(thing, field='FAVORITE_COLOR')) == (
+        "Attempt to access field FAVORITE_COLOR from class test.test_qa_utils.SampleClass."
+        " It was expected to be given a custom value in a subclass: the string name of a color."
+    )
+
+    assert str(UncustomizedInstance(thing, field='favorite_fruit')) == (
+        "Attempt to access field favorite_fruit from instance."
+        " It was expected to be given a custom value in a subclass: the string name of a fruit."
+    )
+
+
+def test_customized_instance():
+
+    uncustomized_thing = SampleClass2(favorite_fruit=CustomizableProperty('favorite_fruit',
+                                                                          description="the string name of a fruit"))
+
+    # It doesn't work to store these things directly in the slot
+    assert isinstance(uncustomized_thing.favorite_fruit, CustomizableProperty)
+    assert isinstance(getattr(uncustomized_thing, "favorite_fruit"), CustomizableProperty)
+    # But this will spot it...
+    with raises_regexp(UncustomizedInstance, "Attempt to access field favorite_fruit from instance."
+                                             " It was expected to be given a custom value in a subclass:"
+                                             " the string name of a fruit."):
+        print(getattr_customized(uncustomized_thing, "favorite_fruit"))
+
+    with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_COLOR"
+                                             " from class test.test_qa_utils.SampleClass."
+                                             " It was expected to be given a custom value in a subclass:"
+                                             " the string name of a color."):
+        print(uncustomized_thing.FAVORITE_COLOR)
+    with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_COLOR"
+                                             " from class test.test_qa_utils.SampleClass."
+                                             " It was expected to be given a custom value in a subclass:"
+                                             " the string name of a color."):
+        print(getattr(uncustomized_thing, "FAVORITE_COLOR"))
+    with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_COLOR"
+                                             " from class test.test_qa_utils.SampleClass."
+                                             " It was expected to be given a custom value in a subclass:"
+                                             " the string name of a color."):
+        print(getattr_customized(uncustomized_thing, "FAVORITE_COLOR"))
+
+    with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_SONG"
+                                             " from class test.test_qa_utils.SampleClass2."
+                                             " It was expected to be given a custom value in a subclass:"
+                                             " the string name of a song."):
+        print(uncustomized_thing.FAVORITE_SONG)
+    with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_SONG"
+                                             " from class test.test_qa_utils.SampleClass2."
+                                             " It was expected to be given a custom value in a subclass:"
+                                             " the string name of a song."):
+        print(getattr(uncustomized_thing, "FAVORITE_SONG"))
+    with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_SONG"
+                                             " from class test.test_qa_utils.SampleClass2."
+                                             " It was expected to be given a custom value in a subclass:"
+                                             " the string name of a song."):
+        print(getattr_customized(uncustomized_thing, "FAVORITE_SONG"))
+
+    customized_thing = SampleClass3(favorite_fruit='orange')
+
+    assert customized_thing.favorite_fruit == 'orange'
+    assert customized_thing.FAVORITE_COLOR == 'blue'
+    assert customized_thing.FAVORITE_SONG == 'Jingle Bells'
+
+
+def test_raises_regexp():
+
+    class MyRuntimeError(RuntimeError):
+        pass
+
+    with raises_regexp(RuntimeError, "This.*test!"):
+        raise RuntimeError("This is a test!")
+
+    with raises_regexp(RuntimeError, "This.*test!"):
+        raise MyRuntimeError("This is a test!")
+
+    with pytest.raises(AssertionError):
+        # This will fail because the inner error has a period, not an exclamation mark, terminating it.
+        # That will cause it to raise an AssertionError instead.
+        with raises_regexp(RuntimeError, "This.*test!"):
+            raise MyRuntimeError("This is a test.")
+
+    with pytest.raises(Exception):
+        # This will fail because the inner error is a KeyError, not a RuntimeError.
+        # I WISH this would raise AssertionError, but pytest lets the KeyError through.
+        # I am not sure that's the same as what unittest does in this case but it will
+        # suffice for now. -kmp 6-Oct-2020
+        with raises_regexp(RuntimeError, "This.*test!"):
+            raise KeyError('This is a test!')

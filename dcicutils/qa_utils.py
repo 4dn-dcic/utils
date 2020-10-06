@@ -7,10 +7,12 @@ import datetime
 import time
 import io
 import os
+import pytest
 import pytz
+import re
 
 from json import dumps as json_dumps, loads as json_loads
-from .misc_utils import PRINT, ignored, Retry
+from .misc_utils import PRINT, ignored, Retry, full_object_name
 
 
 def show_elapsed_time(start, end):
@@ -88,25 +90,30 @@ def local_attrs(obj, **kwargs):
 
 @contextlib.contextmanager
 def override_environ(**overrides):
+    with override_dict(os.environ, **overrides):
+        yield
+
+
+@contextlib.contextmanager
+def override_dict(d, **overrides):
     to_delete = []
     to_restore = {}
-    env = os.environ
     try:
         for k, v in overrides.items():
-            if k in env:
-                to_restore[k] = env[k]
+            if k in d:
+                to_restore[k] = d[k]
             else:
                 to_delete.append(k)
             if v is None:
-                env.pop(k, None)  # Delete key k, tolerating it being already gone
+                d.pop(k, None)  # Delete key k, tolerating it being already gone
             else:
-                env[k] = v
+                d[k] = v
         yield
     finally:
         for k in to_delete:
-            env.pop(k, None)  # Delete key k, tolerating it being already gone
+            d.pop(k, None)  # Delete key k, tolerating it being already gone
         for k, v in to_restore.items():
-            os.environ[k] = v
+            d[k] = v
 
 
 class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
@@ -551,8 +558,73 @@ class MockBotoS3Client:
               % (Bucket, Key, len(data), Fileobj))
         Fileobj.write(data)
 
-    def download_file(self, Bucket, Key, Filename, **kwargs):
+    def download_file(self, Bucket, Key, Filename, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
         if kwargs:
             raise MockKeysNotImplemented("upload_file", kwargs.keys())
         with io.open(Filename, 'wb') as fp:
             self.download_fileobj(Bucket=Bucket, Key=Key, Fileobj=fp)
+
+
+class UncustomizedInstance(Exception):
+
+    def __init__(self, instance, *, field):
+        self.instance = instance
+        self.field = field
+        declaration_class, declaration = self._find_field_declared_class(instance, field)
+        context = ""
+        if declaration_class == 'instance':
+            context = " from instance"
+        elif declaration_class:
+            context = " from class %s" % full_object_name(declaration_class)
+        message = ("Attempt to access field %s%s."
+                   " It was expected to be given a custom value in a subclass: %s."
+                   % (field, context, declaration.description))
+        super().__init__(message)
+
+    @staticmethod
+    def _find_field_declared_class(instance, field):
+        instance_value = instance.__dict__.get(field)
+        if instance_value:
+            return 'instance', instance_value
+        else:
+            for cls in instance.__class__.__mro__:
+                cls_value = cls.__dict__.get(field)
+                if cls_value:
+                    return cls, cls_value
+            raise RuntimeError("%s does not have a field %s." % (instance, field))
+
+
+class CustomizableProperty(property):
+
+    def __init__(self, field, *, description):
+
+        self.field = field
+        self.description = description
+
+        def uncustomized(instance):
+            raise UncustomizedInstance(instance=instance, field=field)
+
+        super().__init__(uncustomized)
+
+
+def getattr_customized(thing, key):
+    # This will raise an error if the attribute is a CustomizableProperty living in the class part of the dict,
+    # but will return the object if it's in the instance.
+    value = getattr(thing, key)
+    if isinstance(value, CustomizableProperty):
+        # This is an uncustomized instance variable, not a class variable.
+        # That's not an intended use case, but just report it without involving mention of the class.
+        raise UncustomizedInstance(instance=thing, field=key)
+    else:
+        return value
+
+
+class VersionChecker:
+
+    CHANGELOG = CustomizableProperty('CHANGELOG', description="The repository-relative name of the change log.")
+
+
+def raises_regexp(error_class, pattern):
+    # Compatibility with unittest style:
+    #  pytest.raises(error_class, match=exp) == unittest.TestCase.assertRaisesRegexp(error_class, exp)
+    return pytest.raises(error_class, match=pattern)
