@@ -9,7 +9,6 @@ import io
 import os
 import pytest
 import pytz
-import re
 
 from json import dumps as json_dumps, loads as json_loads
 from .misc_utils import PRINT, ignored, Retry, full_object_name
