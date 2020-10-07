@@ -470,6 +470,35 @@ def test_upsert_metadata(integrated_ff):
         ff_utils.upsert_metadata(test_data, 'biosourc', key=integrated_ff['ff_key'])
     assert 'Bad status code' in str(exec_info.value)
 
+def check_duplicated_items_by_uuid(items):
+    search_res_by_uuid = {}
+    for item in items:
+        uuid = item['uuid']
+        search_res_by_uuid[uuid] = entry = search_res_by_uuid.get(uuid, [])
+        entry.append(item)
+    duplicated_uuids = {}
+    for uuid, items in search_res_by_uuid.items():
+        if len(items) > 1:
+            duplicated_uuids[uuid] = items
+    assert not duplicated_uuids, (
+        '\n'.join([
+            "Duplicated uuid %s in %s." % (uuid, " and ".join(map(str, items)))
+            for uuid, items in duplicated_uuids.items()
+        ])
+    )
+
+def test_check_duplicated_items_by_uuid():
+
+    with pytest.raises(AssertionError,
+                       match="Duplicated uuid 123 in {'uuid': '123', 'foo': 'a'} and {'uuid': '123', 'foo': 'c'}"):
+        check_duplicated_items_by_uuid(
+            [
+                {'uuid': '123', 'foo': 'a'},
+                {'uuid': '456', 'foo': 'b'},
+                {'uuid': '123', 'foo': 'c'},
+            ]
+        )
+
 
 @pytest.mark.integrated
 @pytest.mark.flaky
@@ -483,8 +512,9 @@ def test_search_metadata(integrated_ff, url):
     # this will fail if items have not yet been indexed
     assert len(search_res) > 0
     # make sure uuids are unique
-    search_uuids = set([item['uuid'] for item in search_res])
-    assert len(search_uuids) == len(search_res)
+    check_duplicated_items_by_uuid(search_res)
+    # search_uuids = set([item['uuid'] for item in search_res])
+    # assert len(search_uuids) == len(search_res)
     search_res_slash = ff_utils.search_metadata(url + '/search/?limit=all&type=File', key=integrated_ff['ff_key'])
     assert isinstance(search_res_slash, list)
     assert len(search_res_slash) == len(search_res)
