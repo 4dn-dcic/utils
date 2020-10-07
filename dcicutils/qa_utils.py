@@ -685,6 +685,9 @@ def raises_regexp(error_class, pattern):
 
 
 def check_duplicated_items_by_key(key, items):
+
+    __tracebackhide__ = True
+
     search_res_by_keyval = {}
     for item in items:
         keyval = item[key]
