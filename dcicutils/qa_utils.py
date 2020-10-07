@@ -9,6 +9,8 @@ import io
 import os
 import pytest
 import pytz
+import re
+import toml
 
 from json import dumps as json_dumps, loads as json_loads
 from .misc_utils import PRINT, ignored, Retry, full_object_name
@@ -570,6 +572,7 @@ class UncustomizedInstance(Exception):
         self.instance = instance
         self.field = field
         declaration_class, declaration = self._find_field_declared_class(instance, field)
+        self.declaration_class = declaration_class
         context = ""
         if declaration_class == 'instance':
             context = " from instance"
@@ -583,10 +586,11 @@ class UncustomizedInstance(Exception):
     @staticmethod
     def _find_field_declared_class(instance, field):
         instance_value = instance.__dict__.get(field)
+        is_class = isinstance(instance, type)
         if instance_value:
-            return 'instance', instance_value
+            return instance if is_class else 'instance', instance_value
         else:
-            for cls in instance.__class__.__mro__:
+            for cls in instance.__mro__ if is_class else instance.__class__.__mro__:
                 cls_value = cls.__dict__.get(field)
                 if cls_value:
                     return cls, cls_value
@@ -605,6 +609,9 @@ class CustomizableProperty(property):
 
         super().__init__(uncustomized)
 
+    def __str__(self):
+        return "<%s %s>" % (self.__class__.__name__, self.field)
+
 
 def getattr_customized(thing, key):
     # This will raise an error if the attribute is a CustomizableProperty living in the class part of the dict,
@@ -620,10 +627,58 @@ def getattr_customized(thing, key):
 
 class VersionChecker:
 
+    PYPROJECT = CustomizableProperty('PYPROJECT', description="The repository-relative name of the pyproject file.")
     CHANGELOG = CustomizableProperty('CHANGELOG', description="The repository-relative name of the change log.")
+
+    @classmethod
+    def check_version(cls):
+        version = cls._check_version()
+        if getattr_customized(cls, "CHANGELOG"):
+            cls._check_change_history(version)
+
+    @classmethod
+    def _check_version(cls):
+
+        __tracebackhide__ = True
+
+        pyproject_file = getattr_customized(cls, 'PYPROJECT')
+        assert os.path.exists(pyproject_file), "Missing pyproject file: %s" % pyproject_file
+        pyproject = toml.load(pyproject_file)
+        version = pyproject.get('tool', {}).get('poetry', {}).get('version', None)
+        assert version, "Missing version in %s." % pyproject_file
+        PRINT("Version = %s" % version)
+        return version
+
+    VERSION_LINE_PATTERN = re.compile("^[#* ]*([0-9]+[.][^ \t\n]*)([ \t\n].*)?$")
+
+    @classmethod
+    def _check_change_history(cls, version=None):
+
+        changelog_file = getattr_customized(cls, "CHANGELOG")
+
+        if not changelog_file:
+            if version:
+                raise AssertionError("Cannot check version without declaring a CHANGELOG file.")
+            return
+
+        assert os.path.exists(changelog_file), "Missing changelog file: %s" % changelog_file
+
+        with io.open(changelog_file) as fp:
+            versions = []
+            for line in fp:
+                m = cls.VERSION_LINE_PATTERN.match(line)
+                if m:
+                    versions.append(m.group(1))
+
+        assert versions, "No version info was parsed from %s" % changelog_file
+        # Might be sorted top to bottom or bottom to top, but ultimately the current version should be first or last.
+        assert versions[0] == version or versions[-1] == version, (
+                "Missing entry for version %s in %s." % (version, changelog_file)
+        )
 
 
 def raises_regexp(error_class, pattern):
-    # Compatibility with unittest style:
+    # Mostly compatible with unittest style, so that (approximately):
     #  pytest.raises(error_class, match=exp) == unittest.TestCase.assertRaisesRegexp(error_class, exp)
+    # They differ on what to do if an error_class other than the expected one is raised.
     return pytest.raises(error_class, match=pattern)

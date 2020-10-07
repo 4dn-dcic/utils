@@ -15,6 +15,7 @@ from dcicutils.qa_utils import (
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented,
     UncustomizedInstance, CustomizableProperty, getattr_customized, raises_regexp,
+    VersionChecker,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -1187,48 +1188,106 @@ def test_customized_instance():
     assert isinstance(uncustomized_thing.favorite_fruit, CustomizableProperty)
     assert isinstance(getattr(uncustomized_thing, "favorite_fruit"), CustomizableProperty)
     # But this will spot it...
-    with raises_regexp(UncustomizedInstance, "Attempt to access field favorite_fruit from instance."
-                                             " It was expected to be given a custom value in a subclass:"
-                                             " the string name of a fruit."):
-        print(getattr_customized(uncustomized_thing, "favorite_fruit"))
+    with printed_output() as printed:
+        with raises_regexp(UncustomizedInstance, "Attempt to access field favorite_fruit from instance."
+                                                 " It was expected to be given a custom value in a subclass:"
+                                                 " the string name of a fruit."):
+            getattr_customized(uncustomized_thing, "favorite_fruit")
+        assert printed.last is None
 
-    with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_COLOR"
-                                             " from class test.test_qa_utils.SampleClass."
-                                             " It was expected to be given a custom value in a subclass:"
-                                             " the string name of a color."):
-        print(uncustomized_thing.FAVORITE_COLOR)
-    with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_COLOR"
-                                             " from class test.test_qa_utils.SampleClass."
-                                             " It was expected to be given a custom value in a subclass:"
-                                             " the string name of a color."):
-        print(getattr(uncustomized_thing, "FAVORITE_COLOR"))
-    with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_COLOR"
-                                             " from class test.test_qa_utils.SampleClass."
-                                             " It was expected to be given a custom value in a subclass:"
-                                             " the string name of a color."):
-        print(getattr_customized(uncustomized_thing, "FAVORITE_COLOR"))
+    with printed_output() as printed:
+        with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_COLOR"
+                                                 " from class test.test_qa_utils.SampleClass."
+                                                 " It was expected to be given a custom value in a subclass:"
+                                                 " the string name of a color."):
+            PRINT(uncustomized_thing.FAVORITE_COLOR)
+        assert printed.last is None
+    with printed_output() as printed:
+        with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_COLOR"
+                                                 " from class test.test_qa_utils.SampleClass."
+                                                 " It was expected to be given a custom value in a subclass:"
+                                                 " the string name of a color."):
+            PRINT(getattr(uncustomized_thing, "FAVORITE_COLOR"))
+        assert printed.last is None
+    with printed_output() as printed:
+        with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_COLOR"
+                                                 " from class test.test_qa_utils.SampleClass."
+                                                 " It was expected to be given a custom value in a subclass:"
+                                                 " the string name of a color."):
+            PRINT(getattr_customized(uncustomized_thing, "FAVORITE_COLOR"))
+        assert printed.last is None
 
-    with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_SONG"
-                                             " from class test.test_qa_utils.SampleClass2."
-                                             " It was expected to be given a custom value in a subclass:"
-                                             " the string name of a song."):
-        print(uncustomized_thing.FAVORITE_SONG)
-    with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_SONG"
-                                             " from class test.test_qa_utils.SampleClass2."
-                                             " It was expected to be given a custom value in a subclass:"
-                                             " the string name of a song."):
-        print(getattr(uncustomized_thing, "FAVORITE_SONG"))
-    with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_SONG"
-                                             " from class test.test_qa_utils.SampleClass2."
-                                             " It was expected to be given a custom value in a subclass:"
-                                             " the string name of a song."):
-        print(getattr_customized(uncustomized_thing, "FAVORITE_SONG"))
+    with printed_output() as printed:
+        with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_SONG"
+                                                 " from class test.test_qa_utils.SampleClass2."
+                                                 " It was expected to be given a custom value in a subclass:"
+                                                 " the string name of a song."):
+            PRINT(uncustomized_thing.FAVORITE_SONG)
+        assert printed.last is None
+    with printed_output() as printed:
+        with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_SONG"
+                                                 " from class test.test_qa_utils.SampleClass2."
+                                                 " It was expected to be given a custom value in a subclass:"
+                                                 " the string name of a song."):
+            PRINT(getattr(uncustomized_thing, "FAVORITE_SONG"))
+        assert printed.last is None
+    with printed_output() as printed:
+        with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_SONG"
+                                                 " from class test.test_qa_utils.SampleClass2."
+                                                 " It was expected to be given a custom value in a subclass:"
+                                                 " the string name of a song."):
+            PRINT(getattr_customized(uncustomized_thing, "FAVORITE_SONG"))
+        assert printed.last is None
 
     customized_thing = SampleClass3(favorite_fruit='orange')
 
     assert customized_thing.favorite_fruit == 'orange'
     assert customized_thing.FAVORITE_COLOR == 'blue'
     assert customized_thing.FAVORITE_SONG == 'Jingle Bells'
+
+
+def test_customized_class():
+    with printed_output() as printed:
+        PRINT(SampleClass.FAVORITE_COLOR)
+        assert printed.last == "<CustomizableProperty FAVORITE_COLOR>"
+    with printed_output() as printed:
+        PRINT(getattr(SampleClass, 'FAVORITE_COLOR'))
+        assert printed.last == "<CustomizableProperty FAVORITE_COLOR>"
+    with printed_output() as printed:
+        with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_COLOR"
+                                                 " from class test.test_qa_utils.SampleClass."
+                                                 " It was expected to be given a custom value in a subclass:"
+                                                 " the string name of a color."):
+            PRINT(getattr_customized(SampleClass, 'FAVORITE_COLOR'))
+        assert printed.last is None
+
+    with printed_output() as printed:
+        PRINT(SampleClass2.FAVORITE_COLOR)
+        assert printed.last == "<CustomizableProperty FAVORITE_COLOR>"
+    with printed_output() as printed:
+        PRINT(getattr(SampleClass2, 'FAVORITE_COLOR'))
+        assert printed.last == "<CustomizableProperty FAVORITE_COLOR>"
+    with printed_output() as printed:
+        with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_COLOR"
+                                                 " from class test.test_qa_utils.SampleClass."
+                                                 " It was expected to be given a custom value in a subclass:"
+                                                 " the string name of a color."):
+            PRINT(getattr_customized(SampleClass2, 'FAVORITE_COLOR'))
+        assert printed.last is None
+
+    with printed_output() as printed:
+        PRINT(SampleClass2.FAVORITE_SONG)
+        assert printed.last == "<CustomizableProperty FAVORITE_SONG>"
+    with printed_output() as printed:
+        PRINT(getattr(SampleClass2, 'FAVORITE_SONG'))
+        assert printed.last == "<CustomizableProperty FAVORITE_SONG>"
+    with printed_output() as printed:
+        with raises_regexp(UncustomizedInstance, "Attempt to access field FAVORITE_SONG"
+                                                 " from class test.test_qa_utils.SampleClass2."
+                                                 " It was expected to be given a custom value in a subclass:"
+                                                 " the string name of a song."):
+            PRINT(getattr_customized(SampleClass2, 'FAVORITE_SONG'))
+        assert printed.last is None
 
 
 def test_raises_regexp():
@@ -1255,3 +1314,43 @@ def test_raises_regexp():
         # suffice for now. -kmp 6-Oct-2020
         with raises_regexp(RuntimeError, "This.*test!"):
             raise KeyError('This is a test!')
+
+
+def test_version_checker_no_changelog():
+
+    class MyVersionChecker(VersionChecker):
+        PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+        CHANGELOG = None
+
+    MyVersionChecker.check_version()
+
+
+def test_version_checker_use_dcicutils_changelog():
+
+    class MyVersionChecker(VersionChecker):
+        PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+        CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.md")
+
+    MyVersionChecker.check_version()
+
+
+def test_version_checker_with_missing_changelog():
+
+    path_exists = os.path.exists
+
+    def mocked_exists(filename):
+        if filename.endswith("CHANGELOG.md"):
+            print("Faking that %s does not exist." % filename)
+            return False
+        else:
+            return path_exists(filename)
+
+    with mock.patch("os.path.exists", mocked_exists):
+
+        class MyVersionChecker(VersionChecker):
+
+            PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+            CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.md")
+
+        with pytest.raises(AssertionError):
+            MyVersionChecker.check_version()  # The version history will be missing because of mocking.
