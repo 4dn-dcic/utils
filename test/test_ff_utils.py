@@ -187,9 +187,11 @@ def test_unified_authentication_decoding(integrated_ff):
             assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
         class MockS3Utils:
+
             def __init__(self, env):
                 assert env == any_env
                 self.env = env
+
             def get_access_keys(self):
                 return any_key
 
@@ -484,7 +486,7 @@ def test_search_metadata(integrated_ff, url):
     # this will fail if items have not yet been indexed
     assert len(search_res) > 0
     # make sure uuids are unique
-    check_duplicated_items_by_key('uuid', search_res)
+    check_duplicated_items_by_key('uuid', search_res, url=url)
     # search_uuids = set([item['uuid'] for item in search_res])
     # assert len(search_uuids) == len(search_res)
     search_res_slash = ff_utils.search_metadata(url + '/search/?limit=all&type=File', key=integrated_ff['ff_key'])
@@ -494,7 +496,8 @@ def test_search_metadata(integrated_ff, url):
     search_res_limit = ff_utils.search_metadata(url + '/search/?limit=3&type=File', key=integrated_ff['ff_key'])
     assert len(search_res_limit) == 3
     # search with a limit from a certain entry
-    search_res_from_limit = ff_utils.search_metadata(url + '/search/?type=File&from=5&limit=53', key=integrated_ff['ff_key'])
+    search_res_from_limit = ff_utils.search_metadata(url + '/search/?type=File&from=5&limit=53',
+                                                     key=integrated_ff['ff_key'])
     assert len(search_res_from_limit) == 53
     # search with a filter
     search_res_filt = ff_utils.search_metadata(url + '/search/?limit=3&type=File&file_type=reads',
@@ -1108,7 +1111,7 @@ def test_search_es_metadata(integrated_ff):
     n_users = len(res)  # Probably a bit more than 20, since 20 are in the master inserts
     assert n_users > 20 and n_users < 100
     assert all(item["_type"] == "user" for item in res)  # Make sure they are all users
-    assert all("@" in item["_source"]["embedded"]["email"] for item in res) # Make sure all have an email address
+    assert all("@" in item["_source"]["embedded"]["email"] for item in res)  # Make sure all have an email address
     assert len(res) == len({ item["_id"] for item in res })  # Make sure ids are unique
     test_query = {
         'query': {

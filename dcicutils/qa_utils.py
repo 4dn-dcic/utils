@@ -4,12 +4,13 @@ qa_utils: Tools for use in quality assurance testing.
 
 import contextlib
 import datetime
-import time
 import io
+import json
 import os
 import pytest
 import pytz
 import re
+import time
 import toml
 
 from json import dumps as json_dumps, loads as json_loads
@@ -684,7 +685,7 @@ def raises_regexp(error_class, pattern):
     return pytest.raises(error_class, match=pattern)
 
 
-def check_duplicated_items_by_key(key, items):
+def check_duplicated_items_by_key(key, items, url=None):
 
     __tracebackhide__ = True
 
@@ -697,9 +698,12 @@ def check_duplicated_items_by_key(key, items):
     for keyval, items in search_res_by_keyval.items():
         if len(items) > 1:
             duplicated_keyvals[keyval] = items
+    prefix = ""
+    if url is not None:
+        prefix = "For %s: " % url
     assert not duplicated_keyvals, (
         '\n'.join([
-            "Duplicated %s %s in %s." % (key, keyval, " and ".join(map(str, items)))
+            "%sDuplicated %s %s in %s." % (prefix, key, keyval, " and ".join(map(lambda x: json.dumps(x, indent=2), items)))
             for keyval, items in duplicated_keyvals.items()
         ])
     )
