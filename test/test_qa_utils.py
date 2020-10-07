@@ -15,7 +15,7 @@ from dcicutils.qa_utils import (
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented,
     UncustomizedInstance, CustomizableProperty, getattr_customized, raises_regexp,
-    VersionChecker,
+    VersionChecker, check_duplicated_items_by_key,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -1354,3 +1354,17 @@ def test_version_checker_with_missing_changelog():
 
         with pytest.raises(AssertionError):
             MyVersionChecker.check_version()  # The version history will be missing because of mocking.
+
+
+def test_check_duplicated_items_by_key():
+
+    with raises_regexp(AssertionError,
+                       "Duplicated uuid 123 in {'uuid': '123', 'foo': 'a'} and {'uuid': '123', 'foo': 'c'}"):
+        check_duplicated_items_by_key(
+            'uuid',
+            [
+                {'uuid': '123', 'foo': 'a'},
+                {'uuid': '456', 'foo': 'b'},
+                {'uuid': '123', 'foo': 'c'},
+            ]
+        )

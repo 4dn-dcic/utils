@@ -682,3 +682,21 @@ def raises_regexp(error_class, pattern):
     #  pytest.raises(error_class, match=exp) == unittest.TestCase.assertRaisesRegexp(error_class, exp)
     # They differ on what to do if an error_class other than the expected one is raised.
     return pytest.raises(error_class, match=pattern)
+
+
+def check_duplicated_items_by_key(key, items):
+    search_res_by_keyval = {}
+    for item in items:
+        keyval = item[key]
+        search_res_by_keyval[keyval] = entry = search_res_by_keyval.get(keyval, [])
+        entry.append(item)
+    duplicated_keyvals = {}
+    for keyval, items in search_res_by_keyval.items():
+        if len(items) > 1:
+            duplicated_keyvals[keyval] = items
+    assert not duplicated_keyvals, (
+        '\n'.join([
+            "Duplicated %s %s in %s." % (key, keyval, " and ".join(map(str, items)))
+            for keyval, items in duplicated_keyvals.items()
+        ])
+    )

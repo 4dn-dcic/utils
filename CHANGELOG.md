@@ -6,6 +6,7 @@
  * Add `qa_utils.raises_regexp` for conceptual compatibility with `AssertRaises` in `unittest`.
  * Add `qa_utils.CustomizableProperty` and companion `getattr_customized`.
  * Add `qa_utils.override_dict`, factored out of `qa_utils.override_environ`.
+ * Add `qa_utils.check_duplicated_items_by_key` to aid in error reporting for search results.
  * Add support for `sentry_dsn` and a `ENCODED_SENTRY_DSN` 
    beanstalk environment variable in `deployment_utils`.
 
