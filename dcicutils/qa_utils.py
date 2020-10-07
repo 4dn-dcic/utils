@@ -5,7 +5,6 @@ qa_utils: Tools for use in quality assurance testing.
 import contextlib
 import datetime
 import io
-import json
 import os
 import pytest
 import pytz
@@ -685,7 +684,7 @@ def raises_regexp(error_class, pattern):
     return pytest.raises(error_class, match=pattern)
 
 
-def check_duplicated_items_by_key(key, items, url=None):
+def check_duplicated_items_by_key(key, items, url=None, formatter=str):
 
     __tracebackhide__ = True
 
@@ -703,7 +702,7 @@ def check_duplicated_items_by_key(key, items, url=None):
         prefix = "For %s: " % url
     assert not duplicated_keyvals, (
         '\n'.join([
-            "%sDuplicated %s %s in %s." % (prefix, key, keyval, " and ".join(map(lambda x: json.dumps(x, indent=2), items)))
+            "%sDuplicated %s %s in %s." % (prefix, key, keyval, " and ".join(map(formatter, items)))
             for keyval, items in duplicated_keyvals.items()
         ])
     )

@@ -486,7 +486,7 @@ def test_search_metadata(integrated_ff, url):
     # this will fail if items have not yet been indexed
     assert len(search_res) > 0
     # make sure uuids are unique
-    check_duplicated_items_by_key('uuid', search_res, url=url)
+    check_duplicated_items_by_key('uuid', search_res, url=url, formatter=lambda x: json.dumps(x, indent=2))
     # search_uuids = set([item['uuid'] for item in search_res])
     # assert len(search_uuids) == len(search_res)
     search_res_slash = ff_utils.search_metadata(url + '/search/?limit=all&type=File', key=integrated_ff['ff_key'])
