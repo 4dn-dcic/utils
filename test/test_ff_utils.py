@@ -2,10 +2,12 @@ import pytest
 import json
 import time
 
-from dcicutils import ff_utils, s3_utils
-from dcicutils.qa_utils import check_duplicated_items_by_key
-from unittest import mock
 from botocore.exceptions import ClientError
+from dcicutils import ff_utils, s3_utils
+from dcicutils.qa_utils import check_duplicated_items_by_key, MockResponse, ignored
+from types import GeneratorType
+from unittest import mock
+from urllib.parse import urlsplit, parse_qsl
 
 
 pytestmark = pytest.mark.working
@@ -164,6 +166,7 @@ def test_unified_authentication_decoding(integrated_ff):
     class UnusedS3Utils:
 
         def __init__(self, env):
+            ignored(env)
             raise AssertionError("s3Utils() got used.")
 
     for any_key in [any_key_tuple, any_key_dict, any_old_key]:
@@ -192,7 +195,7 @@ def test_unified_authentication_decoding(integrated_ff):
                 assert env == any_env
                 self.env = env
 
-            def get_access_keys(self):
+            def get_access_keys(self):  # noqa - this is a mock so PyCharm shouldn't suggest it could be static
                 return any_key
 
         with mock.patch.object(s3_utils, "s3Utils", MockS3Utils):
@@ -210,10 +213,12 @@ def test_unified_authentication_decoding(integrated_ff):
             assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
         class MockS3Utils:
+
             def __init__(self, env):
                 assert env == any_env
                 self.env = env
-            def get_access_keys(self):
+
+            def get_access_keys(self):  # noqa - this is a mock so PyCharm shouldn't suggest it could be static
                 return any_bogus_key
 
         with mock.patch.object(s3_utils, "s3Utils", MockS3Utils):
@@ -474,12 +479,59 @@ def test_upsert_metadata(integrated_ff):
     assert 'Bad status code' in str(exec_info.value)
 
 
-@pytest.mark.integrated
-@pytest.mark.flaky
+MOCKED_SEARCH_COUNT = 130
+MOCKED_SEARCH_ITEMS = [{'uuid': str(uuid)} for uuid in range(MOCKED_SEARCH_COUNT)]
+
+
+def constant_mocked_search_items():
+    return MOCKED_SEARCH_ITEMS
+
+
+def make_mocked_search(item_maker=None):
+
+    if item_maker is None:
+        item_maker = constant_mocked_search_items
+
+    def mocked_search(url, auth, ff_env, retry_fxn):
+        ignored(auth, ff_env, retry_fxn)  # Not the focus of this mock
+        parsed = urlsplit(url)
+        params = dict(parse_qsl(parsed.query))
+        assert params['type'] == 'File', "This mock doesn't handle type=%s" % params['type']
+        assert params['sort'] == '-date_created', "This mock doesn't handle sort=%s" % params['sort']
+        search_from = int(params['from'])
+        search_limit = int(params['limit'])
+        search_items = item_maker()[search_from:search_from + search_limit]
+        if parsed.path.endswith("/browse/"):
+            restype = 'Browse'
+        elif parsed.path.endswith("/search/"):
+            restype = 'Search'
+        else:
+            raise NotImplementedError("Need a better mock.")
+        print("mocked search", url)
+        if len(search_items) > 5:
+            print("yields %s [%s, ..., %s] # %s items"
+                  % (restype, search_items[0], search_items[-1], len(search_items)))
+        else:
+            print("yields %s %s # %s items" % (restype, search_items, len(search_items)))
+        return MockResponse(json={'@type': restype, '@graph': search_items})
+    return mocked_search
+
+
 @pytest.mark.parametrize('url', ['', 'to_become_full_url'])
-def test_search_metadata(integrated_ff, url):
-    from types import GeneratorType
-    if (url != ''):  # replace stub with actual url from integrated_ff
+def test_search_metadata_unit(integrated_ff, url):
+    with mock.patch.object(ff_utils, "authorized_request", make_mocked_search()):
+        check_search_metadata(integrated_ff, url)
+
+
+# @pytest.mark.integrated
+# @pytest.mark.flaky
+# @pytest.mark.parametrize('url', ['', 'to_become_full_url'])
+# def test_search_metadata_integrated(integrated_ff, url):
+#     check_search_metadata(integrated_ff, url)
+
+
+def check_search_metadata(integrated_ff, url):
+    if url != '':  # replace stub with actual url from integrated_ff
         url = integrated_ff['ff_key']['server'] + '/'
     search_res = ff_utils.search_metadata(url + 'search/?limit=all&type=File', key=integrated_ff['ff_key'])
     assert isinstance(search_res, list)
@@ -522,7 +574,7 @@ def test_search_metadata_with_generator(integrated_ff):
     # helper to validate generator
     def validate_gen(gen, expected):
         found = 0
-        for entry in gen:
+        for _ in gen:
             found += 1
         assert found == expected
 
@@ -921,7 +973,7 @@ def test_faceted_search_users(integrated_ff):
     resp = ff_utils.faceted_search(**any_affiliation)
     total = len(resp)
     print("total=", total)  # Probably a number somewhere near 30
-    assert total > 10 and total < 50
+    assert 10 < total < 50
     affiliation = {'item_type': 'user',
                    'Affiliation': '4DN Testing Lab',
                    'key': key,
@@ -1047,6 +1099,7 @@ def test_expand_es_metadata_complain_wrong_frame(integrated_ff):
     key = integrated_ff['ff_key']
     with pytest.raises(Exception) as exec_info:
         store, uuids = ff_utils.expand_es_metadata(test_list, add_pc_wfr=True, store_frame='embroiled', key=key)
+        ignored(store, uuids)  # do we want to do any testing here?
     assert str(exec_info.value) == """Invalid frame name "embroiled", please use one of ['raw', 'object', 'embedded']"""
 
 
@@ -1085,6 +1138,7 @@ def test_dump_results_to_json(integrated_ff):
     import os
 
     def clear_folder(folder):
+        ignored(folder)
         try:
             shutil.rmtree(test_folder)
         except FileNotFoundError:
@@ -1109,10 +1163,11 @@ def test_search_es_metadata(integrated_ff):
                                       key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
     # The exact number may vary, so just do some random plausibility checking of result.
     n_users = len(res)  # Probably a bit more than 20, since 20 are in the master inserts
-    assert n_users > 20 and n_users < 100
+    assert 20 < n_users < 100
     assert all(item["_type"] == "user" for item in res)  # Make sure they are all users
     assert all("@" in item["_source"]["embedded"]["email"] for item in res)  # Make sure all have an email address
-    assert len(res) == len({ item["_id"] for item in res })  # Make sure ids are unique
+    check_duplicated_items_by_key('_id', res, formatter=lambda x: json.dumps(x, indent=2))
+    # assert len(res) == len({ item["_id"] for item in res })  # Make sure ids are unique
     test_query = {
         'query': {
             'bool': {
@@ -1137,7 +1192,7 @@ def test_search_es_metadata_generator(integrated_ff):
     """ Tests SearchESMetadataHandler both normally and with a generator, verifies consistent results """
     handler = ff_utils.SearchESMetadataHandler(key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
     no_gen_res = ff_utils.search_es_metadata('fourfront-mastertestuser', {'size': '1000'},
-                                      key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
+                                             key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])
     res = handler.execute_search('fourfront-mastertestuser', {'size': '1000'}, is_generator=True, page_size=5)
     count = 0
     for _ in res:
