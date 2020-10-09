@@ -13,7 +13,7 @@ import time
 import toml
 
 from json import dumps as json_dumps, loads as json_loads
-from .misc_utils import PRINT, ignored, Retry, full_object_name
+from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized
 
 
 def show_elapsed_time(start, end):
@@ -566,66 +566,23 @@ class MockBotoS3Client:
             self.download_fileobj(Bucket=Bucket, Key=Key, Fileobj=fp)
 
 
-class UncustomizedInstance(Exception):
-
-    def __init__(self, instance, *, field):
-        self.instance = instance
-        self.field = field
-        declaration_class, declaration = self._find_field_declared_class(instance, field)
-        self.declaration_class = declaration_class
-        context = ""
-        if declaration_class == 'instance':
-            context = " from instance"
-        elif declaration_class:
-            context = " from class %s" % full_object_name(declaration_class)
-        message = ("Attempt to access field %s%s."
-                   " It was expected to be given a custom value in a subclass: %s."
-                   % (field, context, declaration.description))
-        super().__init__(message)
-
-    @staticmethod
-    def _find_field_declared_class(instance, field):
-        instance_value = instance.__dict__.get(field)
-        is_class = isinstance(instance, type)
-        if instance_value:
-            return instance if is_class else 'instance', instance_value
-        else:
-            for cls in instance.__mro__ if is_class else instance.__class__.__mro__:
-                cls_value = cls.__dict__.get(field)
-                if cls_value:
-                    return cls, cls_value
-            raise RuntimeError("%s does not have a field %s." % (instance, field))
-
-
-class CustomizableProperty(property):
-
-    def __init__(self, field, *, description):
-
-        self.field = field
-        self.description = description
-
-        def uncustomized(instance):
-            raise UncustomizedInstance(instance=instance, field=field)
-
-        super().__init__(uncustomized)
-
-    def __str__(self):
-        return "<%s %s>" % (self.__class__.__name__, self.field)
-
-
-def getattr_customized(thing, key):
-    # This will raise an error if the attribute is a CustomizableProperty living in the class part of the dict,
-    # but will return the object if it's in the instance.
-    value = getattr(thing, key)
-    if isinstance(value, CustomizableProperty):
-        # This is an uncustomized instance variable, not a class variable.
-        # That's not an intended use case, but just report it without involving mention of the class.
-        raise UncustomizedInstance(instance=thing, field=key)
-    else:
-        return value
-
-
 class VersionChecker:
+
+    """
+    Given appropriate customizations, this allows cross-checking of pyproject.toml and a changelog for consistency.
+
+    You must subclass this class, specifying both the pyproject filename and the changelog filename as
+    class variables PYPROJECT and CHANGELOG, respectively.
+
+    def test_version():
+
+        class MyAppVersionChecker(VersionChecker):
+            PYPROJECT = os.path.join(ROOT_DIR, "pyproject.toml")
+            CHANGELOG = os.path.join(ROOT_DIR, "CHANGELOG.rst")
+
+        MyAppVersionChecker.check_version()
+
+    """
 
     PYPROJECT = CustomizableProperty('PYPROJECT', description="The repository-relative name of the pyproject file.")
     CHANGELOG = CustomizableProperty('CHANGELOG', description="The repository-relative name of the change log.")
@@ -678,6 +635,9 @@ class VersionChecker:
 
 
 def raises_regexp(error_class, pattern):
+    """
+    A context manager that works like pytest.raises but allows a required error message pattern to be specified as well.
+    """
     # Mostly compatible with unittest style, so that (approximately):
     #  pytest.raises(error_class, match=exp) == unittest.TestCase.assertRaisesRegexp(error_class, exp)
     # They differ on what to do if an error_class other than the expected one is raised.
