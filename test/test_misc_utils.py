@@ -16,6 +16,7 @@ from dcicutils.misc_utils import (
     Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool,
     LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
     keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
+    copy_json,
 )
 from dcicutils.qa_utils import Occasionally, ControlledTime, override_environ, MockFileSystem
 from unittest import mock
@@ -1282,3 +1283,20 @@ def test_camel_case_to_snake_case(input, expected):
 ])
 def test_snake_case_to_camel_case(input, expected):
     assert snake_case_to_camel_case(input) == expected
+
+
+@pytest.mark.parametrize('obj', [
+    {},
+    {'hello': 'world'},
+    {'foo': 5},
+    {'list': ['a', 'b', 'c']},
+    {'list2': [1, 2, 3]},
+    {'list_of_objects': [
+        {'hello': 'world', 'foo': 'bar'},
+        {'hello': 'dog', 'foo': 'cat'}
+    ]},
+    {'object': {'of objects': {'of more objects': {'even more': 'and more'}}}}
+])
+def test_copy_json(obj):
+    """ Tests some basic cases for copy_json """
+    assert copy_json(obj) == obj
