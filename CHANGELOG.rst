@@ -17,6 +17,8 @@ Change Log
 * Add ``qa_utils.check_duplicated_items_by_key`` to aid in error reporting for search results.
 * Add support for ``sentry_dsn`` and a ``ENCODED_SENTRY_DSN``
   beanstalk environment variable in ``deployment_utils``.
+* Convert test for ``ff_utils.search_metadata`` to be a proper unit test to avoid
+  some timing errors that occur during integration testing. I wrote 
 
 1.2.1
 =====
