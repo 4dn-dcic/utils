@@ -523,6 +523,7 @@ def test_search_metadata_unit(integrated_ff, url):
         check_search_metadata(integrated_ff, url)
 
 
+# TODO (C4-336): This will be re-enabled as an integration test when part 2 of C4-336 is fixed. -kmp 10-Oct-2020
 # @pytest.mark.integrated
 # @pytest.mark.flaky
 # @pytest.mark.parametrize('url', ['', 'to_become_full_url'])

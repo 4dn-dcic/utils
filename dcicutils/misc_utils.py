@@ -649,6 +649,9 @@ def check_true(test_value, message, error_class=None):
     The error, if one is raised, will be of type error_class, and its message will be given by message.
     The error_class defaults to RuntimeError, but may be any Exception class.
     """
+
+    __tracebackhide__ = True
+
     if error_class is None:
         error_class = RuntimeError
     if not test_value:
