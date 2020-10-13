@@ -1300,3 +1300,14 @@ def test_snake_case_to_camel_case(input, expected):
 def test_copy_json(obj):
     """ Tests some basic cases for copy_json """
     assert copy_json(obj) == obj
+
+
+def test_copy_json_side_effects():
+    obj = {'foo': [1, 2, 3], 'bar': [{'x': 4, 'y': 5}, {'x': 2, 'y': 7}]}
+    obj_copy = copy_json(obj)
+    obj['foo'][1] = 20
+    obj['bar'][0]['y'] = 500
+    obj['bar'][1] = 17
+    assert obj == {'foo': [1, 20, 3], 'bar': [{'x': 4, 'y': 500}, 17]}
+    assert obj_copy == {'foo': [1, 2, 3], 'bar': [{'x': 4, 'y': 5}, {'x': 2, 'y': 7}]}
+
