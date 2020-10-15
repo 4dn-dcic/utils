@@ -12,7 +12,7 @@ from dcicutils import qa_utils
 from dcicutils.misc_utils import Retry, PRINT, file_contents
 from dcicutils.qa_utils import (
     mock_not_called, local_attrs, override_environ, override_dict, show_elapsed_time, timed,
-    ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom,
+    ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented,
     raises_regexp, VersionChecker, check_duplicated_items_by_key,
 )
@@ -959,6 +959,28 @@ def test_uppercase_print_with_time():
 
         assert timestamp_pattern.match(line0)
         assert not timestamp_pattern.match(line1)
+
+
+def test_mock_uuid_module_documentation_example():
+    mock_uuid_module = MockUUIDModule()
+    assert str(mock_uuid_module.uuid4()) == '00000000-0000-0000-0000-000000000001'
+    with mock.patch.object(uuid, "uuid4", mock_uuid_module.uuid4):
+        assert str(uuid.uuid4()) == '00000000-0000-0000-0000-000000000002'
+
+
+def test_mock_uuid_module():
+
+    for _ in range(2):
+        fake_uuid = MockUUIDModule()
+        assert str(fake_uuid.uuid4()) == '00000000-0000-0000-0000-000000000001'
+        assert str(fake_uuid.uuid4()) == '00000000-0000-0000-0000-000000000002'
+        assert str(fake_uuid.uuid4()) == '00000000-0000-0000-0000-000000000003'
+
+    fake_uuid = MockUUIDModule()
+    assert isinstance(fake_uuid.uuid4(), uuid.UUID)
+
+    fake_uuid = MockUUIDModule(prefix='', pad=3, uuid_class=str)
+    assert str(fake_uuid.uuid4()) == '001'
 
 
 def test_mock_boto_s3_client_upload_file_and_download_file_positional():

@@ -11,6 +11,7 @@ import pytz
 import re
 import time
 import toml
+import uuid
 
 from json import dumps as json_dumps, loads as json_loads
 from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized
@@ -400,6 +401,39 @@ class MockFileSystem:
     def _open_for_write(self, file_system, file, binary=False, encoding=None):
         return MockFileWriter(file_system=file_system, file=file, binary=binary,
                               encoding=encoding or self.default_encoding)
+
+
+class MockUUIDModule:
+    """
+    This mock is intended to replace the uuid module itself, not the UUID class (which it ordinarily tries to use).
+    In effect, this only changes how UUID strings are generated, not how UUID objects returned are represented.
+    However, mocking this is a little complicated because you have to replace individual methods. e.g.,
+
+        import uuid
+        def some_test():
+            mock_uuid_module = MockUUIDModule()
+            assert mock_uuid_module.uuid4() == '00000000-0000-0000-0000-000000000001'
+            with mock.patch.object(uuid, "uuid4", mock_uuid_module.uuid4):
+                assert uuid.uuid4() == '00000000-0000-0000-0000-000000000002'
+    """
+
+    PREFIX = '00000000-0000-0000-0000-'
+    PAD = 12
+    UUID_CLASS = uuid.UUID
+
+    def __init__(self, prefix=None, pad=None, uuid_class=None):
+        self._counter = 1
+        self._prefix = self.PREFIX if prefix is None else prefix
+        self._pad = self.PAD if pad is None else pad
+        self._uuid_class = uuid_class or self.UUID_CLASS
+
+    def _bump(self):
+        n = self._counter
+        self._counter += 1
+        return n
+
+    def uuid4(self):
+        return self._uuid_class(self._prefix + str(self._bump()).rjust(self._pad, '0'))
 
 
 class NotReallyRandom:
