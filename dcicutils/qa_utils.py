@@ -585,7 +585,7 @@ class MockBotoS3Client:
 
     def __init__(self, region_name=None):
         if region_name not in (None, 'us-east-1'):
-            raise RuntimeError("Unexpected region:", region_name)
+            raise ValueError("Unexpected region:", region_name)
         self.s3_files = MockFileSystem()
 
     def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS

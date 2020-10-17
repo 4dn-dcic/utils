@@ -966,10 +966,10 @@ def test_mock_boto3_client():
     mock_boto3 = MockBoto3()
 
     assert isinstance(mock_boto3.client('s3'), MockBotoS3Client)
-    assert isinstance(mock_boto3.client('s3', region='us-east-1'), MockBotoS3Client)
+    assert isinstance(mock_boto3.client('s3', region_name='us-east-1'), MockBotoS3Client)
 
-    with pytest.raises(RuntimeError):
-        mock_boto3.client('s3', region='us-east-2')
+    with pytest.raises(ValueError):
+        mock_boto3.client('s3', region_name='us-east-2')
 
     with pytest.raises(NotImplementedError):
         mock_boto3.client('some_other_kind')
