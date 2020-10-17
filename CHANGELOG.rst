@@ -17,6 +17,7 @@ Change Log
 * Add ``misc_utils.CustomizableProperty`` and companion ``misc_utils.getattr_customized``.
 * Add ``qa_utils.override_dict``, factored out of ``qa_utils.override_environ``.
 * Add ``qa_utils.check_duplicated_items_by_key`` to aid in error reporting for search results.
+* Add ``qa_utils.MockUUIDModule`` for being able to mock ``uuid.uuid4()``.
 * Add support for ``sentry_dsn`` and a ``ENCODED_SENTRY_DSN``
   beanstalk environment variable in ``deployment_utils``.
 * Convert test for ``ff_utils.search_metadata`` to be a proper unit test to avoid
