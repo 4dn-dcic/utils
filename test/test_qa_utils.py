@@ -13,7 +13,7 @@ from dcicutils.misc_utils import Retry, PRINT, file_contents
 from dcicutils.qa_utils import (
     mock_not_called, local_attrs, override_environ, override_dict, show_elapsed_time, timed,
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule,
-    MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented,
+    MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3,
     raises_regexp, VersionChecker, check_duplicated_items_by_key,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
@@ -959,6 +959,20 @@ def test_uppercase_print_with_time():
 
         assert timestamp_pattern.match(line0)
         assert not timestamp_pattern.match(line1)
+
+
+def test_mock_boto3_client():
+
+    mock_boto3 = MockBoto3()
+
+    assert isinstance(mock_boto3.client('s3'), MockBotoS3Client)
+    assert isinstance(mock_boto3.client('s3', region='us-east-1'), MockBotoS3Client)
+
+    with pytest.raises(RuntimeError):
+        mock_boto3.client('s3', region='us-east-2')
+
+    with pytest.raises(NotImplementedError):
+        mock_boto3.client('some_other_kind')
 
 
 def test_mock_uuid_module_documentation_example():

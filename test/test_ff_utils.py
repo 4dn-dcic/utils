@@ -4,7 +4,7 @@ import time
 
 from botocore.exceptions import ClientError
 from dcicutils import ff_utils, s3_utils
-from dcicutils.qa_utils import check_duplicated_items_by_key, MockResponse, ignored
+from dcicutils.qa_utils import check_duplicated_items_by_key, MockResponse, ignored, MockBoto3, MockBotoSQSClient
 from types import GeneratorType
 from unittest import mock
 from urllib.parse import urlsplit, parse_qsl
@@ -283,22 +283,63 @@ def test_get_authentication_with_server(integrated_ff):
     assert 'ERROR GETTING SERVER' in str(exec_info.value)
 
 
-@pytest.mark.integrated
-@pytest.mark.flaky
-def test_stuff_in_queues(integrated_ff):
-    """
-    Gotta index a bunch of stuff to make this work
-    """
-    search_res = ff_utils.search_metadata('search/?limit=all&type=File', key=integrated_ff['ff_key'])
-    # just take the first handful
-    for item in search_res[:8]:
-        ff_utils.patch_metadata({}, obj_id=item['uuid'], key=integrated_ff['ff_key'])
-    time.sleep(3)  # let queues catch up
-    stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env'], check_secondary=True)
-    assert stuff_in_queue
-    with pytest.raises(Exception) as exec_info:
-        ff_utils.stuff_in_queues(None, check_secondary=True)  # fail if no env specified
-    assert 'Must provide a full fourfront environment name' in str(exec_info.value)
+def test_stuff_in_queues_unit():
+
+    class MockBotoSQSClientEmpty(MockBotoSQSClient):
+        def compute_mock_queue_attribute(self, QueueUrl, Attribute):
+            return 0
+
+    with mock.patch.object(ff_utils, "boto3", MockBoto3(sqs=MockBotoSQSClientEmpty)):
+        assert not ff_utils.stuff_in_queues('fourfront-foo')
+
+    class MockBotoSQSClientPrimary(MockBotoSQSClient):
+        def compute_mock_queue_attribute(self, QueueUrl, Attribute):
+            result = 0 if 'secondary' in QueueUrl else 1
+            print("Returning %s for url=%s attr=%s" % (result, QueueUrl, Attribute))
+            return result
+
+    with mock.patch.object(ff_utils, "boto3", MockBoto3(sqs=MockBotoSQSClientPrimary)):
+        assert ff_utils.stuff_in_queues('fourfront-foo')
+        assert ff_utils.stuff_in_queues('fourfront-foo', check_secondary=True)
+
+    class MockBotoSQSClientSecondary(MockBotoSQSClient):
+        def compute_mock_queue_attribute(self, QueueUrl, Attribute):
+            result = 1 if 'secondary' in QueueUrl else 0
+            print("Returning %s for url=%s attr=%s" % (result, QueueUrl, Attribute))
+            return result
+
+    with mock.patch.object(ff_utils, "boto3", MockBoto3(sqs=MockBotoSQSClientSecondary)):
+        assert not ff_utils.stuff_in_queues('fourfront-foo')
+        assert ff_utils.stuff_in_queues('fourfront-foo', check_secondary=True)
+
+    class MockBotoSQSClientErring(MockBotoSQSClient):
+        def compute_mock_queue_attribute(self, QueueUrl, Attribute):
+            print("Simulating a boto3 error.")
+            raise ClientError(500, "get_queue_attributes")
+
+    # If there is difficulty getting to the queue, it behaves as if there's stuff in the queue.
+    with mock.patch.object(ff_utils, "boto3", MockBoto3(sqs=MockBotoSQSClientErring)):
+        assert ff_utils.stuff_in_queues('fourfront-foo')
+        assert ff_utils.stuff_in_queues('fourfront-foo', check_secondary=True)
+
+
+# TODO (C4-336): This will be re-enabled as an integration test when part 2 of C4-336 is fixed. -kmp 10-Oct-2020
+# @pytest.mark.integrated
+# @pytest.mark.flaky
+# def test_stuff_in_queues_integrated(integrated_ff):
+#     """
+#     Gotta index a bunch of stuff to make this work
+#     """
+#     search_res = ff_utils.search_metadata('search/?limit=all&type=File', key=integrated_ff['ff_key'])
+#     # just take the first handful
+#     for item in search_res[:8]:
+#         ff_utils.patch_metadata({}, obj_id=item['uuid'], key=integrated_ff['ff_key'])
+#     time.sleep(3)  # let queues catch up
+#     stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env'], check_secondary=True)
+#     assert stuff_in_queue
+#     with pytest.raises(Exception) as exec_info:
+#         ff_utils.stuff_in_queues(None, check_secondary=True)  # fail if no env specified
+#     assert 'Must provide a full fourfront environment name' in str(exec_info.value)
 
 
 @pytest.mark.integrated

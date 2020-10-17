@@ -18,10 +18,13 @@ Change Log
 * Add ``qa_utils.override_dict``, factored out of ``qa_utils.override_environ``.
 * Add ``qa_utils.check_duplicated_items_by_key`` to aid in error reporting for search results.
 * Add ``qa_utils.MockUUIDModule`` for being able to mock ``uuid.uuid4()``.
+* Add ``qa_utils.MockBoto3``.
+* Add ``qa_utils.MockBotoSQSClient`` so that ``get_queue_url`` and ``get_queue_attributes`` can be used
+  in testing of ``ff_utils.stuff_in_queue``.
 * Add support for ``sentry_dsn`` and a ``ENCODED_SENTRY_DSN``
   beanstalk environment variable in ``deployment_utils``.
-* Convert test for ``ff_utils.search_metadata`` to be a proper unit test to avoid
-  some timing errors that occur during integration testing. I wrote 
+* In tests for ``ff_utils``, convert tests for ``search_metadata`` and ``stuff_in_queue``
+  to be proper unit tests, to avoid some timing errors that occur during integration testing.
 
 
 1.2.1

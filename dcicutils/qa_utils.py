@@ -559,12 +559,33 @@ class MockKeysNotImplemented(NotImplementedError):
         super().__init__("Mocked %s does not implement keywords: %s" % (operation, ", ".join(keys)))
 
 
+class MockBoto3:
+
+    @classmethod
+    def _default_mappings(cls):
+        return {
+            's3': MockBotoS3Client,
+            'sqs': MockBotoSQSClient,
+        }
+
+    def __init__(self, **override_mappings):
+        self._mappings = dict(self._default_mappings(), **override_mappings)
+
+    def client(self, kind, **kwargs):
+        mapped_class = self._mappings.get(kind)
+        if not mapped_class:
+            raise NotImplementedError("Unsupported boto3 mock kind:", kind)
+        return mapped_class(**kwargs)
+
+
 class MockBotoS3Client:
     """
     This is a mock of certain S3 functionality.
     """
 
-    def __init__(self):
+    def __init__(self, region_name=None):
+        if region_name not in (None, 'us-east-1'):
+            raise RuntimeError("Unexpected region:", region_name)
         self.s3_files = MockFileSystem()
 
     def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
@@ -598,6 +619,87 @@ class MockBotoS3Client:
             raise MockKeysNotImplemented("upload_file", kwargs.keys())
         with io.open(Filename, 'wb') as fp:
             self.download_fileobj(Bucket=Bucket, Key=Key, Fileobj=fp)
+
+
+class MockBotoSQSClient:
+    """
+    This is a mock of certain SQS functionality.
+    """
+
+    def __init__(self, region_name=None):
+        if region_name not in (None, 'us-east-1'):
+            raise RuntimeError("Unexpected region:", region_name)
+        self._mock_queue_name_seen = None
+
+    def check_mock_queue_url_consistency(self, queue_url):
+        __tracebackhide__ = True
+        if self._mock_queue_name_seen:
+            assert self._mock_queue_name_seen in queue_url, "This mock only supports one queue at a time."
+
+    MOCK_CONTENT_TYPE = 'text/xml'
+    MOCK_CONTENT_LENGTH = 350
+    MOCK_RETRY_ATTEMPTS = 0
+    MOCK_STATUS_CODE = 200
+
+    def compute_mock_response_metadata(self):
+        # It may be that uuid.uuid4() is further mocked, but either way it needs to return something
+        # that is used in two places consistently.
+        request_id = str(uuid.uuid4())
+        http_status_code = self.MOCK_STATUS_CODE
+        return {
+            'RequestId': request_id,
+            'HTTPStatusCode': http_status_code,
+            'HTTPHeaders': self.compute_mock_request_headers(request_id),
+            'RetryAttempts': self.MOCK_RETRY_ATTEMPTS,
+        }
+
+    @classmethod
+    def compute_mock_request_headers(cls, request_id):
+        # request_date_str = 'Thu, 01 Oct 2020 06:00:00 GMT'
+        #   or maybe pytz.UTC.localize(datetime.datetime.utcnow()), where .utcnow() may be further mocked
+        # request_content_type = self.MOCK_CONTENT_TYPE
+        return {
+            'x-amzn-requestid': request_id,
+            # We probably don't need these other values, and if we do we might need different values,
+            # so we prefer not to provide mock values until/unless need is shown. -kmp 15-Oct-2020
+            #
+            # 'date': request_date_str,  # see above
+            # 'content-type': 'text/xml',
+            # 'content-length': 350,
+        }
+
+    MOCK_QUEUE_URL_PREFIX = 'https://queue.amazonaws.com.mock/12345/'  # just something to make it look like a URL
+
+    def compute_mock_queue_url(self, queue_name):
+        return self.MOCK_QUEUE_URL_PREFIX + queue_name
+
+    def get_queue_url(self, QueueName):  # noQA - AWS argument naming style
+        self._mock_queue_name_seen = QueueName
+        request_url = self.compute_mock_queue_url(QueueName)
+        self.check_mock_queue_url_consistency(request_url)
+        return {
+            'QueueUrl': request_url,
+            'ResponseMetadata': self.compute_mock_response_metadata()
+        }
+
+    MOCK_QUEUE_ATTRIBUTES_DEFAULT = 0
+
+    def compute_mock_queue_attribute(self, queue_url, attribute_name):
+        self.check_mock_queue_url_consistency(queue_url)
+        ignored(attribute_name)  # This mock doesn't care which attribute, but you could subclass and override this
+        return str(self.MOCK_QUEUE_ATTRIBUTES_DEFAULT)
+
+    def compute_mock_queue_attributes(self, queue_url, attribute_names):
+        self.check_mock_queue_url_consistency(queue_url)
+        return {attribute_name: self.compute_mock_queue_attribute(queue_url, attribute_name)
+                for attribute_name in attribute_names}
+
+    def get_queue_attributes(self, QueueUrl, AttributeNames):  # noQA - AWS argument naming style
+        self.check_mock_queue_url_consistency(QueueUrl)
+        return {
+            'Attributes': self.compute_mock_queue_attributes(QueueUrl, AttributeNames),
+            'ResponseMetadata': self.compute_mock_response_metadata()
+        }
 
 
 class VersionChecker:

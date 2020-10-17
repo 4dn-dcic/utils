@@ -1,25 +1,21 @@
 from __future__ import print_function
-import sys
+
+import boto3
 import json
 import os
-import time
 import random
-import boto3
+import requests
+import time
+import urllib.parse as urlparse
+
 from collections import namedtuple
+from elasticsearch.exceptions import AuthorizationException
+from urllib.parse import urlencode
 from . import (
     s3_utils,
     es_utils,
 )
 from .misc_utils import PRINT
-import requests
-from elasticsearch.exceptions import AuthorizationException
-# urlparse import differs between py2 and 3
-if sys.version_info[0] < 3:
-    import urlparse
-    from urllib import urlencode as urlencode
-else:
-    import urllib.parse as urlparse
-    from urllib.parse import urlencode
 
 
 # TODO (C4-92, C4-102): Probably to centralize this information in env_utils. Also figure out relation to CGAP.
@@ -559,6 +555,7 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
     representing a quality metric.
 
     Args:
+        uuid: uuid of an experimentSet
         key: authentication key for ff_env (see get_authentication_with_server)
         ff_env: The relevant ff beanstalk environment name.
         include_processed_files: if False will exclude QC metrics on processed files
@@ -591,7 +588,6 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
     organism = None
     experiment_type = None
     experiment_subclass = None
-    description = None
     biosource_summary = None
 
     resp = get_metadata(uuid, key=key, ff_env=ff_env)
@@ -635,8 +631,8 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
                 result.update(exp_qc_metrics)
 
     description = resp.get('dataset_label', None)
-    ES_qc_metrics = fetch_files_qc_metrics(resp, associated_files, key=key, ff_env=ff_env)
-    if ES_qc_metrics:
+    es_qc_metrics = fetch_files_qc_metrics(resp, associated_files, key=key, ff_env=ff_env)
+    if es_qc_metrics:
         meta_info = {'experiment_description': description,
                      'organism': organism,
                      'experiment_type': experiment_type,
@@ -645,9 +641,9 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
                      'source_experimentSet': resp['accession'],
                      'biosource_summary': biosource_summary
                      }
-        for qc_metric in ES_qc_metrics.values():
+        for qc_metric in es_qc_metrics.values():
             qc_metric.update(meta_info)
-        result.update(ES_qc_metrics)
+        result.update(es_qc_metrics)
 
     return result
 
@@ -875,7 +871,7 @@ def get_schema_names(key=None, ff_env=None):
     return schema_name
 
 
-def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_pc_wfr=False, ignore_field=[],
+def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_pc_wfr=False, ignore_field=None,
                        use_generator=False, es_client=None):
     """
     starting from list of uuids, tracks all linked items in object frame by default
@@ -906,6 +902,8 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
     # TODO: if more file types (currently FileFastq and FileProcessed) get workflowrun calculated properties
             we need to add them to the add_from_embedded dictionary.
     """
+    if ignore_field is None:
+        ignore_field = []
     # assert that the used parameter is correct
     accepted_frames = ['raw', 'object', 'embedded']
     if store_frame not in accepted_frames:
@@ -920,6 +918,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
         return my_dict
 
     auth = get_authentication_with_server(key, ff_env)
+    es_url = None
     if es_client is None:  # set up an es client if none is provided
         es_url = get_health_page(key=auth)['elasticsearch']
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
@@ -1219,7 +1218,6 @@ def get_response_json(res):
     Very simple function to return json from a response or raise an error if
     it is not present. Used with the metadata functions.
     """
-    res_json = None
     try:
         res_json = res.json()
     except Exception:
@@ -1255,7 +1253,9 @@ def update_url_params_and_unparse(url, url_params):
     Takes a string url and url params (in format of what is returned by
     get_url_params). Returns a string url param with newly formatted params
     """
-    parsed_url = urlparse.urlparse(url)._replace(query=urlencode(url_params, True))
+    # Note: Although it upsets linting tools, ._replace() is an advertised interface of url.parse -kmp 17-Oct-2020
+    #       See https://docs.python.org/3/library/urllib.parse.html
+    parsed_url = urlparse.urlparse(url)._replace(query=urlencode(url_params, True))  # noQA
     return urlparse.urlunparse(parsed_url)
 
 
