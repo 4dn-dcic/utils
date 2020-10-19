@@ -831,6 +831,22 @@ def make_counter(start=0, step=1):
     return counter
 
 
+def copy_json(obj):
+    """ This function is taken and renamed from ENCODE's snovault quick_deepcopy
+
+    Deep copy an object consisting of dicts, lists, and primitives.
+    This is faster than Python's `copy.deepcopy` because it doesn't
+    do bookkeeping to avoid duplicating objects in a cyclic graph.
+    This is intended to work fine for data deserialized from JSON,
+    but won't work for everything.
+    """
+    if isinstance(obj, dict):
+        obj = {k: copy_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        obj = [copy_json(v) for v in obj]
+    return obj
+
+
 class UncustomizedInstance(Exception):
     """
     Reports a helpful error for access to a CustomizableProperty that has not been properly set.
