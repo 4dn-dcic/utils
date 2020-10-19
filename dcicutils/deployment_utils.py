@@ -472,7 +472,8 @@ class IniFileManager:
     @classmethod
     def build_ini_stream_from_template(cls, template_file_name, init_file_stream,
                                        bs_env=None, bs_mirror_env=None, s3_bucket_env=None, data_set=None,
-                                       es_server=None, es_namespace=None, indexer=None, index_server=None):
+                                       es_server=None, es_namespace=None, indexer=None, index_server=None,
+                                       sentry_dsn=None):
         """
         Sends output to init_file_stream corresponding to the data noe would want in an ini file
         for the given template_file_name and available environment variables.
@@ -487,7 +488,8 @@ class IniFileManager:
             es_server: The name of an es server to use.
             es_namespace: The namespace to use on the es server. If None, this uses the bs_env.
             indexer: Whether or not we are building an ini file for an indexer.
-            indexer: Whether or not we are building an ini file for an index server.
+            index_server: Whether or not we are building an ini file for an index server.
+            sentry_dsn: A sentry DSN specifier, or the empty string if none is desired.
 
         Returns: None
 
@@ -500,6 +502,7 @@ class IniFileManager:
         data_set = data_set or os.environ.get("ENCODED_DATA_SET",
                                               data_set_for_env(bs_env) or "MISSING_ENCODED_DATA_SET")
         es_namespace = es_namespace or os.environ.get("ENCODED_ES_NAMESPACE", bs_env)
+        sentry_dsn = sentry_dsn or os.environ.get("ENCODED_SENTRY_DSN", "")
         # Set ENCODED_INDEXER to 'true' to deploy an indexer.
         # If the value is missing, the empty string, or any other thing besides 'true' (in any case),
         # this value will default to the empty string, causing the line not to appear in the output file
@@ -540,6 +543,7 @@ class IniFileManager:
             'ES_NAMESPACE': es_namespace,
             'INDEXER': indexer,
             'INDEX_SERVER': index_server,
+            'SENTRY_DSN': sentry_dsn,
         }
 
         # if we specify an indexer name for bs_env, we did the deployment wrong and should bail

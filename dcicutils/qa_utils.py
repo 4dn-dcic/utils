@@ -4,13 +4,17 @@ qa_utils: Tools for use in quality assurance testing.
 
 import contextlib
 import datetime
-import time
 import io
 import os
+import pytest
 import pytz
+import re
+import time
+import toml
+import uuid
 
 from json import dumps as json_dumps, loads as json_loads
-from .misc_utils import PRINT, ignored, Retry
+from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized
 
 
 def show_elapsed_time(start, end):
@@ -88,25 +92,30 @@ def local_attrs(obj, **kwargs):
 
 @contextlib.contextmanager
 def override_environ(**overrides):
+    with override_dict(os.environ, **overrides):
+        yield
+
+
+@contextlib.contextmanager
+def override_dict(d, **overrides):
     to_delete = []
     to_restore = {}
-    env = os.environ
     try:
         for k, v in overrides.items():
-            if k in env:
-                to_restore[k] = env[k]
+            if k in d:
+                to_restore[k] = d[k]
             else:
                 to_delete.append(k)
             if v is None:
-                env.pop(k, None)  # Delete key k, tolerating it being already gone
+                d.pop(k, None)  # Delete key k, tolerating it being already gone
             else:
-                env[k] = v
+                d[k] = v
         yield
     finally:
         for k in to_delete:
-            env.pop(k, None)  # Delete key k, tolerating it being already gone
+            d.pop(k, None)  # Delete key k, tolerating it being already gone
         for k, v in to_restore.items():
-            os.environ[k] = v
+            d[k] = v
 
 
 class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
@@ -394,6 +403,39 @@ class MockFileSystem:
                               encoding=encoding or self.default_encoding)
 
 
+class MockUUIDModule:
+    """
+    This mock is intended to replace the uuid module itself, not the UUID class (which it ordinarily tries to use).
+    In effect, this only changes how UUID strings are generated, not how UUID objects returned are represented.
+    However, mocking this is a little complicated because you have to replace individual methods. e.g.,
+
+        import uuid
+        def some_test():
+            mock_uuid_module = MockUUIDModule()
+            assert mock_uuid_module.uuid4() == '00000000-0000-0000-0000-000000000001'
+            with mock.patch.object(uuid, "uuid4", mock_uuid_module.uuid4):
+                assert uuid.uuid4() == '00000000-0000-0000-0000-000000000002'
+    """
+
+    PREFIX = '00000000-0000-0000-0000-'
+    PAD = 12
+    UUID_CLASS = uuid.UUID
+
+    def __init__(self, prefix=None, pad=None, uuid_class=None):
+        self._counter = 1
+        self._prefix = self.PREFIX if prefix is None else prefix
+        self._pad = self.PAD if pad is None else pad
+        self._uuid_class = uuid_class or self.UUID_CLASS
+
+    def _bump(self):
+        n = self._counter
+        self._counter += 1
+        return n
+
+    def uuid4(self):
+        return self._uuid_class(self._prefix + str(self._bump()).rjust(self._pad, '0'))
+
+
 class NotReallyRandom:
     """
     This can be used as a substitute for random to return numbers in a more predictable order.
@@ -517,12 +559,33 @@ class MockKeysNotImplemented(NotImplementedError):
         super().__init__("Mocked %s does not implement keywords: %s" % (operation, ", ".join(keys)))
 
 
+class MockBoto3:
+
+    @classmethod
+    def _default_mappings(cls):
+        return {
+            's3': MockBotoS3Client,
+            'sqs': MockBotoSQSClient,
+        }
+
+    def __init__(self, **override_mappings):
+        self._mappings = dict(self._default_mappings(), **override_mappings)
+
+    def client(self, kind, **kwargs):
+        mapped_class = self._mappings.get(kind)
+        if not mapped_class:
+            raise NotImplementedError("Unsupported boto3 mock kind:", kind)
+        return mapped_class(**kwargs)
+
+
 class MockBotoS3Client:
     """
     This is a mock of certain S3 functionality.
     """
 
-    def __init__(self):
+    def __init__(self, region_name=None):
+        if region_name not in (None, 'us-east-1'):
+            raise ValueError("Unexpected region:", region_name)
         self.s3_files = MockFileSystem()
 
     def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
@@ -551,8 +614,191 @@ class MockBotoS3Client:
               % (Bucket, Key, len(data), Fileobj))
         Fileobj.write(data)
 
-    def download_file(self, Bucket, Key, Filename, **kwargs):
+    def download_file(self, Bucket, Key, Filename, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
         if kwargs:
             raise MockKeysNotImplemented("upload_file", kwargs.keys())
         with io.open(Filename, 'wb') as fp:
             self.download_fileobj(Bucket=Bucket, Key=Key, Fileobj=fp)
+
+
+class MockBotoSQSClient:
+    """
+    This is a mock of certain SQS functionality.
+    """
+
+    def __init__(self, region_name=None):
+        if region_name not in (None, 'us-east-1'):
+            raise RuntimeError("Unexpected region:", region_name)
+        self._mock_queue_name_seen = None
+
+    def check_mock_queue_url_consistency(self, queue_url):
+        __tracebackhide__ = True
+        if self._mock_queue_name_seen:
+            assert self._mock_queue_name_seen in queue_url, "This mock only supports one queue at a time."
+
+    MOCK_CONTENT_TYPE = 'text/xml'
+    MOCK_CONTENT_LENGTH = 350
+    MOCK_RETRY_ATTEMPTS = 0
+    MOCK_STATUS_CODE = 200
+
+    def compute_mock_response_metadata(self):
+        # It may be that uuid.uuid4() is further mocked, but either way it needs to return something
+        # that is used in two places consistently.
+        request_id = str(uuid.uuid4())
+        http_status_code = self.MOCK_STATUS_CODE
+        return {
+            'RequestId': request_id,
+            'HTTPStatusCode': http_status_code,
+            'HTTPHeaders': self.compute_mock_request_headers(request_id),
+            'RetryAttempts': self.MOCK_RETRY_ATTEMPTS,
+        }
+
+    @classmethod
+    def compute_mock_request_headers(cls, request_id):
+        # request_date_str = 'Thu, 01 Oct 2020 06:00:00 GMT'
+        #   or maybe pytz.UTC.localize(datetime.datetime.utcnow()), where .utcnow() may be further mocked
+        # request_content_type = self.MOCK_CONTENT_TYPE
+        return {
+            'x-amzn-requestid': request_id,
+            # We probably don't need these other values, and if we do we might need different values,
+            # so we prefer not to provide mock values until/unless need is shown. -kmp 15-Oct-2020
+            #
+            # 'date': request_date_str,  # see above
+            # 'content-type': 'text/xml',
+            # 'content-length': 350,
+        }
+
+    MOCK_QUEUE_URL_PREFIX = 'https://queue.amazonaws.com.mock/12345/'  # just something to make it look like a URL
+
+    def compute_mock_queue_url(self, queue_name):
+        return self.MOCK_QUEUE_URL_PREFIX + queue_name
+
+    def get_queue_url(self, QueueName):  # noQA - AWS argument naming style
+        self._mock_queue_name_seen = QueueName
+        request_url = self.compute_mock_queue_url(QueueName)
+        self.check_mock_queue_url_consistency(request_url)
+        return {
+            'QueueUrl': request_url,
+            'ResponseMetadata': self.compute_mock_response_metadata()
+        }
+
+    MOCK_QUEUE_ATTRIBUTES_DEFAULT = 0
+
+    def compute_mock_queue_attribute(self, queue_url, attribute_name):
+        self.check_mock_queue_url_consistency(queue_url)
+        ignored(attribute_name)  # This mock doesn't care which attribute, but you could subclass and override this
+        return str(self.MOCK_QUEUE_ATTRIBUTES_DEFAULT)
+
+    def compute_mock_queue_attributes(self, queue_url, attribute_names):
+        self.check_mock_queue_url_consistency(queue_url)
+        return {attribute_name: self.compute_mock_queue_attribute(queue_url, attribute_name)
+                for attribute_name in attribute_names}
+
+    def get_queue_attributes(self, QueueUrl, AttributeNames):  # noQA - AWS argument naming style
+        self.check_mock_queue_url_consistency(QueueUrl)
+        return {
+            'Attributes': self.compute_mock_queue_attributes(QueueUrl, AttributeNames),
+            'ResponseMetadata': self.compute_mock_response_metadata()
+        }
+
+
+class VersionChecker:
+
+    """
+    Given appropriate customizations, this allows cross-checking of pyproject.toml and a changelog for consistency.
+
+    You must subclass this class, specifying both the pyproject filename and the changelog filename as
+    class variables PYPROJECT and CHANGELOG, respectively.
+
+    def test_version():
+
+        class MyAppVersionChecker(VersionChecker):
+            PYPROJECT = os.path.join(ROOT_DIR, "pyproject.toml")
+            CHANGELOG = os.path.join(ROOT_DIR, "CHANGELOG.rst")
+
+        MyAppVersionChecker.check_version()
+
+    """
+
+    PYPROJECT = CustomizableProperty('PYPROJECT', description="The repository-relative name of the pyproject file.")
+    CHANGELOG = CustomizableProperty('CHANGELOG', description="The repository-relative name of the change log.")
+
+    @classmethod
+    def check_version(cls):
+        version = cls._check_version()
+        if getattr_customized(cls, "CHANGELOG"):
+            cls._check_change_history(version)
+
+    @classmethod
+    def _check_version(cls):
+
+        __tracebackhide__ = True
+
+        pyproject_file = getattr_customized(cls, 'PYPROJECT')
+        assert os.path.exists(pyproject_file), "Missing pyproject file: %s" % pyproject_file
+        pyproject = toml.load(pyproject_file)
+        version = pyproject.get('tool', {}).get('poetry', {}).get('version', None)
+        assert version, "Missing version in %s." % pyproject_file
+        PRINT("Version = %s" % version)
+        return version
+
+    VERSION_LINE_PATTERN = re.compile("^[#* ]*([0-9]+[.][^ \t\n]*)([ \t\n].*)?$")
+
+    @classmethod
+    def _check_change_history(cls, version=None):
+
+        changelog_file = getattr_customized(cls, "CHANGELOG")
+
+        if not changelog_file:
+            if version:
+                raise AssertionError("Cannot check version without declaring a CHANGELOG file.")
+            return
+
+        assert os.path.exists(changelog_file), "Missing changelog file: %s" % changelog_file
+
+        with io.open(changelog_file) as fp:
+            versions = []
+            for line in fp:
+                m = cls.VERSION_LINE_PATTERN.match(line)
+                if m:
+                    versions.append(m.group(1))
+
+        assert versions, "No version info was parsed from %s" % changelog_file
+        # Might be sorted top to bottom or bottom to top, but ultimately the current version should be first or last.
+        assert versions[0] == version or versions[-1] == version, (
+                "Missing entry for version %s in %s." % (version, changelog_file)
+        )
+
+
+def raises_regexp(error_class, pattern):
+    """
+    A context manager that works like pytest.raises but allows a required error message pattern to be specified as well.
+    """
+    # Mostly compatible with unittest style, so that (approximately):
+    #  pytest.raises(error_class, match=exp) == unittest.TestCase.assertRaisesRegexp(error_class, exp)
+    # They differ on what to do if an error_class other than the expected one is raised.
+    return pytest.raises(error_class, match=pattern)
+
+
+def check_duplicated_items_by_key(key, items, url=None, formatter=str):
+
+    __tracebackhide__ = True
+
+    search_res_by_keyval = {}
+    for item in items:
+        keyval = item[key]
+        search_res_by_keyval[keyval] = entry = search_res_by_keyval.get(keyval, [])
+        entry.append(item)
+    duplicated_keyvals = {}
+    for keyval, items in search_res_by_keyval.items():
+        if len(items) > 1:
+            duplicated_keyvals[keyval] = items
+    prefix = ""
+    if url is not None:
+        prefix = "For %s: " % url
+    assert not duplicated_keyvals, (
+        '\n'.join([
+            "%sDuplicated %s %s in %s." % (prefix, key, keyval, " and ".join(map(formatter, items)))
+            for keyval, items in duplicated_keyvals.items()
+        ])
+    )

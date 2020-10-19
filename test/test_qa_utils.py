@@ -11,9 +11,10 @@ import uuid
 from dcicutils import qa_utils
 from dcicutils.misc_utils import Retry, PRINT, file_contents
 from dcicutils.qa_utils import (
-    mock_not_called, local_attrs, override_environ, show_elapsed_time, timed,
-    ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom,
-    MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented,
+    mock_not_called, local_attrs, override_environ, override_dict, show_elapsed_time, timed,
+    ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule,
+    MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3,
+    raises_regexp, VersionChecker, check_duplicated_items_by_key,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -151,6 +152,71 @@ def test_dynamic_properties():
     for thing in [3, "foo", None]:
         with local_attrs(thing):
             pass  # Just make sure no error occurs when no attributes given
+
+
+def test_override_dict():
+
+    d = {'foo': 'bar'}
+    d_copy = d.copy()
+
+    unique_prop1 = str(uuid.uuid4())
+    unique_prop2 = str(uuid.uuid4())
+    unique_prop3 = str(uuid.uuid4())
+
+    assert unique_prop1 not in d
+    assert unique_prop2 not in d
+    assert unique_prop3 not in d
+
+    with override_dict(d, **{unique_prop1: "something", unique_prop2: "anything"}):
+
+        assert unique_prop1 in d  # added
+        value1a = d.get(unique_prop1)
+        assert value1a == "something"
+
+        assert unique_prop2 in d  # added
+        value2a = d.get(unique_prop2)
+        assert value2a == "anything"
+
+        assert unique_prop3 not in d
+
+        with override_dict(d, **{unique_prop1: "something_else", unique_prop3: "stuff"}):
+
+            assert unique_prop1 in d  # updated
+            value1b = d.get(unique_prop1)
+            assert value1b == "something_else"
+
+            assert unique_prop2 in d  # unchanged
+            assert d.get(unique_prop2) == value2a
+
+            assert unique_prop3 in d  # added
+            assert d.get(unique_prop3) == "stuff"
+
+            with override_dict(d, **{unique_prop1: None}):
+
+                assert unique_prop1 not in d  # removed
+
+                with override_dict(d, **{unique_prop1: None}):
+
+                    assert unique_prop1 not in d  # re-removed
+
+                assert unique_prop1 not in d  # un-re-removed, but still removed
+
+            assert unique_prop1 in d  # restored after double removal
+            assert d.get(unique_prop1) == value1b
+
+        assert unique_prop1 in d
+        assert d.get(unique_prop1) == value1a
+
+        assert unique_prop2 in d
+        assert d.get(unique_prop2) == value2a
+
+        assert unique_prop3 not in d
+
+    assert unique_prop1 not in d
+    assert unique_prop2 not in d
+    assert unique_prop3 not in d
+
+    assert d == d_copy
 
 
 def test_override_environ():
@@ -895,6 +961,42 @@ def test_uppercase_print_with_time():
         assert not timestamp_pattern.match(line1)
 
 
+def test_mock_boto3_client():
+
+    mock_boto3 = MockBoto3()
+
+    assert isinstance(mock_boto3.client('s3'), MockBotoS3Client)
+    assert isinstance(mock_boto3.client('s3', region_name='us-east-1'), MockBotoS3Client)
+
+    with pytest.raises(ValueError):
+        mock_boto3.client('s3', region_name='us-east-2')
+
+    with pytest.raises(NotImplementedError):
+        mock_boto3.client('some_other_kind')
+
+
+def test_mock_uuid_module_documentation_example():
+    mock_uuid_module = MockUUIDModule()
+    assert str(mock_uuid_module.uuid4()) == '00000000-0000-0000-0000-000000000001'
+    with mock.patch.object(uuid, "uuid4", mock_uuid_module.uuid4):
+        assert str(uuid.uuid4()) == '00000000-0000-0000-0000-000000000002'
+
+
+def test_mock_uuid_module():
+
+    for _ in range(2):
+        fake_uuid = MockUUIDModule()
+        assert str(fake_uuid.uuid4()) == '00000000-0000-0000-0000-000000000001'
+        assert str(fake_uuid.uuid4()) == '00000000-0000-0000-0000-000000000002'
+        assert str(fake_uuid.uuid4()) == '00000000-0000-0000-0000-000000000003'
+
+    fake_uuid = MockUUIDModule()
+    assert isinstance(fake_uuid.uuid4(), uuid.UUID)
+
+    fake_uuid = MockUUIDModule(prefix='', pad=3, uuid_class=str)
+    assert str(fake_uuid.uuid4()) == '001'
+
+
 def test_mock_boto_s3_client_upload_file_and_download_file_positional():
 
     mock_s3_client = MockBotoS3Client()
@@ -1048,3 +1150,83 @@ def test_mock_keys_not_implemented():
 
     err = MockKeysNotImplemented(keys=['foo', 'bar'], operation="some-operation")
     assert str(err) == 'Mocked some-operation does not implement keywords: foo, bar'
+
+
+def test_raises_regexp():
+
+    class MyRuntimeError(RuntimeError):
+        pass
+
+    with raises_regexp(RuntimeError, "This.*test!"):
+        raise RuntimeError("This is a test!")
+
+    with raises_regexp(RuntimeError, "This.*test!"):
+        raise MyRuntimeError("This is a test!")
+
+    with pytest.raises(AssertionError):
+        # This will fail because the inner error has a period, not an exclamation mark, terminating it.
+        # That will cause it to raise an AssertionError instead.
+        with raises_regexp(RuntimeError, "This.*test!"):
+            raise MyRuntimeError("This is a test.")
+
+    with pytest.raises(Exception):
+        # This will fail because the inner error is a KeyError, not a RuntimeError.
+        # I WISH this would raise AssertionError, but pytest lets the KeyError through.
+        # I am not sure that's the same as what unittest does in this case but it will
+        # suffice for now. -kmp 6-Oct-2020
+        with raises_regexp(RuntimeError, "This.*test!"):
+            raise KeyError('This is a test!')
+
+
+def test_version_checker_no_changelog():
+
+    class MyVersionChecker(VersionChecker):
+        PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+        CHANGELOG = None
+
+    MyVersionChecker.check_version()
+
+
+def test_version_checker_use_dcicutils_changelog():
+
+    class MyVersionChecker(VersionChecker):
+        PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+        CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+
+    MyVersionChecker.check_version()
+
+
+def test_version_checker_with_missing_changelog():
+
+    path_exists = os.path.exists
+
+    def mocked_exists(filename):
+        if filename.endswith("CHANGELOG.rst"):
+            print("Faking that %s does not exist." % filename)
+            return False
+        else:
+            return path_exists(filename)
+
+    with mock.patch("os.path.exists", mocked_exists):
+
+        class MyVersionChecker(VersionChecker):
+
+            PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+            CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+
+        with pytest.raises(AssertionError):
+            MyVersionChecker.check_version()  # The version history will be missing because of mocking.
+
+
+def test_check_duplicated_items_by_key():
+
+    with raises_regexp(AssertionError,
+                       "Duplicated uuid 123 in {'uuid': '123', 'foo': 'a'} and {'uuid': '123', 'foo': 'c'}"):
+        check_duplicated_items_by_key(
+            'uuid',
+            [
+                {'uuid': '123', 'foo': 'a'},
+                {'uuid': '456', 'foo': 'b'},
+                {'uuid': '123', 'foo': 'c'},
+            ]
+        )
