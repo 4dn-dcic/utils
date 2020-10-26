@@ -1198,16 +1198,9 @@ def test_version_checker_use_dcicutils_changelog():
 
 def test_version_checker_with_missing_changelog():
 
-    path_exists = os.path.exists
+    mfs = MockFileSystem(files={'pyproject.toml': '[tool.poetry]\nname = "foo"\nversion = "1.2.3"'})
 
-    def mocked_exists(filename):
-        if filename.endswith("CHANGELOG.rst"):
-            print("Faking that %s does not exist." % filename)
-            return False
-        else:
-            return path_exists(filename)
-
-    with mock.patch("os.path.exists", mocked_exists):
+    with mock.patch("os.path.exists", mfs.exists):
 
         class MyVersionChecker(VersionChecker):
 

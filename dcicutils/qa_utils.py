@@ -743,9 +743,16 @@ class VersionChecker:
         return version
 
     VERSION_LINE_PATTERN = re.compile("^[#* ]*([0-9]+[.][^ \t\n]*)([ \t\n].*)?$")
+    VERSION_IS_BETA_PATTERN = re.compile("^.*[0-9][Bb][0-9]$")
 
     @classmethod
     def _check_change_history(cls, version=None):
+
+        if version and cls.VERSION_IS_BETA_PATTERN.match(version):
+            # Don't require beta versions to match up in change log.
+            # We don't just strip the version and look at that because sometimes we use other numbers on betas.
+            # Better to just not do it at all.
+            return
 
         changelog_file = getattr_customized(cls, "CHANGELOG")
 
