@@ -7,6 +7,15 @@ Change Log
 ----------
 
 
+1.3.1
+=====
+
+* Fixes to ``deployment_utils``:
+
+  * Fix overzealous error reporting about environment variable conflicts when the values don't differ.
+  * Add support for ``--sentry_dsn``.
+
+
 1.3.0
 =====
 
