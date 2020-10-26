@@ -9,7 +9,7 @@ import sys
 from io import StringIO
 from unittest import mock
 
-from dcicutils.deployment_utils import EBDeployer, Deployer, boolean_setting, CreateMappingOnDeployManager
+from dcicutils.deployment_utils import EBDeployer, IniFileManager, boolean_setting, CreateMappingOnDeployManager
 from dcicutils.env_utils import is_cgap_env
 from dcicutils.misc_utils import ignored
 from dcicutils.qa_utils import override_environ
@@ -22,7 +22,7 @@ class FakeDistribution:
     version = "simulated"
 
 
-class TestDeployer(Deployer):
+class TestDeployer(IniFileManager):
     TEMPLATE_DIR = os.path.join(_MY_DIR, "ini_files")
     PYPROJECT_FILE_NAME = os.path.join(os.path.dirname(_MY_DIR), "pyproject.toml")
 
@@ -794,7 +794,7 @@ def test_deployment_utils_main_no_env_name():
                 raise AssertionError("ENV_NAME=None did not get noticed.")
             mock_argparser.side_effect = mocked_fail
             with pytest.raises(SystemExit):
-                Deployer.main()
+                IniFileManager.main()
             assert mock_argparser.call_count == 0
 
 
@@ -805,11 +805,11 @@ def test_deployment_utils_main():
 
     fake_template = "something.ini"  # It doesn't matter what we use as a template for this test. we don't open it.
     with override_environ(ENV_NAME='fourfront-foo'):
-        with mock.patch.object(Deployer, "build_ini_file_from_template") as mock_build:
+        with mock.patch.object(IniFileManager, "build_ini_file_from_template") as mock_build:
             # These next two mocks are just incidental to offering help in arg parsing.
             # Those functions are tested elsewhere and are just plain bypassed here.
-            with mock.patch.object(Deployer, "environment_template_filename", return_value=fake_template):
-                with mock.patch.object(Deployer, "template_environment_names", return_value=["something, foo"]):
+            with mock.patch.object(IniFileManager, "environment_template_filename", return_value=fake_template):
+                with mock.patch.object(IniFileManager, "template_environment_names", return_value=["something, foo"]):
 
                     # This function is the core fo the testing, which just sets up a deployer to get called
                     # with an input template name and a target filename, and then calls the Deployer.
@@ -819,7 +819,7 @@ def test_deployment_utils_main():
                             assert kwargs == (expected_kwargs or {})
                         mock_build.side_effect = mocked_build
                         try:
-                            Deployer.main()
+                            IniFileManager.main()
                         except SystemExit as e:
                             assert e.code == expected_code
 
@@ -837,7 +837,8 @@ def test_deployment_utils_main():
                             'es_server': None,
                             'index_server': None,
                             'indexer': None,
-                            's3_bucket_env': None
+                            's3_bucket_env': None,
+                            'sentry_dsn': None,
                         })
 
                     # Next 2 tests some sample settings, in particular the settings of indexer and index_server
@@ -852,7 +853,8 @@ def test_deployment_utils_main():
                             'es_server': None,
                             'index_server': 'true',
                             'indexer': 'false',
-                            's3_bucket_env': None
+                            's3_bucket_env': None,
+                            'sentry_dsn': None,
                         })
 
                     with mock.patch.object(sys, "argv", ['', '--indexer', 'foo']):
@@ -865,7 +867,8 @@ def test_deployment_utils_main():
                                 'es_server': None,
                                 'index_server': 'true',
                                 'indexer': 'false',
-                                's3_bucket_env': None
+                                's3_bucket_env': None,
+                                'sentry_dsn': None,
                             })
 
 
@@ -883,7 +886,7 @@ def test_deployment_utils_boolean_setting():
 @pytest.mark.integrated
 def test_eb_deployer():
     """ Tests some basic aspects of EBDeployer """
-    pass  # write this test!
+    pass  # TODO: write this test!
 
 
 class MockedNoCommandArgs:
@@ -1030,7 +1033,6 @@ def test_get_deployment_config_ff_hotseat_old():
                                ' Processing mode: SKIP')
 
 
-
 @mock.patch('dcicutils.deployment_utils.compute_ff_prd_env', mock.MagicMock(return_value='fourfront-green'))
 def test_get_deployment_config_ff_hotseat_new():
     """ Tests get_deployment_config in the hotseat case with a new-style ecosystem. """
@@ -1043,7 +1045,6 @@ def test_get_deployment_config_ff_hotseat_new():
     # assert cfg['STRICT'] is ...
     assert my_log.last_msg == ('Environment fourfront-hotseat is a hotseat test environment.'
                                ' Processing mode: SKIP')
-
 
 
 # There is no old-style cgap staging
@@ -1061,7 +1062,6 @@ def test_get_deployment_config_cgap_staging_new():
     assert cfg['STRICT'] is True
     assert my_log.last_msg == ('Environment cgap-blue is currently the staging environment.'
                                ' Processing mode: STRICT,WIPE_ES')
-
 
 
 @mock.patch('dcicutils.deployment_utils.compute_cgap_prd_env', mock.MagicMock(return_value='fourfront-cgap'))

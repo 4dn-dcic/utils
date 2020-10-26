@@ -40,6 +40,8 @@ from dcicutils.env_utils import (
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
 )
 from dcicutils.misc_utils import PRINT, Retry, apply_dict_overrides
+from dcicutils.qa_utils import override_environ
+
 
 # constants associated with EB-related APIs
 EB_CONFIGURATION_SETTINGS = 'ConfigurationSettings'
@@ -402,7 +404,7 @@ class IniFileManager:
     def build_ini_file_from_template(cls, template_file_name, init_file_name,
                                      bs_env=None, bs_mirror_env=None, s3_bucket_env=None,
                                      data_set=None, es_server=None, es_namespace=None,
-                                     indexer=None, index_server=None):
+                                     indexer=None, index_server=None, sentry_dsn=None):
         """
         Builds a .ini file from a given template file.
 
@@ -427,7 +429,8 @@ class IniFileManager:
                                                data_set=data_set,
                                                es_server=es_server,
                                                es_namespace=es_namespace,
-                                               indexer=indexer)
+                                               indexer=indexer,
+                                               sentry_dsn=sentry_dsn)
 
     # Ref: https://stackoverflow.com/questions/19911123/how-can-you-get-the-elastic-beanstalk-application-version-in-your-application  # noqa: E501
     EB_MANIFEST_FILENAME = "/opt/elasticbeanstalk/deploy/manifest"
@@ -549,20 +552,18 @@ class IniFileManager:
         # if we specify an indexer name for bs_env, we did the deployment wrong and should bail
         if bs_env in INDEXER_ENVS:
             raise RuntimeError("Deployed with bs_env %s, which is an indexer env."
-                               "Re-deploy with the env you want to index and set the 'ENCODED_INDEXER'"
-                               "environment variable." % bs_env)
+                               " Re-deploy with the env you want to index and set the 'ENCODED_INDEXER'"
+                               " environment variable." % bs_env)
 
         # We assume these variables are not set, but best to check first. Confusion might result otherwise.
-        for extra_var in extra_vars:
-            if extra_var in os.environ:
-                raise RuntimeError("The environment variable %s is already set to %s."
-                                   % (extra_var, os.environ[extra_var]))
+        for extra_var, extra_var_val in extra_vars.items():
+            if extra_var in os.environ and extra_var_val != os.environ[extra_var]:
+                raise RuntimeError("The environment variable %s is already set to %s,"
+                                   " but you are trying to set it to %s."
+                                   % (extra_var, os.environ[extra_var], extra_var_val))
 
-        try:
-
-            # When we've checked everything, go ahead and do the bindings.
-            for var, val in extra_vars.items():
-                os.environ[var] = val
+        # When we've checked everything, go ahead and do the bindings.
+        with override_environ(**extra_vars):
 
             with io.open(template_file_name, 'r') as template_fp:
                 for line in template_fp:
@@ -574,13 +575,6 @@ class IniFileManager:
                     #     print("expanded_line=", expanded_line)
                     if not cls.omittable(line, expanded_line):
                         init_file_stream.write(expanded_line)
-
-        finally:
-
-            for key in extra_vars.keys():
-                # Let's be tidy and put things back the way they were before.
-                # Most things probably don't care, but testing might.
-                del os.environ[key]
 
     @classmethod
     def any_environment_template_filename(cls):
@@ -664,6 +658,9 @@ class IniFileManager:
                                 help="whether this is a standalone indexing server, only doing indexing",
                                 choices=["true", "false"],
                                 default=None)
+            parser.add_argument("--sentry_dsn",
+                                help="a sentry DSN",
+                                default=None)
             args = parser.parse_args()
             template_file_name = (cls.any_environment_template_filename()
                                   if args.use_any
@@ -675,7 +672,8 @@ class IniFileManager:
                                              bs_env=args.bs_env, bs_mirror_env=args.bs_mirror_env,
                                              s3_bucket_env=args.s3_bucket_env, data_set=args.data_set,
                                              es_server=args.es_server, es_namespace=args.es_namespace,
-                                             indexer=args.indexer, index_server=args.index_server)
+                                             indexer=args.indexer, index_server=args.index_server,
+                                             sentry_dsn=args.sentry_dsn)
         except Exception as e:
             PRINT("Error (%s): %s" % (e.__class__.__name__, e))
             sys.exit(1)
