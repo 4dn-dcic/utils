@@ -743,7 +743,7 @@ class VersionChecker:
         return version
 
     VERSION_LINE_PATTERN = re.compile("^[#* ]*([0-9]+[.][^ \t\n]*)([ \t\n].*)?$")
-    VERSION_IS_BETA_PATTERN = re.compile("^.*[0-9][Bb][0-9]$")
+    VERSION_IS_BETA_PATTERN = re.compile("^.*[0-9][Bb][0-9]+$")
 
     @classmethod
     def _check_change_history(cls, version=None):
