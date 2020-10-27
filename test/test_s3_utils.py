@@ -10,13 +10,14 @@ from unittest import mock
 
 
 @pytest.mark.parametrize('ff_ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat'])
-def test_s3Utils_creation(ff_ordinary_envname):
+def test_s3utils_creation_ff_ordinary(ff_ordinary_envname):
     util = s3Utils(env=ff_ordinary_envname)
     assert util.sys_bucket == 'elasticbeanstalk-%s-system' % ff_ordinary_envname
 
 
-def test_s3Utils_creation_ff_stg():
+def test_s3utils_creation_ff_stg():
     print("In test_s3Utils_creation_ff_stg. It is now", str(datetime.datetime.now()))
+
     def test_stg(ff_staging_envname):
         util = s3Utils(env=ff_staging_envname)
         actual_props = {
@@ -31,6 +32,7 @@ def test_s3Utils_creation_ff_stg():
             'raw_file_bucket': 'elasticbeanstalk-fourfront-webprod-files',
             'url': FF_PUBLIC_URL_STG,
         }
+
     test_stg('staging')
     # NOTE: These values should not be parameters because we don't know how long PyTest caches the
     #       parameter values before using them. By doing the test this way, we hold the value for as
@@ -39,8 +41,9 @@ def test_s3Utils_creation_ff_stg():
     test_stg(stg_beanstalk_env)
 
 
-def test_s3Utils_creation_ff_prd():
+def test_s3utils_creation_ff_prd():
     print("In test_s3Utils_creation_ff_prd. It is now", str(datetime.datetime.now()))
+
     def test_prd(ff_production_envname):
         util = s3Utils(env=ff_production_envname)
         actual_props = {
@@ -55,6 +58,7 @@ def test_s3Utils_creation_ff_prd():
             'raw_file_bucket': 'elasticbeanstalk-fourfront-webprod-files',
             'url': FF_PUBLIC_URL_PRD,
         }
+
     test_prd('data')
     # NOTE: These values should not be parameters because we don't know how long PyTest caches the
     #       parameter values before using them. By doing the test this way, we hold the value for as
@@ -63,8 +67,15 @@ def test_s3Utils_creation_ff_prd():
     test_prd(prd_beanstalk_env)
 
 
-def test_s3Utils_creation_cgap_prd():
+@pytest.mark.parametrize('cgap_ordinary_envname', ['fourfront-cgaptest', 'fourfront-cgapdev', 'fourfront-cgapwolf'])
+def test_s3utils_creation_cgap_ordinary(cgap_ordinary_envname):
+    util = s3Utils(env=cgap_ordinary_envname)
+    assert util.sys_bucket == 'elasticbeanstalk-%s-system' % cgap_ordinary_envname
+
+
+def test_s3utils_creation_cgap_prd():
     print("In test_s3Utils_creation_cgap_prd. It is now", str(datetime.datetime.now()))
+
     def test_prd(cgap_production_envname):
         util = s3Utils(env=cgap_production_envname)
         actual_props = {
@@ -79,6 +90,7 @@ def test_s3Utils_creation_cgap_prd():
             'raw_file_bucket': 'elasticbeanstalk-fourfront-cgap-files',
             'url': CGAP_PUBLIC_URL_PRD,
         }
+
     test_prd('cgap')
     # NOTE: These values should not be parameters because we don't know how long PyTest caches the
     #       parameter values before using them. By doing the test this way, we hold the value for as
@@ -87,20 +99,13 @@ def test_s3Utils_creation_cgap_prd():
     test_prd(compute_cgap_prd_env())  # Hopefully returns 'fourfront-cgap' but just in case we're into new naming
 
 
-def test_s3Utils_creation_cgap_stg():
+def test_s3utils_creation_cgap_stg():
     print("In test_s3Utils_creation_cgap_prd. It is now", str(datetime.datetime.now()))
     # For now there is no CGAP stg...
     assert compute_cgap_stg_env() is None, "There seems to be a CGAP staging environment. Tests need updating."
 
 
-@pytest.mark.parametrize('ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev',
-                                              'fourfront-cgaptest', 'fourfront-cgapdev', 'fourfront-cgapwolf'])
-def test_s3Utils_creation(ordinary_envname):
-    util = s3Utils(env=ordinary_envname)
-    assert util.sys_bucket == 'elasticbeanstalk-%s-system' % ordinary_envname
-
-
-def test_s3Utils_get_keys_for_data():
+def test_s3utils_get_keys_for_data():
     util = s3Utils(env='data')
     keys = util.get_access_keys()
     assert keys['server'] == 'https://data.4dnucleome.org'
@@ -113,27 +118,27 @@ def test_s3Utils_get_keys_for_data():
     assert keys_fs['server'] == keys['server']
 
 
-def test_s3Utils_get_keys_for_staging():
+def test_s3utils_get_keys_for_staging():
     util = s3Utils(env='staging')
     keys = util.get_ff_key()
     assert keys['server'] == 'http://staging.4dnucleome.org'
 
 
-def test_s3Utils_get_jupyterhub_key(basestring):
+def test_s3utils_get_jupyterhub_key(basestring):
     util = s3Utils(env='data')
     key = util.get_jupyterhub_key()
     assert 'secret' in key
     assert key['server'] == 'https://jupyter.4dnucleome.org'
 
 
-def test_s3Utils_get_higlass_key():
+def test_s3utils_get_higlass_key():
     util = s3Utils(env='staging')
     keys = util.get_higlass_key()
     assert isinstance(keys, dict)
     assert 3 == len(keys.keys())
 
 
-def test_s3Utils_get_google_key():
+def test_s3utils_get_google_key():
     util = s3Utils(env='staging')
     keys = util.get_google_key()
     assert isinstance(keys, dict)
@@ -143,20 +148,22 @@ def test_s3Utils_get_google_key():
         assert keys[dict_key]
 
 
-def test_s3Utils_get_access_keys_with_old_style_default():
+def test_s3utils_get_access_keys_with_old_style_default():
     util = s3Utils(env='fourfront-mastertest')
     with mock.patch.object(util, "get_key") as mock_get_key:
         actual_key = {'key': 'some-key', 'server': 'some-server'}
+
         def mocked_get_key(keyfile_name):
             ignored(keyfile_name)
             key_wrapper = {'default': actual_key}
             return key_wrapper
+
         mock_get_key.side_effect = mocked_get_key
         key = util.get_access_keys()
         assert key == actual_key
 
 
-def test_s3Utils_get_key_non_json_data():
+def test_s3utils_get_key_non_json_data():
 
     util = s3Utils(env='fourfront-mastertest')
 
@@ -171,7 +178,7 @@ def test_s3Utils_get_key_non_json_data():
         assert util.get_key() == non_json_string
 
 
-def test_s3Utils_delete_key():
+def test_s3utils_delete_key():
 
     sample_key_name = "--- reserved_key_name_for_unit_testing ---"
 
@@ -181,7 +188,7 @@ def test_s3Utils_delete_key():
 
         def make_mocked_delete_object(expected_bucket, expected_key):
 
-            def mocked_delete_object(Bucket, Key):
+            def mocked_delete_object(Bucket, Key):  # noQA - AWS chooses the arg names
                 assert Bucket == expected_bucket
                 assert Key == expected_key
 
@@ -204,7 +211,7 @@ def test_s3Utils_delete_key():
         assert mock_delete_object.call_count == 2
 
 
-def test_s3Utils_s3_put():
+def test_s3utils_s3_put():
 
     util = s3Utils(env='fourfront-mastertest')
 
@@ -233,7 +240,7 @@ def test_s3Utils_s3_put():
             }
 
 
-def test_s3Utils_s3_put_secret():
+def test_s3utils_s3_put_secret():
 
     util = s3Utils(env='fourfront-mastertest')
     standard_algorithm = "AES256"

@@ -7,6 +7,28 @@ Change Log
 ----------
 
 
+1.3.1
+=====
+
+**PR 117: Repair handling of sentry_dsn in deployment_utils (C4-361)**
+
+* Fixes to ``deployment_utils``:
+
+  * Changes the handling of sentry DSN as an argument (``--sentry_dsn``)
+    to the deployer.
+  * Doesn't raise an error if environment variables collide but with the same value.
+  * Uses better binding technology for binding environment variables.
+  * Factors in a change to the tests to not use a deprecated
+    name (Deployer changed to IniFileMaker) for one of the classes.
+  * PEP8 adjustments.
+
+* Fixes to ``qa_utils``:
+
+  * Don't do changelog cross-check for beta versions.
+
+* PEP8 adjustments to ``test_env_utils`` and ``test_s3_utils``.
+
+
 1.3.0
 =====
 
