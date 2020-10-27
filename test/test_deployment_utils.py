@@ -9,7 +9,11 @@ import sys
 from io import StringIO
 from unittest import mock
 
-from dcicutils.deployment_utils import EBDeployer, IniFileManager, boolean_setting, CreateMappingOnDeployManager
+from dcicutils.deployment_utils import (
+    IniFileManager, boolean_setting, CreateMappingOnDeployManager,
+    # TODO: This isn't yet tested.
+    # EBDeployer,
+)
 from dcicutils.env_utils import is_cgap_env
 from dcicutils.misc_utils import ignored
 from dcicutils.qa_utils import override_environ
