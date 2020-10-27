@@ -4,7 +4,7 @@ import os
 from dcicutils.env_utils import (
     is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env, BEANSTALK_PROD_MIRRORS,
     FF_ENV_PRODUCTION_BLUE, FF_ENV_PRODUCTION_GREEN, FF_ENV_WEBPROD, FF_ENV_WEBPROD2, FF_ENV_MASTERTEST,
-    FF_ENV_HOTSEAT, FF_ENV_STAGING, FF_ENV_WEBDEV, FF_ENV_WOLF,
+    FF_ENV_HOTSEAT, FF_ENV_WEBDEV, FF_ENV_WOLF,
     CGAP_ENV_PRODUCTION_BLUE, CGAP_ENV_PRODUCTION_GREEN, CGAP_ENV_WEBPROD, CGAP_ENV_MASTERTEST,
     CGAP_ENV_HOTSEAT, CGAP_ENV_STAGING, CGAP_ENV_WEBDEV, CGAP_ENV_WOLF,
     CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_WEBPROD_NEW, CGAP_ENV_MASTERTEST_NEW,
@@ -220,18 +220,42 @@ def test_is_stg_or_prd_env():
     assert is_stg_or_prd_env("fourfront-webprod") is True
     assert is_stg_or_prd_env("fourfront-webprod2") is True
 
+    assert is_stg_or_prd_env(FF_ENV_PRODUCTION_BLUE) is True
+    assert is_stg_or_prd_env(FF_ENV_PRODUCTION_GREEN) is True
+    assert is_stg_or_prd_env(FF_ENV_PRODUCTION_BLUE) is True
+    assert is_stg_or_prd_env(FF_ENV_PRODUCTION_GREEN) is True
+    assert is_stg_or_prd_env(FF_ENV_WEBPROD) is True
+    assert is_stg_or_prd_env(FF_ENV_WEBPROD2) is True
+
     assert is_stg_or_prd_env("fourfront-yellow") is False
     assert is_stg_or_prd_env("fourfront-mastertest") is False
     assert is_stg_or_prd_env("fourfront-mastertest-1") is False
     assert is_stg_or_prd_env("fourfront-wolf") is False
 
+    assert is_stg_or_prd_env(FF_ENV_HOTSEAT) is False
+    assert is_stg_or_prd_env(FF_ENV_MASTERTEST) is False
+    assert is_stg_or_prd_env(FF_ENV_WOLF) is False
+    assert is_stg_or_prd_env(FF_ENV_WEBDEV) is False
+
     assert is_stg_or_prd_env("fourfront-cgap") is True
     assert is_stg_or_prd_env("fourfront-cgap-blue") is True
     assert is_stg_or_prd_env("fourfront-cgap-green") is True
 
+    assert is_stg_or_prd_env(CGAP_ENV_PRODUCTION_BLUE) is True
+    assert is_stg_or_prd_env(CGAP_ENV_PRODUCTION_BLUE_NEW) is True
+    assert is_stg_or_prd_env(CGAP_ENV_PRODUCTION_GREEN) is True
+    assert is_stg_or_prd_env(CGAP_ENV_PRODUCTION_GREEN_NEW) is True
+    assert is_stg_or_prd_env(CGAP_ENV_WEBPROD) is True
+    assert is_stg_or_prd_env(CGAP_ENV_WEBPROD_NEW) is True
+
     assert is_stg_or_prd_env("fourfront-cgap-yellow") is False
     assert is_stg_or_prd_env("fourfront-cgapwolf") is False
     assert is_stg_or_prd_env("fourfront-cgaptest") is False
+
+    assert is_stg_or_prd_env(CGAP_ENV_HOTSEAT) is False
+    assert is_stg_or_prd_env(CGAP_ENV_MASTERTEST) is False
+    assert is_stg_or_prd_env(CGAP_ENV_WOLF) is False
+    assert is_stg_or_prd_env(CGAP_ENV_WEBDEV) is False
 
     assert is_stg_or_prd_env("cgap-green") is True
     assert is_stg_or_prd_env("cgap-blue") is True
@@ -245,10 +269,24 @@ def test_is_stg_or_prd_env():
 
 def test_is_test_env():
 
+    assert is_test_env(FF_ENV_PRODUCTION_BLUE) is False
+    assert is_test_env(FF_ENV_PRODUCTION_GREEN) is False
+    assert is_test_env(FF_ENV_PRODUCTION_BLUE) is False
+    assert is_test_env(FF_ENV_PRODUCTION_GREEN) is False
+    assert is_test_env(FF_ENV_WEBPROD) is False
+    assert is_test_env(FF_ENV_WEBPROD2) is False
+
     assert is_test_env(FF_ENV_HOTSEAT) is True
     assert is_test_env(FF_ENV_MASTERTEST) is True
     assert is_test_env(FF_ENV_WOLF) is True
     assert is_test_env(FF_ENV_WEBDEV) is True
+
+    assert is_test_env(CGAP_ENV_PRODUCTION_BLUE) is False
+    assert is_test_env(CGAP_ENV_PRODUCTION_BLUE_NEW) is False
+    assert is_test_env(CGAP_ENV_PRODUCTION_GREEN) is False
+    assert is_test_env(CGAP_ENV_PRODUCTION_GREEN_NEW) is False
+    assert is_test_env(CGAP_ENV_WEBPROD) is False
+    assert is_test_env(CGAP_ENV_WEBPROD_NEW) is False
 
     assert is_test_env(CGAP_ENV_HOTSEAT) is True
     assert is_test_env(CGAP_ENV_MASTERTEST) is True
@@ -260,10 +298,24 @@ def test_is_test_env():
 
 def test_is_hotseat_env():
 
+    assert is_hotseat_env(FF_ENV_PRODUCTION_BLUE) is False
+    assert is_hotseat_env(FF_ENV_PRODUCTION_GREEN) is False
+    assert is_hotseat_env(FF_ENV_PRODUCTION_BLUE) is False
+    assert is_hotseat_env(FF_ENV_PRODUCTION_GREEN) is False
+    assert is_hotseat_env(FF_ENV_WEBPROD) is False
+    assert is_hotseat_env(FF_ENV_WEBPROD2) is False
+
     assert is_hotseat_env(FF_ENV_HOTSEAT) is True
     assert is_hotseat_env(FF_ENV_MASTERTEST) is False
     assert is_hotseat_env(FF_ENV_WOLF) is False
     assert is_hotseat_env(FF_ENV_WEBDEV) is False
+
+    assert is_hotseat_env(CGAP_ENV_PRODUCTION_BLUE) is False
+    assert is_hotseat_env(CGAP_ENV_PRODUCTION_BLUE_NEW) is False
+    assert is_hotseat_env(CGAP_ENV_PRODUCTION_GREEN) is False
+    assert is_hotseat_env(CGAP_ENV_PRODUCTION_GREEN_NEW) is False
+    assert is_hotseat_env(CGAP_ENV_WEBPROD) is False
+    assert is_hotseat_env(CGAP_ENV_WEBPROD_NEW) is False
 
     assert is_hotseat_env(CGAP_ENV_HOTSEAT) is True
     assert is_hotseat_env(CGAP_ENV_MASTERTEST) is False
@@ -359,13 +411,13 @@ def test_get_mirror_env_from_context_with_environ_has_env():
 
         settings = {'env.name': FF_ENV_WEBPROD}
         mirror = get_mirror_env_from_context(settings, allow_environ=False, allow_guess=False)
-        assert mirror == None  # env name in environ suppressed, but guessing disallowed
+        assert mirror is None  # env name in environ suppressed, but guessing disallowed
 
     with mock.patch.object(os, "environ", {"ENV_NAME": CGAP_ENV_WEBPROD}):
 
         settings = {}
         mirror = get_mirror_env_from_context(settings, allow_environ=True)
-        assert mirror == None  # env name explicitly declared, then a guess (but no CGAP mirror)
+        assert mirror is None  # env name explicitly declared, then a guess (but no CGAP mirror)
 
         settings = {}
         mirror = get_mirror_env_from_context(settings, allow_environ=True, allow_guess=False)
@@ -493,10 +545,14 @@ def test_infer_foursight_env():
     assert infer_foursight_from_env(mock_request(), FF_ENV_HOTSEAT) == 'hotseat'
 
     # (active) fourfront production environments
-    assert infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_PRD), 'fourfront-blue') == FF_PRODUCTION_IDENTIFIER
-    assert infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_PRD), 'fourfront-green') == FF_PRODUCTION_IDENTIFIER
-    assert infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), 'fourfront-blue') == FF_STAGING_IDENTIFIER
-    assert infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), 'fourfront-green') == FF_STAGING_IDENTIFIER
+    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_PRD), 'fourfront-blue')
+            == FF_PRODUCTION_IDENTIFIER)
+    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_PRD), 'fourfront-green')
+            == FF_PRODUCTION_IDENTIFIER)
+    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), 'fourfront-blue')
+            == FF_STAGING_IDENTIFIER)
+    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), 'fourfront-green')
+            == FF_STAGING_IDENTIFIER)
 
     # (active) cgap environments
     assert infer_foursight_from_env(mock_request(), CGAP_ENV_DEV) == 'cgapdev'
