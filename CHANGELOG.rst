@@ -20,10 +20,13 @@ Change Log
   * Uses better binding technology for binding environment variables.
   * Factors in a change to the tests to not use a deprecated
     name (Deployer changed to IniFileMaker) for one of the classes.
+  * PEP8 adjustments.
 
 * Fixes to ``qa_utils``:
 
   * Don't do changelog cross-check for beta versions.
+
+* PEP8 adjustments to ``test_env_utils`` and ``test_s3_utils``.
 
 
 1.3.0
