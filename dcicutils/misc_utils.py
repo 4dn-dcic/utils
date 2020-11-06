@@ -444,9 +444,11 @@ HMS_TZ = pytz.timezone("US/Eastern")
 
 def as_datetime(dt, tz=None):
     """
-    Parses the given datetime, returning a datetime.datetime object.
+    Parses the given date/time (which may be a string or a datetime.datetime), returning a datetime.datetime object.
 
-    If the given datetime is already such an object, it is returned.
+    If the given datetime is already such an object, it is just returned.
+    If it is a string, it should be in a format such as 'yyyy-mm-dd hh:mm:ss' or 'yyyy-mm-dd hh:mm:ss-nnnn'
+    (with -nnnn being a timezone specification).
     """
     if dt is None:
         return None
