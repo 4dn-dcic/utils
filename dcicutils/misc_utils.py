@@ -5,13 +5,17 @@ This file contains functions that might be generally useful.
 import contextlib
 import datetime
 import functools
+import math
 import io
 import os
 import logging
+import pytz
 import time
 import warnings
 import webtest  # importing the library makes it easier to mock testing
 
+from dateutil.parser import parse as dateutil_parse
+from datetime import datetime as datetime_type
 
 # Is this the right place for this? I feel like this should be done in an application, not a library.
 # -kmp 27-Apr-2020
@@ -410,6 +414,68 @@ def apply_dict_overrides(dictionary: dict, **overrides) -> dict:
 def utc_today_str():
     """Returns a YYYY-mm-dd date string, relative to the UTC timezone."""
     return datetime.datetime.strftime(datetime.datetime.utcnow(), "%Y-%m-%d")
+
+
+def as_seconds(*, seconds=0, minutes=0, hours=0, days=0, weeks=0, milliseconds=0, as_type=None):
+    """
+    Coerces a relative amount of time (keyword arguments seconds, minutes, etc. like timedelta) into seconds.
+
+    If the number of seconds is an integer, it will be coerced to an integer. Otherwise, it will be a float.
+    If as_float is given and not None, it will be applied as a function to the result, allowing it to be coerced
+    to another value than an integer or float.  For example,
+      >>> as_seconds(seconds=1, minutes=1)
+      61
+      >>> as_seconds(seconds=1, minutes=1, as_type=str)
+      '61'
+    """
+    delta = datetime.timedelta(seconds=seconds, minutes=minutes, hours=hours,
+                               days=days, weeks=weeks, milliseconds=milliseconds)
+    seconds = delta.total_seconds()
+    frac, intpart = math.modf(seconds)
+    if frac == 0.0:
+        seconds = int(intpart)
+    if as_type is not None:
+        seconds = as_type(seconds)
+    return seconds
+
+
+HMS_TZ = pytz.timezone("US/Eastern")
+
+
+def as_datetime(dt, tz=None):
+    """
+    Parses the given datetime, returning a datetime.datetime object.
+
+    If the given datetime is already such an object, it is returned.
+    """
+    if dt is None:
+        return None
+    try:
+        # This type check has to work even if datetime is mocked, so we use it under another variable name to
+        # make it harder to mock out. -kmp 6-Nov-2020
+        if not isinstance(dt, datetime_type):
+            dt = dateutil_parse(dt)
+        if tz and not dt.tzinfo:
+            dt = tz.localize(dt)
+        return dt
+    except Exception:
+        return None
+
+
+def in_datetime_interval(when, *, start=None, end=None):
+    """
+    Returns true if the first argument ('when') is in the range given by the other arguments.
+
+    The comparison is upper- and lower-inclusive.
+    """
+    start = as_datetime(start)
+    end = as_datetime(end)
+    return (not start or start <= when) and (not end or end >= when)
+
+
+def hms_now():
+    """Returns the current time in the HMS timezone (US/Eastern, which may be EST or EDT, depending on time of year)."""
+    return as_datetime(datetime.datetime.now(), HMS_TZ)
 
 
 class LockoutManager:

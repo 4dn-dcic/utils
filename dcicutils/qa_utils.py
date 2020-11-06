@@ -144,7 +144,8 @@ class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
     # A randomly chosen but reproducible date 2010-07-01 12:00:00
     INITIAL_TIME = datetime.datetime(2010, 1, 1, 12, 0, 0)
     HMS_TIMEZONE = pytz.timezone("US/Eastern")
-    _DATETIME = datetime.datetime
+    DATETIME_TYPE = datetime.datetime
+    timedelta = datetime.timedelta
 
     def __init__(self, initial_time: datetime.datetime = INITIAL_TIME, tick_seconds: float = 1,
                  local_timezone: pytz.timezone = HMS_TIMEZONE):
@@ -159,6 +160,16 @@ class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
         self._just_now = initial_time
         self._tick_timedelta = datetime.timedelta(seconds=tick_seconds)
         self._local_timezone = local_timezone
+
+        # This is here so that a ControlledTime can be used as a mock for the datetime module itself in some cases.
+        # e.g.,
+        #        with mock.patch.object(foo_module, "datetime", dt):
+        #            ...
+        # so that within the foo module, datetime.datetime will access ProxyDatetimeClass,
+        # but datetime.timedelta will still work because a ControlledTime has a .timedelta.
+        # The ProxyDatetimeClass will offer a few methods that are coordinated with the ControlledTime,
+        # most importantly .now() and .utcnow().
+        self.datetime = self.ProxyDatetimeClass(self)
 
     def set_datetime(self, dt):
         """
@@ -218,6 +229,20 @@ class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
         """
 
         self._just_now += datetime.timedelta(seconds=secs)
+
+    class ProxyDatetimeClass:
+
+        def __init__(self, controlled_time):
+            self._controlled_time = controlled_time
+
+        def now(self):
+            return self._controlled_time.now()
+
+        def utcnow(self):
+            return self._controlled_time.utcnow()
+
+        def __call__(self, *args, **kwargs):
+            return self._controlled_time.DATETIME_TYPE(*args, **kwargs)
 
 
 def notice_pytest_fixtures(*fixtures):
