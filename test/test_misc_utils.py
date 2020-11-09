@@ -4,6 +4,7 @@ import io
 import json
 import os
 import pytest
+import pytz
 import random
 import re
 import time
@@ -17,6 +18,7 @@ from dcicutils.misc_utils import (
     LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
     keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
     CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json,
+    as_seconds, hms_now, in_datetime_interval, as_datetime,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ, MockFileSystem, printed_output, raises_regexp
@@ -677,6 +679,96 @@ def test_utc_today_str():
     assert re.match(pattern, actual), "utc_today_str() result %s did not match format: %s" % (actual, pattern)
 
 
+def test_as_seconds():
+    assert as_seconds(seconds=1, minutes=1) == 61
+    assert as_seconds(seconds=1, minutes=1, as_type=str) == '61'
+    assert as_seconds(minutes=0.5, seconds=1) == 31
+    assert as_seconds(minutes=0.5, seconds=1, as_type=str) == '31'
+    assert as_seconds(minutes=0.025) == 1.5
+    assert as_seconds() == 0
+    assert as_seconds(weeks=1, days=1, hours=1, minutes=1, seconds=1) == 694861
+    assert as_seconds(weeks=1, days=1, hours=1, minutes=1, seconds=1, milliseconds=500) == 694861.5
+    assert as_seconds(milliseconds=1000) == 1
+    assert as_seconds(milliseconds=2000) == 2
+    assert as_seconds(milliseconds=250) == 0.25
+
+
+def test_hms_now():
+
+    t0 = datetime_module.datetime(2015, 7, 4, 12, 0, 0)
+    dt = ControlledTime(t0)
+
+    with mock.patch("dcicutils.misc_utils.datetime", dt):
+
+        t1 = hms_now()
+        t1_utc = t1.replace(tzinfo=pytz.UTC)
+        assert t1.replace(tzinfo=None) == t0 + datetime_module.timedelta(seconds=1)
+        delta = (t1 - t1_utc)
+        delta_seconds = delta.total_seconds()
+        delta_hours = delta_seconds / 3600
+        assert delta_hours in {4.0, 5.0}  # depending on daylight savings time, HMS is either 4 or 5 hours off from UTC
+
+
+def test_as_datetime():
+
+    t0 = datetime_module.datetime(2015, 7, 4, 12, 0, 0)
+    t0_utc = pytz.UTC.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))
+
+    assert as_datetime(t0) == t0
+    assert as_datetime(t0, tz=pytz.UTC) == t0_utc
+    assert not as_datetime('2015-07-04T12:00:00').tzinfo
+    assert as_datetime('2015-07-04T12:00:00') == t0
+    assert as_datetime('2015-07-04 12:00:00') == t0
+    assert as_datetime('2015-07-04 12:00:00', tz=pytz.UTC) == t0_utc
+    assert as_datetime('2015-07-04 12:00:00Z').tzinfo
+    assert as_datetime('2015-07-04 12:00:00Z') != t0
+    assert as_datetime('2015-07-04 12:00:00Z') == t0_utc
+    assert as_datetime('2015-07-04 12:00:00-0000') == t0_utc
+
+
+def test_in_datetime_interval():
+
+    t0 = datetime_module.datetime(2015, 7, 4, 12, 0, 0)
+    t1 = datetime_module.datetime(2015, 7, 4, 13, 0, 0)
+    t2 = datetime_module.datetime(2015, 7, 4, 14, 0, 0)
+    t3 = datetime_module.datetime(2015, 7, 4, 15, 0, 0)
+    t4 = datetime_module.datetime(2015, 7, 4, 16, 0, 0)
+
+    in_t1_to_t3_range_scenarios = [
+        (t0, False),
+        (t1, True),
+        (t2, True),
+        (t3, True),
+        (t4, False),
+    ]
+
+    for t, expected in in_t1_to_t3_range_scenarios:
+        assert in_datetime_interval(t, start=t1, end=t3) is expected
+        assert in_datetime_interval(t, start=str(t1), end=str(t3)) is expected
+
+    in_t1_and_afterwards_range_scenarios = [
+        (t0, False),
+        (t1, True),
+        (t2, True),
+        (t3, True),
+        (t4, True),
+    ]
+
+    for t, expected in in_t1_and_afterwards_range_scenarios:
+        assert in_datetime_interval(t, start=t1) is expected
+
+    in_t1_and_beforehand_range_scenarios = [
+        (t0, True),
+        (t1, True),
+        (t2, True),
+        (t3, True),
+        (t4, False),
+    ]
+
+    for t, expected in in_t1_and_beforehand_range_scenarios:
+        assert in_datetime_interval(t, end=t3) is expected
+
+
 def test_lockout_manager_timestamp():
 
     tick = 0.1
@@ -1308,7 +1400,7 @@ def test_copy_json_side_effects():
     obj = {'foo': [1, 2, 3], 'bar': [{'x': 4, 'y': 5}, {'x': 2, 'y': 7}]}
     obj_copy = copy_json(obj)
     obj['foo'][1] = 20
-    obj['bar'][0]['y'] = 500
+    obj['bar'][0]['y'] = 500  # NoQA - PyCharm wrongly fears there are type errors in this line, that it will fail.
     obj['bar'][1] = 17
     assert obj == {'foo': [1, 20, 3], 'bar': [{'x': 4, 'y': 500}, 17]}
     assert obj_copy == {'foo': [1, 2, 3], 'bar': [{'x': 4, 'y': 5}, {'x': 2, 'y': 7}]}
