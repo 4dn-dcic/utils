@@ -1,5 +1,7 @@
 import os
+
 from .misc_utils import get_setting_from_context, check_true
+from urllib.parse import urlparse
 
 
 FF_ENV_DEV = 'fourfront-dev'  # Maybe not used
@@ -415,3 +417,34 @@ def full_fourfront_env_name(envname):
     check_true(isinstance(envname, str) and "cgap" not in envname, "The envname is not a Fourfront env name.",
                error_class=ValueError)
     return full_env_name(envname)
+
+
+def classify_server_url(url, raise_error=True):
+
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    hostname1 = hostname.split('.', 1)[0]  # The part before the first dot (if any)
+
+    environment = get_bucket_env(hostname1)  # First approximation, maybe overridden below
+
+    is_stg_or_prd = is_stg_or_prd_env(hostname1)
+
+    if hostname1 == 'localhost' or hostname == '127.0.0.1':
+        environment = None
+        kind = 'localhost'
+    elif 'cgap' in hostname1:
+        kind = 'cgap'
+    elif is_stg_or_prd or 'fourfront-' in hostname1:
+        kind = 'fourfront'
+    else:
+        if raise_error:
+            raise RuntimeError("%s is not a Fourfront or CGAP server." % url)
+        else:
+            environment = None
+            kind = None
+
+    return {
+        'kind': kind,
+        'environment': environment,
+        'is_stg_or_prd': is_stg_or_prd
+    }

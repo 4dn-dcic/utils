@@ -7,6 +7,14 @@ Change Log
 ----------
 
 
+1.5.0
+=====
+
+**PR 119: More env_utils support**
+
+* Add ``env_utils.classify_server_url`.
+
+
 1.4.0
 =====
 

@@ -13,9 +13,10 @@ from dcicutils.env_utils import (
     prod_bucket_env, public_url_mappings, CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
     infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env, FF_PRODUCTION_IDENTIFIER,
     FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV,
-    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
+    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env, classify_server_url,
     full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
 )
+from dcicutils.qa_utils import raises_regexp
 from unittest import mock
 
 
@@ -662,3 +663,105 @@ def test_full_fourfront_env_name():
 
     with pytest.raises(ValueError):
         full_fourfront_env_name('data')
+
+
+def test_classify_server_url_localhost():
+
+    assert classify_server_url("http://localhost/foo/bar") == {
+        'kind': 'localhost',
+        'environment': None,
+        'is_stg_or_prd': False,
+    }
+
+    assert classify_server_url("http://localhost:8000/foo/bar") == {
+        'kind': 'localhost',
+        'environment': None,
+        'is_stg_or_prd': False,
+    }
+
+    assert classify_server_url("http://localhost:1234/foo/bar") == {
+        'kind': 'localhost',
+        'environment': None,
+        'is_stg_or_prd': False,
+    }
+
+    assert classify_server_url("http://127.0.0.1:8000/foo/bar") == {
+        'kind': 'localhost',
+        'environment': None,
+        'is_stg_or_prd': False,
+    }
+
+
+def test_classify_server_url_cgap():
+
+    assert classify_server_url("https://cgap.hms.harvard.edu/foo/bar") == {
+        'kind': 'cgap',
+        'environment': 'fourfront-cgap',
+        'is_stg_or_prd': True,
+    }
+
+    assert classify_server_url("http://fourfront-cgapdev.9wzadzju3p.us-east-1.elasticbeanstalk.com/foo/bar") == {
+        'kind': 'cgap',
+        'environment': 'fourfront-cgapdev',
+        'is_stg_or_prd': False,
+    }
+
+    assert classify_server_url("http://fourfront-cgapdev.anything.us-east-1.elasticbeanstalk.com/foo/bar") == {
+        'kind': 'cgap',
+        'environment': 'fourfront-cgapdev',
+        'is_stg_or_prd': False,
+    }
+
+    assert classify_server_url("http://fourfront-cgapwolf.anything.us-east-1.elasticbeanstalk.com/foo/bar") == {
+        'kind': 'cgap',
+        'environment': 'fourfront-cgapwolf',
+        'is_stg_or_prd': False,
+    }
+
+
+def test_classify_server_url_fourfront():
+
+    assert classify_server_url("https://data.4dnucleome.org/foo/bar") == {
+        'kind': 'fourfront',
+        'environment': 'fourfront-webprod',
+        'is_stg_or_prd': True,
+    }
+
+    assert classify_server_url("https://staging.4dnucleome.org/foo/bar") == {
+        'kind': 'fourfront',
+        'environment': 'fourfront-webprod',
+        'is_stg_or_prd': True,
+    }
+
+    assert classify_server_url("http://fourfront-blue.9wzadzju3p.us-east-1.elasticbeanstalk.com/foo/bar") == {
+        'kind': 'fourfront',
+        'environment': 'fourfront-webprod',
+        'is_stg_or_prd': True,
+    }
+
+    assert classify_server_url("http://fourfront-green.9wzadzju3p.us-east-1.elasticbeanstalk.com/foo/bar") == {
+        'kind': 'fourfront',
+        'environment': 'fourfront-webprod',
+        'is_stg_or_prd': True,
+    }
+
+    assert classify_server_url("http://fourfront-mastertest.9wzadzju3p.us-east-1.elasticbeanstalk.com/foo/bar") == {
+        'kind': 'fourfront',
+        'environment': 'fourfront-mastertest',
+        'is_stg_or_prd': False,
+    }
+
+
+def test_classify_server_url_other():
+
+    with raises_regexp(RuntimeError, "not a Fourfront or CGAP server"):
+        classify_server_url("http://google.com")  # raise_error=True is the default
+
+    with raises_regexp(RuntimeError, "not a Fourfront or CGAP server"):
+        classify_server_url("http://google.com", raise_error=True)
+
+    assert classify_server_url("http://google.com", raise_error=False) == {
+        'kind': None,
+        'environment': None,
+        'is_stg_or_prd': False,
+    }
