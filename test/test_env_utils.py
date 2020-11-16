@@ -669,25 +669,25 @@ def test_classify_server_url_localhost():
 
     assert classify_server_url("http://localhost/foo/bar") == {
         'kind': 'localhost',
-        'environment': None,
+        'environment': 'unknown',
         'is_stg_or_prd': False,
     }
 
     assert classify_server_url("http://localhost:8000/foo/bar") == {
         'kind': 'localhost',
-        'environment': None,
+        'environment': 'unknown',
         'is_stg_or_prd': False,
     }
 
     assert classify_server_url("http://localhost:1234/foo/bar") == {
         'kind': 'localhost',
-        'environment': None,
+        'environment': 'unknown',
         'is_stg_or_prd': False,
     }
 
     assert classify_server_url("http://127.0.0.1:8000/foo/bar") == {
         'kind': 'localhost',
-        'environment': None,
+        'environment': 'unknown',
         'is_stg_or_prd': False,
     }
 
@@ -761,7 +761,7 @@ def test_classify_server_url_other():
         classify_server_url("http://google.com", raise_error=True)
 
     assert classify_server_url("http://google.com", raise_error=False) == {
-        'kind': None,
-        'environment': None,
+        'kind': 'unknown',
+        'environment': 'unknown',
         'is_stg_or_prd': False,
     }
