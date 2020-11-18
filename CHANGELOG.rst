@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+1.5.1
+=====
+
+**PR 120: Update ES-py Version
+
+* Updates elasticsearch library to 6.8.1 to take a bug fix.
+
 
 1.5.0
 =====
