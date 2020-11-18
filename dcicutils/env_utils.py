@@ -1,5 +1,7 @@
 import os
+
 from .misc_utils import get_setting_from_context, check_true
+from urllib.parse import urlparse
 
 
 FF_ENV_DEV = 'fourfront-dev'  # Maybe not used
@@ -415,3 +417,54 @@ def full_fourfront_env_name(envname):
     check_true(isinstance(envname, str) and "cgap" not in envname, "The envname is not a Fourfront env name.",
                error_class=ValueError)
     return full_env_name(envname)
+
+
+def classify_server_url(url, raise_error=True):
+    """
+    Given a server url, returns a dictionary of information about how it relates to the Fourfront & CGAP ecosystem.
+
+    If a useful result cannot be be computed, and raise_error is True, an error is raised.
+    Otherwise, a three values are computed and returned as part of a single dictionary:
+
+    * a "kind", which is 'fourfront', 'cgap', 'localhost', or (if raise_error is False) 'unknown'.
+    * an "environment", which is the name of a fourfront or cgap environment (as appropriate) or 'unknown'.
+    * a boolean "is_stg_or_prd" that is True if the environment is a production (staging or production) environment,
+      and False otherwise.
+
+    Parameters:
+
+      url: a server url to be classified
+      raise_error(bool): whether to raise an error if the classification is unknown
+
+    Returns:
+
+      a dictionary of information containing keys "kind", "environment", and "is_stg_or_prd"
+    """
+
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    hostname1 = hostname.split('.', 1)[0]  # The part before the first dot (if any)
+
+    environment = get_bucket_env(hostname1)  # First approximation, maybe overridden below
+
+    is_stg_or_prd = is_stg_or_prd_env(hostname1)
+
+    if hostname1 == 'localhost' or hostname == '127.0.0.1':
+        environment = 'unknown'
+        kind = 'localhost'
+    elif 'cgap' in hostname1:
+        kind = 'cgap'
+    elif is_stg_or_prd or 'fourfront-' in hostname1:
+        kind = 'fourfront'
+    else:
+        if raise_error:
+            raise RuntimeError("%s is not a Fourfront or CGAP server." % url)
+        else:
+            environment = 'unknown'
+            kind = 'unknown'
+
+    return {
+        'kind': kind,
+        'environment': environment,
+        'is_stg_or_prd': is_stg_or_prd
+    }
