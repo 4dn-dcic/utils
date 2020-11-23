@@ -465,12 +465,27 @@ def as_datetime(dt, tz=None):
 
 
 def as_ref_datetime(dt):
+    """
+    Parses a given datetime, returning a rendition of that tie in the reference timezone (US/Eastern by default).
+
+    If the input time is a string or a naive datetime with no timezon, it is assumed to be in the reference timezone
+    (which is US/Eastern by default).
+    If the time is already a datetime, no parsing occurs, but the time is still adjusted to present as it would in the
+    reference timeszone.
+    """
     dt = as_datetime(dt, tz=REF_TZ)
     hms_dt = dt.astimezone(REF_TZ)
     return hms_dt
 
 
 def as_utc_datetime(dt):
+    """
+    Parses a given datetime, returning a rendition of that tie in UTC.
+
+    If the input time is a string or a naive datetime with no timezon, it is assumed to be in the reference timezone
+    (which is US/Eastern by default). UTC is only used as the output format, not as an assumption about the input.
+    If the time is already a datetime, no parsing occurs, but the time is still adjusted to present as it would in UTC.
+    """
     dt = as_datetime(dt, tz=REF_TZ)
     utc_dt = dt.astimezone(pytz.UTC)
     return utc_dt
