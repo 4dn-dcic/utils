@@ -439,7 +439,7 @@ def as_seconds(*, seconds=0, minutes=0, hours=0, days=0, weeks=0, milliseconds=0
     return seconds
 
 
-HMS_TZ = pytz.timezone("US/Eastern")
+REF_TZ = pytz.timezone(os.environ.get("REF_TZ") or "US/Eastern")
 
 
 def as_datetime(dt, tz=None):
@@ -464,6 +464,18 @@ def as_datetime(dt, tz=None):
         return None
 
 
+def as_ref_datetime(dt):
+    dt = as_datetime(dt, tz=REF_TZ)
+    hms_dt = dt.astimezone(REF_TZ)
+    return hms_dt
+
+
+def as_utc_datetime(dt):
+    dt = as_datetime(dt, tz=REF_TZ)
+    utc_dt = dt.astimezone(pytz.UTC)
+    return utc_dt
+
+
 def in_datetime_interval(when, *, start=None, end=None):
     """
     Returns true if the first argument ('when') is in the range given by the other arguments.
@@ -475,9 +487,12 @@ def in_datetime_interval(when, *, start=None, end=None):
     return (not start or start <= when) and (not end or end >= when)
 
 
-def hms_now():
-    """Returns the current time in the HMS timezone (US/Eastern, which may be EST or EDT, depending on time of year)."""
-    return as_datetime(datetime.datetime.now(), HMS_TZ)
+def ref_now():
+    """Returns the current time in the portal's reference timezone, as determined by REF_TZ.
+
+       Because this software originates at Harvard Medical School, the reference timezone defaults to US/Eastern.
+       It can be set to another value by binding the REF_TZ environment variable."""
+    return as_datetime(datetime.datetime.now(), REF_TZ)
 
 
 class LockoutManager:
@@ -999,3 +1014,8 @@ def getattr_customized(thing, key):
         raise UncustomizedInstance(instance=thing, field=key)
     else:
         return value
+
+
+# Deprecated names, still supported for a while.
+HMS_TZ = REF_TZ
+hms_now = ref_now
