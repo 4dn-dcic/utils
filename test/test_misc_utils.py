@@ -752,7 +752,7 @@ def test_as_ref_datetime():
         assert str(result) == '2015-07-04 12:00:00-04:00'
 
     # Note that if this were in winter instead of summer, a different timezone marker would come back
-    for t  in (datetime_module.datetime(2015, 1, 4, 12), '2015-01-04T12:00:00-05:00', '2015-01-04 12:00:00-05:00'):
+    for t in (datetime_module.datetime(2015, 1, 4, 12), '2015-01-04T12:00:00-05:00', '2015-01-04 12:00:00-05:00'):
         assert str(as_ref_datetime(t)) == '2015-01-04 12:00:00-05:00'
 
     # Things that parse as a date equivalent to noon Jul 4, 2014 in UTC time because that is given explicitly,
@@ -782,8 +782,8 @@ def test_as_utc_datetime():
     t0_utc = pytz.UTC.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))
     t0_hms = REF_TZ.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))
 
-    t4_utc = datetime_module.datetime(2015, 7, 4, 16, 0, 0, tzinfo=pytz.UTC)  # 4 hour offset from t0 UTC
-    t5_utc = datetime_module.datetime(2015, 7, 4, 17, 0, 0, tzinfo=pytz.UTC)  # 5 hour offset from t0 UTC
+    t4_utc = datetime_module.datetime(2015, 7, 4, 16, 0, 0, tzinfo=pytz.UTC)  # same as t0_hms, but UTC is 4 hour offset
+    t5_utc = datetime_module.datetime(2015, 1, 4, 17, 0, 0, tzinfo=pytz.UTC)  # 5 hour offset from default ref time
 
     # Things that parse as a date equivalent to noon Jul 4, 2014 in UTC time
     for t in (t0, t0_hms, t4_utc,
@@ -796,17 +796,20 @@ def test_as_utc_datetime():
         assert result != t0
         assert result != t0_utc
         assert result == t0_hms
+        assert result == t4_utc
         assert str(result) == '2015-07-04 16:00:00+00:00'
 
     # Note that if this were in winter instead of summer, a different timezone marker would come back
-    for t  in (datetime_module.datetime(2015, 1, 4, 12),
-               '2015-01-04T12:00:00-0500',
-               '2015-01-04 12:00:00-0500',
-               '2015-01-04T12:00:00-05:00',
-               '2015-01-04 12:00:00-05:00',
-               '2015-01-04T17:00:00Z',
-               '2015-01-04 17:00:00Z'):
-        assert str(as_utc_datetime(t)) == '2015-01-04 17:00:00+00:00'
+    for t in (datetime_module.datetime(2015, 1, 4, 12),
+              '2015-01-04T12:00:00-0500',
+              '2015-01-04 12:00:00-0500',
+              '2015-01-04T12:00:00-05:00',
+              '2015-01-04 12:00:00-05:00',
+              '2015-01-04T17:00:00Z',
+              '2015-01-04 17:00:00Z'):
+        result = as_utc_datetime(t)
+        assert result == t5_utc
+        assert str(result) == '2015-01-04 17:00:00+00:00'
 
     # Things that parse as a date equivalent to noon Jul 4, 2014 in UTC time because that is given explicitly,
     # but the result is still expressed in HMS time notation.
