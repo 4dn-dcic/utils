@@ -7,6 +7,21 @@ Change Log
 ----------
 
 
+1.6.0
+=====
+
+**PR 120: More time functions**
+
+In ``misc_utils``:
+
+* Add ``as_ref_datetime`` to convert times to the reference timezone (US/Eastern by default).
+* Add ``as_utc_datetime`` to convert times to UTC.
+* Rename ``HMS_TZ`` to ``REF_TZ``, but keep ``HMS_TZ`` as a synonym for compatibility for now.
+* Rename ``hms_now`` to ``ref_now``, but again keep ``hms_now`` as a synonym for compatibility for now.
+
+The rationale for these changes is that if we deploy at other locations, it may not be HMS that is relevant, so we could be at some place with another timezone.
+
+
 1.5.0
 =====
 
