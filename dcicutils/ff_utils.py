@@ -184,6 +184,15 @@ def purge_request_with_retries(request_fxn, url, auth, verb, **kwargs):
     return final_res
 
 
+REQUESTS_VERBS = {
+    'GET': requests.get,
+    'POST': requests.post,
+    'PATCH': requests.patch,
+    'PUT': requests.put,
+    'DELETE': requests.delete,
+}
+
+
 def authorized_request(url, auth=None, ff_env=None, verb='GET',
                        retry_fxn=standard_request_with_retries, **kwargs):
     """
@@ -202,6 +211,8 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     OR
     authorized_request('https://data.4dnucleome.org/<some path>', ff_env='fourfront-webprod')
     """
+    # Save to uncomment if debugging unit tests...
+    # print("authorized_request\n URL=%s\n auth=%s\n ff_env=%s\n verb=%s\n" % (url, auth, ff_env, verb))
     use_auth = unified_authentication(auth, ff_env)
     headers = kwargs.get('headers')
     if not headers:
@@ -209,21 +220,19 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     if 'timeout' not in kwargs:
         kwargs['timeout'] = 60  # default timeout
 
-    verbs = {'GET': requests.get,
-             'POST': requests.post,
-             'PATCH': requests.patch,
-             'PUT': requests.put,
-             'DELETE': requests.delete,
-             }
     try:
-        the_verb = verbs[verb.upper()]
+        the_verb = REQUESTS_VERBS[verb.upper()]
     except KeyError:
-        raise Exception("Provided verb %s is not valid. Must one of: %s" % (verb.upper(), ', '.join(verbs.keys())))
+        raise ValueError("Provided verb %s is not valid. Must one of: %s"
+                         % (verb.upper(), ', '.join(REQUESTS_VERBS.keys())))
     # automatically detect a search and overwrite the retry if it is standard
     if '/search/' in url and retry_fxn == standard_request_with_retries:
         retry_fxn = search_request_with_retries
     # use the given retry function. MUST TAKE THESE PARAMS!
-    return retry_fxn(the_verb, url, use_auth, verb, **kwargs)
+    result = retry_fxn(the_verb, url, use_auth, verb, **kwargs)
+    # Save to uncomment if debugging unit tests...
+    # print("authorized_request result=", json.dumps(result.json(), indent=2))
+    return result
 
 
 def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
@@ -1016,8 +1025,8 @@ def _get_page(*, page, key=None, ff_env=None):
         exception if this fails, since this function should tolerate failure """
     try:
         auth = get_authentication_with_server(key, ff_env)
-        health_res = authorized_request(auth['server'] + page, auth=auth, verb='GET')
-        ret = get_response_json(health_res)
+        page_res = authorized_request(auth['server'] + page, auth=auth, verb='GET')
+        ret = get_response_json(page_res)
     except Exception as exc:
         ret = {'error': str(exc)}
     return ret
@@ -1145,8 +1154,8 @@ def unified_authentication(auth=None, ff_env=None):
     elif isinstance(auth, tuple) and len(auth) == 2:
         use_auth = auth
     if not use_auth:
-        raise Exception("Must provide a valid authorization key or ff "
-                        "environment. You gave: %s (key), %s (ff_env)" % (auth, ff_env))
+        raise ValueError("Must provide a valid authorization key or ff environment."
+                         " You gave: %s (key), %s (ff_env)" % (auth, ff_env))
     return use_auth
 
 
@@ -1162,14 +1171,15 @@ def get_authentication_with_server(auth=None, ff_env=None):
     if not isinstance(auth, dict) or not {'key', 'secret', 'server'} <= set(auth.keys()):
         # must have ff_env if we want to get the key
         if not ff_env:
-            raise Exception("ERROR GETTING SERVER!\nMust provide dictionary auth with"
-                            " 'server' or ff environment. You gave: %s (auth), %s (ff_env)"
-                            % (auth, ff_env))
+            raise ValueError("ERROR GETTING SERVER!"
+                             "\nMust provide dictionary auth with 'server' or ff environment."
+                             " You gave: %s (auth), %s (ff_env)"
+                             % (auth, ff_env))
         auth = s3_utils.s3Utils(env=ff_env).get_access_keys()
         if 'server' not in auth:
-            raise Exception("ERROR GETTING SERVER!\nAuthentication retrieved using "
-                            " ff environment does not have server information. Found: %s (auth)"
-                            ", %s (ff_env)" % (auth, ff_env))
+            raise ValueError("ERROR GETTING SERVER!"
+                             "\nAuthentication retrieved using ff environment does not have server information."
+                             " Found: %s (auth), %s (ff_env)" % (auth, ff_env))
     # ensure that the server does not end with '/'
     if auth['server'].endswith('/'):
         auth['server'] = auth['server'][:-1]
@@ -1183,9 +1193,9 @@ def stuff_in_queues(ff_env, check_secondary=False):
     If check_secondary is True, will also check the secondary queue.
     """
     if not ff_env:
-        raise Exception("Must provide a full fourfront environment name to "
-                        "this function (such as 'fourfront-webdev'). You gave: "
-                        "%s" % ff_env)
+        raise ValueError("Must provide a full fourfront environment name to "
+                         "this function (such as 'fourfront-webdev'). You gave: "
+                         "%s" % ff_env)
     stuff_in_queue = False
     client = boto3.client('sqs', region_name='us-east-1')
     queue_names = ['-indexer-queue']
@@ -1264,8 +1274,6 @@ def convert_param(parameter_dict, vals_as_string=False):
     converts dictionary format {argument_name: value, argument_name: value, ...}
     to {'workflow_argument_name': argument_name, 'value': value}
     """
-    # Not needed? -kmp & Will 30-Mar-2020
-    # print(str(parameter_dict))
     metadata_parameters = []
     for k, v in parameter_dict.items():
         # we need this to be a float or integer if it really is, else a string
