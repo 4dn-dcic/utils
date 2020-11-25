@@ -11,7 +11,7 @@ build:  # builds
 	poetry install
 
 test:
-	pytest -vv
+	pytest -vv -m "not integratedx"
 
 update:  # updates dependencies
 	poetry update
