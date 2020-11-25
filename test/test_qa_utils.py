@@ -5,6 +5,7 @@ import pytest
 import pytz
 import re
 import subprocess
+import sys
 import time
 import uuid
 
@@ -370,6 +371,30 @@ def test_controlled_time_sleep():
     t.sleep(10)
 
     assert (t.just_now() - t0).total_seconds() == 10
+
+
+def test_controlled_time_datetime():
+
+    module_type = type(sys.modules['builtins'])
+
+    dt_args = (2016, 1, 1, 12, 34, 56)
+
+    t = ControlledTime(datetime.datetime(*dt_args), tick_seconds=1)
+    t0 = t.just_now()
+
+    # At this point, datetime is still the imported datetime module.
+    assert isinstance(datetime, module_type)
+
+    # This is like using mock.patch on our own datetime
+    with override_dict(globals(), datetime=t):
+
+        # At this point, we've installed a ControlledTime instance as our datetime module.
+        assert not isinstance(datetime, module_type)
+        assert isinstance(datetime, ControlledTime)
+        assert isinstance(datetime.datetime, ControlledTime.ProxyDatetimeClass)
+        # Make sure we can make a datetime.datetime object even with the mock
+        assert datetime.datetime(*dt_args) == t0
+        assert datetime.datetime.now() == t0 + datetime.timedelta(seconds=1)
 
 
 def test_controlled_time_documentation_scenario():
@@ -1198,16 +1223,9 @@ def test_version_checker_use_dcicutils_changelog():
 
 def test_version_checker_with_missing_changelog():
 
-    path_exists = os.path.exists
+    mfs = MockFileSystem(files={'pyproject.toml': '[tool.poetry]\nname = "foo"\nversion = "1.2.3"'})
 
-    def mocked_exists(filename):
-        if filename.endswith("CHANGELOG.rst"):
-            print("Faking that %s does not exist." % filename)
-            return False
-        else:
-            return path_exists(filename)
-
-    with mock.patch("os.path.exists", mocked_exists):
+    with mock.patch("os.path.exists", mfs.exists):
 
         class MyVersionChecker(VersionChecker):
 

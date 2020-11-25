@@ -6,6 +6,65 @@ dcicutils
 Change Log
 ----------
 
+1.5.1
+=====
+
+**PR 120: Update ES-py Version
+
+* Updates elasticsearch library to 6.8.1 to take a bug fix.
+
+
+1.5.0
+=====
+
+**PR 119: More env_utils support**
+
+* Add ``env_utils.classify_server_url`.
+
+
+1.4.0
+=====
+
+**PR 118: Various bits of functionality in support of 4dn-status (C4-363)**
+
+* New feature in ``qa_utils``:
+
+  * ControlledTime can now be used as a mock for the datetime module itself
+    in some situations, though some care is required.
+
+* New features in ``misc_utils``:
+
+  * ``as_seconds`` so that, for example ``as_seconds(minutes=3)``
+    can be used to get 180.
+  * ``hms_now`` to get the value of ``datetime.datetime.now()``
+    in HMS local time (EST or EDT as appropriate).
+  * ``in_datetime_interval`` to test that a given time is within
+    a given time interval.
+  * ``as_datetime`` to coerce a properly formatted ``str`` to
+    a ``datetime.datetime``.
+
+
+1.3.1
+=====
+
+**PR 117: Repair handling of sentry_dsn in deployment_utils (C4-361)**
+
+* Fixes to ``deployment_utils``:
+
+  * Changes the handling of sentry DSN as an argument (``--sentry_dsn``)
+    to the deployer.
+  * Doesn't raise an error if environment variables collide but with the same value.
+  * Uses better binding technology for binding environment variables.
+  * Factors in a change to the tests to not use a deprecated
+    name (Deployer changed to IniFileMaker) for one of the classes.
+  * PEP8 adjustments.
+
+* Fixes to ``qa_utils``:
+
+  * Don't do changelog cross-check for beta versions.
+
+* PEP8 adjustments to ``test_env_utils`` and ``test_s3_utils``.
+
 
 1.3.0
 =====
