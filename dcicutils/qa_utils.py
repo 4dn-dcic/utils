@@ -395,7 +395,7 @@ class MockFileSystem:
         if content is None:
             raise FileNotFoundError("No such file or directory: %s" % file)
         if FILE_SYSTEM_VERBOSE:
-            print("Read %r to %s." % (content, file))
+            print("Read %r from %s." % (content, file))
         return io.BytesIO(content) if binary else io.StringIO(content.decode(encoding or self.default_encoding))
 
     def _open_for_write(self, file_system, file, binary=False, encoding=None):
@@ -472,8 +472,9 @@ class MockResponse:
     a .json property access. So since this is for mocking requests.Response, we implement the function.
     """
 
-    def __init__(self, status_code=200, json=None, content=None):
+    def __init__(self, status_code=200, json=None, content=None, url=None):
         self.status_code = status_code
+        self.url = url or "http://unknown/"
         if json is not None and content is not None:
             raise Exception("MockResponse cannot have both content and json.")
         elif content is not None:
@@ -488,6 +489,10 @@ class MockResponse:
             return "<MockResponse %s %s>" % (self.status_code, self.content)
         else:
             return "<MockResponse %s>" % (self.status_code,)
+
+    @property
+    def text(self):
+        return self.content
 
     def json(self):
         return json_loads(self.content)
@@ -583,14 +588,27 @@ class MockBotoS3Client:
     This is a mock of certain S3 functionality.
     """
 
-    def __init__(self, region_name=None):
+    MOCK_STATIC_FILES = {}
+    MOCK_REQUIRED_ARGUMENTS = {}
+
+    def __init__(self, region_name=None, mock_other_required_arguments=None, mock_s3_files=None):
         if region_name not in (None, 'us-east-1'):
             raise ValueError("Unexpected region:", region_name)
-        self.s3_files = MockFileSystem()
+
+        files = self.MOCK_STATIC_FILES.copy()
+        for name, content in mock_s3_files or {}:
+            files[name] = content
+        self.s3_files = MockFileSystem(files=files)
+
+        other_required_arguments = self.MOCK_REQUIRED_ARGUMENTS.copy()
+        for name, content in mock_other_required_arguments or {}:
+            other_required_arguments[name] = content
+        self.other_required_arguments = other_required_arguments
 
     def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
-        if kwargs:
-            raise MockKeysNotImplemented("upload_fileobj", kwargs.keys())
+        if kwargs != self.other_required_arguments:
+            raise MockKeysNotImplemented("upload_file_obj", kwargs.keys())
+
         data = Fileobj.read()
         print("Uploading %s (%s bytes) to bucket %s key %s"
               % (Fileobj, len(data), Bucket, Key))
@@ -598,15 +616,15 @@ class MockBotoS3Client:
             fp.write(data)
 
     def upload_file(self, Filename, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
-        if kwargs:
+        if kwargs != self.other_required_arguments:
             raise MockKeysNotImplemented("upload_file", kwargs.keys())
 
         with io.open(Filename, 'rb') as fp:
             self.upload_fileobj(Fileobj=fp, Bucket=Bucket, Key=Key)
 
     def download_fileobj(self, Bucket, Key, Fileobj, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
-        if kwargs:
-            raise MockKeysNotImplemented("upload_file", kwargs.keys())
+        if kwargs != self.other_required_arguments:
+            raise MockKeysNotImplemented("download_fileobj", kwargs.keys())
 
         with self.s3_files.open(os.path.join(Bucket, Key), 'rb') as fp:
             data = fp.read()
@@ -615,10 +633,19 @@ class MockBotoS3Client:
         Fileobj.write(data)
 
     def download_file(self, Bucket, Key, Filename, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
-        if kwargs:
-            raise MockKeysNotImplemented("upload_file", kwargs.keys())
+        if kwargs != self.other_required_arguments:
+            raise MockKeysNotImplemented("download_file", kwargs.keys())
+
         with io.open(Filename, 'wb') as fp:
             self.download_fileobj(Bucket=Bucket, Key=Key, Fileobj=fp)
+
+    def get_object(self, Bucket, Key, **kwargs):
+        if kwargs != self.other_required_arguments:
+            raise MockKeysNotImplemented("get_object", kwargs.keys())
+
+        return {
+            "Body": self.s3_files.open(os.path.join(Bucket, Key), 'rb'),
+        }
 
 
 class MockBotoSQSClient:
