@@ -1171,6 +1171,7 @@ def get_authentication_with_server(auth=None, ff_env=None):
     if not isinstance(auth, dict) or not {'key', 'secret', 'server'} <= set(auth.keys()):
         # must have ff_env if we want to get the key
         if not ff_env:
+            # TODO: Refactor these ValueErrors to do messaging in an error class where it doesn't clutter functionality.
             raise ValueError("ERROR GETTING SERVER!"
                              "\nMust provide dictionary auth with 'server' or ff environment."
                              " You gave: %s (auth), %s (ff_env)"

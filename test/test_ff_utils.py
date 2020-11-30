@@ -235,8 +235,16 @@ def test_unified_authentication_decoding(integrated_ff):
             assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
 
-SSE_CUSTOMER_KEY = 'SSECustomerKey'
-SSE_CUSTOMER_ALGORITHM = 'SSECustomerAlgorithm'
+# Here we set up some variables, auxiliary functions, and mocks containing common values needed for testing
+# of the next several functions so that the functions don't have to set them up over
+# and over again in each test.
+
+some_server = 'http://localhost:8000'
+some_auth_key, some_auth_secret = some_auth_tuple = ('mykey', 'mysecret')
+some_badly_formed_auth_tuple = ('mykey', 'mysecret', 'other-junk')  # contains an extra element
+some_auth_dict = {'key': some_auth_key, 'secret': some_auth_secret}
+some_auth_dict_with_server = {'key': some_auth_key, 'secret': some_auth_secret, 'server': some_server}
+some_badly_formed_auth_dict = {'kee': some_auth_key, 'secret': some_auth_secret}  # 'key' is misspelled
 
 foo_env = 'fourfront-foo'
 foo_env_auth_key, foo_env_auth_secret = foo_env_auth_tuple = ('fookey', 'foosecret')
@@ -256,20 +264,42 @@ bar_env_auth_dict = {
 }
 bar_env_default_auth_dict = {'default': bar_env_auth_dict}
 
-some_server = 'http://localhost:8000'
-some_auth_key, some_auth_secret = some_auth_tuple = ('mykey', 'mysecret')
-some_badly_formed_auth_tuple = ('mykey', 'mysecret', 'other-junk')  # contains an extra element
-some_auth_dict = {'key': some_auth_key, 'secret': some_auth_secret}
-some_auth_dict_with_server = {'key': some_auth_key, 'secret': some_auth_secret, 'server': some_server}
-some_badly_formed_auth_dict = {'kee': some_auth_key, 'secret': some_auth_secret}  # 'key' is misspelled
+SSE_CUSTOMER_KEY = 'SSECustomerKey'
+SSE_CUSTOMER_ALGORITHM = 'SSECustomerAlgorithm'
 
 
 def _access_key_home(bs_env):
-    """Retrieves the stashed access keys for a given env."""
+    """
+    Constructs the location in our S3 mock where the stashed access keys live for a given bs_env.
+
+    In our MockBotoS3, buckets and keys in s3 are represented as bucket/key in a MockFileSystem M
+    that is used by the S3 mock to hold its contents. So buckets are just the toplevel folders in M,
+    and keys are below that, and to preset a mock with contents for a given bucket and key, one just
+    creates bucket/key as a filename in M.  This function, _access_key_home will return the appropriate
+    filename for such a mock file system to contain the access keys for a given bs_env.
+    """
     return os.path.join(s3_utils.s3Utils.SYS_BUCKET_TEMPLATE % bs_env, s3_utils.s3Utils.ACCESS_KEYS_S3_KEY)
 
 
 class MockBotoS3WithSSE(MockBotoS3Client):
+    """
+    This is a specialized mock for a boto3 S3 client that does server-side encryption (SSE).
+    We don't actually test that encryption is done, since that would be done by boto3, but we set up so that
+    that calls to any methods on the mock use certain required keyword arguments beyond the ordinary methods
+    that do the ordinary work of the method. e.g., for this mock definition:
+
+        def upload_file(self, Filename, Bucket, Key, **kwargs)
+            ...
+
+    if the call does not look like:
+
+        upload_File(Filename=..., Bucket=..., Key=...,
+                    SSECustomerKey='shazam', SSECustomerAlgorithm='AES256')
+
+    where the mock value 'shazam' is a wired value supplied in calls to the mock and 'AES256' is a constant we
+    expect is consistently used throughout this code base, then an error is raised in testing. The intent is to
+    make sure the calls are done with a certain degree of consistency.
+    """
 
     SSE_ENCRYPT_KEY = 'shazam'
 
@@ -289,12 +319,18 @@ class MockBotoS3WithSSE(MockBotoS3Client):
 
 @contextlib.contextmanager
 def mocked_s3_with_sse():
-    # This the mock_encrypt_key passed by the API being tested is expected to be taken
-    # from the S3_ENCRYPT_KEY environment variable.
-    with override_environ(S3_ENCRYPT_KEY=MockBotoS3WithSSE.SSE_ENCRYPT_KEY):
-        mock_boto3 = MockBoto3(s3=MockBotoS3WithSSE)
-        with mock.patch.object(s3_utils, "boto3", mock_boto3):
-            with mock.patch.object(ff_utils, "boto3", mock_boto3):  # This may or may not be needed, but just in case
+    """
+    This context manager sets up a mock version of boto3 for use by s3_utils and ff_utils during the context
+    of its test. It also sets up the S3_ENCRYPT_KEY environment variable with a sample value for testing.
+    """
+    # First we make a mocked boto3 that will use an S3 mock with mock server side encryption.
+    mock_boto3 = MockBoto3(s3=MockBotoS3WithSSE)
+    # Now we arrange that both s3_utils and ff_utils modules share the illusion that our mock IS the boto3 library
+    with mock.patch.object(s3_utils, "boto3", mock_boto3):
+        with mock.patch.object(ff_utils, "boto3", mock_boto3):
+            # The mocked encrypt key is expected by various tools in the s3_utils module to be supplied
+            # as an environment variable (i.e., in os.environ), so this sets up that environment variable.
+            with override_environ(S3_ENCRYPT_KEY=MockBotoS3WithSSE.SSE_ENCRYPT_KEY):
                 yield
 
 
