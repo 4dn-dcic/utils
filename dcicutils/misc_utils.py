@@ -442,6 +442,17 @@ def as_seconds(*, seconds=0, minutes=0, hours=0, days=0, weeks=0, milliseconds=0
 REF_TZ = pytz.timezone(os.environ.get("REF_TZ") or "US/Eastern")
 
 
+class DatetimeCoercionFailure(ValueError):
+
+    def __init__(self, timespec, timezone):
+        self.timespec = timespec
+        self.timezone = timezone
+        extra = ""
+        if timezone:
+            extra = " (for timezone %s)" % timezone
+        super().__init__("Cannot coerce to datetime: %s%s" % (timespec, extra))
+
+
 def as_datetime(dt, tz=None):
     """
     Parses the given date/time (which may be a string or a datetime.datetime), returning a datetime.datetime object.
@@ -472,10 +483,14 @@ def as_ref_datetime(dt):
     (which is US/Eastern by default).
     If the time is already a datetime, no parsing occurs, but the time is still adjusted to present as it would in the
     reference timeszone.
+    If the given time is not a datetime, and cannot be coerced to be done, an error is raised.
     """
-    dt = as_datetime(dt, tz=REF_TZ)
-    hms_dt = dt.astimezone(REF_TZ)
-    return hms_dt
+    try:
+        real_datetime = as_datetime(dt, tz=REF_TZ)
+        hms_dt = real_datetime.astimezone(REF_TZ)
+        return hms_dt
+    except Exception:
+        raise DatetimeCoercionFailure(timespec=dt, timezone=REF_TZ)
 
 
 def as_utc_datetime(dt):
@@ -485,10 +500,14 @@ def as_utc_datetime(dt):
     If the input time is a string or a naive datetime with no timezon, it is assumed to be in the reference timezone
     (which is US/Eastern by default). UTC is only used as the output format, not as an assumption about the input.
     If the time is already a datetime, no parsing occurs, but the time is still adjusted to present as it would in UTC.
+    If the given time is not a datetime, and cannot be coerced to be done, an error is raised.
     """
-    dt = as_datetime(dt, tz=REF_TZ)
-    utc_dt = dt.astimezone(pytz.UTC)
-    return utc_dt
+    try:
+        real_datetime = as_datetime(dt, tz=REF_TZ)
+        utc_dt = real_datetime.astimezone(pytz.UTC)
+        return utc_dt
+    except Exception:
+        raise DatetimeCoercionFailure(timespec=dt, timezone=pytz.UTC)
 
 
 def in_datetime_interval(when, *, start=None, end=None):

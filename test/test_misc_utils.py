@@ -19,6 +19,7 @@ from dcicutils.misc_utils import (
     keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
     CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json,
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
+    DatetimeCoercionFailure,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ, MockFileSystem, printed_output, raises_regexp
@@ -775,6 +776,17 @@ def test_as_ref_datetime():
         assert result != t0_hms
         assert str(result) == '2015-07-04 08:00:00-04:00'  # The result notation is different than the UTC input
 
+    with raises_regexp(DatetimeCoercionFailure,
+                       re.escape("Cannot coerce to datetime: 2018-01-02 25:00:00 (for timezone US/Eastern)")):
+        as_ref_datetime("2018-01-02 25:00:00")  # There is no 25 o'clock
+
+    with raises_regexp(DatetimeCoercionFailure,
+                       re.escape("Cannot coerce to datetime: 2018-01-02 25:00:00Z (for timezone US/Eastern)")):
+        # This is parsed against US/Eastern time (or whatever REF_TIME is), so the message will mention
+        # that time even though 'Z' tries to override it. The 'Z' part can be recovered in the error message
+        # by looking at the string it's trying to parse.
+        as_ref_datetime("2018-01-02 25:00:00Z")  # There is no 25 o'clock
+
 
 def test_as_utc_datetime():
 
@@ -826,6 +838,10 @@ def test_as_utc_datetime():
         assert result == t0_utc
         assert result != t0_hms
         assert str(result) == '2015-07-04 12:00:00+00:00'
+
+    with raises_regexp(DatetimeCoercionFailure,
+                       re.escape("Cannot coerce to datetime: 2018-01-02 25:00:00 (for timezone UTC)")):
+        as_utc_datetime("2018-01-02 25:00:00")  # There is no 25 o'clock
 
 
 def test_in_datetime_interval():
