@@ -18,7 +18,8 @@ from dcicutils.misc_utils import (
     LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
     keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
     CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json,
-    as_seconds, hms_now, in_datetime_interval, as_datetime,
+    as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
+    DatetimeCoercionFailure,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ, MockFileSystem, printed_output, raises_regexp
@@ -693,14 +694,20 @@ def test_as_seconds():
     assert as_seconds(milliseconds=250) == 0.25
 
 
-def test_hms_now():
+def test_hms_tz():
+
+    assert HMS_TZ == REF_TZ, "HMS_TZ was deprectead, but is still expected to be a synonym for REF_TZ."
+
+
+@pytest.mark.parametrize('now', [hms_now, ref_now])  # hms_now is a deprecated name for ref_now
+def test_hms_now_and_ref_now(now):
 
     t0 = datetime_module.datetime(2015, 7, 4, 12, 0, 0)
     dt = ControlledTime(t0)
 
     with mock.patch("dcicutils.misc_utils.datetime", dt):
 
-        t1 = hms_now()
+        t1 = now()
         t1_utc = t1.replace(tzinfo=pytz.UTC)
         assert t1.replace(tzinfo=None) == t0 + datetime_module.timedelta(seconds=1)
         delta = (t1 - t1_utc)
@@ -724,6 +731,129 @@ def test_as_datetime():
     assert as_datetime('2015-07-04 12:00:00Z') != t0
     assert as_datetime('2015-07-04 12:00:00Z') == t0_utc
     assert as_datetime('2015-07-04 12:00:00-0000') == t0_utc
+
+    with raises_regexp(DatetimeCoercionFailure,
+                       re.escape("Cannot coerce to datetime: 2018-01-02 25:00:00")):
+        as_datetime("2018-01-02 25:00:00")  # There is no 25 o'clock
+
+    assert as_datetime("2018-01-02 25:00:00", raise_error=False) is None
+
+    with raises_regexp(DatetimeCoercionFailure,
+                       re.escape("Cannot coerce to datetime: 2018-01-02 25:00:00 (for timezone UTC)")):
+        as_datetime("2018-01-02 25:00:00", pytz.UTC)  # There is no 25 o'clock
+
+    assert as_datetime("2018-01-02 25:00:00", pytz.UTC, raise_error=False) is None
+
+
+def test_as_ref_datetime():
+
+    t0 = datetime_module.datetime(2015, 7, 4, 12, 0, 0)
+    t0_utc = pytz.UTC.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))
+    t0_hms = REF_TZ.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))
+
+    # Things that parse as a date equivalent to noon Jul 4, 2014 in HMS time
+    for t in (t0, t0_hms,
+              '2015-07-04T12:00:00',
+              '2015-07-04 12:00:00',
+              '2015-07-04T12:00:00-0400',
+              '2015-07-04 12:00:00-0400'):
+        result = as_ref_datetime(t)
+        assert result.tzinfo
+        assert result != t0
+        assert result != t0_utc
+        assert result == t0_hms
+        assert str(result) == '2015-07-04 12:00:00-04:00'
+
+    # Note that if this were in winter instead of summer, a different timezone marker would come back
+    for t in (datetime_module.datetime(2015, 1, 4, 12), '2015-01-04T12:00:00-05:00', '2015-01-04 12:00:00-05:00'):
+        assert str(as_ref_datetime(t)) == '2015-01-04 12:00:00-05:00'
+
+    # Things that parse as a date equivalent to noon Jul 4, 2014 in UTC time because that is given explicitly,
+    # but the result is still expressed in HMS time notation.
+    for t in (t0_utc,
+              '2015-07-04T12:00:00Z',
+              '2015-07-04 12:00:00Z',
+              '2015-07-04T12:00:00-0000',
+              '2015-07-04 12:00:00-0000',
+              '2015-07-04T12:00:00+0000',
+              '2015-07-04 12:00:00+0000',
+              '2015-07-04T12:00:00-00:00',
+              '2015-07-04 12:00:00-00:00',
+              '2015-07-04T12:00:00+00:00',
+              '2015-07-04 12:00:00+00:00'):
+        result = as_ref_datetime(t)
+        assert result.tzinfo
+        assert result != t0
+        assert result == t0_utc  # The times are equivalent even if the notation is different
+        assert result != t0_hms
+        assert str(result) == '2015-07-04 08:00:00-04:00'  # The result notation is different than the UTC input
+
+    with raises_regexp(DatetimeCoercionFailure,
+                       re.escape("Cannot coerce to datetime: 2018-01-02 25:00:00 (for timezone US/Eastern)")):
+        as_ref_datetime("2018-01-02 25:00:00")  # There is no 25 o'clock
+
+    with raises_regexp(DatetimeCoercionFailure,
+                       re.escape("Cannot coerce to datetime: 2018-01-02 25:00:00Z (for timezone US/Eastern)")):
+        # This is parsed against US/Eastern time (or whatever REF_TIME is), so the message will mention
+        # that time even though 'Z' tries to override it. The 'Z' part can be recovered in the error message
+        # by looking at the string it's trying to parse.
+        as_ref_datetime("2018-01-02 25:00:00Z")  # There is no 25 o'clock
+
+
+def test_as_utc_datetime():
+
+    t0 = datetime_module.datetime(2015, 7, 4, 12)
+    t0_utc = pytz.UTC.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))
+    t0_hms = REF_TZ.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))
+
+    t4_utc = datetime_module.datetime(2015, 7, 4, 16, 0, 0, tzinfo=pytz.UTC)  # same as t0_hms, but UTC is 4 hour offset
+    t5_utc = datetime_module.datetime(2015, 1, 4, 17, 0, 0, tzinfo=pytz.UTC)  # 5 hour offset from default ref time
+
+    # Things that parse as a date equivalent to noon Jul 4, 2014 in UTC time
+    for t in (t0, t0_hms, t4_utc,
+              '2015-07-04T12:00:00',  # HMS time implied
+              '2015-07-04 12:00:00',  # HMS time implied
+              '2015-07-04T16:00:00Z',
+              '2015-07-04 16:00:00Z'):
+        result = as_utc_datetime(t)
+        assert result.tzinfo
+        assert result != t0
+        assert result != t0_utc
+        assert result == t0_hms
+        assert result == t4_utc
+        assert str(result) == '2015-07-04 16:00:00+00:00'
+
+    # Note that if this were in winter instead of summer, a different timezone marker would come back
+    for t in (datetime_module.datetime(2015, 1, 4, 12),
+              '2015-01-04T12:00:00-0500',
+              '2015-01-04 12:00:00-0500',
+              '2015-01-04T12:00:00-05:00',
+              '2015-01-04 12:00:00-05:00',
+              '2015-01-04T17:00:00Z',
+              '2015-01-04 17:00:00Z'):
+        result = as_utc_datetime(t)
+        assert result == t5_utc
+        assert str(result) == '2015-01-04 17:00:00+00:00'
+
+    # Things that parse as a date equivalent to noon Jul 4, 2014 in UTC time because that is given explicitly,
+    # but the result is still expressed in HMS time notation.
+    for t in (t0_utc,
+              '2015-07-04T12:00:00Z',
+              '2015-07-04 12:00:00Z',
+              '2015-07-04T12:00:00-0000',
+              '2015-07-04 12:00:00-0000',
+              '2015-07-04T12:00:00+0000',
+              '2015-07-04 12:00:00+0000'):
+        result = as_utc_datetime(t)
+        assert result.tzinfo
+        assert result != t0
+        assert result == t0_utc
+        assert result != t0_hms
+        assert str(result) == '2015-07-04 12:00:00+00:00'
+
+    with raises_regexp(DatetimeCoercionFailure,
+                       re.escape("Cannot coerce to datetime: 2018-01-02 25:00:00 (for timezone UTC)")):
+        as_utc_datetime("2018-01-02 25:00:00")  # There is no 25 o'clock
 
 
 def test_in_datetime_interval():
@@ -767,6 +897,10 @@ def test_in_datetime_interval():
 
     for t, expected in in_t1_and_beforehand_range_scenarios:
         assert in_datetime_interval(t, end=t3) is expected
+
+    with pytest.raises(DatetimeCoercionFailure):
+        # This will raise an error because the 'end=' argument has bad syntax.
+        in_datetime_interval("2015-01-01 23:59:00", start="2015-01-01 22:00:00", end="2015-01-01 25:00:00")
 
 
 def test_lockout_manager_timestamp():
