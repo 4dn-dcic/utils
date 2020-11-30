@@ -1,13 +1,16 @@
-======================
+=========
 dcicutils
-======================
+=========
 
 ----------
 Change Log
 ----------
 
-1.6.0
+
+1.7.0
 =====
+
+**PR 122: Speed up ff_utils unit tests, and misc small bits of functionality**
 
 * Added an ``integratedx`` mark to possible marks in ``pytest.ini``. These
   are the same as ``integrated`` but they represent test cases that have
@@ -51,6 +54,26 @@ Change Log
     places errors are raised.
   * Some very small other refactoring was also done
     for modularity that should not affect behavior.
+
+
+1.6.0
+=====
+
+**PR 121: More time functions**
+
+In ``misc_utils``:
+
+* Fix ``as_datetime`` to raise an error on bad input, allowing `raise_error=False`
+  to suppress that if needed.
+* Add ``as_ref_datetime`` to convert times to the reference timezone (US/Eastern by default).
+* Add ``as_utc_datetime`` to convert times to UTC.
+* Extend ``in_datetime_interval`` to parse all string arguments using
+  ``as_ref_datetime``.
+* Rename ``HMS_TZ`` to ``REF_TZ``, but keep ``HMS_TZ`` as a synonym for compatibility for now.
+* Rename ``hms_now`` to ``ref_now``, but again keep ``hms_now`` as a synonym for compatibility for now.
+
+The rationale for these changes is that if we deploy at other locations, it may not be HMS that is relevant, so we could be at some place with another timezone.
+
 
 1.5.1
 =====
