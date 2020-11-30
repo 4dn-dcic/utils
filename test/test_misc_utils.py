@@ -732,6 +732,18 @@ def test_as_datetime():
     assert as_datetime('2015-07-04 12:00:00Z') == t0_utc
     assert as_datetime('2015-07-04 12:00:00-0000') == t0_utc
 
+    with raises_regexp(DatetimeCoercionFailure,
+                       re.escape("Cannot coerce to datetime: 2018-01-02 25:00:00")):
+        as_datetime("2018-01-02 25:00:00")  # There is no 25 o'clock
+
+    assert as_datetime("2018-01-02 25:00:00", raise_error=False) is None
+
+    with raises_regexp(DatetimeCoercionFailure,
+                       re.escape("Cannot coerce to datetime: 2018-01-02 25:00:00 (for timezone UTC)")):
+        as_datetime("2018-01-02 25:00:00", pytz.UTC)  # There is no 25 o'clock
+
+    assert as_datetime("2018-01-02 25:00:00", pytz.UTC, raise_error=False) is None
+
 
 def test_as_ref_datetime():
 
@@ -885,6 +897,10 @@ def test_in_datetime_interval():
 
     for t, expected in in_t1_and_beforehand_range_scenarios:
         assert in_datetime_interval(t, end=t3) is expected
+
+    with pytest.raises(DatetimeCoercionFailure):
+        # This will raise an error because the 'end=' argument has bad syntax.
+        in_datetime_interval("2015-01-01 23:59:00", start="2015-01-01 22:00:00", end="2015-01-01 25:00:00")
 
 
 def test_lockout_manager_timestamp():

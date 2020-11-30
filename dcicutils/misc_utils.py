@@ -453,61 +453,69 @@ class DatetimeCoercionFailure(ValueError):
         super().__init__("Cannot coerce to datetime: %s%s" % (timespec, extra))
 
 
-def as_datetime(dt, tz=None):
+def as_datetime(timespec, tz=None, raise_error=True):
     """
     Parses the given date/time (which may be a string or a datetime.datetime), returning a datetime.datetime object.
 
-    If the given datetime is already such an object, it is just returned.
+    If the given datetime is already such an object, it is just returned (not necessarily in the given timezone).
+    If the datetime to be returned has no timezone and a timezone argument has been given, that timezone is applied.
     If it is a string, it should be in a format such as 'yyyy-mm-dd hh:mm:ss' or 'yyyy-mm-dd hh:mm:ss-nnnn'
     (with -nnnn being a timezone specification).
+    If the given time is not a datetime, and cannot be coerced to be done, an error is raised
+    unless raise_error (default True) is False.
     """
-    if dt is None:
-        return None
     try:
         # This type check has to work even if datetime is mocked, so we use it under another variable name to
         # make it harder to mock out. -kmp 6-Nov-2020
+        dt = timespec
         if not isinstance(dt, datetime_type):
             dt = dateutil_parse(dt)
         if tz and not dt.tzinfo:
             dt = tz.localize(dt)
         return dt
     except Exception:
-        return None
+        # I decided to treat the returning None case as a bug. It was not advertised and not used.
+        # Throwing an error by default will make this more consistent with as_ref_datetime and as_utc_datetime.
+        # But just in case there is a use that wanted None, so it's easy to fix, raise_error=False can be supplied.
+        # -kmp 29-Nov-2020
+        if raise_error:
+            raise DatetimeCoercionFailure(timespec=timespec, timezone=tz)
+        else:
+            return None
 
 
-def as_ref_datetime(dt):
+def as_ref_datetime(timespec):
     """
     Parses a given datetime, returning a rendition of that tie in the reference timezone (US/Eastern by default).
 
-    If the input time is a string or a naive datetime with no timezon, it is assumed to be in the reference timezone
+    If the input time is a string or a naive datetime with no timezone, it is assumed to be in the reference timezone
     (which is US/Eastern by default).
-    If the time is already a datetime, no parsing occurs, but the time is still adjusted to present as it would in the
-    reference timeszone.
+    If the time is already a datetime, no parsing occurs, but the time is still adjusted to use the reference timeszone.
     If the given time is not a datetime, and cannot be coerced to be done, an error is raised.
     """
     try:
-        real_datetime = as_datetime(dt, tz=REF_TZ)
-        hms_dt = real_datetime.astimezone(REF_TZ)
+        dt = as_datetime(timespec, tz=REF_TZ)
+        hms_dt = dt.astimezone(REF_TZ)
         return hms_dt
     except Exception:
-        raise DatetimeCoercionFailure(timespec=dt, timezone=REF_TZ)
+        raise DatetimeCoercionFailure(timespec=timespec, timezone=REF_TZ)
 
 
-def as_utc_datetime(dt):
+def as_utc_datetime(timespec):
     """
     Parses a given datetime, returning a rendition of that tie in UTC.
 
-    If the input time is a string or a naive datetime with no timezon, it is assumed to be in the reference timezone
+    If the input time is a string or a naive datetime with no timezone, it is assumed to be in the reference timezone
     (which is US/Eastern by default). UTC is only used as the output format, not as an assumption about the input.
-    If the time is already a datetime, no parsing occurs, but the time is still adjusted to present as it would in UTC.
+    If the time is already a datetime, no parsing occurs, but the time is still adjusted to use UTC.
     If the given time is not a datetime, and cannot be coerced to be done, an error is raised.
     """
     try:
-        real_datetime = as_datetime(dt, tz=REF_TZ)
-        utc_dt = real_datetime.astimezone(pytz.UTC)
+        dt = as_datetime(timespec, tz=REF_TZ)
+        utc_dt = dt.astimezone(pytz.UTC)
         return utc_dt
     except Exception:
-        raise DatetimeCoercionFailure(timespec=dt, timezone=pytz.UTC)
+        raise DatetimeCoercionFailure(timespec=timespec, timezone=pytz.UTC)
 
 
 def in_datetime_interval(when, *, start=None, end=None):
@@ -516,8 +524,8 @@ def in_datetime_interval(when, *, start=None, end=None):
 
     The comparison is upper- and lower-inclusive.
     """
-    start = as_datetime(start)
-    end = as_datetime(end)
+    start = start and as_datetime(start)
+    end = end and as_datetime(end)
     return (not start or start <= when) and (not end or end >= when)
 
 
