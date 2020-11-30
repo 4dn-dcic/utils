@@ -523,10 +523,11 @@ def in_datetime_interval(when, *, start=None, end=None):
     Returns true if the first argument ('when') is in the range given by the other arguments.
 
     The comparison is upper- and lower-inclusive.
+    The string will be parsed as a datetime in the reference timezone (REF_TZ) if it doesn't have an explicit timezone.
     """
-    when = as_datetime(when)  # This is not allowed to be None, but it might be a str, and we need datetimes to compare.
-    start = start and as_datetime(start)
-    end = end and as_datetime(end)
+    when = as_ref_datetime(when)  # This is not allowed to be None, but it might be a str, and we need datetimes to compare.
+    start = start and as_ref_datetime(start)
+    end = end and as_ref_datetime(end)
     return (not start or start <= when) and (not end or end >= when)
 
 
