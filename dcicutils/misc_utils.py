@@ -524,6 +524,7 @@ def in_datetime_interval(when, *, start=None, end=None):
 
     The comparison is upper- and lower-inclusive.
     """
+    when = as_datetime(when)  # This is not allowed to be None, but it might be a str, and we need datetimes to compare.
     start = start and as_datetime(start)
     end = end and as_datetime(end)
     return (not start or start <= when) and (not end or end >= when)
