@@ -452,7 +452,7 @@ def test_get_authentication_with_server_unit():
 
 
 @pytest.mark.integratedx
-@pytest.mark.flaky  # TODO: Why is this marked flaky? There should be nothing flaky about this. -kmp 24-Oct-2020
+@pytest.mark.flaky  # e.g., if a deployment or CNAME swap occurs during the run
 def test_get_authentication_with_server_integrated(integrated_ff):
     key1 = ff_utils.get_authentication_with_server(integrated_ff['ff_key'], None)
     assert {'server', 'key', 'secret'} <= set(key1.keys())
@@ -564,24 +564,14 @@ def test_authorized_request_integrated(integrated_ff):
 
 def test_get_metadata_unit():
 
-    counter = make_counter()
-    unsupplied = object()
+    # The first part of this function sets up some common tools and then we test various scenarios
+
+    counter = make_counter()  # used to generate some sample data in mock calls
+    unsupplied = object()     # used in defaulting to prove an argument wasn't called
 
     # use this test biosource
     test_item = '331111bc-8535-4448-903e-854af460b254'
     test_item_id = '/' + test_item
-
-    def mocked_authorized_request(url, auth=None, ff_env=None, verb='GET',
-                                  retry_fxn=unsupplied, **kwargs):
-        ignored(ff_env, kwargs)
-        assert url.startswith(bar_env_url)
-        assert retry_fxn == unsupplied
-        assert verb == 'GET'
-        assert auth == bar_env_auth_dict
-        return MockResponse(json={
-            'mock_data': counter(),
-            '@id': remove_prefix(bar_env_url_trimmed, remove_suffix("?datastore=database", url))
-        })
 
     def make_mocked_stuff_in_queues(return_value=None):
         def mocked_stuff_in_queues(ff_env, check_secondary=False):
@@ -593,12 +583,64 @@ def test_get_metadata_unit():
             return return_value
         return mocked_stuff_in_queues
 
+    def mocked_authorized_request(url, auth=None, ff_env=None, verb='GET',
+                                  retry_fxn=unsupplied, **kwargs):
+        """
+        This function can be used a mock for successful uses of 'authorized_request'.
+        It tests that certain arguments were passed in predictable ways, such as
+        (a) that the mock uses a URL on the 'bar' scenario environment ('http://fourfront-bar.example/')
+            so that we know some other authorized request wasn't also attempted that wasn't expecting this mock.
+        (b) that the retry_fxn was not passed, since this mock doesn't know what to do with that
+        (c) that it's a GET operation, since we're not prepared to store anything and we're testing a getter function
+        (d) that proper authorization for the 'bar' scenario was given
+        It returns mock data that identifies itself as what was asked for.
+        """
+        ignored(ff_env, kwargs)
+        assert url.startswith(bar_env_url)
+        assert retry_fxn == unsupplied, "The retry_fxn argument was not expected by this mock."
+        assert verb == 'GET'
+        assert auth == bar_env_auth_dict
+        return MockResponse(json={
+            'mock_data': counter(),  # just so we can tell calls apart
+            '@id': remove_prefix(bar_env_url_trimmed, remove_suffix("?datastore=database", url))
+        })
+
+    def make_mocked_authorized_request_erring(status_code, json):
+        """Creates an appropriate mock for 'authorized_request' that will just return a specified error."""
+
+        def mocked_authorized_request_erring(url, auth=None, ff_env=None, verb='GET',
+                                             retry_fxn=unsupplied, **kwargs):
+            ignored(url, auth, ff_env, verb, retry_fxn, kwargs)
+            return MockResponse(status_code=status_code, json=json)
+
+        return mocked_authorized_request_erring
+
+    # Actual testing begins here.
+
+    # First we test the 'rosy path' where things go according to plan...
+
     with mock.patch.object(ff_utils, "authorized_request") as mock_authorized_request:
 
         def test_it(n, check_queue=None, expect_suffix="", **kwargs):
+            # This is the basic test we need to do several different ways to test successful operation.
+            # Really what we are testing for is that this function calls through to authorized_request
+            # in the way we expect it to. (We assume that authorized_request is itself already tested.)
+
+            # First we set up our mock that doesn't do a lot other than generate a test datum to see if
+            # that datum is returned correctly.
             mock_authorized_request.side_effect = mocked_authorized_request
+            # Do the call, which will bottom out at our mock call
             res_w_key = ff_utils.get_metadata(test_item, key=bar_env_auth_dict, check_queue=check_queue, **kwargs)
+            # Check that the data flow back from our mock authorized_request call did what we expect
             assert res_w_key == {'@id': test_item_id, 'mock_data': n}
+            # Check that the call out to the mock authorized_request is the thing we think.
+            # In particular, we expect that
+            # (a) this is a GET
+            # (b) it has appropriate auth
+            # (c) the auth specifies a server, which will be in the 'bar' environment because we used bar_env_auth_dict
+            # (d) on certain calls, an additional query string (e.g., "?datastore=database") will be used in the
+            #     function we're testing in some cases (e.g., because check_queue=True is used), so we take that suffix
+            #     as an argument and test for it.
             mock_authorized_request.assert_called_with(bar_env_url.rstrip('/') + test_item_id + expect_suffix,
                                                        auth=bar_env_auth_dict,
                                                        verb='GET')
@@ -616,16 +658,10 @@ def test_get_metadata_unit():
                 test_it(2, check_queue=True)
             test_it(2, check_queue=True, ff_env=bar_env)
 
-    # Nowe consider the error cases...
+    # Now we test the error scenarios...
 
-    def make_mocked_authorized_request_erring(status_code, json):
-
-        def mocked_authorized_request_erring(url, auth=None, ff_env=None, verb='GET',
-                                             retry_fxn=unsupplied, **kwargs):
-            ignored(url, auth, ff_env, verb, retry_fxn, kwargs)
-            return MockResponse(status_code=status_code, json=json)
-
-        return mocked_authorized_request_erring
+    # This tests what happens if we get an error response that doesn't contain valid JSON in the response body.
+    # We test for a 500 here but this is intended to stand for any error response with an ill-formed body.
 
     with mock.patch.object(ff_utils, "authorized_request") as mock_authorized_request:
         # NOTE WELL: If there is no body JSON, an error is raised, but if there is body JSON, it is quietly returned
@@ -633,6 +669,8 @@ def test_get_metadata_unit():
         mock_authorized_request.side_effect = make_mocked_authorized_request_erring(500, json=None)
         with raises_regexp(Exception, "Cannot get json"):
             ff_utils.get_metadata(test_item, key=bar_env_auth_dict, check_queue=False)
+
+    # This tests that the error message JSON can be obtained if the body is well-formed.
 
     with mock.patch.object(ff_utils, "authorized_request") as mock_authorized_request:
         # NOTE WELL: If there is no body JSON, an error is raised, but if there is body JSON, it is quietly returned
