@@ -1,16 +1,15 @@
-======================
+=========
 dcicutils
-======================
+=========
 
 ----------
 Change Log
 ----------
 
-
 1.6.0
 =====
 
-**PR 120: More time functions**
+**PR 121: More time functions**
 
 In ``misc_utils``:
 
@@ -20,6 +19,14 @@ In ``misc_utils``:
 * Rename ``hms_now`` to ``ref_now``, but again keep ``hms_now`` as a synonym for compatibility for now.
 
 The rationale for these changes is that if we deploy at other locations, it may not be HMS that is relevant, so we could be at some place with another timezone.
+
+
+1.5.1
+=====
+
+**PR 120: Update ES-py Version
+
+* Updates elasticsearch library to 6.8.1 to take a bug fix.
 
 
 1.5.0
