@@ -19,6 +19,11 @@ logger = logging.getLogger(__name__)
 
 class s3Utils(object):  # NOQA - This class name violates style rules, but a lot of things might break if we change it.
 
+    SYS_BUCKET_TEMPLATE = "elasticbeanstalk-%s-system"
+    OUTFILE_BUCKET_TEMPLATE = "elasticbeanstalk-%s-wfoutput"
+    RAW_BUCKET_TEMPLATE = "elasticbeanstalk-%s-files"
+    BLOB_BUCKET_TEMPLATE = "elasticbeanstalk-%s-blobs"
+
     def __init__(self, outfile_bucket=None, sys_bucket=None, raw_file_bucket=None,
                  blob_bucket=None, env=None):
         """
@@ -35,18 +40,23 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                     self.url = get_beanstalk_real_url(env)
                     env = prod_bucket_env(env)
             # we use standardized naming schema, so s3 buckets always have same prefix
-            sys_bucket = "elasticbeanstalk-%s-system" % env
-            outfile_bucket = "elasticbeanstalk-%s-wfoutput" % env
-            raw_file_bucket = "elasticbeanstalk-%s-files" % env
-            blob_bucket = "elasticbeanstalk-%s-blobs" % env
+            sys_bucket = self.SYS_BUCKET_TEMPLATE % env
+            outfile_bucket = self.OUTFILE_BUCKET_TEMPLATE % env
+            raw_file_bucket = self.RAW_BUCKET_TEMPLATE % env
+            blob_bucket = self.BLOB_BUCKET_TEMPLATE % env
 
         self.sys_bucket = sys_bucket
         self.outfile_bucket = outfile_bucket
         self.raw_file_bucket = raw_file_bucket
         self.blob_bucket = blob_bucket
 
-    def get_access_keys(self, name='access_key_admin'):
+    ACCESS_KEYS_S3_KEY = 'access_key_admin'
+
+    def get_access_keys(self, name=ACCESS_KEYS_S3_KEY):
         keys = self.get_key(keyfile_name=name)
+        if not isinstance(keys, dict):
+            raise ValueError("Remotely stored access keys are not in the expected form")
+
         if isinstance(keys.get('default'), dict):
             keys = keys['default']
         if self.url:

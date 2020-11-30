@@ -1,10 +1,19 @@
+import contextlib
+import copy
 import pytest
 import json
+import os
+import requests
+import shutil
 import time
 
 from botocore.exceptions import ClientError
-from dcicutils import ff_utils, s3_utils
-from dcicutils.qa_utils import check_duplicated_items_by_key, MockResponse, ignored, MockBoto3, MockBotoSQSClient
+from dcicutils import es_utils, ff_utils, s3_utils
+from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true
+from dcicutils.qa_utils import (
+    check_duplicated_items_by_key, MockResponse, ignored, MockBoto3, MockBotoSQSClient, MockBotoS3Client,
+    override_environ, raises_regexp
+)
 from types import GeneratorType
 from unittest import mock
 from urllib.parse import urlsplit, parse_qsl
@@ -111,7 +120,6 @@ def test_generate_rand_accession():
 
 def test_get_response_json():
     # use responses from http://httpbin.org
-    import requests
     good_res = requests.get('http://httpbin.org/json')
     good_res_json = ff_utils.get_response_json(good_res)
     assert isinstance(good_res_json, dict)
@@ -227,12 +235,150 @@ def test_unified_authentication_decoding(integrated_ff):
             assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
 
+# Here we set up some variables, auxiliary functions, and mocks containing common values needed for testing
+# of the next several functions so that the functions don't have to set them up over
+# and over again in each test.
+
+some_server = 'http://localhost:8000'
+some_auth_key, some_auth_secret = some_auth_tuple = ('mykey', 'mysecret')
+some_badly_formed_auth_tuple = ('mykey', 'mysecret', 'other-junk')  # contains an extra element
+some_auth_dict = {'key': some_auth_key, 'secret': some_auth_secret}
+some_auth_dict_with_server = {'key': some_auth_key, 'secret': some_auth_secret, 'server': some_server}
+some_badly_formed_auth_dict = {'kee': some_auth_key, 'secret': some_auth_secret}  # 'key' is misspelled
+
+foo_env = 'fourfront-foo'
+foo_env_auth_key, foo_env_auth_secret = foo_env_auth_tuple = ('fookey', 'foosecret')
+foo_env_auth_dict = {
+    'key': foo_env_auth_key,
+    'secret': foo_env_auth_secret
+}
+
+bar_env = 'fourfront-bar'
+bar_env_auth_key, bar_env_auth_secret = bar_env_auth_tuple = ('barkey', 'barsecret')
+bar_env_url = 'http://fourfront-bar.example/'
+bar_env_url_trimmed = bar_env_url.rstrip('/')
+bar_env_auth_dict = {
+    'key': bar_env_auth_key,
+    'secret': bar_env_auth_secret,
+    'server': bar_env_url,
+}
+bar_env_default_auth_dict = {'default': bar_env_auth_dict}
+
+SSE_CUSTOMER_KEY = 'SSECustomerKey'
+SSE_CUSTOMER_ALGORITHM = 'SSECustomerAlgorithm'
+
+
+def _access_key_home(bs_env):
+    """
+    Constructs the location in our S3 mock where the stashed access keys live for a given bs_env.
+
+    In our MockBotoS3, buckets and keys in s3 are represented as bucket/key in a MockFileSystem M
+    that is used by the S3 mock to hold its contents. So buckets are just the toplevel folders in M,
+    and keys are below that, and to preset a mock with contents for a given bucket and key, one just
+    creates bucket/key as a filename in M.  This function, _access_key_home will return the appropriate
+    filename for such a mock file system to contain the access keys for a given bs_env.
+    """
+    return os.path.join(s3_utils.s3Utils.SYS_BUCKET_TEMPLATE % bs_env, s3_utils.s3Utils.ACCESS_KEYS_S3_KEY)
+
+
+class MockBotoS3WithSSE(MockBotoS3Client):
+    """
+    This is a specialized mock for a boto3 S3 client that does server-side encryption (SSE).
+    We don't actually test that encryption is done, since that would be done by boto3, but we set up so that
+    that calls to any methods on the mock use certain required keyword arguments beyond the ordinary methods
+    that do the ordinary work of the method. e.g., for this mock definition:
+
+        def upload_file(self, Filename, Bucket, Key, **kwargs)
+            ...
+
+    if the call does not look like:
+
+        upload_File(Filename=..., Bucket=..., Key=...,
+                    SSECustomerKey='shazam', SSECustomerAlgorithm='AES256')
+
+    where the mock value 'shazam' is a wired value supplied in calls to the mock and 'AES256' is a constant we
+    expect is consistently used throughout this code base, then an error is raised in testing. The intent is to
+    make sure the calls are done with a certain degree of consistency.
+    """
+
+    SSE_ENCRYPT_KEY = 'shazam'
+
+    MOCK_REQUIRED_ARGUMENTS = {
+        # Our s3 mock for this test must check that all API calls pass these required arguments.
+        SSE_CUSTOMER_KEY: SSE_ENCRYPT_KEY,
+        SSE_CUSTOMER_ALGORITHM: "AES256"
+    }
+
+    MOCK_STATIC_FILES = {
+        # Our s3 mock presumes access keys are stashed in a well-known key
+        # in the system bucket corresponding to the given beanstalk.
+        _access_key_home(foo_env): json.dumps(foo_env_auth_dict),
+        _access_key_home(bar_env): json.dumps(bar_env_default_auth_dict)
+    }
+
+
+@contextlib.contextmanager
+def mocked_s3_with_sse():
+    """
+    This context manager sets up a mock version of boto3 for use by s3_utils and ff_utils during the context
+    of its test. It also sets up the S3_ENCRYPT_KEY environment variable with a sample value for testing.
+    """
+    # First we make a mocked boto3 that will use an S3 mock with mock server side encryption.
+    mock_boto3 = MockBoto3(s3=MockBotoS3WithSSE)
+    # Now we arrange that both s3_utils and ff_utils modules share the illusion that our mock IS the boto3 library
+    with mock.patch.object(s3_utils, "boto3", mock_boto3):
+        with mock.patch.object(ff_utils, "boto3", mock_boto3):
+            # The mocked encrypt key is expected by various tools in the s3_utils module to be supplied
+            # as an environment variable (i.e., in os.environ), so this sets up that environment variable.
+            with override_environ(S3_ENCRYPT_KEY=MockBotoS3WithSSE.SSE_ENCRYPT_KEY):
+                yield
+
+
+def test_unified_authentication_unit():
+
+    with mocked_s3_with_sse():
+
+        # When supplied a basic auth tuple, (key, secret), and a fourfront environment, the tuple is returned.
+        auth1 = ff_utils.unified_authentication(some_auth_tuple, foo_env)
+        assert auth1 == some_auth_tuple
+
+        # When supplied a password and a fourfront environment,
+        auth2 = ff_utils.unified_authentication(some_auth_dict, foo_env)
+        assert auth2 == some_auth_tuple  # Given an auth dict, the result is canonicalized to an auth tuple
+
+        # A deprecated form of the dictionary has an extra layer of wrapper we have to strip off.
+        # Hopefully calls like this are being rewritten, but for now we continue to support the behavior.
+        auth3 = ff_utils.unified_authentication({'default': some_auth_dict}, foo_env)
+        assert auth3 == some_auth_tuple  # Given an auth dict, the result is canonicalized to an auth tuple
+
+        # This tests that both forms of default credentials are supported remotely.
+
+        auth4 = ff_utils.unified_authentication(None, foo_env)
+        # Check that the auth dict fetched from server is canonicalized to an auth tuple...
+        assert auth4 == foo_env_auth_tuple
+
+        auth5 = ff_utils.unified_authentication(None, bar_env)
+        # Check that the auth dict fetched from server is canonicalized to an auth tuple...
+        assert auth5 == bar_env_auth_tuple
+
+        with raises_regexp(ValueError, "Must provide a valid authorization key or ff environment."):
+            # The .unified_authentication operation checks that an auth given as a tuple has length 2.
+            ff_utils.unified_authentication(some_badly_formed_auth_tuple, foo_env)
+
+        with raises_regexp(ValueError, "Must provide a valid authorization key or ff environment."):
+            # The .unified_authentication operation checks that an auth given as a dict has keys 'key' and 'secret'.
+            ff_utils.unified_authentication(some_badly_formed_auth_dict, foo_env)
+
+        with raises_regexp(ValueError, "Must provide a valid authorization key or ff environment."):
+            # If the first arg (auth) is None, the second arg (ff_env) must not be.
+            ff_utils.unified_authentication(None, None)
+
+
 # Integration tests
 
-
-@pytest.mark.integrated
+@pytest.mark.integratedx
 @pytest.mark.flaky
-def test_unified_authentication(integrated_ff):
+def test_unified_authentication_integrated(integrated_ff):
     key1 = ff_utils.unified_authentication(integrated_ff['ff_key'], integrated_ff['ff_env'])
     assert len(key1) == 2
     key2 = ff_utils.unified_authentication({'default': integrated_ff['ff_key']}, integrated_ff['ff_env'])
@@ -246,30 +392,68 @@ def test_unified_authentication(integrated_ff):
     assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
 
-def test_unified_authentication_more_envs():
-    key1 = ff_utils.unified_authentication(ff_env="data")
-    assert len(key1) == 2
-    key2 = ff_utils.unified_authentication(ff_env="staging")
-    assert key2 == key1
-    key3 = ff_utils.unified_authentication(ff_env="fourfront-green")
-    assert key3 == key1
-    key4 = ff_utils.unified_authentication(ff_env="fourfront-blue")
-    assert key4 == key1
-    key5 = ff_utils.unified_authentication(ff_env="fourfront-cgap")
-    assert len(key5) == 2
-    assert key5 != key1
-    try:
-        ff_utils.unified_authentication(ff_env="fourfront-data")
-    except ClientError as e:
-        assert "The specified bucket does not exist" in str(e)
-    else:
-        raise AssertionError("An exception was expected but did not occur.")
-
-
 @pytest.mark.integrated
-@pytest.mark.flaky
-def test_get_authentication_with_server(integrated_ff):
-    import copy
+def test_unified_authentication_prod_envs_integrated_only():
+    # This is ONLY an integration test. There is no unit test functionality tested here.
+    # All of the functionality used here is already tested elsewhere.
+
+    # Fourfront prod
+    ff_prod_auth = ff_utils.unified_authentication(ff_env="data")
+    assert len(ff_prod_auth) == 2
+    staging_auth = ff_utils.unified_authentication(ff_env="staging")
+    assert staging_auth == ff_prod_auth
+    green_auth = ff_utils.unified_authentication(ff_env="fourfront-green")
+    assert green_auth == ff_prod_auth
+    blue_auth = ff_utils.unified_authentication(ff_env="fourfront-blue")
+    assert blue_auth == ff_prod_auth
+
+    # CGAP prod
+    cgap_prod_auth = ff_utils.unified_authentication(ff_env="fourfront-cgap")
+    assert len(cgap_prod_auth) == 2
+
+    # Assure CGAP and Fourfront don't share auth
+    auth_is_shared = cgap_prod_auth == ff_prod_auth
+    assert not auth_is_shared
+
+    with raises_regexp(ClientError, "The specified bucket does not exist"):
+        # There is no such environment as 'fourfront-data'
+        ff_utils.unified_authentication(ff_env="fourfront-data")
+
+
+def test_get_authentication_with_server_unit():
+
+    with mocked_s3_with_sse():
+
+        key1 = ff_utils.get_authentication_with_server(bar_env_auth_dict, None)
+        assert isinstance(key1, dict)
+        assert {'server', 'key', 'secret'} <= set(key1.keys())
+        assert key1['key'] == bar_env_auth_key
+        assert key1['secret'] == bar_env_auth_secret
+        assert key1['server'] == bar_env_url_trimmed
+
+        key2 = ff_utils.get_authentication_with_server(bar_env_default_auth_dict, None)
+        assert isinstance(key2, dict)
+        assert {'server', 'key', 'secret'} <= set(key2.keys())
+        assert key2 == key1
+
+        key3 = ff_utils.get_authentication_with_server(None, bar_env)
+        assert isinstance(key2, dict)
+        assert {'server', 'key', 'secret'} <= set(key3.keys())
+        assert key3 == key1
+
+        with raises_regexp(ValueError, 'ERROR GETTING SERVER'):
+            # The mocked foo_env, unlike the bar_env, is missing a 'server' key in its dict,
+            # so it will be rejected as bad data by .get_authentication_with_server().
+            ff_utils.get_authentication_with_server(foo_env_auth_dict, None)
+
+        with raises_regexp(ValueError, 'ERROR GETTING SERVER'):
+            # If the auth is not provided (or None), the ff_env must be given (and not None).
+            ff_utils.get_authentication_with_server(None, None)
+
+
+@pytest.mark.integratedx
+@pytest.mark.flaky  # e.g., if a deployment or CNAME swap occurs during the run
+def test_get_authentication_with_server_integrated(integrated_ff):
     key1 = ff_utils.get_authentication_with_server(integrated_ff['ff_key'], None)
     assert {'server', 'key', 'secret'} <= set(key1.keys())
     key2 = ff_utils.get_authentication_with_server({'default': integrated_ff['ff_key']}, None)
@@ -286,14 +470,15 @@ def test_get_authentication_with_server(integrated_ff):
 def test_stuff_in_queues_unit():
 
     class MockBotoSQSClientEmpty(MockBotoSQSClient):
-        def compute_mock_queue_attribute(self, QueueUrl, Attribute):
+        def compute_mock_queue_attribute(self, QueueUrl, Attribute):  # noQA - Amazon AWS chose the argument names
             return 0
 
     with mock.patch.object(ff_utils, "boto3", MockBoto3(sqs=MockBotoSQSClientEmpty)):
         assert not ff_utils.stuff_in_queues('fourfront-foo')
 
     class MockBotoSQSClientPrimary(MockBotoSQSClient):
-        def compute_mock_queue_attribute(self, QueueUrl, Attribute):
+
+        def compute_mock_queue_attribute(self, QueueUrl, Attribute):  # noQA - Amazon AWS chose the argument names
             result = 0 if 'secondary' in QueueUrl else 1
             print("Returning %s for url=%s attr=%s" % (result, QueueUrl, Attribute))
             return result
@@ -303,7 +488,7 @@ def test_stuff_in_queues_unit():
         assert ff_utils.stuff_in_queues('fourfront-foo', check_secondary=True)
 
     class MockBotoSQSClientSecondary(MockBotoSQSClient):
-        def compute_mock_queue_attribute(self, QueueUrl, Attribute):
+        def compute_mock_queue_attribute(self, QueueUrl, Attribute):  # noQA - Amazon AWS chose the argument names
             result = 1 if 'secondary' in QueueUrl else 0
             print("Returning %s for url=%s attr=%s" % (result, QueueUrl, Attribute))
             return result
@@ -313,7 +498,7 @@ def test_stuff_in_queues_unit():
         assert ff_utils.stuff_in_queues('fourfront-foo', check_secondary=True)
 
     class MockBotoSQSClientErring(MockBotoSQSClient):
-        def compute_mock_queue_attribute(self, QueueUrl, Attribute):
+        def compute_mock_queue_attribute(self, QueueUrl, Attribute):  # noQA - Amazon AWS chose the argument names
             print("Simulating a boto3 error.")
             raise ClientError(500, "get_queue_attributes")
 
@@ -323,23 +508,22 @@ def test_stuff_in_queues_unit():
         assert ff_utils.stuff_in_queues('fourfront-foo', check_secondary=True)
 
 
-# TODO (C4-336): This will be re-enabled as an integration test when part 2 of C4-336 is fixed. -kmp 10-Oct-2020
-# @pytest.mark.integrated
-# @pytest.mark.flaky
-# def test_stuff_in_queues_integrated(integrated_ff):
-#     """
-#     Gotta index a bunch of stuff to make this work
-#     """
-#     search_res = ff_utils.search_metadata('search/?limit=all&type=File', key=integrated_ff['ff_key'])
-#     # just take the first handful
-#     for item in search_res[:8]:
-#         ff_utils.patch_metadata({}, obj_id=item['uuid'], key=integrated_ff['ff_key'])
-#     time.sleep(3)  # let queues catch up
-#     stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env'], check_secondary=True)
-#     assert stuff_in_queue
-#     with pytest.raises(Exception) as exec_info:
-#         ff_utils.stuff_in_queues(None, check_secondary=True)  # fail if no env specified
-#     assert 'Must provide a full fourfront environment name' in str(exec_info.value)
+@pytest.mark.integratedx
+@pytest.mark.flaky
+def test_stuff_in_queues_integrated(integrated_ff):
+    """
+    Gotta index a bunch of stuff to make this work
+    """
+    search_res = ff_utils.search_metadata('search/?limit=all&type=File', key=integrated_ff['ff_key'])
+    # just take the first handful
+    for item in search_res[:8]:
+        ff_utils.patch_metadata({}, obj_id=item['uuid'], key=integrated_ff['ff_key'])
+    time.sleep(3)  # let queues catch up
+    stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env'], check_secondary=True)
+    assert stuff_in_queue
+    with pytest.raises(Exception) as exec_info:
+        ff_utils.stuff_in_queues(None, check_secondary=True)  # fail if no env specified
+    assert 'Must provide a full fourfront environment name' in str(exec_info.value)
 
 
 @pytest.mark.integrated
@@ -378,9 +562,128 @@ def test_authorized_request_integrated(integrated_ff):
     assert 'Bad status code' in str(exec_info.value)
 
 
-@pytest.mark.integrated
+def test_get_metadata_unit():
+
+    # The first part of this function sets up some common tools and then we test various scenarios
+
+    counter = make_counter()  # used to generate some sample data in mock calls
+    unsupplied = object()     # used in defaulting to prove an argument wasn't called
+
+    # use this test biosource
+    test_item = '331111bc-8535-4448-903e-854af460b254'
+    test_item_id = '/' + test_item
+
+    def make_mocked_stuff_in_queues(return_value=None):
+        def mocked_stuff_in_queues(ff_env, check_secondary=False):
+            assert return_value is not None, "The mock for stuff_in_queues was not expected to be called."
+            check_true(ff_env, "Must provide a full fourfront environment name to stuff_in_queues,"
+                               " so it's required by this mock.",
+                       error_class=ValueError)
+            assert check_secondary is False, "This mock expects check_secondary to be false for stuff_in_queues."
+            return return_value
+        return mocked_stuff_in_queues
+
+    def mocked_authorized_request(url, auth=None, ff_env=None, verb='GET',
+                                  retry_fxn=unsupplied, **kwargs):
+        """
+        This function can be used a mock for successful uses of 'authorized_request'.
+        It tests that certain arguments were passed in predictable ways, such as
+        (a) that the mock uses a URL on the 'bar' scenario environment ('http://fourfront-bar.example/')
+            so that we know some other authorized request wasn't also attempted that wasn't expecting this mock.
+        (b) that the retry_fxn was not passed, since this mock doesn't know what to do with that
+        (c) that it's a GET operation, since we're not prepared to store anything and we're testing a getter function
+        (d) that proper authorization for the 'bar' scenario was given
+        It returns mock data that identifies itself as what was asked for.
+        """
+        ignored(ff_env, kwargs)
+        assert url.startswith(bar_env_url)
+        assert retry_fxn == unsupplied, "The retry_fxn argument was not expected by this mock."
+        assert verb == 'GET'
+        assert auth == bar_env_auth_dict
+        return MockResponse(json={
+            'mock_data': counter(),  # just so we can tell calls apart
+            '@id': remove_prefix(bar_env_url_trimmed, remove_suffix("?datastore=database", url))
+        })
+
+    def make_mocked_authorized_request_erring(status_code, json):
+        """Creates an appropriate mock for 'authorized_request' that will just return a specified error."""
+
+        def mocked_authorized_request_erring(url, auth=None, ff_env=None, verb='GET',
+                                             retry_fxn=unsupplied, **kwargs):
+            ignored(url, auth, ff_env, verb, retry_fxn, kwargs)
+            return MockResponse(status_code=status_code, json=json)
+
+        return mocked_authorized_request_erring
+
+    # Actual testing begins here.
+
+    # First we test the 'rosy path' where things go according to plan...
+
+    with mock.patch.object(ff_utils, "authorized_request") as mock_authorized_request:
+
+        def test_it(n, check_queue=None, expect_suffix="", **kwargs):
+            # This is the basic test we need to do several different ways to test successful operation.
+            # Really what we are testing for is that this function calls through to authorized_request
+            # in the way we expect it to. (We assume that authorized_request is itself already tested.)
+
+            # First we set up our mock that doesn't do a lot other than generate a test datum to see if
+            # that datum is returned correctly.
+            mock_authorized_request.side_effect = mocked_authorized_request
+            # Do the call, which will bottom out at our mock call
+            res_w_key = ff_utils.get_metadata(test_item, key=bar_env_auth_dict, check_queue=check_queue, **kwargs)
+            # Check that the data flow back from our mock authorized_request call did what we expect
+            assert res_w_key == {'@id': test_item_id, 'mock_data': n}
+            # Check that the call out to the mock authorized_request is the thing we think.
+            # In particular, we expect that
+            # (a) this is a GET
+            # (b) it has appropriate auth
+            # (c) the auth specifies a server, which will be in the 'bar' environment because we used bar_env_auth_dict
+            # (d) on certain calls, an additional query string (e.g., "?datastore=database") will be used in the
+            #     function we're testing in some cases (e.g., because check_queue=True is used), so we take that suffix
+            #     as an argument and test for it.
+            mock_authorized_request.assert_called_with(bar_env_url.rstrip('/') + test_item_id + expect_suffix,
+                                                       auth=bar_env_auth_dict,
+                                                       verb='GET')
+
+        with mock.patch.object(ff_utils, "stuff_in_queues", make_mocked_stuff_in_queues()):
+            test_it(0, check_queue=False)
+
+        with mock.patch.object(ff_utils, "stuff_in_queues", make_mocked_stuff_in_queues(return_value=True)):
+            with raises_regexp(ValueError, "environment name"):
+                test_it(1, check_queue=True, expect_suffix="?datastore=database")
+            test_it(1, check_queue=True, expect_suffix="?datastore=database", ff_env=bar_env)
+
+        with mock.patch.object(ff_utils, "stuff_in_queues", make_mocked_stuff_in_queues(return_value=False)):
+            with raises_regexp(ValueError, "environment name"):
+                test_it(2, check_queue=True)
+            test_it(2, check_queue=True, ff_env=bar_env)
+
+    # Now we test the error scenarios...
+
+    # This tests what happens if we get an error response that doesn't contain valid JSON in the response body.
+    # We test for a 500 here but this is intended to stand for any error response with an ill-formed body.
+
+    with mock.patch.object(ff_utils, "authorized_request") as mock_authorized_request:
+        # NOTE WELL: If there is no body JSON, an error is raised, but if there is body JSON, it is quietly returned
+        #            as if it were what was requested. See next check.
+        mock_authorized_request.side_effect = make_mocked_authorized_request_erring(500, json=None)
+        with raises_regexp(Exception, "Cannot get json"):
+            ff_utils.get_metadata(test_item, key=bar_env_auth_dict, check_queue=False)
+
+    # This tests that the error message JSON can be obtained if the body is well-formed.
+
+    with mock.patch.object(ff_utils, "authorized_request") as mock_authorized_request:
+        # NOTE WELL: If there is no body JSON, an error is raised, but if there is body JSON, it is quietly returned
+        #            as if it were what was requested. See previous check.
+        # TODO: Consider whether get_metadata() would be better off doing a .raise_For_status() -kmp 25-Oct-2020
+        error_message_json = {'message': 'foo'}
+        mock_authorized_request.side_effect = make_mocked_authorized_request_erring(500, json=error_message_json)
+        assert ff_utils.get_metadata(test_item, key=bar_env_auth_dict, check_queue=False) == error_message_json
+
+
+@pytest.mark.integratedx
 @pytest.mark.flaky(max_runs=3)  # very flaky for some reason
-def test_get_metadata(integrated_ff, basestring):
+def test_get_metadata_integrated(integrated_ff, basestring):
     # use this test biosource
     test_item = '331111bc-8535-4448-903e-854af460b254'
     res_w_key = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'])
@@ -564,12 +867,11 @@ def test_search_metadata_unit(integrated_ff, url):
         check_search_metadata(integrated_ff, url)
 
 
-# TODO (C4-336): This will be re-enabled as an integration test when part 2 of C4-336 is fixed. -kmp 10-Oct-2020
-# @pytest.mark.integrated
-# @pytest.mark.flaky
-# @pytest.mark.parametrize('url', ['', 'to_become_full_url'])
-# def test_search_metadata_integrated(integrated_ff, url):
-#     check_search_metadata(integrated_ff, url)
+@pytest.mark.integratedx
+@pytest.mark.flaky
+@pytest.mark.parametrize('url', ['', 'to_become_full_url'])
+def test_search_metadata_integrated(integrated_ff, url):
+    check_search_metadata(integrated_ff, url)
 
 
 def check_search_metadata(integrated_ff, url):
@@ -685,8 +987,6 @@ def test_get_search_generator(integrated_ff):
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_get_es_metadata(integrated_ff):
-    from dcicutils import es_utils
-    from types import GeneratorType
     # use this test biosource and biosample
     test_biosource = '331111bc-8535-4448-903e-854af460b254'
     test_biosample = '111112bc-1111-4448-903e-854af460b123'
@@ -795,7 +1095,6 @@ def test_get_es_metadata(integrated_ff):
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_get_es_search_generator(integrated_ff):
-    from dcicutils import es_utils
     # get es_client info from the health page
     health = ff_utils.get_health_page(key=integrated_ff['ff_key'])
     es_url = health['elasticsearch']
@@ -1176,8 +1475,6 @@ def test_delete_field(integrated_ff):
 @pytest.mark.file_operation
 @pytest.mark.flaky
 def test_dump_results_to_json(integrated_ff):
-    import shutil
-    import os
 
     def clear_folder(folder):
         ignored(folder)
@@ -1265,11 +1562,70 @@ def test_get_page(integrated_ff):
     assert 'primary_waiting' in indexing_status_res
 
 
-@pytest.mark.integrated
-def test_are_counts_even(integrated_ff):
+@pytest.mark.integratedx
+def test_are_counts_even_integrated(integrated_ff):
     ff_env = integrated_ff['ff_env']
     counts_are_even, totals = ff_utils.get_counts_summary(ff_env)
     if counts_are_even:
         assert 'more items' not in ' '.join(totals)
     else:
         assert 'more items' in ' '.join(totals)
+
+
+# These are stripped-down versions of actual results that illustrate the kinds of output we might expect.
+
+SAMPLE_COUNTS_MISMATCH = {
+    'title': 'Item Counts',
+    'db_es_total': 'DB: 54  ES: 57   < ES has 3 more items >',
+    'db_es_compare': {
+        'AnalysisStep': 'DB: 26   ES: 26 ',
+        'BiosampleCellCulture': 'DB: 3   ES: 3 ',
+        'Construct': 'DB: 1   ES: 1 ',
+        'Document': 'DB: 2   ES: 2 ',
+        'Enzyme': 'DB: 9   ES: 9 ',
+        'Biosample': 'DB: 13   ES: 16   < ES has 3 more items >',
+    }
+}
+
+SAMPLE_COUNTS_MATCH = {
+    'title': 'Item Counts',
+    'db_es_total': 'DB: 54  ES: 54 ',
+    'db_es_compare': {
+        'AnalysisStep': 'DB: 26   ES: 26 ',
+        'BiosampleCellCulture': 'DB: 3   ES: 3 ',
+        'Construct': 'DB: 1   ES: 1 ',
+        'Document': 'DB: 2   ES: 2 ',
+        'Enzyme': 'DB: 9   ES: 9 ',
+        'Biosample': 'DB: 13   ES: 13 ',
+    }
+}
+
+
+@pytest.mark.parametrize('expect_match, sample_counts', [(True, SAMPLE_COUNTS_MATCH), (False, SAMPLE_COUNTS_MISMATCH)])
+def test_are_counts_even_unit(expect_match, sample_counts):
+
+    unsupplied = object()
+
+    def mocked_authorized_request(url, auth=None, ff_env=None, verb='GET',
+                                  retry_fxn=unsupplied, **kwargs):
+        print("URL=%s auth=%s ff_env=%s verb=%s" % (url, auth, ff_env, verb))
+        ignored(ff_env, kwargs)
+        assert auth == bar_env_auth_dict
+        assert verb == 'GET'
+        assert retry_fxn == unsupplied
+
+        return MockResponse(json=sample_counts)
+
+    with mock.patch.object(ff_utils, "authorized_request", mocked_authorized_request):
+        with mock.patch.object(s3_utils.s3Utils, "get_access_keys",
+                               return_value=bar_env_auth_dict):
+
+            counts_are_even, totals = ff_utils.get_counts_summary(env='fourfront-foo')
+            print("expect_match=", expect_match, "counts_are_even=", counts_are_even, "totals=", totals)
+
+            if expect_match:
+                assert counts_are_even
+                assert 'more items' not in ' '.join(totals)
+            else:
+                assert not counts_are_even
+                assert 'more items' in ' '.join(totals)

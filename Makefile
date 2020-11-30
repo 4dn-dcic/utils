@@ -10,8 +10,17 @@ build:  # builds
 	make configure
 	poetry install
 
-test:
+test:  # runs default tests, which are the unit tests
+	make test-units
+
+test-all:
 	pytest -vv
+
+test-units:  # runs unit tests (and integration tests not backed by a unit test)
+	pytest -vv -m "not integratedx"
+
+test-integrations:  # runs integration tests
+	pytest -vv -m "integrated or integratedx"
 
 update:  # updates dependencies
 	poetry update

@@ -6,6 +6,56 @@ dcicutils
 Change Log
 ----------
 
+
+1.7.0
+=====
+
+**PR 122: Speed up ff_utils unit tests, and misc small bits of functionality**
+
+* Added an ``integratedx`` mark to possible marks in ``pytest.ini``. These
+  are the same as ``integrated`` but they represent test cases that have
+  an associated unit test that is redundant, so that the ``integratedx``
+  test doesn't have to be run to get full coverage.
+
+* For ``ff_utils``:
+
+  * Split tests into a ``xxx_unit`` and
+    ``xxx_integrated`` version.  The latter is marked with new
+    ``integratedx`` mark.
+
+* For ``env_utils``:
+
+  * Added some test cases.
+
+* For ``s3_utils``:
+
+  * Small remodularization of ``s3Utils`` for easier access to
+    some constants in testing.
+  * Improvements to error reporting in ``s3Utils.get_access_keys()``.
+
+* For ``qa_utils``:
+
+  * In ``MockFileSystem``, fixed a typo in debugging typeout.
+  * In ``MockResponse``:
+
+    * Added a ``url=`` init arg and ``.url`` property.
+    * Added a .text as synonym for ``.content``.
+
+  * In ``MockBotoS3Client``:
+
+    * Extended to handle ``region_name=``.
+    * Added ``mock_other_required_arguments=`` and ``mock_s3_files=``
+      init args for use in testing.
+    * Added ``MockBotoS3Client``, add ``.get_object(Bucket, Key)``.
+
+* For ``ff_utils``:
+
+  * Used ``ValueError`` rather than ``Exception`` in several
+    places errors are raised.
+  * Some very small other refactoring was also done
+    for modularity that should not affect behavior.
+
+
 1.6.0
 =====
 
@@ -28,7 +78,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.5.1
 =====
 
-**PR 120: Update ES-py Version
+**PR 120: Update ES-py Version**
 
 * Updates elasticsearch library to 6.8.1 to take a bug fix.
 
@@ -38,7 +88,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 
 **PR 119: More env_utils support**
 
-* Add ``env_utils.classify_server_url`.
+* Add ``env_utils.classify_server_url``.
 
 
 1.4.0
