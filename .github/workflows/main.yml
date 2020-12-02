@@ -40,5 +40,5 @@ jobs:
       - name: QA
         run: |
           poetry install
-          flake8 dcicutils
+          poetry run flake8 dcicutils
           make test
