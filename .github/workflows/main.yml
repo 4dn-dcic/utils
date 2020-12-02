@@ -39,8 +39,6 @@ jobs:
 
       - name: QA
         run: |
-          poetry shell 
           poetry install
           flake8 dcicutils
-          pytest -vv test
-
+          make test
