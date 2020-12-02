@@ -38,6 +38,9 @@ jobs:
           pip install poetry
 
       - name: QA
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           poetry install
           poetry run flake8 dcicutils
