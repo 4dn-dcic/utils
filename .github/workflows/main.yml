@@ -34,8 +34,10 @@ jobs:
           python-version: ${{ matrix.python_version }}
 
       - name: Install Poetry
-        run: pip install poetry
-      
+        run: |
+          pip install poetry
+          pip install flake8
+
       - name: QA
         run: |
           poetry install
