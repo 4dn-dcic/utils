@@ -25,5 +25,8 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
       - name: Publish
+        env:
+          PYPI_USER: ${{ secrets.PYPI_USER }}
+          PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: poetry publish --build --username=$PYPI_USER --password=$PYPI_PASSWORD 
 
