@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+1.7.1
+=====
+
+**PR 123: Add GA for build**
+
+* Adds 3 Github Actions for building the library, building docs
+  and deploying to PyPi
 
 1.7.0
 =====
