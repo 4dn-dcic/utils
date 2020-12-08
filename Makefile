@@ -17,7 +17,7 @@ test-all:
 	pytest -vv
 
 test-units:  # runs unit tests (and integration tests not backed by a unit test)
-	pytest -vv -m "not integratedx"
+	poetry run pytest -vv -m "not integratedx"
 
 test-integrations:  # runs integration tests
 	pytest -vv -m "integrated or integratedx"
