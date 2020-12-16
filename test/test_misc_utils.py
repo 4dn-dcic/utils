@@ -17,7 +17,7 @@ from dcicutils.misc_utils import (
     Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool,
     LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
     keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
-    CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json,
+    CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json, url_path_join,
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
     DatetimeCoercionFailure,
 )
@@ -1729,3 +1729,12 @@ def test_customized_class():
                                                  % test_class_prefix):
             PRINT(getattr_customized(SampleClass2, 'FAVORITE_SONG'))
         assert printed.last is None
+
+
+def test_url_path_join():
+
+    assert url_path_join('foo', 'bar') == 'foo/bar'
+    assert url_path_join('foo/', 'bar') == 'foo/bar'
+    assert url_path_join('foo', '/bar') == 'foo/bar'
+    assert url_path_join('foo/', '/bar') == 'foo/bar'
+    assert url_path_join('//foo//', '///bar//') == '//foo/bar//'

@@ -1060,6 +1060,24 @@ def getattr_customized(thing, key):
         return value
 
 
+def url_path_join(*fragments):
+    """
+    Concatenates its arguments, returning a string with exactly one slash ('/') separating each of the path fragments.
+
+    So, whether the path_fragments are ('foo', 'bar') or ('foo/', 'bar') or ('foo', '/bar') or ('foo/', '/bar')
+    or even ('foo//', '///bar'), the result will be 'foo/bar'. The left side of the first thing and the
+    right side of the last thing are unaffected.
+
+    :param fragments: a list of URL path fragments
+    :return: a slash-separated concatentation of the given path fragments
+    """
+    fragments = fragments or ("",)
+    result = fragments[0]  # Tolerate an empty list
+    for thing in fragments[1:]:
+        result = result.rstrip("/") + "/" + thing.lstrip("/")
+    return result
+
+
 # Deprecated names, still supported for a while.
 HMS_TZ = REF_TZ
 hms_now = ref_now

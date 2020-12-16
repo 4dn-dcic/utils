@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+1.8.0
+=====
+
+**PR 124: Add url_path_join**
+
+* Add ``misc_utils.url_path_join`` for merging parts of URLs.
+
 1.7.1
 =====
 
