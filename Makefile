@@ -13,6 +13,9 @@ build:  # builds
 test:  # runs default tests, which are the unit tests
 	make test-units
 
+retest:  # runs only failed tests from the last test run. (if no failures, it seems to run all?? -kmp 17-Dec-2020)
+	pytest -vv --last-failed
+
 test-all:
 	pytest -vv
 
