@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+1.8.1
+=====
+
+**PR 125: Edits to getting_started doc**
+
+* Edited getting_started.rst doc to reflect updated account creation protocol.
+
 1.8.0
 =====
 
@@ -237,4 +244,3 @@ the ``poetry.app`` section of ``pyproject.toml``, as in::
    name = "dcicutils"
    version = "100.200.300"
    ...etc.
-
