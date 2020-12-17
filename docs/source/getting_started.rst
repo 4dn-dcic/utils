@@ -16,7 +16,7 @@ To fully utilize the utilities, you should have your AWS credentials set up. In 
 External set up
 ^^^^^^^^^^^^^^^
 
-The utilities require an access key, which is generated using your use account on Fourfront. If you do not yet have an account, the first step is to `request one <https://data.4dnucleome.org/help/user-guide/account-creation>`_. You can then generate an access key on your `user information page <https://data.4dnucleome.org/me>`_ when your account is set up and you are logged in. Make sure to take note of the information generated when you make an access key. Store it in a safe place, because it will be needed when you make a request to Fourfront.
+The utilities require an access key, which is generated using your use account on Fourfront. If you do not yet have an account, you can `create one <https://data.4dnucleome.org/help/user-guide/account-creation>`_ using Google or Github authentication. Once you have an account, you can generate an access key on your `user information page <https://data.4dnucleome.org/me>`_ when your account is set up and you are logged in. Make sure to take note of the information generated when you make an access key. Store it in a safe place, because it will be needed when you make a request to Fourfront.
 
 The main format of the authorization used for the utilities is:
 
