@@ -1,3 +1,4 @@
+import pytest
 import boto3
 import io
 import json
@@ -352,3 +353,55 @@ def test_compute_prd_env_for_project():
             mock_describer.side_effect = _mocked_describe_beanstalk_environments
             assert bs._compute_prd_env_for_project('cgap') == 'cgap-env-2'
             assert bs._compute_prd_env_for_project('ff') == 'ff-env-2'
+
+
+@pytest.mark.parametrize('options, expected', [
+    ([
+         {
+            'Namespace': bs.ENV_VARIABLE_NAMESPACE,
+            'OptionName': 'super_secret',
+            'Value': 'i am secret'
+         }
+     ], {'super_secret': 'i am secret'}),
+    ([
+         {
+            'Namespace': bs.ENV_VARIABLE_NAMESPACE,
+            'OptionName': 'super_secret',
+            'Value': 'i am secret'
+         },
+         {
+            'Namespace': 'something else',
+            'OptionName': 'not_secret',
+            'Value': 'i dont care about this value'
+         }
+     ], {'super_secret': 'i am secret'}),
+    ([
+         {
+            'Namespace': 'identifier',
+            'OptionName': 'something',
+            'Value': 'important'
+         },
+         {
+            'Namespace': 'something else',
+            'OptionName': 'not_secret',
+            'Value': 'i dont care about this value'
+         }
+     ], {}),
+    ([
+         {
+            'Namespace': bs.ENV_VARIABLE_NAMESPACE,
+            'OptionName': 'super_secret',
+            'Value': 'i am secret'
+         },
+         {
+            'Namespace': bs.ENV_VARIABLE_NAMESPACE,
+            'OptionName': 'not_secret',
+            'Value': 'this one shows up too though'
+         }
+     ], {'super_secret': 'i am secret', 'not_secret': 'this one shows up too though'}),
+])
+def test_get_beanstalk_env_variables(options, expected):
+    with mock.patch('dcicutils.beanstalk_utils._get_beanstalk_configuration_settings') as mock_api:
+        mock_api.return_value = options  # do not call out to AWS
+        actual = bs.get_beanstalk_environment_variables('unused')
+        assert actual == expected
