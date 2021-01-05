@@ -362,7 +362,7 @@ def test_compute_prd_env_for_project():
             'OptionName': 'super_secret',
             'Value': 'i am secret'
          }
-     ], [('super_secret', 'i am secret')]),
+     ], {'super_secret': 'i am secret'}),
     ([
          {
             'Namespace': bs.ENV_VARIABLE_NAMESPACE,
@@ -374,7 +374,19 @@ def test_compute_prd_env_for_project():
             'OptionName': 'not_secret',
             'Value': 'i dont care about this value'
          }
-     ], [('super_secret', 'i am secret')])
+     ], {'super_secret': 'i am secret'}),
+    ([
+         {
+            'Namespace': 'identifier',
+            'OptionName': 'something',
+            'Value': 'important'
+         },
+         {
+            'Namespace': 'something else',
+            'OptionName': 'not_secret',
+            'Value': 'i dont care about this value'
+         }
+     ], {})
 ])
 def test_get_beanstalk_env_variables(options, expected):
     with mock.patch('dcicutils.beanstalk_utils._get_beanstalk_configuration_settings') as mock_api:

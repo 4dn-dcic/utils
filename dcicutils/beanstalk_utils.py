@@ -409,11 +409,11 @@ def get_beanstalk_environment_variables(env):
         Ensure that if you are using this you are not logging the output of this anywhere.
     """
     options = _get_beanstalk_configuration_settings(env)
-    env = []
+    env = {}
     for option in options:
         if 'Namespace' in option:
             if option['Namespace'] == ENV_VARIABLE_NAMESPACE:
-                env.append((option['OptionName'], option['Value']))
+                env[option['OptionName']] = option['Value']
     return env
 
 
