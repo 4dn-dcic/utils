@@ -58,6 +58,9 @@ CGAP_GOLDEN_DB = 'fourfront-cgap.co3gwj7b7tpq.us-east-1.rds.amazonaws.com'
 # Although not visibly used in this repository, this variable is imported by Torb.
 GOLDEN_DB = FF_GOLDEN_DB
 
+# identifier for locating environment variables in EB config
+ENV_VARIABLE_NAMESPACE = 'aws:elasticbeanstalk:application:environment'
+
 REGION = 'us-east-1'
 
 
@@ -361,6 +364,59 @@ def get_beanstalk_real_url(env):
     return url
 
 
+def _get_beanstalk_configuration_settings(env):
+    """ Helper function for the below method (that is easy to mock for testing).
+        This function should not be called directly.
+        (relevant) syntax from boto3 docs:
+            {
+                'ConfigurationSettings': [
+                    {
+                        'SolutionStackName': 'string',
+                        'PlatformArn': 'string',
+                        'ApplicationName': 'string',
+                        'TemplateName': 'string',
+                        'Description': 'string',
+                        'EnvironmentName': 'string',
+                        'DeploymentStatus': 'deployed'|'pending'|'failed',
+                        'DateCreated': datetime(2015, 1, 1),
+                        'DateUpdated': datetime(2015, 1, 1),
+                        'OptionSettings': [
+                            {
+                                'ResourceName': 'string',
+                                'Namespace': 'string',
+                                'OptionName': 'string',
+                                'Value': 'string'
+                            },
+                        ]
+                    },
+                ]
+            }
+    """
+    try:
+        client = boto3.client('elasticbeanstalk')
+        config = client.describe_configuration_settings(ApplicationName='4dn-web', EnvironmentName=env)
+        options = config['ConfigurationSettings']['OptionSettings']  # guaranteed to be present
+        return options
+    except ClientError:
+        logger.error('Error encountered attempting to get environment settings for %s' % env)
+        return []
+
+
+def get_beanstalk_environment_variables(env):
+    """ Acquires the environment variables used to deploy the given environment.
+
+        VERY IMPORTANT NOTE: this function will echo *extremely sensitive* data if run.
+        Ensure that if you are using this you are not logging the output of this anywhere.
+    """
+    options = _get_beanstalk_configuration_settings(env)
+    env = []
+    for option in options:
+        if 'Namespace' in option:
+            if option['Namespace'] == ENV_VARIABLE_NAMESPACE:
+                env.append((option['OptionName'], option['Value']))
+    return env
+
+
 @obsolete
 def is_beanstalk_ready(env):
     """
@@ -480,7 +536,6 @@ def is_db_ready(db_identifier):
     return is_ready, details
 
 
-@obsolete
 def create_db_snapshot(db_identifier, snapshot_name):
     """
     Given an RDS instance indentifier, create a snapshot using the given name.
