@@ -28,4 +28,6 @@ jobs:
         env:
           PYPI_USER: ${{ secrets.PYPI_USER }}
           PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: make publish
+        run: | 
+          pip install poetry
+          make publish
