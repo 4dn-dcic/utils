@@ -6,6 +6,16 @@ dcicutils
 Change Log
 ----------
 
+1.8.2
+=====
+
+**PR 126: C4-503 Grab Environment API**
+
+* Adds get_beanstalk_environment_variables, which will return information 
+  necessary to simulate any application given the caller has the appropriate 
+  access keys.
+* Removes an obsolete tag from create_db_snapshot, which was set erroneously.
+
 1.8.1
 =====
 
