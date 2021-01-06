@@ -395,7 +395,9 @@ def _get_beanstalk_configuration_settings(env):
     try:
         client = boto3.client('elasticbeanstalk', region_name=REGION)
         config = client.describe_configuration_settings(ApplicationName='4dn-web', EnvironmentName=env)
-        options = config['ConfigurationSettings'][0]['OptionSettings']  # guaranteed to be present
+        # These are guaranteed to be present
+        [settings] = config['ConfigurationSettings']
+        options = settings['OptionSettings']
         return options
     except ClientError:
         logger.error('Error encountered attempting to get environment settings for %s' % env)
