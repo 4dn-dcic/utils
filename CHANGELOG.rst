@@ -6,6 +6,19 @@ dcicutils
 Change Log
 ----------
 
+1.8.4
+=====
+
+**PR 127: Beanstalk Bugfix**
+
+* Parses Beanstalk API correctly and passes region.
+
+1.8.3
+=====
+
+**No PR: Just fixes to GA PyPi deploy**
+
+
 1.8.2
 =====
 
