@@ -393,7 +393,7 @@ def _get_beanstalk_configuration_settings(env):
             }
     """
     try:
-        client = boto3.client('elasticbeanstalk', region_name='us-east-1')
+        client = boto3.client('elasticbeanstalk', region_name=REGION)
         config = client.describe_configuration_settings(ApplicationName='4dn-web', EnvironmentName=env)
         options = config['ConfigurationSettings'][0]['OptionSettings']  # guaranteed to be present
         return options
