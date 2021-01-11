@@ -6,6 +6,14 @@ dcicutils
 Change Log
 ----------
 
+1.8.5
+=====
+
+**PR 128: Changelog Warnings (C4-511) and Publish Fixes (C4-512)**
+
+* Make changelog problems warn rather than fail testing.
+* Make publication for GitHub Actions (GA) not query interactively for confirmation.
+
 1.8.4
 =====
 
