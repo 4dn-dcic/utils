@@ -33,4 +33,4 @@ jobs:
           PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: | 
           pip install poetry
-          poetry publish --no-interaction --build --username=$PYPI_USER --password=$PYPI_PASSWORD
+          make publish-for-ga

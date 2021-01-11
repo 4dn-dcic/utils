@@ -31,6 +31,9 @@ update:  # updates dependencies
 publish:
 	scripts/publish
 
+publish-for-ga:
+	scripts/publish --noconfirm
+
 help:
 	@make info
 
