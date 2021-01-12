@@ -11,8 +11,9 @@ Change Log
 
 **PR 128: Changelog Warnings (C4-511) and Publish Fixes (C4-512)**
 
-* Make changelog problems warn rather than fail testing.
+* Make changelog problems issue a warning rather than fail testing.
 * Make publication for GitHub Actions (GA) not query interactively for confirmation.
+* Fix bug in handling of ``encoding=`` in the ``open`` operation of ``MockFileSystem``.
 
 1.8.4
 =====
@@ -25,7 +26,6 @@ Change Log
 =====
 
 **No PR: Just fixes to GA PyPi deploy**
-
 
 1.8.2
 =====

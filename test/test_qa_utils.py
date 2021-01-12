@@ -1236,6 +1236,63 @@ def test_version_checker_with_missing_changelog():
             MyVersionChecker.check_version()  # The version history will be missing because of mocking.
 
 
+def test_version_checker_with_proper_changelog():
+
+    pyproject_filename = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+    changelog_filename = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+
+    mfs = MockFileSystem(files={
+        pyproject_filename: '[tool.poetry]\nname = "foo"\nversion = "1.2.3"',
+        changelog_filename:
+            '1.2.0\n'
+            'Some new feature.\n'
+            '1.2.1\n'
+            'A bug fix.\n'
+            '1.2.2\n'
+            'A second bug fix.\n'
+            '1.2.3\n'
+            'A third bug fix.\n'
+    })
+
+    with mock.patch("io.open", mfs.open):
+        with mock.patch("os.path.exists", mfs.exists):
+
+            class MyVersionChecker(VersionChecker):
+
+                PYPROJECT = pyproject_filename
+                CHANGELOG = changelog_filename
+
+            # The CHANGELOG is present and with the right data.
+            MyVersionChecker.check_version()
+
+
+def test_version_checker_with_insufficient_changelog():
+
+    pyproject_filename = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+    changelog_filename = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+
+    mfs = MockFileSystem(files={
+        pyproject_filename: '[tool.poetry]\nname = "foo"\nversion = "1.2.3"',
+        changelog_filename:
+            '1.2.0\n'
+            'Some new feature.\n'
+            '1.2.1\n'
+            'A bug fix.\n'
+    })
+
+    with mock.patch("io.open", mfs.open):
+        with mock.patch("os.path.exists", mfs.exists):
+
+            class MyVersionChecker(VersionChecker):
+
+                PYPROJECT = pyproject_filename
+                CHANGELOG = changelog_filename
+
+            with pytest.warns(VersionChecker.WARNING_CATEGORY):
+                # The CHANGELOG won't have the right data, so we should see a warning.
+                MyVersionChecker.check_version()
+
+
 def test_check_duplicated_items_by_key():
 
     with raises_regexp(AssertionError,

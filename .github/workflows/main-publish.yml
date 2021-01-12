@@ -32,5 +32,5 @@ jobs:
           PYPI_USER: ${{ secrets.PYPI_USER }}
           PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: | 
-          pip install poetry
+          make configure
           make publish-for-ga

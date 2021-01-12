@@ -12,6 +12,7 @@ import re
 import time
 import toml
 import uuid
+import warnings
 
 from json import dumps as json_dumps, loads as json_loads
 from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized
@@ -401,17 +402,17 @@ class MockFileSystem:
         if not self.files.pop(file, None):
             raise FileNotFoundError("No such file or directory: %s" % file)
 
-    def open(self, file, mode='r'):
+    def open(self, file, mode='r', encoding=None):
         if FILE_SYSTEM_VERBOSE:
             print("Opening %r in mode %r." % (file, mode))
         if mode == 'w':
-            return self._open_for_write(file_system=self, file=file, binary=False)
+            return self._open_for_write(file_system=self, file=file, binary=False, encoding=encoding)
         elif mode == 'wb':
-            return self._open_for_write(file_system=self, file=file, binary=True)
+            return self._open_for_write(file_system=self, file=file, binary=True, encoding=encoding)
         elif mode == 'r':
-            return self._open_for_read(file, binary=False)
+            return self._open_for_read(file, binary=False, encoding=encoding)
         elif mode == 'rb':
-            return self._open_for_read(file, binary=True)
+            return self._open_for_read(file, binary=True, encoding=encoding)
         else:
             raise AssertionError("Mocked io.open doesn't handle mode=%r." % mode)
 
@@ -664,7 +665,7 @@ class MockBotoS3Client:
         with io.open(Filename, 'wb') as fp:
             self.download_fileobj(Bucket=Bucket, Key=Key, Fileobj=fp)
 
-    def get_object(self, Bucket, Key, **kwargs):
+    def get_object(self, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
         if kwargs != self.other_required_arguments:
             raise MockKeysNotImplemented("get_object", kwargs.keys())
 
@@ -775,6 +776,8 @@ class VersionChecker:
     PYPROJECT = CustomizableProperty('PYPROJECT', description="The repository-relative name of the pyproject file.")
     CHANGELOG = CustomizableProperty('CHANGELOG', description="The repository-relative name of the change log.")
 
+    WARNING_CATEGORY = pytest.PytestConfigWarning
+
     @classmethod
     def check_version(cls):
         version = cls._check_version()
@@ -823,10 +826,12 @@ class VersionChecker:
                     versions.append(m.group(1))
 
         assert versions, "No version info was parsed from %s" % changelog_file
+
         # Might be sorted top to bottom or bottom to top, but ultimately the current version should be first or last.
-        assert versions[0] == version or versions[-1] == version, (
-                "Missing entry for version %s in %s." % (version, changelog_file)
-        )
+        if versions[0] != version and versions[-1] != version:
+            warnings.warn("Missing entry for version %s in %s." % (version, changelog_file),
+                          category=cls.WARNING_CATEGORY, stacklevel=2)
+            return
 
 
 def raises_regexp(error_class, pattern):
