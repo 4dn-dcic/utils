@@ -1,8 +1,10 @@
+import boto3
 import datetime
 import io
 import pytest
 
-from dcicutils.qa_utils import ignored, override_environ
+from dcicutils import s3_utils as s3_utils_module
+from dcicutils.qa_utils import ignored, override_environ, MockBoto3, MockFileSystem
 from dcicutils.s3_utils import s3Utils
 from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
 from dcicutils.env_utils import get_standard_mirror_env, FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, CGAP_PUBLIC_URL_PRD
@@ -320,11 +322,15 @@ def test_read_s3_zip(integrated_s3_info):
     assert files['summary.txt'].startswith(b'PASS')
 
 
-def test_unzip_s3_to_s3(integrated_s3_info):
+@pytest.mark.integratedx
+@pytest.mark.parametrize("suffix, expected_report", [("", "fastqc_report.html"), ("2", "qc_report.html")])
+def test_unzip_s3_to_s3_integrated(integrated_s3_info, suffix, expected_report):
     """test for unzip_s3_to_s3 with case where there is a basdir"""
 
+    zip_filename_key = "zip_filename" + suffix
+
     prefix = '__test_data/extracted'
-    filename = integrated_s3_info['zip_filename']
+    filename = integrated_s3_info[zip_filename_key]
     s3_connection = integrated_s3_info['s3Obj']
 
     # start with a clean test space
@@ -337,36 +343,56 @@ def test_unzip_s3_to_s3(integrated_s3_info):
 
     # now copy to that dir we just deleted
     ret_files = s3_connection.unzip_s3_to_s3(filename, prefix)
-    assert ret_files['fastqc_report.html']['s3key'].startswith("https://s3.amazonaws.com")
+    assert ret_files[expected_report]['s3key'].startswith("https://s3.amazonaws.com")
+    assert ret_files[expected_report]['s3key'].endswith(expected_report)
 
     objs = s3_connection.s3_read_dir(prefix)
     assert objs.get('Contents')
 
 
-def test_unzip_s3_to_s3_2(integrated_s3_info):
+@pytest.mark.parametrize("suffix, expected_report", [("", "fastqc_report.html"), ("2", "qc_report.html")])
+def test_unzip_s3_to_s3_unit(zip_filenames, integrated_env, suffix, expected_report):
     """test for unzip_s3_to_s3 with case where there is no basdir"""
 
-    prefix = '__test_data/extracted'
-    filename = integrated_s3_info['zip_filename2']
-    s3_connection = integrated_s3_info['s3Obj']
+    zip_path_key = "zip_path" + suffix
+    zip_filename_key = "zip_filename" + suffix
 
-    s3_connection.s3_delete_dir(prefix)
+    b3 = MockBoto3()
 
-    # ensure this thing was deleted
-    # if no files there will be no Contents in response
-    objs = s3_connection.s3_read_dir(prefix)
-    assert not objs.get('Contents')
+    ffenv = integrated_env['ffenv']
 
-    # now copy to that dir we just deleted
-    ret_files = s3_connection.unzip_s3_to_s3(filename, prefix)
-    assert ret_files['qc_report.html']['s3key'].startswith("https://s3.amazonaws.com")
-    assert ret_files['qc_report.html']['s3key'].endswith("qc_report.html")
+    with mock.patch.object(s3_utils_module, "boto3", b3):
 
-    objs = s3_connection.s3_read_dir(prefix)
-    assert objs.get('Contents')
+        prefix = '__test_data/extracted'
+        filename = zip_filenames[zip_filename_key]
+
+        s3_connection = s3Utils(env=ffenv)
+
+        # Not needed when mocked.
+        # s3_connection.s3_delete_dir(prefix)
+
+        # In our mock, this won't exist already on S3 like in the integrated version of this test,
+        # so we have to pre-load to our mock S3 manually. -kmp 13-Jan-2021
+        s3_connection.s3.upload_file(Filename=zip_filenames[zip_path_key],
+                                     Bucket=s3_connection.outfile_bucket,
+                                     Key=zip_filenames[zip_filename_key])
+
+        # ensure this thing was deleted
+        # if no files there will be no Contents in response
+        objs = s3_connection.s3_read_dir(prefix)
+        assert not objs.get('Contents')
+
+        # now copy to that dir we just deleted
+        ret_files = s3_connection.unzip_s3_to_s3(filename, prefix)
+        assert ret_files[expected_report]['s3key'].startswith("https://s3.amazonaws.com")
+        assert ret_files[expected_report]['s3key'].endswith(expected_report)
+
+        objs = s3_connection.s3_read_dir(prefix)
+        assert objs.get('Contents')
 
 
-def test_unzip_s3_to_s3_store_results(integrated_s3_info):
+@pytest.mark.integratedx
+def test_unzip_s3_to_s3_store_results_integrated(integrated_s3_info):
     """test for unzip_s3_to_s3 with case where there is a basdir and store_results=False"""
     prefix = '__test_data/extracted'
     filename = integrated_s3_info['zip_filename']
@@ -385,3 +411,39 @@ def test_unzip_s3_to_s3_store_results(integrated_s3_info):
 
     objs = s3_connection.s3_read_dir(prefix)
     assert objs.get('Contents')
+
+
+def test_unzip_s3_to_s3_store_results_unit(zip_filenames, integrated_env):
+    """test for unzip_s3_to_s3 with case where there is a basdir and store_results=False"""
+
+    b3 = MockBoto3()
+
+    ffenv = integrated_env['ffenv']
+
+    with mock.patch.object(s3_utils_module, "boto3", b3):
+
+        prefix = '__test_data/extracted'
+        filename = zip_filenames['zip_filename2']
+
+        s3_connection = s3Utils(env=ffenv)
+
+        # Not needed when mocked
+        # s3_connection.s3_delete_dir(prefix)
+
+        # In our mock, this won't exist already on S3 like in the integrated version of this test,
+        # so we have to pre-load to our mock S3 manually. -kmp 13-Jan-2021
+        s3_connection.s3.upload_file(Filename=zip_filenames['zip_path2'],
+                                     Bucket=s3_connection.outfile_bucket,
+                                     Key=zip_filenames['zip_filename2'])
+
+        # ensure this thing was deleted
+        # if no files there will be no Contents in response
+        objs = s3_connection.s3_read_dir(prefix)
+        assert not objs.get('Contents')
+
+        # now copy to that dir we just deleted
+        ret_files = s3_connection.unzip_s3_to_s3(filename, prefix, store_results=False)
+        assert len(ret_files) == 0  # no returned content
+
+        objs = s3_connection.s3_read_dir(prefix)
+        assert objs.get('Contents')

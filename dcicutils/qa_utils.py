@@ -4,6 +4,7 @@ qa_utils: Tools for use in quality assurance testing.
 
 import contextlib
 import datetime
+import hashlib
 import io
 import os
 import pytest
@@ -617,7 +618,9 @@ class MockBotoS3Client:
     MOCK_STATIC_FILES = {}
     MOCK_REQUIRED_ARGUMENTS = {}
 
-    def __init__(self, region_name=None, mock_other_required_arguments=None, mock_s3_files=None):
+    DEFAULT_STORAGE_CLASS = "STANDARD"
+
+    def __init__(self, region_name=None, mock_other_required_arguments=None, mock_s3_files=None, storage_class=None):
         if region_name not in (None, 'us-east-1'):
             raise ValueError("Unexpected region:", region_name)
 
@@ -630,6 +633,8 @@ class MockBotoS3Client:
         for name, content in mock_other_required_arguments or {}:
             other_required_arguments[name] = content
         self.other_required_arguments = other_required_arguments
+        self.storage_class = storage_class or self.DEFAULT_STORAGE_CLASS
+
 
     def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
         if kwargs != self.other_required_arguments:
@@ -671,6 +676,61 @@ class MockBotoS3Client:
 
         return {
             "Body": self.s3_files.open(os.path.join(Bucket, Key), 'rb'),
+        }
+
+    PUT_OBJECT_CONTENT_TYPES = {
+        "text/html": [".html"],
+        "image/png": [".png"],
+        "application/json": [".json"],
+        "text/plain": [".txt", ".text"],
+        "binary/octet-stream": [".fo"],
+    }
+
+    def put_object(self, *, Bucket, Key, Body, ContentType=None, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+        if ContentType is not None:
+            exts = self.PUT_OBJECT_CONTENT_TYPES.get(ContentType)
+            assert exts, "Unimplemented mock .put_object content type %s for Key=%s" % (ContentType, Key)
+            assert any(Key.endswith(ext) for ext in exts), (
+                    "mock .put_object expects Key=%s to end in one of %s for ContentType=%s" % (Key, exts, ContentType))
+        assert not kwargs, "put_object mock doesn't support %s." % kwargs
+        self.s3_files.files[Bucket + "/" + Key] = Body
+        return {
+            'ETag': self._content_etag(Body)
+        }
+
+    @staticmethod
+    def _content_etag(content):
+        return hashlib.md5(content).hexdigest()
+
+    def list_objects(self, Bucket, Prefix=None):
+        # Ref: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects
+        bucket_prefix = Bucket + "/"
+        bucket_prefix_length = len(bucket_prefix)
+        search_prefix = bucket_prefix + (Prefix or '')
+        found = []
+        for filename, content in self.s3_files.files.items():
+            if filename.startswith(search_prefix):
+                found.append({
+                    'Key': filename[bucket_prefix_length:],
+                    'ETag': self._content_etag(content),
+                    # "LastModified": ...,
+                    # "Owner": {"DisplayName": ..., "ID"...},
+                    "Size": len(content),
+                    "StorageClass": self.storage_class,
+                })
+        return {
+            # "CommonPrefixes": {"Prefix": ...},
+            "Contents": found,
+            # "ContinuationToken": ...,
+            # "Delimiter": ...,
+            # "EncodingType": ...,
+            # "KeyCount": ...,
+            "IsTruncated": False,
+            # "MaxKeys": ...,
+            # "NextContinuationToken": ...,
+            "Name": Bucket,
+            "Prefix": Prefix,
+            # "StartAfter": ...,
         }
 
 

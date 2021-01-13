@@ -52,6 +52,11 @@ INTEGRATED_ES, INTEGRATED_ES_NAMESPACE = _discover_es_info(INTEGRATED_ENV)
 check_true(INTEGRATED_ENV == INTEGRATED_ES_NAMESPACE, "INTEGRATED_ENV and INTEGRATED_ES_NAMESPACE are not the same.")
 
 
+@pytest.fixture()
+def integrated_env():
+    return {'ffenv': INTEGRATED_ENV}
+
+
 @pytest.fixture(scope='session')
 def basestring():
     try:
@@ -82,22 +87,44 @@ def integrated_ff():
 
 
 @pytest.fixture(scope='session')
-def integrated_s3_info():
+def zip_filenames():
+
+    zip_filename = '__test_data/fastqc_report.zip'
+    zip_filename2 = '__test_data/madqc_report.zip'
+
+    zip_path = os.path.join(TEST_DIR, 'data_files', os.path.basename(zip_filename))
+    zip_path2 = os.path.join(TEST_DIR, 'data_files', os.path.basename(zip_filename2))
+    return {
+        # short filenames or s3 key names (informally, s3 filenames)
+        'zip_filename': zip_filename,
+        'zip_filename2': zip_filename2,
+        # actual local filenames where the data should be
+        'zip_path': zip_path,
+        'zip_path2': zip_path2,
+    }
+
+
+@pytest.fixture(scope='session')
+def integrated_s3_info(zip_filenames):
     """
     Ensure the test files are present in the s3 sys bucket of the integrated
     environment (probably 'fourfront-mastertest') and return some info on them
     """
     test_filename = '__test_data/test_file.txt'
-    zip_filename = '__test_data/fastqc_report.zip'
-    zip_filename2 = '__test_data/madqc_report.zip'
     s3_obj = s3Utils(env=INTEGRATED_ENV)
     # for now, always upload these files
     s3_obj.s3.put_object(Bucket=s3_obj.outfile_bucket, Key=test_filename,
                          Body=str.encode('thisisatest'))
-    zip_path = os.path.join(TEST_DIR, 'data_files', os.path.basename(zip_filename))
-    s3_obj.s3.upload_file(Filename=str(zip_path), Bucket=s3_obj.outfile_bucket, Key=zip_filename)
-    zip_path2 = os.path.join(TEST_DIR, 'data_files', os.path.basename(zip_filename2))
-    s3_obj.s3.upload_file(Filename=str(zip_path2), Bucket=s3_obj.outfile_bucket, Key=zip_filename2)
+    s3_obj.s3.upload_file(Filename=zip_filenames['zip_path'],
+                          Bucket=s3_obj.outfile_bucket,
+                          Key=zip_filenames['zip_filename'])
+    s3_obj.s3.upload_file(Filename=zip_filenames['zip_path2'],
+                          Bucket=s3_obj.outfile_bucket,
+                          Key=zip_filenames['zip_filename2'])
 
-    return {'s3Obj': s3_obj, 'filename': test_filename, 'zip_filename': zip_filename,
-            'zip_filename2': zip_filename2}
+    return {
+        's3Obj': s3_obj,
+        'filename': test_filename,
+        'zip_filename': zip_filenames['zip_filename'],
+        'zip_filename2': zip_filenames['zip_filename2'],
+    }
