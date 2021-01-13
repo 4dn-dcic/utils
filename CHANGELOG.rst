@@ -6,6 +6,23 @@ dcicutils
 Change Log
 ----------
 
+1.8.5
+=====
+
+**PR 128: Changelog Warnings (C4-511) and Publish Fixes (C4-512)**
+
+* Make changelog problems issue a warning rather than fail testing.
+* Make publication for GitHub Actions (GA) not query interactively for confirmation.
+
+Some other fixes are included because the ``test_unzip_s3_to_s3``
+and ``test_unzip_s3_to_s3_2`` tests were intermittently failing.
+Those tests were refactored, and the following additional support was added:
+
+* In ``MockBotoS3Client``, added support for some cases of:
+  * ``.put_object()``
+  * ``.list_objects()``
+
+
 1.8.4
 =====
 
@@ -17,7 +34,6 @@ Change Log
 =====
 
 **No PR: Just fixes to GA PyPi deploy**
-
 
 1.8.2
 =====

@@ -4,6 +4,7 @@ qa_utils: Tools for use in quality assurance testing.
 
 import contextlib
 import datetime
+import hashlib
 import io
 import os
 import pytest
@@ -12,6 +13,7 @@ import re
 import time
 import toml
 import uuid
+import warnings
 
 from json import dumps as json_dumps, loads as json_loads
 from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized
@@ -401,17 +403,17 @@ class MockFileSystem:
         if not self.files.pop(file, None):
             raise FileNotFoundError("No such file or directory: %s" % file)
 
-    def open(self, file, mode='r'):
+    def open(self, file, mode='r', encoding=None):
         if FILE_SYSTEM_VERBOSE:
             print("Opening %r in mode %r." % (file, mode))
         if mode == 'w':
-            return self._open_for_write(file_system=self, file=file, binary=False)
+            return self._open_for_write(file_system=self, file=file, binary=False, encoding=encoding)
         elif mode == 'wb':
-            return self._open_for_write(file_system=self, file=file, binary=True)
+            return self._open_for_write(file_system=self, file=file, binary=True, encoding=encoding)
         elif mode == 'r':
-            return self._open_for_read(file, binary=False)
+            return self._open_for_read(file, binary=False, encoding=encoding)
         elif mode == 'rb':
-            return self._open_for_read(file, binary=True)
+            return self._open_for_read(file, binary=True, encoding=encoding)
         else:
             raise AssertionError("Mocked io.open doesn't handle mode=%r." % mode)
 
@@ -616,7 +618,9 @@ class MockBotoS3Client:
     MOCK_STATIC_FILES = {}
     MOCK_REQUIRED_ARGUMENTS = {}
 
-    def __init__(self, region_name=None, mock_other_required_arguments=None, mock_s3_files=None):
+    DEFAULT_STORAGE_CLASS = "STANDARD"
+
+    def __init__(self, region_name=None, mock_other_required_arguments=None, mock_s3_files=None, storage_class=None):
         if region_name not in (None, 'us-east-1'):
             raise ValueError("Unexpected region:", region_name)
 
@@ -629,6 +633,8 @@ class MockBotoS3Client:
         for name, content in mock_other_required_arguments or {}:
             other_required_arguments[name] = content
         self.other_required_arguments = other_required_arguments
+        self.storage_class = storage_class or self.DEFAULT_STORAGE_CLASS
+
 
     def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
         if kwargs != self.other_required_arguments:
@@ -664,12 +670,67 @@ class MockBotoS3Client:
         with io.open(Filename, 'wb') as fp:
             self.download_fileobj(Bucket=Bucket, Key=Key, Fileobj=fp)
 
-    def get_object(self, Bucket, Key, **kwargs):
+    def get_object(self, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
         if kwargs != self.other_required_arguments:
             raise MockKeysNotImplemented("get_object", kwargs.keys())
 
         return {
             "Body": self.s3_files.open(os.path.join(Bucket, Key), 'rb'),
+        }
+
+    PUT_OBJECT_CONTENT_TYPES = {
+        "text/html": [".html"],
+        "image/png": [".png"],
+        "application/json": [".json"],
+        "text/plain": [".txt", ".text"],
+        "binary/octet-stream": [".fo"],
+    }
+
+    def put_object(self, *, Bucket, Key, Body, ContentType=None, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+        if ContentType is not None:
+            exts = self.PUT_OBJECT_CONTENT_TYPES.get(ContentType)
+            assert exts, "Unimplemented mock .put_object content type %s for Key=%s" % (ContentType, Key)
+            assert any(Key.endswith(ext) for ext in exts), (
+                    "mock .put_object expects Key=%s to end in one of %s for ContentType=%s" % (Key, exts, ContentType))
+        assert not kwargs, "put_object mock doesn't support %s." % kwargs
+        self.s3_files.files[Bucket + "/" + Key] = Body
+        return {
+            'ETag': self._content_etag(Body)
+        }
+
+    @staticmethod
+    def _content_etag(content):
+        return hashlib.md5(content).hexdigest()
+
+    def list_objects(self, Bucket, Prefix=None):
+        # Ref: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects
+        bucket_prefix = Bucket + "/"
+        bucket_prefix_length = len(bucket_prefix)
+        search_prefix = bucket_prefix + (Prefix or '')
+        found = []
+        for filename, content in self.s3_files.files.items():
+            if filename.startswith(search_prefix):
+                found.append({
+                    'Key': filename[bucket_prefix_length:],
+                    'ETag': self._content_etag(content),
+                    # "LastModified": ...,
+                    # "Owner": {"DisplayName": ..., "ID"...},
+                    "Size": len(content),
+                    "StorageClass": self.storage_class,
+                })
+        return {
+            # "CommonPrefixes": {"Prefix": ...},
+            "Contents": found,
+            # "ContinuationToken": ...,
+            # "Delimiter": ...,
+            # "EncodingType": ...,
+            # "KeyCount": ...,
+            "IsTruncated": False,
+            # "MaxKeys": ...,
+            # "NextContinuationToken": ...,
+            "Name": Bucket,
+            "Prefix": Prefix,
+            # "StartAfter": ...,
         }
 
 
@@ -775,6 +836,8 @@ class VersionChecker:
     PYPROJECT = CustomizableProperty('PYPROJECT', description="The repository-relative name of the pyproject file.")
     CHANGELOG = CustomizableProperty('CHANGELOG', description="The repository-relative name of the change log.")
 
+    WARNING_CATEGORY = pytest.PytestConfigWarning
+
     @classmethod
     def check_version(cls):
         version = cls._check_version()
@@ -823,10 +886,12 @@ class VersionChecker:
                     versions.append(m.group(1))
 
         assert versions, "No version info was parsed from %s" % changelog_file
+
         # Might be sorted top to bottom or bottom to top, but ultimately the current version should be first or last.
-        assert versions[0] == version or versions[-1] == version, (
-                "Missing entry for version %s in %s." % (version, changelog_file)
-        )
+        if versions[0] != version and versions[-1] != version:
+            warnings.warn("Missing entry for version %s in %s." % (version, changelog_file),
+                          category=cls.WARNING_CATEGORY, stacklevel=2)
+            return
 
 
 def raises_regexp(error_class, pattern):
