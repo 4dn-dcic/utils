@@ -6,7 +6,7 @@ dcicutils
 Change Log
 ----------
 
-1.8.5
+1.9.0
 =====
 
 **PR 128: Changelog Warnings (C4-511) and Publish Fixes (C4-512)**
