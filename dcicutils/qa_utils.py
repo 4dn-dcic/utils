@@ -16,7 +16,7 @@ import uuid
 import warnings
 
 from json import dumps as json_dumps, loads as json_loads
-from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized
+from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix
 
 
 def show_elapsed_time(start, end):
@@ -602,12 +602,16 @@ class MockBoto3:
 
     def __init__(self, **override_mappings):
         self._mappings = dict(self._default_mappings(), **override_mappings)
+        self.shared_reality = {}
+
+    def resource(self, key, **kwargs):
+        return self._mappings[key](boto3=self, **kwargs)
 
     def client(self, kind, **kwargs):
         mapped_class = self._mappings.get(kind)
         if not mapped_class:
             raise NotImplementedError("Unsupported boto3 mock kind:", kind)
-        return mapped_class(**kwargs)
+        return mapped_class(boto3=self, **kwargs)
 
 
 class MockBotoS3Client:
@@ -620,14 +624,21 @@ class MockBotoS3Client:
 
     DEFAULT_STORAGE_CLASS = "STANDARD"
 
-    def __init__(self, region_name=None, mock_other_required_arguments=None, mock_s3_files=None, storage_class=None):
+    def __init__(self, region_name=None, mock_other_required_arguments=None, mock_s3_files=None,
+                 storage_class=None, boto3=None):
+        self.boto3 = boto3 or MockBoto3()
         if region_name not in (None, 'us-east-1'):
             raise ValueError("Unexpected region:", region_name)
 
-        files = self.MOCK_STATIC_FILES.copy()
-        for name, content in mock_s3_files or {}:
-            files[name] = content
-        self.s3_files = MockFileSystem(files=files)
+        files_cache_marker = '_s3_file_data'
+        shared_reality = self.boto3.shared_reality
+        s3_files = shared_reality.get(files_cache_marker)
+        if s3_files is None:
+            files = self.MOCK_STATIC_FILES.copy()
+            for name, content in mock_s3_files or {}:
+                files[name] = content
+            shared_reality[files_cache_marker] = s3_files = MockFileSystem(files=files)
+        self.s3_files = s3_files
 
         other_required_arguments = self.MOCK_REQUIRED_ARGUMENTS.copy()
         for name, content in mock_other_required_arguments or {}:
@@ -674,9 +685,12 @@ class MockBotoS3Client:
         if kwargs != self.other_required_arguments:
             raise MockKeysNotImplemented("get_object", kwargs.keys())
 
-        return {
-            "Body": self.s3_files.open(os.path.join(Bucket, Key), 'rb'),
-        }
+        head_metadata = self.head_object(Bucket=Bucket, Key=Key, **kwargs)
+
+        pseudo_filename = os.path.join(Bucket, Key)
+
+        return dict(head_metadata,
+                    Body=self.s3_files.open(pseudo_filename, 'rb'))
 
     PUT_OBJECT_CONTENT_TYPES = {
         "text/html": [".html"],
@@ -701,6 +715,30 @@ class MockBotoS3Client:
     @staticmethod
     def _content_etag(content):
         return hashlib.md5(content).hexdigest()
+
+    def Bucket(self, name):
+        return MockBotoS3Bucket(s3=self, name=name)
+
+    def head_object(self, Bucket, Key, **kwargs):
+        if kwargs != self.other_required_arguments:
+            raise MockKeysNotImplemented("get_object", kwargs.keys())
+
+        pseudo_filename = os.path.join(Bucket, Key)
+
+        if self.s3_files.exists(pseudo_filename):
+            content = self.s3_files.files[pseudo_filename]
+            return {
+                'Bucket': Bucket,
+                'Key': Key,
+                'ETag': self._content_etag(content),
+                'ContentLength': len(content),
+                # Numerous others, but this is enough to make the dictionary non-empty and to satisfy some of our tools
+            }
+        else:
+            # I would need to research what specific error is needed here and hwen,
+            # since it might be a 404 (not found) or a 403 (permissions), depending on various details.
+            # For now, just fail in any way since maybe our code doesn't care.
+            raise Exception("Mock File Not Found")
 
     def list_objects(self, Bucket, Prefix=None):
         # Ref: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects
@@ -734,15 +772,81 @@ class MockBotoS3Client:
         }
 
 
+class MockBotoS3Bucket:
+
+    def __init__(self, name, s3=None):
+        assert s3, "missing s3"
+        self.s3 = s3
+        self.name = name
+        self.objects = MockBotoS3BucketObjects(bucket=self)
+
+    def _delete(self, delete_bucket_too=False):
+        prefix = self.name + "/"
+        files = self.s3.s3_files.files
+        to_delete = set()
+        for pseudo_filename, _ in [files.items()]:
+            if pseudo_filename.startswith(prefix):
+                if pseudo_filename != prefix:
+                    to_delete.add(pseudo_filename)
+        for pseudo_filename in to_delete:
+            del files[pseudo_filename]
+        if not delete_bucket_too:
+            files[prefix] = b''
+        # TODO: Does anything need to be returned here?
+
+    def _keys(self):
+        found = False
+        keys = set()  # In real S3, this would be cached info, but for testing we just create it on demand
+        prefix = self.name + "/"
+        for pseudo_filename, content in self.s3.s3_files.files.items():
+            if pseudo_filename.startswith(prefix):
+                found = True
+                key = remove_prefix(prefix, pseudo_filename)
+                if key != prefix:
+                    keys.add(key)
+        if not keys:
+            if not found:
+                # It's OK if we only found "<bucketname>/", which is an empty, but not missing bucket
+                raise Exception("NoSuchBucket")
+        return sorted(keys)
+
+    def delete(self):
+        self._delete(delete_bucket_too=True)
+
+    def _all(self):
+        """A callback for <bucket>.objects.all()"""
+        return [self.s3.head_object(Bucket=self.name, Key=key)
+                for key in self._keys()]
+
+
+class MockBotoS3ObjectSummary:
+    # Not sure if we need to expose the strucutre of this yet. -kmp 13-Jan-2021
+    def __init__(self, **attributes):
+        self._attributes = attributes
+
+
+class MockBotoS3BucketObjects:
+
+    def __init__(self, bucket):
+        self.bucket = bucket
+
+    def all(self):
+        return self.bucket._all()
+
+    def delete(self):
+        return self.bucket._delete(delete_bucket_too=False)
+
+
 class MockBotoSQSClient:
     """
     This is a mock of certain SQS functionality.
     """
 
-    def __init__(self, region_name=None):
+    def __init__(self, region_name=None, boto3=None):
         if region_name not in (None, 'us-east-1'):
             raise RuntimeError("Unexpected region:", region_name)
         self._mock_queue_name_seen = None
+        self.boto3 = boto3 or MockBoto3()
 
     def check_mock_queue_url_consistency(self, queue_url):
         __tracebackhide__ = True
