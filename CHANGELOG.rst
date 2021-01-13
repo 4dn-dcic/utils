@@ -13,7 +13,15 @@ Change Log
 
 * Make changelog problems issue a warning rather than fail testing.
 * Make publication for GitHub Actions (GA) not query interactively for confirmation.
-* Fix bug in handling of ``encoding=`` in the ``open`` operation of ``MockFileSystem``.
+
+Some other fixes are included because the ``test_unzip_s3_to_s3``
+and ``test_unzip_s3_to_s3_2`` tests were intermittently failing.
+Those tests were refactored, and the following additional support was added:
+
+* In ``MockBotoS3Client``, added support for some cases of:
+  * ``.put_object()``
+  * ``.list_objects()``
+
 
 1.8.4
 =====
