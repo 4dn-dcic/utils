@@ -6,6 +6,15 @@ dcicutils
 Change Log
 ----------
 
+1.9.1
+=====
+
+* Fix problem in 1.9.0 with unwanted dependency on
+  ``pytest.PytestConfigWarning`` (C4-521).
+* Added some unit tests to run instead of integration tests for
+  ``s3_utils`` in a number of cases.
+
+
 1.9.0
 =====
 
