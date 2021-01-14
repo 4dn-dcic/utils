@@ -940,7 +940,11 @@ class VersionChecker:
     PYPROJECT = CustomizableProperty('PYPROJECT', description="The repository-relative name of the pyproject file.")
     CHANGELOG = CustomizableProperty('CHANGELOG', description="The repository-relative name of the change log.")
 
-    WARNING_CATEGORY = pytest.PytestConfigWarning
+    # I wanted to use pytest.PytestConfigWarning, but that creates a dependency
+    # on particular versions of pytest, and we don't export a delivery
+    # constraint of a particular pytest version. So RuntimeWarning is a
+    # safer setting for now. -kmp 14-Jan-2021
+    WARNING_CATEGORY = RuntimeWarning
 
     @classmethod
     def check_version(cls):
