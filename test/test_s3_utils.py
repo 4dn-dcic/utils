@@ -1,4 +1,5 @@
 import boto3
+import contextlib
 import datetime
 import io
 import pytest
@@ -11,13 +12,55 @@ from dcicutils.env_utils import get_standard_mirror_env, FF_PUBLIC_URL_STG, FF_P
 from unittest import mock
 
 
+@contextlib.contextmanager
+def mocked_s3_integration(integrated_names=None, zip_suffix="", ffenv=None):
+    """
+    This does common setup of some mocks needed by zip testing.
+    """
+
+    zip_path_key = "zip_path" + zip_suffix
+    zip_filename_key = "zip_filename" + zip_suffix
+
+    b3 = MockBoto3()
+
+    if not ffenv:
+        ffenv = integrated_names['ffenv'] if integrated_names else None
+
+    with mock.patch.object(s3_utils_module, "boto3", b3):
+
+        s3_connection = s3Utils(env=ffenv)
+
+        if integrated_names is not None:
+
+            # Not needed when mocked.
+            # s3_connection.s3_delete_dir(prefix)
+
+            # In our mock, this won't exist already on S3 like in the integrated version of this test,
+            # so we have to pre-load to our mock S3 manually. -kmp 13-Jan-2021
+            s3_connection.s3.upload_file(Filename=integrated_names[zip_path_key],
+                                         Bucket=s3_connection.outfile_bucket,
+                                         Key=integrated_names[zip_filename_key])
+
+            s3_connection.s3.put_object(Bucket=s3_connection.outfile_bucket,
+                                        Key=integrated_names['filename'],
+                                        Body=str.encode('thisisatest'))
+
+        yield s3_connection
+
+
+@pytest.mark.integrated
 @pytest.mark.parametrize('ff_ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat'])
 def test_s3utils_creation_ff_ordinary(ff_ordinary_envname):
     util = s3Utils(env=ff_ordinary_envname)
     assert util.sys_bucket == 'elasticbeanstalk-%s-system' % ff_ordinary_envname
 
 
+@pytest.mark.integrated
 def test_s3utils_creation_ff_stg():
+    # TODO: I'm not sure what this is testing, so it's hard to rewrite
+    #   But I fear this use of env 'staging' implies the GA test environment has overbroad privilege.
+    #   We should make this work without access to 'staging'.
+    #   -kmp 13-Jan-2021
     print("In test_s3Utils_creation_ff_stg. It is now", str(datetime.datetime.now()))
 
     def test_stg(ff_staging_envname):
@@ -43,7 +86,12 @@ def test_s3utils_creation_ff_stg():
     test_stg(stg_beanstalk_env)
 
 
+@pytest.mark.integrated
 def test_s3utils_creation_ff_prd():
+    # TODO: I'm not sure what this is testing, so it's hard to rewrite
+    #   But I fear this use of env 'data' implies the GA test environment has overbroad privilege.
+    #   We should make this work without access to 'data'.
+    #   -kmp 13-Jan-2021
     print("In test_s3Utils_creation_ff_prd. It is now", str(datetime.datetime.now()))
 
     def test_prd(ff_production_envname):
@@ -69,13 +117,19 @@ def test_s3utils_creation_ff_prd():
     test_prd(prd_beanstalk_env)
 
 
+@pytest.mark.integrated
 @pytest.mark.parametrize('cgap_ordinary_envname', ['fourfront-cgaptest', 'fourfront-cgapdev', 'fourfront-cgapwolf'])
 def test_s3utils_creation_cgap_ordinary(cgap_ordinary_envname):
     util = s3Utils(env=cgap_ordinary_envname)
     assert util.sys_bucket == 'elasticbeanstalk-%s-system' % cgap_ordinary_envname
 
 
+@pytest.mark.integrated
 def test_s3utils_creation_cgap_prd():
+    # TODO: I'm not sure what this is testing, so it's hard to rewrite
+    #   But I fear this use of env 'data' implies the GA test environment has overbroad privilege.
+    #   We should make this work without access to 'data'.
+    #   -kmp 13-Jan-2021
     print("In test_s3Utils_creation_cgap_prd. It is now", str(datetime.datetime.now()))
 
     def test_prd(cgap_production_envname):
@@ -101,12 +155,14 @@ def test_s3utils_creation_cgap_prd():
     test_prd(compute_cgap_prd_env())  # Hopefully returns 'fourfront-cgap' but just in case we're into new naming
 
 
+@pytest.mark.integrated
 def test_s3utils_creation_cgap_stg():
     print("In test_s3Utils_creation_cgap_prd. It is now", str(datetime.datetime.now()))
     # For now there is no CGAP stg...
     assert compute_cgap_stg_env() is None, "There seems to be a CGAP staging environment. Tests need updating."
 
 
+@pytest.mark.integrated
 def test_s3utils_get_keys_for_data():
     util = s3Utils(env='data')
     keys = util.get_access_keys()
@@ -120,20 +176,35 @@ def test_s3utils_get_keys_for_data():
     assert keys_fs['server'] == keys['server']
 
 
+@pytest.mark.integrated
 def test_s3utils_get_keys_for_staging():
+    # TODO: I'm not sure what this is testing, so it's hard to rewrite
+    #   But I fear this use of env 'staging' implies the GA test environment has overbroad privilege.
+    #   We should make this work without access to 'staging'.
+    #   -kmp 13-Jan-2021
     util = s3Utils(env='staging')
     keys = util.get_ff_key()
     assert keys['server'] == 'http://staging.4dnucleome.org'
 
 
+@pytest.mark.integrated
 def test_s3utils_get_jupyterhub_key(basestring):
+    # TODO: I'm not sure what this is testing, so it's hard to rewrite
+    #   But I fear this use of env 'data' implies the GA test environment has overbroad privilege.
+    #   We should make this work without access to 'data'.
+    #   -kmp 13-Jan-2021
     util = s3Utils(env='data')
     key = util.get_jupyterhub_key()
     assert 'secret' in key
     assert key['server'] == 'https://jupyter.4dnucleome.org'
 
 
-def test_s3utils_get_higlass_key():
+@pytest.mark.integrated
+def test_s3utils_get_higlass_key_integrated():
+    # TODO: I'm not sure what this is testing, so it's hard to rewrite
+    #   But I fear this use of env 'staging' implies the GA test environment has overbroad privilege.
+    #   We should make this work without access to 'staging'.
+    #   -kmp 13-Jan-2021
     util = s3Utils(env='staging')
     keys = util.get_higlass_key()
     assert isinstance(keys, dict)
@@ -150,6 +221,7 @@ def test_s3utils_get_google_key():
         assert keys[dict_key]
 
 
+@pytest.mark.unit
 def test_s3utils_get_access_keys_with_old_style_default():
     util = s3Utils(env='fourfront-mastertest')
     with mock.patch.object(util, "get_key") as mock_get_key:
@@ -165,6 +237,7 @@ def test_s3utils_get_access_keys_with_old_style_default():
         assert key == actual_key
 
 
+@pytest.mark.unit
 def test_s3utils_get_key_non_json_data():
 
     util = s3Utils(env='fourfront-mastertest')
@@ -180,6 +253,7 @@ def test_s3utils_get_key_non_json_data():
         assert util.get_key() == non_json_string
 
 
+@pytest.mark.unit
 def test_s3utils_delete_key():
 
     sample_key_name = "--- reserved_key_name_for_unit_testing ---"
@@ -213,6 +287,7 @@ def test_s3utils_delete_key():
         assert mock_delete_object.call_count == 2
 
 
+@pytest.mark.unit
 def test_s3utils_s3_put():
 
     util = s3Utils(env='fourfront-mastertest')
@@ -242,6 +317,7 @@ def test_s3utils_s3_put():
             }
 
 
+@pytest.mark.unit
 def test_s3utils_s3_put_secret():
 
     util = s3Utils(env='fourfront-mastertest')
@@ -279,26 +355,59 @@ def test_s3utils_s3_put_secret():
             }
 
 
-def test_does_key_exist():
+@pytest.mark.integratedx
+def test_does_key_exist_integrated():
     """ Use staging to check for non-existant key """
     util = s3Utils(env='staging')
     assert not util.does_key_exist('not_a_key')
 
 
-def test_read_s3(integrated_s3_info):
+@pytest.mark.unit
+def test_does_key_exist_unit(integrated_names):
+    """ Use staging to check for non-existant key """
+
+    with mocked_s3_integration(integrated_names=integrated_names) as s3_connection:
+
+        assert not s3_connection.does_key_exist('not_a_key')
+
+
+@pytest.mark.integratedx
+def test_read_s3_integrated(integrated_s3_info):
     read = integrated_s3_info['s3Obj'].read_s3(integrated_s3_info['filename'])
     assert read.strip() == b'thisisatest'
 
 
-def test_get_file_size(integrated_s3_info):
+@pytest.mark.unit
+def test_read_s3_unit(integrated_names):
+
+    with mocked_s3_integration(integrated_names=integrated_names) as s3_connection:
+
+        read = s3_connection.read_s3(integrated_names['filename'])
+        assert read.strip() == b'thisisatest'
+
+
+@pytest.mark.integratedx
+def test_get_file_size_integrated(integrated_s3_info):
     size = integrated_s3_info['s3Obj'].get_file_size(integrated_s3_info['filename'])
     assert size == 11
     with pytest.raises(Exception) as exec_info:
         integrated_s3_info['s3Obj'].get_file_size('not_a_file')
     assert 'not found' in str(exec_info.value)
 
+@pytest.mark.unit
+def test_get_file_size_unit(integrated_names):
 
-def test_size(integrated_s3_info):
+    with mocked_s3_integration(integrated_names=integrated_names) as s3_connection:
+
+        size = s3_connection.get_file_size(integrated_names['filename'])
+        assert size == 11
+        with pytest.raises(Exception) as exec_info:
+            s3_connection.get_file_size('not_a_file')
+        assert 'not found' in str(exec_info.value)
+
+
+@pytest.mark.integratedx
+def test_size_integrated(integrated_s3_info):
     """ Get size of non-existent, real bucket """
     bucket = integrated_s3_info['s3Obj'].sys_bucket
     sz = integrated_s3_info['s3Obj'].size(bucket)
@@ -308,18 +417,67 @@ def test_size(integrated_s3_info):
     assert 'NoSuchBucket' in str(exec_info.value)
 
 
-def test_get_file_size_in_bg(integrated_s3_info):
-    size = integrated_s3_info['s3Obj'].get_file_size(integrated_s3_info['filename'],
-                                                     add_gb=2, size_in_gb=True)
+@pytest.mark.unit
+def test_size_unit(integrated_names):
+    """ Get size of non-existent, real bucket """
+
+    with mocked_s3_integration(integrated_names=integrated_names) as s3_connection:
+
+        bucket = s3_connection.sys_bucket
+
+        # # Because this is a mock, the set of objects will be empty, so let's initialize it.
+        s3_connection.s3.put_object(Bucket=bucket, Key="a.txt", Body=b'apple')
+        s3_connection.s3.put_object(Bucket=bucket, Key="b.txt", Body=b'orange, banana')
+        s3_connection.s3.put_object(Bucket=bucket, Key="c.txt", Body=b'papaya')
+
+        # When buckets exist, we expect no error
+        sz = s3_connection.size(bucket)
+        assert sz == 3, "Expected exactly 3 files in the mocked bucket, but got %s" % sz
+
+        # When bucket doesn't exist, we expect an error
+        with pytest.raises(Exception, match='.*NoSuchBucket.*') as exec_info:
+            s3_connection.size('not_a_bucket')
+
+
+@pytest.mark.integratedx
+def test_get_file_size_in_gb_integrated(integrated_s3_info):
+
+    s3_connection = integrated_s3_info['s3Obj']
+
+    size = s3_connection.get_file_size(integrated_s3_info['filename'],
+                                       add_gb=2, size_in_gb=True)
     assert int(size) == 2
 
 
-def test_read_s3_zip(integrated_s3_info):
+@pytest.mark.unit
+def test_get_file_size_in_gb_unit(integrated_names):
+
+    with mocked_s3_integration(integrated_names=integrated_names) as s3_connection:
+
+        size = s3_connection.get_file_size(integrated_names['filename'],
+                                           add_gb=2, size_in_gb=True)
+        assert int(size) == 2
+
+
+@pytest.mark.integratedx
+def test_read_s3_zip_integrated(integrated_s3_info):
     filename = integrated_s3_info['zip_filename']
     files = integrated_s3_info['s3Obj'].read_s3_zipfile(filename, ['summary.txt', 'fastqc_data.txt'])
     assert files['summary.txt']
     assert files['fastqc_data.txt']
     assert files['summary.txt'].startswith(b'PASS')
+
+
+@pytest.mark.unit
+def test_read_s3_zip_unit(integrated_names):
+
+    with mocked_s3_integration(integrated_names=integrated_names) as s3_connection:
+
+        filename = integrated_names['zip_filename']
+        files = s3_connection.read_s3_zipfile(filename, ['summary.txt', 'fastqc_data.txt'])
+        assert files['summary.txt']
+        assert files['fastqc_data.txt']
+        assert files['summary.txt'].startswith(b'PASS')
 
 
 @pytest.mark.integratedx
@@ -350,32 +508,16 @@ def test_unzip_s3_to_s3_integrated(integrated_s3_info, suffix, expected_report):
     assert objs.get('Contents')
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize("suffix, expected_report", [("", "fastqc_report.html"), ("2", "qc_report.html")])
-def test_unzip_s3_to_s3_unit(zip_filenames, integrated_env, suffix, expected_report):
+def test_unzip_s3_to_s3_unit(integrated_names, suffix, expected_report):
     """test for unzip_s3_to_s3 with case where there is no basdir"""
 
-    zip_path_key = "zip_path" + suffix
-    zip_filename_key = "zip_filename" + suffix
+    with mocked_s3_integration(integrated_names=integrated_names, zip_suffix=suffix) as s3_connection:
 
-    b3 = MockBoto3()
-
-    ffenv = integrated_env['ffenv']
-
-    with mock.patch.object(s3_utils_module, "boto3", b3):
-
+        zip_filename_key = "zip_filename" + suffix
         prefix = '__test_data/extracted'
-        filename = zip_filenames[zip_filename_key]
-
-        s3_connection = s3Utils(env=ffenv)
-
-        # Not needed when mocked.
-        # s3_connection.s3_delete_dir(prefix)
-
-        # In our mock, this won't exist already on S3 like in the integrated version of this test,
-        # so we have to pre-load to our mock S3 manually. -kmp 13-Jan-2021
-        s3_connection.s3.upload_file(Filename=zip_filenames[zip_path_key],
-                                     Bucket=s3_connection.outfile_bucket,
-                                     Key=zip_filenames[zip_filename_key])
+        filename = integrated_names[zip_filename_key]
 
         # ensure this thing was deleted
         # if no files there will be no Contents in response
@@ -413,28 +555,15 @@ def test_unzip_s3_to_s3_store_results_integrated(integrated_s3_info):
     assert objs.get('Contents')
 
 
-def test_unzip_s3_to_s3_store_results_unit(zip_filenames, integrated_env):
+@pytest.mark.unit
+def test_unzip_s3_to_s3_store_results_unit(integrated_names):
     """test for unzip_s3_to_s3 with case where there is a basdir and store_results=False"""
 
-    b3 = MockBoto3()
+    with mocked_s3_integration(integrated_names=integrated_names) as s3_connection:
 
-    ffenv = integrated_env['ffenv']
-
-    with mock.patch.object(s3_utils_module, "boto3", b3):
-
+        zip_filename_key = "zip_filename"
         prefix = '__test_data/extracted'
-        filename = zip_filenames['zip_filename2']
-
-        s3_connection = s3Utils(env=ffenv)
-
-        # Not needed when mocked
-        # s3_connection.s3_delete_dir(prefix)
-
-        # In our mock, this won't exist already on S3 like in the integrated version of this test,
-        # so we have to pre-load to our mock S3 manually. -kmp 13-Jan-2021
-        s3_connection.s3.upload_file(Filename=zip_filenames['zip_path2'],
-                                     Bucket=s3_connection.outfile_bucket,
-                                     Key=zip_filenames['zip_filename2'])
+        filename = integrated_names[zip_filename_key]
 
         # ensure this thing was deleted
         # if no files there will be no Contents in response

@@ -861,6 +861,7 @@ def make_mocked_search(item_maker=None):
     return mocked_search
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize('url', ['', 'to_become_full_url'])
 def test_search_metadata_unit(integrated_ff, url):
     with mock.patch.object(ff_utils, "authorized_request", make_mocked_search()):
