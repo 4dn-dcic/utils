@@ -823,13 +823,75 @@ def test_upsert_metadata(integrated_ff):
     assert 'Bad status code' in str(exec_info.value)
 
 
+def make_mocked_item(n):
+    return {'uuid': str(n)}
+
 MOCKED_SEARCH_COUNT = 130
-MOCKED_SEARCH_ITEMS = [{'uuid': str(uuid)} for uuid in range(MOCKED_SEARCH_COUNT)]
+MOCKED_SEARCH_ITEMS = [make_mocked_item(uuid_counter) for uuid_counter in range(MOCKED_SEARCH_COUNT)]
 
 
 def constant_mocked_search_items():
     return MOCKED_SEARCH_ITEMS
 
+
+class InsertingMockedSearchItems():
+    """
+    This class is for use in simulating a situation in which an insertion occurs between calls to a search.
+    The base set of data from which simulated results are taken will change on the second (POS=1) call,
+    with an additional element being inserted at position 0 on that call and persisting for subsequent calls.
+
+    For example, when querying /search/?type=File&from=5&limit=53 there will be two internal queries:
+
+    mocked search http://fourfront-mastertest.9wzadzju3p.us-east-1.elasticbeanstalk.com//search/?type=File&limit=50&sort=-date_created&from=0
+    yields Search [{'uuid': '0'}, ..., {'uuid': '49'}] # 50 items
+    mocked search http://fourfront-mastertest.9wzadzju3p.us-east-1.elasticbeanstalk.com//search/?type=File&limit=50&sort=-date_created&from=50
+    yields Search [{'uuid': '49'}, ..., {'uuid': '98'}] # 50 items
+
+    but only 52 items will be returned because the 50th element, {'uuid': '49'}, is returned twice and most of the
+    50 items returned on the second call will be ignored, as only 3 additional items are needed to make 53.
+    (If all 50 were duplicates, a third call would have been done seeking more elements.)
+
+    Likewise when querying /search/?type=File&limit=53 (note in this case no from=5) there will be two internal queries:
+
+    mocked search http://fourfront-mastertest.9wzadzju3p.us-east-1.elasticbeanstalk.com//search/?type=File&from=5&limit=50&sort=-date_created
+    yields Search [{'uuid': '5'}, ..., {'uuid': '54'}] # 50 items
+    mocked search http://fourfront-mastertest.9wzadzju3p.us-east-1.elasticbeanstalk.com//search/?type=File&from=55&limit=50&sort=-date_created
+    yields Search [{'uuid': '54'}, ..., {'uuid': '103'}] # 50 items
+
+    and again 52 items will be returned, but this time it's {'uuid': 54'} that is the 50th element. But in this case,
+    as with the other, most of the second set of results will be discarded, as only 3 additional items are
+    needed to make 53.
+    """
+
+    POS = 0
+    ITEMS = MOCKED_SEARCH_ITEMS.copy()
+
+    @classmethod
+    def reset(cls):
+        """
+        This function can be called proactively to reinitialize the mock.
+        We're using a class method, not an instance method, because this simplifies the data flow
+        and our use case is sufficiently simple that we don't need lots of these things at once.
+        """
+        cls.POS = 0
+        cls.ITEMS = MOCKED_SEARCH_ITEMS.copy()
+
+    @classmethod
+    def handler(cls):
+        """
+        This function can be called to get the list of data representing the ES data store.
+        We've allocated 130 of these in all, so the 'data store' out of which subsequences of results
+        are selected will look like:
+        [{'uuid': '1'}, {'uuid': '2'}, ..., {'uuid': '129'}]
+        On the second call, an item numbered '130' will be inserted at position 0, so the 'data store'
+        out of which subsequences of results are selected will look like:
+        [{'uuid': '130'}, {'uuid': '1'}, {'uuid': '2'}, ..., {'uuid': '129'}]
+        """
+        if cls.POS == 1:
+            extra_item = make_mocked_item(MOCKED_SEARCH_COUNT)
+            cls.ITEMS.insert(0, extra_item)
+        cls.POS += 1
+        return cls.ITEMS
 
 def make_mocked_search(item_maker=None):
 
@@ -864,8 +926,24 @@ def make_mocked_search(item_maker=None):
 @pytest.mark.unit
 @pytest.mark.parametrize('url', ['', 'to_become_full_url'])
 def test_search_metadata_unit(integrated_ff, url):
+    """
+    Test normal case of search_metadata involving a search always being based on a consistently indexed set of data.
+    """
     with mock.patch.object(ff_utils, "authorized_request", make_mocked_search()):
         check_search_metadata(integrated_ff, url)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('url', ['', 'to_become_full_url'])
+def test_search_metadata_inserting_unit(integrated_ff, url):
+    """
+    Tests unusual case of search_metadata (C4-336) returning duplicated items.
+    See detailed explanation in ``InsertingMockedSearchItems``.
+    """
+    InsertingMockedSearchItems.reset()
+    with mock.patch.object(ff_utils, "authorized_request",
+                           make_mocked_search(item_maker=InsertingMockedSearchItems.handler)):
+        check_search_metadata(integrated_ff, url, expect_shortfall=True)
 
 
 @pytest.mark.integratedx
@@ -875,9 +953,11 @@ def test_search_metadata_integrated(integrated_ff, url):
     check_search_metadata(integrated_ff, url)
 
 
-def check_search_metadata(integrated_ff, url):
+def check_search_metadata(integrated_ff, url, expect_shortfall=False):
     if url != '':  # replace stub with actual url from integrated_ff
         url = integrated_ff['ff_key']['server'] + '/'
+
+    InsertingMockedSearchItems.reset()
     search_res = ff_utils.search_metadata(url + 'search/?limit=all&type=File', key=integrated_ff['ff_key'])
     assert isinstance(search_res, list)
     # this will fail if items have not yet been indexed
@@ -886,27 +966,45 @@ def check_search_metadata(integrated_ff, url):
     check_duplicated_items_by_key('uuid', search_res, url=url, formatter=lambda x: json.dumps(x, indent=2))
     # search_uuids = set([item['uuid'] for item in search_res])
     # assert len(search_uuids) == len(search_res)
+
+    InsertingMockedSearchItems.reset()
     search_res_slash = ff_utils.search_metadata(url + '/search/?limit=all&type=File', key=integrated_ff['ff_key'])
     assert isinstance(search_res_slash, list)
     assert len(search_res_slash) == len(search_res)
+
     # search with a limit
+    InsertingMockedSearchItems.reset()
     search_res_limit = ff_utils.search_metadata(url + '/search/?limit=3&type=File', key=integrated_ff['ff_key'])
     assert len(search_res_limit) == 3
+
     # search with a limit from a certain entry
+    InsertingMockedSearchItems.reset()
+    search_res_from_limit = ff_utils.search_metadata(url + '/search/?type=File&limit=53',
+                                                     key=integrated_ff['ff_key'])
+    assert len(search_res_from_limit) == 52 if expect_shortfall else 53
+
+    # search with a limit from a certain entry
+    InsertingMockedSearchItems.reset()
     search_res_from_limit = ff_utils.search_metadata(url + '/search/?type=File&from=5&limit=53',
                                                      key=integrated_ff['ff_key'])
-    assert len(search_res_from_limit) == 53
+    assert len(search_res_from_limit) == 52 if expect_shortfall else 53
+
     # search with a filter
+    InsertingMockedSearchItems.reset()
     search_res_filt = ff_utils.search_metadata(url + '/search/?limit=3&type=File&file_type=reads',
                                                key=integrated_ff['ff_key'])
     assert len(search_res_filt) > 0
+
     # test is_generator=True
+    InsertingMockedSearchItems.reset()
     search_res_gen = ff_utils.search_metadata(url + '/search/?limit=3&type=File&file_type=reads',
                                               key=integrated_ff['ff_key'], is_generator=True)
     assert isinstance(search_res_gen, GeneratorType)
     gen_res = [v for v in search_res_gen]  # run the gen
     assert len(gen_res) == 3
+
     # do same search as limit but use the browse endpoint instead
+    InsertingMockedSearchItems.reset()
     browse_res_limit = ff_utils.search_metadata(url + '/browse/?limit=3&type=File', key=integrated_ff['ff_key'])
     assert len(browse_res_limit) == 3
 

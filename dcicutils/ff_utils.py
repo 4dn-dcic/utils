@@ -368,10 +368,37 @@ def search_result_generator(page_generator):
     """
     Simple wrapper function to return a generator to iterate through item
     results on the search page
+
+    NOTE: Depending on the nature of the page generator, which may involve separate external calls
+    to a resource like elastic search that is not transactionally managed, the data being queried
+    may change between those calls, usually to add (though theoretically even to remove) an element.
+
+    Consider a case where the data to be queried is indexed in elastic search as A,C,E,G,I,K,M.
+    but where a page size of 3 is used with start position 0. That call will return A,C,E. The
+    user may expect G,I on the second page, but before it can be done, suppose an element D is
+    indexed and that the stored data is A,C,D,E,G,I,K,M. Requesting data from start position 0 would
+    now return A,C,D but we already had the first page, so we request data starting at position 3
+    for the second page and get E,G,I.  That means our sequence of return values would be A,C,E,E,G,I,K,M,
+    or, in other words, showing a duplication. To avoid this, we keep track of the IDs we've seen
+    and show only the first case of each element, so A,C,E,G,I,K,M. (We won't see the D but we weren't
+    going to see it anyway, and it wasn't available the time we started, so the timing was already close.)
+
+    Unfortunately, we aren't so lucky for deletion, though that happens more rarely. That will cause
+    an element to fall out. So if we have A,C,E,G,I,K,M and C is deleted between the first and second call,
+    getting us A,C,E first, and then on the second call when the data is A,E,G,I,K,M we get I,K,M, we'll
+    get the sequence A,C,E,I,K,M and will have missed legitimate element G. There is little to do with this
+    without restarting (which might not terminate or might be O(n^2) in worst case). But deletion is unusual.
     """
+    items_seen = set()
     for page in page_generator:
-        for res in page:
-            yield res
+        for item in page:
+            if isinstance(item, dict):
+                item_uuid = item.get('uuid')
+                if item_uuid:
+                    if item_uuid in items_seen:
+                        continue
+                    items_seen.add(item_uuid)
+            yield item
 
 
 def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=False):
@@ -392,15 +419,23 @@ def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=F
         search_url = '/'.join([auth['server'], search])
     else:
         search_url = search  # assume full url is correct
-    search_generator = get_search_generator(search_url, auth=auth, page_limit=page_limit)
+    page_generator = get_search_generator(search_url, auth=auth, page_limit=page_limit)
     if is_generator:
         # yields individual items from search result
-        return search_result_generator(search_generator)
+        return search_result_generator(page_generator)
     else:
         # return a list of all search results
         search_res = []
-        for page in search_generator:
-            search_res.extend(page)
+        items_seen = set()
+        for page in page_generator:
+            for item in page:
+                if isinstance(item, dict):
+                    item_uuid = item.get('uuid')
+                    if item_uuid:
+                        if item_uuid in items_seen:
+                            continue
+                        items_seen.add(item_uuid)
+                search_res.append(item)
         return search_res
 
 
