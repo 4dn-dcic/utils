@@ -6,6 +6,16 @@ dcicutils
 Change Log
 ----------
 
+
+1.9.2
+=====
+**PR 130: Fix bug that sometimes results in duplicated search results (C4-336)**
+
+* Fixes bug C4-336, in which sometimes ``ff_utils.search_metadata``, by doing a series of
+  Elastic Search calls that it pastes together into a single result,
+  can return a list containing duplicated items.
+
+
 1.9.1
 =====
 
