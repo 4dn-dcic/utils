@@ -826,6 +826,7 @@ def test_upsert_metadata(integrated_ff):
 def make_mocked_item(n):
     return {'uuid': str(n)}
 
+
 MOCKED_SEARCH_COUNT = 130
 MOCKED_SEARCH_ITEMS = [make_mocked_item(uuid_counter) for uuid_counter in range(MOCKED_SEARCH_COUNT)]
 
@@ -834,7 +835,7 @@ def constant_mocked_search_items():
     return MOCKED_SEARCH_ITEMS
 
 
-class InsertingMockedSearchItems():
+class InsertingMockedSearchItems:
     """
     This class is for use in simulating a situation in which an insertion occurs between calls to a search.
     The base set of data from which simulated results are taken will change on the second (POS=1) call,
@@ -861,7 +862,7 @@ class InsertingMockedSearchItems():
     and again 52 items will be returned, but this time it's {'uuid': 54'} that is the 50th element. But in this case,
     as with the other, most of the second set of results will be discarded, as only 3 additional items are
     needed to make 53.
-    """
+    """  # noQA - some long lines in this doc string that are URLs and not easily broken
 
     POS = 0
     ITEMS = MOCKED_SEARCH_ITEMS.copy()
@@ -893,6 +894,7 @@ class InsertingMockedSearchItems():
         cls.POS += 1
         return cls.ITEMS
 
+
 def make_mocked_search(item_maker=None):
 
     if item_maker is None:
@@ -902,10 +904,12 @@ def make_mocked_search(item_maker=None):
         ignored(auth, ff_env, retry_fxn)  # Not the focus of this mock
         parsed = urlsplit(url)
         params = dict(parse_qsl(parsed.query))
-        assert params['type'] == 'File', "This mock doesn't handle type=%s" % params['type']
-        assert params['sort'] == '-date_created', "This mock doesn't handle sort=%s" % params['sort']
-        search_from = int(params['from'])
-        search_limit = int(params['limit'])
+        # There are some noQA markers here because PyCharm wrongly infers that the params values are expected
+        # to be type 'bytes'. -kmp 15-Jan-2021
+        assert params['type'] == 'File', "This mock doesn't handle type=%s" % params['type']  # noQA
+        assert params['sort'] == '-date_created', "This mock doesn't handle sort=%s" % params['sort']  # noQA
+        search_from = int(params['from'])  # noQA
+        search_limit = int(params['limit'])  # noQA
         search_items = item_maker()[search_from:search_from + search_limit]
         if parsed.path.endswith("/browse/"):
             restype = 'Browse'
@@ -954,9 +958,14 @@ def test_search_metadata_integrated(integrated_ff, url):
 
 
 def check_search_metadata(integrated_ff, url, expect_shortfall=False):
+    """
+    This is a common function shared between unit and integration tests for search_metadata.
+    """
     if url != '':  # replace stub with actual url from integrated_ff
         url = integrated_ff['ff_key']['server'] + '/'
 
+    # Note that we do some some .reset() calls on a mock that are not needed when servicing the integration test,
+    # but they are harmless and it seemed pointless to make it conditional. -kmp 15-Jan-2021
     InsertingMockedSearchItems.reset()
     search_res = ff_utils.search_metadata(url + 'search/?limit=all&type=File', key=integrated_ff['ff_key'])
     assert isinstance(search_res, list)
