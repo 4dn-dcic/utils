@@ -7,6 +7,19 @@ Change Log
 ----------
 
 
+1.10.0
+======
+
+**PR 131: Misc functionality in service of C4-183** 
+
+* In ``dcicutils.misc_utils``:
+
+  * New function ``remove_element`` to remove an element from a list.
+  * New class ``TestApp`` which is a synonym for ``webtest.TestApp``
+    but declared not to be a test case.
+  * Make ``_VirtualAppHelper`` use new ``TestApp``.
+
+
 1.9.2
 =====
 **PR 130: Fix bug that sometimes results in duplicated search results (C4-336)**

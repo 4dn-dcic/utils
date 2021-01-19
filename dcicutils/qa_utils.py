@@ -716,10 +716,10 @@ class MockBotoS3Client:
     def _content_etag(content):
         return hashlib.md5(content).hexdigest()
 
-    def Bucket(self, name):
+    def Bucket(self, name):  # noQA - AWS function naming style
         return MockBotoS3Bucket(s3=self, name=name)
 
-    def head_object(self, Bucket, Key, **kwargs):
+    def head_object(self, Bucket, Key, **kwargs):  # noQA - AWS argument naming style
         if kwargs != self.other_required_arguments:
             raise MockKeysNotImplemented("get_object", kwargs.keys())
 
@@ -740,7 +740,7 @@ class MockBotoS3Client:
             # For now, just fail in any way since maybe our code doesn't care.
             raise Exception("Mock File Not Found")
 
-    def list_objects(self, Bucket, Prefix=None):
+    def list_objects(self, Bucket, Prefix=None):  # noQA - AWS argument naming style
         # Ref: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects
         bucket_prefix = Bucket + "/"
         bucket_prefix_length = len(bucket_prefix)
@@ -831,10 +831,10 @@ class MockBotoS3BucketObjects:
         self.bucket = bucket
 
     def all(self):
-        return self.bucket._all()
+        return self.bucket._all()  # noQA - we are effectively a friend of this instance and are intended to call this.
 
     def delete(self):
-        return self.bucket._delete(delete_bucket_too=False)
+        return self.bucket._delete(delete_bucket_too=False)  # noQA - we are effectively a friend of this instance
 
 
 class MockBotoSQSClient:
