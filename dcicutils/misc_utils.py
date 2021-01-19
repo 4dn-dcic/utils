@@ -69,7 +69,23 @@ class VirtualAppError(Exception):
         return self.__repr__()
 
 
-class _VirtualAppHelper(webtest.TestApp):  # effectively disguises 'TestApp'
+class TestApp(webtest.TestApp):
+    """
+    Equivalent to webtest.TestApp, but pytest will not let the name confuse into thinking it's a test case.
+
+    A test case in PyTest is something that contains "test" in its name. We didn't pick the name TestApp,
+    but there may be tools that want to use TestApp for testing, and so this is a better place to inherit from,
+    since we've added an appropriate declaration to keep PyTest from confusing it with a TestCase.
+    """
+
+    __test__ = False  # This declaration asserts to PyTest that this is not a test case.
+
+
+class _VirtualAppHelper(TestApp):
+    """
+    A helper class equivalent to webtest.TestApp, except that it isn't intended for test use.
+    """
+
     pass
 
 
@@ -783,6 +799,27 @@ def check_true(test_value, message, error_class=None):
         error_class = RuntimeError
     if not test_value:
         raise error_class(message)
+
+
+def remove_element(elem, lst, raise_error=True):
+    """
+    Returns a copy of the given list with the first occurrence of the given element removed.
+
+    If the element doesn't occur in the list, an error is raised unless given raise_error=False,
+    in which case a copy of the original list is returned.
+
+    :param elem: an object
+    :param lst: a list
+    :param raise_error: a boolean (default True)
+    """
+
+    result = lst.copy()
+    try:
+        result.remove(elem)
+    except ValueError:
+        if raise_error:
+            raise
+    return result
 
 
 def remove_prefix(prefix, text, required=False):

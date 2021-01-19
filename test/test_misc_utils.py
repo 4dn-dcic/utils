@@ -12,14 +12,14 @@ import warnings
 import webtest
 
 from dcicutils.misc_utils import (
-    PRINT, ignored, filtered_warnings, get_setting_from_context, VirtualApp, VirtualAppError,
+    PRINT, ignored, filtered_warnings, get_setting_from_context, TestApp, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
     Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool,
     LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
     keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
     CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json, url_path_join,
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
-    DatetimeCoercionFailure,
+    DatetimeCoercionFailure, remove_element,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ, MockFileSystem, printed_output, raises_regexp
@@ -136,6 +136,12 @@ class FakeTestApp:
 
 class FakeApp:
     pass
+
+
+def test_test_app():
+    test_app = TestApp(FakeApp(), {})
+    assert isinstance(test_app, webtest.TestApp)
+    assert not test_app.__test__
 
 
 def test_virtual_app_creation():
@@ -1280,6 +1286,16 @@ def test_check_true():
     with pytest.raises(RuntimeError) as e:
         check_true(x == [4, 5, 6], msg)
     assert msg in str(e)
+
+
+def test_remove_element():
+
+    assert remove_element('b', ['a', 'b', 'c', 'a', 'b', 'c']) == ['a', 'c', 'a', 'b', 'c']
+
+    with pytest.raises(ValueError):
+        assert remove_element('z', ['a', 'b', 'c', 'a', 'b', 'c'])
+
+    assert remove_element('z', ['a', 'b', 'c', 'a', 'b', 'c'], raise_error=False) == ['a', 'b', 'c', 'a', 'b', 'c']
 
 
 def test_remove_prefix():
