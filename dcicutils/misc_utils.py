@@ -803,10 +803,10 @@ def check_true(test_value, message, error_class=None):
 
 def remove_element(elem, lst, raise_error=True):
     """
-    Returns a copy of the given list with the first occurrence of the given element removed.
+    Returns a shallow copy of the given list with the first occurrence of the given element removed.
 
     If the element doesn't occur in the list, an error is raised unless given raise_error=False,
-    in which case a copy of the original list is returned.
+    in which case a shallow copy of the original list is returned (with no elements removed).
 
     :param elem: an object
     :param lst: a list

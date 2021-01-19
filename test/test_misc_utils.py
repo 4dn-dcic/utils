@@ -1290,12 +1290,20 @@ def test_check_true():
 
 def test_remove_element():
 
-    assert remove_element('b', ['a', 'b', 'c', 'a', 'b', 'c']) == ['a', 'c', 'a', 'b', 'c']
+    old = ['a', 'b', 'c', 'a', 'b', 'c']
+    new = remove_element('b', old)
+    assert old is not new
+    assert old == ['a', 'b', 'c', 'a', 'b', 'c']
+    assert new == ['a', 'c', 'a', 'b', 'c']
+
+    new = remove_element('z', old, raise_error=False)
+    assert old is not new
+    assert new == ['a', 'b', 'c', 'a', 'b', 'c']
+    assert old == ['a', 'b', 'c', 'a', 'b', 'c']
 
     with pytest.raises(ValueError):
-        assert remove_element('z', ['a', 'b', 'c', 'a', 'b', 'c'])
-
-    assert remove_element('z', ['a', 'b', 'c', 'a', 'b', 'c'], raise_error=False) == ['a', 'b', 'c', 'a', 'b', 'c']
+        remove_element('z', old)
+    assert old == ['a', 'b', 'c', 'a', 'b', 'c']
 
 
 def test_remove_prefix():
