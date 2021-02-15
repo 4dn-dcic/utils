@@ -1,5 +1,6 @@
 import botocore.exceptions
 import datetime as datetime_module
+import functools
 import io
 import json
 import os
@@ -12,14 +13,15 @@ import warnings
 import webtest
 
 from dcicutils.misc_utils import (
-    PRINT, ignored, filtered_warnings, get_setting_from_context, TestApp, VirtualApp, VirtualAppError,
+    PRINT, ignored, ignorable, filtered_warnings, get_setting_from_context, TestApp, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
     Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool,
     LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
     keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
     CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json, url_path_join,
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
-    DatetimeCoercionFailure, remove_element,
+    DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, reversed,
+    ancestor_classes, is_proper_subclass, decorator
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ, MockFileSystem, printed_output, raises_regexp
@@ -40,6 +42,13 @@ def test_uppercase_print():
 def test_ignored():
     def foo(x, y):
         ignored(x, y)
+    # Check that no error occurs for having used this.
+    assert foo(3, 4) is None
+
+
+def test_ignorable():
+    def foo(x, y):
+        ignorable(x, y)
     # Check that no error occurs for having used this.
     assert foo(3, 4) is None
 
@@ -722,6 +731,19 @@ def test_hms_now_and_ref_now(now):
         assert delta_hours in {4.0, 5.0}  # depending on daylight savings time, HMS is either 4 or 5 hours off from UTC
 
 
+def test_find_association():
+
+    one = {'value': 1, 'english': 'one', 'spanish': 'uno'}
+    two = {'value': 2, 'english': 'two', 'spanish': 'dos'}
+    three = {'value': 3, 'english': 'three', 'spanish': 'tres'}
+
+    things = [one, two, three]
+    assert find_association(things, value=1) == one
+    assert find_association(things, spanish='dos') == two
+    assert find_association(things, spanish='dos', value=2) == two
+    assert find_association(things, spanish='dos', value=3) is None
+
+
 def test_as_datetime():
 
     t0 = datetime_module.datetime(2015, 7, 4, 12, 0, 0)
@@ -1288,6 +1310,22 @@ def test_check_true():
     assert msg in str(e)
 
 
+def test_reversed():
+
+    x = [10, 20, 30]
+    y = reversed(x)
+
+    assert x is not y
+    assert x == [10, 20, 30]
+    assert y == [30, 20, 10]
+
+    y = reversed(y)
+    assert x is not y
+    assert x == y
+    assert x == [10, 20, 30]
+    assert y == [10, 20, 30]
+
+
 def test_remove_element():
 
     old = ['a', 'b', 'c', 'a', 'b', 'c']
@@ -1342,6 +1380,46 @@ def test_remove_suffix():
     assert remove_suffix("", "foo", required=True) == "foo"
 
 
+def test_ancestor_classes():
+    assert ancestor_classes(int) == [object]
+
+    class Foo:
+        pass
+
+    assert ancestor_classes(Foo) == [object]
+
+    class FooBar(Foo):
+        pass
+
+    assert ancestor_classes(FooBar) == [Foo, object]
+    assert ancestor_classes(FooBar, reverse=True) == [object, Foo]
+
+
+def test_is_proper_subclass():
+
+    assert is_proper_subclass(object, object) is False
+    assert is_proper_subclass(float, object) is True
+    assert is_proper_subclass(object, float) is False
+    assert is_proper_subclass(float, float) is False
+
+    class Foo:
+        pass
+
+    class Bar(Foo):
+        pass
+
+    class Baz(Bar):
+        pass
+
+    assert is_proper_subclass(Foo, object) is True
+    assert is_proper_subclass(Bar, object) is True
+    assert is_proper_subclass(Baz, object) is True
+
+    assert is_proper_subclass(Foo, Foo) is False
+    assert is_proper_subclass(Bar, Foo) is True
+    assert is_proper_subclass(Baz, Foo) is True
+
+
 def test_full_class_name():
 
     assert full_class_name(3) == 'int'
@@ -1366,6 +1444,10 @@ def test_constantly():
     assert five(nobody='cares') == 5
     assert five(0, 1, 2, fourth=3, fifth=4) == 5
 
+    assert str(five) == "constantly(5)"
+    assert repr(five) == "constantly(5)"
+    assert five.__doc__ == "A function that always returns a constant value: 5"
+
     assert five() + five() == 10
 
     arbitrariness = 1000000
@@ -1374,6 +1456,59 @@ def test_constantly():
     assert randomness() > 0
     assert randomness() - randomness() == 0
     assert randomness() == randomness()
+
+
+def test_identity():
+    for x in [1, 'foo', ['x', 17]]:
+        assert x == identity(x)
+
+
+def test_count_if():
+
+    list_of_numbers = [0, 10, 20, 30]
+    list_of_things = [None, 1, '', 'foo', 'False', [1, 2, 3]]
+
+    list_of_non_zero_numbers = list_of_numbers.copy()
+    list_of_non_zero_numbers.remove(0)
+
+    assert count_if(constantly(True), list_of_numbers) == len(list_of_numbers)
+    assert count_if(constantly(True), list_of_things) == len(list_of_things)
+    assert count_if(constantly(True), []) == 0
+
+    assert count_if(constantly(False), list_of_numbers) == 0
+    assert count_if(constantly(False), list_of_things) == 0
+    assert count_if(constantly(False), []) == 0
+
+    assert count_if(identity, list_of_numbers) == len([x for x in list_of_numbers if x])
+    assert count_if(identity, list_of_things) == len([x for x in list_of_things if x])
+    assert count_if(identity, []) == 0
+
+    with pytest.raises(Exception):
+        count_if(identity, None)
+
+
+def test_count():
+
+    list_of_numbers = [0, 10, 20, 30]
+    list_of_things = [None, 1, '', 'foo', 'False', [1, 2, 3]]
+
+    list_of_non_zero_numbers = list_of_numbers.copy()
+    list_of_non_zero_numbers.remove(0)
+
+    assert count(list_of_numbers, filter=constantly(True)) == len(list_of_numbers)
+    assert count(list_of_things, filter=constantly(True)) == len(list_of_things)
+    assert count([], filter=constantly(True)) == 0
+
+    assert count(list_of_numbers, filter=constantly(False)) == 0
+    assert count(list_of_things, filter=constantly(False)) == 0
+    assert count([], filter=constantly(False)) == 0
+
+    assert count(list_of_numbers) == len([x for x in list_of_numbers if x])
+    assert count(list_of_things) == len([x for x in list_of_things if x])
+    assert count([]) == 0
+
+    with pytest.raises(Exception):
+        count(None)
 
 
 def test_keyword_as_title():
@@ -1762,3 +1897,140 @@ def test_url_path_join():
     assert url_path_join('foo', '/bar') == 'foo/bar'
     assert url_path_join('foo/', '/bar') == 'foo/bar'
     assert url_path_join('//foo//', '///bar//') == '//foo/bar//'
+
+
+def test_decorator_for_class():
+
+    # This test is kind of a 'test first' thing, where we first illustrate that the native decorator facility
+    # has a problem that is pretty irritating. Then we check our solution doesn't have that problem.
+
+    def check_class_decoration(the_decorator):
+
+        @the_decorator(foo=False)
+        class Decorated1:
+            pass
+
+        @the_decorator(foo=True)
+        class Decorated2(Decorated1):
+            pass
+
+        @the_decorator
+        class Decorated3(Decorated2):  # noQA - There's a deliberate bug on this line for testing
+            pass
+
+        assert isinstance(Decorated1, type)
+        assert isinstance(Decorated2, type)
+        assert isinstance(Decorated3, type)
+
+        assert Decorated1.foo is False
+        assert Decorated2.foo is True
+        assert Decorated3.foo is False
+
+    def native_decorator(foo=False):
+        def _wrap(cls):
+            cls.foo = foo
+            return cls
+        return _wrap
+
+    with pytest.raises(Exception):
+        #
+        # If you were to remove the pytest.raises here, you'd see:
+        #
+        # >       assert isinstance(Decorated3, type)
+        # E       assert False
+        # E        +  where False =
+        #               isinstance(<function test_decorator.<locals>.native_decorator.<locals>._wrap at 0x109ec50d0>,
+        #                          type)
+        #
+        check_class_decoration(native_decorator)
+
+    # It works to 'promote' a native decorator to a better decorator via function call.
+
+    check_class_decoration(decorator(native_decorator))
+
+    # It works the normal decorator way with @better_decorator
+
+    @decorator  # noQA - PyCharm will incorrectly infer that this requires an argument list
+    def better_decorator(foo=False):
+        def _wrap(cls):
+            cls.foo = foo
+            return cls
+        return _wrap
+
+    check_class_decoration(better_decorator)
+
+    # It works the normal decorator way with an arglist, as in: @another_better_decorator(...)
+
+    @decorator()
+    def another_better_decorator(foo=False):
+        def _wrap(cls):
+            cls.foo = foo
+            return cls
+        return _wrap
+
+    check_class_decoration(another_better_decorator)
+
+
+def test_decorator_for_function():
+
+    def check_function_decoration(the_decorator):
+
+        # Remember that the function promises not to take positional arguments.
+        @the_decorator(label='eff')
+        def f(x):
+            return x
+
+        assert f(4) == {'eff': 4}
+
+        @the_decorator()
+        def f(x):
+            return x
+
+        assert f(4) == {'value': 4}
+
+        @the_decorator
+        def f(x):
+            return x
+
+        assert f(4) == {'value': 4}
+
+    def native_decorator(label='value'):
+        def _wrap(fn):
+            @functools.wraps(fn)
+            def _wrapped(*args, **kwargs):
+                return {label: fn(*args, **kwargs)}
+            return _wrapped
+        return _wrap
+
+    with pytest.raises(Exception):
+        check_function_decoration(native_decorator)
+
+    # It works to 'promote' a native decorator to a better decorator via function call.
+
+    check_function_decoration(decorator(native_decorator))
+
+    # It works the normal decorator way with @better_decorator
+
+    @decorator  # noQA - PyCharm will incorrectly infer that this requires an argument list
+    def better_decorator(label='value'):
+        def _wrap(fn):
+            @functools.wraps(fn)
+            def _wrapped(*args, **kwargs):
+                return {label: fn(*args, **kwargs)}
+            return _wrapped
+        return _wrap
+
+    check_function_decoration(better_decorator)
+
+    # It works the normal decorator way with an arglist, as in: @another_better_decorator(...)
+
+    @decorator()
+    def another_better_decorator(label='value'):
+        def _wrap(fn):
+            @functools.wraps(fn)
+            def _wrapped(*args, **kwargs):
+                return {label: fn(*args, **kwargs)}
+            return _wrapped
+        return _wrap
+
+    check_function_decoration(another_better_decorator)
