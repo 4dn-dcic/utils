@@ -7,6 +7,26 @@ Change Log
 ----------
 
 
+1.11.0
+======
+
+**PR 132: Miscellaneous support for cgap-portal, and some unit testing (part of C4-601)**
+
+* For ``jh_utils``:
+
+  * Better unit test for ``find_valid_file_or_extra_file`` (part of fixing C4-601).
+
+* For ``misc_utils``:
+
+  * New function ``ignorable`` which is basically a synonym for ``ignore``, but with the sense that it's OK for the variables given as its arguments to be used elsewhere or not.
+  * New function ``ancestor_classes`` that returns a list of the classes from which a given class inherits.
+  * New function ``is_proper_subclass`` that is like ``issubclass`` but returns ``True`` only if its two arguments _are_ not the same class.
+  * New function ``identity`` that returns its argument.
+  * New functions ``count`` and ``count_if`` for counting things in a sequence.
+  * New function ``find_association`` for finding dictionaries in a list based on specified field criteria.
+  * New ``@decorator`` decorator for defining (what else?) decorators. Specifically, this addresses the ``@foo`` vs ``@foo()`` issue, allowing both syntaxes.
+
+
 1.10.0
 ======
 
@@ -317,3 +337,4 @@ the ``poetry.app`` section of ``pyproject.toml``, as in::
    name = "dcicutils"
    version = "100.200.300"
    ...etc.
+

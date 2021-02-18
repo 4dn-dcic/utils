@@ -5,6 +5,7 @@ This file contains functions that might be generally useful.
 import contextlib
 import datetime
 import functools
+import inspect
 import math
 import io
 import os
@@ -198,6 +199,24 @@ def ignored(*args, **kwargs):
     return args, kwargs
 
 
+def ignorable(*args, **kwargs):
+    """
+    This is useful for defeating flake warnings.
+    Call this function to use values that really might be ignored.
+    This is intended as a declaration that variables are or might be intentionally ignored,
+    but no enforcement of that is done. Some sample uses:
+
+    def foo(x, y):
+        ignorable(x, y)  # so flake8 won't complain about unused vars, whether or not next line is commented out.
+        # print(x, y)
+        return 3
+
+    foo_synonym = foo
+    ignorable(foo_synonym)  # We might or might not use foo_synonym, but we don't want it reported as unused
+    """
+    return args, kwargs
+
+
 def get_setting_from_context(settings, ini_var, env_var=None, default=None):
     """
     This gets a value from either an environment variable or a config file.
@@ -330,7 +349,7 @@ class Retry:
             wait_multiplier: A multiplier by which the number of wait_seconds is adjusted on each retry.
         """
 
-        def decorator(function):
+        def _decorator(function):
             function_name = name_key or function.__name__
             function_profile = cls.RetryOptions(
                 retries_allowed=cls._defaulted(retries_allowed, cls.DEFAULT_RETRIES_ALLOWED),
@@ -368,7 +387,7 @@ class Retry:
 
             return wrapped_function
 
-        return decorator
+        return _decorator
 
     @classmethod
     def retrying(cls, fn, retries_allowed=None, wait_seconds=None, wait_increment=None, wait_multiplier=None):
@@ -858,6 +877,21 @@ def obsolete(func, fail=True):
     return inner
 
 
+def ancestor_classes(cls, reverse=False):
+    result = list(cls.__mro__[1:])
+    if reverse:
+        result.reverse()
+    return result
+
+
+def is_proper_subclass(cls, maybe_proper_superclass):
+    """
+    Returns true of its first argument is a subclass of the second argument, but is not that class itself.
+    (Every class is a subclass of itself, but no class is a 'proper subclass' of itself.)
+    """
+    return cls is not maybe_proper_superclass and issubclass(cls, maybe_proper_superclass)
+
+
 def full_class_name(obj):
     """
     Returns the fully-qualified name of the class of the given obj (an object).
@@ -894,6 +928,30 @@ def constantly(value):
         ignored(args, kwargs)
         return value
     return fn
+
+
+def identity(x):
+    """Returns its argument."""
+    return x
+
+
+def count_if(filter, seq):
+    return sum(1 for x in seq if filter(x))
+
+
+def count(seq, filter=None):
+    return count_if(filter or identity, seq)
+
+
+def find_association(data, **kwargs):
+    for datum in data:
+        mismatch = False
+        for k, v in kwargs.items():
+            if k in datum and datum[k] != v:
+                mismatch = True
+        if not mismatch:
+            return datum
+    return None
 
 
 def keyword_as_title(keyword):
@@ -1113,6 +1171,77 @@ def url_path_join(*fragments):
     for thing in fragments[1:]:
         result = result.rstrip("/") + "/" + thing.lstrip("/")
     return result
+
+
+def _is_function_of_exactly_one_required_arg(x):
+    if not callable(x):
+        return False
+    argspec = inspect.getfullargspec(x)
+    return len(argspec.args) == 1 and not argspec.varargs and not argspec.defaults and not argspec.kwonlyargs
+
+
+def _apply_decorator(fn, *args, **kwargs):
+    """
+    This implements a fix to the decorator syntax where it gets fussy about whether @foo and @foo() are synonyms.
+    The price to be paid is you can't use it for decorators that take positional arguments.
+    """
+    if args and (kwargs or len(args) > 1):
+        # If both args and kwargs are in play, they have to have been passed explicitly like @foo(a1, k2=v2).
+        # If more than one positional is given, that has to be something like @foo(a1, a2, ...)
+        # Decorators using this function need to agree to only accept keyword arguments, so those cases can't happen.
+        # They can do this by using an optional first positional argument, as in 'def foo(x=3):',
+        # or they can do it by using a * as in 'def foo(*, x)' or if no arguments are desired, obviously, 'def foo():'.
+        raise SyntaxError("Positional arguments to decorator (@%s) not allowed here." % fn.__name__)
+    elif args:
+        arg0 = args[0]  # At this point, we know there is a single positional argument.
+        #
+        # Here there are two cases.
+        #
+        # (a) The user may have done @foo, in which case we will have a fn which is the value of foo,
+        #     but not the result of applying it.
+        #
+        # (b) Otherwise, the user has done @foo(), in which case what we'll have the function of one
+        #     argument that does the wrapping of the subsequent function or class.
+        #
+        # So since case (a) expects fn to be a function that tolerates zero arguments
+        # while case (b) expects fn to be a function that rejects positional arguments,
+        # we can call fn with the positional argument, arg0. If that argument is rejected with a TypeError,
+        # we know that it's really case (a) and that we need to call fn once with no arguments
+        # before retrying on arg0.
+        if _is_function_of_exactly_one_required_arg(fn):
+            # We are ready to wrap the function or class in arg0
+            return fn(arg0)
+        else:
+            # We are ALMOST ready to wrap the function or class in arg0,
+            # but first we have to call ourselves with no arguments as in case (a) described above.
+            return fn()(arg0)
+    else:
+        # Here we have kwargs = {...} from @foo(x=3, y=4, ...) or maybe no kwargs either @foo().
+        # Either way, we've already evaluated the foo(...) call, so all that remains is to call on our kwargs.
+        # (There are no args to call it on because we tested that above.)
+        return fn(**kwargs)
+
+
+def _decorator(decorator_function):
+    """See documentation for decorator."""
+    @functools.wraps(decorator_function)
+    def _wrap_decorator(*args, **kwargs):
+        return _apply_decorator(decorator_function, *args, **kwargs)
+    return _wrap_decorator
+
+
+@_decorator
+def decorator():
+    """
+    This defines a decorator, such that is can be used as either @foo or @foo()
+    PROVIDED THAT the function doing the decorating is not a function a single required argument,
+    since that would create an ambiguity that would inhibit the auto-correction this will do.
+
+    @decorator
+    def foo(...):
+        ...
+    """
+    return _decorator
 
 
 # Deprecated names, still supported for a while.
