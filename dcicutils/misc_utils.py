@@ -820,12 +820,6 @@ def check_true(test_value, message, error_class=None):
         raise error_class(message)
 
 
-def reversed(seq):
-    seq_copied = list(seq).copy()
-    seq_copied.reverse()
-    return seq_copied
-
-
 def remove_element(elem, lst, raise_error=True):
     """
     Returns a shallow copy of the given list with the first occurrence of the given element removed.
@@ -929,29 +923,11 @@ def full_object_name(obj):
         return None
 
 
-class _ConstantValuedFunction:
-
-    def __init__(self, value):
-        self._value = value
-
-    def __str__(self):
-        return repr(self)
-
-    def __repr__(self):
-        return "constantly(%r)" % self._value
-
-    def __call__(self, *args, **kwargs):
+def constantly(value):
+    def fn(*args, **kwargs):
         ignored(args, kwargs)
-        return self._value
-
-    @property
-    def __doc__(self):
-        return "A function that always returns a constant value: %r" % self._value
-
-
-def constantly(x):
-    """Given any constant x, returns a function that always returns the constant x."""
-    return _ConstantValuedFunction(x)
+        return value
+    return fn
 
 
 def identity(x):

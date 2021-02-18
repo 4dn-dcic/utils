@@ -20,7 +20,7 @@ from dcicutils.misc_utils import (
     keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
     CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json, url_path_join,
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
-    DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, reversed,
+    DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association,
     ancestor_classes, is_proper_subclass, decorator
 )
 from dcicutils.qa_utils import (
@@ -1310,22 +1310,6 @@ def test_check_true():
     assert msg in str(e)
 
 
-def test_reversed():
-
-    x = [10, 20, 30]
-    y = reversed(x)
-
-    assert x is not y
-    assert x == [10, 20, 30]
-    assert y == [30, 20, 10]
-
-    y = reversed(y)
-    assert x is not y
-    assert x == y
-    assert x == [10, 20, 30]
-    assert y == [10, 20, 30]
-
-
 def test_remove_element():
 
     old = ['a', 'b', 'c', 'a', 'b', 'c']
@@ -1443,10 +1427,6 @@ def test_constantly():
     assert five(13) == 5
     assert five(nobody='cares') == 5
     assert five(0, 1, 2, fourth=3, fifth=4) == 5
-
-    assert str(five) == "constantly(5)"
-    assert repr(five) == "constantly(5)"
-    assert five.__doc__ == "A function that always returns a constant value: 5"
 
     assert five() + five() == 10
 
