@@ -7,6 +7,19 @@ Change Log
 ----------
 
 
+1.11.0.1b0
+==========
+
+**PR TBD...**
+
+This change is in response to trouble we've had with deployment,
+trying to get us back to a level playing field.
+
+* In `misc_utils`:
+
+  * Different/safer implementation of the TestApp change.
+
+
 1.11.0
 ======
 
