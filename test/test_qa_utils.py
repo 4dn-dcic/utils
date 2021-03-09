@@ -385,8 +385,6 @@ def test_controlled_time_utcnow_with_tz():
 
 def test_controlled_time_utcnow():
 
-    hour = 60 * 60  # 60 seconds * 60 minutes
-
     # This doesn't test that we resolve the timezone correclty, just that if we use a given timezone, it works.
     # We've picked a timezone where daylight time is not likely to be in play.
     local_time = guess_local_timezone_for_testing()
@@ -396,8 +394,7 @@ def test_controlled_time_utcnow():
     t1 = t.now()     # initial time + 1 second
     t.set_datetime(t0)
     t2 = t.utcnow()  # initial time UTC + 1 second
-    # US/Eastern on 2020-01-01 is not daylight time, so EST (-0500) not EDT (-0400).
-    assert (t2 - t1).total_seconds() == 5 * hour
+    # This might be 5 hours in US/Eastern at HMS or it might be 0 hours in UTC on AWS or GitHub Actions.
     assert (t2 - t1).total_seconds() == abs(local_time.utcoffset(t0).total_seconds())
 
 
