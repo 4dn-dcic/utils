@@ -4,6 +4,7 @@ qa_utils: Tools for use in quality assurance testing.
 
 import contextlib
 import datetime
+import dateutil.tz as dateutil_tz
 import hashlib
 import io
 import os
@@ -16,7 +17,7 @@ import uuid
 import warnings
 
 from json import dumps as json_dumps, loads as json_loads
-from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix
+from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ
 
 
 def show_elapsed_time(start, end):
@@ -120,6 +121,42 @@ def override_dict(d, **overrides):
             d[k] = v
 
 
+LOCAL_TIMEZONE_MAPPINGS = {
+    ('EST', 'EDT'): "US/Eastern",
+    ('CST', 'CDT'): "US/Central",
+    ('MST', 'MDT'): "US/Mountain",
+    ('PST', 'PDT'): "US/Pacific",
+}
+
+
+def guess_local_timezone_for_testing():
+    # Figuring out the actual local timezone from Python is much discussed on Stackoverflow and elsehwere
+    # and there are no perfect solutions. It's a complicated topic. But mostly we need to be able to distinguish
+    # local testing at HMS and remote testing on AWS.
+    a_winter_time = datetime.datetime(2000, 12, 31, 12, 0, 0)
+    a_summer_time = datetime.datetime(2000, 6, 30, 12, 0, 0)
+    local_timezone = dateutil_tz.tzlocal()  # Alas, not a full timezone object with all the methods a pytz.timezone has
+    winter_tz_name = local_timezone.tzname(a_winter_time)
+    summer_tz_name = local_timezone.tzname(a_summer_time)
+    mapping_key = (winter_tz_name, summer_tz_name)
+    mapping = LOCAL_TIMEZONE_MAPPINGS.get(mapping_key)
+    if mapping:
+        return pytz.timezone(mapping)
+    elif winter_tz_name == summer_tz_name:
+        # We have some timezone that doesn't vary
+        winter_tz = pytz.timezone(winter_tz_name)
+        if winter_tz.utcoffset(a_winter_time).total_seconds() == 0:
+            return pytz.UTC
+        else:
+            # Something like MST that we don't have in our ad hoc table, where it's the same all year round.
+            # This may not select its prettiest name, but all we really want is to get a pytz.timezone at all
+            # because that will have a .localize() method, which some of our code cares about.
+            return winter_tz
+    else:
+        raise NotImplementedError("This mock is not designed well enough for timezone %s/%s."
+                                  % (winter_tz_name, summer_tz_name))
+
+
 class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
     """
     This class can be used in mocking datetime.datetime for things that do certain time-related actions.
@@ -145,12 +182,13 @@ class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
 
     # A randomly chosen but reproducible date 2010-07-01 12:00:00
     INITIAL_TIME = datetime.datetime(2010, 1, 1, 12, 0, 0)
-    HMS_TIMEZONE = pytz.timezone("US/Eastern")
+    HMS_TIMEZONE = REF_TZ
+    LOCAL_TIMEZONE = guess_local_timezone_for_testing()
     DATETIME_TYPE = datetime.datetime
     timedelta = datetime.timedelta
 
     def __init__(self, initial_time: datetime.datetime = INITIAL_TIME, tick_seconds: float = 1,
-                 local_timezone: pytz.timezone = HMS_TIMEZONE):
+                 local_timezone: pytz.timezone = LOCAL_TIMEZONE):
         if not isinstance(initial_time, datetime.datetime):
             raise ValueError("Expected initial_time to be a datetime: %r" % initial_time)
         if initial_time.tzinfo is not None:

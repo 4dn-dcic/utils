@@ -1,6 +1,7 @@
 import datetime
 import io
 import os
+import platform
 import pytest
 import pytz
 import re
@@ -15,7 +16,7 @@ from dcicutils.qa_utils import (
     mock_not_called, local_attrs, override_environ, override_dict, show_elapsed_time, timed,
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3,
-    raises_regexp, VersionChecker, check_duplicated_items_by_key,
+    raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -280,6 +281,43 @@ def test_override_environ():
     assert unique_prop3 not in os.environ
 
 
+class MockLocalTimezone:
+
+    def __init__(self, summer_tz, winter_tz):
+        self._summer_tz = summer_tz
+        self._winter_tz = winter_tz
+
+    def tzname(self, dt: datetime.datetime):
+        # The exact time that daylight time runs varies from year to year. For testing we'll say that
+        # daylight time is April 1 to Oct 31.  In practice, we recommend times close to Dec 31 for winter
+        # and Jun 30 for summer, so the precise transition date doesn't matter. -kmp 9-Mar-2021
+        if 3 < dt.month < 11:
+            return self._summer_tz
+        else:
+            return self._winter_tz
+
+
+def test_guess_local_timezone_for_testing():
+
+    with mock.patch.object(qa_utils.dateutil_tz, "tzlocal") as mock_tzlocal:  # noQA
+
+        mock_tzlocal.side_effect = lambda: MockLocalTimezone(summer_tz='GMT', winter_tz='GMT')
+        assert guess_local_timezone_for_testing() == pytz.UTC
+
+        mock_tzlocal.side_effect = lambda: MockLocalTimezone(summer_tz='EDT', winter_tz='EST')
+        guess = guess_local_timezone_for_testing()
+        assert guess == pytz.timezone("US/Eastern")
+
+        mock_tzlocal.side_effect = lambda: MockLocalTimezone(summer_tz='MST', winter_tz='MST')
+        guess = guess_local_timezone_for_testing()
+        assert guess == pytz.timezone("MST")
+
+        with pytest.raises(Exception):
+            # Unknown times that disagree will fail.
+            mock_tzlocal.side_effect = lambda: MockLocalTimezone(summer_tz='GMT', winter_tz='BST')
+            guess_local_timezone_for_testing()
+
+
 def test_controlled_time_creation():
 
     t = ControlledTime()
@@ -319,10 +357,12 @@ def test_controlled_time_now():
     assert (t3 - t0).total_seconds() == 3
 
 
-def test_controlled_time_utcnow():
+def test_controlled_time_utcnow_with_tz():
 
     hour = 60 * 60  # 60 seconds * 60 minutes
 
+    # This doesn't test that we resolve the timezone correclty, just that if we use a given timezone, it works.
+    # We've picked a timezone where daylight time is not likely to be in play.
     eastern_time = pytz.timezone("US/Eastern")
     t0 = datetime.datetime(2020, 1, 1, 0, 0, 0)
     t = ControlledTime(initial_time=t0, local_timezone=eastern_time)
@@ -332,6 +372,25 @@ def test_controlled_time_utcnow():
     t2 = t.utcnow()  # initial time UTC + 1 second
     # US/Eastern on 2020-01-01 is not daylight time, so EST (-0500) not EDT (-0400).
     assert (t2 - t1).total_seconds() == 5 * hour
+    assert (t2 - t1).total_seconds() == abs(eastern_time.utcoffset(t0).total_seconds())
+
+
+def test_controlled_time_utcnow():
+
+    hour = 60 * 60  # 60 seconds * 60 minutes
+
+    # This doesn't test that we resolve the timezone correclty, just that if we use a given timezone, it works.
+    # We've picked a timezone where daylight time is not likely to be in play.
+    local_time = guess_local_timezone_for_testing()
+    t0 = datetime.datetime(2020, 1, 1, 0, 0, 0)
+    t = ControlledTime(initial_time=t0)
+
+    t1 = t.now()     # initial time + 1 second
+    t.set_datetime(t0)
+    t2 = t.utcnow()  # initial time UTC + 1 second
+    # US/Eastern on 2020-01-01 is not daylight time, so EST (-0500) not EDT (-0400).
+    assert (t2 - t1).total_seconds() == 5 * hour
+    assert (t2 - t1).total_seconds() == abs(local_time.utcoffset(t0).total_seconds())
 
 
 def test_controlled_time_reset_datetime():
