@@ -129,7 +129,7 @@ LOCAL_TIMEZONE_MAPPINGS = {
 }
 
 
-def guess_local_timezone_for_testing():
+def guess_local_timezone_for_testing() -> pytz.tzinfo:
     # Figuring out the actual local timezone from Python is much discussed on Stackoverflow and elsehwere
     # and there are no perfect solutions. It's a complicated topic. But mostly we need to be able to distinguish
     # local testing at HMS and remote testing on AWS.

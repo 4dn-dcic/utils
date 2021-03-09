@@ -11,7 +11,7 @@ import time
 import uuid
 
 from dcicutils import qa_utils
-from dcicutils.misc_utils import Retry, PRINT, file_contents
+from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ
 from dcicutils.qa_utils import (
     mock_not_called, local_attrs, override_environ, override_dict, show_elapsed_time, timed,
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule,
@@ -281,7 +281,7 @@ def test_override_environ():
     assert unique_prop3 not in os.environ
 
 
-class MockLocalTimezone:
+class MockLocalTimezone:  # Technically should return pytz.tzinfo but doesn't
 
     def __init__(self, summer_tz, winter_tz):
         self._summer_tz = summer_tz
@@ -295,6 +295,14 @@ class MockLocalTimezone:
             return self._summer_tz
         else:
             return self._winter_tz
+
+
+def test_guess_local_timezone_for_testing_contextually():
+
+    if platform.system() == 'Darwin':
+        assert guess_local_timezone_for_testing() == REF_TZ
+    else:
+        assert guess_local_timezone_for_testing() == pytz.UTC
 
 
 def test_guess_local_timezone_for_testing():
