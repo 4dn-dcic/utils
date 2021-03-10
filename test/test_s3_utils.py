@@ -1,11 +1,11 @@
-import boto3
 import contextlib
 import datetime
 import io
 import pytest
 
 from dcicutils import s3_utils as s3_utils_module
-from dcicutils.qa_utils import ignored, override_environ, MockBoto3, MockFileSystem
+from dcicutils.misc_utils import ignored, ignorable
+from dcicutils.qa_utils import override_environ, MockBoto3
 from dcicutils.s3_utils import s3Utils
 from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
 from dcicutils.env_utils import get_standard_mirror_env, FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, CGAP_PUBLIC_URL_PRD
@@ -394,6 +394,7 @@ def test_get_file_size_integrated(integrated_s3_info):
         integrated_s3_info['s3Obj'].get_file_size('not_a_file')
     assert 'not found' in str(exec_info.value)
 
+
 @pytest.mark.unit
 def test_get_file_size_unit(integrated_names):
 
@@ -436,6 +437,7 @@ def test_size_unit(integrated_names):
 
         # When bucket doesn't exist, we expect an error
         with pytest.raises(Exception, match='.*NoSuchBucket.*') as exec_info:
+            ignorable(exec_info)
             s3_connection.size('not_a_bucket')
 
 
