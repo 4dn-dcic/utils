@@ -2,11 +2,45 @@
 qa_utils: Tools for use in quality assurance testing.
 """
 
-import datetime
 import contextlib
+import datetime
+import io
 import os
+import pytest
 import pytz
-from .misc_utils import PRINT, ignored, Retry
+import re
+import time
+import toml
+import uuid
+
+from json import dumps as json_dumps, loads as json_loads
+from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized
+
+
+def show_elapsed_time(start, end):
+    """ Helper method for below that is the default - just prints the elapsed time. """
+    PRINT('Elapsed: %s' % (end - start))
+
+
+@contextlib.contextmanager
+def timed(reporter=None, debug=None):
+    """ A simple context manager that will time how long it spends in context. Useful for debugging.
+
+        :param reporter: lambda x, y where x and y are the start and finish times respectively, default PRINT
+        :param debug: lambda x where x is an exception, default NO ACTION
+    """
+    if reporter is None:
+        reporter = show_elapsed_time
+    start = time.time()
+    try:
+        yield
+    except Exception as e:
+        if debug is not None:
+            debug(e)
+        raise
+    finally:
+        end = time.time()
+        reporter(start, end)
 
 
 def mock_not_called(name):
@@ -58,25 +92,30 @@ def local_attrs(obj, **kwargs):
 
 @contextlib.contextmanager
 def override_environ(**overrides):
+    with override_dict(os.environ, **overrides):
+        yield
+
+
+@contextlib.contextmanager
+def override_dict(d, **overrides):
     to_delete = []
     to_restore = {}
-    env = os.environ
     try:
         for k, v in overrides.items():
-            if k in env:
-                to_restore[k] = env[k]
+            if k in d:
+                to_restore[k] = d[k]
             else:
                 to_delete.append(k)
             if v is None:
-                env.pop(k, None)  # Delete key k, tolerating it being already gone
+                d.pop(k, None)  # Delete key k, tolerating it being already gone
             else:
-                env[k] = v
+                d[k] = v
         yield
     finally:
         for k in to_delete:
-            env.pop(k, None)  # Delete key k, tolerating it being already gone
+            d.pop(k, None)  # Delete key k, tolerating it being already gone
         for k, v in to_restore.items():
-            os.environ[k] = v
+            d[k] = v
 
 
 class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
@@ -256,6 +295,10 @@ class Occasionally:
         else:
             return self.function(*args, **kwargs)
 
+    @property
+    def __name__(self):
+        return "{}.occassionally".format(self.function.__name__)
+
 
 class RetryManager(Retry):
     """
@@ -287,8 +330,475 @@ class RetryManager(Retry):
             options['retries_allowed'] = retries_allowed
         if wait_seconds is not None:
             options['wait_seconds'] = wait_seconds
+        if wait_increment is not None:
+            options['wait_increment'] = wait_increment
+        if wait_multiplier is not None:
+            options['wait_multiplier'] = wait_multiplier
         if wait_increment is not None or wait_multiplier is not None:
-            options['wait_adjustor'] = cls._wait_adjustor(wait_increment=wait_increment,
-                                                          wait_multiplier=wait_multiplier)
+            options['wait_adjustor'] = function_profile.make_wait_adjustor(wait_increment=wait_increment,
+                                                                           wait_multiplier=wait_multiplier)
         with local_attrs(function_profile, **options):
             yield
+
+
+FILE_SYSTEM_VERBOSE = True
+
+
+class MockFileWriter:
+
+    def __init__(self, file_system, file, binary=False, encoding='utf-8'):
+        self.file_system = file_system
+        self.file = file
+        self.encoding = encoding
+        self.stream = io.BytesIO() if binary else io.StringIO()
+
+    def __enter__(self):
+        return self.stream
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        content = self.stream.getvalue()
+        if FILE_SYSTEM_VERBOSE:
+            print("Writing %r to %s." % (content, self.file))
+        self.file_system.files[self.file] = content if isinstance(content, bytes) else content.encode(self.encoding)
+
+
+class MockFileSystem:
+    """Extremely low-tech mock file system."""
+
+    def __init__(self, files=None, default_encoding='utf-8'):
+        self.default_encoding = default_encoding
+        self.files = {filename: content.encode(default_encoding) for filename, content in (files or {}).items()}
+
+    def exists(self, file):
+        return bool(self.files.get(file))
+
+    def remove(self, file):
+        if not self.files.pop(file, None):
+            raise FileNotFoundError("No such file or directory: %s" % file)
+
+    def open(self, file, mode='r'):
+        if FILE_SYSTEM_VERBOSE:
+            print("Opening %r in mode %r." % (file, mode))
+        if mode == 'w':
+            return self._open_for_write(file_system=self, file=file, binary=False)
+        elif mode == 'wb':
+            return self._open_for_write(file_system=self, file=file, binary=True)
+        elif mode == 'r':
+            return self._open_for_read(file, binary=False)
+        elif mode == 'rb':
+            return self._open_for_read(file, binary=True)
+        else:
+            raise AssertionError("Mocked io.open doesn't handle mode=%r." % mode)
+
+    def _open_for_read(self, file, binary=False, encoding=None):
+        content = self.files.get(file)
+        if content is None:
+            raise FileNotFoundError("No such file or directory: %s" % file)
+        if FILE_SYSTEM_VERBOSE:
+            print("Read %r to %s." % (content, file))
+        return io.BytesIO(content) if binary else io.StringIO(content.decode(encoding or self.default_encoding))
+
+    def _open_for_write(self, file_system, file, binary=False, encoding=None):
+        return MockFileWriter(file_system=file_system, file=file, binary=binary,
+                              encoding=encoding or self.default_encoding)
+
+
+class MockUUIDModule:
+    """
+    This mock is intended to replace the uuid module itself, not the UUID class (which it ordinarily tries to use).
+    In effect, this only changes how UUID strings are generated, not how UUID objects returned are represented.
+    However, mocking this is a little complicated because you have to replace individual methods. e.g.,
+
+        import uuid
+        def some_test():
+            mock_uuid_module = MockUUIDModule()
+            assert mock_uuid_module.uuid4() == '00000000-0000-0000-0000-000000000001'
+            with mock.patch.object(uuid, "uuid4", mock_uuid_module.uuid4):
+                assert uuid.uuid4() == '00000000-0000-0000-0000-000000000002'
+    """
+
+    PREFIX = '00000000-0000-0000-0000-'
+    PAD = 12
+    UUID_CLASS = uuid.UUID
+
+    def __init__(self, prefix=None, pad=None, uuid_class=None):
+        self._counter = 1
+        self._prefix = self.PREFIX if prefix is None else prefix
+        self._pad = self.PAD if pad is None else pad
+        self._uuid_class = uuid_class or self.UUID_CLASS
+
+    def _bump(self):
+        n = self._counter
+        self._counter += 1
+        return n
+
+    def uuid4(self):
+        return self._uuid_class(self._prefix + str(self._bump()).rjust(self._pad, '0'))
+
+
+class NotReallyRandom:
+    """
+    This can be used as a substitute for random to return numbers in a more predictable order.
+    """
+
+    def __init__(self):
+        self.counter = 0
+
+    def _random_int(self, n):
+        """Returns an integer between 0 and n, upper-exclusive, not one of the published 'random' operations."""
+        result = self.counter % n
+        self.counter += 1
+        return result
+
+    def randint(self, a, b):
+        """Returns a number between a and b, inclusive at both ends, though not especially randomly."""
+        assert isinstance(a, int) and isinstance(b, int) and a < b, "Arguments must be two strictly ascending ints."
+        rangesize = int(abs(b-a))+1
+        return a + self._random_int(rangesize)
+
+    def choice(self, things):
+        return things[self._random_int(len(things))]
+
+
+class MockResponse:
+    """
+    This class is useful for mocking requests.Response (the class that comes back from requests.get and friends).
+
+    This mock is useful because requests.Response is a pain to initialize and the common cases are simple to set
+    up here by just passing arguments.
+
+    Note, too, that requests.Response differs from pyramid.Response in that in requests.Response the way to get
+    the JSON out of a response is to use the .json() method, whereas in pyramid.Response it would just be
+    a .json property access. So since this is for mocking requests.Response, we implement the function.
+    """
+
+    def __init__(self, status_code=200, json=None, content=None):
+        self.status_code = status_code
+        if json is not None and content is not None:
+            raise Exception("MockResponse cannot have both content and json.")
+        elif content is not None:
+            self.content = content
+        elif json is None:
+            self.content = ""
+        else:
+            self.content = json_dumps(json)
+
+    def __str__(self):
+        if self.content:
+            return "<MockResponse %s %s>" % (self.status_code, self.content)
+        else:
+            return "<MockResponse %s>" % (self.status_code,)
+
+    def json(self):
+        return json_loads(self.content)
+
+    def raise_for_status(self):
+        if self.status_code >= 300:
+            raise Exception("%s raised for status." % self)
+
+
+class _PrintCapturer:
+    """
+    This class is used internally to the 'printed_output' context manager to maintain state information
+    on what has been printed so far by PRINT within the indicated context.
+    """
+
+    def __init__(self):
+        self.lines = []
+        self.last = None
+
+    def mock_print_handler(self, *args, **kwargs):
+        text = " ".join(map(str, args))
+        print(text, **kwargs)
+        # This only captures non-file output output.
+        if kwargs.get('file') is None:
+            self.last = text
+            self.lines.append(text)
+
+
+@contextlib.contextmanager
+def printed_output():
+    """
+    This context manager is used to capture output from dcicutils.PRINT for testing.
+
+    The 'printed' object obtained in the 'as' clause of this context manager has two attributes of note:
+
+    * .last contains the last (i.e., most recent) line of output
+    * .lines contains all the lines of output in a list
+
+    These values are updated dynamically as output occurs.
+    (Only output that is not to a file will be captured.)
+
+    Example:
+
+        def show_succcessor(n):
+            PRINT("The successor of %s is %s." % (n, n+1))
+
+        def test_show_successor():
+            with printed_output() as printed:
+                assert printed.last is None
+                assert printed.lines == []
+                show_successor(3)
+                assert printed.last = 'The successor of 3 is 4.'
+                assert printed.lines == ['The successor of 3 is 4.']
+                show_successor(4)
+                assert printed.last == 'The successor of 4 is 5.'
+                assert printed.lines == ['The successor of 3 is 4.', 'The successor of 4 is 5.']
+    """
+
+    printed = _PrintCapturer()
+    with local_attrs(PRINT, _printer=printed.mock_print_handler):
+        yield printed
+
+
+class MockKeysNotImplemented(NotImplementedError):
+
+    def __init__(self, operation, keys):
+        self.operation = operation
+        self.keys = keys
+        super().__init__("Mocked %s does not implement keywords: %s" % (operation, ", ".join(keys)))
+
+
+class MockBoto3:
+
+    @classmethod
+    def _default_mappings(cls):
+        return {
+            's3': MockBotoS3Client,
+            'sqs': MockBotoSQSClient,
+        }
+
+    def __init__(self, **override_mappings):
+        self._mappings = dict(self._default_mappings(), **override_mappings)
+
+    def client(self, kind, **kwargs):
+        mapped_class = self._mappings.get(kind)
+        if not mapped_class:
+            raise NotImplementedError("Unsupported boto3 mock kind:", kind)
+        return mapped_class(**kwargs)
+
+
+class MockBotoS3Client:
+    """
+    This is a mock of certain S3 functionality.
+    """
+
+    def __init__(self, region_name=None):
+        if region_name not in (None, 'us-east-1'):
+            raise ValueError("Unexpected region:", region_name)
+        self.s3_files = MockFileSystem()
+
+    def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+        if kwargs:
+            raise MockKeysNotImplemented("upload_fileobj", kwargs.keys())
+        data = Fileobj.read()
+        print("Uploading %s (%s bytes) to bucket %s key %s"
+              % (Fileobj, len(data), Bucket, Key))
+        with self.s3_files.open(os.path.join(Bucket, Key), 'wb') as fp:
+            fp.write(data)
+
+    def upload_file(self, Filename, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+        if kwargs:
+            raise MockKeysNotImplemented("upload_file", kwargs.keys())
+
+        with io.open(Filename, 'rb') as fp:
+            self.upload_fileobj(Fileobj=fp, Bucket=Bucket, Key=Key)
+
+    def download_fileobj(self, Bucket, Key, Fileobj, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+        if kwargs:
+            raise MockKeysNotImplemented("upload_file", kwargs.keys())
+
+        with self.s3_files.open(os.path.join(Bucket, Key), 'rb') as fp:
+            data = fp.read()
+        print("Downloading bucket %s key %s (%s bytes) to %s"
+              % (Bucket, Key, len(data), Fileobj))
+        Fileobj.write(data)
+
+    def download_file(self, Bucket, Key, Filename, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+        if kwargs:
+            raise MockKeysNotImplemented("upload_file", kwargs.keys())
+        with io.open(Filename, 'wb') as fp:
+            self.download_fileobj(Bucket=Bucket, Key=Key, Fileobj=fp)
+
+
+class MockBotoSQSClient:
+    """
+    This is a mock of certain SQS functionality.
+    """
+
+    def __init__(self, region_name=None):
+        if region_name not in (None, 'us-east-1'):
+            raise RuntimeError("Unexpected region:", region_name)
+        self._mock_queue_name_seen = None
+
+    def check_mock_queue_url_consistency(self, queue_url):
+        __tracebackhide__ = True
+        if self._mock_queue_name_seen:
+            assert self._mock_queue_name_seen in queue_url, "This mock only supports one queue at a time."
+
+    MOCK_CONTENT_TYPE = 'text/xml'
+    MOCK_CONTENT_LENGTH = 350
+    MOCK_RETRY_ATTEMPTS = 0
+    MOCK_STATUS_CODE = 200
+
+    def compute_mock_response_metadata(self):
+        # It may be that uuid.uuid4() is further mocked, but either way it needs to return something
+        # that is used in two places consistently.
+        request_id = str(uuid.uuid4())
+        http_status_code = self.MOCK_STATUS_CODE
+        return {
+            'RequestId': request_id,
+            'HTTPStatusCode': http_status_code,
+            'HTTPHeaders': self.compute_mock_request_headers(request_id),
+            'RetryAttempts': self.MOCK_RETRY_ATTEMPTS,
+        }
+
+    @classmethod
+    def compute_mock_request_headers(cls, request_id):
+        # request_date_str = 'Thu, 01 Oct 2020 06:00:00 GMT'
+        #   or maybe pytz.UTC.localize(datetime.datetime.utcnow()), where .utcnow() may be further mocked
+        # request_content_type = self.MOCK_CONTENT_TYPE
+        return {
+            'x-amzn-requestid': request_id,
+            # We probably don't need these other values, and if we do we might need different values,
+            # so we prefer not to provide mock values until/unless need is shown. -kmp 15-Oct-2020
+            #
+            # 'date': request_date_str,  # see above
+            # 'content-type': 'text/xml',
+            # 'content-length': 350,
+        }
+
+    MOCK_QUEUE_URL_PREFIX = 'https://queue.amazonaws.com.mock/12345/'  # just something to make it look like a URL
+
+    def compute_mock_queue_url(self, queue_name):
+        return self.MOCK_QUEUE_URL_PREFIX + queue_name
+
+    def get_queue_url(self, QueueName):  # noQA - AWS argument naming style
+        self._mock_queue_name_seen = QueueName
+        request_url = self.compute_mock_queue_url(QueueName)
+        self.check_mock_queue_url_consistency(request_url)
+        return {
+            'QueueUrl': request_url,
+            'ResponseMetadata': self.compute_mock_response_metadata()
+        }
+
+    MOCK_QUEUE_ATTRIBUTES_DEFAULT = 0
+
+    def compute_mock_queue_attribute(self, queue_url, attribute_name):
+        self.check_mock_queue_url_consistency(queue_url)
+        ignored(attribute_name)  # This mock doesn't care which attribute, but you could subclass and override this
+        return str(self.MOCK_QUEUE_ATTRIBUTES_DEFAULT)
+
+    def compute_mock_queue_attributes(self, queue_url, attribute_names):
+        self.check_mock_queue_url_consistency(queue_url)
+        return {attribute_name: self.compute_mock_queue_attribute(queue_url, attribute_name)
+                for attribute_name in attribute_names}
+
+    def get_queue_attributes(self, QueueUrl, AttributeNames):  # noQA - AWS argument naming style
+        self.check_mock_queue_url_consistency(QueueUrl)
+        return {
+            'Attributes': self.compute_mock_queue_attributes(QueueUrl, AttributeNames),
+            'ResponseMetadata': self.compute_mock_response_metadata()
+        }
+
+
+class VersionChecker:
+
+    """
+    Given appropriate customizations, this allows cross-checking of pyproject.toml and a changelog for consistency.
+
+    You must subclass this class, specifying both the pyproject filename and the changelog filename as
+    class variables PYPROJECT and CHANGELOG, respectively.
+
+    def test_version():
+
+        class MyAppVersionChecker(VersionChecker):
+            PYPROJECT = os.path.join(ROOT_DIR, "pyproject.toml")
+            CHANGELOG = os.path.join(ROOT_DIR, "CHANGELOG.rst")
+
+        MyAppVersionChecker.check_version()
+
+    """
+
+    PYPROJECT = CustomizableProperty('PYPROJECT', description="The repository-relative name of the pyproject file.")
+    CHANGELOG = CustomizableProperty('CHANGELOG', description="The repository-relative name of the change log.")
+
+    @classmethod
+    def check_version(cls):
+        version = cls._check_version()
+        if getattr_customized(cls, "CHANGELOG"):
+            cls._check_change_history(version)
+
+    @classmethod
+    def _check_version(cls):
+
+        __tracebackhide__ = True
+
+        pyproject_file = getattr_customized(cls, 'PYPROJECT')
+        assert os.path.exists(pyproject_file), "Missing pyproject file: %s" % pyproject_file
+        pyproject = toml.load(pyproject_file)
+        version = pyproject.get('tool', {}).get('poetry', {}).get('version', None)
+        assert version, "Missing version in %s." % pyproject_file
+        PRINT("Version = %s" % version)
+        return version
+
+    VERSION_LINE_PATTERN = re.compile("^[#* ]*([0-9]+[.][^ \t\n]*)([ \t\n].*)?$")
+
+    @classmethod
+    def _check_change_history(cls, version=None):
+
+        changelog_file = getattr_customized(cls, "CHANGELOG")
+
+        if not changelog_file:
+            if version:
+                raise AssertionError("Cannot check version without declaring a CHANGELOG file.")
+            return
+
+        assert os.path.exists(changelog_file), "Missing changelog file: %s" % changelog_file
+
+        with io.open(changelog_file) as fp:
+            versions = []
+            for line in fp:
+                m = cls.VERSION_LINE_PATTERN.match(line)
+                if m:
+                    versions.append(m.group(1))
+
+        assert versions, "No version info was parsed from %s" % changelog_file
+        # Might be sorted top to bottom or bottom to top, but ultimately the current version should be first or last.
+        assert versions[0] == version or versions[-1] == version, (
+                "Missing entry for version %s in %s." % (version, changelog_file)
+        )
+
+
+def raises_regexp(error_class, pattern):
+    """
+    A context manager that works like pytest.raises but allows a required error message pattern to be specified as well.
+    """
+    # Mostly compatible with unittest style, so that (approximately):
+    #  pytest.raises(error_class, match=exp) == unittest.TestCase.assertRaisesRegexp(error_class, exp)
+    # They differ on what to do if an error_class other than the expected one is raised.
+    return pytest.raises(error_class, match=pattern)
+
+
+def check_duplicated_items_by_key(key, items, url=None, formatter=str):
+
+    __tracebackhide__ = True
+
+    search_res_by_keyval = {}
+    for item in items:
+        keyval = item[key]
+        search_res_by_keyval[keyval] = entry = search_res_by_keyval.get(keyval, [])
+        entry.append(item)
+    duplicated_keyvals = {}
+    for keyval, items in search_res_by_keyval.items():
+        if len(items) > 1:
+            duplicated_keyvals[keyval] = items
+    prefix = ""
+    if url is not None:
+        prefix = "For %s: " % url
+    assert not duplicated_keyvals, (
+        '\n'.join([
+            "%sDuplicated %s %s in %s." % (prefix, key, keyval, " and ".join(map(formatter, items)))
+            for keyval, items in duplicated_keyvals.items()
+        ])
+    )

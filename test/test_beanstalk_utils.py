@@ -314,7 +314,6 @@ def test_compute_prd_env_for_env():
     assert is_stg_or_prd_env(computed_cgap_prd)
 
 
-
 def _mocked_describe_beanstalk_environments(*args, **kwargs):
     print("Ignoring args=", args, "kwargs=", kwargs)
     return {

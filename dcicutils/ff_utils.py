@@ -1,24 +1,21 @@
 from __future__ import print_function
-import sys
+
+import boto3
 import json
 import os
-import time
 import random
-import boto3
+import requests
+import time
+import urllib.parse as urlparse
+
+from collections import namedtuple
+from elasticsearch.exceptions import AuthorizationException
+from urllib.parse import urlencode
 from . import (
     s3_utils,
     es_utils,
 )
 from .misc_utils import PRINT
-import requests
-from elasticsearch.exceptions import AuthorizationException
-# urlparse import differs between py2 and 3
-if sys.version_info[0] < 3:
-    import urlparse
-    from urllib import urlencode as urlencode
-else:
-    import urllib.parse as urlparse
-    from urllib.parse import urlencode
 
 
 # TODO (C4-92, C4-102): Probably to centralize this information in env_utils. Also figure out relation to CGAP.
@@ -109,7 +106,8 @@ def search_request_with_retries(request_fxn, url, auth, verb, **kwargs):
         try:
             res_json = res.json()
         except ValueError:
-            res_json = {}
+            # PyCharm notes this is unused. -kmp 17-Jul-2020
+            # res_json = {}
             try:
                 res.raise_for_status()
             except Exception as e:
@@ -251,12 +249,12 @@ def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
 
 
 def patch_metadata(patch_item, obj_id='', key=None, ff_env=None, add_on=''):
-    '''
+    """
     Patch metadata given the patch body and an optional obj_id (if not provided,
     will attempt to use accession or uuid from patch_item body).
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
-    '''
+    """
     auth = get_authentication_with_server(key, ff_env)
     obj_id = obj_id if obj_id else patch_item.get('accession', patch_item.get('uuid'))
     if not obj_id:
@@ -270,13 +268,13 @@ def patch_metadata(patch_item, obj_id='', key=None, ff_env=None, add_on=''):
 
 
 def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
-    '''
+    """
     Post metadata given the post body and a string schema name.
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
     add_on is the string that will be appended to the post url (used
     with tibanna)
-    '''
+    """
     auth = get_authentication_with_server(key, ff_env)
     post_url = '/'.join([auth['server'], schema_name]) + process_add_on(add_on)
     # format item to json
@@ -286,7 +284,7 @@ def post_metadata(post_item, schema_name, key=None, ff_env=None, add_on=''):
 
 
 def upsert_metadata(upsert_item, schema_name, key=None, ff_env=None, add_on=''):
-    '''
+    """
     UPSERT metadata given the upsert body and a string schema name.
     UPSERT means POST or PATCH on conflict.
     Either takes a dictionary form authentication (MUST include 'server')
@@ -295,7 +293,7 @@ def upsert_metadata(upsert_item, schema_name, key=None, ff_env=None, add_on=''):
     with the same body, and if so, runs a patch instead.
     add_on is the string that will be appended to the upsert url (used
     with tibanna)
-    '''
+    """
     auth = get_authentication_with_server(key, ff_env)
     upsert_url = '/'.join([auth['server'], schema_name]) + process_add_on(add_on)
     # format item to json
@@ -381,7 +379,7 @@ def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=F
     if search.startswith('/'):
         search = search[1:]
     parsed_search = urlparse(search)
-    if ((parsed_search.scheme == '') and (parsed_search.netloc == '')):  # both will be empty for non-urls
+    if parsed_search.scheme == '' and parsed_search.netloc == '':  # both will be empty for non-urls
         search_url = '/'.join([auth['server'], search])
     else:
         search_url = search  # assume full url is correct
@@ -467,7 +465,7 @@ def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
     return search_metadata(search, ff_env=ff_env, key=key)
 
 
-def fetch_files_qc_metrics(data, associated_files=['processed_files'],
+def fetch_files_qc_metrics(data, associated_files=None,
                            ignore_typical_fields=True,
                            key=None, ff_env=None):
     """
@@ -478,10 +476,15 @@ def fetch_files_qc_metrics(data, associated_files=['processed_files'],
         associated_files: a list of the types of the files fields the qc metrics will be extracted from:
             examples are = ['files', 'processed_files', 'other_processed_files']
         ignore_typical_fields: flag to ignore 4DN custom fields from the qc metric object
+        key: authentication key for ff_env (see get_authentication_with_server)
+        ff_env: The relevant ff beanstalk environment name.
 
     Returns:
         a dictionary of dictionaries containing the qc_metric information
     """
+    if associated_files is None:
+        associated_files = ['processed_files']
+
     qc_metrics = {}
 
     if ignore_typical_fields:
@@ -490,7 +493,7 @@ def fetch_files_qc_metrics(data, associated_files=['processed_files'],
                                'last_modified', 'slope', '@id', 'aggregated-items', 'status', 'public_release',
                                'actions', 'submitted_by', 'convergence', 'lab', 'date_created', 'uuid']
     else:
-        ignore_typical_fields = []
+        ignorable_qc_fields = []
     # for each file
     for associated_file in associated_files:
         if associated_file in data:
@@ -552,6 +555,9 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
     representing a quality metric.
 
     Args:
+        uuid: uuid of an experimentSet
+        key: authentication key for ff_env (see get_authentication_with_server)
+        ff_env: The relevant ff beanstalk environment name.
         include_processed_files: if False will exclude QC metrics on processed files
                                 Default: True
         include_raw_files: if True will provide QC metrics on raw files as well
@@ -582,7 +588,6 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
     organism = None
     experiment_type = None
     experiment_subclass = None
-    description = None
     biosource_summary = None
 
     resp = get_metadata(uuid, key=key, ff_env=ff_env)
@@ -626,8 +631,8 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
                 result.update(exp_qc_metrics)
 
     description = resp.get('dataset_label', None)
-    ES_qc_metrics = fetch_files_qc_metrics(resp, associated_files, key=key, ff_env=ff_env)
-    if ES_qc_metrics:
+    es_qc_metrics = fetch_files_qc_metrics(resp, associated_files, key=key, ff_env=ff_env)
+    if es_qc_metrics:
         meta_info = {'experiment_description': description,
                      'organism': organism,
                      'experiment_type': experiment_type,
@@ -636,9 +641,9 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
                      'source_experimentSet': resp['accession'],
                      'biosource_summary': biosource_summary
                      }
-        for qc_metric in ES_qc_metrics.values():
+        for qc_metric in es_qc_metrics.values():
             qc_metric.update(meta_info)
-        result.update(ES_qc_metrics)
+        result.update(es_qc_metrics)
 
     return result
 
@@ -713,7 +718,7 @@ def get_es_search_generator(es_client, index, body, page_size=200):
         yield es_hits
 
 
-def get_es_metadata(uuids, es_client=None, filters={}, sources=[], chunk_size=200,
+def get_es_metadata(uuids, es_client=None, filters=None, sources=None, chunk_size=200,
                     is_generator=False, key=None, ff_env=None):
     """
     Given a list of string item uuids, will return a
@@ -770,11 +775,11 @@ def get_es_metadata(uuids, es_client=None, filters={}, sources=[], chunk_size=20
         is_generator:
             Boolean is_generator will return a generator for individual results if True;
             if False (default), returns a list of results.
-        key: autentication key
+        key: authentication key for ff_env (see get_authentication_with_server)
         ff_env: authentication by env (needs system variables)
     """
     auth = get_authentication_with_server(key, ff_env)
-    meta = _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth)
+    meta = _get_es_metadata(uuids, es_client, filters or {}, sources or [], chunk_size, auth)
     if is_generator:
         return meta
     return list(meta)
@@ -866,7 +871,7 @@ def get_schema_names(key=None, ff_env=None):
     return schema_name
 
 
-def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_pc_wfr=False, ignore_field=[],
+def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_pc_wfr=False, ignore_field=None,
                        use_generator=False, es_client=None):
     """
     starting from list of uuids, tracks all linked items in object frame by default
@@ -874,7 +879,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
     returns a dictionary with item types (schema name), and list of items in defined frame
     Sometimes, certain fields need to be skipped (i.e. relations), you can use ignore fields.
     Args:
-        uuid_list (array):               Starting node for search, only use uuids.
+        uuid_list (list):                Starting node for search, only use uuids.
         key (dict):                      standard ff_utils authentication key
         ff_env (str):                    standard ff environment string
         store_frame (str, default 'raw'):Depending on use case, can store frame raw or object or embedded
@@ -897,6 +902,8 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
     # TODO: if more file types (currently FileFastq and FileProcessed) get workflowrun calculated properties
             we need to add them to the add_from_embedded dictionary.
     """
+    if ignore_field is None:
+        ignore_field = []
     # assert that the used parameter is correct
     accepted_frames = ['raw', 'object', 'embedded']
     if store_frame not in accepted_frames:
@@ -911,6 +918,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
         return my_dict
 
     auth = get_authentication_with_server(key, ff_env)
+    es_url = None
     if es_client is None:  # set up an es client if none is provided
         es_url = get_health_page(key=auth)['elasticsearch']
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
@@ -1002,19 +1010,58 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
     return store, list(item_uuids)
 
 
-def get_health_page(key=None, ff_env=None):
-    """
-    Simple function to return the json for a FF health page given keys or
-    ff_env. Will return json containing an error rather than raising an
-    exception if this fails, since this function should tolerate failure
-    """
+def _get_page(*, page, key=None, ff_env=None):
+    """ Wrapper for commonly used code to GET a page from an environment
+        Given keys or ff_env, will return json containing an error rather than raising an
+        exception if this fails, since this function should tolerate failure """
     try:
         auth = get_authentication_with_server(key, ff_env)
-        health_res = authorized_request(auth['server'] + '/health', auth=auth, verb='GET')
+        health_res = authorized_request(auth['server'] + page, auth=auth, verb='GET')
         ret = get_response_json(health_res)
     except Exception as exc:
         ret = {'error': str(exc)}
     return ret
+
+
+def get_health_page(key=None, ff_env=None):
+    """
+    Simple function to return the json for a FF health page
+    """
+    return _get_page(page='/health', key=key, ff_env=ff_env)
+
+
+def get_counts_page(key=None, ff_env=None):
+    """ Gets DB/ES counts page in JSON """
+    return _get_page(page='/counts', key=key, ff_env=ff_env)
+
+
+def get_indexing_status(key=None, ff_env=None):
+    """ Gets indexing status counts page in JSON """
+    return _get_page(page='/indexing_status', key=key, ff_env=ff_env)
+
+
+# namedtuple definition used below and can be imported elsewhere
+CountSummary = namedtuple('CountSummary', ['are_even', 'summary_total'])
+
+
+def get_counts_summary(env):
+    """ Returns a named tuple given an FF name to check representing the counts state.
+            CountSummary
+                are_even: boolean on whether or not counts are even
+                summary_total: raw value of counts
+    """
+    totals = get_counts_page(ff_env=env)
+    if 'error' in totals:  # error encountered getting page, assume false and return error
+        return CountSummary(are_even=False, summary_total=totals)
+    totals = totals['db_es_total'].split()
+
+    # example value of split totals: ['DB:', '74048', 'ES:', '74048']
+    # or ['DB:', '887', 'ES:', '888', '<', 'ES', 'has', '1', 'more', 'items', '>']
+    db_total = int(totals[1])
+    es_total = int(totals[3])
+    if db_total > es_total or es_total > db_total:
+        return CountSummary(are_even=False, summary_total=totals)
+    return CountSummary(are_even=True, summary_total=totals)
 
 
 class SearchESMetadataHandler(object):
@@ -1210,7 +1257,6 @@ def get_response_json(res):
     Very simple function to return json from a response or raise an error if
     it is not present. Used with the metadata functions.
     """
-    res_json = None
     try:
         res_json = res.json()
     except Exception:
@@ -1246,15 +1292,17 @@ def update_url_params_and_unparse(url, url_params):
     Takes a string url and url params (in format of what is returned by
     get_url_params). Returns a string url param with newly formatted params
     """
-    parsed_url = urlparse.urlparse(url)._replace(query=urlencode(url_params, True))
+    # Note: Although it upsets linting tools, ._replace() is an advertised interface of url.parse -kmp 17-Oct-2020
+    #       See https://docs.python.org/3/library/urllib.parse.html
+    parsed_url = urlparse.urlparse(url)._replace(query=urlencode(url_params, True))  # noQA
     return urlparse.urlunparse(parsed_url)
 
 
 def convert_param(parameter_dict, vals_as_string=False):
-    '''
+    """
     converts dictionary format {argument_name: value, argument_name: value, ...}
     to {'workflow_argument_name': argument_name, 'value': value}
-    '''
+    """
     # Not needed? -kmp & Will 30-Mar-2020
     # print(str(parameter_dict))
     metadata_parameters = []

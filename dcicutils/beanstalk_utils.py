@@ -1,6 +1,8 @@
-'''Utilities related to ElasticBeanstalk deployment and management.
+"""
+Utilities related to ElasticBeanstalk deployment and management.
 This includes, but is not limited to: ES, s3, RDS, Auth0, and Foursight.
-'''
+"""
+
 from __future__ import print_function
 import subprocess
 import logging
@@ -13,11 +15,12 @@ import time
 from datetime import datetime
 from . import ff_utils
 from botocore.exceptions import ClientError
-from .misc_utils import PRINT
+from .misc_utils import PRINT, obsolete, remove_suffix
 from .env_utils import (
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, public_url_mappings,
     blue_green_mirror_env, get_standard_mirror_env,
 )
+
 
 logging.basicConfig()
 logger = logging.getLogger('logger')
@@ -75,6 +78,13 @@ def delete_db(db_identifier, take_snapshot=True, allow_delete_prod=False):
     Returns:
         dict: boto3 response from delete_db_instance
     """
+    return _delete_db(db_identifier=db_identifier,
+                      take_snapshot=take_snapshot,
+                      allow_delete_prod=allow_delete_prod)
+
+
+def _delete_db(db_identifier, take_snapshot=True, allow_delete_prod=False):
+    """Internal version of delete_db."""
     # safety. Do not allow accidental programmatic deletion of webprod DB
     if 'prod' in db_identifier and not allow_delete_prod:
         raise Exception('Must set allow_delete_prod to True to delete RDS instance' % db_identifier)
@@ -102,6 +112,7 @@ def delete_db(db_identifier, take_snapshot=True, allow_delete_prod=False):
     return resp
 
 
+@obsolete
 def get_es_from_bs_config(env):
     """
     Given an ElasticBeanstalk environment name, get the corresponding
@@ -119,6 +130,7 @@ def get_es_from_bs_config(env):
             return item.split('=')[1].strip(':80')
 
 
+@obsolete
 def is_indexing_finished(env, prev_version=None, travis_build_id=None):
     """
     Checker function used with torb waitfor lambda; output must be standarized.
@@ -128,7 +140,7 @@ def is_indexing_finished(env, prev_version=None, travis_build_id=None):
     Args:
         env (str): ElasticBeanstalk environment name
         prev_version (str): optional EB version of the previous configuration
-        travis_build_id (int): optional ID for a Travis build
+        travis_build_id (int or str): optional ID for a Travis build
 
     Returns:
         bool, list: True if done, results from /counts page
@@ -150,7 +162,7 @@ def is_indexing_finished(env, prev_version=None, travis_build_id=None):
     if prev_version and beanstalk_info(env).get('VersionLabel') == prev_version:
         if travis_build_id:
             try:
-                trav_done, trav_details = is_travis_finished(travis_build_id)
+                trav_done, trav_details = is_travis_finished(str(travis_build_id))
             except Exception as exc:
                 # if the build failed, let the indexing check continue
                 if 'Build Failed' in str(exc):
@@ -199,7 +211,7 @@ def is_indexing_finished(env, prev_version=None, travis_build_id=None):
     return is_ready, totals
 
 
-def swap_cname(src, dest):
+def _swap_cname(src, dest):
     """
     Swap the CNAMEs of two ElasticBeanstalk (EB) environments, given by
     src and dest. Will restart the app servers after swapping.
@@ -223,14 +235,43 @@ def swap_cname(src, dest):
     client.restart_app_server(EnvironmentName=dest)
 
 
+def _create_foursight_new(dest_env):
+    """ Helper function that does what create_foursight_auto used to do but slightly differently """
+    fs = {'dest_env': dest_env, 'bs_url': get_beanstalk_real_url(dest_env)}
+
+    # Get information, pass to create_foursight
+    fs['fs_url'] = get_foursight_env(dest_env, fs['bs_url'])
+    fs['es_url'] = ff_utils.get_health_page(ff_env=dest_env)['elasticsearch']
+    fs['foursight'] = create_foursight(**fs)
+
+    # delete initial checks (? not clear why this was happening before)
+    if fs['foursight'].get('initial_checks'):
+        del fs['foursight']['initial_checks']
+
+    return fs
+
+
+def swap_cname(src, dest):
+    """ Does a CNAME swap and foursight configuration (pulled in from Torb)
+        NOTE: this is the mechanism by which CNAME swaps must occur as of 9/15/2020
+    """
+    _swap_cname(src, dest)
+    res_data = _create_foursight_new(src)
+    print('Updated foursight %s environment to use %s. Foursight response: %s'
+          % (res_data['fs_url'], res_data['dest_env'], res_data['foursight']))
+    res_stag = _create_foursight_new(dest)
+    print('Updated foursight %s environment to use %s. Foursight response: %s'
+          % (res_stag['fs_url'], res_stag['dest_env'], res_stag['foursight']))
+
+
 def _compute_prd_env_for_project(project):
-    '''
+    """
     Determines which ElasticBeanstalk environment is currently hosting
     data.4dnucleome.org. Requires IAM permissions for EB!
 
     Returns:
         str: EB environment name hosting data.4dnucleome
-    '''
+    """
     magic_cname = CGAP_MAGIC_CNAME if project == 'cgap' else FF_MAGIC_CNAME
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = describe_beanstalk_environments(client, ApplicationName="4dn-web")
@@ -250,7 +291,7 @@ def compute_ff_stg_env():
     return get_standard_mirror_env(compute_ff_prd_env())
 
 
-whodaman = compute_ff_prd_env  # This naming is deprecated but retained for compatibility.
+whodaman = compute_ff_prd_env  # This naming is obsolete but retained for compatibility.
 
 
 def compute_cgap_prd_env():
@@ -299,7 +340,6 @@ def get_beanstalk_real_url(env):
     Returns:
         str: url of the ElasticBeanstalk environment
     """
-    url = ''
     urls = public_url_mappings(env)
 
     if env in urls:  # Special case handling of 'cgap', 'data', or 'staging' as an argument.
@@ -321,6 +361,7 @@ def get_beanstalk_real_url(env):
     return url
 
 
+@obsolete
 def is_beanstalk_ready(env):
     """
     Checker function used with torb waitfor lambda; output must be standarized.
@@ -393,6 +434,7 @@ def is_snapshot_ready(snapshot_name):
     return is_ready, resp['DBSnapshots'][0]['DBSnapshotIdentifier']
 
 
+@obsolete
 def is_es_ready(es_name):
     """
     Checker function used with torb waitfor lambda; output must be standarized.
@@ -438,6 +480,7 @@ def is_db_ready(db_identifier):
     return is_ready, details
 
 
+@obsolete
 def create_db_snapshot(db_identifier, snapshot_name):
     """
     Given an RDS instance indentifier, create a snapshot using the given name.
@@ -467,7 +510,7 @@ def create_db_snapshot(db_identifier, snapshot_name):
     return response
 
 
-def create_db_from_snapshot(db_identifier, snapshot_name, delete_db=True):
+def create_db_from_snapshot(db_identifier, snapshot_name, delete_db_if_present=True):
     """
     Given an RDS instance indentifier and a snapshot ARN/name, create an RDS
     instance from the snapshot. If an instance already exists with the given
@@ -492,11 +535,11 @@ def create_db_from_snapshot(db_identifier, snapshot_name, delete_db=True):
         )
     except ClientError:
         # Something went wrong
-        # Even if delete_db, never allow deletion of a db with 'webprod' in it
-        if delete_db:
+        # Even if delete_db, never allow deletion of a db with 'production' in it
+        if delete_db_if_present and 'production' not in db_identifier:
             # Drop target database with final snapshot
             try:
-                delete_db(db_identifier, True)
+                _delete_db(db_identifier, take_snapshot=True)
             except ClientError:
                 pass
             return "Deleting"
@@ -505,6 +548,7 @@ def create_db_from_snapshot(db_identifier, snapshot_name, delete_db=True):
     return response['DBInstance']['DBInstanceArn']
 
 
+@obsolete
 def is_travis_started(request_url):
     """
     Checker function used with torb waitfor lambda; output must be standarized.
@@ -538,13 +582,14 @@ def is_travis_started(request_url):
     return is_ready, details
 
 
+@obsolete
 def is_travis_finished(build_id):
     """
     Checker function used with torb waitfor lambda; output must be standarized.
     Check to see if a given travis build has passed
 
     Args:
-        build_id (str): Travis build identifier
+        build_id (int or str): Travis build identifier
 
     Returns:
         bool, dict: True if done, Travis response JSON
@@ -577,9 +622,11 @@ def is_travis_finished(build_id):
 
 
 def make_envvar_option(name, value):
-    return {'Namespace': 'aws:elasticbeanstalk:application:environment',
-            'OptionName': name,
-            'Value': value}
+    return {
+        'Namespace': 'aws:elasticbeanstalk:application:environment',
+        'OptionName': name,
+        'Value': value
+    }
 
 
 def get_bs_env(envname):
@@ -603,6 +650,7 @@ def get_bs_env(envname):
     return env_vars.split(',')
 
 
+@obsolete
 def update_bs_config(envname, template=None, keep_env_vars=False,
                      env_override=None):
     """
@@ -649,6 +697,7 @@ def update_bs_config(envname, template=None, keep_env_vars=False,
                                          OptionSettings=options)
 
 
+@obsolete
 def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
     """
     XXX: Will not work currently, do NOT use on production
@@ -668,9 +717,13 @@ def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
     Returns:
         dict: boto3 res from create_environment/update_environment
     """
+    # TODO (C4-280): Reconsider this and other functionality.
+    if is_stg_or_prd_env(envname):
+        raise RuntimeError("beanstalk_utils.create_bs is not approved for production use.")
+
     client = boto3.client('elasticbeanstalk', region_name=REGION)
 
-    # deterimine the configuration template for Elasticbeanstal
+    # determine the configuration template for Elasticbeanstalk
     template = 'fourfront-base'
     if for_indexing:
         template = 'fourfront-indexing'
@@ -688,6 +741,7 @@ def create_bs(envname, load_prod, db_endpoint, es_url, for_indexing=False):
     # logic for mirrorEsEnv, which is used to coordinate elasticsearch
     # changes between fourfront data and staging
     if 'fourfront-webprod' in envname:
+        # TODO: This code is obsolete and needs to be upgraded. For now, the use of this on production is disabled.
         other_env = 'fourfront-webprod2' if envname == 'fourfront-webprod' else 'fourfront-webprod'
         mirror_es = get_es_build_status(other_env, max_tries=3)
         if mirror_es:
@@ -784,6 +838,7 @@ def log_to_foursight(event, lambda_name='', overrides=None):
                             % (url, data, exc, res.text))
 
 
+@obsolete
 def create_foursight_auto(dest_env):
     """
     Call `create_foursight` to create a Foursight environment based off a
@@ -857,14 +912,18 @@ def create_foursight(dest_env, bs_url, es_url, fs_url=None):
     # we want some url like thing
     if not bs_url.startswith('http'):
         bs_url = 'http://' + bs_url
-    if not bs_url.endswith("/"):
-        bs_url += "/"
+    if not bs_url.endswith('/'):
+        bs_url += '/'
 
-    es_url = es_url.rstrip(":80")
-    if not es_url.startswith("http"):
-        es_url = "https://" + es_url
-    if not es_url.endswith("/"):
-        es_url += "/"
+    if ':80' in es_url:
+        es_url = remove_suffix(':80', es_url)
+    elif ':443' in es_url:
+        es_url = remove_suffix(':443', es_url)
+
+    if not es_url.startswith('http'):
+        es_url = 'https://' + es_url
+    if not es_url.endswith('/'):
+        es_url += '/'
 
     # environments on foursight don't include fourfront
     if not fs_url:
@@ -873,10 +932,10 @@ def create_foursight(dest_env, bs_url, es_url, fs_url=None):
         fs_url = fs_url[len('fourfront-'):]
 
     foursight_url = FOURSIGHT_URL + 'environments/' + fs_url
-    payload = {"fourfront": bs_url,  "es": es_url, "ff_env": dest_env}
+    payload = {'fourfront': bs_url,  'es': es_url, 'ff_env': dest_env}
 
     ff_auth = os.environ.get('FS_AUTH')
-    headers = {'content-type': "application/json", 'Authorization': ff_auth}
+    headers = {'content-type': 'application/json', 'Authorization': ff_auth}
     res = requests.put(foursight_url, data=json.dumps(payload), headers=headers)
     try:
         return res.json()
@@ -886,6 +945,7 @@ def create_foursight(dest_env, bs_url, es_url, fs_url=None):
                         % (foursight_url, payload, exc, res.text))
 
 
+@obsolete
 def create_new_es(new):
     """
     Create a new Elasticsearch domain with given name. See the
@@ -922,6 +982,7 @@ def create_new_es(new):
     return resp
 
 
+@obsolete
 def get_es_build_status(new, max_tries=None):
     """
     Check the build status of an Elasticsearch instance with given name.
@@ -962,6 +1023,7 @@ def get_es_build_status(new, max_tries=None):
 #########################################################################
 
 
+@obsolete
 def add_es(new, force_new=False):
     """
     Either gets information on an existing Elasticsearch instance
@@ -1016,6 +1078,7 @@ def delete_es_domain(env_name):
         PRINT("es domain %s not found, skipping" % env_name)
 
 
+@obsolete
 def clone_bs_env_cli(old, new, load_prod, db_endpoint, es_url):
     """
     Use the eb command line client to clone an ElasticBeanstalk environment
@@ -1101,7 +1164,7 @@ def delete_s3_buckets(env_name):
         try:
             s3.Bucket(bucket).objects.delete()
             s3.Bucket(bucket).delete()
-        except:  # noqa: E722
+        except Exception:  # noqa: E722
             PRINT(bucket + " not found skipping...")
 
 
@@ -1202,24 +1265,24 @@ def auth0_client_update(url):
         None
     """
     # generate a jwt to validate future requests
-    client = os.environ["Auth0Client"]
-    secret = os.environ["Auth0Secret"]
-    payload = {"grant_type": "client_credentials",
-               "client_id": client,
-               "client_secret": secret,
-               "audience": "https://hms-dbmi.auth0.com/api/v2/"}
-    headers = {'content-type': "application/json"}
-    res = requests.post("https://hms-dbmi.auth0.com/oauth/token",
+    client = os.environ['Auth0Client']
+    secret = os.environ['Auth0Secret']
+    payload = {'grant_type': 'client_credentials',
+               'client_id': client,
+               'client_secret': secret,
+               'audience': 'https://hms-dbmi.auth0.com/api/v2/'}
+    headers = {'content-type': 'application/json'}
+    res = requests.post('https://hms-dbmi.auth0.com/oauth/token',
                         data=json.dumps(payload),
                         headers=headers)
     jwt = res.json()['access_token']
 
-    client_url = "https://hms-dbmi.auth0.com/api/v2/clients/%s" % client
+    client_url = 'https://hms-dbmi.auth0.com/api/v2/clients/%s' % client
     headers['authorization'] = 'Bearer %s' % jwt
 
     get_res = requests.get(client_url + '?fields=callbacks', headers=headers)
     callbacks = get_res.json()['callbacks']
-    callbacks.append("http://" + url)
+    callbacks.append('http://' + url)
     client_data = {'callbacks': callbacks}
 
     update_res = requests.patch(client_url, data=json.dumps(client_data), headers=headers)
@@ -1238,18 +1301,18 @@ def auth0_client_remove(url):
         None
     """
     # generate a jwt to validate future requests
-    client = os.environ["Auth0Client"]
-    secret = os.environ["Auth0Secret"]
-    payload = {"grant_type": "client_credentials",
-               "client_id": client,
-               "client_secret": secret,
-               "audience": "https://hms-dbmi.auth0.com/api/v2/"}
-    headers = {'content-type': "application/json"}
-    res = requests.post("https://hms-dbmi.auth0.com/oauth/token",
+    client = os.environ['Auth0Client']
+    secret = os.environ['Auth0Secret']
+    payload = {'grant_type': 'client_credentials',
+               'client_id': client,
+               'client_secret': secret,
+               'audience': 'https://hms-dbmi.auth0.com/api/v2/'}
+    headers = {'content-type': 'application/json'}
+    res = requests.post('https://hms-dbmi.auth0.com/oauth/token',
                         data=json.dumps(payload),
                         headers=headers)
     jwt = res.json()['access_token']
-    client_url = "https://hms-dbmi.auth0.com/api/v2/clients/%s" % client
+    client_url = 'https://hms-dbmi.auth0.com/api/v2/clients/%s' % client
     headers['authorization'] = 'Bearer %s' % jwt
 
     get_res = requests.get(client_url + '?fields=callbacks', headers=headers)
@@ -1258,7 +1321,7 @@ def auth0_client_remove(url):
     try:
         idx = callbacks.index(full_url)
     except ValueError:
-        PRINT(full_url + " Not in auth0 auth, doesn't need to be removed")
+        PRINT(full_url + ' Not in auth0 auth, doesn\'t need to be removed')
         return
     if idx:
         callbacks.pop(idx)
@@ -1305,9 +1368,9 @@ def copy_s3_buckets(new, old):
     # get rid of system bucket
     new_buckets.pop()
     for old, new in zip(old_buckets, new_buckets):
-        oldb = "s3://%s" % old
-        newb = "s3://%s" % new
-        PRINT("copying data from old %s to new %s" % (oldb, newb))
+        oldb = 's3://%s' % old
+        newb = 's3://%s' % new
+        PRINT('copying data from old %s to new %s' % (oldb, newb))
         subprocess.call(['aws', 's3', 'sync', oldb, newb])
 
 
@@ -1334,7 +1397,7 @@ def clone_beanstalk_command_line(old, new, prod=False, copy_s3=False):
     Returns:
         None
     """
-    if 'Auth0Client' not in os.environ or "Auth0Secret" not in os.environ:
+    if 'Auth0Client' not in os.environ or 'Auth0Secret' not in os.environ:
         PRINT('Must set Auth0Client and Auth0Secret env variables! Exiting...')
         return
     PRINT('### eb status (START)')
@@ -1347,26 +1410,26 @@ def clone_beanstalk_command_line(old, new, prod=False, copy_s3=False):
                      " This includes s3, ES, RDS, and Auth0 callbacks. If you "
                      "are sure, type the new env name to confirm: " % (new, old))
     if str(name) != new:
-        PRINT("Could not confirm env. Exiting...")
+        PRINT('Could not confirm env. Exiting...')
         return
-    PRINT("### start build ES service")
+    PRINT('### start build ES service')
     add_es(new)
-    PRINT("### create the s3 buckets")
+    PRINT('### create the s3 buckets')
     create_s3_buckets(new)
-    PRINT("### create snapshot and copy database")
+    PRINT('### create snapshot and copy database')
     db_endpoint = snapshot_and_clone_db(old, new)
-    PRINT("### waiting for ES service")
+    PRINT('### waiting for ES service')
     es_endpoint = get_es_build_status(new)
-    PRINT("### clone elasticbeanstalk envrionment")
+    PRINT('### clone elasticbeanstalk envrionment')
     # TODO, can we pass in github commit id here?
     clone_bs_env_cli(old, new, prod, db_endpoint, es_endpoint)
-    PRINT("### allow auth-0 requests")
+    PRINT('### allow auth-0 requests')
     add_to_auth0_client(new)
     if copy_s3 is True:
-        PRINT("### copy contents of s3")
+        PRINT('### copy contents of s3')
         copy_s3_buckets(new, old)
-    PRINT("### All done! It may take some time for the beanstalk env to finish"
-          " initialization. You may want to deploy the most current FF branch.")
+    PRINT('### All done! It may take some time for the beanstalk env to finish'
+          ' initialization. You may want to deploy the most current FF branch.')
 
 
 def delete_beanstalk_command_line(env):
@@ -1388,7 +1451,7 @@ def delete_beanstalk_command_line(env):
     Returns:
         None
     """
-    if 'Auth0Client' not in os.environ or "Auth0Secret" not in os.environ:
+    if 'Auth0Client' not in os.environ or 'Auth0Secret' not in os.environ:
         PRINT('Must set Auth0Client and Auth0Secret env variables! Exiting...')
         return
     PRINT('### eb status (START)')
@@ -1397,20 +1460,20 @@ def delete_beanstalk_command_line(env):
         PRINT('This command must be called from an eb initialized repo! Exiting...')
         return
     PRINT('### eb status (END)')
-    name = use_input("This will totally blow away the environment, including s3,"
-                     "ES, RDS, and Auth0 callbacks. If you are sure, type the "
-                     "env name to confirm: ")
+    name = use_input('This will totally blow away the environment, including s3,'
+                     'ES, RDS, and Auth0 callbacks. If you are sure, type the '
+                     'env name to confirm: ')
     if str(name) != env:
-        PRINT("Could not confirm env. Exiting...")
+        PRINT('Could not confirm env. Exiting...')
         return
-    PRINT("### Removing access to auth0")
+    PRINT('### Removing access to auth0')
     remove_from_auth0_client(env)
-    PRINT("### Deleting beanstalk enviornment")
+    PRINT('### Deleting beanstalk enviornment')
     delete_bs_env_cli(env)
-    PRINT("### Delete contents of s3")
+    PRINT('### Delete contents of s3')
     delete_s3_buckets(env)
-    PRINT("### Delete es domain")
+    PRINT('### Delete es domain')
     delete_es_domain(env)
-    PRINT("### Delete database")
+    PRINT('### Delete database')
     delete_db(env)
     PRINT('### All done!')

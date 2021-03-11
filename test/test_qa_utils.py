@@ -1,4 +1,5 @@
 import datetime
+import io
 import os
 import pytest
 import pytz
@@ -7,9 +8,13 @@ import subprocess
 import time
 import uuid
 
-from dcicutils.misc_utils import Retry
+from dcicutils import qa_utils
+from dcicutils.misc_utils import Retry, PRINT, file_contents
 from dcicutils.qa_utils import (
-    mock_not_called, local_attrs, override_environ, ControlledTime, Occasionally, RetryManager
+    mock_not_called, local_attrs, override_environ, override_dict, show_elapsed_time, timed,
+    ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule,
+    MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3,
+    raises_regexp, VersionChecker, check_duplicated_items_by_key,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -147,6 +152,71 @@ def test_dynamic_properties():
     for thing in [3, "foo", None]:
         with local_attrs(thing):
             pass  # Just make sure no error occurs when no attributes given
+
+
+def test_override_dict():
+
+    d = {'foo': 'bar'}
+    d_copy = d.copy()
+
+    unique_prop1 = str(uuid.uuid4())
+    unique_prop2 = str(uuid.uuid4())
+    unique_prop3 = str(uuid.uuid4())
+
+    assert unique_prop1 not in d
+    assert unique_prop2 not in d
+    assert unique_prop3 not in d
+
+    with override_dict(d, **{unique_prop1: "something", unique_prop2: "anything"}):
+
+        assert unique_prop1 in d  # added
+        value1a = d.get(unique_prop1)
+        assert value1a == "something"
+
+        assert unique_prop2 in d  # added
+        value2a = d.get(unique_prop2)
+        assert value2a == "anything"
+
+        assert unique_prop3 not in d
+
+        with override_dict(d, **{unique_prop1: "something_else", unique_prop3: "stuff"}):
+
+            assert unique_prop1 in d  # updated
+            value1b = d.get(unique_prop1)
+            assert value1b == "something_else"
+
+            assert unique_prop2 in d  # unchanged
+            assert d.get(unique_prop2) == value2a
+
+            assert unique_prop3 in d  # added
+            assert d.get(unique_prop3) == "stuff"
+
+            with override_dict(d, **{unique_prop1: None}):
+
+                assert unique_prop1 not in d  # removed
+
+                with override_dict(d, **{unique_prop1: None}):
+
+                    assert unique_prop1 not in d  # re-removed
+
+                assert unique_prop1 not in d  # un-re-removed, but still removed
+
+            assert unique_prop1 in d  # restored after double removal
+            assert d.get(unique_prop1) == value1b
+
+        assert unique_prop1 in d
+        assert d.get(unique_prop1) == value1a
+
+        assert unique_prop2 in d
+        assert d.get(unique_prop2) == value2a
+
+        assert unique_prop3 not in d
+
+    assert unique_prop1 not in d
+    assert unique_prop2 not in d
+    assert unique_prop3 not in d
+
+    assert d == d_copy
 
 
 def test_override_environ():
@@ -597,6 +667,24 @@ def test_retry_manager():
                     assert mock_sleep.mock_calls[i + 1][ARGS][0] == 8.75
                     assert mock_sleep.mock_calls[i + 2][ARGS][0] == 10.9375
 
+            mock_sleep.reset_mock()
+            assert mock_sleep.call_count == 0
+
+            with RetryManager.retry_options('reliably_add3', wait_seconds=7, wait_increment=1):
+
+                for i in range(10):
+                    # In this context, we won't retry enough to succeed...
+                    rarely_add3.reset()
+                    with pytest.raises(Exception):
+                        reliably_add3(1)
+
+                # Now the sleep calls will be the same 7,  8.75, 10.9375 progression
+                assert mock_sleep.call_count == 30
+                for i in range(0, 30, 3):  # start, stop, step
+                    assert mock_sleep.mock_calls[i][ARGS][0] == 7
+                    assert mock_sleep.mock_calls[i + 1][ARGS][0] == 8
+                    assert mock_sleep.mock_calls[i + 2][ARGS][0] == 9
+
         with pytest.raises(ValueError):
 
             # The name-key must not be a number.
@@ -614,3 +702,531 @@ def test_retry_manager():
             # The name-key must be registered
             with RetryManager.retry_options(name_key="not-a-registered-name", retries_allowed=3, wait_seconds=5):
                 pass
+
+
+def test_mock_file_system():
+
+    fs = MockFileSystem()
+
+    with mock.patch.object(io, "open") as mock_open:
+        with mock.patch.object(os.path, "exists") as mock_exists:
+            with mock.patch.object(os, "remove") as mock_remove:
+
+                mock_open.side_effect = fs.open
+                mock_exists.side_effect = fs.exists
+                mock_remove.side_effect = fs.remove
+
+                filename = "no.such.file"
+                assert os.path.exists(filename) is False
+
+                with pytest.raises(AssertionError):
+                    with io.open(filename, 'q'):
+                        pass
+
+                with io.open(filename, 'w') as fp:
+                    fp.write("foo")
+                    fp.write("bar")
+
+                assert os.path.exists(filename) is True
+
+                with io.open(filename, 'r') as fp:
+                    assert fp.read() == 'foobar'
+
+                with io.open(filename, 'r') as fp:
+                    assert fp.read() == 'foobar'
+
+                assert os.path.exists(filename) is True
+
+                os.remove(filename)
+
+                assert os.path.exists(filename) is False
+
+                with pytest.raises(FileNotFoundError):
+                    os.remove(filename)
+
+                with pytest.raises(FileNotFoundError):
+                    io.open(filename, 'r')
+
+                with io.open(filename, 'wb') as fp:
+                    fp.write(b'foo')
+                    fp.write(b'bar')
+                    fp.write(bytes((10, 65, 66, 67, 10)))  # Unicode Newline, A, B, C, Newline
+                    fp.write(b'a b c')
+                    fp.write(b'\n')
+
+                assert os.path.exists(filename)
+
+                with io.open(filename, 'rb') as fp:
+                    assert fp.read() == b'foobar\nABC\na b c\n'
+
+                with io.open(filename, 'r') as fp:
+                    assert [line.rstrip('\n') for line in fp] == ['foobar', 'ABC', 'a b c']
+
+                os.remove(filename)
+
+                assert not os.path.exists(filename)
+
+
+class _MockPrinter:
+
+    def __init__(self):
+        self.printed = []
+
+    def mock_print(self, *args):
+        self.printed.append(" ".join(args))
+
+    def reset(self):
+        self.printed = []
+
+
+def test_show_elapsed_time():
+
+    mock_printer = _MockPrinter()
+
+    with mock.patch.object(qa_utils, "PRINT", mock_printer.mock_print):
+        show_elapsed_time(1.0, 5.625)
+        show_elapsed_time(6, 7)
+
+        assert mock_printer.printed == ["Elapsed: 4.625", "Elapsed: 1"]
+
+
+class _MockTime:
+
+    def __init__(self, start=0.0, tick=1.0):
+        self.elapsed = start
+        self.tick = tick
+
+    def time(self):
+        self.elapsed = now = self.elapsed + self.tick
+        return now
+
+
+def test_timed():
+
+    mocked_printer = _MockPrinter()
+    mocked_time = _MockTime()
+
+    with mock.patch.object(qa_utils, "PRINT", mocked_printer.mock_print):
+        with mock.patch.object(time, 'time', mocked_time.time):
+
+            with timed():
+                pass
+            assert mocked_printer.printed == ["Elapsed: 1.0"]
+
+            mocked_printer.reset()
+
+            with timed():
+                time.time()
+                time.time()
+            assert mocked_printer.printed == ["Elapsed: 3.0"]
+
+            mocked_printer.reset()
+
+            stuff = []
+
+            with timed(reporter=lambda x, y: stuff.append(y - x)):
+                time.time()
+                time.time()
+            assert mocked_printer.printed == []
+            assert stuff == [3.0]
+
+            mocked_printer.reset()
+
+            stuff = []
+
+            def my_debugger(x):
+                assert isinstance(x, RuntimeError)
+                assert str(x) == "Foo"
+
+            success = False
+            try:
+                with timed(reporter=lambda x, y: stuff.append(y - x), debug=my_debugger):
+                    time.time()
+                    raise RuntimeError("Foo")
+            except RuntimeError:
+                success = True
+
+            assert mocked_printer.printed == []
+            assert stuff == [2.0]
+            assert success, "RuntimeError was not caught."
+
+
+def test_not_really_random():
+
+    r = NotReallyRandom()
+    assert [r.randint(3, 5) for _ in range(10)] == [3, 4, 5, 3, 4, 5, 3, 4, 5, 3]
+
+
+def test_mock_response():
+
+    # Cannot specify both json and content
+    with pytest.raises(Exception):
+        MockResponse(200, content="foo", json={"foo": "bar"})
+
+    ok_empty_response = MockResponse(status_code=200)
+
+    assert ok_empty_response.content == ""
+
+    with pytest.raises(Exception):
+        ok_empty_response.json()
+
+    assert str(ok_empty_response) == '<MockResponse 200>'
+
+    ok_empty_response.raise_for_status()  # This should raise no error
+
+    ok_response = MockResponse(status_code=200, json={'foo': 'bar'})
+
+    assert ok_response.status_code == 200
+    assert ok_response.json() == {'foo': 'bar'}
+
+    assert str(ok_response) == '<MockResponse 200 {"foo": "bar"}>'
+
+    ok_response.raise_for_status()  # This should raise no error
+
+    ok_non_json_response = MockResponse(status_code=200, content="foo")
+
+    assert ok_non_json_response.status_code == 200
+    assert ok_non_json_response.content == "foo"
+    with pytest.raises(Exception):
+        ok_non_json_response.json()
+
+    error_response = MockResponse(status_code=400, json={'message': 'bad stuff'})
+
+    assert error_response.status_code == 400
+    assert error_response.json() == {'message': "bad stuff"}
+
+    assert str(error_response) == '<MockResponse 400 {"message": "bad stuff"}>'
+
+    with pytest.raises(Exception):
+        error_response.raise_for_status()
+
+
+def test_uppercase_print_with_printed_output():
+
+    with printed_output() as printed:
+
+        assert printed.lines == []
+
+        PRINT("foo")
+        assert printed.lines == ["foo"]
+        assert printed.last == "foo"
+
+        PRINT("bar")
+        assert printed.lines == ["foo", "bar"]
+        assert printed.last == "bar"
+
+
+def test_uppercase_print_with_time():
+
+    # Test uses WITHOUT timestamps
+    with printed_output() as printed:
+
+        assert printed.lines == []
+        assert printed.last is None
+
+        PRINT("This", "is", "a", "test.")
+
+        assert printed.lines == ["This is a test."]
+        assert printed.last == "This is a test."
+
+        PRINT("This, too.")
+
+        assert printed.lines == ["This is a test.", "This, too."]
+        assert printed.last == "This, too."
+
+    timestamp_pattern = re.compile(r'^[0-9][0-9]:[0-9][0-9]:[0-9][0-9] (.*)$')
+
+    # Test uses WITH timestamps
+    with printed_output() as printed:
+
+        PRINT("This", "is", "a", "test.", timestamped=True)
+        PRINT("This, too.", timestamped=True)
+
+        trimmed = []
+        for line in printed.lines:
+            matched = timestamp_pattern.match(line)
+            assert matched, "Timestamp missing or in bad form: %s" % line
+            trimmed.append(matched.group(1))
+
+        assert trimmed == ["This is a test.", "This, too."]
+
+    with printed_output() as printed:
+
+        PRINT("This", "is", "a", "test.", timestamped=True)
+        PRINT("This, too.")
+
+        line0, line1 = printed.lines
+
+        assert timestamp_pattern.match(line0)
+        assert not timestamp_pattern.match(line1)
+
+
+def test_mock_boto3_client():
+
+    mock_boto3 = MockBoto3()
+
+    assert isinstance(mock_boto3.client('s3'), MockBotoS3Client)
+    assert isinstance(mock_boto3.client('s3', region_name='us-east-1'), MockBotoS3Client)
+
+    with pytest.raises(ValueError):
+        mock_boto3.client('s3', region_name='us-east-2')
+
+    with pytest.raises(NotImplementedError):
+        mock_boto3.client('some_other_kind')
+
+
+def test_mock_uuid_module_documentation_example():
+    mock_uuid_module = MockUUIDModule()
+    assert str(mock_uuid_module.uuid4()) == '00000000-0000-0000-0000-000000000001'
+    with mock.patch.object(uuid, "uuid4", mock_uuid_module.uuid4):
+        assert str(uuid.uuid4()) == '00000000-0000-0000-0000-000000000002'
+
+
+def test_mock_uuid_module():
+
+    for _ in range(2):
+        fake_uuid = MockUUIDModule()
+        assert str(fake_uuid.uuid4()) == '00000000-0000-0000-0000-000000000001'
+        assert str(fake_uuid.uuid4()) == '00000000-0000-0000-0000-000000000002'
+        assert str(fake_uuid.uuid4()) == '00000000-0000-0000-0000-000000000003'
+
+    fake_uuid = MockUUIDModule()
+    assert isinstance(fake_uuid.uuid4(), uuid.UUID)
+
+    fake_uuid = MockUUIDModule(prefix='', pad=3, uuid_class=str)
+    assert str(fake_uuid.uuid4()) == '001'
+
+
+def test_mock_boto_s3_client_upload_file_and_download_file_positional():
+
+    mock_s3_client = MockBotoS3Client()
+    local_mfs = MockFileSystem()
+
+    # Check positionally
+
+    with mock.patch("io.open", local_mfs.open):
+
+        with io.open("file1.txt", 'w') as fp:
+            fp.write('Hello!\n')
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {}
+
+        mock_s3_client.upload_file("file1.txt", "MyBucket", "MyFile")
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        mock_s3_client.download_file("MyBucket", "MyFile", "file2.txt")
+
+        assert local_mfs.files == {
+            "file1.txt": b"Hello!\n",
+            "file2.txt": b"Hello!\n",
+        }
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        assert file_contents("file1.txt") == file_contents("file2.txt")
+
+
+def test_mock_boto_s3_client_upload_file_and_download_file_keyworded():
+
+    mock_s3_client = MockBotoS3Client()
+    local_mfs = MockFileSystem()
+
+    with mock.patch("io.open", local_mfs.open):
+
+        with io.open("file1.txt", 'w') as fp:
+            fp.write('Hello!\n')
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {}
+
+        mock_s3_client.upload_file(Filename="file1.txt", Bucket="MyBucket", Key="MyFile")
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        mock_s3_client.download_file(Bucket="MyBucket", Key="MyFile", Filename="file2.txt")
+
+        assert local_mfs.files == {
+            "file1.txt": b"Hello!\n",
+            "file2.txt": b"Hello!\n",
+        }
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        assert file_contents("file1.txt") == file_contents("file2.txt")
+
+
+def test_mock_boto_s3_client_upload_fileobj_and_download_fileobj_positional():
+
+    mock_s3_client = MockBotoS3Client()
+    local_mfs = MockFileSystem()
+
+    # Check positionally
+
+    with mock.patch("io.open", local_mfs.open):
+
+        with io.open("file1.txt", 'w') as fp:
+            fp.write('Hello!\n')
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {}
+
+        with io.open("file1.txt", 'rb') as fp:
+            mock_s3_client.upload_fileobj(fp, "MyBucket", "MyFile")
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        with io.open("file2.txt", 'wb') as fp:
+            mock_s3_client.download_fileobj("MyBucket", "MyFile", fp)
+
+        assert local_mfs.files == {
+            "file1.txt": b"Hello!\n",
+            "file2.txt": b"Hello!\n",
+        }
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        assert file_contents("file1.txt") == file_contents("file2.txt")
+
+
+def test_mock_boto_s3_client_upload_fileobj_and_download_fileobj_keyworded():
+
+    mock_s3_client = MockBotoS3Client()
+    local_mfs = MockFileSystem()
+
+    with mock.patch("io.open", local_mfs.open):
+
+        with io.open("file1.txt", 'w') as fp:
+            fp.write('Hello!\n')
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {}
+
+        with io.open("file1.txt", 'rb') as fp:
+            mock_s3_client.upload_fileobj(Fileobj=fp, Bucket="MyBucket", Key="MyFile")
+
+        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        with io.open("file2.txt", 'wb') as fp:
+            mock_s3_client.download_fileobj(Bucket="MyBucket", Key="MyFile", Fileobj=fp)
+
+        assert local_mfs.files == {
+            "file1.txt": b"Hello!\n",
+            "file2.txt": b"Hello!\n",
+        }
+        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+
+        assert file_contents("file1.txt") == file_contents("file2.txt")
+
+
+def test_mock_boto_s3_client_limitations():
+
+    mock_s3_client = MockBotoS3Client()
+
+    local_fs = MockFileSystem()
+
+    with mock.patch("io.open", local_fs.open):
+
+        with pytest.raises(MockKeysNotImplemented):
+            mock_s3_client.upload_file(Filename="foo", Bucket="bucketname", Key="keyname",
+                                       Config='not-implemented')
+
+        with pytest.raises(MockKeysNotImplemented):
+            mock_s3_client.upload_fileobj(Fileobj=io.BytesIO(), Bucket="bucketname", Key="keyname",
+                                          Config='not-implemented')
+
+        with pytest.raises(MockKeysNotImplemented):
+            mock_s3_client.download_file(Filename="foo", Bucket="bucketname", Key="keyname",
+                                         Config='not-implemented')
+
+        with pytest.raises(MockKeysNotImplemented):
+            mock_s3_client.download_fileobj(Fileobj=io.BytesIO(), Bucket="bucketname", Key="keyname",
+                                            Config='not-implemented')
+
+
+def test_mock_keys_not_implemented():
+
+    err = MockKeysNotImplemented(keys=['foo', 'bar'], operation="some-operation")
+    assert str(err) == 'Mocked some-operation does not implement keywords: foo, bar'
+
+
+def test_raises_regexp():
+
+    class MyRuntimeError(RuntimeError):
+        pass
+
+    with raises_regexp(RuntimeError, "This.*test!"):
+        raise RuntimeError("This is a test!")
+
+    with raises_regexp(RuntimeError, "This.*test!"):
+        raise MyRuntimeError("This is a test!")
+
+    with pytest.raises(AssertionError):
+        # This will fail because the inner error has a period, not an exclamation mark, terminating it.
+        # That will cause it to raise an AssertionError instead.
+        with raises_regexp(RuntimeError, "This.*test!"):
+            raise MyRuntimeError("This is a test.")
+
+    with pytest.raises(Exception):
+        # This will fail because the inner error is a KeyError, not a RuntimeError.
+        # I WISH this would raise AssertionError, but pytest lets the KeyError through.
+        # I am not sure that's the same as what unittest does in this case but it will
+        # suffice for now. -kmp 6-Oct-2020
+        with raises_regexp(RuntimeError, "This.*test!"):
+            raise KeyError('This is a test!')
+
+
+def test_version_checker_no_changelog():
+
+    class MyVersionChecker(VersionChecker):
+        PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+        CHANGELOG = None
+
+    MyVersionChecker.check_version()
+
+
+def test_version_checker_use_dcicutils_changelog():
+
+    class MyVersionChecker(VersionChecker):
+        PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+        CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+
+    MyVersionChecker.check_version()
+
+
+def test_version_checker_with_missing_changelog():
+
+    path_exists = os.path.exists
+
+    def mocked_exists(filename):
+        if filename.endswith("CHANGELOG.rst"):
+            print("Faking that %s does not exist." % filename)
+            return False
+        else:
+            return path_exists(filename)
+
+    with mock.patch("os.path.exists", mocked_exists):
+
+        class MyVersionChecker(VersionChecker):
+
+            PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+            CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+
+        with pytest.raises(AssertionError):
+            MyVersionChecker.check_version()  # The version history will be missing because of mocking.
+
+
+def test_check_duplicated_items_by_key():
+
+    with raises_regexp(AssertionError,
+                       "Duplicated uuid 123 in {'uuid': '123', 'foo': 'a'} and {'uuid': '123', 'foo': 'c'}"):
+        check_duplicated_items_by_key(
+            'uuid',
+            [
+                {'uuid': '123', 'foo': 'a'},
+                {'uuid': '456', 'foo': 'b'},
+                {'uuid': '123', 'foo': 'c'},
+            ]
+        )

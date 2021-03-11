@@ -4,6 +4,8 @@ import os
 import datetime
 import pytest
 from dcicutils import s3_utils
+from dcicutils.qa_utils import override_environ
+
 pytestmark = pytest.mark.working
 
 
@@ -15,10 +17,19 @@ def initialize_jh_env(server):
 
 
 def test_import_fails_without_initialization():
-    # this fails because proper env variables were not set up
-    with pytest.raises(Exception) as exec_info:
-        from dcicutils import jh_utils  # NOQA
-    assert 'ERROR USING JUPYTERHUB_UTILS!' in str(exec_info.value)
+
+    # Loading this library fails if proper env variables were not set up.
+    # TODO: I'm not sure I think that's a good idea. Functions should fail, imports should not. -kmp 14-Aug-2020
+
+    with override_environ(FF_ACCESS_KEY=None):
+        with pytest.raises(Exception) as exec_info:
+            from dcicutils import jh_utils  # NOQA
+        assert 'ERROR USING JUPYTERHUB_UTILS!' in str(exec_info.value)
+
+    with override_environ(FF_ACCESS_SECRET=None):
+        with pytest.raises(Exception) as exec_info:
+            from dcicutils import jh_utils  # NOQA
+        assert 'ERROR USING JUPYTERHUB_UTILS!' in str(exec_info.value)
 
 
 @pytest.mark.integrated
