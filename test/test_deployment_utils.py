@@ -14,7 +14,7 @@ from dcicutils.deployment_utils import (
     # TODO: This isn't yet tested.
     # EBDeployer,
 )
-from dcicutils.env_utils import is_cgap_env
+from dcicutils.env_utils import is_cgap_env, data_set_for_env
 from dcicutils.misc_utils import ignored
 from dcicutils.qa_utils import override_environ
 
@@ -638,28 +638,37 @@ def test_deployment_utils_transitional_equivalence():
                                     return "'%s' missing in '%s'" % (fragment, line)
                             self.check_any(line)
 
-                    # CGAP uses data_set='prod' for 'fourfront-cgap' and data_set='test' for all others.
+                    # CGAP uses data_set='prod' for everything but 'fourfront-cgapdev', which uses 'test'.
+                    # But that logic is hidden in data_set_for_env, in case it changes.
 
                     us_east = "us-east-1.es.amazonaws.com:80"
                     index_default = "true"
                     index_server_default = None
 
-                    tester(ref_ini="cgap.ini", bs_env="fourfront-cgap", data_set="prod",
+                    bs_env = "fourfront-cgap"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="cgap.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
                            line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                         expect_index_server=index_server_default))
 
-                    tester(ref_ini="cgapdev.ini", bs_env="fourfront-cgapdev", data_set="test",
+                    bs_env = "fourfront-cgapdev"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="cgapdev.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-cgapdev-gnv2sgdngkjbcemdadmaoxcsae.%s" % us_east,
                            line_checker=Checker(expect_indexer=index_default,
                                                 expect_index_server=index_server_default))
 
-                    tester(ref_ini="cgaptest.ini", bs_env="fourfront-cgaptest", data_set="test",
+                    bs_env = "fourfront-cgaptest"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="cgaptest.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-cgaptest-dxiczz2zv7f3nshshvevcvmpmy.%s" % us_east,
                            line_checker=Checker(expect_indexer=index_default,
                                                 expect_index_server=index_server_default))
 
-                    tester(ref_ini="cgapwolf.ini", bs_env="fourfront-cgapwolf", data_set="test",
+                    bs_env = "fourfront-cgapwolf"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="cgapwolf.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-cgapwolf-r5kkbokabymtguuwjzspt2kiqa.%s" % us_east,
                            line_checker=Checker(expect_indexer=index_default,
                                                 expect_index_server=index_server_default))
@@ -667,37 +676,51 @@ def test_deployment_utils_transitional_equivalence():
                     # Fourfront uses data_set='prod' for everything but 'fourfront-mastertest',
                     # which uses data_set='test'
 
-                    tester(ref_ini="blue.ini", bs_env="fourfront-blue", data_set="prod",
+                    bs_env = "fourfront-blue"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="blue.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
                            line_checker=FFProdChecker(expect_indexer=index_default,
                                                       expect_index_server=index_server_default))
 
-                    tester(ref_ini="green.ini", bs_env="fourfront-green", data_set="prod",
+                    bs_env = "fourfront-green"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="green.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-green-cghpezl64x4uma3etijfknh7ja.%s" % us_east,
                            line_checker=FFProdChecker(expect_indexer=index_default,
                                                       expect_index_server=index_server_default))
 
-                    tester(ref_ini="hotseat.ini", bs_env="fourfront-hotseat", data_set="prod",
+                    bs_env = "fourfront-hotseat"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="hotseat.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-hotseat-f3oxd2wjxw3h2wsxxbcmzhhd4i.%s" % us_east,
                            line_checker=Checker(expect_indexer=index_default,
                                                 expect_index_server=index_server_default))
 
-                    tester(ref_ini="mastertest.ini", bs_env="fourfront-mastertest", data_set="test",
+                    bs_env = "fourfront-mastertest"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="mastertest.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.%s" % us_east,
                            line_checker=Checker(expect_indexer=index_default,
                                                 expect_index_server=index_server_default))
 
-                    tester(ref_ini="webdev.ini", bs_env="fourfront-webdev", data_set="prod",
+                    bs_env = "fourfront-webdev"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="webdev.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
                            line_checker=Checker(expect_indexer=index_default,
                                                 expect_index_server=index_server_default))
 
-                    tester(ref_ini="webprod.ini", bs_env="fourfront-webprod", data_set="prod",
+                    bs_env = "fourfront-webprod"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="webprod.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-webprod-hmrrlalm4ifyhl4bzbvl73hwv4.%s" % us_east,
                            line_checker=FFProdChecker(expect_indexer=index_default,
                                                       expect_index_server=index_server_default))
 
-                    tester(ref_ini="webprod2.ini", bs_env="fourfront-webprod2", data_set="prod",
+                    bs_env = "fourfront-webprod2"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="webprod2.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-webprod2-fkav4x4wjvhgejtcg6ilrmczpe.%s" % us_east,
                            line_checker=FFProdChecker(expect_indexer=index_default,
                                                       expect_index_server=index_server_default))

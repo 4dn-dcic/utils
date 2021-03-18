@@ -7,6 +7,24 @@ Change Log
 ----------
 
 
+1.11.2
+======
+
+**PR 134: Fixes to env_utils.data_set_for_env for CGAP (C4-634)**
+
+* Fix ``env_utils.data_set_for_env`` which were returning ``'test'``
+  for ``fourfront-cgapwolf`` and ``fourfront-cgaptest``.
+  Oddly, the proper value is ``'prod'``.
+
+
+1.11.1
+======
+
+**PR 133: Fix ControlledTime.utcnow on AWS (C4-623)**
+
+* Fix ``qa_utils.ControlledTime.utcnow`` on AWS (C4-623).
+
+
 1.11.0
 ======
 
