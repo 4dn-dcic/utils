@@ -141,12 +141,12 @@ BEANSTALK_DEV_DATA_SETS = {
     'fourfront-webdev': 'prod',
 
     'fourfront-cgapdev': 'test',
-    'fourfront-cgaptest': 'test',
-    'fourfront-cgapwolf': 'test',
+    'fourfront-cgaptest': 'prod',
+    'fourfront-cgapwolf': 'prod',
 
     'cgap-dev': 'test',
-    'cgap-test': 'test',
-    'cgap-wolf': 'test',
+    'cgap-test': 'prod',
+    'cgap-wolf': 'prod',
 
 }
 
