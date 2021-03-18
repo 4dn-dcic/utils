@@ -14,7 +14,7 @@ from dcicutils.deployment_utils import (
     # TODO: This isn't yet tested.
     # EBDeployer,
 )
-from dcicutils.env_utils import is_cgap_env
+from dcicutils.env_utils import is_cgap_env, data_set_for_env
 from dcicutils.misc_utils import ignored
 from dcicutils.qa_utils import override_environ
 
@@ -638,28 +638,37 @@ def test_deployment_utils_transitional_equivalence():
                                     return "'%s' missing in '%s'" % (fragment, line)
                             self.check_any(line)
 
-                    # CGAP uses data_set='prod' for 'fourfront-cgap' and data_set='test' for all others.
+                    # CGAP uses data_set='prod' for everything but 'fourfront-cgapdev', which uses 'test'.
+                    # But that logic is hidden in data_set_for_env, in case it changes.
 
                     us_east = "us-east-1.es.amazonaws.com:80"
                     index_default = "true"
                     index_server_default = None
 
-                    tester(ref_ini="cgap.ini", bs_env="fourfront-cgap", data_set="prod",
+                    bs_env = "fourfront-cgap"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="cgap.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
                            line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                         expect_index_server=index_server_default))
 
-                    tester(ref_ini="cgapdev.ini", bs_env="fourfront-cgapdev", data_set="test",
+                    bs_env = "fourfront-cgapdev"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="cgapdev.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-cgapdev-gnv2sgdngkjbcemdadmaoxcsae.%s" % us_east,
                            line_checker=Checker(expect_indexer=index_default,
                                                 expect_index_server=index_server_default))
 
-                    tester(ref_ini="cgaptest.ini", bs_env="fourfront-cgaptest", data_set="test",
+                    bs_env = "fourfront-cgaptest"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="cgaptest.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-cgaptest-dxiczz2zv7f3nshshvevcvmpmy.%s" % us_east,
                            line_checker=Checker(expect_indexer=index_default,
                                                 expect_index_server=index_server_default))
 
-                    tester(ref_ini="cgapwolf.ini", bs_env="fourfront-cgapwolf", data_set="test",
+                    bs_env = "fourfront-cgapwolf"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="cgapwolf.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-cgapwolf-r5kkbokabymtguuwjzspt2kiqa.%s" % us_east,
                            line_checker=Checker(expect_indexer=index_default,
                                                 expect_index_server=index_server_default))
