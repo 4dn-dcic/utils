@@ -10,7 +10,7 @@ Change Log
 1.11.2
 ======
 
-**PR 134: Fixes to env_utils.data_set_for_env for CGAP**
+**PR 134: Fixes to env_utils.data_set_for_env for CGAP (C4-634)**
 
 * Fix ``env_utils.data_set_for_env`` which were returning ``'test'``
   for ``fourfront-cgapwolf`` and ``fourfront-cgaptest``.
