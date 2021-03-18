@@ -676,37 +676,51 @@ def test_deployment_utils_transitional_equivalence():
                     # Fourfront uses data_set='prod' for everything but 'fourfront-mastertest',
                     # which uses data_set='test'
 
-                    tester(ref_ini="blue.ini", bs_env="fourfront-blue", data_set="prod",
+                    bs_env = "fourfront-blue"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="blue.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
                            line_checker=FFProdChecker(expect_indexer=index_default,
                                                       expect_index_server=index_server_default))
 
-                    tester(ref_ini="green.ini", bs_env="fourfront-green", data_set="prod",
+                    bs_env = "fourfront-green"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="green.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-green-cghpezl64x4uma3etijfknh7ja.%s" % us_east,
                            line_checker=FFProdChecker(expect_indexer=index_default,
                                                       expect_index_server=index_server_default))
 
-                    tester(ref_ini="hotseat.ini", bs_env="fourfront-hotseat", data_set="prod",
+                    bs_env = "fourfront-hotseat"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="hotseat.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-hotseat-f3oxd2wjxw3h2wsxxbcmzhhd4i.%s" % us_east,
                            line_checker=Checker(expect_indexer=index_default,
                                                 expect_index_server=index_server_default))
 
-                    tester(ref_ini="mastertest.ini", bs_env="fourfront-mastertest", data_set="test",
+                    bs_env = "fourfront-mastertest"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="mastertest.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.%s" % us_east,
                            line_checker=Checker(expect_indexer=index_default,
                                                 expect_index_server=index_server_default))
 
-                    tester(ref_ini="webdev.ini", bs_env="fourfront-webdev", data_set="prod",
+                    bs_env = "fourfront-webdev"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="webdev.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
                            line_checker=Checker(expect_indexer=index_default,
                                                 expect_index_server=index_server_default))
 
-                    tester(ref_ini="webprod.ini", bs_env="fourfront-webprod", data_set="prod",
+                    bs_env = "fourfront-webprod"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="webprod.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-webprod-hmrrlalm4ifyhl4bzbvl73hwv4.%s" % us_east,
                            line_checker=FFProdChecker(expect_indexer=index_default,
                                                       expect_index_server=index_server_default))
 
-                    tester(ref_ini="webprod2.ini", bs_env="fourfront-webprod2", data_set="prod",
+                    bs_env = "fourfront-webprod2"
+                    data_set = data_set_for_env(bs_env)
+                    tester(ref_ini="webprod2.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-webprod2-fkav4x4wjvhgejtcg6ilrmczpe.%s" % us_east,
                            line_checker=FFProdChecker(expect_indexer=index_default,
                                                       expect_index_server=index_server_default))
