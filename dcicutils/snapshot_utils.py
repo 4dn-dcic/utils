@@ -3,7 +3,7 @@ import logging
 
 from elasticsearch.exceptions import NotFoundError
 from dcicutils.misc_utils import (
-    environ_bool, PRINT, camel_case_to_snake_case, full_class_name,
+    environ_bool, PRINT, camel_case_to_snake_case, full_object_name,
     ignorable, ancestor_classes, decorator
 )
 
@@ -19,7 +19,7 @@ class _ElasticSearchDataCache:
     _ABSTRACT_DATA_CACHES = set()
     _DATA_CACHE_BASE_CLASS = None
 
-    SNAPSHOTS_INITIALIZED = {}
+    _SNAPSHOTS_INITIALIZED = {}
 
     repository_short_name = 'snapshots'
     snapshots_repository_location = None
@@ -140,7 +140,7 @@ class _ElasticSearchDataCache:
         if not cls.is_data_cache(cls):
             raise RuntimeError("The class %s is not a registered data cache class."
                                " It may need an @%s.register() decoration."
-                               % (full_class_name(cls), full_class_name(cls._DATA_CACHE_BASE_CLASS)))
+                               % (cls.__name__, full_object_name(cls._DATA_CACHE_BASE_CLASS)))
         if cls.DEBUG_SNAPSHOTS:
             PRINT(level * "  ", level, "Checking ancestors of", cls.__name__)
         ancestor_found = None
@@ -226,11 +226,11 @@ class _ElasticSearchDataCache:
 
     @classmethod
     def mark_snapshot_initialized(cls, snapshot_name):
-        cls.SNAPSHOTS_INITIALIZED[snapshot_name] = True
+        cls._SNAPSHOTS_INITIALIZED[snapshot_name] = True
 
     @classmethod
     def is_snapshot_initialized(cls, snapshot_name):
-        return cls.SNAPSHOTS_INITIALIZED.get(snapshot_name)
+        return cls._SNAPSHOTS_INITIALIZED.get(snapshot_name)
 
     @classmethod
     def _setattrs_safely(cls, **attributes_and_values):
@@ -349,24 +349,30 @@ class _ElasticSearchDataCache:
             raise
 
     @classmethod
-    def register(cls, is_abstract=False, is_base=False):
+    def register(cls, is_abstract=False, _is_base=False):
+
         def _wrap_registered(cls):
-            if is_base:
+
+            if _is_base:
                 if cls._DATA_CACHE_BASE_CLASS:
                     raise RuntimeError("Attempt to declare %s with base=True, but %s has already been declared."
-                                       % (full_class_name(cls),
-                                          full_class_name(cls._DATA_CACHE_BASE_CLASS)))
+                                       % (cls.__name__, full_object_name(cls._DATA_CACHE_BASE_CLASS)))
                 cls._DATA_CACHE_BASE_CLASS = cls
             elif not cls._DATA_CACHE_BASE_CLASS:
                 raise RuntimeError("Attempt to use @data_cache decorator for the first time on %s, but is_base=%s."
-                                   % (full_class_name(cls), is_base))
+                                   % (cls.__name__, _is_base))
+
             if not issubclass(cls, cls._DATA_CACHE_BASE_CLASS):
                 raise SyntaxError("The data_cache class %s does not inherit, directly or indirectly, from %s."
-                                  % (cls.__name__, full_class_name(cls._DATA_CACHE_BASE_CLASS)))
+                                  % (cls.__name__, full_object_name(cls._DATA_CACHE_BASE_CLASS)))
+
             cls._REGISTERED_DATA_CACHES.add(cls)
+
             if is_abstract:
                 cls._ABSTRACT_DATA_CACHES.add(cls)
+
             return cls
+
         return _wrap_registered
 
     @classmethod
@@ -380,9 +386,10 @@ class _ElasticSearchDataCache:
 
 
 @decorator()
-def es_data_cache(is_abstract=True, is_base=True):
-    return _ElasticSearchDataCache.register(is_abstract=True, is_base=True)
+def es_data_cache(is_abstract=True, _is_base=True):
+    return _ElasticSearchDataCache.register(is_abstract=is_abstract, is_base=_is_base)
 
-@es_data_cache(is_abstract=True, is_base=True)
+
+@es_data_cache(is_abstract=True, _is_base=True)
 class ElasticSearchDataCache(_ElasticSearchDataCache):
     pass
