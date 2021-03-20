@@ -80,14 +80,14 @@ def test_data_set_for_env():
 
     assert data_set_for_env('fourfront-cgap') == 'prod'
     assert data_set_for_env('fourfront-cgapdev') == 'test'
-    assert data_set_for_env('fourfront-cgaptest') == 'test'
-    assert data_set_for_env('fourfront-cgapwolf') == 'test'
+    assert data_set_for_env('fourfront-cgaptest') == 'prod'  # oddly, yes, not a typo
+    assert data_set_for_env('fourfront-cgapwolf') == 'prod'  # same
 
     assert data_set_for_env('cgap-blue') == 'prod'
     assert data_set_for_env('cgap-green') == 'prod'
     assert data_set_for_env('cgap-dev') == 'test'
-    assert data_set_for_env('cgap-test') == 'test'
-    assert data_set_for_env('cgap-wolf') == 'test'
+    assert data_set_for_env('cgap-test') == 'prod'  # see above
+    assert data_set_for_env('cgap-wolf') == 'prod'  # see above
 
 
 def test_public_url_mappings():
