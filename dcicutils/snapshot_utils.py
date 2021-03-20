@@ -351,27 +351,27 @@ class _ElasticSearchDataCache:
     @classmethod
     def register(cls, is_abstract=False, _is_base=False):
 
-        def _wrap_registered(cls):
+        def _wrap_registered(class_being_declared):
 
             if _is_base:
                 if cls._DATA_CACHE_BASE_CLASS:
-                    raise RuntimeError("Attempt to declare %s with base=True, but %s has already been declared."
-                                       % (cls.__name__, full_object_name(cls._DATA_CACHE_BASE_CLASS)))
-                cls._DATA_CACHE_BASE_CLASS = cls
+                    raise RuntimeError("Attempt to declare %s with _base=True, but %s has already been declared."
+                                       % (class_being_declared.__name__, full_object_name(cls._DATA_CACHE_BASE_CLASS)))
+                cls._DATA_CACHE_BASE_CLASS = class_being_declared
             elif not cls._DATA_CACHE_BASE_CLASS:
                 raise RuntimeError("Attempt to use @data_cache decorator for the first time on %s, but is_base=%s."
-                                   % (cls.__name__, _is_base))
+                                   % (class_being_declared.__name__, _is_base))
 
-            if not issubclass(cls, cls._DATA_CACHE_BASE_CLASS):
+            if not issubclass(class_being_declared, cls._DATA_CACHE_BASE_CLASS):
                 raise SyntaxError("The data_cache class %s does not inherit, directly or indirectly, from %s."
-                                  % (cls.__name__, full_object_name(cls._DATA_CACHE_BASE_CLASS)))
+                                  % (class_being_declared.__name__, full_object_name(cls._DATA_CACHE_BASE_CLASS)))
 
-            cls._REGISTERED_DATA_CACHES.add(cls)
+            cls._REGISTERED_DATA_CACHES.add(class_being_declared)
 
             if is_abstract:
-                cls._ABSTRACT_DATA_CACHES.add(cls)
+                cls._ABSTRACT_DATA_CACHES.add(class_being_declared)
 
-            return cls
+            return class_being_declared
 
         return _wrap_registered
 
@@ -386,7 +386,7 @@ class _ElasticSearchDataCache:
 
 
 @decorator()
-def es_data_cache(is_abstract=True, _is_base=True):
+def es_data_cache(is_abstract=False, _is_base=False):
     return _ElasticSearchDataCache.register(is_abstract=is_abstract, _is_base=_is_base)
 
 
