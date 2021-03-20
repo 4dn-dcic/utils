@@ -8,155 +8,23 @@ from dcicutils.misc_utils import (
 )
 
 
+# class DataCacheInfo: => ElasticSearchDataCache
+# Then rename to _
+#    REGISTERED_DATA_CACHES = set()
+#    ABSTRACT_DATA_CACHES = set()
+#    DATA_CACHE_BASE_CLASS = None
 
 
-def is_valid_indexer_namespace(indexer_namespace, allow_null=False):
-    """
-    Returns true if its argument is a valid indexer namespace.
-
-    For non-shared resources, the null string is an allowed namespace.
-    For all shared resources, a string ending in a digit is required.
-
-    This test allows these formats:
-
-    kind                      examples (not necessarily exhaustive)
-    ----                      -------------------------------------
-    travis or github job id   ...-test-...  (typically including a Travis or GitHub Actions job id)
-    any guid                  c978d7ab-e970-417b-8cb1-4516546e6ced
-    a timestamp               20211202123456, 2021-12-02T12:34:56, or 2021-12-02T12:34:56.0000
-    any above with a prefix   4dn-20211202123456, sno-20211202123456, cgap-20211202123456, ff-20211202123456
-    """
-    if indexer_namespace == "":
-        # Allow the empty string only in production situations
-        return True if allow_null else False
-    if not isinstance(indexer_namespace, str):
-        # Non-strings (including None) are not indexer_namespaces
-        return False
-    # At this point we know we have a non-empty string, so check that last 4 characters match of one of our options.
-    return bool(indexer_namespace)  # Maybe: '-test-' in indexer_namespace or len(indexer_namespace) >= 4
-
-
-def snapshot_exists(es_testapp, repository_short_name, snapshot_name):
-    es = es_testapp.app.registry['elasticsearch']
-    try:
-        return bool(es.snapshot.get(repository=repository_short_name, snapshot=snapshot_name))
-    except NotFoundError:
-        return False
-
-
-def create_workbook_snapshot(es_testapp, snapshots_repository_location, repository_short_name, snapshot_name):
-    if snapshot_exists(es_testapp, repository_short_name, snapshot_name):
-        return
-    es = es_testapp.app.registry['elasticsearch']
-    try:
-
-        if DEBUG_SNAPSHOTS:
-            PRINT("Creating snapshot repo", repository_short_name, "at", snapshots_repository_location)
-        repo_creation_result = es.snapshot.create_repository(repository_short_name,
-                                                             {
-                                                                 "type": "fs",
-                                                                 "settings": {
-                                                                     "location": snapshots_repository_location,
-                                                                 }
-                                                             })
-        assert repo_creation_result == {'acknowledged': True}
-        if DEBUG_SNAPSHOTS:
-            PRINT("Creating snapshot", repository_short_name)
-        snapshot_creation_result = es.snapshot.create(repository=repository_short_name,
-                                                      snapshot=snapshot_name,
-                                                      wait_for_completion=True)
-        assert snapshot_creation_result.get('snapshot', {}).get('snapshot') == snapshot_name
-    except Exception as e:
-        logging.error(str(e))
-        if DEBUG_SNAPSHOTS:
-            import pdb
-            pdb.set_trace()
-        raise
-
-
-def restore_workbook_snapshot(es_testapp, indexer_namespace, repository_short_name, snapshot_name=None,
-                              require_indexer_namespace=True):
-    es = es_testapp.app.registry['elasticsearch']
-    try:
-        if require_indexer_namespace:
-            if not indexer_namespace or not is_valid_indexer_namespace(indexer_namespace):
-                raise RuntimeError("restore_workbook_snapshot requires an indexer namespace prefix (got %r)."
-                                   " (You can use the indexer_namespace fixture to acquire it.)"
-                                   % (indexer_namespace,))
-
-        all_index_info = [info['index'] for info in es.cat.indices(format='json')]
-        index_names = [name for name in all_index_info if name.startswith(indexer_namespace)]
-        if index_names:
-            index_names_string = ",".join(index_names)
-            if DEBUG_SNAPSHOTS:
-                # PRINT("Deleting index files", index_names_string)
-                PRINT("Deleting index files for prefix=", indexer_namespace)
-            result = es.indices.delete(index_names_string)
-            if DEBUG_SNAPSHOTS:
-                ignorable(result)
-                # PRINT("deletion result=", result)
-                PRINT("Deleted index files for prefix=", indexer_namespace)
-        result = es.snapshot.restore(repository=repository_short_name,
-                                     snapshot=snapshot_name,
-                                     wait_for_completion=True)
-        # Need to find out what a successful result looks like
-        if DEBUG_SNAPSHOTS:
-            ignorable(result)
-            # PRINT("restore result=", result)
-            PRINT("restored snapshot_name=", snapshot_name)
-    except Exception as e:
-        # Maybe should log somehow?
-        logging.error(str(e))
-        # Maybe should reset cls.done to False?
-        if DEBUG_SNAPSHOTS:
-            import pdb
-            pdb.set_trace()
-        raise
-
-
-class DataCacheInfo:
-    REGISTERED_DATA_CACHES = set()
-    ABSTRACT_DATA_CACHES = set()
-    DATA_CACHE_BASE_CLASS = None
-
-
-def is_data_cache(candidate_class, allow_abstract=False):
-    return (candidate_class in DataCacheInfo.REGISTERED_DATA_CACHES
-            and (allow_abstract or _is_abstract_data_cache(candidate_class)))
-
-
-def _is_abstract_data_cache(candidate_class):
-    return candidate_class not in DataCacheInfo.ABSTRACT_DATA_CACHES
-
-
-@decorator()
-def es_data_cache(is_abstract=False, is_base=False):
-    def _wrap_registered(cls):
-        if is_base:
-            if DataCacheInfo.DATA_CACHE_BASE_CLASS:
-                raise RuntimeError("Attempt to declare %s with base=True, but %s has already been declared."
-                                   % (full_class_name(cls), full_class_name(DataCacheInfo.DATA_CACHE_BASE_CLASS)))
-            DataCacheInfo.DATA_CACHE_BASE_CLASS = cls
-        elif not DataCacheInfo.DATA_CACHE_BASE_CLASS:
-            raise RuntimeError("Attempt to use @data_cache decorator for the first time on %s, but is_base=%s."
-                               % (full_class_name(cls), is_base))
-        if not issubclass(cls, DataCacheInfo.DATA_CACHE_BASE_CLASS):
-            raise SyntaxError("The data_cache class %s does not inherit, directly or indirectly, from %s."
-                              % (cls.__name__, full_class_name(ElasticSearchDataCache)))
-        DataCacheInfo.REGISTERED_DATA_CACHES.add(cls)
-        if is_abstract:
-            DataCacheInfo.ABSTRACT_DATA_CACHES.add(cls)
-        return cls
-    return _wrap_registered
-
-
-@es_data_cache(is_abstract=True, is_base=True)
-class ElasticSearchDataCache:
+class _ElasticSearchDataCache:
     """ Caches whether or not we have already provisioned a particular body of data. """
 
     # When this is more stable/trusted, we might want to remove this.
     # But I'd rather not be adding/removing instrumentation as I'm debugging it. -kmp 11-Mar-2021
     DEBUG_SNAPSHOTS = environ_bool("DEBUG_SNAPSHOTS", default=False)
+
+    REGISTERED_DATA_CACHES = set()
+    ABSTRACT_DATA_CACHES = set()
+    DATA_CACHE_BASE_CLASS = None
 
     SNAPSHOTS_INITIALIZED = {}
 
@@ -246,10 +114,10 @@ class ElasticSearchDataCache:
                           level=level + 1)
             if cls.DEBUG_SNAPSHOTS:
                 PRINT(level * "  ", level, "Creating snapshot", snapshot_name, "at", datetime.datetime.now())
-            create_workbook_snapshot(es_testapp,
-                                     snapshots_repository_location=cls.snapshots_repository_location,
-                                     repository_short_name=cls.repository_short_name,
-                                     snapshot_name=snapshot_name)
+            cls.create_workbook_snapshot(es_testapp,
+                                         snapshots_repository_location=cls.snapshots_repository_location,
+                                         repository_short_name=cls.repository_short_name,
+                                         snapshot_name=snapshot_name)
             cls.mark_snapshot_initialized(snapshot_name)
             if cls.DEBUG_SNAPSHOTS:
                 PRINT(level * "  ", level, "Done creating snapshot", snapshot_name, "at", datetime.datetime.now())
@@ -262,10 +130,10 @@ class ElasticSearchDataCache:
         else:
             if cls.DEBUG_SNAPSHOTS:
                 PRINT(level * "  ", level, "Restoring snapshot", snapshot_name, "at", datetime.datetime.now())
-            restore_workbook_snapshot(es_testapp,
-                                      indexer_namespace=cls.indexer_namespace,
-                                      repository_short_name=cls.repository_short_name,
-                                      snapshot_name=snapshot_name)
+            cls.restore_workbook_snapshot(es_testapp,
+                                          indexer_namespace=cls.indexer_namespace,
+                                          repository_short_name=cls.repository_short_name,
+                                          snapshot_name=snapshot_name)
             if cls.DEBUG_SNAPSHOTS:
                 PRINT(level * "  ", level, "Done restoring snapshot", snapshot_name, "at", datetime.datetime.now())
 
@@ -276,10 +144,10 @@ class ElasticSearchDataCache:
     def load_data(cls, es_testapp, datadir, indexer_namespace, other_data=None, level=0):
         if cls.DEBUG_SNAPSHOTS:
             PRINT(level * "  ", level, "Entering %s.load_data at %s" % (cls.__name__, datetime.datetime.now()))
-        if not is_data_cache(cls):
+        if not cls.is_data_cache(cls):
             raise RuntimeError("The class %s is not a registered data cache class."
-                               " It may need an @es_data_cache() decoration."
-                               % full_class_name(cls))
+                               " It may need an @%s.register() decoration."
+                               % (full_class_name(cls), full_class_name(cls.DATA_CACHE_BASE_CLASS)))
         if cls.DEBUG_SNAPSHOTS:
             PRINT(level * "  ", level, "Checking ancestors of", cls.__name__)
         ancestor_found = None
@@ -289,7 +157,7 @@ class ElasticSearchDataCache:
             # We only care about classes that are descended from our root class, obeying our protocols,
             # and actually allowed to have snapshots made (i.e., not declared abstract). Other mixed in
             # classes can be safely ignored.
-            if is_data_cache(ancestor_class):
+            if cls.is_data_cache(ancestor_class):
                 if ancestor_found:
                     if not issubclass(ancestor_found, ancestor_class):
                         # This could happen with multiple inheritance. We can't rely on just calling its
@@ -301,7 +169,7 @@ class ElasticSearchDataCache:
                         # -kmp 14-Feb-2021
                         raise RuntimeError("%s requires its descendants to use only single inheritance"
                                            ", but %s mixes %s and %s, and %s is not a subclass of %s."
-                                           % (ElasticSearchDataCache.__name__,
+                                           % (cls.DATA_CACHE_BASE_CLASS.__name__,
                                               cls.__name__,
                                               ancestor_found.__name__,
                                               ancestor_class.__name__,
@@ -382,3 +250,143 @@ class ElasticSearchDataCache:
                     pdb.set_trace()
                 raise RuntimeError("Conflicting %s: %s (new) and %s (existing)." % (attr, value, existing))
             setattr(cls, attr, value)
+
+    @classmethod
+    def is_valid_indexer_namespace(cls, indexer_namespace, allow_null=False):
+        """
+        Returns true if its argument is a valid indexer namespace.
+
+        For non-shared resources, the null string is an allowed namespace.
+        For all shared resources, a string ending in a digit is required.
+
+        This test allows these formats:
+
+        kind                      examples (not necessarily exhaustive)
+        ----                      -------------------------------------
+        travis or github job id   ...-test-...  (typically including a Travis or GitHub Actions job id)
+        any guid                  c978d7ab-e970-417b-8cb1-4516546e6ced
+        a timestamp               20211202123456, 2021-12-02T12:34:56, or 2021-12-02T12:34:56.0000
+        any above with a prefix   4dn-20211202123456, sno-20211202123456, cgap-20211202123456, ff-20211202123456
+        """
+        if indexer_namespace == "":
+            # Allow the empty string only in production situations
+            return True if allow_null else False
+        if not isinstance(indexer_namespace, str):
+            # Non-strings (including None) are not indexer_namespaces
+            return False
+        # At this point we know we have a non-empty string, so check that last 4 characters match of one of our options.
+        return bool(indexer_namespace)  # Maybe: '-test-' in indexer_namespace or len(indexer_namespace) >= 4
+
+    @classmethod
+    def snapshot_exists(cls, es_testapp, repository_short_name, snapshot_name):
+        es = es_testapp.app.registry['elasticsearch']
+        try:
+            return bool(es.snapshot.get(repository=repository_short_name, snapshot=snapshot_name))
+        except NotFoundError:
+            return False
+
+    @classmethod
+    def create_workbook_snapshot(cls, es_testapp, snapshots_repository_location, repository_short_name, snapshot_name):
+        if cls.snapshot_exists(es_testapp, repository_short_name, snapshot_name):
+            return
+        es = es_testapp.app.registry['elasticsearch']
+        try:
+
+            if cls.DEBUG_SNAPSHOTS:
+                PRINT("Creating snapshot repo", repository_short_name, "at", snapshots_repository_location)
+            repo_creation_result = es.snapshot.create_repository(repository_short_name,
+                                                                 {
+                                                                     "type": "fs",
+                                                                     "settings": {
+                                                                         "location": snapshots_repository_location,
+                                                                     }
+                                                                 })
+            assert repo_creation_result == {'acknowledged': True}
+            if cls.DEBUG_SNAPSHOTS:
+                PRINT("Creating snapshot", repository_short_name)
+            snapshot_creation_result = es.snapshot.create(repository=repository_short_name,
+                                                          snapshot=snapshot_name,
+                                                          wait_for_completion=True)
+            assert snapshot_creation_result.get('snapshot', {}).get('snapshot') == snapshot_name
+        except Exception as e:
+            logging.error(str(e))
+            if cls.DEBUG_SNAPSHOTS:
+                import pdb
+                pdb.set_trace()
+            raise
+
+    @classmethod
+    def restore_workbook_snapshot(cls, es_testapp, indexer_namespace, repository_short_name, snapshot_name=None,
+                                  require_indexer_namespace=True):
+        es = es_testapp.app.registry['elasticsearch']
+        try:
+            if require_indexer_namespace:
+                if not indexer_namespace or not cls.is_valid_indexer_namespace(indexer_namespace):
+                    raise RuntimeError("restore_workbook_snapshot requires an indexer namespace prefix (got %r)."
+                                       " (You can use the indexer_namespace fixture to acquire it.)"
+                                       % (indexer_namespace,))
+
+            all_index_info = [info['index'] for info in es.cat.indices(format='json')]
+            index_names = [name for name in all_index_info if name.startswith(indexer_namespace)]
+            if index_names:
+                index_names_string = ",".join(index_names)
+                if cls.DEBUG_SNAPSHOTS:
+                    # PRINT("Deleting index files", index_names_string)
+                    PRINT("Deleting index files for prefix=", indexer_namespace)
+                result = es.indices.delete(index_names_string)
+                if cls.DEBUG_SNAPSHOTS:
+                    ignorable(result)
+                    # PRINT("deletion result=", result)
+                    PRINT("Deleted index files for prefix=", indexer_namespace)
+            result = es.snapshot.restore(repository=repository_short_name,
+                                         snapshot=snapshot_name,
+                                         wait_for_completion=True)
+            # Need to find out what a successful result looks like
+            if cls.DEBUG_SNAPSHOTS:
+                ignorable(result)
+                # PRINT("restore result=", result)
+                PRINT("restored snapshot_name=", snapshot_name)
+        except Exception as e:
+            # Maybe should log somehow?
+            logging.error(str(e))
+            # Maybe should reset cls.done to False?
+            if cls.DEBUG_SNAPSHOTS:
+                import pdb
+                pdb.set_trace()
+            raise
+
+    @classmethod
+    @decorator()
+    def register(cls, is_abstract=False, is_base=False):
+        def _wrap_registered(cls):
+            if is_base:
+                if cls.DataCacheInfo.DATA_CACHE_BASE_CLASS:
+                    raise RuntimeError("Attempt to declare %s with base=True, but %s has already been declared."
+                                       % (full_class_name(cls),
+                                          full_class_name(cls.DataCacheInfo.DATA_CACHE_BASE_CLASS)))
+                cls.DataCacheInfo.DATA_CACHE_BASE_CLASS = cls
+            elif not cls.DataCacheInfo.DATA_CACHE_BASE_CLASS:
+                raise RuntimeError("Attempt to use @data_cache decorator for the first time on %s, but is_base=%s."
+                                   % (full_class_name(cls), is_base))
+            if not issubclass(cls, cls.DataCacheInfo.DATA_CACHE_BASE_CLASS):
+                raise SyntaxError("The data_cache class %s does not inherit, directly or indirectly, from %s."
+                                  % (cls.__name__, full_class_name(cls.DATA_CACHE_BASE_CLASS)))
+            cls.DataCacheInfo.REGISTERED_DATA_CACHES.add(cls)
+            if is_abstract:
+                cls.DataCacheInfo.ABSTRACT_DATA_CACHES.add(cls)
+            return cls
+        return _wrap_registered
+
+    @classmethod
+    def is_data_cache(cls, candidate_class, allow_abstract=False):
+        return (candidate_class in cls.REGISTERED_DATA_CACHES
+                and (allow_abstract or cls._is_abstract_data_cache(candidate_class)))
+
+    @classmethod
+    def _is_abstract_data_cache(cls, candidate_class):
+        return candidate_class not in cls.ABSTRACT_DATA_CACHES
+
+
+@_ElasticSearchDataCache.register(is_abstract=True, is_base=True)
+class ElasticSearchDataCache(_ElasticSearchDataCache):
+    pass
