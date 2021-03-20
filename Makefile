@@ -14,16 +14,16 @@ test:  # runs default tests, which are the unit tests
 	make test-units
 
 retest:  # runs only failed tests from the last test run. (if no failures, it seems to run all?? -kmp 17-Dec-2020)
-	pytest -vv --last-failed
+	poetry run pytest -vv -r w --last-failed
 
 test-all:
-	pytest -vv
+	poetry run pytest -vv -r w
 
 test-units:  # runs unit tests (and integration tests not backed by a unit test)
-	poetry run pytest -vv -m "not integratedx"
+	poetry run pytest -vv -r w -m "not integratedx"
 
 test-integrations:  # runs integration tests
-	pytest -vv -m "integrated or integratedx"
+	poetry run pytest -vv -r w -m "integrated or integratedx"
 
 update:  # updates dependencies
 	poetry update

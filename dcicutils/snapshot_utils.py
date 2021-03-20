@@ -4,16 +4,23 @@ import logging
 from elasticsearch.exceptions import NotFoundError
 from dcicutils.misc_utils import (
     environ_bool, PRINT, camel_case_to_snake_case, full_object_name,
-    ignorable, ancestor_classes, decorator
+    ignorable, ancestor_classes, decorator, ignored,
 )
 
 
 class _ElasticSearchDataCache:
     """ Caches whether or not we have already provisioned a particular body of data. """
 
-    # When this is more stable/trusted, we might want to remove this.
-    # But I'd rather not be adding/removing instrumentation as I'm debugging it. -kmp 11-Mar-2021
+    # Invoking tests with DEBUG_SNAPSHOTS=TRUE will cause pdb breakpoints in certain situations.
     DEBUG_SNAPSHOTS = environ_bool("DEBUG_SNAPSHOTS", default=False)
+
+    # Invoking tests with VERBOSE_SNAPSHOTS=TRUE will cause debugging typeout to appear.
+    VERBOSE_SNAPSHOTS = environ_bool("VERBOSE_SNAPSHOTS", default=DEBUG_SNAPSHOTS)
+
+    # Invoking tests with ENABLE_SNAPSHOTS=TRUE will cause this facility to work.
+    # It is off by default because right now it only works on local machines.
+    # TODO: Provision our servers to have a storage area to which snapshots can be made.
+    ENABLE_SNAPSHOTS = environ_bool("ENABLE_SNAPSHOTS", default=False)
 
     _REGISTERED_DATA_CACHES = set()
     _ABSTRACT_DATA_CACHES = set()
@@ -31,11 +38,9 @@ class _ElasticSearchDataCache:
         """
         Initialize the data associated with a a snapshot if it has not already been done.
 
-        DEPRECATION NOTICE: If initialization had already been done, this does NOT repeat it.
-            It is possible that this was done and then the environment was later changed,
-            for example in another test, and is not precisely what it was. This is how the original
-            'workbook' fixture worked.  Fixtures of this kind are retained for compatibility
-            with legacy testing. This entry point should generally be considered deprecated.
+        If initialization had already been done, this does NOT repeat it. Of course, it's possible
+        that this was done and then the environment was later changed, for example in another test,
+        and is not precisely what it was. Some fixtures work this way for legacy or efficiency reasons.
 
         :param es_testapp: an es_testapp fixture (providing an endpoint with admin access to test application with ES)
         :param datadir: the name of the temporary directory allocated for use of this test run
@@ -48,7 +53,7 @@ class _ElasticSearchDataCache:
         :param level: This is used internally and should not be passed explicitly.  It helps with indentation
             and is used as a prefix when DEBUG_WORKBOOK_CACHE is True and is otherwise ignored.
         """
-        if cls.DEBUG_SNAPSHOTS:
+        if cls.VERBOSE_SNAPSHOTS:
             if level == 0:
                 PRINT()
             PRINT(level * "  ", level,
@@ -58,30 +63,23 @@ class _ElasticSearchDataCache:
                                datadir=datadir, indexer_namespace=indexer_namespace, snapshot_name=snapshot_name,
                                other_data=other_data,
                                level=level + 1,
-                               # This is the important part, requesting deprecated legacy 'workbook' behavior,
-                               # which presumed that after the first initialization, state would just stay
-                               # initialized (or would be put explicitly back in order). We'll soon phase this out.
-                               # -kmp 13-Feb-2021
+                               # This is the important part, supporting the caller's promise that once initialized,
+                               # state will remain sufficiently consistent that reinitialization can be skipped.
                                only_on_first_call=True)
-        if cls.DEBUG_SNAPSHOTS:
+        if cls.VERBOSE_SNAPSHOTS:
             PRINT(level * "  ", level,
                   "Exiting %s.assure_data_once_loaded at %s" % (cls.__name__, datetime.datetime.now()))
 
     @classmethod
-    def assure_data_loaded(cls, es_testapp, datadir, indexer_namespace, snapshot_name=None, other_data=None,
-                           # This next argument supports deprecated legacy behavior. -kmp 13-Feb-2021
-                           only_on_first_call=False, level=0):
+    def assure_data_loaded(cls, es_testapp, datadir, indexer_namespace,
+                           snapshot_name=None, other_data=None, level=0,
+                           only_on_first_call=False, enable_snapshots=None):
         """
         Creates (and remembers) or else restores the ES data associated with this class.
 
-        DEPRECATION NOTICE: If initialization had already been done, this does NOT repeat it.
-            It is possible that this was done and then the environment was later changed,
-            for example in another test, and is not precisely what it was. This is how the original
-            'workbook' fixture worked.  Fixtures of this kind are retained for compatibility
-            with legacy testing. This entry point should generally be considered deprecated.
-
         :param es_testapp: an es_testapp fixture (providing an endpoint with admin access to test application with ES)
-        :param datadir: the name of the temporary directory allocated for use of this test run
+        :param datadir: the name of the temporary directory allocated for use of this test run.
+            All filenames used by this facility for snapshots are computed relative to the datadir.
         :param indexer_namespace: the prefix string to be used on all ES index names
         :param snapshot_name: an optional snapshot name to override the default for special uses.
             The default value of None asks it be inferred from information declared as the snapshot_name class variable.
@@ -94,7 +92,13 @@ class _ElasticSearchDataCache:
         :param level: This is used internally and should not be passed explicitly.  It helps with indentation
             and is used as a prefix when DEBUG_WORKBOOK_CACHE is True and is otherwise ignored.
         """
-        if cls.DEBUG_SNAPSHOTS:
+        if enable_snapshots is None:
+            enable_snapshots = cls.ENABLE_SNAPSHOTS
+
+        if not enable_snapshots:
+            only_on_first_call = True
+
+        if cls.VERBOSE_SNAPSHOTS:
             if level == 0:
                 PRINT()
             PRINT(level * "  ", level, "Entering %s.assure_data_loaded at %s" % (cls.__name__, datetime.datetime.now()))
@@ -105,47 +109,48 @@ class _ElasticSearchDataCache:
         if not cls.is_snapshot_initialized(snapshot_name):
             cls.load_data(es_testapp, datadir=datadir, indexer_namespace=indexer_namespace, other_data=other_data,
                           level=level + 1)
-            if cls.DEBUG_SNAPSHOTS:
+            if cls.VERBOSE_SNAPSHOTS:
                 PRINT(level * "  ", level, "Creating snapshot", snapshot_name, "at", datetime.datetime.now())
             cls.create_workbook_snapshot(es_testapp,
                                          snapshots_repository_location=cls.snapshots_repository_location,
                                          repository_short_name=cls.repository_short_name,
+                                         indexer_namespace=indexer_namespace,
                                          snapshot_name=snapshot_name)
             cls.mark_snapshot_initialized(snapshot_name)
-            if cls.DEBUG_SNAPSHOTS:
+            if cls.VERBOSE_SNAPSHOTS:
                 PRINT(level * "  ", level, "Done creating snapshot", snapshot_name, "at", datetime.datetime.now())
         elif only_on_first_call:
             # DEPRECATION NOTICE: This is legacy behavior related to how the 'workbook' fixture used to work,
             # which was to rely on loading it once and then rather than reverting it. -kmp 13-Feb-2021
-            if cls.DEBUG_SNAPSHOTS:
+            if cls.VERBOSE_SNAPSHOTS:
                 PRINT(level * "  ", level, "Skipping snapshot restoration because only_first_on_call=True.")
             pass
         else:
-            if cls.DEBUG_SNAPSHOTS:
+            if cls.VERBOSE_SNAPSHOTS:
                 PRINT(level * "  ", level, "Restoring snapshot", snapshot_name, "at", datetime.datetime.now())
             cls.restore_workbook_snapshot(es_testapp,
                                           indexer_namespace=cls.indexer_namespace,
                                           repository_short_name=cls.repository_short_name,
                                           snapshot_name=snapshot_name)
-            if cls.DEBUG_SNAPSHOTS:
+            if cls.VERBOSE_SNAPSHOTS:
                 PRINT(level * "  ", level, "Done restoring snapshot", snapshot_name, "at", datetime.datetime.now())
 
-        if cls.DEBUG_SNAPSHOTS:
+        if cls.VERBOSE_SNAPSHOTS:
             PRINT(level * "  ", level, "Exiting %s.assure_data_loaded at %s" % (cls.__name__, datetime.datetime.now()))
 
     @classmethod
     def load_data(cls, es_testapp, datadir, indexer_namespace, other_data=None, level=0):
-        if cls.DEBUG_SNAPSHOTS:
+        if cls.VERBOSE_SNAPSHOTS:
             PRINT(level * "  ", level, "Entering %s.load_data at %s" % (cls.__name__, datetime.datetime.now()))
         if not cls.is_data_cache(cls):
             raise RuntimeError("The class %s is not a registered data cache class."
                                " It may need an @%s.register() decoration."
                                % (cls.__name__, full_object_name(cls._DATA_CACHE_BASE_CLASS)))
-        if cls.DEBUG_SNAPSHOTS:
+        if cls.VERBOSE_SNAPSHOTS:
             PRINT(level * "  ", level, "Checking ancestors of", cls.__name__)
         ancestor_found = None
         for ancestor_class in ancestor_classes(cls):
-            if cls.DEBUG_SNAPSHOTS:
+            if cls.VERBOSE_SNAPSHOTS:
                 PRINT(level * "  ", level, "Trying ancestor", ancestor_class)
             # We only care about classes that are descended from our root class, obeying our protocols,
             # and actually allowed to have snapshots made (i.e., not declared abstract). Other mixed in
@@ -171,33 +176,33 @@ class _ElasticSearchDataCache:
                 else:
                     ancestor_found = ancestor_class
         if ancestor_found:
-            if cls.DEBUG_SNAPSHOTS:
+            if cls.VERBOSE_SNAPSHOTS:
                 PRINT(level * "  ", level, "Assuring data for ancestor class", ancestor_found.__name__,
                       "on behalf of", cls.__name__)
             ancestor_found.assure_data_loaded(es_testapp,
                                               datadir=datadir,
                                               indexer_namespace=indexer_namespace,
                                               other_data=other_data, level=level+1)
-            if cls.DEBUG_SNAPSHOTS:
+            if cls.VERBOSE_SNAPSHOTS:
                 PRINT(level * "  ", level, "Done assuring data for ancestor class", ancestor_found.__name__,
                       "on behalf of", cls.__name__)
         else:
-            if cls.DEBUG_SNAPSHOTS:
+            if cls.VERBOSE_SNAPSHOTS:
                 PRINT(level * "  ", level, "No useful ancestor found. No foundation to load.", cls.__name__)
         # Having built a foundation, now add the data that we wanted.
-        if cls.DEBUG_SNAPSHOTS:
+        if cls.VERBOSE_SNAPSHOTS:
             PRINT(level * "  ", level, "Loading additional requested class data", cls.__name__)
         # Now that a proper foundation is assured, load the new data that this class contributes.
         cls.load_additional_data(es_testapp, other_data=other_data)
-        if cls.DEBUG_SNAPSHOTS:
+        if cls.VERBOSE_SNAPSHOTS:
             PRINT(level * "  ", level, "Done loading additional requested class data", cls.__name__)
         # Finally, assure everything is indexed.
-        if cls.DEBUG_SNAPSHOTS:
+        if cls.VERBOSE_SNAPSHOTS:
             print(level * "  ", level, "Starting indexing at", datetime.datetime.now())
         es_testapp.post_json('/index', {'record': False})
-        if cls.DEBUG_SNAPSHOTS:
+        if cls.VERBOSE_SNAPSHOTS:
             print(level * "  ", level, "Done indexing at", datetime.datetime.now())
-        if cls.DEBUG_SNAPSHOTS:
+        if cls.VERBOSE_SNAPSHOTS:
             PRINT(level * "  ", level, "Exiting %s.load_data at %s" % (cls.__name__, datetime.datetime.now()))
 
     @classmethod
@@ -279,24 +284,38 @@ class _ElasticSearchDataCache:
             return False
 
     @classmethod
-    def create_workbook_snapshot(cls, es_testapp, snapshots_repository_location, repository_short_name, snapshot_name):
+    def repository_spec(cls, snapshots_repository_location, repository_short_name, indexer_namespace, snapshot_name):
+        # If this method was customized in different ways in a subclass, these other arguments might be useful.
+        ignored(repository_short_name, indexer_namespace, snapshot_name)
+        return {
+            "type": "fs",
+            "settings": {
+                "location": snapshots_repository_location,
+            }
+        }
+
+    @classmethod
+    def create_workbook_snapshot(cls, es_testapp, snapshots_repository_location, repository_short_name,
+                                 indexer_namespace, snapshot_name):
+        if not cls.ENABLE_SNAPSHOTS:
+            if cls.VERBOSE_SNAPSHOTS:
+                PRINT("NOT creating snapshot because %s.ENABLE_SNAPSHOTS is False." % full_object_name(cls))
+            return
         if cls.snapshot_exists(es_testapp, repository_short_name, snapshot_name):
             return
         es = es_testapp.app.registry['elasticsearch']
         try:
 
-            if cls.DEBUG_SNAPSHOTS:
+            if cls.VERBOSE_SNAPSHOTS:
                 PRINT("Creating snapshot repo", repository_short_name, "at", snapshots_repository_location)
-            repo_creation_result = es.snapshot.create_repository(repository_short_name,
-                                                                 {
-                                                                     "type": "fs",
-                                                                     "settings": {
-                                                                         "location": snapshots_repository_location,
-                                                                     }
-                                                                 })
+            spec = cls.repository_spec(snapshots_repository_location=snapshots_repository_location,
+                                       repository_short_name=repository_short_name,
+                                       indexer_namespace=indexer_namespace, snapshot_name=snapshot_name)
+            repo_creation_result = es.snapshot.create_repository(repository_short_name, spec)
             assert repo_creation_result == {'acknowledged': True}
-            if cls.DEBUG_SNAPSHOTS:
+            if cls.VERBOSE_SNAPSHOTS:
                 PRINT("Creating snapshot", repository_short_name)
+            ignored(indexer_namespace)  # It would be nice to makea  snapshot only of part of the data
             snapshot_creation_result = es.snapshot.create(repository=repository_short_name,
                                                           snapshot=snapshot_name,
                                                           wait_for_completion=True)
@@ -311,6 +330,10 @@ class _ElasticSearchDataCache:
     @classmethod
     def restore_workbook_snapshot(cls, es_testapp, indexer_namespace, repository_short_name, snapshot_name=None,
                                   require_indexer_namespace=True):
+        if not cls.ENABLE_SNAPSHOTS:
+            if cls.VERBOSE_SNAPSHOTS:
+                PRINT("NOT restoring snapshot because %s.ENABLE_SNAPSHOTS is False." % full_object_name(cls))
+            return
         es = es_testapp.app.registry['elasticsearch']
         try:
             if require_indexer_namespace:
@@ -323,11 +346,11 @@ class _ElasticSearchDataCache:
             index_names = [name for name in all_index_info if name.startswith(indexer_namespace)]
             if index_names:
                 index_names_string = ",".join(index_names)
-                if cls.DEBUG_SNAPSHOTS:
+                if cls.VERBOSE_SNAPSHOTS:
                     # PRINT("Deleting index files", index_names_string)
                     PRINT("Deleting index files for prefix=", indexer_namespace)
                 result = es.indices.delete(index_names_string)
-                if cls.DEBUG_SNAPSHOTS:
+                if cls.VERBOSE_SNAPSHOTS:
                     ignorable(result)
                     # PRINT("deletion result=", result)
                     PRINT("Deleted index files for prefix=", indexer_namespace)
@@ -335,7 +358,7 @@ class _ElasticSearchDataCache:
                                          snapshot=snapshot_name,
                                          wait_for_completion=True)
             # Need to find out what a successful result looks like
-            if cls.DEBUG_SNAPSHOTS:
+            if cls.VERBOSE_SNAPSHOTS:
                 ignorable(result)
                 # PRINT("restore result=", result)
                 PRINT("restored snapshot_name=", snapshot_name)
