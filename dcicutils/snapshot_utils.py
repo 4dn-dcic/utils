@@ -387,7 +387,7 @@ class _ElasticSearchDataCache:
 
 @decorator()
 def es_data_cache(is_abstract=True, _is_base=True):
-    return _ElasticSearchDataCache.register(is_abstract=is_abstract, is_base=_is_base)
+    return _ElasticSearchDataCache.register(is_abstract=is_abstract, _is_base=_is_base)
 
 
 @es_data_cache(is_abstract=True, _is_base=True)
