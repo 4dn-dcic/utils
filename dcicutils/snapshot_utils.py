@@ -356,7 +356,6 @@ class _ElasticSearchDataCache:
             raise
 
     @classmethod
-    @decorator()
     def register(cls, is_abstract=False, is_base=False):
         def _wrap_registered(cls):
             if is_base:
@@ -387,6 +386,10 @@ class _ElasticSearchDataCache:
         return candidate_class not in cls.ABSTRACT_DATA_CACHES
 
 
-@_ElasticSearchDataCache.register(is_abstract=True, is_base=True)
+@decorator()
+def es_data_cache(is_abstract=True, is_base=True):
+    return _ElasticSearchDataCache.register(is_abstract=True, is_base=True)
+
+@es_data_cache(is_abstract=True, is_base=True)
 class ElasticSearchDataCache(_ElasticSearchDataCache):
     pass
