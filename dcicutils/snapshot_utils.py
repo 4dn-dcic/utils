@@ -123,12 +123,13 @@ class DataCacheInfo:
     DATA_CACHE_BASE_CLASS = None
 
 
-def is_data_cache(cls, allow_abstract=False):
-    return cls in DataCacheInfo.REGISTERED_DATA_CACHES and (allow_abstract or _is_abstract_data_cache(cls))
+def is_data_cache(candidate_class, allow_abstract=False):
+    return (candidate_class in DataCacheInfo.REGISTERED_DATA_CACHES
+            and (allow_abstract or _is_abstract_data_cache(candidate_class)))
 
 
-def _is_abstract_data_cache(cls):
-    return cls not in DataCacheInfo.ABSTRACT_DATA_CACHES
+def _is_abstract_data_cache(candidate_class):
+    return candidate_class not in DataCacheInfo.ABSTRACT_DATA_CACHES
 
 
 @decorator()
