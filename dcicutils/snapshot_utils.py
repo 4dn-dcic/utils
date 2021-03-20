@@ -8,13 +8,6 @@ from dcicutils.misc_utils import (
 )
 
 
-# class DataCacheInfo: => ElasticSearchDataCache
-# Then rename to _
-#    REGISTERED_DATA_CACHES = set()
-#    ABSTRACT_DATA_CACHES = set()
-#    DATA_CACHE_BASE_CLASS = None
-
-
 class _ElasticSearchDataCache:
     """ Caches whether or not we have already provisioned a particular body of data. """
 
@@ -22,9 +15,9 @@ class _ElasticSearchDataCache:
     # But I'd rather not be adding/removing instrumentation as I'm debugging it. -kmp 11-Mar-2021
     DEBUG_SNAPSHOTS = environ_bool("DEBUG_SNAPSHOTS", default=False)
 
-    REGISTERED_DATA_CACHES = set()
-    ABSTRACT_DATA_CACHES = set()
-    DATA_CACHE_BASE_CLASS = None
+    _REGISTERED_DATA_CACHES = set()
+    _ABSTRACT_DATA_CACHES = set()
+    _DATA_CACHE_BASE_CLASS = None
 
     SNAPSHOTS_INITIALIZED = {}
 
@@ -147,7 +140,7 @@ class _ElasticSearchDataCache:
         if not cls.is_data_cache(cls):
             raise RuntimeError("The class %s is not a registered data cache class."
                                " It may need an @%s.register() decoration."
-                               % (full_class_name(cls), full_class_name(cls.DATA_CACHE_BASE_CLASS)))
+                               % (full_class_name(cls), full_class_name(cls._DATA_CACHE_BASE_CLASS)))
         if cls.DEBUG_SNAPSHOTS:
             PRINT(level * "  ", level, "Checking ancestors of", cls.__name__)
         ancestor_found = None
@@ -169,7 +162,7 @@ class _ElasticSearchDataCache:
                         # -kmp 14-Feb-2021
                         raise RuntimeError("%s requires its descendants to use only single inheritance"
                                            ", but %s mixes %s and %s, and %s is not a subclass of %s."
-                                           % (cls.DATA_CACHE_BASE_CLASS.__name__,
+                                           % (cls._DATA_CACHE_BASE_CLASS.__name__,
                                               cls.__name__,
                                               ancestor_found.__name__,
                                               ancestor_class.__name__,
@@ -359,31 +352,31 @@ class _ElasticSearchDataCache:
     def register(cls, is_abstract=False, is_base=False):
         def _wrap_registered(cls):
             if is_base:
-                if cls.DataCacheInfo.DATA_CACHE_BASE_CLASS:
+                if cls._DATA_CACHE_BASE_CLASS:
                     raise RuntimeError("Attempt to declare %s with base=True, but %s has already been declared."
                                        % (full_class_name(cls),
-                                          full_class_name(cls.DataCacheInfo.DATA_CACHE_BASE_CLASS)))
-                cls.DataCacheInfo.DATA_CACHE_BASE_CLASS = cls
-            elif not cls.DataCacheInfo.DATA_CACHE_BASE_CLASS:
+                                          full_class_name(cls._DATA_CACHE_BASE_CLASS)))
+                cls._DATA_CACHE_BASE_CLASS = cls
+            elif not cls._DATA_CACHE_BASE_CLASS:
                 raise RuntimeError("Attempt to use @data_cache decorator for the first time on %s, but is_base=%s."
                                    % (full_class_name(cls), is_base))
-            if not issubclass(cls, cls.DataCacheInfo.DATA_CACHE_BASE_CLASS):
+            if not issubclass(cls, cls._DATA_CACHE_BASE_CLASS):
                 raise SyntaxError("The data_cache class %s does not inherit, directly or indirectly, from %s."
-                                  % (cls.__name__, full_class_name(cls.DATA_CACHE_BASE_CLASS)))
-            cls.DataCacheInfo.REGISTERED_DATA_CACHES.add(cls)
+                                  % (cls.__name__, full_class_name(cls._DATA_CACHE_BASE_CLASS)))
+            cls._REGISTERED_DATA_CACHES.add(cls)
             if is_abstract:
-                cls.DataCacheInfo.ABSTRACT_DATA_CACHES.add(cls)
+                cls._ABSTRACT_DATA_CACHES.add(cls)
             return cls
         return _wrap_registered
 
     @classmethod
     def is_data_cache(cls, candidate_class, allow_abstract=False):
-        return (candidate_class in cls.REGISTERED_DATA_CACHES
+        return (candidate_class in cls._REGISTERED_DATA_CACHES
                 and (allow_abstract or cls._is_abstract_data_cache(candidate_class)))
 
     @classmethod
     def _is_abstract_data_cache(cls, candidate_class):
-        return candidate_class not in cls.ABSTRACT_DATA_CACHES
+        return candidate_class not in cls._ABSTRACT_DATA_CACHES
 
 
 @decorator()
