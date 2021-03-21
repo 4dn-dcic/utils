@@ -17,6 +17,9 @@ Change Log
   tests. For now this feature is entirely OFF unless one uses environment
   variable ENABLE_SNAPSHOTS=TRUE in the command invocation.
 
+* Extend the mock for ``open`` in ``qa_utils.MockFileSystem`` to handle
+  file open modes involving "t" and "+".
+
 
 1.11.2
 ======

@@ -444,13 +444,13 @@ class MockFileSystem:
     def open(self, file, mode='r', encoding=None):
         if FILE_SYSTEM_VERBOSE:
             print("Opening %r in mode %r." % (file, mode))
-        if mode == 'w':
+        if mode in ('w', 'wt', 'w+', 'w+t', 'wt+'):
             return self._open_for_write(file_system=self, file=file, binary=False, encoding=encoding)
-        elif mode == 'wb':
+        elif mode in ('wb', 'w+b', 'wb+'):
             return self._open_for_write(file_system=self, file=file, binary=True, encoding=encoding)
-        elif mode == 'r':
+        elif mode in ('r', 'rt', 'r+', 'r+t', 'rt+'):
             return self._open_for_read(file, binary=False, encoding=encoding)
-        elif mode == 'rb':
+        elif mode in ('rb', 'r+b', 'rb+'):
             return self._open_for_read(file, binary=True, encoding=encoding)
         else:
             raise AssertionError("Mocked io.open doesn't handle mode=%r." % mode)
