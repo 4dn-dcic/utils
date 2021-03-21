@@ -7,14 +7,15 @@ Change Log
 ----------
 
 
-1.11.1.1b3
-==========
+1.11.1.1b11
+===========
 
-**PR 134: Fixes to env_utils.data_set_for_env for CGAP (C4-634)**
+**PR 135: Support for ElasticSearchDataCache**
 
-* Fix ``env_utils.data_set_for_env`` which were returning ``'test'``
-  for ``fourfront-cgapwolf`` and ``fourfront-cgaptest``.
-  Oddly, the proper value is ``'prod'``.
+* Support for ``ElasticSearchDataCache`` and the ``es_data_cache`` decorator
+  in the new ``snapshot_utils`` module to allow local snapshot isolation on
+  tests. For now this feature is entirely OFF unless one uses environment
+  variable ENABLE_SNAPSHOTS=TRUE in the command invocation.
 
 
 1.11.2

@@ -895,7 +895,6 @@ def test_mock_file_system_simple():
                 }
 
 
-
 class _MockPrinter:
 
     def __init__(self):
