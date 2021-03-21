@@ -482,7 +482,7 @@ class MockFileSystem:
             raise AssertionError("Mocked io.open doesn't handle mode=%r." % mode)
 
     def _open_for_read(self, file, binary=False, encoding=None):
-        self._do_not_mirror(file)
+        self._maybe_auto_mirror_file(file)
         content = self.files.get(file)
         if content is None:
             raise FileNotFoundError("No such file or directory: %s" % file)
