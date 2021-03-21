@@ -7,8 +7,8 @@ Change Log
 ----------
 
 
-1.11.1.1b14
-===========
+1.12.0
+======
 
 **PR 135: Support for ElasticSearchDataCache**
 
