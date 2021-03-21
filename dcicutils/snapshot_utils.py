@@ -73,7 +73,7 @@ class _ElasticSearchDataCache:
     @classmethod
     def assure_data_loaded(cls, es_testapp, datadir, indexer_namespace,
                            snapshot_name=None, other_data=None, level=0,
-                           only_on_first_call=False, enable_snapshots=None):
+                           only_on_first_call=False):
         """
         Creates (and remembers) or else restores the ES data associated with this class.
 
@@ -92,10 +92,7 @@ class _ElasticSearchDataCache:
         :param level: This is used internally and should not be passed explicitly.  It helps with indentation
             and is used as a prefix when DEBUG_WORKBOOK_CACHE is True and is otherwise ignored.
         """
-        if enable_snapshots is None:
-            enable_snapshots = cls.ENABLE_SNAPSHOTS
-
-        if not enable_snapshots:
+        if not cls.ENABLE_SNAPSHOTS:
             only_on_first_call = True
 
         if cls.VERBOSE_SNAPSHOTS:
@@ -111,27 +108,28 @@ class _ElasticSearchDataCache:
                           level=level + 1)
             if cls.VERBOSE_SNAPSHOTS:
                 PRINT(level * "  ", level, "Creating snapshot", snapshot_name, "at", datetime.datetime.now())
-            cls.create_workbook_snapshot(es_testapp,
-                                         snapshots_repository_location=cls.snapshots_repository_location,
-                                         repository_short_name=cls.repository_short_name,
-                                         indexer_namespace=indexer_namespace,
-                                         snapshot_name=snapshot_name)
+            cls.create_snapshot(es_testapp,
+                                snapshots_repository_location=cls.snapshots_repository_location,
+                                repository_short_name=cls.repository_short_name,
+                                indexer_namespace=indexer_namespace,
+                                snapshot_name=snapshot_name)
             cls.mark_snapshot_initialized(snapshot_name)
             if cls.VERBOSE_SNAPSHOTS:
                 PRINT(level * "  ", level, "Done creating snapshot", snapshot_name, "at", datetime.datetime.now())
         elif only_on_first_call:
-            # DEPRECATION NOTICE: This is legacy behavior related to how the 'workbook' fixture used to work,
-            # which was to rely on loading it once and then rather than reverting it. -kmp 13-Feb-2021
+            # This supports an optimization in which a fixture is run only once when setting up and not again
+            # rather than reinitializing on every attempt. That only works if the tests of the data are sufficiently
+            # stable, or tests are sufficiently robust, that everything can still pass.
             if cls.VERBOSE_SNAPSHOTS:
                 PRINT(level * "  ", level, "Skipping snapshot restoration because only_first_on_call=True.")
             pass
         else:
             if cls.VERBOSE_SNAPSHOTS:
                 PRINT(level * "  ", level, "Restoring snapshot", snapshot_name, "at", datetime.datetime.now())
-            cls.restore_workbook_snapshot(es_testapp,
-                                          indexer_namespace=cls.indexer_namespace,
-                                          repository_short_name=cls.repository_short_name,
-                                          snapshot_name=snapshot_name)
+            cls.restore_snapshot(es_testapp,
+                                 indexer_namespace=cls.indexer_namespace,
+                                 repository_short_name=cls.repository_short_name,
+                                 snapshot_name=snapshot_name)
             if cls.VERBOSE_SNAPSHOTS:
                 PRINT(level * "  ", level, "Done restoring snapshot", snapshot_name, "at", datetime.datetime.now())
 
@@ -295,8 +293,8 @@ class _ElasticSearchDataCache:
         }
 
     @classmethod
-    def create_workbook_snapshot(cls, es_testapp, snapshots_repository_location, repository_short_name,
-                                 indexer_namespace, snapshot_name):
+    def create_snapshot(cls, es_testapp, snapshots_repository_location, repository_short_name,
+                        indexer_namespace, snapshot_name):
         if not cls.ENABLE_SNAPSHOTS:
             if cls.VERBOSE_SNAPSHOTS:
                 PRINT("NOT creating snapshot because %s.ENABLE_SNAPSHOTS is False." % full_object_name(cls))
@@ -328,8 +326,8 @@ class _ElasticSearchDataCache:
             raise
 
     @classmethod
-    def restore_workbook_snapshot(cls, es_testapp, indexer_namespace, repository_short_name, snapshot_name=None,
-                                  require_indexer_namespace=True):
+    def restore_snapshot(cls, es_testapp, indexer_namespace, repository_short_name, snapshot_name=None,
+                         require_indexer_namespace=True):
         if not cls.ENABLE_SNAPSHOTS:
             if cls.VERBOSE_SNAPSHOTS:
                 PRINT("NOT restoring snapshot because %s.ENABLE_SNAPSHOTS is False." % full_object_name(cls))
@@ -338,7 +336,7 @@ class _ElasticSearchDataCache:
         try:
             if require_indexer_namespace:
                 if not indexer_namespace or not cls.is_valid_indexer_namespace(indexer_namespace):
-                    raise RuntimeError("restore_workbook_snapshot requires an indexer namespace prefix (got %r)."
+                    raise RuntimeError("restore_snapshot requires an indexer namespace prefix (got %r)."
                                        " (You can use the indexer_namespace fixture to acquire it.)"
                                        % (indexer_namespace,))
 
