@@ -16,6 +16,7 @@ import toml
 import uuid
 import warnings
 
+from dcicutils.misc_utils import environ_bool
 from json import dumps as json_dumps, loads as json_loads
 from unittest import mock
 from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ
@@ -407,7 +408,7 @@ class RetryManager(Retry):
             yield
 
 
-FILE_SYSTEM_VERBOSE = True
+FILE_SYSTEM_VERBOSE = environ_bool("FILE_SYSTEM_VERBOSE", default=False)
 
 
 class MockFileWriter:
