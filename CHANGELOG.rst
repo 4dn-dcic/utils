@@ -20,8 +20,13 @@ Change Log
 * Extend the mock for ``open`` in ``qa_utils.MockFileSystem`` to handle
   file open modes involving "t" and "+".
 
-* Support for ``qa_utils.MockFileSystem`` new keyword arguments
-  ``auto_mirror_files_for_read`` and ``do_not_auto_mirror``.
+* Support for ``qa_utils.MockFileSystem``:
+
+  * New keyword arguments
+    ``auto_mirror_files_for_read`` and ``do_not_auto_mirror``.
+
+  * New context manager method ``mock_exists_open_remove`` that mocks these
+    common methods for the mock file system that is its ``self``.
 
 
 1.11.2
