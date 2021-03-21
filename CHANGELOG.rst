@@ -7,7 +7,7 @@ Change Log
 ----------
 
 
-1.11.1.1b11
+1.11.1.1b14
 ===========
 
 **PR 135: Support for ElasticSearchDataCache**
@@ -19,6 +19,9 @@ Change Log
 
 * Extend the mock for ``open`` in ``qa_utils.MockFileSystem`` to handle
   file open modes involving "t" and "+".
+
+* Support for ``qa_utils.MockFileSystem`` new keyword arguments
+  ``auto_mirror_files_for_read`` and ``do_not_auto_mirror``.
 
 
 1.11.2

@@ -895,6 +895,52 @@ def test_mock_file_system_simple():
                 }
 
 
+def test_mock_file_system_auto():
+
+    temp_filename = "IF_YOU_SEE_THIS_FILE_DELETE_IT.txt"
+
+    temp_file_text = ("This file is used only temporarily by dcicutils.qa_utils.test_mock_file_system_auto.\n"
+                      "It is safe and encouraged to to delete it.\n"
+                      "This token is unique: %s.\n"
+                      % uuid.uuid4())
+
+    try:
+
+        # We're writing this before turning on the mock, to see if the mock can see it.
+        with open(temp_filename, 'w') as outfile:
+            outfile.write(temp_file_text)
+
+        with MockFileSystem(auto_mirror_files_for_read=True).mock_exists_open_remove() as mfs:
+
+            assert len(mfs.files) == 0
+
+            assert os.path.exists(temp_filename)
+
+            assert len(mfs.files) == 1
+
+            with open(temp_filename) as infile:
+                content = infile.read()
+
+            assert content == temp_file_text
+
+            os.remove(temp_filename)
+
+            assert len(mfs.files) == 0
+
+            # Removing the file in the mock does not cause us to auto-mirror anew.
+            assert not os.path.exists(temp_filename)
+
+            # This is just confirmation
+            assert len(mfs.files) == 0
+
+        # But now we are outside the mock again, so the file should be visible.
+        assert os.path.exists(temp_filename)
+
+    finally:
+
+        os.remove(temp_filename)
+
+
 class _MockPrinter:
 
     def __init__(self):
