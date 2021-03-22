@@ -20,7 +20,7 @@ from dcicutils.misc_utils import (
     keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
     CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json, url_path_join,
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
-    DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association,
+    DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator
 )
 from dcicutils.qa_utils import (
@@ -731,23 +731,46 @@ def test_hms_now_and_ref_now(now):
         assert delta_hours in {4.0, 5.0}  # depending on daylight savings time, HMS is either 4 or 5 hours off from UTC
 
 
-def test_find_association():
-
+@pytest.fixture
+def three_things():
     one = {'value': 1, 'english': 'one', 'spanish': 'uno'}
     two = {'value': 2, 'english': 'two', 'spanish': 'dos'}
     three = {'value': 3, 'english': 'three', 'spanish': 'tres'}
+    return [one, two, three]
 
-    things = [one, two, three]
-    assert find_association(things, value=1) == one
-    assert find_association(things, spanish='dos') == two
-    assert find_association(things, spanish='dos', value=2) == two
-    assert find_association(things, spanish='dos', value=3) is None
+
+def test_find_association(three_things):
+    one, two, three = three_things
+    assert find_association(three_things, value=1) == one
+    assert find_association(three_things, spanish='dos') == two
+    assert find_association(three_things, spanish='dos', value=2) == two
+    assert find_association(three_things, spanish='dos', value=3) is None  # find_associations would return []
+
+
+def test_find_association_functional(three_things):
+    one, two, three = three_things
+    assert find_association(three_things, value=lambda x: x % 2 == 0) == two
+    with pytest.raises(Exception):
+        find_association(three_things, value=lambda x: x % 2 == 1)   # find_associations would return [one, three]
+
+
+def test_find_associations(three_things):
+    one, two, three = three_things
+    assert find_associations(three_things, value=1) == [one]
+    assert find_associations(three_things, spanish='dos') == [two]
+    assert find_associations(three_things, spanish='dos', value=2) == [two]
+    assert find_associations(three_things, spanish='dos', value=3) == []
+
+
+def test_find_associations_functional(three_things):
+    one, two, three = three_things
+    assert find_associations(three_things, value=lambda x: x % 2 == 1) == [one, three]
 
 
 def test_as_datetime():
 
     t0 = datetime_module.datetime(2015, 7, 4, 12, 0, 0)
-    t0_utc = pytz.UTC.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))
+    t0_utc = pytz.UTC.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))  # noQA - PyCharm wrongly fusses at this
 
     assert as_datetime(t0) == t0
     assert as_datetime(t0, tz=pytz.UTC) == t0_utc
@@ -776,7 +799,7 @@ def test_as_datetime():
 def test_as_ref_datetime():
 
     t0 = datetime_module.datetime(2015, 7, 4, 12, 0, 0)
-    t0_utc = pytz.UTC.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))
+    t0_utc = pytz.UTC.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))  # noQA - PyCharm wrongly fusses at this
     t0_hms = REF_TZ.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))
 
     # Things that parse as a date equivalent to noon Jul 4, 2014 in HMS time
@@ -831,7 +854,7 @@ def test_as_ref_datetime():
 def test_as_utc_datetime():
 
     t0 = datetime_module.datetime(2015, 7, 4, 12)
-    t0_utc = pytz.UTC.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))
+    t0_utc = pytz.UTC.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))  # noQA - PyCharm wrongly fusses at this
     t0_hms = REF_TZ.localize(datetime_module.datetime(2015, 7, 4, 12, 0, 0))
 
     t4_utc = datetime_module.datetime(2015, 7, 4, 16, 0, 0, tzinfo=pytz.UTC)  # same as t0_hms, but UTC is 4 hour offset

@@ -28,6 +28,13 @@ Change Log
   * New context manager method ``mock_exists_open_remove`` that mocks these
     common methods for the mock file system that is its ``self``.
 
+* In ``misc_utils``:
+
+  * Extend ``find_association`` to allow a predicate as a search value.
+
+  * New function ``find_associations`` which is like ``find_association``
+    but returns a list of results, so doesn't err if more than one found.
+
 
 1.11.2
 ======
