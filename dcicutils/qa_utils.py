@@ -16,7 +16,9 @@ import toml
 import uuid
 import warnings
 
+from dcicutils.misc_utils import environ_bool
 from json import dumps as json_dumps, loads as json_loads
+from unittest import mock
 from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ
 
 
@@ -406,7 +408,7 @@ class RetryManager(Retry):
             yield
 
 
-FILE_SYSTEM_VERBOSE = True
+FILE_SYSTEM_VERBOSE = environ_bool("FILE_SYSTEM_VERBOSE", default=False)
 
 
 class MockFileWriter:
@@ -430,32 +432,58 @@ class MockFileWriter:
 class MockFileSystem:
     """Extremely low-tech mock file system."""
 
-    def __init__(self, files=None, default_encoding='utf-8'):
+    def __init__(self, files=None, default_encoding='utf-8', auto_mirror_files_for_read=False, do_not_auto_mirror=()):
         self.default_encoding = default_encoding
+        # Setting this dynamically will make things inconsistent
+        self._auto_mirror_files_for_read = auto_mirror_files_for_read
+        self._do_not_auto_mirror = set(do_not_auto_mirror or [])
         self.files = {filename: content.encode(default_encoding) for filename, content in (files or {}).items()}
+        for filename in self.files:
+            self._do_not_mirror(filename)
+
+    IO_OPEN = staticmethod(io.open)
+    OS_PATH_EXISTS = staticmethod(os.path.exists)
+    OS_REMOVE = staticmethod(os.remove)
+
+    def _do_not_mirror(self, file):
+        if self._auto_mirror_files_for_read:
+            self._do_not_auto_mirror.add(file)
+
+    def _maybe_auto_mirror_file(self, file):
+        if self._auto_mirror_files_for_read:
+            if file not in self._do_not_auto_mirror:
+                if (self.OS_PATH_EXISTS(file)
+                        # file might be in files if someone has been manipulating the file structure directly
+                        and file not in self.files):
+                    with open(file, 'rb') as fp:
+                        self.files[file] = fp.read()
+                self._do_not_mirror(file)
 
     def exists(self, file):
+        self._maybe_auto_mirror_file(file)
         return bool(self.files.get(file))
 
     def remove(self, file):
+        self._maybe_auto_mirror_file(file)
         if not self.files.pop(file, None):
             raise FileNotFoundError("No such file or directory: %s" % file)
 
     def open(self, file, mode='r', encoding=None):
         if FILE_SYSTEM_VERBOSE:
             print("Opening %r in mode %r." % (file, mode))
-        if mode == 'w':
+        if mode in ('w', 'wt', 'w+', 'w+t', 'wt+'):
             return self._open_for_write(file_system=self, file=file, binary=False, encoding=encoding)
-        elif mode == 'wb':
+        elif mode in ('wb', 'w+b', 'wb+'):
             return self._open_for_write(file_system=self, file=file, binary=True, encoding=encoding)
-        elif mode == 'r':
+        elif mode in ('r', 'rt', 'r+', 'r+t', 'rt+'):
             return self._open_for_read(file, binary=False, encoding=encoding)
-        elif mode == 'rb':
+        elif mode in ('rb', 'r+b', 'rb+'):
             return self._open_for_read(file, binary=True, encoding=encoding)
         else:
             raise AssertionError("Mocked io.open doesn't handle mode=%r." % mode)
 
     def _open_for_read(self, file, binary=False, encoding=None):
+        self._maybe_auto_mirror_file(file)
         content = self.files.get(file)
         if content is None:
             raise FileNotFoundError("No such file or directory: %s" % file)
@@ -464,8 +492,16 @@ class MockFileSystem:
         return io.BytesIO(content) if binary else io.StringIO(content.decode(encoding or self.default_encoding))
 
     def _open_for_write(self, file_system, file, binary=False, encoding=None):
+        self._do_not_mirror(file)
         return MockFileWriter(file_system=file_system, file=file, binary=binary,
                               encoding=encoding or self.default_encoding)
+
+    @contextlib.contextmanager
+    def mock_exists_open_remove(self):
+        with mock.patch("os.path.exists", self.exists):
+            with mock.patch("io.open", self.open):
+                with mock.patch("os.remove", self.remove):
+                    yield self
 
 
 class MockUUIDModule:

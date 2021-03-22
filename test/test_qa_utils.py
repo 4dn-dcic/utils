@@ -1,3 +1,4 @@
+import boto3
 import datetime
 import io
 import os
@@ -856,6 +857,90 @@ def test_mock_file_system():
                 assert not os.path.exists(filename)
 
 
+def test_mock_file_system_simple():
+
+    mfs = MockFileSystem(files={"pre-existing-file.txt": "stuff from yesterday"})
+
+    with mock.patch("io.open", mfs.open):
+        with mock.patch("os.path.exists", mfs.exists):
+            with mock.patch("os.remove", mfs.remove):
+
+                filename = "no.such.file"
+                assert os.path.exists(filename) is False
+
+                filename2 = "pre-existing-file.txt"
+                assert os.path.exists(filename2)
+
+                assert len(mfs.files) == 1
+
+                with io.open(filename, 'w') as fp:
+                    fp.write("foo")
+                    fp.writelines(["bar\n", "baz\n"])
+
+                assert os.path.exists(filename) is True
+
+                with io.open(filename, 'r') as fp:
+                    assert fp.read() == 'foobar\nbaz\n'
+
+                assert len(mfs.files) == 2
+
+                with io.open(filename2, 'r') as fp:
+                    assert fp.read() == "stuff from yesterday"
+
+                assert sorted(mfs.files.keys()) == ['no.such.file', 'pre-existing-file.txt']
+
+                assert mfs.files == {
+                    'no.such.file': b'foobar\nbaz\n',
+                    'pre-existing-file.txt': b'stuff from yesterday'
+                }
+
+
+def test_mock_file_system_auto():
+
+    temp_filename = "IF_YOU_SEE_THIS_FILE_DELETE_IT.txt"
+
+    temp_file_text = ("This file is used only temporarily by dcicutils.qa_utils.test_mock_file_system_auto.\n"
+                      "It is safe and encouraged to to delete it.\n"
+                      "This token is unique: %s.\n"
+                      % uuid.uuid4())
+
+    try:
+
+        # We're writing this before turning on the mock, to see if the mock can see it.
+        with open(temp_filename, 'w') as outfile:
+            outfile.write(temp_file_text)
+
+        with MockFileSystem(auto_mirror_files_for_read=True).mock_exists_open_remove() as mfs:
+
+            assert len(mfs.files) == 0
+
+            assert os.path.exists(temp_filename)
+
+            assert len(mfs.files) == 1
+
+            with open(temp_filename) as infile:
+                content = infile.read()
+
+            assert content == temp_file_text
+
+            os.remove(temp_filename)
+
+            assert len(mfs.files) == 0
+
+            # Removing the file in the mock does not cause us to auto-mirror anew.
+            assert not os.path.exists(temp_filename)
+
+            # This is just confirmation
+            assert len(mfs.files) == 0
+
+        # But now we are outside the mock again, so the file should be visible.
+        assert os.path.exists(temp_filename)
+
+    finally:
+
+        os.remove(temp_filename)
+
+
 class _MockPrinter:
 
     def __init__(self):
@@ -1062,6 +1147,31 @@ def test_mock_boto3_client():
 
     with pytest.raises(NotImplementedError):
         mock_boto3.client('some_other_kind')
+
+
+def test_mock_boto3_client_use():
+
+    mock_boto3 = MockBoto3()
+    mfs = MockFileSystem(files={"myfile": "some content"})
+
+    with mock.patch("io.open", mfs.open):
+        with mock.patch("os.path.exists", mfs.exists):
+            with mock.patch.object(boto3, "client", mock_boto3.client):
+
+                s3 = boto3.client('s3')  # noQA - PyCharm wrongly sees a syntax error
+                assert isinstance(s3, MockBotoS3Client)
+                s3.upload_file(Filename="myfile", Bucket="foo", Key="bar")
+                s3.download_file(Filename="myfile2", Bucket="foo", Key="bar")
+                myfile_content = file_contents("myfile")
+                myfile_content2 = file_contents("myfile2")
+                assert myfile_content == myfile_content2 == "some content"
+
+    # No matter what clients you get, they all share the same MockFileSystem, which we can get from s3_files
+    s3fs = mock_boto3.client('s3').s3_files
+    # We saved an s3 file to bucket "foo" and key "bar", so it will be in the s3fs as "foo/bar"
+    assert sorted(s3fs.files.keys()) == ['foo/bar']
+    # The content is stored in binary format
+    assert s3fs.files['foo/bar'] == b'some content'
 
 
 def test_mock_uuid_module_documentation_example():

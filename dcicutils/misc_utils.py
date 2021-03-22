@@ -943,15 +943,41 @@ def count(seq, filter=None):
     return count_if(filter or identity, seq)
 
 
-def find_association(data, **kwargs):
+# Previous definition
+#
+# def find_association(data, **kwargs):
+#     for datum in data:
+#         mismatch = False
+#         for k, v in kwargs.items():
+#             if k in datum and datum[k] != v:
+#                 mismatch = True
+#         if not mismatch:
+#             return datum
+#     return None
+
+def find_associations(data, **kwargs):
+    found = []
     for datum in data:
         mismatch = False
         for k, v in kwargs.items():
-            if k in datum and datum[k] != v:
+            defaulted_val = datum.get(k)
+            if not (v(defaulted_val) if callable(v) else (v == defaulted_val)):
                 mismatch = True
+                break
         if not mismatch:
-            return datum
-    return None
+            found.append(datum)
+    return found
+
+
+def find_association(data, **kwargs):
+    results = find_associations(data, **kwargs)
+    n = len(results)
+    if n == 0:
+        return None
+    elif n == 1:
+        return results[0]
+    else:
+        raise ValueError("Got %s results when 1 was expected." % n)
 
 
 def keyword_as_title(keyword):
