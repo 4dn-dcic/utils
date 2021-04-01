@@ -127,6 +127,11 @@ class FakeTestApp:
         self.calls.append(call_info)
         return FakeResponse({'processed': call_info})
 
+    def post(self, url, obj, **kwargs):
+        call_info = {'op': 'post', 'url': url, 'obj': obj, 'kwargs': kwargs}
+        self.calls.append(call_info)
+        return FakeResponse({'processed': call_info})
+
     def post_json(self, url, obj, **kwargs):
         call_info = {'op': 'post_json', 'url': url, 'obj': obj, 'kwargs': kwargs}
         self.calls.append(call_info)
@@ -216,6 +221,60 @@ def test_virtual_app_get():
             {
                 'op': 'get',
                 'url': 'http://no.such.place/',
+                'kwargs': {'params': {'foo': 'bar'}},
+            },
+        ]
+
+
+def test_virtual_app_post():
+
+    with mock.patch.object(VirtualApp, "HELPER_CLASS", FakeTestApp):
+        app = FakeApp()
+        environ = {'some': 'stuff'}
+        vapp = VirtualApp(app, environ)
+
+    log_info = []
+
+    with mock.patch("logging.info") as mock_info:
+        mock_info.side_effect = lambda msg: log_info.append(msg)
+
+        response1 = vapp.post("http://no.such.place/", {'beta': 'gamma'})
+        assert response1.json() == {
+            'processed': {
+                'op': 'post',
+                'url': 'http://no.such.place/',
+                'obj': {'beta': 'gamma'},
+                'kwargs': {},
+            }
+        }
+
+        response2 = vapp.post("http://no.such.place/", {'alpha': 'omega'}, params={'foo': 'bar'})
+        assert response2.json() == {
+            'processed': {
+                'op': 'post',
+                'url': 'http://no.such.place/',
+                'obj': {'alpha': 'omega'},
+                'kwargs': {'params': {'foo': 'bar'}},
+            }
+        }
+
+        assert log_info == [
+            ("OUTGOING HTTP POST on url: %s with object: %s"
+             % ("http://no.such.place/", {'beta': 'gamma'})),
+            ("OUTGOING HTTP POST on url: %s with object: %s"
+             % ("http://no.such.place/", {'alpha': 'omega'})),
+        ]
+        assert vapp.wrapped_app.calls == [
+            {
+                'op': 'post',
+                'url': 'http://no.such.place/',
+                'obj': {'beta': 'gamma'},
+                'kwargs': {},
+            },
+            {
+                'op': 'post',
+                'url': 'http://no.such.place/',
+                'obj': {'alpha': 'omega'},
                 'kwargs': {'params': {'foo': 'bar'}},
             },
         ]
