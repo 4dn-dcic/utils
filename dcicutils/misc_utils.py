@@ -129,6 +129,20 @@ class VirtualApp:
         except webtest.AppError as e:
             raise VirtualAppError(msg='HTTP GET failed.', url=url, body='<empty>', raw_exception=e)
 
+    def post(self, url, obj, **kwargs):
+        """ Wrapper for TestApp.post that logs the outgoing POST
+
+        :param url: url to POST to
+        :param obj: object body to POST
+        :param kwargs: args to pass to the POST
+        :return: result of POST
+        """
+        logging.info('OUTGOING HTTP POST on url: %s with object: %s' % (url, obj))
+        try:
+            return self.wrapped_app.post(url, obj, **kwargs)
+        except webtest.AppError as e:
+            raise VirtualAppError(msg='HTTP POST failed.', url=url, body=obj, raw_exception=e)
+
     def post_json(self, url, obj, **kwargs):
         """ Wrapper for TestApp.post_json that logs the outgoing POST
 

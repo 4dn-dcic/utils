@@ -7,6 +7,16 @@ Change Log
 ----------
 
 
+1.13.0
+======
+
+**PR 136: Support for VirtualApp.post**
+
+* Add a ``post`` method to ``VirtualApp`` for situations where ``post_json``
+  is not appropriate.
+
+
+
 1.12.0
 ======
 
