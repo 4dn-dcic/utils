@@ -1,4 +1,5 @@
 import boto3
+import base64
 from .misc_utils import PRINT
 
 
@@ -45,11 +46,16 @@ class ECRUtils(object):
         return url
 
     def authorize_user(self):
+        """ Calls to boto3 to get authorization credentials for ECR. """
         try:
             return self.client.get_authorization_token()['authorizationData'][0]
         except Exception as e:
             PRINT('Could not acquire ECR authorization credentials: %s' % e)
             raise
 
-    def push_image(self):
-        pass
+    @staticmethod
+    def extract_ecr_password_from_authorization(*, authorization):
+        """ Extracts the password from the authorization token returned from the
+            above API call.
+        """
+        return base64.b64decode(authorization['authorizationToken']).replace(b'AWS:', b'').decode('utf-8')

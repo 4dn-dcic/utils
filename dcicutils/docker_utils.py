@@ -9,7 +9,7 @@ class DockerUtils:
     def __init__(self):
         self.client = docker.from_env()
 
-    def login(self, ecr_repo_uri, ecr_user, ecr_pass):
+    def login(self, *, ecr_repo_uri, ecr_user, ecr_pass):
         """ Authenticates with ECR through Docker - takes as input the result of
             ecr_client.get_authorization_token()
         """
@@ -29,4 +29,5 @@ class DockerUtils:
         image.tag(ecr_repo_name, tag=tag)
 
     def push_image(self, tag, ecr_repo_name):
+        """ Pushes the tag - presumes the above tag_image method has been called. """
         return self.client.images.push(ecr_repo_name, tag=tag)
