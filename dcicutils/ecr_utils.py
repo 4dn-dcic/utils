@@ -29,7 +29,7 @@ class ECRUtils(object):
         self.env = env_name
         self.local_repository = local_repository
         self.is_cgap = 'cgap' in env_name
-        self.client = boto3.client('ecr')
+        self.client = boto3.client('ecr', region='us-east-1')  # XXX: constant?
         self.url = None  # set by calling the below method
 
     def resolve_repository_uri(self, url=None):
