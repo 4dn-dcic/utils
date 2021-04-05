@@ -46,7 +46,14 @@ class ECRUtils(object):
         return url
 
     def authorize_user(self):
-        """ Calls to boto3 to get authorization credentials for ECR. """
+        """ Calls to boto3 to get authorization credentials for ECR.
+            Gives a result like this:
+                {
+                    'authorizationData': [{'authorizationToken': 'very long token....',
+                                            'expiresAt': <datetime>,
+                                            'proxyEndpoint': <ecr URL> ... }]
+                }
+        """
         try:
             return self.client.get_authorization_token()['authorizationData'][0]
         except Exception as e:
