@@ -18,8 +18,7 @@ class DockerUtils:
 
     def build_image(self, *, path: str, tag='latest', rm=True):
         """ Builds an image with the given tag on the given path. """
-        image, build_log = self.client.images.build(
-            path=path, tag=tag, rm=rm)
+        image, build_log = self.client.images.build(path=path, tag=tag, rm=rm)
         return image, build_log
 
     @staticmethod

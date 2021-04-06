@@ -1,6 +1,7 @@
 import boto3
 import base64
 from .misc_utils import PRINT
+from .env_utils import is_cgap_env
 
 
 # Defines the standard Docker image tags for CGAP ECR
@@ -28,8 +29,10 @@ class ECRUtils(object):
         """ Creates an ECR client on startup """
         self.env = env_name
         self.local_repository = local_repository
-        self.is_cgap = 'cgap' in env_name
-        self.client = boto3.client('ecr', region='us-east-1')  # XXX: constant?
+        self.is_cgap = is_cgap_env(env_name)
+        if not self.is_cgap:
+            raise NotImplementedError('ECR setup is not implemented for fourfront!')
+        self.client = boto3.client('ecr')  # XXX: constant?
         self.url = None  # set by calling the below method
 
     def resolve_repository_uri(self, url=None):
@@ -38,12 +41,18 @@ class ECRUtils(object):
             try:
                 resp = self.client.describe_repositories()
                 for repo in resp.get('repositories', []):
-                    if self.env in repo['repositoryUri']:
+                    if repo['repositoryUri'].endswith(self.env):
                         return repo['repositoryUri']
             except Exception as e:
                 PRINT('Could not retrieve repository information from ECR: %s' % e)
         self.url = url  # hang onto this
         return url
+
+    def get_uri(self):
+        """ Returns URI if it's been set, raise exception otherwise """
+        if self.url is not None:
+            return self.url
+        raise Exception('Tried to get URI when it has not been resolved yet!')
 
     def authorize_user(self):
         """ Calls to boto3 to get authorization credentials for ECR.
@@ -55,7 +64,8 @@ class ECRUtils(object):
                 }
         """
         try:
-            return self.client.get_authorization_token()['authorizationData'][0]
+            [auth_data] = self.client.get_authorization_token()['authorizationData']
+            return auth_data
         except Exception as e:
             PRINT('Could not acquire ECR authorization credentials: %s' % e)
             raise

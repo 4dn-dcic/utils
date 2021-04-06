@@ -4,7 +4,7 @@ from dcicutils.ecr_utils import ECRUtils
 from dcicutils.docker_utils import DockerUtils
 
 
-REPO_URL = '123456789.dkr.ecr.us-east-2.amazonaws.com/cgap-mastertest'
+REPO_URL = '123456789.dkr.ecr.us-east-2.amazonaws.com/cgap-mastertest'  # dummy URL
 
 
 def mocked_describe_respositories():
