@@ -1,4 +1,5 @@
 import docker
+from .misc_utils import PRINT
 
 
 class DockerUtils:
@@ -29,4 +30,5 @@ class DockerUtils:
 
     def push_image(self, tag, ecr_repo_name):
         """ Pushes the tag - presumes the above tag_image method has been called. """
-        return self.client.images.push(ecr_repo_name, tag=tag)
+        for line in self.client.images.push(ecr_repo_name, tag=tag, stream=True, decode=True):
+            PRINT(line)
