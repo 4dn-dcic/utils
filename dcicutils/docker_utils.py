@@ -28,7 +28,8 @@ class DockerUtils:
         # works by side-effect
         image.tag(ecr_repo_name, tag=tag)
 
-    def push_image(self, tag, ecr_repo_name):
+    def push_image(self, *, tag, ecr_repo_name, auth_config):
         """ Pushes the tag - presumes the above tag_image method has been called. """
-        for line in self.client.images.push(ecr_repo_name, tag=tag, stream=True, decode=True):
+        for line in self.client.images.push(ecr_repo_name, tag=tag, stream=True, decode=True,
+                                            auth_config=auth_config):
             PRINT(line)
