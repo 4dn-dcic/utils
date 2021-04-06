@@ -1,5 +1,6 @@
 import boto3
 from .misc_utils import PRINT
+from .ecr_utils import CGAP_ECR_REGION as CGAP_ECS_REGION
 
 
 class ECSUtils:
@@ -16,7 +17,7 @@ class ECSUtils:
     def __init__(self, *, cluster_name):
         """ Cluster name in this case is the env name """
         self.cluster_name = cluster_name
-        self.client = boto3.client('ecs')
+        self.client = boto3.client('ecs', region_name=CGAP_ECS_REGION)  # same as ECR
 
     def update_ecs_service(self, *, service_name=WSGI):
         """ Forces an update of this cluster's service, by default WSGI (for now)

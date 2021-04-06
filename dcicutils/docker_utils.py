@@ -15,6 +15,8 @@ class DockerUtils:
             ecr_client.get_authorization_token()
         """
         # works by side effect
+        # XXX: not clear that the above^ is true, considering auth_config override is
+        # needed in 'push_images' - Will 4/6/21
         self.client.login(username=ecr_user, password=ecr_pass, registry=ecr_repo_uri)
 
     def build_image(self, *, path: str, tag='latest', rm=True):
