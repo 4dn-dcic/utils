@@ -149,11 +149,20 @@ def find_valid_file_or_extra_file(obj_id, format):
     home_dir = '/home/jovyan'
     # hardcoded so that we can find which volume to look in by file type
     # will need to be updated if more File types are added to proc file bucket
-    if 'FileVistrack' in file_meta['@type'] or 'FileProcessed' in file_meta['@type']:
+    if file_meta['open_data_url']:
+        data_dir = 'open_data'
+        if 'FileVistrack' in file_meta['@type'] or 'FileProcessed' in file_meta['@type']:
+            file_type = 'wfoutput'
+        else:
+            file_type = 'files'
+        open_data_prefix = '{}'.format(file_type)
+        full_path = '/'.join([home_dir, data_dir, open_data_prefix, all_ffs[use_ff]['uk']])
+    elif 'FileVistrack' in file_meta['@type'] or 'FileProcessed' in file_meta['@type']:
         data_dir = 'proc_data'
+        full_path = '/'.join([home_dir, data_dir, all_ffs[use_ff]['uk']])
     else:
         data_dir = 'raw_data'
-    full_path = '/'.join([home_dir, data_dir, all_ffs[use_ff]['uk']])
+        full_path = '/'.join([home_dir, data_dir, all_ffs[use_ff]['uk']])
     return {'metadata': file_meta, 'full_href': full_href, 'full_path': full_path}
 
 
