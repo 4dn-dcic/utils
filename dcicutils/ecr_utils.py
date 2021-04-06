@@ -32,7 +32,7 @@ class ECRUtils(object):
         self.is_cgap = is_cgap_env(env_name)
         if not self.is_cgap:
             raise NotImplementedError('ECR setup is not implemented for fourfront!')
-        self.client = boto3.client('ecr')  # XXX: constant?
+        self.client = boto3.client('ecr', region_name='us-east-1')  # XXX: constant?
         self.url = None  # set by calling the below method
 
     def resolve_repository_uri(self, url=None):
