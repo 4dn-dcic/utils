@@ -42,7 +42,7 @@ class ECRUtils(object):
                 resp = self.client.describe_repositories()
                 for repo in resp.get('repositories', []):
                     if repo['repositoryUri'].endswith(self.env):
-                        return repo['repositoryUri']
+                        url = repo['repositoryUri']
             except Exception as e:
                 PRINT('Could not retrieve repository information from ECR: %s' % e)
         self.url = url  # hang onto this
