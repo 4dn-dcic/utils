@@ -26,8 +26,8 @@ class ElasticSearchServiceClient:
     DEFAULT_COLD_DATA_NODE_TYPE = 'c5.large.elasticsearch'
     DEFAULT_COLD_DATA_NODE_COUNT = 2
 
-    def __init__(self):
-        self.client = boto3.client('es')
+    def __init__(self, region_name='us-east-1'):
+        self.client = boto3.client('es', region_name=region_name)
 
     def resize_elasticsearch_cluster(self, *, domain_name, master_node_type, master_node_count,
                                      data_node_type, data_node_count=2):
