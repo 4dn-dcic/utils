@@ -1,4 +1,6 @@
 import logging
+import boto3
+from .misc_utils import PRINT
 from elasticsearch import Elasticsearch, RequestsHttpConnection
 from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
 
@@ -6,6 +8,64 @@ from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
 logging.basicConfig()
 logger = logging.getLogger('logger')
 logger.setLevel(logging.INFO)
+
+
+class ElasticSearchServiceClient:
+    """ Implements utilities for interacting with the Amazon ElasticSearch Service.
+        The idea is, for the production setup, we implement a hot/cold cluster configuration where
+        during the day (say 6 am to 8 pm EST) we run a larger cluster than at night/on
+        weekends. Foursight will implement this mechanism.
+     """
+    DEFAULT_HOT_MASTER_NODE_TYPE = 'c5.large.elasticsearch'
+    DEFAULT_HOT_MASTER_NODE_COUNT = 3
+    DEFAULT_HOT_DATA_NODE_TYPE = 'r5.2xlarge.elasticsearch'
+    DEFAULT_HOT_DATA_NODE_COUNT = 2
+
+    DEFAULT_COLD_MASTER_NODE_TYPE = 't2.small.elasticsearch'  # does not matter
+    DEFAULT_COLD_MASTER_NODE_COUNT = 0
+    DEFAULT_COLD_DATA_NODE_TYPE = 'c5.large.elasticsearch'
+    DEFAULT_COLD_DATA_NODE_COUNT = 2
+
+    def __init__(self):
+        self.client = boto3.client('es')
+
+    def resize_elasticsearch_cluster(self, *, domain_name, master_node_type, master_node_count,
+                                     data_node_type, data_node_count=2):
+        """ Triggers a resizing of the given cluster name (the env name).
+
+        :param domain_name: name of domain we'd like to resize
+        :param master_node_type: instance type we'd like to use for master nodes
+        :param master_node_count: number of master nodes (disabled if 0)
+        :param data_node_type: instance type we'd like to use for data nodes
+        :param data_node_count: # of data nodes, 2 by default
+        :return: True if successful, False otherwise
+        """
+        config = {
+            'InstanceType': data_node_type,
+            'InstanceCount': data_node_count,
+            'DedicatedMasterEnabled': False,
+        }
+        if master_node_count:
+            config.update({
+                'DedicatedMasterEnabled': True,
+                'DedicatedMasterType': master_node_type,
+                'DedicatedMasterCount': master_node_count
+            })
+        try:
+            response = self.client.update_elasticsearch_domain_config(
+                DomainName=domain_name,
+                ElasticsearchClusterConfig=config
+            )['ResponseMetadata']
+            response_is_ok = response['HTTPStatusCode'] == 200
+            if not response_is_ok:
+                PRINT('Could not trigger cluster resize: %s' % response)
+                return False
+            return True
+        except KeyError as e:
+            PRINT('Got unexpected response structure from AWS: %s' % e)
+        except Exception as e:
+            PRINT('Got an unhandled error from boto3: %s' % e)
+        return False
 
 
 def create_es_client(es_url, use_aws_auth=True, **options):
