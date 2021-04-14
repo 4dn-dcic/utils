@@ -18,7 +18,7 @@ class ElasticSearchServiceClient:
      """
     DEFAULT_HOT_MASTER_NODE_TYPE = 'c5.large.elasticsearch'
     DEFAULT_HOT_MASTER_NODE_COUNT = 3
-    DEFAULT_HOT_DATA_NODE_TYPE = 'r5.2xlarge.elasticsearch'
+    DEFAULT_HOT_DATA_NODE_TYPE = 'c5.2xlarge.elasticsearch'
     DEFAULT_HOT_DATA_NODE_COUNT = 2
 
     DEFAULT_COLD_MASTER_NODE_TYPE = 't2.small.elasticsearch'  # does not matter
