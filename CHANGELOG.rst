@@ -6,6 +6,25 @@ dcicutils
 Change Log
 ----------
 
+1.14.1
+======
+
+**PR 139: Add ES cluster resize capability
+
+* Adds ElasticSearchServiceClient, a wrapper for boto3.client('es')
+* Implements resize_elasticsearch_cluster, issuing an update to the relevant settings
+* Integrated test was performed on staging
+* Unit tests mock the boto3 API
+
+
+1.14.0
+======
+
+**PR 137: Docker, ECR, ECS Utils
+
+* Adds 3 new modules with basic functionality needed for further development on the alpha stack
+* Deprecates Python 3.4
+
 
 1.13.0
 ======
@@ -87,7 +106,7 @@ Change Log
 1.10.0
 ======
 
-**PR 131: Misc functionality in service of C4-183** 
+**PR 131: Misc functionality in service of C4-183**
 
 * In ``dcicutils.misc_utils``:
 
@@ -151,8 +170,8 @@ Those tests were refactored, and the following additional support was added:
 
 **PR 126: C4-503 Grab Environment API**
 
-* Adds get_beanstalk_environment_variables, which will return information 
-  necessary to simulate any application given the caller has the appropriate 
+* Adds get_beanstalk_environment_variables, which will return information
+  necessary to simulate any application given the caller has the appropriate
   access keys.
 * Removes an obsolete tag from create_db_snapshot, which was set erroneously.
 
