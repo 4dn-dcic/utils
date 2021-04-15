@@ -1,7 +1,95 @@
 import pytest
+from unittest import mock
 from dcicutils.qa_utils import timed
 from dcicutils.ff_utils import get_es_metadata
-from dcicutils.es_utils import create_es_client, execute_lucene_query_on_es, get_bulk_uuids_embedded
+from dcicutils.es_utils import create_es_client, execute_lucene_query_on_es, get_bulk_uuids_embedded, ElasticSearchServiceClient
+
+
+class TestElasticSearchServiceClient:
+
+    @staticmethod
+    def mock_update_es_success(DomainName, ElasticsearchClusterConfig):
+        return {
+            'ResponseMetadata': {
+                'HTTPStatusCode': 200
+            }
+        }
+
+    @staticmethod
+    def mock_update_es_fail(DomainName, ElasticsearchClusterConfig):
+        return {
+            'ResponseMetadata': {
+                'HTTPStatusCode': 403
+            }
+        }
+
+    @staticmethod
+    def mock_update_es_bad_response(DomainName, ElasticsearchClusterConfig):
+        return {
+            'something_else': {
+                'blah': 403
+            }
+        }
+
+    @staticmethod
+    def mock_update_es_unknown(DomainName, ElasticsearchClusterConfig):
+        raise Exception('Literally anything')
+
+    def test_elasticsearch_service_client_resize_accepted(self):
+        """ Tests handling of a success response. """
+        client = ElasticSearchServiceClient()
+        with mock.patch.object(client.client, 'update_elasticsearch_domain_config',
+                               self.mock_update_es_success):
+            success = client.resize_elasticsearch_cluster(
+                domain_name='fourfront-newtest',
+                master_node_type='t2.medium.elasticsearch',
+                master_node_count=3,
+                data_node_type='c5.large.elasticsearch',
+                data_node_count=2
+            )
+            assert success
+
+    def test_elasticsearch_service_client_resize_fail(self):
+        """ Tests handling of a 403 response. """
+        client = ElasticSearchServiceClient()
+        with mock.patch.object(client.client, 'update_elasticsearch_domain_config',
+                               self.mock_update_es_fail):
+            success = client.resize_elasticsearch_cluster(
+                domain_name='fourfront-newtest',
+                master_node_type='t2.medium.elasticsearch',
+                master_node_count=3,
+                data_node_type='c5.large.elasticsearch',
+                data_node_count=2
+            )
+            assert not success
+
+    def test_elasticsearch_service_client_resize_bad_response(self):
+        """ Tests handling of a badly formatted response. """
+        client = ElasticSearchServiceClient()
+        with mock.patch.object(client.client, 'update_elasticsearch_domain_config',
+                               self.mock_update_es_bad_response):
+            success = client.resize_elasticsearch_cluster(
+                domain_name='fourfront-newtest',
+                master_node_type='t2.medium.elasticsearch',
+                master_node_count=3,
+                data_node_type='c5.large.elasticsearch',
+                data_node_count=2
+            )
+            assert not success
+
+    def test_elasticsearch_service_client_resize_unknown(self):
+        """ Tests handling of a unknown error. """
+        client = ElasticSearchServiceClient()
+        with mock.patch.object(client.client, 'update_elasticsearch_domain_config',
+                               self.mock_update_es_unknown):
+            success = client.resize_elasticsearch_cluster(
+                domain_name='fourfront-newtest',
+                master_node_type='t2.medium.elasticsearch',
+                master_node_count=3,
+                data_node_type='c5.large.elasticsearch',
+                data_node_count=2
+            )
+            assert not success
 
 
 @pytest.fixture
