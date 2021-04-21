@@ -62,6 +62,22 @@ absolute_uri_validator = (
 
 
 def is_valid_absolute_uri(text):
+    """
+    Returns True if the given text is a string in the proper format to be an 'absolute' URI,
+    by which we mean the URI has a scheme (http or https) and a host specification.
+
+    For more info, see "Uniform Resource Identifier (URI): Generic Syntax" at https://tools.ietf.org/html/rfc3986
+    """
+    # Technically something like 'foo/bar.html' is also a URI, but it is a relative one, and
+    # the intended use of this function is to verify the URI specification of a resource on the web,
+    # independent of browser context, so a relative specification would be meaningless. We can add
+    # a separate operation for that later if we need one.
+    #
+    # We don't use rfc3987 (IRIs) both because it allows some resource locators we're not sure we're
+    # committed to accepting. Wikipedia, in https://en.wikipedia.org/wiki/Internationalized_Resource_Identifier,
+    # hints that there is some controversy about whether IRIs are even a good idea. We can revisit the idea if
+    # someone is demanding it. (And, as a practical matter, the rfc3987 library has a problematic license.)
+    # -kmp 21-Apr-2021
     try:
         uri_ref = rfc3986.uri_reference(text)
     except ValueError:
