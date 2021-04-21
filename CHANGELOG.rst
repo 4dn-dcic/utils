@@ -9,15 +9,16 @@ Change Log
 1.15.0
 ======
 
-**TBD**
+**PR 140: Add misc_utils.is_valid_absolute_uri (C4-651)**
 
-* Adds ``misc_utils.is_valid_absolute_uri`` for RFC 3986 compliance.
+* Adds ``misc_utils.is_valid_absolute_uri``
+  for RFC 3986 compliance.
 
 
 1.14.1
 ======
 
-**PR 139: Add ES cluster resize capability
+**PR 139: Add ES cluster resize capability**
 
 * Adds ElasticSearchServiceClient, a wrapper for boto3.client('es')
 * Implements resize_elasticsearch_cluster, issuing an update to the relevant settings
@@ -28,7 +29,7 @@ Change Log
 1.14.0
 ======
 
-**PR 137: Docker, ECR, ECS Utils
+**PR 137: Docker, ECR, ECS Utils**
 
 * Adds 3 new modules with basic functionality needed for further development on the alpha stack
 * Deprecates Python 3.4
