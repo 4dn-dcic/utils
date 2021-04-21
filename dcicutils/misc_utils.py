@@ -11,6 +11,8 @@ import io
 import os
 import logging
 import pytz
+import rfc3986.validators
+import rfc3986.exceptions
 import time
 import warnings
 import webtest  # importing the library makes it easier to mock testing
@@ -47,6 +49,28 @@ class _PRINT:
 
 PRINT = _PRINT()
 PRINT.__name__ = 'PRINT'
+
+
+absolute_uri_validator = (
+    rfc3986.validators.Validator()
+    # Validation qualifiers
+    .allow_schemes('http', 'https')
+    # TODO: We might want to consider the possibility of forbidding the use of a password. -kmp 20-Apr-2021
+    # .forbid_use_of_password()
+    .require_presence_of('scheme', 'host')
+    .check_validity_of('scheme', 'host', 'path'))
+
+
+def is_valid_absolute_uri(text):
+    try:
+        uri_ref = rfc3986.uri_reference(text)
+    except ValueError:
+        return False
+    try:
+        absolute_uri_validator.validate(uri_ref)
+        return True
+    except rfc3986.exceptions.ValidationError:
+        return False
 
 
 class VirtualAppError(Exception):
@@ -949,25 +973,13 @@ def identity(x):
     return x
 
 
-def count_if(filter, seq):
+def count_if(filter, seq):  # noQA - that's right, we're shadowing the built-in Python function 'filter'.
     return sum(1 for x in seq if filter(x))
 
 
-def count(seq, filter=None):
+def count(seq, filter=None):  # noQA - that's right, we're shadowing the built-in Python function 'filter'.
     return count_if(filter or identity, seq)
 
-
-# Previous definition
-#
-# def find_association(data, **kwargs):
-#     for datum in data:
-#         mismatch = False
-#         for k, v in kwargs.items():
-#             if k in datum and datum[k] != v:
-#                 mismatch = True
-#         if not mismatch:
-#             return datum
-#     return None
 
 def find_associations(data, **kwargs):
     found = []

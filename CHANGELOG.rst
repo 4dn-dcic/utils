@@ -6,6 +6,14 @@ dcicutils
 Change Log
 ----------
 
+1.15.0
+======
+
+**TBD**
+
+* Adds ``misc_utils.is_valid_absolute_uri`` for RFC 3986 compliance.
+
+
 1.14.1
 ======
 
