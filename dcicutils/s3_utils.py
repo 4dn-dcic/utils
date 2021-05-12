@@ -24,16 +24,68 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     RAW_BUCKET_TEMPLATE = "elasticbeanstalk-%s-files"
     BLOB_BUCKET_TEMPLATE = "elasticbeanstalk-%s-blobs"
 
+    @staticmethod
+    def verify_and_get_env_config(s3_client, global_bucket: str):
+        """ Verifies the S3 environment from which the env config is coming from, and returns the S3-based env config
+            Throws exceptions if the S3 bucket is unreachable, or an env based on the name of the global S3 bucket
+            is not present.
+        """
+        head_response = s3_client.head_bucket(Bucket=global_bucket)
+        status = head_response['ResponseMetadata']['HTTPStatusCode']  # should be 200; raise error for 404 or 403
+        if status is not 200:
+            raise Exception('Could not access GLOBAL_BUCKET_ENV {global_bucket}: status: {status}'.format(
+                global_bucket=global_bucket, status=status))
+        # list contents of global bucket, look for a match with the global bucket name
+        list_response = s3_client.list_objects(Bucket=global_bucket)
+        # no match, raise exception
+        if list_response['KeyCount'] < 1:
+            raise Exception('No config objects found in global bucket {global_bucket}'.format(
+                global_bucket=global_bucket))
+        keys = [list_response['Contents'][i]['Key'] for i in range(0, len(list_response['Contents']))]
+        config_filename = None
+        for filename in keys:
+            # multiple matches, raise exception
+            if filename in global_bucket and config_filename is not None:
+                raise Exception('multiple matches for global env bucket: {global_bucket}; keys: {keys}'.format(
+                    global_bucket=global_bucket,
+                    keys=keys,
+                ))
+            elif filename in global_bucket:
+                config_filename = filename
+            else:
+                pass
+        if not config_filename:
+            raise Exception('no matches for global env bucket: {global_bucket}; keys: {keys}'.format(
+                global_bucket=global_bucket,
+                keys=keys,
+            ))
+        else:
+            # one match, fetch that file as config
+            get_response = s3_client.get_object(Bucket=global_bucket, Key=config_filename)
+            env_config = json.loads(get_response['Body'].read())
+            return env_config
+
     def __init__(self, outfile_bucket=None, sys_bucket=None, raw_file_bucket=None,
                  blob_bucket=None, env=None):
-        """
-        if we pass in env set the outfile and sys bucket from the environment
+        """ Initializes s3 utils in one of three ways:
+        1) If 'GLOBAL_BUCKET_ENV' is set to an S3 env bucket, use that bucket to fetch the env for the buckets.
+           We then use this env to build the bucket names.
+        2) With no global env set, if we instead pass in the env kwarg, we use this kwarg to build the bucket names.
+        3) With no global env or env kwarg, we expect bucket kwargs to be set, and use those as bucket names directly.
         """
         # avoid circular ref
         from .beanstalk_utils import get_beanstalk_real_url
         self.url = ''
         self.s3 = boto3.client('s3', region_name='us-east-1')
-        if sys_bucket is None:
+        global_bucket = os.environ.get('GLOBAL_BUCKET_ENV')
+        if global_bucket:
+            env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket)
+            env = env_config['ff_env']
+            sys_bucket = self.SYS_BUCKET_TEMPLATE % env
+            outfile_bucket = self.OUTFILE_BUCKET_TEMPLATE % env
+            raw_file_bucket = self.RAW_BUCKET_TEMPLATE % env
+            blob_bucket = self.BLOB_BUCKET_TEMPLATE % env
+        elif sys_bucket is None:
             # staging and production share same buckets
             if env:
                 if is_stg_or_prd_env(env):
