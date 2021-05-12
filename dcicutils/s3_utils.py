@@ -6,6 +6,7 @@ import mimetypes
 from zipfile import ZipFile
 from io import BytesIO
 import logging
+import requests
 from .env_utils import is_stg_or_prd_env, prod_bucket_env
 from .misc_utils import PRINT
 
@@ -66,7 +67,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             return env_config
 
     def __init__(self, outfile_bucket=None, sys_bucket=None, raw_file_bucket=None,
-                 blob_bucket=None, env=None):
+                 blob_bucket=None, metadata_bucket=None, env=None):
         """ Initializes s3 utils in one of three ways:
         1) If 'GLOBAL_BUCKET_ENV' is set to an S3 env bucket, use that bucket to fetch the env for the buckets.
            We then use this env to build the bucket names.
@@ -80,11 +81,13 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         global_bucket = os.environ.get('GLOBAL_BUCKET_ENV')
         if global_bucket:
             env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket)
-            env = env_config['ff_env']
-            sys_bucket = self.SYS_BUCKET_TEMPLATE % env
-            outfile_bucket = self.OUTFILE_BUCKET_TEMPLATE % env
-            raw_file_bucket = self.RAW_BUCKET_TEMPLATE % env
-            blob_bucket = self.BLOB_BUCKET_TEMPLATE % env
+            ff_url = env_config['fourfront']
+            health_json = requests.get('{ff_url}/health?format=json'.format(ff_url=ff_url)).json()
+            sys_bucket = health_json['system_bucket']
+            outfile_bucket = health_json['processed_file_bucket']
+            raw_file_bucket = health_json['file_upload_bucket']
+            blob_bucket = health_json['blob_bucket']
+            metadata_bucket = health_json['metadata_bundles_bucket']
         elif sys_bucket is None:
             # staging and production share same buckets
             if env:
@@ -101,6 +104,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         self.outfile_bucket = outfile_bucket
         self.raw_file_bucket = raw_file_bucket
         self.blob_bucket = blob_bucket
+        self.metadata_bucket = metadata_bucket
 
     ACCESS_KEYS_S3_KEY = 'access_key_admin'
 
