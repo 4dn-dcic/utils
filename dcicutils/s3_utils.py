@@ -37,7 +37,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             raise Exception('Could not access GLOBAL_BUCKET_ENV {global_bucket}: status: {status}'.format(
                 global_bucket=global_bucket, status=status))
         # list contents of global bucket, look for a match with the global bucket name
-        list_response = s3_client.list_objects(Bucket=global_bucket)
+        list_response = s3_client.list_objects_v2(Bucket=global_bucket)
         # no match, raise exception
         if list_response['KeyCount'] < 1:
             raise Exception('No config objects found in global bucket {global_bucket}'.format(
