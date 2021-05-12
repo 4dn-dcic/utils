@@ -32,7 +32,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         """
         head_response = s3_client.head_bucket(Bucket=global_bucket)
         status = head_response['ResponseMetadata']['HTTPStatusCode']  # should be 200; raise error for 404 or 403
-        if status is not 200:
+        if status != 200:
             raise Exception('Could not access GLOBAL_BUCKET_ENV {global_bucket}: status: {status}'.format(
                 global_bucket=global_bucket, status=status))
         # list contents of global bucket, look for a match with the global bucket name
