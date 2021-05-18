@@ -80,6 +80,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         self.s3 = boto3.client('s3', region_name='us-east-1')
         global_bucket = os.environ.get('GLOBAL_BUCKET_ENV')
         if global_bucket:
+            logger.warning('Fetching bucket data via GLOBAL_BUCKET_ENV: {}'.format(global_bucket))
             env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket)
             ff_url = env_config['fourfront']
             health_json = requests.get('{ff_url}/health?format=json'.format(ff_url=ff_url)).json()
@@ -88,6 +89,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             raw_file_bucket = health_json['file_upload_bucket']
             blob_bucket = health_json['blob_bucket']
             metadata_bucket = health_json['metadata_bundles_bucket']
+            logger.warning('Buckets resolved successfully.')
         elif sys_bucket is None:
             # staging and production share same buckets
             if env:

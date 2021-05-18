@@ -337,6 +337,9 @@ category = "dev"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, <4"
 
+[package.dependencies]
+toml = {version = "*", optional = true, markers = "extra == \"toml\""}
+
 [package.extras]
 toml = ["toml"]
 
@@ -375,7 +378,7 @@ requests = ["requests (>=2.4.0,<3.0.0)"]
 
 [[package]]
 name = "flake8"
-version = "3.9.1"
+version = "3.9.2"
 description = "the modular source code checker: pep8 pyflakes and co"
 category = "dev"
 optional = false
@@ -408,7 +411,7 @@ smmap = ">=3.0.1,<5"
 
 [[package]]
 name = "gitpython"
-version = "3.1.15"
+version = "3.1.17"
 description = "Python Git Library"
 category = "main"
 optional = false
@@ -416,7 +419,7 @@ python-versions = ">=3.5"
 
 [package.dependencies]
 gitdb = ">=4.0.1,<5"
-typing-extensions = ">=3.7.4.0"
+typing-extensions = {version = ">=3.7.4.0", markers = "python_version < \"3.8\""}
 
 [[package]]
 name = "idna"
@@ -571,14 +574,14 @@ testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "requests", "xm
 
 [[package]]
 name = "pytest-cov"
-version = "2.11.1"
+version = "2.12.0"
 description = "Pytest plugin for measuring coverage."
 category = "dev"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [package.dependencies]
-coverage = ">=5.2.1"
+coverage = {version = ">=5.2.1", extras = ["toml"]}
 pytest = ">=4.6"
 
 [package.extras]
@@ -657,7 +660,7 @@ socks = ["PySocks (>=1.5.6,!=1.5.7)", "win-inet-pton"]
 
 [[package]]
 name = "rfc3986"
-version = "1.4.0"
+version = "1.5.0"
 description = "Validating URI References per RFC 3986"
 category = "main"
 optional = false
@@ -921,8 +924,8 @@ elasticsearch = [
     {file = "elasticsearch-6.8.1.tar.gz", hash = "sha256:a8062a00b61bc7babeea028530667583a68ecb1a9f59ab0b22ff7feaf70d3564"},
 ]
 flake8 = [
-    {file = "flake8-3.9.1-py2.py3-none-any.whl", hash = "sha256:3b9f848952dddccf635be78098ca75010f073bfe14d2c6bda867154bea728d2a"},
-    {file = "flake8-3.9.1.tar.gz", hash = "sha256:1aa8990be1e689d96c745c5682b687ea49f2e05a443aff1f8251092b0014e378"},
+    {file = "flake8-3.9.2-py2.py3-none-any.whl", hash = "sha256:bf8fd333346d844f616e8d47905ef3a3384edae6b4e9beb0c5101e25e3110907"},
+    {file = "flake8-3.9.2.tar.gz", hash = "sha256:07528381786f2a6237b061f6e96610a4167b226cb926e2aa2b6b1d78057c576b"},
 ]
 flaky = [
     {file = "flaky-3.7.0-py2.py3-none-any.whl", hash = "sha256:d6eda73cab5ae7364504b7c44670f70abed9e75f77dd116352f662817592ec9c"},
@@ -933,8 +936,8 @@ gitdb = [
     {file = "gitdb-4.0.7.tar.gz", hash = "sha256:96bf5c08b157a666fec41129e6d327235284cca4c81e92109260f353ba138005"},
 ]
 gitpython = [
-    {file = "GitPython-3.1.15-py3-none-any.whl", hash = "sha256:a77824e516d3298b04fb36ec7845e92747df8fcfee9cacc32dd6239f9652f867"},
-    {file = "GitPython-3.1.15.tar.gz", hash = "sha256:05af150f47a5cca3f4b0af289b73aef8cf3c4fe2385015b06220cbcdee48bb6e"},
+    {file = "GitPython-3.1.17-py3-none-any.whl", hash = "sha256:29fe82050709760081f588dd50ce83504feddbebdc4da6956d02351552b1c135"},
+    {file = "GitPython-3.1.17.tar.gz", hash = "sha256:ee24bdc93dce357630764db659edaf6b8d664d4ff5447ccfeedd2dc5c253f41e"},
 ]
 idna = [
     {file = "idna-2.10-py2.py3-none-any.whl", hash = "sha256:b97d804b1e9b523befed77c48dacec60e6dcb0b5391d57af6a65a312a90648c0"},
@@ -992,8 +995,8 @@ pytest = [
     {file = "pytest-6.1.2.tar.gz", hash = "sha256:c0a7e94a8cdbc5422a51ccdad8e6f1024795939cc89159a0ae7f0b316ad3823e"},
 ]
 pytest-cov = [
-    {file = "pytest-cov-2.11.1.tar.gz", hash = "sha256:359952d9d39b9f822d9d29324483e7ba04a3a17dd7d05aa6beb7ea01e359e5f7"},
-    {file = "pytest_cov-2.11.1-py2.py3-none-any.whl", hash = "sha256:bdb9fdb0b85a7cc825269a4c56b48ccaa5c7e365054b6038772c32ddcdc969da"},
+    {file = "pytest-cov-2.12.0.tar.gz", hash = "sha256:8535764137fecce504a49c2b742288e3d34bc09eed298ad65963616cc98fd45e"},
+    {file = "pytest_cov-2.12.0-py2.py3-none-any.whl", hash = "sha256:95d4933dcbbacfa377bb60b29801daa30d90c33981ab2a79e9ab4452c165066e"},
 ]
 pytest-mock = [
     {file = "pytest-mock-3.5.1.tar.gz", hash = "sha256:a1e2aba6af9560d313c642dae7e00a2a12b022b80301d9d7fc8ec6858e1dd9fc"},
@@ -1030,8 +1033,8 @@ requests = [
     {file = "requests-2.25.1.tar.gz", hash = "sha256:27973dd4a904a4f13b263a19c866c13b92a39ed1c964655f025f3f8d3d75b804"},
 ]
 rfc3986 = [
-    {file = "rfc3986-1.4.0-py2.py3-none-any.whl", hash = "sha256:af9147e9aceda37c91a05f4deb128d4b4b49d6b199775fd2d2927768abdc8f50"},
-    {file = "rfc3986-1.4.0.tar.gz", hash = "sha256:112398da31a3344dc25dbf477d8df6cb34f9278a94fee2625d89e4514be8bb9d"},
+    {file = "rfc3986-1.5.0-py2.py3-none-any.whl", hash = "sha256:a86d6e1f5b1dc238b218b012df0aa79409667bb209e58da56d0b94704e712a97"},
+    {file = "rfc3986-1.5.0.tar.gz", hash = "sha256:270aaf10d87d0d4e095063c65bf3ddbc6ee3d0b226328ce21e036f946e421835"},
 ]
 s3transfer = [
     {file = "s3transfer-0.3.7-py2.py3-none-any.whl", hash = "sha256:efa5bd92a897b6a8d5c1383828dca3d52d0790e0756d49740563a3fb6ed03246"},
