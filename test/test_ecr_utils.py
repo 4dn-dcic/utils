@@ -1,7 +1,7 @@
-import pytest
 from unittest import mock
 from dcicutils.ecr_utils import ECRUtils
 from dcicutils.docker_utils import DockerUtils
+from dcicutils.misc_utils import ignored
 
 
 REPO_URL = '123456789.dkr.ecr.us-east-2.amazonaws.com/cgap-mastertest'  # dummy URL
@@ -15,6 +15,7 @@ def mocked_describe_respositories():
 
 
 def mocked_ecr_login(*, username, password, registry):
+    ignored(username, password, registry)
     return
 
 

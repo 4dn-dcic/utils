@@ -16,7 +16,7 @@ import toml
 import uuid
 import warnings
 
-from dcicutils.misc_utils import environ_bool
+from dcicutils.misc_utils import environ_bool, exported, override_environ, override_dict
 from json import dumps as json_dumps, loads as json_loads
 from unittest import mock
 from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ
@@ -95,32 +95,7 @@ def local_attrs(obj, **kwargs):
             setattr(obj, key, saved[key])
 
 
-@contextlib.contextmanager
-def override_environ(**overrides):
-    with override_dict(os.environ, **overrides):
-        yield
-
-
-@contextlib.contextmanager
-def override_dict(d, **overrides):
-    to_delete = []
-    to_restore = {}
-    try:
-        for k, v in overrides.items():
-            if k in d:
-                to_restore[k] = d[k]
-            else:
-                to_delete.append(k)
-            if v is None:
-                d.pop(k, None)  # Delete key k, tolerating it being already gone
-            else:
-                d[k] = v
-        yield
-    finally:
-        for k in to_delete:
-            d.pop(k, None)  # Delete key k, tolerating it being already gone
-        for k, v in to_restore.items():
-            d[k] = v
+exported(override_environ, override_dict)
 
 
 LOCAL_TIMEZONE_MAPPINGS = {
