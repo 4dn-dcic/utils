@@ -2,7 +2,9 @@ import pytest
 from unittest import mock
 from dcicutils.qa_utils import timed
 from dcicutils.ff_utils import get_es_metadata
-from dcicutils.es_utils import create_es_client, execute_lucene_query_on_es, get_bulk_uuids_embedded, ElasticSearchServiceClient
+from dcicutils.es_utils import (
+    create_es_client, execute_lucene_query_on_es, get_bulk_uuids_embedded, ElasticSearchServiceClient,
+)
 
 
 class TestElasticSearchServiceClient:
