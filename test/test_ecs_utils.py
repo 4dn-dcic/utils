@@ -6,7 +6,24 @@ from dcicutils.misc_utils import ignored
 
 @pytest.fixture(scope='module')
 def ecs_utils():
-    return ECSUtils(cluster_name='dummy-cluster')
+    return ECSUtils()
+
+
+def mock_list_ecs_services(*, cluster):
+    """ Mock API signature """
+    ignored(cluster)
+    return {
+        'serviceArns':
+            [
+                'arn:aws:ecs:us-east-2:1234566777:service/c4-ecs-trial-alpha-stack-CGAPDockerCluster-Z4m1uYa2J11O/c4-ecs-trial-alpha-stack-CGAPIndexerService-YihcMquIc354',
+                'arn:aws:ecs:us-east-2:1234566777:service/c4-ecs-trial-alpha-stack-CGAPDockerCluster-Z4m1uYa2J11O/c4-ecs-trial-alpha-stack-CGAPDeploymentService-NRyGGBTSnqbQ',
+                'arn:aws:ecs:us-east-2:1234566777:service/c4-ecs-trial-alpha-stack-CGAPDockerCluster-Z4m1uYa2J11O/c4-ecs-trial-alpha-stack-CGAPIngesterService-QRcdjlE5ZJS1',
+                'arn:aws:ecs:us-east-2:1234566777:service/c4-ecs-trial-alpha-stack-CGAPDockerCluster-Z4m1uYa2J11O/c4-ecs-trial-alpha-stack-CGAPWSGIService-oDZbeVVWjZMq'
+            ],
+        'ResponseMetadata':
+            {'RequestId': 'not-a-uuid',
+             'HTTPStatusCode': 200}
+    }
 
 
 def mock_update_service(*, cluster, service, forceNewDeployment):  # noQA - AWS chose mixed case argument name
@@ -17,17 +34,8 @@ def mock_update_service(*, cluster, service, forceNewDeployment):  # noQA - AWS 
     return
 
 
-@pytest.mark.parametrize('service_name', [
-    ECSUtils.WSGI, ECSUtils.INDEXER, ECSUtils.INGESTER
-])
-def test_ecs_utils_basic_should_proceed(ecs_utils, service_name):
-    with mock.patch.object(ecs_utils.client, 'update_service', mock_update_service):
-        ecs_utils.update_ecs_service(service_name=service_name)
-
-
-@pytest.mark.parametrize('service_name', [
-    'badservicename', 5, None
-])
-def test_ecs_utils_basic_should_fail(ecs_utils, service_name):
-    with pytest.raises(Exception):
-        ecs_utils.update_ecs_service(service_name=service_name)
+def test_ecs_utils_will_update_services(ecs_utils):
+    """ Tests basic code interaction, no integrated testing right now. """
+    with mock.patch.object(ecs_utils.client, 'list_services', mock_list_ecs_services):
+        with mock.patch.object(ecs_utils.client, 'update_service', mock_update_service):
+            ecs_utils.update_all_services(cluster_name='unused')
