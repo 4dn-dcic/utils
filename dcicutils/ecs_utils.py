@@ -33,7 +33,7 @@ class ECSUtils:
         try:
             self.client.update_service(cluster=cluster_name, service=service_name,
                                        forceNewDeployment=True)
-            PRINT('Successfully updated ECS cluster %s service %s' % cluster_name, service_name)
+            PRINT('Successfully updated ECS cluster %s service %s' % (cluster_name, service_name))
         except Exception as e:
             PRINT('Error encountered triggering cluster update: %s' % e)
             raise
