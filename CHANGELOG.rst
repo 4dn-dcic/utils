@@ -6,6 +6,65 @@ dcicutils
 Change Log
 ----------
 
+1.16.0
+======
+
+**PR 141: Move override_environ and override_dict to misc_utils**
+
+* In ``misc_utils``:
+
+  * Adds ``override_environ`` and ``override_dict``
+    which were previously defined in ``qa_utils``.
+
+  * Adds new function ``exported`` which is really a synonym
+    for ``ignored`` but highlights the reason for the presence
+    of the named variable is so that other files can still
+    import it.
+
+* In ``qa_utils``:
+
+  * Leaves legacy support for ``override_environ``
+    and ``override_dict``, which are now defined in ``misc_utils``.
+
+
+1.15.1
+======
+
+**PR 138: JH Docker Mount Update**
+
+* In ``jh_utils.find_valid_file_or_extra_file``,
+  account for file metadata containing an
+  ``"open_data_url"``.
+
+
+1.15.0
+======
+
+**PR 140: Add misc_utils.is_valid_absolute_uri (C4-651)**
+
+* Adds ``misc_utils.is_valid_absolute_uri``
+  for RFC 3986 compliance.
+
+
+1.14.1
+======
+
+**PR 139: Add ES cluster resize capability**
+
+* Adds ElasticSearchServiceClient, a wrapper for boto3.client('es')
+* Implements resize_elasticsearch_cluster, issuing an update to the relevant settings
+* Integrated test was performed on staging
+* Unit tests mock the boto3 API
+
+
+1.14.0
+======
+
+**PR 137: Docker, ECR, ECS Utils**
+
+* Adds 3 new modules with basic functionality needed for further development on the alpha stack
+* Deprecates Python 3.4
+
 
 1.13.0
 ======
@@ -87,7 +146,7 @@ Change Log
 1.10.0
 ======
 
-**PR 131: Misc functionality in service of C4-183** 
+**PR 131: Misc functionality in service of C4-183**
 
 * In ``dcicutils.misc_utils``:
 
@@ -151,8 +210,8 @@ Those tests were refactored, and the following additional support was added:
 
 **PR 126: C4-503 Grab Environment API**
 
-* Adds get_beanstalk_environment_variables, which will return information 
-  necessary to simulate any application given the caller has the appropriate 
+* Adds get_beanstalk_environment_variables, which will return information
+  necessary to simulate any application given the caller has the appropriate
   access keys.
 * Removes an obsolete tag from create_db_snapshot, which was set erroneously.
 

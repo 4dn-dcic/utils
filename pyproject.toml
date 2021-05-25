@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "1.14.0"
+version = "1.16.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -18,14 +18,15 @@ botocore = "^1.13.46"
 # TODO: elasticsearch is on version 7. -kmp 15-Feb-2020
 elasticsearch = "6.8.1"
 aws-requests-auth = ">=0.4.2,<1"
-urllib3 = "^1.24.3"
-structlog = "^19.2.0"
-requests = "^2.21.0"
-toml = ">=0.10.0,<1"
-webtest = "^2.0.34"
-pytz = ">=2016.4"
-gitpython = "^3.1.2"
 docker = "^4.4.4"
+gitpython = "^3.1.2"
+pytz = ">=2016.4"
+requests = "^2.21.0"
+rfc3986 = "^1.4.0"
+structlog = "^19.2.0"
+toml = ">=0.10.0,<1"
+urllib3 = "^1.24.3"
+webtest = "^2.0.34"
 
 [tool.poetry.dev-dependencies]
 # PyCharm says boto3-stubs contains useful type hints

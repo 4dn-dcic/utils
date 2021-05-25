@@ -11,6 +11,8 @@ import io
 import os
 import logging
 import pytz
+import rfc3986.validators
+import rfc3986.exceptions
 import time
 import warnings
 import webtest  # importing the library makes it easier to mock testing
@@ -47,6 +49,44 @@ class _PRINT:
 
 PRINT = _PRINT()
 PRINT.__name__ = 'PRINT'
+
+
+absolute_uri_validator = (
+    rfc3986.validators.Validator()
+    # Validation qualifiers
+    .allow_schemes('http', 'https')
+    # TODO: We might want to consider the possibility of forbidding the use of a password. -kmp 20-Apr-2021
+    # .forbid_use_of_password()
+    .require_presence_of('scheme', 'host')
+    .check_validity_of('scheme', 'host', 'path'))
+
+
+def is_valid_absolute_uri(text):
+    """
+    Returns True if the given text is a string in the proper format to be an 'absolute' URI,
+    by which we mean the URI has a scheme (http or https) and a host specification.
+
+    For more info, see "Uniform Resource Identifier (URI): Generic Syntax" at https://tools.ietf.org/html/rfc3986
+    """
+    # Technically something like 'foo/bar.html' is also a URI, but it is a relative one, and
+    # the intended use of this function is to verify the URI specification of a resource on the web,
+    # independent of browser context, so a relative specification would be meaningless. We can add
+    # a separate operation for that later if we need one.
+    #
+    # We don't use rfc3987 (IRIs) both because it allows some resource locators we're not sure we're
+    # committed to accepting. Wikipedia, in https://en.wikipedia.org/wiki/Internationalized_Resource_Identifier,
+    # hints that there is some controversy about whether IRIs are even a good idea. We can revisit the idea if
+    # someone is demanding it. (And, as a practical matter, the rfc3987 library has a problematic license.)
+    # -kmp 21-Apr-2021
+    try:
+        uri_ref = rfc3986.uri_reference(text)
+    except ValueError:
+        return False
+    try:
+        absolute_uri_validator.validate(uri_ref)
+        return True
+    except rfc3986.exceptions.ValidationError:
+        return False
 
 
 class VirtualAppError(Exception):
@@ -193,6 +233,33 @@ class VirtualApp:
             if myapp is a TestApp or a VirtualApp.
         """
         return self.wrapped_app.app
+
+
+def exported(*variables):
+    """
+    This function does nothing but is used for declaration purposes.
+    It is useful for the situation where one module imports names from another module merely to allow
+    functions in another module to import them, usually for legacy compatibility.
+    Otherwise, the import might look unnecessary.
+    e.g.,
+
+    ---file1.py---
+    def identity(x):
+        return x
+
+    ---file2.py---
+    from .file1 import identity
+    from dcicutils.misc_utils import exported
+
+    # This function used to be defined here, but now is defined in file1.py
+    exported(identity)
+
+    ---file3.py---
+    # This file has not been updated to realize that file1.py is the new home of identity.
+    from .file2 import identity
+    print("one=", identity(1))
+    """
+    ignored(variables)
 
 
 def ignored(*args, **kwargs):
@@ -818,6 +885,48 @@ def environ_bool(var, default=False):
         return os.environ[var].lower() == "true"
 
 
+@contextlib.contextmanager
+def override_environ(**overrides):
+    """
+    Overrides os.environ for the dynamic extent of the call, using the specified values.
+    A value of None means to delete the property temporarily.
+    (This uses override_dict to do the actual overriding. See notes for that function about lack of thread safety.)
+    """
+    with override_dict(os.environ, **overrides):
+        yield
+
+
+@contextlib.contextmanager
+def override_dict(d, **overrides):
+    """
+    Overrides the given dictionary for the dynamic extent of the call, using the specified values.
+    A value of None means to delete the property temporarily.
+
+    This function is not threadsafe because it dynamically assigns and de-assigns parts of a dictionary.
+    It should be reserved for use in test functions or command line tools or other contexts that are known
+    to be single-threaded, or at least not competing for the resource of the dictionary. (It would be threadsafe
+    to use a dictionary that is only owned by the current process.)
+    """
+    to_delete = []
+    to_restore = {}
+    try:
+        for k, v in overrides.items():
+            if k in d:
+                to_restore[k] = d[k]
+            else:
+                to_delete.append(k)
+            if v is None:
+                d.pop(k, None)  # Delete key k, tolerating it being already gone
+            else:
+                d[k] = v
+        yield
+    finally:
+        for k in to_delete:
+            d.pop(k, None)  # Delete key k, tolerating it being already gone
+        for k, v in to_restore.items():
+            d[k] = v
+
+
 def check_true(test_value, message, error_class=None):
     """
     If the first argument does not evaluate to a true value, an error is raised.
@@ -949,25 +1058,13 @@ def identity(x):
     return x
 
 
-def count_if(filter, seq):
+def count_if(filter, seq):  # noQA - that's right, we're shadowing the built-in Python function 'filter'.
     return sum(1 for x in seq if filter(x))
 
 
-def count(seq, filter=None):
+def count(seq, filter=None):  # noQA - that's right, we're shadowing the built-in Python function 'filter'.
     return count_if(filter or identity, seq)
 
-
-# Previous definition
-#
-# def find_association(data, **kwargs):
-#     for datum in data:
-#         mismatch = False
-#         for k, v in kwargs.items():
-#             if k in datum and datum[k] != v:
-#                 mismatch = True
-#         if not mismatch:
-#             return datum
-#     return None
 
 def find_associations(data, **kwargs):
     found = []
