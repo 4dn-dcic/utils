@@ -9,11 +9,11 @@ class ECSUtils:
     """
 
     def __init__(self):
-        """ Cluster name in this case is the env name """
+        """ Creates a boto3 client for 'ecs'. """
         self.client = boto3.client('ecs', region_name=CGAP_ECS_REGION)  # same as ECR
 
     def list_ecs_clusters(self):
-        """ Returns a list of ECS clusters + some metadata. """
+        """ Returns a list of ECS clusters ARNs. """
         return self.client.list_clusters().get('clusterArns', [])
 
     def list_ecs_services(self, *, cluster_name):
