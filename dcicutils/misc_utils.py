@@ -1129,6 +1129,14 @@ def snake_case_to_camel_case(s):
     return s.title().replace('_', '')
 
 
+def capitalize1(s):
+    """
+    Capitalizes the first letter of a string and leaves the others alone.
+    This is in contrast to the string's .capitalize() method, which would force the rest of the string to lowercase.
+    """
+    return s[:1].upper() + s[1:]
+
+
 class CachedField:
     def __init__(self, name, update_function, timeout=600):
         """ Provides a named field that is cached for a certain period of time. The value is computed

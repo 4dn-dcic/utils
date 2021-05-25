@@ -22,7 +22,8 @@ from dcicutils.misc_utils import (
     CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json, url_path_join,
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
-    ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict
+    ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
+    capitalize1,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -1719,6 +1720,18 @@ class TestCachedField:
 ])
 def test_camel_case_to_snake_case(token, expected):
     assert camel_case_to_snake_case(token) == expected
+
+
+@pytest.mark.parametrize('token, expected', [
+    ('', ''),
+    ('x', 'X'),
+    ('foo', 'Foo'),
+    ('FOO', 'FOO'),
+    ('Foo', 'Foo'),
+    ('fooBar', 'FooBar'),
+])
+def test_capitalize1(token, expected):
+    assert capitalize1(token) == expected
 
 
 @pytest.mark.parametrize('token, expected', [
