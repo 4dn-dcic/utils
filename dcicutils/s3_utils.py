@@ -83,7 +83,9 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             logger.warning('Fetching bucket data via GLOBAL_BUCKET_ENV: {}'.format(global_bucket))
             env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket)
             ff_url = env_config['fourfront']
-            health_json = requests.get('{ff_url}/health?format=json'.format(ff_url=ff_url)).json()
+            health_json_url = '{ff_url}/health?format=json'.format(ff_url=ff_url)
+            logger.warning('health json url: {}'.format(health_json_url))
+            health_json = requests.get(health_json_url).json()
             sys_bucket = health_json['system_bucket']
             outfile_bucket = health_json['processed_file_bucket']
             raw_file_bucket = health_json['file_upload_bucket']

@@ -1259,6 +1259,26 @@ def stuff_in_queues(ff_env, check_secondary=False):
     return stuff_in_queue
 
 
+def fetch_network_ids(subnet_names, security_group_names):
+    """ Takes lists of subnet and security group names, and fetches their corresponding ids from AWS."""
+    ec2_client = boto3.client('ec2')
+    subnet_ids = []
+    security_group_ids = []
+    for i in subnet_names:
+        response = ec2_client.describe_subnets()
+        subnet_id = i
+        subnet_ids.append(subnet_id)
+    for i in security_group_names:
+        response = ec2_client.describe_security_groups(  # could possibly be done with just one query
+            Filters=[
+                dict(Name='group-name', Values=[i])
+            ]
+        )
+        security_group_id = response['SecurityGroups'][0]['GroupId']
+        security_group_ids.append(security_group_id)
+    return subnet_ids, security_group_ids
+
+
 def get_response_json(res):
     """
     Very simple function to return json from a response or raise an error if
