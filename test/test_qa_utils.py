@@ -13,7 +13,7 @@ import uuid
 
 from dcicutils import qa_utils
 from dcicutils.exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix
-from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ, capitalize1
+from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ
 from dcicutils.qa_utils import (
     mock_not_called, local_attrs, override_environ, override_dict, show_elapsed_time, timed,
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule,

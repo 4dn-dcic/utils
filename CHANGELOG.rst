@@ -6,6 +6,25 @@ dcicutils
 Change Log
 ----------
 
+
+1.17.0
+======
+
+**PR 142: Add known_bug_accepted and related support**
+
+* In ``misc_utils``:
+
+  * Add ``capitalize1`` to uppercase the first letter of something,
+    leaving other case alone (rather than forcing it lower).
+
+* In ``qa_utils``:
+
+  * Add ``known_bug_expected`` to mark situations in testing where
+    a named bug is expected (one for which there is a JIRA ticket),
+    allowing managing of the error handling by setting the bug's status
+    as ``fixed=False`` (the default) or ``fixed=True``.
+
+
 1.16.0
 ======
 

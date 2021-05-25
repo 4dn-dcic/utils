@@ -1,8 +1,7 @@
 # Exceptions can be put here to get them out of the way of the main flow of things,
 # and because once in a while we may want them to be shared or to have shared parents.
 
-from dcicutils.diff_utils import DiffManager
-from dcicutils.misc_utils import ignored, full_object_name, full_class_name, capitalize1
+from dcicutils.misc_utils import full_object_name, full_class_name, capitalize1
 
 
 class KnownBugError(AssertionError):

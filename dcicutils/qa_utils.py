@@ -22,7 +22,6 @@ from unittest import mock
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
 from .misc_utils import (
     PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ,
-    full_class_name, full_object_name, capitalize1,
 )
 
 
