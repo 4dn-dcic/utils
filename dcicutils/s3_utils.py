@@ -3,6 +3,7 @@ import json
 import boto3
 import os
 import mimetypes
+import urllib.request
 from zipfile import ZipFile
 from io import BytesIO
 import logging
@@ -66,6 +67,16 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             env_config = json.loads(get_response['Body'].read())
             return env_config
 
+    @staticmethod
+    def fetch_health_page_json(url, use_urllib):
+        if use_urllib is False:
+            return requests.get(url).json()
+        else:
+            res = urllib.request.urlopen(url)
+            res_body = res.read()
+            j = json.loads(res_body.decode("utf-8"))
+            return j
+
     def __init__(self, outfile_bucket=None, sys_bucket=None, raw_file_bucket=None,
                  blob_bucket=None, metadata_bucket=None, env=None):
         """ Initializes s3 utils in one of three ways:
@@ -85,7 +96,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             ff_url = env_config['fourfront']
             health_json_url = '{ff_url}/health?format=json'.format(ff_url=ff_url)
             logger.warning('health json url: {}'.format(health_json_url))
-            health_json = requests.get(health_json_url).json()
+            health_json = self.fetch_health_page_json(url=health_json_url, use_urllib=True)
             sys_bucket = health_json['system_bucket']
             outfile_bucket = health_json['processed_file_bucket']
             raw_file_bucket = health_json['file_upload_bucket']
