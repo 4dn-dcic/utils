@@ -10,7 +10,7 @@ Change Log
 1.17.0
 ======
 
-**PR 142: Add known_bug_accepted and related support**
+**PR 144: Add known_bug_accepted and related support**
 
 * In ``misc_utils``:
 
@@ -28,7 +28,7 @@ Change Log
 1.16.0
 ======
 
-**PR 141: Move override_environ and override_dict to misc_utils**
+**PR 143: Move override_environ and override_dict to misc_utils**
 
 * In ``misc_utils``:
 
