@@ -12,11 +12,12 @@ import time
 import uuid
 
 from dcicutils import qa_utils
-from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ
+from dcicutils.exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix
+from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ, capitalize1
 from dcicutils.qa_utils import (
     mock_not_called, local_attrs, override_environ, override_dict, show_elapsed_time, timed,
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule,
-    MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3,
+    MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
@@ -1479,3 +1480,49 @@ def test_check_duplicated_items_by_key():
                 {'uuid': '123', 'foo': 'c'},
             ]
         )
+
+
+def test_known_bug_expected_and_found():
+    with known_bug_expected(jira_ticket="TST-00001"):
+        raise ValueError("Foo")
+
+
+def test_known_bug_expected_but_wrong_class_1():
+    with pytest.raises(WrongErrorSeen):
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError):
+            raise ValueError("Foo")
+
+
+def test_known_bug_expected_but_wrong_class_2():
+    with known_bug_expected(jira_ticket="TST-00002", error_class=WrongErrorSeen):
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError):
+            raise ValueError("Foo")
+
+
+def test_known_bug_expected_but_no_error_1():
+    with pytest.raises(ExpectedErrorNotSeen):
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError):
+            pass
+
+
+def test_known_bug_expected_but_no_error_2():
+    with known_bug_expected(jira_ticket="TST-00002", error_class=ExpectedErrorNotSeen):
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError):
+            pass
+
+
+def test_known_bug_expected_fixed():
+    with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError, fixed=True):
+        pass
+
+
+def test_known_bug_expected_regression_1():
+    with pytest.raises(UnexpectedErrorAfterFix):
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError, fixed=True):
+            raise RuntimeError("foo")
+
+
+def test_known_bug_expected_regression_2():
+    with known_bug_expected(jira_ticket="TST-00002", error_class=UnexpectedErrorAfterFix):
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError, fixed=True):
+            raise RuntimeError("foo")

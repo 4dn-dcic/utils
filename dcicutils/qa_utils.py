@@ -19,7 +19,11 @@ import warnings
 from dcicutils.misc_utils import environ_bool
 from json import dumps as json_dumps, loads as json_loads
 from unittest import mock
-from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ
+from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
+from .misc_utils import (
+    PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ,
+    full_class_name, full_object_name, capitalize1,
+)
 
 
 def show_elapsed_time(start, end):
@@ -1108,3 +1112,29 @@ def check_duplicated_items_by_key(key, items, url=None, formatter=str):
             for keyval, items in duplicated_keyvals.items()
         ])
     )
+
+
+@contextlib.contextmanager
+def known_bug_expected(jira_ticket=None, fixed=False, error_class=None):
+    error_class = error_class or Exception
+    if fixed is False:
+        try:
+            yield
+        except error_class:
+            # The expected error was seen, so nothing to do.
+            pass
+        except Exception as e:
+            raise WrongErrorSeen(jira_ticket=jira_ticket, expected_class=error_class, error_seen=e)
+        else:
+            raise ExpectedErrorNotSeen(jira_ticket=jira_ticket)
+    else:
+        try:
+            yield
+        except error_class as e:
+            # Once fixed, we should complain if it recurs.
+            raise UnexpectedErrorAfterFix(jira_ticket=jira_ticket, expected_class=error_class, error_seen=e)
+        except Exception as e:
+            raise WrongErrorSeenAfterFix(jira_ticket=jira_ticket, expected_class=error_class, error_seen=e)
+        else:
+            # If no error occurs, that's probably the fix in play.
+            pass
