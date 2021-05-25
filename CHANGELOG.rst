@@ -10,7 +10,7 @@ Change Log
 1.17.0
 ======
 
-**PR 144: Add known_bug_accepted and related support**
+**PR 144: Add known_bug_expected and related support**
 
 * In ``misc_utils``:
 
