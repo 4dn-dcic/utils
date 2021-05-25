@@ -1130,7 +1130,10 @@ def snake_case_to_camel_case(s):
 
 
 def capitalize1(s):
-    """ Capitalizes the first letter of a string and leaves the others alone. """
+    """
+    Capitalizes the first letter of a string and leaves the others alone.
+    This is in contrast to the string's .capitalize() method, which would force the rest of the string to lowercase.
+    """
     return s[:1].upper() + s[1:]
 
 

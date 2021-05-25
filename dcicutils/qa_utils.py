@@ -1090,6 +1090,36 @@ def check_duplicated_items_by_key(key, items, url=None, formatter=str):
 
 @contextlib.contextmanager
 def known_bug_expected(jira_ticket=None, fixed=False, error_class=None):
+    """
+    A context manager for provisionally catching errors due to known bugs.
+
+    For a bug that has a ticket filed against it, a use of the functionality in testing can be wrapped by
+    an expression such as:
+
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError):
+            ... stuff that fails ...
+
+    If the expected error does not occur, an error will result so that it's easy to notice that it may have changed
+    or been fixed.
+
+    Later, when the bug is fixed, just add fixed=True, as in:
+
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError, fixed=True):
+            ... stuff that fails ...
+
+    If the previously-expected error (now thought to be fixed) happens, an error will result so it's easy to tell
+    if there's been a regression.
+
+    Parameters:
+
+        jira_ticket:  a string identifying the bug, or None. There is no syntax checking or validation.
+        fixed: a boolean that says whether the bug is expected to be fixed.
+        error_class: the class of error that would result if the bug were not fixed.
+
+    Returns:
+
+        N/A - This is intended for use as a context manager.
+    """
     error_class = error_class or Exception
     if fixed is False:
         try:
