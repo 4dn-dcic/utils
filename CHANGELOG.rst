@@ -24,6 +24,15 @@ Change Log
     allowing managing of the error handling by setting the bug's status
     as ``fixed=False`` (the default) or ``fixed=True``.
 
+* In (new module) ``exceptions``:
+
+  * ``KnownBugError``
+  * ``UnfixedBugError``
+  * ``WrongErrorSeen``
+  * ``ExpectedErrorNotSeen``
+  * ``FixedBugError``
+  * ``WrongErrorSeenAfterFix``
+  * ``UnexpectedErrorAfterFix``
 
 1.16.0
 ======
