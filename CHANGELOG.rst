@@ -6,6 +6,71 @@ dcicutils
 Change Log
 ----------
 
+1.18.0
+======
+
+**PR 141 Port Application Dockerization utils**
+
+* Add additional ECS related APIs needed for orchestration/deployment.
+
+1.17.0
+======
+
+**PR 144: Add known_bug_expected and related support**
+
+* In ``misc_utils``:
+
+  * Add ``capitalize1`` to uppercase the first letter of something,
+    leaving other case alone (rather than forcing it lower).
+
+* In ``qa_utils``:
+
+  * Add ``known_bug_expected`` to mark situations in testing where
+    a named bug is expected (one for which there is a JIRA ticket),
+    allowing managing of the error handling by setting the bug's status
+    as ``fixed=False`` (the default) or ``fixed=True``.
+
+* In (new module) ``exceptions``:
+
+  * ``KnownBugError``
+  * ``UnfixedBugError``
+  * ``WrongErrorSeen``
+  * ``ExpectedErrorNotSeen``
+  * ``FixedBugError``
+  * ``WrongErrorSeenAfterFix``
+  * ``UnexpectedErrorAfterFix``
+
+1.16.0
+======
+
+**PR 142: Move override_environ and override_dict to misc_utils**
+
+* In ``misc_utils``:
+
+  * Adds ``override_environ`` and ``override_dict``
+    which were previously defined in ``qa_utils``.
+
+  * Adds new function ``exported`` which is really a synonym
+    for ``ignored`` but highlights the reason for the presence
+    of the named variable is so that other files can still
+    import it.
+
+* In ``qa_utils``:
+
+  * Leaves legacy support for ``override_environ``
+    and ``override_dict``, which are now defined in ``misc_utils``.
+
+
+1.15.1
+======
+
+**PR 138: JH Docker Mount Update**
+
+* In ``jh_utils.find_valid_file_or_extra_file``,
+  account for file metadata containing an
+  ``"open_data_url"``.
+
+
 1.15.0
 ======
 

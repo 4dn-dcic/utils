@@ -16,10 +16,13 @@ import toml
 import uuid
 import warnings
 
-from dcicutils.misc_utils import environ_bool
+from dcicutils.misc_utils import environ_bool, exported, override_environ, override_dict
 from json import dumps as json_dumps, loads as json_loads
 from unittest import mock
-from .misc_utils import PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ
+from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
+from .misc_utils import (
+    PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ,
+)
 
 
 def show_elapsed_time(start, end):
@@ -95,32 +98,7 @@ def local_attrs(obj, **kwargs):
             setattr(obj, key, saved[key])
 
 
-@contextlib.contextmanager
-def override_environ(**overrides):
-    with override_dict(os.environ, **overrides):
-        yield
-
-
-@contextlib.contextmanager
-def override_dict(d, **overrides):
-    to_delete = []
-    to_restore = {}
-    try:
-        for k, v in overrides.items():
-            if k in d:
-                to_restore[k] = d[k]
-            else:
-                to_delete.append(k)
-            if v is None:
-                d.pop(k, None)  # Delete key k, tolerating it being already gone
-            else:
-                d[k] = v
-        yield
-    finally:
-        for k in to_delete:
-            d.pop(k, None)  # Delete key k, tolerating it being already gone
-        for k, v in to_restore.items():
-            d[k] = v
+exported(override_environ, override_dict)
 
 
 LOCAL_TIMEZONE_MAPPINGS = {
@@ -1108,3 +1086,59 @@ def check_duplicated_items_by_key(key, items, url=None, formatter=str):
             for keyval, items in duplicated_keyvals.items()
         ])
     )
+
+
+@contextlib.contextmanager
+def known_bug_expected(jira_ticket=None, fixed=False, error_class=None):
+    """
+    A context manager for provisionally catching errors due to known bugs.
+
+    For a bug that has a ticket filed against it, a use of the functionality in testing can be wrapped by
+    an expression such as:
+
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError):
+            ... stuff that fails ...
+
+    If the expected error does not occur, an error will result so that it's easy to notice that it may have changed
+    or been fixed.
+
+    Later, when the bug is fixed, just add fixed=True, as in:
+
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError, fixed=True):
+            ... stuff that fails ...
+
+    If the previously-expected error (now thought to be fixed) happens, an error will result so it's easy to tell
+    if there's been a regression.
+
+    Parameters:
+
+        jira_ticket:  a string identifying the bug, or None. There is no syntax checking or validation.
+        fixed: a boolean that says whether the bug is expected to be fixed.
+        error_class: the class of error that would result if the bug were not fixed.
+
+    Returns:
+
+        N/A - This is intended for use as a context manager.
+    """
+    error_class = error_class or Exception
+    if fixed is False:
+        try:
+            yield
+        except error_class:
+            # The expected error was seen, so nothing to do.
+            pass
+        except Exception as e:
+            raise WrongErrorSeen(jira_ticket=jira_ticket, expected_class=error_class, error_seen=e)
+        else:
+            raise ExpectedErrorNotSeen(jira_ticket=jira_ticket)
+    else:
+        try:
+            yield
+        except error_class as e:
+            # Once fixed, we should complain if it recurs.
+            raise UnexpectedErrorAfterFix(jira_ticket=jira_ticket, expected_class=error_class, error_seen=e)
+        except Exception as e:
+            raise WrongErrorSeenAfterFix(jira_ticket=jira_ticket, expected_class=error_class, error_seen=e)
+        else:
+            # If no error occurs, that's probably the fix in play.
+            pass

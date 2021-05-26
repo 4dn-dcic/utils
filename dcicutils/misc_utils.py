@@ -235,6 +235,33 @@ class VirtualApp:
         return self.wrapped_app.app
 
 
+def exported(*variables):
+    """
+    This function does nothing but is used for declaration purposes.
+    It is useful for the situation where one module imports names from another module merely to allow
+    functions in another module to import them, usually for legacy compatibility.
+    Otherwise, the import might look unnecessary.
+    e.g.,
+
+    ---file1.py---
+    def identity(x):
+        return x
+
+    ---file2.py---
+    from .file1 import identity
+    from dcicutils.misc_utils import exported
+
+    # This function used to be defined here, but now is defined in file1.py
+    exported(identity)
+
+    ---file3.py---
+    # This file has not been updated to realize that file1.py is the new home of identity.
+    from .file2 import identity
+    print("one=", identity(1))
+    """
+    ignored(variables)
+
+
 def ignored(*args, **kwargs):
     """
     This is useful for defeating flake warnings.
@@ -858,6 +885,48 @@ def environ_bool(var, default=False):
         return os.environ[var].lower() == "true"
 
 
+@contextlib.contextmanager
+def override_environ(**overrides):
+    """
+    Overrides os.environ for the dynamic extent of the call, using the specified values.
+    A value of None means to delete the property temporarily.
+    (This uses override_dict to do the actual overriding. See notes for that function about lack of thread safety.)
+    """
+    with override_dict(os.environ, **overrides):
+        yield
+
+
+@contextlib.contextmanager
+def override_dict(d, **overrides):
+    """
+    Overrides the given dictionary for the dynamic extent of the call, using the specified values.
+    A value of None means to delete the property temporarily.
+
+    This function is not threadsafe because it dynamically assigns and de-assigns parts of a dictionary.
+    It should be reserved for use in test functions or command line tools or other contexts that are known
+    to be single-threaded, or at least not competing for the resource of the dictionary. (It would be threadsafe
+    to use a dictionary that is only owned by the current process.)
+    """
+    to_delete = []
+    to_restore = {}
+    try:
+        for k, v in overrides.items():
+            if k in d:
+                to_restore[k] = d[k]
+            else:
+                to_delete.append(k)
+            if v is None:
+                d.pop(k, None)  # Delete key k, tolerating it being already gone
+            else:
+                d[k] = v
+        yield
+    finally:
+        for k in to_delete:
+            d.pop(k, None)  # Delete key k, tolerating it being already gone
+        for k, v in to_restore.items():
+            d[k] = v
+
+
 def check_true(test_value, message, error_class=None):
     """
     If the first argument does not evaluate to a true value, an error is raised.
@@ -1058,6 +1127,14 @@ def camel_case_to_snake_case(s):
 def snake_case_to_camel_case(s):
     """ Converts snake_case to CamelCase - note that "our" CamelCase always capitalizes the first character. """
     return s.title().replace('_', '')
+
+
+def capitalize1(s):
+    """
+    Capitalizes the first letter of a string and leaves the others alone.
+    This is in contrast to the string's .capitalize() method, which would force the rest of the string to lowercase.
+    """
+    return s[:1].upper() + s[1:]
 
 
 class CachedField:

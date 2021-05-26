@@ -9,6 +9,7 @@ import pytz
 import random
 import re
 import time
+import uuid
 import warnings
 import webtest
 
@@ -21,10 +22,11 @@ from dcicutils.misc_utils import (
     CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json, url_path_join,
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
-    ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri
+    ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
+    capitalize1,
 )
 from dcicutils.qa_utils import (
-    Occasionally, ControlledTime, override_environ, MockFileSystem, printed_output, raises_regexp
+    Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
 )
 from unittest import mock
 
@@ -1350,32 +1352,32 @@ def test_rate_manager():
 
 def test_environ_bool():
 
-    with override_environ(FOO=None):
+    with qa_override_environ(FOO=None):
         assert environ_bool("FOO") is False
         assert environ_bool("FOO", default=None) is None
         assert environ_bool("FOO", None) is None
 
-    with override_environ(FOO="TRUE"):
+    with qa_override_environ(FOO="TRUE"):
         assert environ_bool("FOO") is True
         assert environ_bool("FOO", default=None) is True
         assert environ_bool("FOO", None) is True
 
-    with override_environ(FOO="TrUe"):  # Actually, any case should work
+    with qa_override_environ(FOO="TrUe"):  # Actually, any case should work
         assert environ_bool("FOO") is True
         assert environ_bool("FOO", default=None) is True
         assert environ_bool("FOO", None) is True
 
-    with override_environ(FOO="FALSE"):
+    with qa_override_environ(FOO="FALSE"):
         assert environ_bool("FOO") is False
         assert environ_bool("FOO", default=None) is False
         assert environ_bool("FOO", None) is False
 
-    with override_environ(FOO="anything"):
+    with qa_override_environ(FOO="anything"):
         assert environ_bool("FOO") is False
         assert environ_bool("FOO", default=None) is False
         assert environ_bool("FOO", None) is False
 
-    with override_environ(FOO=""):
+    with qa_override_environ(FOO=""):
         assert environ_bool("FOO") is False
         assert environ_bool("FOO", default=None) is False
         assert environ_bool("FOO", None) is False
@@ -1718,6 +1720,18 @@ class TestCachedField:
 ])
 def test_camel_case_to_snake_case(token, expected):
     assert camel_case_to_snake_case(token) == expected
+
+
+@pytest.mark.parametrize('token, expected', [
+    ('', ''),
+    ('x', 'X'),
+    ('foo', 'Foo'),
+    ('FOO', 'FOO'),
+    ('Foo', 'Foo'),
+    ('fooBar', 'FooBar'),
+])
+def test_capitalize1(token, expected):
+    assert capitalize1(token) == expected
 
 
 @pytest.mark.parametrize('token, expected', [
@@ -2131,7 +2145,8 @@ def test_is_valid_absolute_uri():
 
     assert is_valid_absolute_uri("//somehost/?alpha=1&beta=2") is False
 
-    assert is_valid_absolute_uri("//somehost/?alpha=1&beta=2&colon=:") is False  # Used to wrongly yield True due to ':' in URI
+    # Used to wrongly yield True due to ':' in URI
+    assert is_valid_absolute_uri("//somehost/?alpha=1&beta=2&colon=:") is False
 
     # Scheme provided, but no host. We want absolute URIs.
     #
@@ -2182,8 +2197,134 @@ def test_is_valid_absolute_uri():
 
     # TODO: In the rfc3987 implementation, we allowed tags, but do we really want that? -kmp 20-Apr-2021
 
-    assert is_valid_absolute_uri("foo#alpha") is False  # Used to be False, but only due to lack of ':' in URI, not due to tag
+    # Used to be False, but only due to lack of ':' in URI, not due to tag
+    assert is_valid_absolute_uri("foo#alpha") is False
     assert is_valid_absolute_uri("foo#alpha:beta") is False  # Used to wrongly be True due to ':' in URI
 
     assert is_valid_absolute_uri("http://abc.def/foo#alpha") is True  # TODO: Reconsider tags
     assert is_valid_absolute_uri("http://abc.def/foo#alpha:beta") is True  # TODO: Reconsider tags
+
+
+def test_override_dict():
+
+    d = {'foo': 'bar'}
+    d_copy = d.copy()
+
+    unique_prop1 = str(uuid.uuid4())
+    unique_prop2 = str(uuid.uuid4())
+    unique_prop3 = str(uuid.uuid4())
+
+    assert unique_prop1 not in d
+    assert unique_prop2 not in d
+    assert unique_prop3 not in d
+
+    with override_dict(d, **{unique_prop1: "something", unique_prop2: "anything"}):
+
+        assert unique_prop1 in d  # added
+        value1a = d.get(unique_prop1)
+        assert value1a == "something"
+
+        assert unique_prop2 in d  # added
+        value2a = d.get(unique_prop2)
+        assert value2a == "anything"
+
+        assert unique_prop3 not in d
+
+        with override_dict(d, **{unique_prop1: "something_else", unique_prop3: "stuff"}):
+
+            assert unique_prop1 in d  # updated
+            value1b = d.get(unique_prop1)
+            assert value1b == "something_else"
+
+            assert unique_prop2 in d  # unchanged
+            assert d.get(unique_prop2) == value2a
+
+            assert unique_prop3 in d  # added
+            assert d.get(unique_prop3) == "stuff"
+
+            with override_dict(d, **{unique_prop1: None}):
+
+                assert unique_prop1 not in d  # removed
+
+                with override_dict(d, **{unique_prop1: None}):
+
+                    assert unique_prop1 not in d  # re-removed
+
+                assert unique_prop1 not in d  # un-re-removed, but still removed
+
+            assert unique_prop1 in d  # restored after double removal
+            assert d.get(unique_prop1) == value1b
+
+        assert unique_prop1 in d
+        assert d.get(unique_prop1) == value1a
+
+        assert unique_prop2 in d
+        assert d.get(unique_prop2) == value2a
+
+        assert unique_prop3 not in d
+
+    assert unique_prop1 not in d
+    assert unique_prop2 not in d
+    assert unique_prop3 not in d
+
+    assert d == d_copy
+
+
+def test_override_environ():
+
+    unique_prop1 = str(uuid.uuid4())
+    unique_prop2 = str(uuid.uuid4())
+    unique_prop3 = str(uuid.uuid4())
+
+    assert unique_prop1 not in os.environ
+    assert unique_prop2 not in os.environ
+    assert unique_prop3 not in os.environ
+
+    with override_environ(**{unique_prop1: "something", unique_prop2: "anything"}):
+
+        assert unique_prop1 in os.environ  # added
+        value1a = os.environ.get(unique_prop1)
+        assert value1a == "something"
+
+        assert unique_prop2 in os.environ  # added
+        value2a = os.environ.get(unique_prop2)
+        assert value2a == "anything"
+
+        assert unique_prop3 not in os.environ
+
+        with override_environ(**{unique_prop1: "something_else", unique_prop3: "stuff"}):
+
+            assert unique_prop1 in os.environ  # updated
+            value1b = os.environ.get(unique_prop1)
+            assert value1b == "something_else"
+
+            assert unique_prop2 in os.environ  # unchanged
+            assert os.environ.get(unique_prop2) == value2a
+
+            assert unique_prop3 in os.environ  # added
+            assert os.environ.get(unique_prop3) == "stuff"
+
+            with override_environ(**{unique_prop1: None}):
+
+                assert unique_prop1 not in os.environ  # removed
+
+                with override_environ(**{unique_prop1: None}):
+
+                    assert unique_prop1 not in os.environ  # re-removed
+
+                assert unique_prop1 not in os.environ  # un-re-removed, but still removed
+
+            assert unique_prop1 in os.environ  # restored after double removal
+            assert os.environ.get(unique_prop1) == value1b
+
+        assert unique_prop1 in os.environ
+        assert os.environ.get(unique_prop1) == value1a
+
+        assert unique_prop2 in os.environ
+        assert os.environ.get(unique_prop2) == value2a
+
+        assert unique_prop3 not in os.environ
+
+    assert unique_prop1 not in os.environ
+    assert unique_prop2 not in os.environ
+    assert unique_prop3 not in os.environ

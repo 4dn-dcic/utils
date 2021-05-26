@@ -15,6 +15,7 @@ from dcicutils.env_utils import (
     FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env, classify_server_url,
     full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
+    make_env_name_cfn_compatible,
 )
 from dcicutils.qa_utils import raises_regexp
 from unittest import mock
@@ -765,3 +766,13 @@ def test_classify_server_url_other():
         'environment': 'unknown',
         'is_stg_or_prd': False,
     }
+
+
+@pytest.mark.parametrize('env_name, cfn_id', [
+    ('cgap-mastertest', 'cgapmastertest'),
+    ('fourfront-cgap', 'fourfrontcgap'),
+    ('cgap-msa', 'cgapmsa'),
+    ('fourfrontmastertest', 'fourfrontmastertest')
+])
+def test_make_env_name_cfn_compatible(env_name, cfn_id):
+    assert make_env_name_cfn_compatible(env_name) == cfn_id
