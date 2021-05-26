@@ -6,6 +6,12 @@ dcicutils
 Change Log
 ----------
 
+1.18.0
+======
+
+**PR 141 Port Application Dockerization utils**
+
+* Add additional ECS related APIs needed for orchestration/deployment.
 
 1.17.0
 ======
@@ -37,7 +43,7 @@ Change Log
 1.16.0
 ======
 
-**PR 143: Move override_environ and override_dict to misc_utils**
+**PR 142: Move override_environ and override_dict to misc_utils**
 
 * In ``misc_utils``:
 

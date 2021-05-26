@@ -468,3 +468,11 @@ def classify_server_url(url, raise_error=True):
         'environment': environment,
         'is_stg_or_prd': is_stg_or_prd
     }
+
+
+def make_env_name_cfn_compatible(env_name: str) -> str:
+    """ Common IDs in Cloudformation forbid the use of '-', and we don't want to change
+        our environment name formatting so this simple method is provided to document this
+        behavior. ex: cgap-mastertest -> cgapmastertest
+    """
+    return env_name.replace('-', '')
