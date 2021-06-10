@@ -2,8 +2,8 @@ import os
 import boto3
 import json
 from botocore.exceptions import ClientError
-from dcicutils.ecr_utils import CGAP_ECR_REGION
-from dcicutils.misc_utils import PRINT
+from .ecr_utils import CGAP_ECR_REGION
+from .misc_utils import PRINT
 
 
 # Environment variable whose value is the name of a secret
