@@ -14,6 +14,8 @@ Change Log
 
 * Make ``lang_utils`` import ``ignored`` from ``misc_utils``, not ``qa_utils``.
 * Make ``deployment_utils`` import ``override_environ`` from ``misc_utils``, not ``qa_utils``.
+* Move ``local_attrs`` from ``qa_utils`` to ``misc_utils``
+  so that similar errors can be avoided in other libraries that import it.
 
 
 1.18.0
