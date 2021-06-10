@@ -16,12 +16,12 @@ import toml
 import uuid
 import warnings
 
-from dcicutils.misc_utils import environ_bool, exported, override_environ, override_dict
 from json import dumps as json_dumps, loads as json_loads
 from unittest import mock
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
 from .misc_utils import (
     PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ,
+    environ_bool, exported, override_environ, override_dict, local_attrs,
 )
 
 
@@ -66,39 +66,7 @@ def mock_not_called(name):
     return mocked_function
 
 
-@contextlib.contextmanager
-def local_attrs(obj, **kwargs):
-    """
-    This binds the named attributes of the given object.
-    This is only allowed for an object that directly owns the indicated attributes.
-
-    """
-    keys = kwargs.keys()
-    for key in keys:
-        if key not in obj.__dict__:
-            # This works only for objects that directly have the indicated property.
-            # That happens for
-            #  (a) an instance where its instance variables are in keys.
-            #  (b) an uninstantiated class where its class variables (but not inherited class variables) are in keys.
-            # So the error happens for these cases:
-            #  (c) an instance where any of the keys come from its class instead of the instance itself
-            #  (d) an uninstantiated class being used for keys that are inherited rather than direct class variables
-            raise ValueError("%s inherits property %s. Treating it as dynamic could affect other objects."
-                             % (obj, key))
-    saved = {
-        key: getattr(obj, key)
-        for key in keys
-    }
-    try:
-        for key in keys:
-            setattr(obj, key, kwargs[key])
-        yield
-    finally:
-        for key in keys:
-            setattr(obj, key, saved[key])
-
-
-exported(override_environ, override_dict)
+exported(override_environ, override_dict, local_attrs)
 
 
 LOCAL_TIMEZONE_MAPPINGS = {

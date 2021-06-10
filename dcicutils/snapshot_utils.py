@@ -2,7 +2,7 @@ import datetime
 import logging
 
 from elasticsearch.exceptions import NotFoundError
-from dcicutils.misc_utils import (
+from .misc_utils import (
     environ_bool, PRINT, camel_case_to_snake_case, full_object_name,
     ignorable, ancestor_classes, decorator, ignored,
 )
