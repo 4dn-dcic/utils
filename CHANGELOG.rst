@@ -6,12 +6,23 @@ dcicutils
 Change Log
 ----------
 
+
+1.18.1
+======
+
+**PR 145 Fix internal import problems**
+
+* Make ``lang_utils`` import ``ignored`` from ``misc_utils``, not ``qa_utils``.
+* Make ``deployment_utils`` import ``override_environ`` from ``misc_utils``, not ``qa_utils``.
+
+
 1.18.0
 ======
 
 **PR 141 Port Application Dockerization utils**
 
 * Add additional ECS related APIs needed for orchestration/deployment.
+
 
 1.17.0
 ======
@@ -39,6 +50,7 @@ Change Log
   * ``FixedBugError``
   * ``WrongErrorSeenAfterFix``
   * ``UnexpectedErrorAfterFix``
+
 
 1.16.0
 ======

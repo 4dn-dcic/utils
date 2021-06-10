@@ -39,8 +39,7 @@ from dcicutils.env_utils import (
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, is_test_env, is_hotseat_env,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
 )
-from dcicutils.misc_utils import PRINT, Retry, apply_dict_overrides
-from dcicutils.qa_utils import override_environ
+from dcicutils.misc_utils import PRINT, Retry, apply_dict_overrides, override_environ
 
 
 # constants associated with EB-related APIs
