@@ -49,9 +49,10 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             if filename == env:
                 config_filename = filename
         if not config_filename:
-            raise Exception('no matches for global env bucket: {global_bucket}; keys: {keys}'.format(
+            raise Exception('no matches for global env bucket: {global_bucket}; keys: {keys}; desired env: {env}'.format(
                 global_bucket=global_bucket,
                 keys=keys,
+                env=env
             ))
         else:
             # one match, fetch that file as config
