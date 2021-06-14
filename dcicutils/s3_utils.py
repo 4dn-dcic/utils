@@ -27,7 +27,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     BLOB_BUCKET_TEMPLATE = "elasticbeanstalk-%s-blobs"
 
     @staticmethod
-    def verify_and_get_env_config(s3_client, global_bucket: str):
+    def verify_and_get_env_config(s3_client, global_bucket: str, env):
         """ Verifies the S3 environment from which the env config is coming from, and returns the S3-based env config
             Throws exceptions if the S3 bucket is unreachable, or an env based on the name of the global S3 bucket
             is not present.
@@ -46,16 +46,8 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         keys = [list_response['Contents'][i]['Key'] for i in range(0, len(list_response['Contents']))]
         config_filename = None
         for filename in keys:
-            # multiple matches, raise exception
-            if filename in global_bucket and config_filename is not None:
-                raise Exception('multiple matches for global env bucket: {global_bucket}; keys: {keys}'.format(
-                    global_bucket=global_bucket,
-                    keys=keys,
-                ))
-            elif filename in global_bucket:
+            if filename == env:
                 config_filename = filename
-            else:
-                pass
         if not config_filename:
             raise Exception('no matches for global env bucket: {global_bucket}; keys: {keys}'.format(
                 global_bucket=global_bucket,
@@ -92,7 +84,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         global_bucket = os.environ.get('GLOBAL_BUCKET_ENV')
         if global_bucket:
             logger.warning('Fetching bucket data via GLOBAL_BUCKET_ENV: {}'.format(global_bucket))
-            env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket)
+            env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket, env=env)
             ff_url = env_config['fourfront']
             health_json_url = '{ff_url}/health?format=json'.format(ff_url=ff_url)
             logger.warning('health json url: {}'.format(health_json_url))
