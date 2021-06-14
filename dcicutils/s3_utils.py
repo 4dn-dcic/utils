@@ -94,7 +94,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             outfile_bucket = health_json['processed_file_bucket']
             raw_file_bucket = health_json['file_upload_bucket']
             blob_bucket = health_json['blob_bucket']
-            metadata_bucket = health_json['metadata_bundles_bucket']
+            metadata_bucket = health_json.get('metadata_bundles_bucket', None)  # N/A for 4DN
             logger.warning('Buckets resolved successfully.')
         elif sys_bucket is None:
             # staging and production share same buckets
