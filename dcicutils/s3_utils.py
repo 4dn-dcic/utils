@@ -102,6 +102,8 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 if is_stg_or_prd_env(env):
                     self.url = get_beanstalk_real_url(env)
                     env = prod_bucket_env(env)
+                elif 'fourfront-' not in env:
+                    env = 'fourfront-' + env
             # we use standardized naming schema, so s3 buckets always have same prefix
             sys_bucket = self.SYS_BUCKET_TEMPLATE % env
             outfile_bucket = self.OUTFILE_BUCKET_TEMPLATE % env
