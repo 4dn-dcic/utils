@@ -8,7 +8,7 @@ from zipfile import ZipFile
 from io import BytesIO
 import logging
 import requests
-from .env_utils import is_stg_or_prd_env, prod_bucket_env
+from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name
 from .misc_utils import PRINT
 
 
@@ -90,11 +90,11 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             health_json_url = '{ff_url}/health?format=json'.format(ff_url=ff_url)
             logger.warning('health json url: {}'.format(health_json_url))
             health_json = self.fetch_health_page_json(url=health_json_url, use_urllib=True)
-            sys_bucket = health_json['system_bucket']
-            outfile_bucket = health_json['processed_file_bucket']
-            raw_file_bucket = health_json['file_upload_bucket']
-            blob_bucket = health_json['blob_bucket']
-            metadata_bucket = health_json.get('metadata_bundles_bucket', None)  # N/A for 4DN
+            sys_bucket = sys_bucket or health_json['system_bucket']
+            outfile_bucket = outfile_bucket or health_json['processed_file_bucket']
+            raw_file_bucket = raw_file_bucket or health_json['file_upload_bucket']
+            blob_bucket = blob_bucket or health_json['blob_bucket']
+            metadata_bucket = metadata_bucket or health_json.get('metadata_bundles_bucket', None)  # N/A for 4DN
             logger.warning('Buckets resolved successfully.')
         elif sys_bucket is None:
             # staging and production share same buckets
@@ -102,8 +102,8 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 if is_stg_or_prd_env(env):
                     self.url = get_beanstalk_real_url(env)
                     env = prod_bucket_env(env)
-                elif 'fourfront-' not in env:
-                    env = 'fourfront-' + env
+                else:
+                    env = full_env_name(env)
             # we use standardized naming schema, so s3 buckets always have same prefix
             sys_bucket = self.SYS_BUCKET_TEMPLATE % env
             outfile_bucket = self.OUTFILE_BUCKET_TEMPLATE % env
