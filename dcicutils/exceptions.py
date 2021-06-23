@@ -71,6 +71,19 @@ class ConfigurationError(ValueError):
     pass
 
 
+class SynonymousEnvironmentVariablesMismatched(ConfigurationError):
+
+    def __init__(self, var1, val1, var2, val2):
+        self.var1 = var1
+        self.val1 = val1
+        self.var2 = var2
+        self.val2 = val2
+        super().__init__("The environment variables {var1} and {var2} are synonyms but have inconsistent values:"
+                         " If you supply values for both, they must be the same value."
+                         " You supplied: {var1}={val1!r} {var2}={val2!r}"
+                         .format(var1=var1, val1=val1, var2=var2, val2=val2))
+
+
 class InferredBucketConflict(ConfigurationError):
 
     def __init__(self, *, kind, specified, inferred):
@@ -81,25 +94,26 @@ class InferredBucketConflict(ConfigurationError):
                          " and {kind} bucket inferred from health page, {inferred}, do not match."
                          .format(kind=kind, specified=specified, inferred=inferred))
 
-class CannotInferEnvFromEmptyGlobal(ConfigurationError):
+
+class CannotInferEnvFromNoGlobalEnvs(ConfigurationError):
 
     def __init__(self, *, global_bucket):
         self.global_bucket = global_bucket
-        super().__init__("No envs were found in the global bucket, {global_bucket}, so no env can be inferred."
+        super().__init__("No envs were found in the global env bucket, {global_bucket}, so no env can be inferred."
                          .format(global_bucket=global_bucket))
 
 
-class CannotInferEnvFromManyGlobal(ConfigurationError):
+class CannotInferEnvFromManyGlobalEnvs(ConfigurationError):
 
     def __init__(self, *, global_bucket, keys):
         self.global_bucket = global_bucket
         self.keys = keys
-        super().__init__("Too many keys were found in the global bucket, {global_bucket},"
+        super().__init__("Too many keys were found in the global env bucket, {global_bucket},"
                          " for a particular env to be inferred: {keys}"
                          .format(global_bucket=global_bucket, keys=keys))
 
 
-class CannotFindEnvInGlobal(ConfigurationError):
+class MissingGlobalEnv(ConfigurationError):
 
     def __init__(self, *, global_bucket, keys, env):
         self.global_bucket = global_bucket
@@ -114,5 +128,5 @@ class GlobalBucketAccessError(ConfigurationError):
     def __init__(self, *, global_bucket, status):
         self.global_bucket = global_bucket
         self.status = status
-        super().__init__("Could not access GLOBAL_BUCKET_ENV {global_bucket}: status: {status}"
+        super().__init__("Could not access global env bucket {global_bucket}: status: {status}"
                          .format(global_bucket=global_bucket, status=status))

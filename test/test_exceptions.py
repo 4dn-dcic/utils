@@ -1,5 +1,9 @@
 from dcicutils.exceptions import (
     ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix,
+    ConfigurationError, SynonymousEnvironmentVariablesMismatched,
+    # To be tested later...
+    # InferredBucketConflict,
+    # CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv, GlobalBucketAccessError,
 )
 
 
@@ -91,3 +95,28 @@ def test_wrong_error_seen_after_fix():
         ' where one of class RuntimeError was expected to be fixed.'
         ' This may be another bug showing through or a regression of some sort: Not an integer.'
     )
+
+
+def test_configuration_error():
+    message = "some config error"
+    e = ConfigurationError(message)
+    assert str(e) == message
+    assert isinstance(e, ConfigurationError)
+    assert isinstance(e, ValueError)
+    assert isinstance(e, Exception)
+
+
+def test_synonymous_environment_variables_mismatched():
+    e = SynonymousEnvironmentVariablesMismatched(var1="twelve", val1="6+6", var2="dozen", val2="10+2")
+    assert str(e).startswith("The environment variables twelve and dozen are synonyms but have inconsistent values")
+    assert isinstance(e, SynonymousEnvironmentVariablesMismatched)
+    assert isinstance(e, ConfigurationError)
+    assert isinstance(e, ValueError)
+    assert isinstance(e, Exception)
+
+# TODO: Write more tests later...
+#  InferredBucketConflict, subclass of ConfigurationError, with init args kind, specified, inferred.
+#  CannotInferEnvFromNoGlobalEnvs, subclass of ConfigurationError, with init arg global_bucket.
+#  CannotInferEnvFromManyGlobalEnvs, subclass of ConfigurationError, with init args global_bucket, keys.
+#  MissingGLobalEnv,subclass of ConfigurationError, with init args global_bucket, keys, env.
+#  GlobalBucketAccessError, subclass of ConfigurationError, with init args global_bucket, status.

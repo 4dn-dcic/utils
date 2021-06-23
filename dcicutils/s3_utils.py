@@ -11,8 +11,8 @@ import requests
 from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name
 from .misc_utils import PRINT
 from .exceptions import (
-    InferredBucketConflict, CannotInferEnvFromEmptyGlobal, CannotInferEnvFromManyGlobal, CannotFindEnvInGlobal,
-    GlobalBucketAccessError,
+    InferredBucketConflict, CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv,
+    GlobalBucketAccessError, SynonymousEnvironmentVariablesMismatched,
 )
 
 
@@ -40,11 +40,11 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         status = head_response['ResponseMetadata']['HTTPStatusCode']  # should be 200; raise error for 404 or 403
         if status != 200:
             raise GlobalBucketAccessError(global_bucket=global_bucket, status=status)
-        # list contents of global bucket, look for a match with the global bucket name
+        # list contents of global env bucket, look for a match with the global env bucket name
         list_response = s3_client.list_objects_v2(Bucket=global_bucket)
         # no match, raise exception
         if list_response['KeyCount'] < 1:
-            raise CannotInferEnvFromEmptyGlobal(global_bucket=global_bucket)
+            raise CannotInferEnvFromNoGlobalEnvs(global_bucket=global_bucket)
         keys = [content['Key'] for content in list_response['Contents']]
         if env is None:
             if len(keys) == 1:
@@ -53,13 +53,13 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 logger.warn("No env was specified, but {env} is the only one available, so using that."
                             .format(env=env))
             else:
-                raise CannotInferEnvFromManyGlobal(global_bucket=global_bucket, keys=keys)
+                raise CannotInferEnvFromManyGlobalEnvs(global_bucket=global_bucket, keys=keys)
         config_filename = None
         for filename in keys:
             if filename == env:
                 config_filename = filename
         if not config_filename:
-            raise CannotFindEnvInGlobal(global_bucket=global_bucket, keys=keys, env=env)
+            raise MissingGlobalEnv(global_bucket=global_bucket, keys=keys, env=env)
         else:
             # we found a match, so fetch that file as config
             get_response = s3_client.get_object(Bucket=global_bucket, Key=config_filename)
@@ -79,21 +79,30 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     def __init__(self, outfile_bucket=None, sys_bucket=None, raw_file_bucket=None,
                  blob_bucket=None, metadata_bucket=None, env=None):
         """ Initializes s3 utils in one of three ways:
-        1) If 'GLOBAL_BUCKET_ENV' is set to an S3 env bucket, use that bucket to fetch the env for the buckets.
-           We then use this env to build the bucket names.
-        2) With no global env set, if we instead pass in the env kwarg, we use this kwarg to build the bucket names.
-        3) With no global env or env kwarg, we expect bucket kwargs to be set, and use those as bucket names directly.
+        1) If 'GLOBAL_ENV_BUCKET' is set to an S3 env bucket, use that bucket to fetch the env for the buckets.
+           We then use this env to build the bucket names. If there is only one such env, env can be None or omitted.
+        2) With GLOBAL_ENV_BUCKET not set, if we instead pass in the env kwarg,
+           we use this kwarg to build the bucket names according to legacy conventions.
+        3) With no GLOBAL_ENV_BUCKET or env kwarg,
+           we expect bucket kwargs to be set, and use those as bucket names directly.
         """
         # avoid circular ref
         from .beanstalk_utils import get_beanstalk_real_url
         self.url = ''
         self.s3 = boto3.client('s3', region_name='us-east-1')
-        global_bucket = os.environ.get('GLOBAL_BUCKET_ENV')
+        global_bucket_env_var='GLOBAL_BUCKET_ENV'  # Deprecated. Supported for now since some tools started using it.
+        global_env_bucket_var='GLOBAL_ENV_BUCKET'  # Preferred name. Please transition code to use this.
+        global_bucket_env = os.environ.get(global_bucket_env_var)
+        global_env_bucket = os.environ.get(global_env_bucket_var)
+        if global_env_bucket and global_bucket_env and global_env_bucket != global_bucket_env:
+            raise SynonymousEnvironmentVariablesMismatched(var1=global_bucket_env_var, val1=global_bucket_env,
+                                                           var2=global_env_bucket_var, val2=global_env_bucket)
+        global_bucket = global_env_bucket or global_bucket_env
         if sys_bucket is None:
             # The choice to discriminate first on sys_bucket being None is part of the resolution of
             # https://hms-dbmi.atlassian.net/browse/C4-674
             if global_bucket:
-                logger.warning('Fetching bucket data via GLOBAL_BUCKET_ENV: {}'.format(global_bucket))
+                logger.warning('Fetching bucket data via global env bucket: {}'.format(global_bucket))
                 env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket, env=env)
                 ff_url = env_config['fourfront']
                 health_json_url = '{ff_url}/health?format=json'.format(ff_url=ff_url)

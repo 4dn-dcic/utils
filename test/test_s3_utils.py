@@ -584,7 +584,7 @@ def test_unzip_s3_to_s3_store_results_unit(integrated_names):
 # From https://hms-dbmi.atlassian.net/browse/C4-674
 # To be a viable test, this will need some mocking.
 # def test_s3_utils_legacy_behavior():
-#     os.environ['GLOBAL_BUCKET_ENV'] = 'foursight-cgap-mastertest-envs'
+#     os.environ['GLOBAL_BUCKET_ENV'] = os.environ['GLOBAL_ENV_BUCKET'] = 'foursight-cgap-mastertest-envs'
 #     s3Utils('application-cgap-mastertest-wfout',
 #             'application-cgap-mastertest-wfout',
 #             'application-cgap-mastertest-wfout')
