@@ -17,7 +17,12 @@ def get_ecs_real_url(env):
     return ''
 
 
-def get_ecr_repo_url(env):
+# XXX: For now, this hardcoded constant must be kept consistent with 4dn-cloud-infra.
+#      We need to re-think how this is looked up.
+ECR_TRIAL_ALPHA_REPO_URL = 'C4EcrTrialAlphaECRRepoURL'
+
+
+def get_ecr_repo_url(env, from_stack_output_key=ECR_TRIAL_ALPHA_REPO_URL):
     """ Gets the ECR repository URL of the repository from which ECS pulls application
         image runtimes from.
     """
@@ -25,7 +30,7 @@ def get_ecr_repo_url(env):
     stacks = cfn_client.describe_stacks().get('Stacks', [])
     for stack in stacks:
         for output in stack.get('Outputs', []):
-            if output.get('OutputKey', '') == 'C4EcrTrialAlphaECRRepoURL':  # XXX: hardcoded constant from 4dn-cloud-infra
+            if output.get('OutputKey', '') == from_stack_output_key:
                 val = output.get('OutputValue')
                 if env in val:
                     return val

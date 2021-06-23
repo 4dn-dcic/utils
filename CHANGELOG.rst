@@ -12,50 +12,75 @@ Change Log
 
 **PR 146: Better S3 bucket management in deployment_utils**
 
-In ``deployment_utils``:
+* In ``cloudformation_utils``:
 
-* Add environment variables that can be set per stack/instance:
+  * Small bug fix to ``get_ecs_real_url``.
 
-  * ``ENCODED_S3_BUCKET_ENV`` - a unique token for your organization to be used in auto-generating S3 bucket names.
-    The defaulted value (which includes possible override by a ``--s3_bucket_env`` argument in the generator command)
-    will be usable as ``${S3_BUCKET_ENV}`` in ``.ini`` file templates.
+  * Add ``get_ecr_repo_url``.
 
-  * ``ENCODED_FILE_UPLOAD_BUCKET`` - the name of the file upload bucket to use if a ``--file_upload_bucket`` argument
-    is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-files``
-    is not desired. This fully defaulted value will be available as ``${FILE_UPLOAD_BUCKET}`` in ``.ini`` file
-    templates, and is the recommended way to compute the proper value for the ``file_upload_bucket`` configuration
-    parameter.
+* In ``deployment_utils``:
 
-  * ``ENCODED_FILE_WFOUT_BUCKET`` - the name of the file wfout bucket to use if a ``--file_wfout_bucket`` argument
-    is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-wfoutput``
-    is not desired. This fully defaulted value will be available as ``${FILE_WFOUT_BUCKET}`` in ``.ini`` file
-    templates, and is the recommended way to compute the proper value for the ``file_wfout_bucket`` configuration
-    parameter.
+   * Add environment variables that can be set per stack/instance:
 
-  * ``ENCODED_BLOB_BUCKET`` - the name of the blob bucket to use if a ``--blob_bucket`` argument
-    is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-blobs``
-    is not desired. This fully defaulted value will be available as ``${BLOB_BUCKET}`` in ``.ini`` file
-    templates, and is the recommended way to compute the proper value for the ``blob_bucket`` configuration
-    parameter.
+     * ``ENCODED_S3_BUCKET_ENV`` - a unique token for your organization to be used in auto-generating S3 bucket names.
+       The defaulted value (which includes possible override by a ``--s3_bucket_env`` argument in the generator command)
+       will be usable as ``${S3_BUCKET_ENV}`` in ``.ini`` file templates.
 
-  * ``ENCODED_SYSTEM_BUCKET`` - the name of the system bucket to use if a ``--system_bucket`` argument
-    is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-system``
-    is not desired. This fully defaulted value will be available as ``${SYSTEM_BUCKET}`` in ``.ini`` file
-    templates, and is the recommended way to compute the proper value for the ``system_bucket`` configuration
-    parameter.
+     * ``ENCODED_FILE_UPLOAD_BUCKET`` - the name of the file upload bucket to use if a ``--file_upload_bucket`` argument
+       is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-files``
+       is not desired. This fully defaulted value will be available as ``${FILE_UPLOAD_BUCKET}`` in ``.ini`` file
+       templates, and is the recommended way to compute the proper value for the ``file_upload_bucket`` configuration
+       parameter.
 
-  * ``METADATA_BUNDLES_BUCKET`` - the name of the metadata bundles bucket to use if a ``--metadata_bundles_bucket``
-    argument is not given in the generator command, and the default of
-    ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-metadata-bundles`` is not desired. This fully defaulted value will be
-    available as ``${METADATA_BUNDLES_BUCKET}`` in ``.ini`` file
-    templates, and is the recommended way to compute the proper value for the ``metadata_bundles_bucket`` configuration
-    parameter.
+     * ``ENCODED_FILE_WFOUT_BUCKET`` - the name of the file wfout bucket to use if a ``--file_wfout_bucket`` argument
+      is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-wfoutput``
+      is not desired. This fully defaulted value will be available as ``${FILE_WFOUT_BUCKET}`` in ``.ini`` file
+       templates, and is the recommended way to compute the proper value for the ``file_wfout_bucket`` configuration
+       parameter.
 
-  * Fixed a bug that the index_server argument was not being correctly passed into lower level functions when
-    ``--index_server`` was specified on the command line.
+     * ``ENCODED_BLOB_BUCKET`` - the name of the blob bucket to use if a ``--blob_bucket`` argument
+       is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-blobs``
+       is not desired. This fully defaulted value will be available as ``${BLOB_BUCKET}`` in ``.ini`` file
+       templates, and is the recommended way to compute the proper value for the ``blob_bucket`` configuration
+       parameter.
 
-  * Fixed a bug where passing no ``--encoded_data_set`` but an explicit null-string value of the environment variable
-    ``ENCODED_DATA_SET`` did not lead to further defaulting in some circumstances.
+     * ``ENCODED_SYSTEM_BUCKET`` - the name of the system bucket to use if a ``--system_bucket`` argument
+       is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-system``
+       is not desired. This fully defaulted value will be available as ``${SYSTEM_BUCKET}`` in ``.ini`` file
+       templates, and is the recommended way to compute the proper value for the ``system_bucket`` configuration
+       parameter.
+
+     * ``METADATA_BUNDLES_BUCKET`` - the name of the metadata bundles bucket to use if a ``--metadata_bundles_bucket``
+       argument is not given in the generator command, and the default of
+       ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-metadata-bundles`` is not desired. This fully defaulted value will be
+       available as ``${METADATA_BUNDLES_BUCKET}`` in ``.ini`` file
+       templates, and is the recommended way to compute the proper value for the ``metadata_bundles_bucket`` configuration
+       parameter.
+
+     * Fixed a bug that the index_server argument was not being correctly passed into lower level functions when
+       ``--index_server`` was specified on the command line.
+
+     * Fixed a bug where passing no ``--encoded_data_set`` but an explicit null-string value of the environment variable
+       ``ENCODED_DATA_SET`` did not lead to further defaulting in some circumstances.
+
+  * In ``ff_utils``:
+
+    * Add ``fetch_network_ids``.
+
+  * In ``s3_utils``:
+
+    * Add new methods ``fetch_health_page_json`` and ``verify_and_Get_env_config`` in support of new initialization
+      protocol for ``s3Utils``.
+
+    * Extend ``s3Utils`` initialization protocol so that under certain conditions,
+      environment variable if ``GLOBAL_ENV_BUCKET`` is set,
+      the init protocol will be discovered from that bucket.
+
+      NOTE WELL: The name ``GLOBAL_BUCKET_ENV`` is also supported as a synonm for ``GLOBAL_ENV_BUCKET``
+      because it was used in testing before we settled on a final name, and we're allowing a
+      grace period. But this name should not be considered properly supported. That it works now
+      is a courtesy and anyone concerned about incompatible changes should use the newer name,
+      ``GLOBAL_ENV_BUCEKT``.
 
 
 1.18.1

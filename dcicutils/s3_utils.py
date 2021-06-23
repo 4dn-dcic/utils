@@ -90,8 +90,8 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         from .beanstalk_utils import get_beanstalk_real_url
         self.url = ''
         self.s3 = boto3.client('s3', region_name='us-east-1')
-        global_bucket_env_var='GLOBAL_BUCKET_ENV'  # Deprecated. Supported for now since some tools started using it.
-        global_env_bucket_var='GLOBAL_ENV_BUCKET'  # Preferred name. Please transition code to use this.
+        global_bucket_env_var = 'GLOBAL_BUCKET_ENV'  # Deprecated. Supported for now since some tools started using it.
+        global_env_bucket_var = 'GLOBAL_ENV_BUCKET'  # Preferred name. Please transition code to use this.
         global_bucket_env = os.environ.get(global_bucket_env_var)
         global_env_bucket = os.environ.get(global_env_bucket_var)
         if global_env_bucket and global_bucket_env and global_env_bucket != global_bucket_env:
@@ -125,7 +125,8 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 else:
                     raw_file_bucket = raw_file_bucket_from_health_page
                 if blob_bucket and blob_bucket != blob_bucket_from_health_page:
-                    raise InferredBucketConflict(kind="blob", specified=blob_bucket, inferred=blob_bucket_from_health_page)
+                    raise InferredBucketConflict(kind="blob", specified=blob_bucket,
+                                                 inferred=blob_bucket_from_health_page)
                 else:
                     blob_bucket = blob_bucket_from_health_page
                 if metadata_bucket and metadata_bucket != metadata_bucket_from_health_page:

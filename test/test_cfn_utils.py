@@ -1,4 +1,3 @@
-import pytest
 from unittest import mock
 from dcicutils.cloudformation_utils import get_ecs_real_url
 
