@@ -50,8 +50,8 @@ Change Log
        templates, and is the recommended way to compute the proper value for the ``system_bucket`` configuration
        parameter.
 
-     * ``METADATA_BUNDLES_BUCKET`` - the name of the metadata bundles bucket to use if a ``--metadata_bundles_bucket``
-       argument is not given in the generator command, and the default of
+     * ``ENCODED_METADATA_BUNDLES_BUCKET`` - the name of the metadata bundles bucket to use if a
+       ``--metadata_bundles_bucket`` argument is not given in the generator command, and the default of
        ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-metadata-bundles`` is not desired. This fully defaulted value will be
        available as ``${METADATA_BUNDLES_BUCKET}`` in ``.ini`` file
        templates, and is the recommended way to compute the proper value for the ``metadata_bundles_bucket`` configuration
