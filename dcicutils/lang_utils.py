@@ -1,7 +1,7 @@
 import datetime
 import re
 
-from .qa_utils import ignored
+from .misc_utils import ignored
 
 
 class EnglishUtils:

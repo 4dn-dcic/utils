@@ -33,14 +33,13 @@ import time
 import boto3
 from git import Repo
 
-from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env
-from dcicutils.env_utils import (
+from .beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env
+from .env_utils import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS,
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, is_test_env, is_hotseat_env,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
 )
-from dcicutils.misc_utils import PRINT, Retry, apply_dict_overrides
-from dcicutils.qa_utils import override_environ
+from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ
 
 
 # constants associated with EB-related APIs
@@ -401,10 +400,13 @@ class IniFileManager:
     PYPROJECT_FILE_NAME = None
 
     @classmethod
-    def build_ini_file_from_template(cls, template_file_name, init_file_name,
-                                     bs_env=None, bs_mirror_env=None, s3_bucket_env=None,
+    def build_ini_file_from_template(cls, template_file_name, init_file_name, *,
+                                     bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
                                      data_set=None, es_server=None, es_namespace=None,
-                                     indexer=None, index_server=None, sentry_dsn=None):
+                                     indexer=None, index_server=None, sentry_dsn=None,
+                                     file_upload_bucket=None, file_wfout_bucket=None,
+                                     blob_bucket=None, system_bucket=None, metadata_bundles_bucket=None):
+
         """
         Builds a .ini file from a given template file.
 
@@ -413,24 +415,42 @@ class IniFileManager:
             init_file_name (str): The name of the .ini file to build.
             bs_env (str): The ElasticBeanstalk environment name for which this .ini file should work.
             bs_mirror_env (str): The name of the ElasticBeanstalk environment that acts as a blue/green mirror.
+            s3_bucket_org (str): A token that uniquely identifies your organization for use in all s3 bucket names.
+              In the original CGAP, this token was 'elasticbeanstalk'. Going forward, each account must choose
+              a token that uniquely identifies the organization instead. The default of 'elasticbeanstalk'
+              is necessary for legacy reasons but will fail for any other organization than the original HMS/DBMI use.
+              You really need to specify this argument or use the ENCODED_S3_BUCKET_ORG environment variable.
             s3_bucket_env (str): Environment name that is part of the s3 bucket name. (Usually defaults properly.)
             data_set (str): An identifier for data to load (either 'prod' for prd/stg envs, or 'test' for others)
             es_server (str): The server name (or server:port) for the ElasticSearch server.
             es_namespace (str): The ElasticSearch namespace to use (probably but not necessarily same as bs_env).
             indexer (bool): Whether or not we are building an ini file for an indexer.
             index_server (bool): Whether or not we are building an ini file for an index server.
+            file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
+            file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
+            blob_bucket (str): Specific name of the bucket to use on S3 for blob data.
+            system_bucket (str): Specific name of the bucket to use on S3 for system data.
+            metadata_bundles_bucket (str): Specific name of the bucket to use on S3 for metadata bundles data.
         """
         with io.open(init_file_name, 'w') as init_file_fp:
             cls.build_ini_stream_from_template(template_file_name=template_file_name,
                                                init_file_stream=init_file_fp,
                                                bs_env=bs_env,
                                                bs_mirror_env=bs_mirror_env,
+                                               s3_bucket_org=s3_bucket_org,
                                                s3_bucket_env=s3_bucket_env,
                                                data_set=data_set,
                                                es_server=es_server,
                                                es_namespace=es_namespace,
                                                indexer=indexer,
-                                               sentry_dsn=sentry_dsn)
+                                               index_server=index_server,
+                                               sentry_dsn=sentry_dsn,
+                                               file_upload_bucket=file_upload_bucket,
+                                               file_wfout_bucket=file_wfout_bucket,
+                                               blob_bucket=blob_bucket,
+                                               system_bucket=system_bucket,
+                                               metadata_bundles_bucket=metadata_bundles_bucket,
+                                               )
 
     # Ref: https://stackoverflow.com/questions/19911123/how-can-you-get-the-elastic-beanstalk-application-version-in-your-application  # noqa: E501
     EB_MANIFEST_FILENAME = "/opt/elasticbeanstalk/deploy/manifest"
@@ -472,11 +492,15 @@ class IniFileManager:
 
     AUTO_INDEX_SERVER_TOKEN = "__index_server"
 
+    LEGACY_S3_BUCKET_ORG = "elasticbeanstalk"
+
     @classmethod
-    def build_ini_stream_from_template(cls, template_file_name, init_file_stream,
-                                       bs_env=None, bs_mirror_env=None, s3_bucket_env=None, data_set=None,
-                                       es_server=None, es_namespace=None, indexer=None, index_server=None,
-                                       sentry_dsn=None):
+    def build_ini_stream_from_template(cls, template_file_name, init_file_stream, *,
+                                       bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
+                                       data_set=None, es_server=None, es_namespace=None, indexer=None,
+                                       index_server=None, sentry_dsn=None, file_upload_bucket=None,
+                                       file_wfout_bucket=None, blob_bucket=None, system_bucket=None,
+                                       metadata_bundles_bucket=None):
         """
         Sends output to init_file_stream corresponding to the data noe would want in an ini file
         for the given template_file_name and available environment variables.
@@ -501,11 +525,33 @@ class IniFileManager:
         es_server = es_server or os.environ.get('ENCODED_ES_SERVER', "MISSING_ENCODED_ES_SERVER")
         bs_env = bs_env or os.environ.get("ENCODED_BS_ENV", "MISSING_ENCODED_BS_ENV")
         bs_mirror_env = bs_mirror_env or os.environ.get("ENCODED_BS_MIRROR_ENV", get_standard_mirror_env(bs_env)) or ""
+        s3_bucket_org = (s3_bucket_org
+                         or os.environ.get("ENCODED_S3_BUCKET_ORG")
+                         or cls.LEGACY_S3_BUCKET_ORG)
         s3_bucket_env = s3_bucket_env or os.environ.get("ENCODED_S3_BUCKET_ENV", get_bucket_env(bs_env))
-        data_set = data_set or os.environ.get("ENCODED_DATA_SET",
-                                              data_set_for_env(bs_env) or "MISSING_ENCODED_DATA_SET")
+        data_set = (data_set
+                    or os.environ.get("ENCODED_DATA_SET")
+                    or data_set_for_env(bs_env)
+                    or "MISSING_ENCODED_DATA_SET")
         es_namespace = es_namespace or os.environ.get("ENCODED_ES_NAMESPACE", bs_env)
         sentry_dsn = sentry_dsn or os.environ.get("ENCODED_SENTRY_DSN", "")
+
+        file_upload_bucket = (file_upload_bucket
+                              or os.environ.get("ENCODED_FILE_UPLOAD_BUCKET")
+                              or f"{s3_bucket_org}-{s3_bucket_env}-files")
+        file_wfout_bucket = (file_wfout_bucket
+                             or os.environ.get("ENCODED_FILE_WFOUT_BUCKET")
+                             or f"{s3_bucket_org}-{s3_bucket_env}-wfoutput")
+        blob_bucket = (blob_bucket
+                       or os.environ.get("ENCODED_BLOB_BUCKET")
+                       or f"{s3_bucket_org}-{s3_bucket_env}-blobs")
+        system_bucket = (system_bucket
+                         or os.environ.get("ENCODED_SYSTEM_BUCKET")
+                         or f"{s3_bucket_org}-{s3_bucket_env}-system")
+        metadata_bundles_bucket = (metadata_bundles_bucket
+                                   or os.environ.get("ENCODED_METADATA_BUNDLES_BUCKET")
+                                   or f"{s3_bucket_org}-{s3_bucket_env}-metadata-bundles")
+
         # Set ENCODED_INDEXER to 'true' to deploy an indexer.
         # If the value is missing, the empty string, or any other thing besides 'true' (in any case),
         # this value will default to the empty string, causing the line not to appear in the output file
@@ -541,12 +587,18 @@ class IniFileManager:
             'ES_SERVER': es_server,
             'BS_ENV': bs_env,
             'BS_MIRROR_ENV': bs_mirror_env,
+            'S3_BUCKET_ORG': s3_bucket_org,
             'S3_BUCKET_ENV': s3_bucket_env,
             'DATA_SET': data_set,
             'ES_NAMESPACE': es_namespace,
             'INDEXER': indexer,
             'INDEX_SERVER': index_server,
             'SENTRY_DSN': sentry_dsn,
+            'FILE_UPLOAD_BUCKET': file_upload_bucket,
+            'FILE_WFOUT_BUCKET': file_wfout_bucket,
+            'BLOB_BUCKET': blob_bucket,
+            'SYSTEM_BUCKET': system_bucket,
+            'METADATA_BUNDLES_BUCKET': metadata_bundles_bucket,
         }
 
         # if we specify an indexer name for bs_env, we did the deployment wrong and should bail
@@ -637,6 +689,9 @@ class IniFileManager:
             parser.add_argument("--bs_mirror_env",
                                 help="the name of the mirror of the ElasticBeanstalk environment name",
                                 default=None)
+            parser.add_argument("--s3_bucket_org",
+                                help="a token that uniquely identifies your organization for use in all s3 buckets",
+                                default=None)
             parser.add_argument("--s3_bucket_env",
                                 help="name of env to use in s3 bucket name, usually defaulted without specifying",
                                 default=None)
@@ -661,6 +716,21 @@ class IniFileManager:
             parser.add_argument("--sentry_dsn",
                                 help="a sentry DSN",
                                 default=None)
+            parser.add_argument("--file_upload_bucket",
+                                help="the name of the file upload bucket to use",
+                                default=None)
+            parser.add_argument("--file_wfout_bucket",
+                                help="the name of the file wfout bucket to use",
+                                default=None)
+            parser.add_argument("--blob_bucket",
+                                help="the name of a blob bucket to use",
+                                default=None)
+            parser.add_argument("--system-bucket",
+                                help="the name of a system bucket to use",
+                                default=None)
+            parser.add_argument("--metadata_bundles_bucket",
+                                help="the name of a metadata bundles bucket to use",
+                                default=None)
             args = parser.parse_args()
             template_file_name = (cls.any_environment_template_filename()
                                   if args.use_any
@@ -670,10 +740,14 @@ class IniFileManager:
             # print("ini_file_name=", ini_file_name)
             cls.build_ini_file_from_template(template_file_name, ini_file_name,
                                              bs_env=args.bs_env, bs_mirror_env=args.bs_mirror_env,
-                                             s3_bucket_env=args.s3_bucket_env, data_set=args.data_set,
+                                             s3_bucket_org=args.s3_bucket_org, s3_bucket_env=args.s3_bucket_env,
+                                             data_set=args.data_set,
                                              es_server=args.es_server, es_namespace=args.es_namespace,
                                              indexer=args.indexer, index_server=args.index_server,
-                                             sentry_dsn=args.sentry_dsn)
+                                             sentry_dsn=args.sentry_dsn, file_upload_bucket=args.file_upload_bucket,
+                                             file_wfout_bucket=args.file_wfout_bucket,
+                                             blob_bucket=args.blob_bucket, system_bucket=args.system_bucket,
+                                             metadata_bundles_bucket=args.metadata_bundles_bucket)
         except Exception as e:
             PRINT("Error (%s): %s" % (e.__class__.__name__, e))
             sys.exit(1)
