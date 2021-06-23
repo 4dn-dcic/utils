@@ -10,6 +10,10 @@ import logging
 import requests
 from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name
 from .misc_utils import PRINT
+from .exceptions import (
+    InferredBucketConflict, CannotInferEnvFromEmptyGlobal, CannotInferEnvFromManyGlobal, CannotFindEnvInGlobal,
+    GlobalBucketAccessError,
+)
 
 
 ###########################
@@ -35,27 +39,29 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         head_response = s3_client.head_bucket(Bucket=global_bucket)
         status = head_response['ResponseMetadata']['HTTPStatusCode']  # should be 200; raise error for 404 or 403
         if status != 200:
-            raise Exception('Could not access GLOBAL_BUCKET_ENV {global_bucket}: status: {status}'.format(
-                global_bucket=global_bucket, status=status))
+            raise GlobalBucketAccessError(global_bucket=global_bucket, status=status)
         # list contents of global bucket, look for a match with the global bucket name
         list_response = s3_client.list_objects_v2(Bucket=global_bucket)
         # no match, raise exception
         if list_response['KeyCount'] < 1:
-            raise Exception('No config objects found in global bucket {global_bucket}'.format(
-                global_bucket=global_bucket))
-        keys = [list_response['Contents'][i]['Key'] for i in range(0, len(list_response['Contents']))]
+            raise CannotInferEnvFromEmptyGlobal(global_bucket=global_bucket)
+        keys = [content['Key'] for content in list_response['Contents']]
+        if env is None:
+            if len(keys) == 1:
+                # If there is only one env, which is the likely case, let's infer that this is the one we want.
+                env = keys[0]
+                logger.warn("No env was specified, but {env} is the only one available, so using that."
+                            .format(env=env))
+            else:
+                raise CannotInferEnvFromManyGlobal(global_bucket=global_bucket, keys=keys)
         config_filename = None
         for filename in keys:
             if filename == env:
                 config_filename = filename
         if not config_filename:
-            raise Exception('no matches for global env bucket: {global_bucket}; keys: {keys}; desired env: {env}'.format(
-                global_bucket=global_bucket,
-                keys=keys,
-                env=env
-            ))
+            raise CannotFindEnvInGlobal(global_bucket=global_bucket, keys=keys, env=env)
         else:
-            # one match, fetch that file as config
+            # we found a match, so fetch that file as config
             get_response = s3_client.get_object(Bucket=global_bucket, Key=config_filename)
             env_config = json.loads(get_response['Body'].read())
             return env_config
@@ -83,32 +89,61 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         self.url = ''
         self.s3 = boto3.client('s3', region_name='us-east-1')
         global_bucket = os.environ.get('GLOBAL_BUCKET_ENV')
-        if global_bucket:
-            logger.warning('Fetching bucket data via GLOBAL_BUCKET_ENV: {}'.format(global_bucket))
-            env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket, env=env)
-            ff_url = env_config['fourfront']
-            health_json_url = '{ff_url}/health?format=json'.format(ff_url=ff_url)
-            logger.warning('health json url: {}'.format(health_json_url))
-            health_json = self.fetch_health_page_json(url=health_json_url, use_urllib=True)
-            sys_bucket = sys_bucket or health_json['system_bucket']
-            outfile_bucket = outfile_bucket or health_json['processed_file_bucket']
-            raw_file_bucket = raw_file_bucket or health_json['file_upload_bucket']
-            blob_bucket = blob_bucket or health_json['blob_bucket']
-            metadata_bucket = metadata_bucket or health_json.get('metadata_bundles_bucket', None)  # N/A for 4DN
-            logger.warning('Buckets resolved successfully.')
-        elif sys_bucket is None:
-            # staging and production share same buckets
-            if env:
-                if is_stg_or_prd_env(env):
-                    self.url = get_beanstalk_real_url(env)
-                    env = prod_bucket_env(env)
+        if sys_bucket is None:
+            # The choice to discriminate first on sys_bucket being None is part of the resolution of
+            # https://hms-dbmi.atlassian.net/browse/C4-674
+            if global_bucket:
+                logger.warning('Fetching bucket data via GLOBAL_BUCKET_ENV: {}'.format(global_bucket))
+                env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket, env=env)
+                ff_url = env_config['fourfront']
+                health_json_url = '{ff_url}/health?format=json'.format(ff_url=ff_url)
+                logger.warning('health json url: {}'.format(health_json_url))
+                health_json = self.fetch_health_page_json(url=health_json_url, use_urllib=True)
+                sys_bucket_from_health_page = health_json['system_bucket']
+                outfile_bucket_from_health_page = health_json['processed_file_bucket']
+                raw_file_bucket_from_health_page = health_json['file_upload_bucket']
+                blob_bucket_from_health_page = health_json['blob_bucket']
+                metadata_bucket_from_health_page = health_json.get('metadata_bundles_bucket', None)  # N/A for 4DN
+                sys_bucket = sys_bucket_from_health_page  # OK to overwrite because we checked it's None above
+                if outfile_bucket and outfile_bucket != outfile_bucket_from_health_page:
+                    raise InferredBucketConflict(kind="outfile", specified=outfile_bucket,
+                                                 inferred=outfile_bucket_from_health_page)
                 else:
-                    env = full_env_name(env)
-            # we use standardized naming schema, so s3 buckets always have same prefix
-            sys_bucket = self.SYS_BUCKET_TEMPLATE % env
-            outfile_bucket = self.OUTFILE_BUCKET_TEMPLATE % env
-            raw_file_bucket = self.RAW_BUCKET_TEMPLATE % env
-            blob_bucket = self.BLOB_BUCKET_TEMPLATE % env
+                    outfile_bucket = outfile_bucket_from_health_page
+                if raw_file_bucket and raw_file_bucket != raw_file_bucket_from_health_page:
+                    raise InferredBucketConflict(kind="raw file", specified=raw_file_bucket,
+                                                 inferred=raw_file_bucket_from_health_page)
+                else:
+                    raw_file_bucket = raw_file_bucket_from_health_page
+                if blob_bucket and blob_bucket != blob_bucket_from_health_page:
+                    raise InferredBucketConflict(kind="blob", specified=blob_bucket, inferred=blob_bucket_from_health_page)
+                else:
+                    blob_bucket = blob_bucket_from_health_page
+                if metadata_bucket and metadata_bucket != metadata_bucket_from_health_page:
+                    raise InferredBucketConflict(kind="metadata", specified=metadata_bucket,
+                                                 inferred=metadata_bucket_from_health_page)
+                else:
+                    metadata_bucket = metadata_bucket_from_health_page
+                logger.warning('Buckets resolved successfully.')
+            else:
+                # staging and production share same buckets
+                if env:
+                    if is_stg_or_prd_env(env):
+                        self.url = get_beanstalk_real_url(env)
+                        env = prod_bucket_env(env)
+                    else:
+                        env = full_env_name(env)
+                # we use standardized naming schema, so s3 buckets always have same prefix
+                sys_bucket = self.SYS_BUCKET_TEMPLATE % env
+                outfile_bucket = self.OUTFILE_BUCKET_TEMPLATE % env
+                raw_file_bucket = self.RAW_BUCKET_TEMPLATE % env
+                blob_bucket = self.BLOB_BUCKET_TEMPLATE % env
+        else:
+            # If at least sys_bucket was given, for legacy reasons (see https://hms-dbmi.atlassian.net/browse/C4-674)
+            # we assume that the given buckets are exactly the ones we want and we don't set up any others.
+            # It follows from this that if not all the buckets are given, some may end up being None, but we assume
+            # those won't be needed. -kmp 23-Jun-2021
+            pass
 
         self.sys_bucket = sys_bucket
         self.outfile_bucket = outfile_bucket
