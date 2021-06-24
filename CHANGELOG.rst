@@ -22,6 +22,10 @@ Change Log
 
    * Add environment variables that can be set per stack/instance:
 
+     * ``ENCODED_S3_BUCKET_ORG`` - a unique token for your organization to be used in auto-generating S3 bucket orgs.
+       The defaulted value (which includes possible override by a ``--s3_bucket_org`` argument in the generator command)
+       will be usable as ``${S3_BUCKET_ORG}`` in ``.ini`` file templates.
+
      * ``ENCODED_S3_BUCKET_ENV`` - a unique token for your organization to be used in auto-generating S3 bucket names.
        The defaulted value (which includes possible override by a ``--s3_bucket_env`` argument in the generator command)
        will be usable as ``${S3_BUCKET_ENV}`` in ``.ini`` file templates.
