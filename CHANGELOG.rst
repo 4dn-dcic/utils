@@ -67,6 +67,10 @@ Change Log
 
     * Add ``fetch_network_ids``.
 
+  * In ``misc_utils``:
+
+    * Add ``dict_zip``.
+
   * In ``s3_utils``:
 
     * Add new methods ``fetch_health_page_json`` and ``verify_and_Get_env_config`` in support of new initialization
