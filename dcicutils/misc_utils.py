@@ -1421,6 +1421,33 @@ def decorator():
     return _decorator
 
 
+def dict_zip(dict1, dict2):
+    """
+    This is like the zip operator that zips two lists, but it takes two dictionaries and pairs matching elements.
+    e.g.,
+
+        >>> dict_zip({'a': 'one', 'b': 'two'}, {'a': 1, 'b': 2})
+        [('one', 1), ('two', 2)]
+
+    In Python 3.6+, the order of the result list is the same as the order of the keys in the first dict.
+    If the two dictionaries do not have exactly the same set of keys, an error will be raised.
+    """
+    res = []
+    for key1 in dict1:
+        if key1 not in dict2:
+            raise ValueError(f"Key {key1!r} is in dict1, but not dict2."
+                             f" dict1.keys()={list(dict1.keys())}"
+                             f" dict2.keys()={list(dict2.keys())}")
+
+        res.append((dict1[key1], dict2[key1]))
+    for key2 in dict2:
+        if key2 not in dict1:
+            raise ValueError(f"Key {key2!r} is in dict1, but not dict2."
+                             f" dict1.keys()={list(dict1.keys())}"
+                             f" dict2.keys()={list(dict2.keys())}")
+    return res
+
+
 # Deprecated names, still supported for a while.
 HMS_TZ = REF_TZ
 hms_now = ref_now

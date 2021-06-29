@@ -23,7 +23,7 @@ from dcicutils.misc_utils import (
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
-    capitalize1, local_attrs,
+    capitalize1, local_attrs, dict_zip,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -2445,3 +2445,16 @@ def test_dynamic_properties():
     for thing in [3, "foo", None]:
         with local_attrs(thing):
             pass  # Just make sure no error occurs when no attributes given
+
+
+def test_dict_zip():
+
+    assert dict_zip({}, {}) == []
+    assert dict_zip({'a': 'one'}, {'a': 1}) == [('one', 1)]
+    assert dict_zip({'a': 'one', 'b': 'two'}, {'a': 1, 'b': 2}) == [('one', 1), ('two', 2)]
+
+    with pytest.raises(ValueError):
+        dict_zip({'a': 'one'}, {'a': 1, 'extra': 2})
+
+    with pytest.raises(ValueError):
+        dict_zip({'a': 'one', 'extra': 2}, {'a': 1})

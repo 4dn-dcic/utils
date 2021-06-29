@@ -116,6 +116,20 @@ def test_deployment_utils_build_ini_file_from_template():
     NOTE: This implicitly also tests build_ini_file_from_stream.
     """
 
+    # All variables named ENCODED_xxx1, ENCODED_xxx2, etc. are expected to be available in the template files
+    # as just xxx1, xxx2, etc. AFTER being merged with command line arguments (which take precedence). If not
+    # supplied, defaulting will in some cases occur. So the order of precedence for assigning values to the xxxN
+    # variables is:
+    #
+    # 1. Command arguments always take precedence over all else, as they are regarded as most specific.
+    # 2. If no command argument has intervened, ENCODED_xxxN values take precedence over any would-be-defaulting
+    #    because it represents the ambient default of the command and is presumably there to back up commands.
+    # 3. If neither a command argument nor an ENCODED_xxxN variable has assigned a default, argument-specific
+    #    defaulting might in some cases be attempted. In a few places, this defaulting uses previously-resolved
+    #    values of other variables (as happens where the last-resort default for bucket naming is composed from
+    #    s3_bucket_org and s3_bucket_env, but can be overridden on a bucket-kind by bucket-kind basis with
+    #    a <kind>_bucket argument to the command or an ENCODED_<kind>_BUCKET environment variable).
+
     with mock.patch("pkg_resources.get_distribution", return_value=FakeDistribution()):
 
         some_template_file_name = "mydir/whatever"
@@ -530,25 +544,28 @@ def test_deployment_utils_transitional_equivalence():
     # TODO: Once this mechanism is in place, the files cgap.ini, cgapdev.ini, cgaptest.ini, and cgapwolf.ini
     #       can either be removed (and these transitional tests removed) or transitioned to be test data.
 
-    def tester(ref_ini, bs_env, data_set, es_server, es_namespace=None, line_checker=None):
+    def tester(ref_ini, bs_env, data_set, es_server, *, any_ini=None, es_namespace=None, line_checker=None, **others):
         """
         This common tester program checks that the any.ini does the same thing as a given ref ini,
         given a particular set of environment variables.  It does the output to a string in both cases
         and then compares the result.
         """
 
-        assert ref_ini[:-4] == bs_env[10:]  # "xxx.ini" needs to match "fourfront-xxx"
+        if bs_env.startswith("fourfront"):
+            assert ref_ini[:-4] == bs_env[10:]  # "xxx.ini" needs to match "fourfront-xxx"
+        else:
+            assert ref_ini[:-4] == bs_env  # In a post-fourfront world, "xxx.ini" needs to match "xxx"
 
         es_namespace = es_namespace or bs_env
 
         # Test of build_ini_from_template with just 2 keyword arguments explicitly supplied (bs_env, es_server),
         # and others defaulted.
 
-        old_output = StringIO()
-        new_output = StringIO()
+        ref_output = StringIO()
+        any_output = StringIO()
 
-        any_ini = os.path.join(TestDeployer.TEMPLATE_DIR, "cg_any.ini" if is_cgap_env(bs_env) else "ff_any.ini")
-
+        any_ini_path = os.path.join(TestDeployer.TEMPLATE_DIR,
+                                    any_ini or ("cg_any.ini" if is_cgap_env(bs_env) else "ff_any.ini"))
         ref_ini_path = os.path.join(TestDeployer.TEMPLATE_DIR, ref_ini)
 
         with override_environ(APP_VERSION='externally_defined'):
@@ -558,35 +575,38 @@ def test_deployment_utils_transitional_equivalence():
             with pytest.raises(RuntimeError):
                 TestDeployer.build_ini_stream_from_template(ref_ini_path, "this shouldn't get used")
 
-        TestDeployer.build_ini_stream_from_template(ref_ini_path, old_output)
-        TestDeployer.build_ini_stream_from_template(any_ini, new_output,
+        TestDeployer.build_ini_stream_from_template(ref_ini_path, ref_output,
+                                                    bs_env=bs_env, es_server=es_server, **others)
+        TestDeployer.build_ini_stream_from_template(any_ini_path, any_output,
                                                     # data_env & es_namespace are something we should be able to default
-                                                    bs_env=bs_env, es_server=es_server)
+                                                    bs_env=bs_env, es_server=es_server, **others)
 
-        old_content = old_output.getvalue()
-        new_content = new_output.getvalue()
-        assert old_content == new_content
+        ref_content = ref_output.getvalue()
+        any_content = any_output.getvalue()
+        assert ref_content == any_content
 
         # Test of build_ini_from_template with all 4 keyword arguments explicitly supplied (bs_env, data_set,
         # es_server, es_namespace), none defaulted.
 
-        old_output = StringIO()
-        new_output = StringIO()
+        ref_output = StringIO()
+        any_output = StringIO()
 
-        TestDeployer.build_ini_stream_from_template(os.path.join(TestDeployer.TEMPLATE_DIR, ref_ini), old_output)
-        TestDeployer.build_ini_stream_from_template(any_ini, new_output,
+        TestDeployer.build_ini_stream_from_template(ref_ini_path, ref_output,
                                                     bs_env=bs_env, data_set=data_set,
-                                                    es_server=es_server, es_namespace=es_namespace)
+                                                    es_server=es_server, es_namespace=es_namespace, **others)
+        TestDeployer.build_ini_stream_from_template(any_ini_path, any_output,
+                                                    bs_env=bs_env, data_set=data_set,
+                                                    es_server=es_server, es_namespace=es_namespace, **others)
 
-        old_content = old_output.getvalue()
-        new_content = new_output.getvalue()
-        assert old_content == new_content
+        ref_content = ref_output.getvalue()
+        any_content = any_output.getvalue()
+        assert ref_content == any_content
 
         problems = []
 
         if line_checker:
 
-            for raw_line in io.StringIO(new_content):
+            for raw_line in io.StringIO(any_content):
                 line = raw_line.rstrip()
                 problem = line_checker.check(line)
                 if problem:
@@ -604,12 +624,14 @@ def test_deployment_utils_transitional_equivalence():
 
                     class Checker:
 
-                        def __init__(self, expect_indexer, expect_index_server):
+                        def __init__(self, expect_indexer, expect_index_server, expected_values=None):
                             self.indexer = None
                             self.expect_indexer = expect_indexer
                             self.expect_index_server = expect_index_server
                             self.indexer = None
                             self.index_server = None
+                            self.expected_values = expected_values or {}
+                            self.actual_values = {}
 
                         def check_any(self, line):
                             if line.startswith('indexer ='):
@@ -618,6 +640,11 @@ def test_deployment_utils_transitional_equivalence():
                             if line.startswith('index_server ='):
                                 print("saw index server line:", repr(line))
                                 self.index_server = line.split('=')[1].strip()
+                            for key in self.expected_values.keys():
+                                if line.startswith(f"{key} ="):
+                                    print("saw expected line:", repr(line))
+                                    self.actual_values[key] = line.split('=')[1].strip()
+                                    break  # very minor optimization, but not strictly needed
 
                         def check(self, line):
                             self.check_any(line)
@@ -625,6 +652,7 @@ def test_deployment_utils_transitional_equivalence():
                         def check_finally(self):
                             assert self.indexer == self.expect_indexer
                             assert self.index_server == self.expect_index_server
+                            assert self.expected_values == self.actual_values
 
                     class CGAPProdChecker(Checker):
                         pass
@@ -651,6 +679,96 @@ def test_deployment_utils_transitional_equivalence():
                            es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
                            line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                         expect_index_server=index_server_default))
+
+                    test_alpha_org = "alphatest"
+                    bs_env = "cgap_alpha"
+                    data_set = data_set_for_env(bs_env) or "prod"
+
+                    tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                           line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                        expect_index_server=index_server_default,
+                                                        expected_values={
+                                                            "file_upload_bucket": f"elasticbeanstalk-{bs_env}-files",
+                                                        }),
+                           s3_bucket_env=bs_env)
+
+                    tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                           line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                        expect_index_server=index_server_default,
+                                                        expected_values={
+                                                            "file_upload_bucket": f"{test_alpha_org}-{bs_env}-files",
+                                                        }),
+                           s3_bucket_env=bs_env,
+                           s3_bucket_org=test_alpha_org)
+
+                    bs_env = "cgap_alfa"
+                    tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                           line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                        expect_index_server=index_server_default,
+                                                        expected_values={
+                                                            "file_upload_bucket": 'fu-bucket',
+                                                            "file_wfout_bucket": 'fw-bucket',
+                                                            "blob_bucket": "b-bucket",
+                                                            "system_bucket": "s-bucket",
+                                                            "metadata_bundles_bucket": "md-bucket",
+                                                        }),
+                           s3_bucket_env=bs_env,
+                           s3_bucket_org=test_alpha_org,
+                           file_upload_bucket='fu-bucket',
+                           file_wfout_bucket='fw-bucket',
+                           blob_bucket='b-bucket',
+                           system_bucket='s-bucket',
+                           metadata_bundles_bucket='md-bucket')
+
+                    with override_environ(ENCODED_FILE_UPLOAD_BUCKET='decoy1',
+                                          ENCODED_FILE_WFOUT_BUCKET='decoy2',
+                                          ENCODED_BLOB_BUCKET='decoy3',
+                                          ENCODED_SYSTEM_BUCKET='decoy4',
+                                          ENCODED_METADATA_BUNDLES_BUCKET='decoy5',
+                                          ENCODED_S3_BUCKET_ORG='decoy6'):
+                        # The decoy values in the environment variables don't matter because we'll be passing
+                        # explicit values for these to the builder that will take precedence.
+                        tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                               es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                            expect_index_server=index_server_default,
+                                                            expected_values={
+                                                                "file_upload_bucket": 'fu-bucket',
+                                                                "file_wfout_bucket": 'fw-bucket',
+                                                                "blob_bucket": "b-bucket",
+                                                                "system_bucket": "s-bucket",
+                                                                "metadata_bundles_bucket": "md-bucket",
+                                                            }),
+                               s3_bucket_env=bs_env,
+                               s3_bucket_org=test_alpha_org,
+                               file_upload_bucket='fu-bucket',
+                               file_wfout_bucket='fw-bucket',
+                               blob_bucket='b-bucket',
+                               system_bucket='s-bucket',
+                               metadata_bundles_bucket='md-bucket')
+
+                    with override_environ(ENCODED_FILE_UPLOAD_BUCKET='fu-bucket',
+                                          ENCODED_FILE_WFOUT_BUCKET='fw-bucket',
+                                          ENCODED_BLOB_BUCKET='b-bucket',
+                                          ENCODED_SYSTEM_BUCKET='s-bucket',
+                                          ENCODED_METADATA_BUNDLES_BUCKET='md-bucket',
+                                          ENCODED_S3_BUCKET_ORG=test_alpha_org):
+                        # If no explicit args are passed to the builder, the ENCODED_xxx arguments DO matter.
+                        tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                               es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                            expect_index_server=index_server_default,
+                                                            expected_values={
+                                                                "file_upload_bucket": 'fu-bucket',
+                                                                "file_wfout_bucket": 'fw-bucket',
+                                                                "blob_bucket": "b-bucket",
+                                                                "system_bucket": "s-bucket",
+                                                                "metadata_bundles_bucket": "md-bucket",
+                                                            }),
+                               s3_bucket_env=bs_env)
 
                     bs_env = "fourfront-cgapdev"
                     data_set = data_set_for_env(bs_env)
@@ -864,8 +982,14 @@ def test_deployment_utils_main():
                             'es_server': None,
                             'index_server': None,
                             'indexer': None,
+                            's3_bucket_org': None,
                             's3_bucket_env': None,
                             'sentry_dsn': None,
+                            'file_upload_bucket': None,
+                            'file_wfout_bucket': None,
+                            'blob_bucket': None,
+                            'system_bucket': None,
+                            'metadata_bundles_bucket': None,
                         })
 
                     # Next 2 tests some sample settings, in particular the settings of indexer and index_server
@@ -880,8 +1004,14 @@ def test_deployment_utils_main():
                             'es_server': None,
                             'index_server': 'true',
                             'indexer': 'false',
+                            's3_bucket_org': None,
                             's3_bucket_env': None,
                             'sentry_dsn': None,
+                            'file_upload_bucket': None,
+                            'file_wfout_bucket': None,
+                            'blob_bucket': None,
+                            'system_bucket': None,
+                            'metadata_bundles_bucket': None,
                         })
 
                     with mock.patch.object(sys, "argv", ['', '--indexer', 'foo']):
@@ -894,8 +1024,14 @@ def test_deployment_utils_main():
                                 'es_server': None,
                                 'index_server': 'true',
                                 'indexer': 'false',
+                                's3_bucket_org': None,
                                 's3_bucket_env': None,
                                 'sentry_dsn': None,
+                                'file_upload_bucket': None,
+                                'file_wfout_bucket': None,
+                                'blob_bucket': None,
+                                'system_bucket': None,
+                                'metadata_bundles_bucket': None,
                             })
 
 

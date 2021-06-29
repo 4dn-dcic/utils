@@ -15,10 +15,10 @@ def mock_list_ecs_services(*, cluster):
     return {
         'serviceArns':
             [
-                'arn:aws:ecs:us-east-2:1234566777:service/c4-ecs-trial-alpha-stack-CGAPDockerCluster-Z4m1uYa2J11O/c4-ecs-trial-alpha-stack-CGAPIndexerService-YihcMquIc354',
-                'arn:aws:ecs:us-east-2:1234566777:service/c4-ecs-trial-alpha-stack-CGAPDockerCluster-Z4m1uYa2J11O/c4-ecs-trial-alpha-stack-CGAPDeploymentService-NRyGGBTSnqbQ',
-                'arn:aws:ecs:us-east-2:1234566777:service/c4-ecs-trial-alpha-stack-CGAPDockerCluster-Z4m1uYa2J11O/c4-ecs-trial-alpha-stack-CGAPIngesterService-QRcdjlE5ZJS1',
-                'arn:aws:ecs:us-east-2:1234566777:service/c4-ecs-trial-alpha-stack-CGAPDockerCluster-Z4m1uYa2J11O/c4-ecs-trial-alpha-stack-CGAPWSGIService-oDZbeVVWjZMq'
+                'arn:aws:ecs:us-east-2:1234566777:service/c4-ecs-trial-alpha-stack-CGAPDockerCluster-Z4m1uYa2J11O/c4-ecs-trial-alpha-stack-CGAPIndexerService-YihcMquIc354',  # noQA: E501
+                'arn:aws:ecs:us-east-2:1234566777:service/c4-ecs-trial-alpha-stack-CGAPDockerCluster-Z4m1uYa2J11O/c4-ecs-trial-alpha-stack-CGAPDeploymentService-NRyGGBTSnqbQ',  # noQA: E501
+                'arn:aws:ecs:us-east-2:1234566777:service/c4-ecs-trial-alpha-stack-CGAPDockerCluster-Z4m1uYa2J11O/c4-ecs-trial-alpha-stack-CGAPIngesterService-QRcdjlE5ZJS1',  # noQA: E501
+                'arn:aws:ecs:us-east-2:1234566777:service/c4-ecs-trial-alpha-stack-CGAPDockerCluster-Z4m1uYa2J11O/c4-ecs-trial-alpha-stack-CGAPWSGIService-oDZbeVVWjZMq'  # noQA: E501
             ],
         'ResponseMetadata':
             {'RequestId': 'not-a-uuid',
