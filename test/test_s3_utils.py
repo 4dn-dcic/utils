@@ -4,11 +4,12 @@ import io
 import pytest
 
 from dcicutils import s3_utils as s3_utils_module
+from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
+from dcicutils.env_utils import get_standard_mirror_env, FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, CGAP_PUBLIC_URL_PRD
+from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched
 from dcicutils.misc_utils import ignored, ignorable
 from dcicutils.qa_utils import override_environ, MockBoto3
 from dcicutils.s3_utils import s3Utils
-from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
-from dcicutils.env_utils import get_standard_mirror_env, FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, CGAP_PUBLIC_URL_PRD
 from unittest import mock
 
 
@@ -580,13 +581,51 @@ def test_unzip_s3_to_s3_store_results_unit(integrated_names):
         assert objs.get('Contents')
 
 
-# From https://hms-dbmi.atlassian.net/browse/C4-674
-# To be a viable test, this will need some mocking.
-#
-# import os
-#
-# def test_s3_utils_legacy_behavior():
-#     os.environ['GLOBAL_BUCKET_ENV'] = os.environ['GLOBAL_ENV_BUCKET'] = 'foursight-cgap-mastertest-envs'
-#     s3Utils('application-cgap-mastertest-wfout',
-#             'application-cgap-mastertest-wfout',
-#             'application-cgap-mastertest-wfout')
+def test_s3_utils_legacy_behavior():
+    # From https://hms-dbmi.atlassian.net/browse/C4-674
+
+    outfile_bucket = 'my-outfile-bucket'
+    sys_bucket = 'my-system-bucket'
+    raw_file_bucket = 'my-raw_file-bucket'
+
+    def test_it():
+
+        # As long as sys_bucket= is given in the s3Utils() call, it will just fill the slots
+        # with given values and won't try to do anything smart.
+
+        s = s3Utils(outfile_bucket, sys_bucket, raw_file_bucket)
+        assert s.outfile_bucket == outfile_bucket
+        assert s.sys_bucket == sys_bucket
+        assert s.raw_file_bucket == raw_file_bucket
+        assert s.blob_bucket is None
+        assert s.metadata_bucket is None
+
+        s = s3Utils(sys_bucket=sys_bucket)
+        assert s.outfile_bucket is None
+        assert s.sys_bucket == sys_bucket
+        assert s.raw_file_bucket is None
+        assert s.blob_bucket is None
+        assert s.metadata_bucket is None
+
+    test_it()
+
+    # Test that certain legacy behavior is unperturbed by GLOBAL_ENV_BUCKET (or its older name, GLOBAL_BUCKET_ENV)
+    with override_environ(GLOBAL_BUCKET_ENV='should-be-unused',
+                          GLOBAL_ENV_BUCKET='should-be-unused'):
+        test_it()
+
+
+def test_s3_utils_environment_variable_use():
+
+    with pytest.raises(SynonymousEnvironmentVariablesMismatched):
+
+        with override_environ(GLOBAL_BUCKET_ENV='should-be-unused',
+                              GLOBAL_ENV_BUCKET='inconsistently-unused'):
+
+            # If we do the simple-minded version of this, the environment variable doesn't matter
+            s3Utils(sys_bucket='foo')
+
+            with pytest.raises(SynonymousEnvironmentVariablesMismatched):
+                # If we don't initialize the sys_bucket, we have to go through the smart protocols
+                # and expect environment variables to be in order.
+                s3Utils()

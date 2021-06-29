@@ -1422,6 +1422,16 @@ def decorator():
 
 
 def dict_zip(dict1, dict2):
+    """
+    This is like the zip operator that zips two lists, but it takes two dictionaries and pairs matching elements.
+    e.g.,
+
+        >>> dict_zip({'a': 'one', 'b': 'two'}, {'a': 1, 'b': 2})
+        [('one', 1), ('two', 2)]
+
+    In Python 3.6+, the order of the result list is the same as the order of the keys in the first dict.
+    If the two dictionaries do not have exactly the same set of keys, an error will be raised.
+    """
     res = []
     for key1 in dict1:
         if key1 not in dict2:
