@@ -103,6 +103,7 @@ class EBDeployer:
             repo.archive(fp, format='zip')
         return zip_location
 
+    # noinspection PyUnresolvedReferences - PyCharm has bogus issues with the boto3.client reference here.
     @classmethod
     def upload_application_to_s3(cls, zip_location):
         """ Uploads the zip file at zip_location to the specified S3 bucket
@@ -426,6 +427,7 @@ class IniFileManager:
             es_namespace (str): The ElasticSearch namespace to use (probably but not necessarily same as bs_env).
             indexer (bool): Whether or not we are building an ini file for an indexer.
             index_server (bool): Whether or not we are building an ini file for an index server.
+            sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
             file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
             blob_bucket (str): Specific name of the bucket to use on S3 for blob data.
@@ -510,6 +512,7 @@ class IniFileManager:
             init_file_stream: A stream to send output to.
             bs_env: A beanstalk environment.
             bs_mirror_env: A beanstalk environment.
+            s3_bucket_org: Short name token unique to the organization, for use as a low-tech namespace separator.
             s3_bucket_env: Environment name that is part of the s3 bucket name. (Usually defaults properly.)
             data_set: 'test' or 'prod'. Default is 'test' unless bs_env is a staging or production environment.
             es_server: The name of an es server to use.
@@ -517,6 +520,11 @@ class IniFileManager:
             indexer: Whether or not we are building an ini file for an indexer.
             index_server: Whether or not we are building an ini file for an index server.
             sentry_dsn: A sentry DSN specifier, or the empty string if none is desired.
+            file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
+            file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
+            blob_bucket (str): Specific name of the bucket to use on S3 for blob data.
+            system_bucket (str): Specific name of the bucket to use on S3 for system data.
+            metadata_bundles_bucket (str): Specific name of the bucket to use on S3 for metadata bundles data.
 
         Returns: None
 
@@ -825,7 +833,8 @@ class CreateMappingOnDeployManager:
         else:
             description = "an unrecognized environment"
         log.info('Environment %s is %s. Processing mode: %s'
-                 % (env, description, cls._summarize_deploy_options(deploy_cfg)))
+                 % (env, description, # noQA - PyCharm wrongly worries description might be unassigned
+                    cls._summarize_deploy_options(deploy_cfg)))
         return deploy_cfg
 
     @staticmethod
