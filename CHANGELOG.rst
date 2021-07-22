@@ -9,7 +9,7 @@ Change Log
 1.20.0
 ======
 
-**PR 147: Support auth0 client and secret in deployment_utils**
+**PR 148: Support auth0 client and secret in deployment_utils**
 
 * In ``deployment_utils``, add support for managing auth0 client and secret:
 
@@ -28,6 +28,7 @@ Change Log
 1.19.0
 ======
 
+**PR 147: Init s3Utils via GLOBAL_ENV_BUCKET and misc S3_BUCKET_ORG support (C4-554)**
 **PR 146: Better S3 bucket management in deployment_utils**
 
 * In ``cloudformation_utils``:
