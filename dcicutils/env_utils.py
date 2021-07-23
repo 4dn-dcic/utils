@@ -22,20 +22,23 @@ def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, a
     ignored(assumes_cgap, assumes_no_mirror)
 
     def _decorate(fn):
-        legacy_handler = getattr(legacy, fn.__name__)
-        orchestrated_handler = legacy_handler if use_legacy else fn
 
-        @functools.wraps(legacy_handler)
+        if use_legacy:
+            return fn
+
+        legacy_fn = getattr(legacy, fn.__name__)
+
+        @functools.wraps(legacy_fn)
         def wrapped(*args, **kwargs):
             if EnvUtils.declared_data()['is_legacy']:
-                return legacy_handler(*args, **kwargs)
+                return legacy_fn(*args, **kwargs)
             elif unimplemented:
                 raise NotImplementedError(f"Unimplemented: {full_object_name(fn)}")
             else:
                 try:
-                    return orchestrated_handler(*args, **kwargs)
+                    return fn(*args, **kwargs)
                 except UseLegacy:
-                    return legacy_handler(*args, **kwargs)
+                    return legacy_fn(*args, **kwargs)
 
         return wrapped
 
