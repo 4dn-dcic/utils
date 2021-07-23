@@ -16,7 +16,7 @@ from datetime import datetime
 from . import ff_utils
 from botocore.exceptions import ClientError
 from .misc_utils import PRINT, obsolete, remove_suffix
-from .env_utils import (
+from .env_utils_legacy import (
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, public_url_mappings,
     blue_green_mirror_env, get_standard_mirror_env,
 )

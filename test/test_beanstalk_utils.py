@@ -5,8 +5,8 @@ import json
 import os
 import socket
 from collections import defaultdict
-from dcicutils import beanstalk_utils as bs, env_utils, source_beanstalk_env_vars, compute_prd_env_for_env
-from dcicutils.env_utils import is_fourfront_env, is_cgap_env, is_stg_or_prd_env
+from dcicutils import beanstalk_utils as bs, env_utils_legacy, source_beanstalk_env_vars, compute_prd_env_for_env
+from dcicutils.env_utils_legacy import is_fourfront_env, is_cgap_env, is_stg_or_prd_env
 from dcicutils.qa_utils import mock_not_called
 from dcicutils.misc_utils import ignored
 from unittest import mock
@@ -141,8 +141,8 @@ def test_magic_cnames_by_cname_consistency():
     # But such is magic. The values should not be casually changed, and such overhead is appropriate.
     # It's good to have tests that will catch unwanted tinkering, typos, etc.
 
-    ff_magic_envs = [env_utils.FF_ENV_PRODUCTION_GREEN, env_utils.FF_ENV_PRODUCTION_BLUE]
-    cgap_magic_envs = [env_utils.CGAP_ENV_WEBPROD]
+    ff_magic_envs = [env_utils_legacy.FF_ENV_PRODUCTION_GREEN, env_utils_legacy.FF_ENV_PRODUCTION_BLUE]
+    cgap_magic_envs = [env_utils_legacy.CGAP_ENV_WEBPROD]
 
     assert ff_magic_envs == ['fourfront-green', 'fourfront-blue']
     assert cgap_magic_envs == ['fourfront-cgap']
@@ -163,7 +163,7 @@ def test_magic_cnames_by_cname_consistency():
             assert _ip_addresses(cname) == ff_prod_ips
             note = "\n => FF PRODUCTION (%s @ %s)" % (ff_prod, ",".join(ff_prod_ips))
             roles['FF_PRODUCTION'].append(env_name)
-            assert env_utils.is_stg_or_prd_env(env_name)
+            assert env_utils_legacy.is_stg_or_prd_env(env_name)
         elif cname == bs.CGAP_MAGIC_CNAME:
             assert env_name in cgap_magic_envs
             cgap_prod = "cgap.hms.harvard.edu"
@@ -171,27 +171,27 @@ def test_magic_cnames_by_cname_consistency():
             assert _ip_addresses(cname) == cgap_prod_ips
             note = "\n => CGAP PRODUCTION (%s @ %s)" % (cgap_prod, ",".join(cgap_prod_ips))
             roles['CGAP_PRODUCTION'].append(env_name)
-            assert env_utils.is_stg_or_prd_env(env_name)
-        elif env_utils.is_stg_or_prd_env(env_name):
-            if env_utils.is_cgap_env(env_name):
+            assert env_utils_legacy.is_stg_or_prd_env(env_name)
+        elif env_utils_legacy.is_stg_or_prd_env(env_name):
+            if env_utils_legacy.is_cgap_env(env_name):
                 note = "\n => CGAP STAGING ???"  # An error about this is reported later
                 roles['CGAP_STAGING'].append(env_name)
-                assert env_utils.is_stg_or_prd_env(env_name)
+                assert env_utils_legacy.is_stg_or_prd_env(env_name)
             else:
                 ff_staging = "staging.4dnucleome.org"
                 ff_staging_ips = _ip_addresses(ff_staging)
                 assert _ip_addresses(cname) == ff_staging_ips
                 note = "\n => FF STAGING (%s @ %s)" % (ff_staging, ",".join(ff_staging_ips))
                 roles['FF_STAGING'].append(env_name)
-                assert env_utils.is_stg_or_prd_env(env_name)
+                assert env_utils_legacy.is_stg_or_prd_env(env_name)
         print("%s (%s) = %s %s" % (env_name, ip, cname, note))
     print("roles =", json.dumps(roles, indent=2))
     assert len(roles['FF_PRODUCTION']) == 1
     assert len(roles['FF_STAGING']) == 1
     assert len(roles['CGAP_PRODUCTION']) == 1
     assert len(roles['CGAP_STAGING']) == 0  # CGAP does not expect to have a production mirror
-    assert env_utils.get_standard_mirror_env(roles['FF_PRODUCTION'][0]) == roles['FF_STAGING'][0]
-    assert env_utils.get_standard_mirror_env(roles['FF_STAGING'][0]) == roles['FF_PRODUCTION'][0]
+    assert env_utils_legacy.get_standard_mirror_env(roles['FF_PRODUCTION'][0]) == roles['FF_STAGING'][0]
+    assert env_utils_legacy.get_standard_mirror_env(roles['FF_STAGING'][0]) == roles['FF_PRODUCTION'][0]
     #
     # Uncommenting the following assertion will fail the test but first will provide useful
     # debugging information about configurations.
@@ -265,9 +265,9 @@ def test_compute_ff_and_cgap_prd_and_stg_envs():
 
     def mocked_standard_mirror_env(envname):
         assert envname.endswith("-prd-env"), "mocked_standard_mirror_env does nto handle %r." % envname
-        if env_utils.is_fourfront_env(envname):
+        if env_utils_legacy.is_fourfront_env(envname):
             return "fourfront-stg-env"
-        elif env_utils.is_cgap_env(envname):
+        elif env_utils_legacy.is_cgap_env(envname):
             return None
         else:
             raise AssertionError("mocked_standard_mirror_env does not handle %r." % envname)
@@ -287,7 +287,7 @@ def test_compute_ff_and_cgap_prd_and_stg_envs():
 def test_compute_ff_stg_env_by_alternate_means():
     # NOTE: bs.compute_ff_prd_env is tested elsewhere in this file. If that test is failing, debug that problem first!
     actual_ff_prd = bs.compute_ff_prd_env()
-    expected_prd_options = {env_utils.FF_ENV_PRODUCTION_BLUE, env_utils.FF_ENV_PRODUCTION_GREEN}
+    expected_prd_options = {env_utils_legacy.FF_ENV_PRODUCTION_BLUE, env_utils_legacy.FF_ENV_PRODUCTION_GREEN}
     assert actual_ff_prd in expected_prd_options
     assert bs.compute_ff_stg_env() == (expected_prd_options - {actual_ff_prd}).pop()
 
@@ -296,10 +296,10 @@ def test_compute_cgap_stg_env_by_alternate_means():
     # NOTE: bs.compute_cgap_prd_env is tested elsewhere in this file. If that test is failing, debug that problem first!
     actual_cgap_prd = bs.compute_cgap_prd_env()
     if actual_cgap_prd == 'fourfront-cgap':
-        assert env_utils.get_standard_mirror_env('fourfront-cgap') is None
+        assert env_utils_legacy.get_standard_mirror_env('fourfront-cgap') is None
         assert bs.compute_cgap_stg_env() is None
     else:
-        expected_prd_options = {env_utils.CGAP_ENV_PRODUCTION_BLUE_NEW, env_utils.CGAP_ENV_PRODUCTION_GREEN_NEW}
+        expected_prd_options = {env_utils_legacy.CGAP_ENV_PRODUCTION_BLUE_NEW, env_utils_legacy.CGAP_ENV_PRODUCTION_GREEN_NEW}
         assert actual_cgap_prd in expected_prd_options
         assert bs.compute_cgap_stg_env() == (expected_prd_options - {actual_cgap_prd}).pop()
 

@@ -1,7 +1,7 @@
 import boto3
 import base64
 from .misc_utils import PRINT
-from .env_utils import is_cgap_env
+from .env_utils_legacy import is_cgap_env
 
 
 # Defines the standard Docker image tags for CGAP ECR

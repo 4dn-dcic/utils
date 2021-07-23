@@ -6,6 +6,11 @@ dcicutils
 Change Log
 ----------
 
+2.0.0
+=====
+
+Configurable support for orchestrated CGAP in ``env_utils``.
+
 
 1.19.0
 ======

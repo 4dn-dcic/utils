@@ -34,7 +34,7 @@ import boto3
 from git import Repo
 
 from .beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env
-from .env_utils import (
+from .env_utils_legacy import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS,
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, is_test_env, is_hotseat_env,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,

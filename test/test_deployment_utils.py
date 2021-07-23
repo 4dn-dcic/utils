@@ -14,7 +14,7 @@ from dcicutils.deployment_utils import (
     # TODO: This isn't yet tested.
     # EBDeployer,
 )
-from dcicutils.env_utils import is_cgap_env, data_set_for_env
+from dcicutils.env_utils_legacy import is_cgap_env, data_set_for_env
 from dcicutils.misc_utils import ignored
 from dcicutils.qa_utils import override_environ
 

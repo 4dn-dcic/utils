@@ -8,7 +8,7 @@ from zipfile import ZipFile
 from io import BytesIO
 import logging
 import requests
-from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name
+from .env_utils_legacy import is_stg_or_prd_env, prod_bucket_env, full_env_name
 from .misc_utils import PRINT
 from .exceptions import (
     InferredBucketConflict, CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv,
