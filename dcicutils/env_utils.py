@@ -1,5 +1,6 @@
 import boto3
 import functools
+import json
 import os
 
 from .misc_utils import decorator, full_object_name, ignored, remove_prefix, check_true
@@ -8,11 +9,29 @@ from urllib.parse import urlparse
 
 
 class UseLegacy(BaseException):
+    """
+    Raise this class inside an @if_orchestrated definition in order to dynamically go to using legacy behavior,
+    usually after having considered or attempted some different way of doing these things first.  If you want to
+    go straight to that, it's better (more efficienct) to use @if_orchestrated(use_legacy=True).
+
+    This class inherits from BaseException, not Exception, because it doesn't want to be trapped by any other
+    exception handlers. It wants to dive straight through them and go straight to alternative handling.
+    """
     pass
 
 
 @decorator()
 def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, assumes_no_mirror=False):
+    """
+    This is a decorator intended to manage new versions of these functions as they apply to orchestrated CGAP
+    without disturbing legacy behavior (now found in env_utils_legacy.py and still supported for the original
+    beanstalk-oriented deploys at HMS for cgap-portal AND fourfront.
+
+    The arguments to this decorator are as follows:
+
+
+
+    """
     # assumes_cgap and assumes_no_mirror are purely decorative.
     #    assumes_cgap says that the orchestrated handler for this definition presumes a cgap-style orchestration.
     #                 If we ever orchestrate fourfront, definitions marked assumes_cgap need more thought.
@@ -23,14 +42,14 @@ def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, a
 
     def _decorate(fn):
 
-        if use_legacy:
-            return fn
-
         legacy_fn = getattr(legacy, fn.__name__)
+
+        if use_legacy:
+            return legacy_fn
 
         @functools.wraps(legacy_fn)
         def wrapped(*args, **kwargs):
-            if EnvUtils.declared_data()['is_legacy']:
+            if EnvUtils.declared_data().get(e.IS_LEGACY):
                 return legacy_fn(*args, **kwargs)
             elif unimplemented:
                 raise NotImplementedError(f"Unimplemented: {full_object_name(fn)}")
@@ -55,7 +74,6 @@ class EnvNames:
     OTHER_FOURFRONT_SERVERS = 'other_fourfront_servers'  # server hostnames that are Fourfront even if not obvious
     PRD_ENV_NAME = 'prd_env_name'  # the name of the prod env
     PUBLIC_URL_TABLE = 'public_url_table'  # dictionary mapping envnames & pseudo_envnames to public urls
-    # We don't have staging in an orchestrated world.
     # STG_ENV_NAME = 'stg_env_name'  # the name of the stage env (or None)
     TEST_ENVS = 'test_envs'  # a list of environments that are for testing
 
@@ -70,10 +88,11 @@ class EnvUtils:
 
     _DECLARED_DATA = None
 
-    _ORCHESTRATED_TEMPLATE = {
-        e.DEV_DATA_SET_TABLE: {'cgap': 'prod', 'cgap-mastertest': 'test'},
+    SAMPLE_TEMPLATE_FOR_TESTING = {
+        e.DEV_DATA_SET_TABLE: {'cgap': 'prod', 'cgap-test': 'test'},
+        e.FULL_ENV_PREFIX: '',
         e.HOTSEAT_ENVS: [],
-        e.INDEXER_ENV_NAME: 'cgap.indexer',
+        e.INDEXER_ENV_NAME: 'cgap-indexer',
         e.IS_LEGACY: False,
         e.OTHER_CGAP_SERVERS: [],
         # We don't have to specify this for now because we're only doing CGAP.
@@ -103,7 +122,8 @@ class EnvUtils:
             env_name = os.environ.get('ENV_NAME')
             if env_name:
                 s3 = boto3.client('s3')
-                data = s3.get_object(Bucket=bucket, Key=env_name)
+                metadata = s3.get_object(Bucket=bucket, Key=env_name)
+                data = json.load(metadata['Body'])
                 cls.set_declared_data(data)
                 return
         cls.set_declared_data({e.IS_LEGACY: True})
