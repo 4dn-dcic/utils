@@ -23,7 +23,7 @@ from dcicutils.misc_utils import (
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
-    capitalize1, local_attrs, dict_zip,
+    capitalize1, local_attrs, dict_zip, _is_function_of_exactly_one_required_arg,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -1461,6 +1461,48 @@ def test_ancestor_classes():
 
     assert ancestor_classes(FooBar) == [Foo, object]
     assert ancestor_classes(FooBar, reverse=True) == [object, Foo]
+
+
+def test_is_function_of_exactly_one_required_arg():
+
+    def f0():
+        return ['n_args', 0]
+
+    def f1(x):
+        return ['n_args', 1]
+
+    def f2(x, y):
+        return ['n_args', 2]
+
+    def f0_k1(*, k):
+        return ['n_args', 0, 'n_kwargs', 1]
+
+    def f1_k1(*, k):
+        return ['n_args', 1, 'n_kwargs', 1]
+
+    def f2_k1(*, k):
+        return ['n_args', 2, 'n_kwargs', 1]
+
+    def f0_1(x=0):
+        return ['n_args_min', 0, 'n_args_max', 1]
+
+    def f0_2(x=0, y=0):
+        return ['n_args_min', 0, 'n_args_max', 1]
+
+    def f0_k0_1(*, k=0):
+        return ['n_args', 0, 'n_kwargs_min', 0, 'n_kwargs_max', 1]
+
+    assert _is_function_of_exactly_one_required_arg(f0) is False
+    assert _is_function_of_exactly_one_required_arg(f1) is True
+    assert _is_function_of_exactly_one_required_arg(f2) is False
+
+    assert _is_function_of_exactly_one_required_arg(f0_k1) is False
+    assert _is_function_of_exactly_one_required_arg(f1_k1) is False
+    assert _is_function_of_exactly_one_required_arg(f2_k1) is False
+
+    assert _is_function_of_exactly_one_required_arg(f0_1) is False
+    assert _is_function_of_exactly_one_required_arg(f0_2) is False
+    assert _is_function_of_exactly_one_required_arg(f0_k0_1) is False
 
 
 def test_is_proper_subclass():
