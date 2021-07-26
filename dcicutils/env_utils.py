@@ -3,9 +3,10 @@ import functools
 import json
 import os
 
-from .misc_utils import decorator, full_object_name, ignored, remove_prefix, check_true
+from .misc_utils import decorator, full_object_name, ignored, remove_prefix, check_true, find_association
 from . import env_utils_legacy as legacy
 from urllib.parse import urlparse
+from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
 
 
 class UseLegacy(BaseException):
@@ -29,18 +30,15 @@ def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, a
 
     The arguments to this decorator are as follows:
 
-
-
+    :param unimplemented: a boolean saying if orchestrated functionality is unimplemented (so gets an automatic error).
+    :param use_legacy: a boolean saying if the legacy definition is suitably general to be used directly
+    :param assumes_cgap: a boolean saying whether the orchestrated definition is CGAP-specific
+    :param assumes_no_mirror: a boolean saying whether the orchestrated definition is expected to fail if mirroring on
     """
-    # assumes_cgap and assumes_no_mirror are purely decorative.
-    #    assumes_cgap says that the orchestrated handler for this definition presumes a cgap-style orchestration.
-    #                 If we ever orchestrate fourfront, definitions marked assumes_cgap need more thought.
-    #    assumes_no_mirror says that the orchestrated handler for this definition presumes no fourfront-style
-    #                      mirroring. If we ever decide to do such mirroring, we'll need to reconsider
-    #                      things marked assumes_no_mirror=True
-    ignored(assumes_cgap, assumes_no_mirror)
 
     def _decorate(fn):
+
+        EnvUtils.init()
 
         legacy_fn = getattr(legacy, fn.__name__)
 
@@ -49,10 +47,16 @@ def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, a
 
         @functools.wraps(legacy_fn)
         def wrapped(*args, **kwargs):
-            if EnvUtils.declared_data().get(e.IS_LEGACY):
+            if EnvUtils.IS_LEGACY:
                 return legacy_fn(*args, **kwargs)
             elif unimplemented:
                 raise NotImplementedError(f"Unimplemented: {full_object_name(fn)}")
+            elif assumes_no_mirror and STAGE_MIRRORING_ENABLED:
+                raise NotImplementedError(f"In {full_object_name(fn)}:"
+                                          f" Mirroring is not supported in an orchestrated environment.")
+            elif assumes_cgap and EnvUtils.ORCHESTRATED_APP != 'cgap':
+                raise NotImplementedError(f"In {full_object_name(fn)}:"
+                                          f" Non-cgap applications are not supported.")
             else:
                 try:
                     return fn(*args, **kwargs)
@@ -66,20 +70,39 @@ def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, a
 
 class EnvNames:
     DEV_DATA_SET_TABLE = 'dev_data_set_table'  # dictionary mapping envnames to their preferred data set
+    DEV_ENV_DOMAIN_SUFFIX = 'dev_env_domain_suffix'  # e.g., .abc123def456ghi789.us-east-1.rds.amazonaws.com
     FULL_ENV_PREFIX = 'full_env_prefix'  # a string like "cgap-" that precedes all env names
     HOTSEAT_ENVS = 'hotseat_envs'  # a list of environments that are for testing with hot data
     INDEXER_ENV_NAME = 'indexer_env_name'  # the environment name used for indexing
     IS_LEGACY = 'is_legacy'
-    OTHER_CGAP_SERVERS = 'other_cgap_servers'  # server hostnames that don't contain 'cgap' in them but are still CGAP
-    OTHER_FOURFRONT_SERVERS = 'other_fourfront_servers'  # server hostnames that are Fourfront even if not obvious
+    ORCHESTRATED_APP = 'orchestrated_app'  # This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
+    PRD_BUCKET = 'prd_bucket'
     PRD_ENV_NAME = 'prd_env_name'  # the name of the prod env
     PUBLIC_URL_TABLE = 'public_url_table'  # dictionary mapping envnames & pseudo_envnames to public urls
-    # STG_ENV_NAME = 'stg_env_name'  # the name of the stage env (or None)
+    STG_ENV_NAME = 'stg_env_name'  # the name of the stage env (or None)
     TEST_ENVS = 'test_envs'  # a list of environments that are for testing
 
 
-e = EnvNames
+class PublicUrlParts:
+    ENVIRONMENT = 'environment'
+    HOST = 'host'
+    NAME = 'name'
+    URL = 'url'
 
+
+class ClassificationParts:
+
+    BUCKET_ENV = 'bucket_env'
+    ENVIRONMENT = 'environment'  # Obsolete. Use BUCKET_ENV or SERVER_ENV going forward
+    IS_STG_OR_PRD = 'is_stg_or_prd'
+    KIND = 'kind'
+    PUBLIC_NAME = 'public_name'
+    SERVER_ENV = 'server_env'
+
+
+e = EnvNames
+p = PublicUrlParts
+c = ClassificationParts
 
 _MISSING = object()
 
@@ -88,32 +111,133 @@ class EnvUtils:
 
     _DECLARED_DATA = None
 
-    SAMPLE_TEMPLATE_FOR_TESTING = {
-        e.DEV_DATA_SET_TABLE: {'cgap': 'prod', 'cgap-test': 'test'},
-        e.FULL_ENV_PREFIX: '',
-        e.HOTSEAT_ENVS: [],
-        e.INDEXER_ENV_NAME: 'cgap-indexer',
+    DEV_DATA_SET_TABLE = None  # dictionary mapping envnames to their preferred data set
+    DEV_ENV_DOMAIN_SUFFIX = None
+    FULL_ENV_PREFIX = None  # a string like "cgap-" that precedes all env names (does NOT have to include 'cgap')
+    HOTSEAT_ENVS = None
+    INDEXER_ENV_NAME = None  # the environment name used for indexing
+    IS_LEGACY = None
+    ORCHESTRATED_APP = None  # This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
+    PRD_BUCKET = None
+    PRD_ENV_NAME = None  # the name of the prod env
+    PUBLIC_URL_TABLE = None  # dictionary mapping envnames & pseudo_envnames to public urls
+    STG_ENV_NAME = None  # the name of the stage env (or None)
+    TEST_ENVS = None  # a list of environments that are for testing
+
+    DEV_SUFFIX_FOR_TESTING = ".abc123def456ghi789.us-east-1.rds.amazonaws.com"
+
+    SAMPLE_TEMPLATE_FOR_CGAP_TESTING = {
+        e.DEV_DATA_SET_TABLE: {'acme-hotseat': 'prod', 'acme-test': 'test'},
+        e.DEV_ENV_DOMAIN_SUFFIX: DEV_SUFFIX_FOR_TESTING,
+        e.FULL_ENV_PREFIX: 'acme-',
+        e.HOTSEAT_ENVS: ['acme-hotseat', 'acme-pubdemo'],
+        e.INDEXER_ENV_NAME: 'acme-indexer',
         e.IS_LEGACY: False,
-        e.OTHER_CGAP_SERVERS: [],
-        # We don't have to specify this for now because we're only doing CGAP.
-        # If we were doing an orchestrated Fourfront, we'd want this.
-        # e.OTHER_FOURFRONT_SERVERS: [],
-        e.PRD_ENV_NAME: 'cgap',
-        e.PUBLIC_URL_TABLE: {'cgap': 'http://cgap.example.com'},
-        # We don't do stage mirroring in the orchestrated world.
+        e.ORCHESTRATED_APP: 'cgap',
+        e.PRD_BUCKET: 'production-data',
+        e.PRD_ENV_NAME: 'acme-prd',
+        e.PUBLIC_URL_TABLE: [
+            {
+                p.NAME: 'cgap',
+                p.URL: 'https://genetics.example.com',
+                p.HOST: 'genetics.example.com',
+                p.ENVIRONMENT: 'acme-prd',
+            },
+            {
+                p.NAME: 'stg',
+                p.URL: 'https://staging.genetics.example.com',
+                p.HOST: 'staging.genetics.example.com',
+                p.ENVIRONMENT: 'acme-stg',
+            },
+            {
+                p.NAME: 'testing',
+                p.URL: 'https://testing.genetics.example.com',
+                p.HOST: 'testing.genetics.example.com',
+                p.ENVIRONMENT: 'acme-pubtest',
+            },
+            {
+                p.NAME: 'demo',
+                p.URL: 'https://demo.genetics.example.com',
+                p.HOST: 'demo.genetics.example.com',
+                p.ENVIRONMENT: 'acme-pubdemo',
+            },
+        ],
+        # We don't do stage mirroring in the orchestrated world, and probably should not confuse users by inviting
+        # these to be set. For extra security, even if you did set them they wouldn't work without enabling mirroring.
+        # -kmp 24-Jul-2021
         # e.STG_ENV_NAME: None,
-        e.TEST_ENVS: [],
+        e.TEST_ENVS: ['acme-test', 'acme-mastertest', 'acme-pubtest'],
+    }
+
+    SAMPLE_TEMPLATE_FOR_FOURFRONT_TESTING = {
+        e.DEV_DATA_SET_TABLE: {'acme-hotseat': 'prod', 'acme-test': 'test'},
+        e.DEV_ENV_DOMAIN_SUFFIX: DEV_SUFFIX_FOR_TESTING,
+        e.FULL_ENV_PREFIX: 'acme-',
+        e.HOTSEAT_ENVS: ['acme-hotseat'],
+        e.INDEXER_ENV_NAME: 'acme-indexer',
+        e.IS_LEGACY: False,
+        e.ORCHESTRATED_APP: 'fourfront',
+        e.PRD_BUCKET: 'production-data',
+        e.PRD_ENV_NAME: 'acme-prd',
+        e.PUBLIC_URL_TABLE: [
+            {
+                p.NAME: 'data',
+                p.URL: 'https://genetics.example.com',
+                p.HOST: 'genetics.example.com',
+                p.ENVIRONMENT: 'acme-prd',
+            },
+            {
+                p.NAME: 'staging',
+                p.URL: 'https://stg.genetics.example.com',
+                p.HOST: 'stg.genetics.example.com',
+                p.ENVIRONMENT: 'acme-stg',
+            },
+            {
+                p.NAME: 'test',
+                p.URL: 'https://testing.genetics.example.com',
+                p.HOST: 'testing.genetics.example.com',
+                p.ENVIRONMENT: 'acme-pubtest',
+            },
+            {
+                p.NAME: 'demo',
+                p.URL: 'https://demo.genetics.example.com',
+                p.HOST: 'demo.genetics.example.com',
+                p.ENVIRONMENT: 'acme-pubdemo',
+            },
+            {
+                p.NAME: 'hot',
+                p.URL: 'https://hot.genetics.example.com',
+                p.HOST: 'hot.genetics.example.com',
+                p.ENVIRONMENT: 'acme-hotseat',
+            },
+
+        ],
+        # We don't do stage mirroring in the orchestrated world, and probably should not confuse users by inviting
+        # these to be set. For extra security, even if you did set them they wouldn't work without enabling mirroring.
+        # -kmp 24-Jul-2021
+        # e.STG_ENV_NAME: None,
+        e.TEST_ENVS: ['acme-test', 'acme-mastertest', 'acme-pubtest'],
     }
 
     @classmethod
-    def declared_data(cls):
+    def init(cls):
         if cls._DECLARED_DATA is None:
             cls.load_declared_data()
+
+    @classmethod
+    def declared_data(cls):
+        cls.init()
         return cls._DECLARED_DATA
 
     @classmethod
     def set_declared_data(cls, data):
         cls._DECLARED_DATA = data
+        for var, key in EnvNames.__dict__.items():
+            if var.isupper():
+                if key in data:
+                    setattr(EnvUtils, var, data[key])
+                else:
+                    setattr(EnvUtils, var, None)
 
     @classmethod
     def load_declared_data(cls):
@@ -138,16 +262,15 @@ class EnvUtils:
 
 @if_orchestrated
 def is_indexer_env(envname):
-    return envname == EnvUtils.lookup(e.INDEXER_ENV_NAME)
+    return envname == EnvUtils.INDEXER_ENV_NAME
 
 
 @if_orchestrated
 def indexer_env_for_env(envname):
-    indexer_env = EnvUtils.lookup(e.INDEXER_ENV_NAME)
-    if envname == indexer_env:
+    if envname == EnvUtils.INDEXER_ENV_NAME:
         return None
     else:
-        return indexer_env
+        return EnvUtils.INDEXER_ENV_NAME
 
 
 @if_orchestrated
@@ -155,90 +278,156 @@ def data_set_for_env(envname, default=None):
     if is_stg_or_prd_env(envname):
         return 'prod'
     else:
-        info = EnvUtils.lookup(e.DEV_DATA_SET_TABLE) or {}
+        info = EnvUtils.DEV_DATA_SET_TABLE or {}
         return info.get(envname, default)
 
 
 @if_orchestrated(use_legacy=True)
-def blue_green_mirror_env(envname):
-    # The legacy definition just swaps the names 'blue' and 'green' in envname, which is fine.
+def blue_green_mirror_env(envname: str):
     ignored(envname)
 
 
 @if_orchestrated
 def prod_bucket_env(envname):
     if is_stg_or_prd_env(envname):
-        return EnvUtils.lookup(e.PRD_ENV_NAME)
+        return EnvUtils.PRD_BUCKET
     else:
         return None
 
 
 @if_orchestrated
 def get_bucket_env(envname):
-    # This may look the same as the legacy definition, but it has to call our prod_bucket_env, not the legacy one.
-    return prod_bucket_env(envname) if is_stg_or_prd_env(envname) else envname
+    if is_stg_or_prd_env(envname):
+        return EnvUtils.PRD_BUCKET
+    else:
+        return envname
 
 
 @if_orchestrated
 def public_url_mappings(envname):
     ignored(envname)
-    mappings = EnvUtils.lookup(e.PUBLIC_URL_TABLE)
-    return mappings
+    return {entry[p.NAME]: entry[p.URL] for entry in EnvUtils.PUBLIC_URL_TABLE}
 
 
 @if_orchestrated
 def is_cgap_server(server, allow_localhost=False):
-    ignored(allow_localhost)
-    others = EnvUtils.lookup(e.OTHER_CGAP_SERVERS)
-    if server in others:
+    check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
+    is_cgap = EnvUtils.ORCHESTRATED_APP == 'cgap'
+    if not is_cgap:
+        return False
+    kind = classify_server_url(server, raise_error=False).get(c.KIND)
+    if kind == 'cgap':
+        return True
+    elif allow_localhost and kind == 'localhost':
         return True
     else:
-        raise UseLegacy()
+        return False
 
 
 @if_orchestrated
 def is_fourfront_server(server, allow_localhost=False):
-    ignored(allow_localhost)
-    others = EnvUtils.lookup(e.OTHER_FOURFRONT_SERVERS)
-    if server in others:
+    check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
+    is_fourfront = EnvUtils.ORCHESTRATED_APP == 'fourfront'
+    if not is_fourfront:
+        return False
+    kind = classify_server_url(server, raise_error=False).get(c.KIND)
+    if kind == 'fourfront':
+        return True
+    elif allow_localhost and kind == 'localhost':
         return True
     else:
-        raise UseLegacy()
+        return False
 
 
-@if_orchestrated(use_legacy=True)
+@if_orchestrated
 def is_cgap_env(envname):
-    # The legacy handler just checks for 'cgap' in the envname, which is fine.
-    ignored(envname)
+    if not isinstance(envname, str):
+        return False
+    elif EnvUtils.ORCHESTRATED_APP != 'cgap':
+        return False
+    elif envname.startswith(EnvUtils.FULL_ENV_PREFIX):
+        return True
+    elif find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.NAME: envname}):
+        return True
+    else:
+        return False
 
 
-@if_orchestrated(use_legacy=True)
+@if_orchestrated
 def is_fourfront_env(envname):
-    # The legacy handler just checks for 'fourfront' in the envname and 'cgap' not there, which is fine.
-    ignored(envname)
+    if not isinstance(envname, str):
+        return False
+    elif EnvUtils.ORCHESTRATED_APP != 'fourfront':
+        return False
+    elif envname.startswith(EnvUtils.FULL_ENV_PREFIX):
+        return True
+    elif find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.NAME: envname}):
+        return True
+    else:
+        return False
+
+
+# Don't enable this casually. It's intended only if we make some decision to engage mirroring.
+# Although it's fine to call an environment your staging environment without enabling this,
+# what the system means about something being the stg environment is that it's the stage side of a mirror.
+# -kmp 24-Jul-2021
+STAGE_MIRRORING_ENABLED = False
+
+
+def _is_raw_stg_or_prd_env(envname):
+    return (envname == EnvUtils.PRD_ENV_NAME or
+            (STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME and envname == EnvUtils.STG_ENV_NAME))
 
 
 @if_orchestrated
 def is_stg_or_prd_env(envname):
     # The legacy version does something much more elaborate that involves heuristics on names.
-    # We'll just declare the one we want and leave it at that.
-    # Note also that we're NOT doing:
-    #   return (envname == EnvUtils.lookup(e.STG_ENV_NAME) or
-    #           envname == EnvUtils.lookup(e.PRD_ENV_NAME))
-    # because there is no mirroring here. Any stage environment is not like legacy cgap stage.
-    return envname == EnvUtils.lookup(e.PRD_ENV_NAME)
+    # Note, too, that in the legacy version, this would return true both of CGAP or Fourfront names,
+    # but really you're only supposed to call it on one or the other's environments. It's rarely the
+    # case that the same code would ever be implicating both.  So here we assume every orchestrated
+    # ecosystem is one or the other, and hence there is a canonical PRD_ENV_NAME and STG_ENV_NAME.
+    # -kmp 24-Jul-2021
+
+    if not isinstance(envname, str):
+        return False
+    elif _is_raw_stg_or_prd_env(envname):
+        return True
+    else:
+        alias_entry = find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname)
+        if alias_entry:
+            return _is_raw_stg_or_prd_env(alias_entry[p.ENVIRONMENT])
+        else:
+            return False
 
 
 @if_orchestrated
 def is_test_env(envname):
-    envs = EnvUtils.lookup(e.TEST_ENVS, default=[])
-    return envname in envs if envname else False
+    envs = EnvUtils.TEST_ENVS or []
+    if not isinstance(envname, str):
+        return False
+    elif envname in envs:
+        return True
+    else:
+        alias_entry = find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname)
+        if alias_entry:
+            return alias_entry[p.ENVIRONMENT] in envs
+        else:
+            return False
 
 
 @if_orchestrated
 def is_hotseat_env(envname):
-    envs = EnvUtils.lookup(e.HOTSEAT_ENVS, default=[])
-    return envname in envs if envname else False
+    envs = EnvUtils.HOTSEAT_ENVS or []
+    if not isinstance(envname, str):
+        return False
+    elif envname in envs:
+        return True
+    else:
+        alias_entry = find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname)
+        if alias_entry:
+            return alias_entry[p.ENVIRONMENT] in envs
+        else:
+            return False
 
 
 @if_orchestrated(use_legacy=True)
@@ -247,26 +436,55 @@ def get_env_from_context(settings, allow_environ=True):
     ignored(settings, allow_environ)
 
 
-@if_orchestrated(assumes_no_mirror=True)
-def get_mirror_env_from_context(settings, allow_guess=True):
-    ignored(allow_guess, settings)
-    # NOTE: This presumes we're not doing mirroring in orchestrated environments.
-    #       IF we were, this would need further review.
-    return None
+@if_orchestrated
+def get_mirror_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT, allow_guess=True):
+    # This is the same text as the legacy environment, but it needs to call our guess_mirror_env from this file.
+    # -kmp 26-Jul-2021
+    if not STAGE_MIRRORING_ENABLED:
+        return None
+    elif allow_environ:
+        environ_mirror_env_name = os.environ.get('MIRROR_ENV_NAME')
+        if environ_mirror_env_name:
+            return environ_mirror_env_name
+    declared = settings.get('mirror.env.name', '')
+    if declared:
+        return declared
+    elif allow_guess:
+        who_i_am = get_env_from_context(settings, allow_environ=allow_environ)
+        return guess_mirror_env(who_i_am)
+    else:
+        return None
 
 
-@if_orchestrated(assumes_no_mirror=True)
+@if_orchestrated
 def get_standard_mirror_env(envname):
-    ignored(envname)
-    # NOTE: This presumes we're not doing mirroring in orchestrated environments.
-    #       IF we were, this would need further review.
+    if not STAGE_MIRRORING_ENABLED:
+        return None
+    elif envname == EnvUtils.PRD_ENV_NAME:
+        return EnvUtils.STG_ENV_NAME
+    elif envname == EnvUtils.STG_ENV_NAME:
+        return EnvUtils.PRD_ENV_NAME
+    else:
+        entry = find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname)
+        if entry:
+            real_envname = entry[p.ENVIRONMENT]
+            if real_envname == EnvUtils.PRD_ENV_NAME:
+                found = EnvUtils.STG_ENV_NAME
+            elif real_envname == EnvUtils.STG_ENV_NAME:
+                found = EnvUtils.PRD_ENV_NAME
+            else:
+                return False
+            rev_entry = find_association(EnvUtils.PUBLIC_URL_TABLE, environment=found)
+            if rev_entry:
+                return rev_entry[p.NAME]
+            else:
+                return found
     return None
 
 
-@if_orchestrated(assumes_no_mirror=True)
+@if_orchestrated
 def guess_mirror_env(envname):
-    ignored(envname)
-    return None
+    return get_standard_mirror_env(envname)
 
 
 @if_orchestrated
@@ -281,65 +499,87 @@ def infer_repo_from_env(envname):
         return None
 
 
-@if_orchestrated(assumes_cgap=True)
+@if_orchestrated
 def infer_foursight_from_env(request, envname):
     ignored(request)
-    if is_cgap_env(envname):
-        return remove_prefix('cgap-', envname, required=False)
-    else:
-        raise UseLegacy()
+    if STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME:
+        classification = classify_server_url(request.domain)
+        if classification[c.IS_STG_OR_PRD]:
+            public_name = classification[c.PUBLIC_NAME]
+            if public_name:
+                return public_name
+    return remove_prefix(EnvUtils.FULL_ENV_PREFIX, envname, required=False)
 
 
 @if_orchestrated
 def full_env_name(envname):
-    prefix = EnvUtils.lookup(e.FULL_ENV_PREFIX)
-    if envname.startswith(prefix):
+
+    entry = find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname)
+    if entry:
+        return entry[p.ENVIRONMENT]
+
+    if envname.startswith(EnvUtils.FULL_ENV_PREFIX):
         return envname
     else:
-        return prefix + envname
+        return EnvUtils.FULL_ENV_PREFIX + envname
 
 
 @if_orchestrated
 def full_cgap_env_name(envname):
-    check_true(isinstance(envname, str) and is_cgap_env(envname), "The envname is not a CGAP env name.",
+    check_true(isinstance(envname, str) and EnvUtils.ORCHESTRATED_APP == 'cgap', "The envname is not a CGAP env name.",
                error_class=ValueError)
     return full_env_name(envname)
 
 
-@if_orchestrated(unimplemented=True, assumes_cgap=True)
+@if_orchestrated
 def full_fourfront_env_name(envname):
-    ignored(envname)
+    check_true(isinstance(envname, str) and EnvUtils.ORCHESTRATED_APP == 'fourfront',
+               "The envname is not a Fourfront env name.",
+               error_class=ValueError)
+    return full_env_name(envname)
 
 
 @if_orchestrated
 def classify_server_url(url, raise_error=True):
 
+    public_name = None
+    check_true(isinstance(url, str), "The 'url' argument must be a string.", error_class=ValueError)
+
+    if not url.startswith("http"):
+        url = "http://" + url  # without a prefix, the url parser does badly
     parsed = urlparse(url)
     hostname = parsed.hostname
     hostname1 = hostname.split('.', 1)[0]  # The part before the first dot (if any)
 
-    environment = get_bucket_env(hostname1)  # First approximation, maybe overridden below
-
-    is_stg_or_prd = is_stg_or_prd_env(hostname1)
-
     if hostname1 == 'localhost' or hostname == '127.0.0.1':
         environment = 'unknown'
         kind = 'localhost'
-    elif 'cgap' in hostname1:
-        kind = 'cgap'
-    elif is_stg_or_prd or 'fourfront-' in hostname1:
-        kind = 'fourfront'
+    elif hostname1.startswith(EnvUtils.FULL_ENV_PREFIX) and hostname.endswith(EnvUtils.DEV_ENV_DOMAIN_SUFFIX):
+        environment = hostname1
+        kind = EnvUtils.ORCHESTRATED_APP
+        entry = find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.ENVIRONMENT: environment})
+        if entry:
+            public_name = entry[p.NAME]
     else:
-        if raise_error:
-            raise RuntimeError("%s is not a Fourfront or CGAP server." % url)
+        entry = find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.HOST: hostname})
+        if entry:
+            environment = entry[p.ENVIRONMENT]
+            kind = EnvUtils.ORCHESTRATED_APP
+            public_name = entry[p.NAME]
+        elif raise_error:
+            raise RuntimeError(f"{url} is not a {EnvUtils.ORCHESTRATED_APP} server.")
         else:
             environment = 'unknown'
             kind = 'unknown'
 
+    bucket_env = get_bucket_env(environment)  # note that 'unknown' may go through this, returning still 'unknown'
     return {
-        'kind': kind,
-        'environment': environment,
-        'is_stg_or_prd': is_stg_or_prd
+        c.KIND: kind,
+        c.ENVIRONMENT: bucket_env,  # Obsolete. Really a bucket_env, so use that instead.
+        c.BUCKET_ENV: bucket_env,
+        c.SERVER_ENV: environment,
+        c.IS_STG_OR_PRD: is_stg_or_prd_env(environment),  # _is_raw_stg_or_prd_env(environment),
+        c.PUBLIC_NAME: public_name,
     }
 
 
