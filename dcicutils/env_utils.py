@@ -508,6 +508,9 @@ def infer_foursight_from_env(request, envname):
             public_name = classification[c.PUBLIC_NAME]
             if public_name:
                 return public_name
+    entry = find_association(EnvUtils.PUBLIC_URL_TABLE, environment=envname)
+    if entry:
+        envname = entry[p.NAME]
     return remove_prefix(EnvUtils.FULL_ENV_PREFIX, envname, required=False)
 
 

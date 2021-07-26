@@ -1427,6 +1427,7 @@ def test_orchestrated_infer_foursight_env():
     def mock_request(domain):  # build a dummy request with the 'domain' member, checked in the method
         return MockedRequest(domain)
 
+    assert infer_foursight_from_env(mock_request('acme-prd' + dev_suffix), 'acme-prd') == 'cgap'
     assert infer_foursight_from_env(mock_request('acme-mastertest' + dev_suffix), 'acme-mastertest') == 'mastertest'
     assert infer_foursight_from_env(mock_request('acme-webdev' + dev_suffix), 'acme-webdev') == 'webdev'
     assert infer_foursight_from_env(mock_request('acme-hotseat' + dev_suffix), 'acme-hotseat') == 'hotseat'
