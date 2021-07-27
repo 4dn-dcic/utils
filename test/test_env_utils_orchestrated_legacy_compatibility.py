@@ -737,37 +737,41 @@ def test_legacy_full_fourfront_env_name():
 @using_legacy_behavior()
 def test_legacy_classify_server_url_localhost():
 
+    # NOTE WELL: These results are from the legacy version of the function, which does not return as many values
+    #            in the dictionary, but also hopefully does not need as many values.
+    #            TODO: Extend legacy version to offer at least c.SERVER_ENV and c.BUCKET_ENV.
+
     assert classify_server_url("http://localhost/foo/bar") == {
         c.KIND: 'localhost',
         c.ENVIRONMENT: 'unknown',
         c.IS_STG_OR_PRD: False,
-        c.PUBLIC_NAME: None,
     }
 
     assert classify_server_url("http://localhost:8000/foo/bar") == {
         c.KIND: 'localhost',
         c.ENVIRONMENT: 'unknown',
         c.IS_STG_OR_PRD: False,
-        c.PUBLIC_NAME: None,
     }
 
     assert classify_server_url("http://localhost:1234/foo/bar") == {
         c.KIND: 'localhost',
         c.ENVIRONMENT: 'unknown',
         c.IS_STG_OR_PRD: False,
-        c.PUBLIC_NAME: None,
    }
 
     assert classify_server_url("http://127.0.0.1:8000/foo/bar") == {
         c.KIND: 'localhost',
         c.ENVIRONMENT: 'unknown',
         c.IS_STG_OR_PRD: False,
-        c.PUBLIC_NAME: None,
     }
 
 
 @using_legacy_behavior()
 def test_legacy_classify_server_url_cgap():
+
+    # NOTE WELL: These results are from the legacy version of the function, which does not return as many values
+    #            in the dictionary, but also hopefully does not need as many values.
+    #            TODO: Extend legacy version to offer at least c.SERVER_ENV and c.BUCKET_ENV.
 
     assert classify_server_url("https://cgap.hms.harvard.edu/foo/bar") == {
         'kind': 'cgap',
@@ -796,6 +800,10 @@ def test_legacy_classify_server_url_cgap():
 
 @using_legacy_behavior()
 def test_legacy_classify_server_url_fourfront():
+
+    # NOTE WELL: These results are from the legacy version of the function, which does not return as many values
+    #            in the dictionary, but also hopefully does not need as many values.
+    #            TODO: Extend legacy version to offer at least c.SERVER_ENV and c.BUCKET_ENV.
 
     assert classify_server_url("https://data.4dnucleome.org/foo/bar") == {
         'kind': 'fourfront',
@@ -831,6 +839,10 @@ def test_legacy_classify_server_url_fourfront():
 @using_legacy_behavior()
 def test_legacy_classify_server_url_other():
 
+    # NOTE WELL: These results are from the legacy version of the function, which does not return as many values
+    #            in the dictionary, but also hopefully does not need as many values.
+    #            TODO: Extend legacy version to offer at least c.SERVER_ENV and c.BUCKET_ENV.
+
     with raises_regexp(RuntimeError, "not a Fourfront or CGAP server"):
         classify_server_url("http://google.com")  # raise_error=True is the default
 
@@ -841,7 +853,6 @@ def test_legacy_classify_server_url_other():
         c.KIND: 'unknown',
         c.ENVIRONMENT: 'unknown',
         c.IS_STG_OR_PRD: False,
-        c.PUBLIC_NAME: None,
     }
 
 
