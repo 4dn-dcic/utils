@@ -103,6 +103,7 @@ class EBDeployer:
             repo.archive(fp, format='zip')
         return zip_location
 
+    # noinspection PyUnresolvedReferences - PyCharm has bogus issues with the boto3.client reference here.
     @classmethod
     def upload_application_to_s3(cls, zip_location):
         """ Uploads the zip file at zip_location to the specified S3 bucket
@@ -404,6 +405,7 @@ class IniFileManager:
                                      bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
                                      data_set=None, es_server=None, es_namespace=None,
                                      indexer=None, index_server=None, sentry_dsn=None,
+                                     auth0_client=None, auth0_secret=None,
                                      file_upload_bucket=None, file_wfout_bucket=None,
                                      blob_bucket=None, system_bucket=None, metadata_bundles_bucket=None):
 
@@ -426,6 +428,9 @@ class IniFileManager:
             es_namespace (str): The ElasticSearch namespace to use (probably but not necessarily same as bs_env).
             indexer (bool): Whether or not we are building an ini file for an indexer.
             index_server (bool): Whether or not we are building an ini file for an index server.
+            sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
+            auth0_client (str): A string identifying the auth0 client application.
+            auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
             file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
             blob_bucket (str): Specific name of the bucket to use on S3 for blob data.
@@ -445,6 +450,8 @@ class IniFileManager:
                                                indexer=indexer,
                                                index_server=index_server,
                                                sentry_dsn=sentry_dsn,
+                                               auth0_client=auth0_client,
+                                               auth0_secret=auth0_secret,
                                                file_upload_bucket=file_upload_bucket,
                                                file_wfout_bucket=file_wfout_bucket,
                                                blob_bucket=blob_bucket,
@@ -498,7 +505,9 @@ class IniFileManager:
     def build_ini_stream_from_template(cls, template_file_name, init_file_stream, *,
                                        bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
                                        data_set=None, es_server=None, es_namespace=None, indexer=None,
-                                       index_server=None, sentry_dsn=None, file_upload_bucket=None,
+                                       index_server=None, sentry_dsn=None,
+                                       auth0_client=None, auth0_secret=None,
+                                       file_upload_bucket=None,
                                        file_wfout_bucket=None, blob_bucket=None, system_bucket=None,
                                        metadata_bundles_bucket=None):
         """
@@ -510,13 +519,21 @@ class IniFileManager:
             init_file_stream: A stream to send output to.
             bs_env: A beanstalk environment.
             bs_mirror_env: A beanstalk environment.
+            s3_bucket_org: Short name token unique to the organization, for use as a low-tech namespace separator.
             s3_bucket_env: Environment name that is part of the s3 bucket name. (Usually defaults properly.)
             data_set: 'test' or 'prod'. Default is 'test' unless bs_env is a staging or production environment.
             es_server: The name of an es server to use.
             es_namespace: The namespace to use on the es server. If None, this uses the bs_env.
             indexer: Whether or not we are building an ini file for an indexer.
             index_server: Whether or not we are building an ini file for an index server.
-            sentry_dsn: A sentry DSN specifier, or the empty string if none is desired.
+            sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
+            auth0_client (str): A string identifying the auth0 client application.
+            auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
+            file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
+            file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
+            blob_bucket (str): Specific name of the bucket to use on S3 for blob data.
+            system_bucket (str): Specific name of the bucket to use on S3 for system data.
+            metadata_bundles_bucket (str): Specific name of the bucket to use on S3 for metadata bundles data.
 
         Returns: None
 
@@ -535,7 +552,8 @@ class IniFileManager:
                     or "MISSING_ENCODED_DATA_SET")
         es_namespace = es_namespace or os.environ.get("ENCODED_ES_NAMESPACE", bs_env)
         sentry_dsn = sentry_dsn or os.environ.get("ENCODED_SENTRY_DSN", "")
-
+        auth0_client = auth0_client or os.environ.get("ENCODED_AUTH0_CLIENT", "")
+        auth0_secret = auth0_secret or os.environ.get("ENCODED_AUTH0_SECRET", "")
         file_upload_bucket = (file_upload_bucket
                               or os.environ.get("ENCODED_FILE_UPLOAD_BUCKET")
                               or f"{s3_bucket_org}-{s3_bucket_env}-files")
@@ -594,6 +612,8 @@ class IniFileManager:
             'INDEXER': indexer,
             'INDEX_SERVER': index_server,
             'SENTRY_DSN': sentry_dsn,
+            'AUTH0_CLIENT': auth0_client,
+            'AUTH0_SECRET': auth0_secret,
             'FILE_UPLOAD_BUCKET': file_upload_bucket,
             'FILE_WFOUT_BUCKET': file_wfout_bucket,
             'BLOB_BUCKET': blob_bucket,
@@ -716,6 +736,12 @@ class IniFileManager:
             parser.add_argument("--sentry_dsn",
                                 help="a sentry DSN",
                                 default=None)
+            parser.add_argument("--auth0_client",
+                                help="an auth0 client identifier token",
+                                default=None)
+            parser.add_argument("--auth0_secret",
+                                help="an auth0 secret to authorize auth0_client",
+                                default=None)
             parser.add_argument("--file_upload_bucket",
                                 help="the name of the file upload bucket to use",
                                 default=None)
@@ -744,7 +770,10 @@ class IniFileManager:
                                              data_set=args.data_set,
                                              es_server=args.es_server, es_namespace=args.es_namespace,
                                              indexer=args.indexer, index_server=args.index_server,
-                                             sentry_dsn=args.sentry_dsn, file_upload_bucket=args.file_upload_bucket,
+                                             sentry_dsn=args.sentry_dsn,
+                                             auth0_client=args.auth0_client,
+                                             auth0_secret=args.auth0_secret,
+                                             file_upload_bucket=args.file_upload_bucket,
                                              file_wfout_bucket=args.file_wfout_bucket,
                                              blob_bucket=args.blob_bucket, system_bucket=args.system_bucket,
                                              metadata_bundles_bucket=args.metadata_bundles_bucket)
@@ -825,7 +854,8 @@ class CreateMappingOnDeployManager:
         else:
             description = "an unrecognized environment"
         log.info('Environment %s is %s. Processing mode: %s'
-                 % (env, description, cls._summarize_deploy_options(deploy_cfg)))
+                 % (env, description, # noQA - PyCharm wrongly worries description might be unassigned
+                    cls._summarize_deploy_options(deploy_cfg)))
         return deploy_cfg
 
     @staticmethod

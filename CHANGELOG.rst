@@ -6,10 +6,29 @@ dcicutils
 Change Log
 ----------
 
+1.20.0
+======
+
+**PR 148: Support auth0 client and secret in deployment_utils**
+
+* In ``deployment_utils``, add support for managing auth0 client and secret:
+
+  * To pass client and secret into the ini file generator:
+
+    * ``--auth0_client`` and ``--auth0_secret`` command line arguments.
+    * ``$ENCODED_AUTH0_CLIENT`` and ``ENCODED_AUTH0_SECRET`` as environment variables.
+
+  * Ini file templates can just use ``AUTH0_CLIENT`` and ``AUTH0_SECRET`` to obtain a properly defaulted value.
+    It is recommended to put something like this in the ini file template::
+
+      auth0.client = ${AUTH0_CLIENT}
+      auth0.secret = ${AUTH0_SECRET}
+
 
 1.19.0
 ======
 
+**PR 147: Init s3Utils via GLOBAL_ENV_BUCKET and misc S3_BUCKET_ORG support (C4-554)**
 **PR 146: Better S3 bucket management in deployment_utils**
 
 * In ``cloudformation_utils``:
