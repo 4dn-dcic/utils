@@ -10,7 +10,7 @@ Change Log
 1.21.0
 ======
 
-**PR 149: Add misc_utils.json_leaf_subst**
+**PR 150: Add misc_utils.json_leaf_subst**
 
 * Add ``misc_utils.json_leaf_subst`` to do substitutions at the leaves
   (atomic parts) of a JSON object.
