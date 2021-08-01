@@ -23,7 +23,7 @@ from dcicutils.misc_utils import (
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
-    capitalize1, local_attrs, dict_zip,
+    capitalize1, local_attrs, dict_zip, json_leaf_subst,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -2458,3 +2458,22 @@ def test_dict_zip():
 
     with pytest.raises(ValueError):
         dict_zip({'a': 'one', 'extra': 2}, {'a': 1})
+
+
+def test_json_leaf_subst():
+
+    subs = {"x": "ex"}
+    assert json_leaf_subst(3, subs) == 3
+    assert json_leaf_subst("x", subs) == "ex"
+    assert json_leaf_subst("y", subs) == "y"
+    assert json_leaf_subst(["x", "y", "z"], subs) == ["ex", "y", "z"]
+    assert json_leaf_subst(["x", "y", "z", "x", "y", "z"], subs) == ["ex", "y", "z", "ex", "y", "z"]
+
+    subs = {3: "three"}
+    assert json_leaf_subst(3, subs) == "three"
+    assert json_leaf_subst(3.0, subs) == "three"  # weird but acceptable
+
+    subs = {"x": "ex", "y": "why", "ex": "y", "why": "y"}
+    assert json_leaf_subst("x", subs) == "ex"
+    assert json_leaf_subst(["x", "y"], subs) == ["ex", "why"]
+    assert json_leaf_subst({"x": "y", "y": "x"}, subs) == {"ex": "why", "why": "ex"}

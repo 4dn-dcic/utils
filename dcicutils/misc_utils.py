@@ -1448,6 +1448,21 @@ def dict_zip(dict1, dict2):
     return res
 
 
+def json_leaf_subst(exp, substitutions):
+    """
+    Given an expression and some substitutions, substitutes all occurrences of the given
+    """
+    def do_subst(e):
+        return json_leaf_subst(e, substitutions)
+    if isinstance(exp, dict):
+        return {do_subst(k): do_subst(v) for k, v in exp.items()}
+    elif isinstance(exp, list):
+        return [do_subst(e) for e in exp]
+    elif exp in substitutions:  # Something atomic like a string or number
+        return substitutions[exp]
+    return exp
+
+
 # Deprecated names, still supported for a while.
 HMS_TZ = REF_TZ
 hms_now = ref_now
