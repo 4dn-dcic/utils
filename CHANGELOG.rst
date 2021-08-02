@@ -10,7 +10,7 @@ Change Log
 1.21.0
 ======
 
-**PR 150: Add misc_utils.json_leaf_subst**
+**PR 150: Add json_leaf_subst, conjoined_list and disjoined_list**
 
 * In ``misc_utils``:
 
