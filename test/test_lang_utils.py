@@ -1,6 +1,9 @@
 import datetime
+import pytest
 
-from dcicutils.lang_utils import EnglishUtils, a_or_an, select_a_or_an, string_pluralize
+from dcicutils.lang_utils import (
+    EnglishUtils, a_or_an, select_a_or_an, string_pluralize, conjoined_list, disjoined_list,
+)
 
 
 def test_string_pluralize_case():
@@ -230,3 +233,66 @@ def test_custom_a_or_an():
     assert EnglishUtils.n_of(0, "egg", num_format=maybe_a_or_n) == "no eggs"
     assert EnglishUtils.n_of(1, "egg", num_format=maybe_a_or_n) == "an egg"
     assert EnglishUtils.n_of(3, "egg", num_format=maybe_a_or_n) == "some eggs"
+
+
+def test_conjoined_list():
+
+    with pytest.raises(ValueError):
+        assert conjoined_list([])
+
+    assert conjoined_list([], nothing='nothing') == 'nothing'
+    assert conjoined_list(['a']) == 'a'
+    assert conjoined_list(['a', 'b']) == 'a and b'
+    assert conjoined_list(['a', 'b', 'c']) == 'a, b and c'
+    assert conjoined_list(['a', 'b', 'c'], oxford_comma=True) == 'a, b, and c'
+    assert conjoined_list(['a', 'b', 'c', 'd']) == 'a, b, c and d'
+
+    assert conjoined_list(['a'], conjunction='or') == 'a'
+    assert conjoined_list(['a', 'b'], conjunction='or') == 'a or b'
+    assert conjoined_list(['a', 'b', 'c'], conjunction='or') == 'a, b or c'
+    assert conjoined_list(['a', 'b', 'c', 'd'], conjunction='or') == 'a, b, c or d'
+    assert conjoined_list(['a', 'b', 'c', 'd'], conjunction='or', oxford_comma=True) == 'a, b, c, or d'
+
+    assert conjoined_list(['a'], conjunction='AND') == 'a'
+    assert conjoined_list(['a', 'b'], conjunction='AND') == 'a AND b'
+    assert conjoined_list(['a', 'b', 'c', 'd'], conjunction='AND') == 'a, b, c AND d'
+    assert conjoined_list(['a', 'b', 'c', 'd'], conjunction='AND', oxford_comma=True) == 'a, b, c, AND d'
+
+    assert conjoined_list(['a'], comma=';') == 'a'
+    assert conjoined_list(['a', 'b'], comma=';') == 'a and b'
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=';') == 'a; b; c and d'
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=';', oxford_comma=True) == 'a; b; c; and d'
+
+    assert conjoined_list(['a'], comma=False) == 'a'
+    assert conjoined_list(['a', 'b'], comma=False) == 'a and b'
+    assert conjoined_list(['a', 'b', 'c'], comma=False) == 'a and b and c'
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=False) == 'a and b and c and d'
+    # oxford_comma does nothing if comma is disabled.
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=False, oxford_comma=True) == 'a and b and c and d'
+
+    assert conjoined_list(['a'], comma=False, whitespace='_') == 'a'
+    assert conjoined_list(['a', 'b'], comma=False, whitespace='_') == 'a_and_b'
+    assert conjoined_list(['a', 'b', 'c'], comma=False, whitespace='_') == 'a_and_b_and_c'
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=False, whitespace='_') == 'a_and_b_and_c_and_d'
+    # oxford_comma does nothing if comma is disabled.
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=False, whitespace='_', oxford_comma=True) == 'a_and_b_and_c_and_d'
+
+    # Verify that the same function is a method
+    assert EnglishUtils.conjoined_list([], nothing='nothing') == 'nothing'
+    assert EnglishUtils.conjoined_list(['a']) == 'a'
+    assert EnglishUtils.conjoined_list(['a', 'b']) == 'a and b'
+    assert EnglishUtils.conjoined_list(['a', 'b', 'c']) == 'a, b and c'
+    assert EnglishUtils.conjoined_list(['a', 'b', 'c', 'd']) == 'a, b, c and d'
+
+
+def test_disjoined_list():
+
+    assert disjoined_list(['a']) == 'a'
+    assert disjoined_list(['a', 'b']) == 'a or b'
+    assert disjoined_list(['a', 'b', 'c']) == 'a, b or c'
+    assert disjoined_list(['a', 'b', 'c', 'd']) == 'a, b, c or d'
+
+    assert disjoined_list(['a'], oxford_comma=True) == 'a'
+    assert disjoined_list(['a', 'b'], oxford_comma=True) == 'a or b'
+    assert disjoined_list(['a', 'b', 'c'], oxford_comma=True) == 'a, b, or c'
+    assert disjoined_list(['a', 'b', 'c', 'd'], oxford_comma=True) == 'a, b, c, or d'

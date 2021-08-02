@@ -185,12 +185,56 @@ class EnglishUtils:
         result = ", ".join(result)
         return result
 
+    @classmethod
+    def disjoined_list(cls, items, conjunction='or', comma=",", oxford_comma=False, whitespace=" ", nothing=None):
+        return cls.conjoined_list(items, conjunction=conjunction, comma=comma, oxford_comma=oxford_comma,
+                                  whitespace=whitespace, nothing=nothing)
+
+    @classmethod
+    def conjoined_list(cls, items, conjunction='and', comma=",", oxford_comma=False, whitespace=" ", nothing=None):
+        assert isinstance(conjunction, str), "The 'conjunction' argument must a string or boolean."
+        conj = conjunction + whitespace
+
+        if comma is False:
+            sep = whitespace + conj
+            oxford_comma = False  # It would be odd to
+        elif comma is True:
+            sep = "," + whitespace
+        else:
+            assert isinstance(comma, str), "The 'comma' argument must a string or boolean."
+            sep = comma + whitespace
+
+        if oxford_comma is False:
+            final_sep = whitespace
+        elif oxford_comma is True:
+            final_sep = sep
+        else:
+            assert isinstance(oxford_comma, str), "The 'oxford_comma' argument must a string or boolean."
+            final_sep = oxford_comma + whitespace
+
+        n = len(items)
+
+        if n == 0:
+            if nothing:
+                return nothing
+            else:
+                raise ValueError("Cannot construct a conjoined list with no elements.")
+        elif n == 1:
+            return str(items[0])
+        elif n == 2:
+            return f"{items[0]}{whitespace}{conj}{items[1]}"
+        else:
+            return sep.join(items[:-1]) + f"{final_sep}{conj}{items[-1]}"
+
 
 # Export specific useful functions
 
 a_or_an = EnglishUtils.a_or_an
 
 n_of = EnglishUtils.n_of
+
+conjoined_list = EnglishUtils.conjoined_list
+disjoined_list = EnglishUtils.disjoined_list
 
 relative_time_string = EnglishUtils.relative_time_string
 

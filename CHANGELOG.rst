@@ -12,8 +12,16 @@ Change Log
 
 **PR 150: Add misc_utils.json_leaf_subst**
 
-* Add ``misc_utils.json_leaf_subst`` to do substitutions at the leaves
-  (atomic parts) of a JSON object.
+* In ``misc_utils``:
+
+  * Add ``json_leaf_subst`` to do substitutions at the leaves
+    (atomic parts) of a JSON object.
+
+* In ``lang_utils``:
+
+  * Add ``conjoined_list`` and ``disjoined_list`` to get a comma-separated
+    list in ordinary English form with an "and" or an "or" before the
+    last element.
 
 
 1.20.0
