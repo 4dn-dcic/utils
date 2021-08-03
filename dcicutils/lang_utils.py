@@ -1,7 +1,8 @@
 import datetime
 import re
 
-from .misc_utils import ignored
+from .misc_utils import ignored, capitalize1
+from typing import Union, Optional
 
 
 class EnglishUtils:
@@ -142,6 +143,61 @@ class EnglishUtils:
         return "%s %s" % (display_n, thing if n == 1 else cls.string_pluralize(thing))
 
     @classmethod
+    def there_are(cls, items, *, kind: str = "thing", count: Optional[int] = None, there: str = "there",
+                  capitalize = True, joiner=None, zero: object = "no", punctuate=False, use_article=False,
+                  **joiner_options) -> str:
+        """
+        Constructs a sentence that enumerates a set of things.
+
+        :param items: the items to enumerate
+        :param kind: the kind of items being enumerated (default "thing")
+        :param there: the demonstrative or noun phrase that starts the sentence (default "there")
+        :param capitalize: whether to capitalize the first letter of the sentence (default True)
+        :param joiner: the joining function to join the items (default if None is just a commas-separated list)
+        :param zero: the value to print instead of a numeric zero (default "no")
+        :param punctuate: in the case of one or more values (not zero), whether to end with a period (default False)
+        :param use_article: whether to put 'a' or 'an' in front of each option (default False)
+        :param joiner_options: additional (keyword) options to be used with a joiner function if one is supplied
+
+        By far the most common uses are likely to be:
+
+        >>> there_are(['Joe', 'Sally'], kind="user")
+        "There are 2 users: Joe, Sally"
+        >>> there_are(['Joe'], kind="user")
+        "There is 1 user: Joe"
+        >>> there_are([], kind="user")
+        "There are no users."
+
+        There are various control options. For example:
+
+        >>> there_are(['Joe', 'Sally'], kind="user", joiner=conjoined_list, punctuate=True)
+        "There are 2 users: Joe and Sally."
+        >>> there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=True)
+        "There is 1 user: Joe."
+        >>> there_are([], kind="user", joiner=conjoined_list, punctuate=True)
+        "There are no users."
+
+        """
+
+        there = capitalize1(there) if capitalize else there
+        n = len(items) if count is None else count
+        is_or_are = "is" if n == 1 else "are"
+        part1 = f"{there} {is_or_are} {n_of(n, kind, num_format=lambda n, thing: zero if n == 0 else None)}"
+        if n == 0:
+            return part1 + "."
+        else:
+            if use_article:
+                items = [a_or_an(str(item)) for item in items]
+            else:
+                items = [str(item) for item in items]
+            if joiner is None:
+                joined = ", ".join(items)
+            else:
+                joined = joiner(items, **joiner_options)
+            punctuation = "." if punctuate else ""
+            return f"{part1}: {joined}{punctuation}"
+
+    @classmethod
     def _time_count_formatter(cls, n, unit):
         ignored(unit)
         if isinstance(n, float):
@@ -186,12 +242,68 @@ class EnglishUtils:
         return result
 
     @classmethod
-    def disjoined_list(cls, items, conjunction='or', comma=",", oxford_comma=False, whitespace=" ", nothing=None):
+    def disjoined_list(cls, items, conjunction: str = 'or', comma: Union[bool, str] = ",",
+                       oxford_comma: Union[bool, str] = False, whitespace: str = " ",
+                       nothing: Optional[str] = None) -> str:
+        """
+        Given a list of items, returns an English string that describes the option of any of them,
+        joined by commas, as needed, and with the conjunction 'or' before the last item if there's more than one.
+
+        For example:
+
+        >>> disjoined_list(['something'])
+        'something'
+        >>> disjoined_list(['P', 'NP'])
+        'P or NP'
+        >>> disjoined_list(['this', 'that', 'the other'])
+        'this, that or the other'
+        >>> disjoined_list(['this', 'that', 'the other'], oxford_comma=True)
+        'this, that, or the other'
+        >>> disjoined_list(['this', 'that', 'the other'], comma=False)
+        'this or that or the other'
+
+        :param items: a list of items
+        :param conjunction: a string (default 'or') to be used before the last item if there's more than one
+        :param comma: a string (default ',') to use as a comma. Semicolon (';') is the most obvious other choice,
+                      or False to indicate that the conjunction should be used between all elements.
+        :param oxford_comma: a boolean (default False) saying whether to use a so-called 'Oxford comma',
+                             or a string to use as that comma.
+        :param nothing: a string to use if there are no items, to avoid an error being raised.
+        """
+
         return cls.conjoined_list(items, conjunction=conjunction, comma=comma, oxford_comma=oxford_comma,
                                   whitespace=whitespace, nothing=nothing)
 
     @classmethod
-    def conjoined_list(cls, items, conjunction='and', comma=",", oxford_comma=False, whitespace=" ", nothing=None):
+    def conjoined_list(cls, items, conjunction: str = 'and', comma: Union[bool, str] = ",",
+                       oxford_comma: Union[bool, str] = False, whitespace: str = " ",
+                       nothing: Optional[str] = None) -> str:
+        """
+        Given a list of items, returns an English string that describes the collection of all of them,
+        joined by commas, as needed, and with the conjunction 'and' before the last item if more than one item.
+
+        For example:
+
+        >>> conjoined_list(['something'])
+        'something'
+        >>> conjoined_list(['yin', 'yang'])
+        'yin and yang'
+        >>> conjoined_list(['up', 'down', 'all around'])
+        'up, down and all around'
+        >>> conjoined_list(['up', 'down', 'all around'], oxford_comma=True)
+        'up, down, and all around'
+        >>> conjoined_list(['up', 'down', 'all around'], comma=False)
+        'up and down and all around'
+
+        :param items: a list of items
+        :param conjunction: a string (default 'and') to be used before the last item if there's more than one
+        :param comma: a string (default ',') to use as a comma. Semicolon (';') is the most obvious other choice,
+                      or False to indicate that the conjunction should be used between all elements.
+        :param oxford_comma: a boolean (default False) saying whether to use an 'Oxford comma' (ask Google),
+                             or a string to use as the Oxford comma.
+        :param nothing: a string to use if there are no items, to avoid an error being raised.
+        """
+
         assert isinstance(conjunction, str), "The 'conjunction' argument must a string or boolean."
         conj = conjunction + whitespace
 
@@ -241,3 +353,5 @@ relative_time_string = EnglishUtils.relative_time_string
 select_a_or_an = EnglishUtils.select_a_or_an
 
 string_pluralize = EnglishUtils.string_pluralize
+
+there_are = EnglishUtils.there_are

@@ -2,7 +2,7 @@ import datetime
 import pytest
 
 from dcicutils.lang_utils import (
-    EnglishUtils, a_or_an, select_a_or_an, string_pluralize, conjoined_list, disjoined_list,
+    EnglishUtils, a_or_an, select_a_or_an, string_pluralize, conjoined_list, disjoined_list, there_are,
 )
 
 
@@ -296,3 +296,40 @@ def test_disjoined_list():
     assert disjoined_list(['a', 'b'], oxford_comma=True) == 'a or b'
     assert disjoined_list(['a', 'b', 'c'], oxford_comma=True) == 'a, b, or c'
     assert disjoined_list(['a', 'b', 'c', 'd'], oxford_comma=True) == 'a, b, c, or d'
+
+
+def test_there_are():
+
+    assert there_are([]) == "There are no things."
+    assert there_are([], zero=0) == "There are 0 things."
+
+    assert there_are(['foo']) == "There is 1 thing: foo"
+    assert there_are(['foo'], punctuate=True) == "There is 1 thing: foo."
+
+    assert there_are(['box', 'bugle', 'bear']) == "There are 3 things: box, bugle, bear"
+    assert there_are(['box', 'bugle', 'bear'], joiner=conjoined_list) == "There are 3 things: box, bugle and bear"
+    assert there_are(['box', 'bugle', 'bear'],
+                     joiner=conjoined_list, oxford_comma=True) == "There are 3 things: box, bugle, and bear"
+    assert there_are(['box', 'bugle', 'bear'],
+                     joiner=conjoined_list, oxford_comma=True, kind="option", conjunction="or"
+                     ) == "There are 3 options: box, bugle, or bear"
+    assert there_are(['apple', 'egg', 'steak'], use_article=True, punctuate=True,
+                     joiner=disjoined_list, oxford_comma=True, kind="option", conjunction="or",
+                     ) == "There are 3 options: an apple, an egg, or a steak."
+    assert there_are(['apple', 'egg', 'steak'], use_article=True, joiner=conjoined_list, kind="option", punctuate=True,
+                     ) == "There are 3 options: an apple, an egg and a steak."
+
+    assert there_are([2, 3, 5, 7], kind="single-digit prime") == "There are 4 single-digit primes: 2, 3, 5, 7"
+    assert there_are([2, 3, 5, 7], kind="single-digit prime", punctuate=True, joiner=conjoined_list,
+                     ) == "There are 4 single-digit primes: 2, 3, 5 and 7."
+
+    # From the doc strings
+
+    assert there_are(['Joe', 'Sally'], kind="user") == "There are 2 users: Joe, Sally"
+    assert there_are(['Joe'], kind="user") == "There is 1 user: Joe"
+    assert there_are([], kind="user") == "There are no users."
+
+    assert there_are(['Joe', 'Sally'], kind="user", joiner=conjoined_list, punctuate=True
+                     ) == "There are 2 users: Joe and Sally."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=True) == "There is 1 user: Joe."
+    assert there_are([], kind="user", joiner=conjoined_list, punctuate=True) == "There are no users."
