@@ -1450,7 +1450,14 @@ def dict_zip(dict1, dict2):
 
 def json_leaf_subst(exp, substitutions):
     """
-    Given an expression and some substitutions, substitutes all occurrences of the given
+    Given an expression and some substitutions, substitutes all occurrences of the given substitutions.
+    For example:
+
+    >>> json_leaf_subst({'xxx': ['foo', 'bar', 'baz']}, {'foo': 'fu', 'bar': 'bah', 'xxx': 'yyy'})
+    {'yyy': ['fu', 'bah', 'baz']}
+
+    :param exp: a JSON expression, represented in Python as a string, a number, a list, or a dict
+    :param substitutions: a dictionary of replacements from keys to values
     """
     def do_subst(e):
         return json_leaf_subst(e, substitutions)
