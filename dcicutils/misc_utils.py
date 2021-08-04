@@ -1470,6 +1470,18 @@ def json_leaf_subst(exp, substitutions):
     return exp
 
 
+class NamedObject(object):
+
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return f"<{self.name}>"
+
+    def __repr__(self):
+        return f"<{self.name}@{id(self):x}>"
+
+
 # Deprecated names, still supported for a while.
 HMS_TZ = REF_TZ
 hms_now = ref_now
