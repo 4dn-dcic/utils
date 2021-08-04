@@ -17,6 +17,9 @@ Change Log
   * Add ``json_leaf_subst`` to do substitutions at the leaves
     (atomic parts) of a JSON object.
 
+  * Add ``NamedObject`` for creating named tokens.
+
+
 * In ``lang_utils``:
 
   * Add ``conjoined_list`` and ``disjoined_list`` to get a comma-separated
