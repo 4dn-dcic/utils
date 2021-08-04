@@ -2,7 +2,7 @@ from unittest import mock
 from dcicutils.cloudformation_utils import get_ecs_real_url
 
 
-class MockedCfnClient():
+class MockedCfnClient:
     """ Mocks boto3.client('cloudformation').describe_stacks """
     def __init__(self):
         pass
