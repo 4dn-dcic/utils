@@ -1,14 +1,15 @@
 # flake8: noqa
+
 import boto3
 import pytest
 import os
 import requests
 import time
 
+from dcicutils.beanstalk_utils import describe_beanstalk_environments, REGION
+from dcicutils.ff_utils import authorized_request, get_health_page
 from dcicutils.misc_utils import check_true
 from dcicutils.s3_utils import s3Utils
-from dcicutils.ff_utils import authorized_request, get_health_page
-from dcicutils.beanstalk_utils import describe_beanstalk_environments, REGION
 from .conftest_settings import TEST_DIR
 
 
