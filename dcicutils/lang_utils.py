@@ -144,7 +144,7 @@ class EnglishUtils:
 
     @classmethod
     def must_be_one_of(cls, items, *, possible: Union[bool, str] = True, kind: str = "option", quote=False,
-                       capitalize = True, joiner=None, **joiner_options):
+                       capitalize=True, joiner=None, **joiner_options):
         """
         Constructs a sentence that complains about a given quantity not being among a given set of options.
 
@@ -196,13 +196,14 @@ class EnglishUtils:
 
     @classmethod
     def there_are(cls, items, *, kind: str = "thing", count: Optional[int] = None, there: str = "there",
-                  capitalize = True, joiner=None, zero: object = "no", punctuate=False, use_article=False,
+                  capitalize=True, joiner=None, zero: object = "no", punctuate=False, use_article=False,
                   **joiner_options) -> str:
         """
         Constructs a sentence that enumerates a set of things.
 
         :param items: the items to enumerate
         :param kind: the kind of items being enumerated (default "thing")
+        :param count: the number of items (defaults to the result of 'len(items)')
         :param there: the demonstrative or noun phrase that starts the sentence (default "there")
         :param capitalize: whether to capitalize the first letter of the sentence (default True)
         :param joiner: the joining function to join the items (default if None is just a commas-separated list)
@@ -320,6 +321,7 @@ class EnglishUtils:
                       or False to indicate that the conjunction should be used between all elements.
         :param oxford_comma: a boolean (default False) saying whether to use a so-called 'Oxford comma',
                              or a string to use as that comma.
+        :param whitespace: what to use as separator whitespace (default ' ')
         :param nothing: a string to use if there are no items, to avoid an error being raised.
         """
 
@@ -353,6 +355,7 @@ class EnglishUtils:
                       or False to indicate that the conjunction should be used between all elements.
         :param oxford_comma: a boolean (default False) saying whether to use an 'Oxford comma' (ask Google),
                              or a string to use as the Oxford comma.
+        :param whitespace: what to use as separator whitespace (default ' ')
         :param nothing: a string to use if there are no items, to avoid an error being raised.
         """
 
