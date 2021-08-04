@@ -28,7 +28,7 @@ def generate_sample_fastq_content(num=10, length=10):
 
     for i in range(num):
         content += '@SEQUENCE{} length={}\n'.format(i, length)
-        content += ''.join(random.choice(bases) for i in range(length)) + '\n'
+        content += ''.join(random.choice(bases) for _ in range(length)) + '\n'
         content += '+\n'
         content += 'I' * length + '\n'
 
