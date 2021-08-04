@@ -143,6 +143,58 @@ class EnglishUtils:
         return "%s %s" % (display_n, thing if n == 1 else cls.string_pluralize(thing))
 
     @classmethod
+    def must_be_one_of(cls, items, *, possible: Union[bool, str] = True, kind: str = "option", quote=False,
+                       capitalize = True, joiner=None, **joiner_options):
+        """
+        Constructs a sentence that complains about a given quantity not being among a given set of options.
+
+        This is intended to be useful in error messages to enumerate a set of values, usually but not necessarily
+        strings, that had been expected but not received. For example:
+
+        >>> must_be_one_of([])
+        "There are no possible options."
+        >>> must_be_one_of(['foo'])
+        "The only possible option is foo."
+        >>> must_be_one_of(['foo', 'bar'])
+        "Possible options are foo and bar."
+        >>> must_be_one_of(['foo', 'bar', 'baz'])
+        "Possible options are foo, bar and baz."
+
+        :param items: the items to enumerate
+        :param possible: whether to use the word 'possible' before the given kind (default True), or an string to use
+        :param kind: the kind of items being enumerated (default "option")
+        :param quote: whether to put quotes around each option
+        :param capitalize: whether to capitalize the first letter of the sentence (default True)
+        :param joiner: the joining function to join the items (default if None is just a commas-separated list)
+        :param joiner_options: additional (keyword) options to be used with a joiner function if one is supplied
+        """
+
+        n = len(items)
+        maybe_adj = ""
+        if possible:
+            if possible is True:
+                possible = "possible"
+            maybe_adj = possible + " "
+        if not joiner:
+            joiner = cls.conjoined_list
+        if quote:
+            # First force to a string, so we don't call the item's repr, then use repr to add quotation marks.
+            items = [repr(str(item)) for item in items]
+        if n == 0:
+            kinds = cls.string_pluralize(kind)
+            result = f"there are no {maybe_adj}{kinds}."
+        elif n == 1:
+            [item] = items
+            result = f"the only {maybe_adj}{kind} is {item}."
+        else:
+            kinds = cls.string_pluralize(kind)
+            options = joiner(items, **joiner_options)
+            result = f"{maybe_adj}{kinds} are {options}."
+        if capitalize:
+            result = capitalize1(result)
+        return result
+
+    @classmethod
     def there_are(cls, items, *, kind: str = "thing", count: Optional[int] = None, there: str = "there",
                   capitalize = True, joiner=None, zero: object = "no", punctuate=False, use_article=False,
                   **joiner_options) -> str:
@@ -355,3 +407,5 @@ select_a_or_an = EnglishUtils.select_a_or_an
 string_pluralize = EnglishUtils.string_pluralize
 
 there_are = EnglishUtils.there_are
+
+must_be_one_of = EnglishUtils.must_be_one_of

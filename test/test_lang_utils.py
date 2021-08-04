@@ -2,7 +2,7 @@ import datetime
 import pytest
 
 from dcicutils.lang_utils import (
-    EnglishUtils, a_or_an, select_a_or_an, string_pluralize, conjoined_list, disjoined_list, there_are,
+    EnglishUtils, a_or_an, select_a_or_an, string_pluralize, conjoined_list, disjoined_list, there_are, must_be_one_of
 )
 
 
@@ -333,3 +333,26 @@ def test_there_are():
                      ) == "There are 2 users: Joe and Sally."
     assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=True) == "There is 1 user: Joe."
     assert there_are([], kind="user", joiner=conjoined_list, punctuate=True) == "There are no users."
+
+
+def test_must_be():
+
+    assert must_be_one_of([], possible=False) == "There are no options."
+    assert must_be_one_of(['foo'], possible=False) == "The only option is foo."
+    assert must_be_one_of(['foo', 'bar'], possible=False) == "Options are foo and bar."
+    assert must_be_one_of(['foo', 'bar', 'baz'], possible=False) == "Options are foo, bar and baz."
+
+    assert must_be_one_of([]) == "There are no possible options."
+    assert must_be_one_of(['foo']) == "The only possible option is foo."
+    assert must_be_one_of(['foo', 'bar']) == "Possible options are foo and bar."
+    assert must_be_one_of(['foo', 'bar', 'baz']) == "Possible options are foo, bar and baz."
+
+    assert must_be_one_of([], quote=True) == "There are no possible options."
+    assert must_be_one_of(['foo'], quote=True) == "The only possible option is 'foo'."
+    assert must_be_one_of(['foo', 'bar'], quote=True) == "Possible options are 'foo' and 'bar'."
+    assert must_be_one_of(['foo', 'bar', 'baz'], quote=True) == "Possible options are 'foo', 'bar' and 'baz'."
+
+    assert must_be_one_of([], possible='valid', kind='argument') == "There are no valid arguments."
+    assert must_be_one_of(['A'], possible='valid', kind='argument') == "The only valid argument is A."
+    assert must_be_one_of(['A', 'B'], possible='valid', kind='argument') == "Valid arguments are A and B."
+    assert must_be_one_of(['A', 'B', 'C'], possible='valid', kind='argument') == "Valid arguments are A, B and C."

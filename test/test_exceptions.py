@@ -2,6 +2,7 @@ from dcicutils.exceptions import (
     ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix,
     ConfigurationError, SynonymousEnvironmentVariablesMismatched, InferredBucketConflict,
     CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv, GlobalBucketAccessError,
+    InvalidParameterError,
 )
 
 
@@ -159,5 +160,62 @@ def test_global_bucket_access_error():
     assert str(e) == "Could not access global env bucket my-envs: status: 403"
     assert isinstance(e, GlobalBucketAccessError)
     assert isinstance(e, ConfigurationError)
+    assert isinstance(e, ValueError)
+    assert isinstance(e, Exception)
+
+
+def test_invalid_parameter_error():
+
+    e = InvalidParameterError(parameter='letter', value='charlie', options=['alpha', 'beta', 'gamma'])
+    assert str(e) == "The value of letter, 'charlie', was not valid. Valid values are 'alpha', 'beta' and 'gamma'."
+
+    e = InvalidParameterError(parameter='letter', value='charlie', options=['alpha', 'beta'])
+    assert str(e) == "The value of letter, 'charlie', was not valid. Valid values are 'alpha' and 'beta'."
+
+    e = InvalidParameterError(parameter='letter', value='charlie', options=['alpha'])
+    assert str(e) == "The value of letter, 'charlie', was not valid. The only valid value is 'alpha'."
+
+    e = InvalidParameterError(parameter='letter', value='charlie', options=[])
+    assert str(e) == "The value of letter, 'charlie', was not valid. There are no valid values."
+
+    e = InvalidParameterError(value='charlie', options=[])
+    assert str(e) == "The value, 'charlie', was not valid. There are no valid values."
+
+    e = InvalidParameterError(parameter='letter', options=[])
+    assert str(e) == "The value of letter was not valid. There are no valid values."
+
+    e = InvalidParameterError(options=[])
+    assert str(e) == "The value was not valid. There are no valid values."
+
+    e = InvalidParameterError()
+    assert str(e) == "The value was not valid. There are no valid values."
+
+    assert isinstance(e, InvalidParameterError)
+    assert isinstance(e, ValueError)
+    assert isinstance(e, Exception)
+
+    class AlphabetError(InvalidParameterError):
+        VALID_OPTIONS = ['alpha', 'beta', 'gamma']
+
+    e = AlphabetError(parameter='letter', value='charlie')
+    assert str(e) == "The value of letter, 'charlie', was not valid. Valid values are 'alpha', 'beta' and 'gamma'."
+
+    e = AlphabetError(parameter='letter')
+    assert str(e) == "The value of letter was not valid. Valid values are 'alpha', 'beta' and 'gamma'."
+
+    e = AlphabetError(parameter='letter', value=InvalidParameterError.SUPPRESSED)
+    assert str(e) == "The value of letter was not valid. Valid values are 'alpha', 'beta' and 'gamma'."
+
+    e = AlphabetError(value='charlie')
+    assert str(e) == "The value, 'charlie', was not valid. Valid values are 'alpha', 'beta' and 'gamma'."
+
+    e = AlphabetError()
+    assert str(e) == "The value was not valid. Valid values are 'alpha', 'beta' and 'gamma'."
+
+    e = AlphabetError(value=InvalidParameterError.SUPPRESSED)
+    assert str(e) == "The value was not valid. Valid values are 'alpha', 'beta' and 'gamma'."
+
+    assert isinstance(e, AlphabetError)
+    assert isinstance(e, InvalidParameterError)
     assert isinstance(e, ValueError)
     assert isinstance(e, Exception)

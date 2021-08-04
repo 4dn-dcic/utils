@@ -19,12 +19,21 @@ Change Log
 
   * Add ``NamedObject`` for creating named tokens.
 
+* In ``exceptions``:
+
+  * Add ``InvalidParameterError``.
 
 * In ``lang_utils``:
 
   * Add ``conjoined_list`` and ``disjoined_list`` to get a comma-separated
     list in ordinary English form with an "and" or an "or" before the
-    last element.
+    last element. (Note that these also support new functions
+    ``there_are`` and ``must_be_one_of``).
+
+  * Add ``there are`` and ``must_be_one_of`` to handle construction of
+    messages that are commonly needed but require nuanced adjustment of
+    wording to sound right in English. (Note that ``must_be_one_of`` also
+    supports ``InvalidParameterError``.)
 
 
 1.20.0

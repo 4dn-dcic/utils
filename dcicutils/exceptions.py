@@ -1,14 +1,24 @@
 # Exceptions can be put here to get them out of the way of the main flow of things,
 # and because once in a while we may want them to be shared or to have shared parents.
 
-from .misc_utils import full_object_name, full_class_name, capitalize1
+from .misc_utils import full_object_name, full_class_name, capitalize1, NamedObject
+from .lang_utils import must_be_one_of
 
 
 class KnownBugError(AssertionError):
 
+    # One way or another, the initialization protocol will set these.
+    jira_ticket = None
+    bug_name = None
+
     def set_jira_ticket(self, jira_ticket):
         self.jira_ticket = jira_ticket
         self.bug_name = "a bug" if jira_ticket is None else "Bug %s" % jira_ticket
+
+    def __init__(self, message):
+        super(KnownBugError, self).__init__(message)
+        if self.bug_name is None:
+            self.set_jira_ticket(self.jira_ticket)
 
 
 class UnfixedBugError(KnownBugError):
@@ -130,3 +140,36 @@ class GlobalBucketAccessError(ConfigurationError):
         self.status = status
         super().__init__("Could not access global env bucket {global_bucket}: status: {status}"
                          .format(global_bucket=global_bucket, status=status))
+
+
+class InvalidParameterError(ValueError):
+
+    SUPPRESSED = NamedObject('suppressed')
+    QUOTE_OPTIONS = True
+    VALIDITY_WORD = "valid"
+    VALID_OPTIONS = None
+
+    def __init__(self, parameter=None, value=SUPPRESSED, options=None, message=None):
+        options = self.VALID_OPTIONS if options is None else options  # options takes precedence if both are defined
+        if options is None:
+            # This value might come from either the argument options or the self.VALID_OPTIONS. We no longer care.
+            options = []
+        self.parameter = parameter
+        self.value = value
+        self.options = options
+        self.message = message
+
+        if message is None:
+            value_part = ""
+            if value is not self.SUPPRESSED:
+                if self.QUOTE_OPTIONS:
+                    value = repr(str(value))
+                value_part = f", {value},"
+            valid = self.VALIDITY_WORD
+            restriction = must_be_one_of(options, possible=valid, kind='value', quote=self.QUOTE_OPTIONS)
+            parameter_part = ""
+            if parameter is not None:
+                parameter_part = f" of {parameter}"
+            message = f"The value{parameter_part}{value_part} was not {valid}. {restriction}"
+
+        super().__init__(message)
