@@ -3,7 +3,11 @@ import pytest
 
 from unittest import mock
 from dcicutils import command_utils as command_utils_module
-from dcicutils.command_utils import _ask_boolean_question, yes_or_no, y_or_n
+from dcicutils.command_utils import (
+    _ask_boolean_question,  # noQA - access to internal function is so we can test it
+    yes_or_no, y_or_n
+)
+from dcicutils.misc_utils import ignored
 
 
 @contextlib.contextmanager
@@ -27,6 +31,7 @@ def input_series(*items):
     with mock.patch.object(command_utils_module, "input") as mock_input:
 
         def mocked_input(*args, **kwargs):
+            ignored(args, kwargs)
             if not inputs:
                 raise OutOfInputs()
             return inputs.pop()
