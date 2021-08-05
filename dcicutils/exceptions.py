@@ -153,7 +153,8 @@ class InvalidParameterError(ValueError):
         return self.VALID_OPTIONS
 
     def _defaulted_options(self, options):
-        options = self.compute_valid_options() if options is None else options  # options takes precedence if both are defined
+        # The options argument takes precedence if both are defined
+        options = self.compute_valid_options() if options is None else options
         if options is None:
             options = []
         return options
