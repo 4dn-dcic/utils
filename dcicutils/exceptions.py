@@ -149,11 +149,17 @@ class InvalidParameterError(ValueError):
     VALIDITY_WORD = "valid"
     VALID_OPTIONS = None
 
-    def __init__(self, parameter=None, value=SUPPRESSED, options=None, message=None):
-        options = self.VALID_OPTIONS if options is None else options  # options takes precedence if both are defined
+    def compute_valid_options(self):
+        return self.VALID_OPTIONS
+
+    def _defaulted_options(self, options):
+        options = self.compute_valid_options() if options is None else options  # options takes precedence if both are defined
         if options is None:
-            # This value might come from either the argument options or the self.VALID_OPTIONS. We no longer care.
             options = []
+        return options
+
+    def __init__(self, parameter=None, value=SUPPRESSED, options=None, message=None):
+        options = self._defaulted_options(options)
         self.parameter = parameter
         self.value = value
         self.options = options

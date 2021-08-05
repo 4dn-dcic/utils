@@ -164,7 +164,7 @@ def test_global_bucket_access_error():
     assert isinstance(e, Exception)
 
 
-def test_invalid_parameter_error():
+def test_invalid_parameter_error_with_options_by_argument():
 
     e = InvalidParameterError(parameter='letter', value='charlie', options=['alpha', 'beta', 'gamma'])
     assert str(e) == "The value of letter, 'charlie', was not valid. Valid values are 'alpha', 'beta' and 'gamma'."
@@ -194,6 +194,9 @@ def test_invalid_parameter_error():
     assert isinstance(e, ValueError)
     assert isinstance(e, Exception)
 
+
+def test_invalid_parameter_error_with_static_options():
+
     class AlphabetError(InvalidParameterError):
         VALID_OPTIONS = ['alpha', 'beta', 'gamma']
 
@@ -219,3 +222,34 @@ def test_invalid_parameter_error():
     assert isinstance(e, InvalidParameterError)
     assert isinstance(e, ValueError)
     assert isinstance(e, Exception)
+
+
+def test_invalid_parameter_error_with_dynamic_options():
+
+    n = 0
+
+    class StretchyError(InvalidParameterError):
+
+        def compute_valid_options(self):
+            return [f"val{x}" for x in range(n)]
+
+    e0a = StretchyError()
+    e0b = StretchyError()
+    assert str(e0a) == "The value was not valid. There are no valid values."
+    n += 1  # n == 1. Valid values for newly created errors = ['val0']
+    assert str(e0a) == "The value was not valid. There are no valid values."  # created when n == 0
+    assert str(e0b) == "The value was not valid. There are no valid values."  # ditto
+
+    e1a = StretchyError()
+    e1b = StretchyError()
+    assert str(e1a) == "The value was not valid. The only valid value is 'val0'."
+    n += 1  # n == 2. Valid values for newly created errors are now ['val0', 'val1']
+    assert str(e1a) == "The value was not valid. The only valid value is 'val0'."  # created when n == 1
+    assert str(e1b) == "The value was not valid. The only valid value is 'val0'."  # ditto
+
+    e2a = StretchyError()
+    e2b = StretchyError()
+    assert str(e2a) == "The value was not valid. Valid values are 'val0' and 'val1'."
+    n += 1  # n == 3. Valid values for newly created errors = ['val0', 'val1', 'val2']
+    assert str(e2a) == "The value was not valid. Valid values are 'val0' and 'val1'."  # created when n == 2
+    assert str(e2b) == "The value was not valid. Valid values are 'val0' and 'val1'."  # ditto
