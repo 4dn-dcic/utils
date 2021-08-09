@@ -19,6 +19,9 @@ Change Log
 
   * Add ``NamedObject`` for creating named tokens.
 
+  * Add a ``separator=`` argument to ``camel_case_to_snake_case`` and ``snake_case_to_camel_case``.
+
+
 * In ``exceptions``:
 
   * Add ``InvalidParameterError``.

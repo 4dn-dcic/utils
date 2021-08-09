@@ -1151,14 +1151,28 @@ def file_contents(filename, binary=False):
         return fp.read()
 
 
-def camel_case_to_snake_case(s):
-    """ Converts CamelCase to snake_case """
-    return ''.join('_' + c.lower() if c.isupper() else c for c in s).lstrip('_')
+def camel_case_to_snake_case(s, separator='_'):
+    """
+    Converts CamelCase to snake_case.
+    With a separator argument (default '_'), use that character instead for snake_case.
+    e.g., with separator='-', you'll get snake-case.
+
+    :param s: a string to convert
+    :param separator: the snake-case separator character (default '_')
+    """
+    return ''.join(separator + c.lower() if c.isupper() else c for c in s).lstrip(separator)
 
 
-def snake_case_to_camel_case(s):
-    """ Converts snake_case to CamelCase - note that "our" CamelCase always capitalizes the first character. """
-    return s.title().replace('_', '')
+def snake_case_to_camel_case(s, separator='_'):
+    """
+    Converts snake_case to CamelCase. (Note that "our" CamelCase always capitalizes the first character.)
+    With a separator argument (default '_'), expect that character instead for snake_case.
+    e.g., with separator='-', you'll expect snake-case.
+
+    :param s: a string to convert
+    :param separator: the snake-case separator character (default '_')
+    """
+    return s.title().replace(separator, '')
 
 
 def capitalize1(s):

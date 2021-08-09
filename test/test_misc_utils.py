@@ -1723,20 +1723,23 @@ def test_camel_case_to_snake_case(token, expected):
 
 
 @pytest.mark.parametrize('token, expected', [
+    ('VariantSample', 'variant-sample'),
+    ('Variant', 'variant'),
+    ('HiglassViewConfig', 'higlass-view-config'),
+    ('ABCD', 'a-b-c-d'),
     ('', ''),
-    ('x', 'X'),
-    ('foo', 'Foo'),
-    ('FOO', 'FOO'),
-    ('Foo', 'Foo'),
-    ('fooBar', 'FooBar'),
+    ('Oneverylongthing1234567895D', 'oneverylongthing1234567895-d'),
+    ('XMLContainer', 'x-m-l-container'),
 ])
-def test_capitalize1(token, expected):
-    assert capitalize1(token) == expected
+def test_camel_case_to_snake_case_hyphenated(token, expected):
+    assert camel_case_to_snake_case(token, separator='-') == expected
 
 
 @pytest.mark.parametrize('token, expected', [
     ('variant_sample', 'VariantSample'),
     ('variant', 'Variant'),
+    ('_variant_', 'Variant'),
+    ('__variant', 'Variant'),
     ('higlass_view_config', 'HiglassViewConfig'),
     ('a_b_c_d', 'ABCD'),
     ('', ''),
@@ -1746,6 +1749,34 @@ def test_capitalize1(token, expected):
 ])
 def test_snake_case_to_camel_case(token, expected):
     assert snake_case_to_camel_case(token) == expected
+
+
+@pytest.mark.parametrize('token, expected', [
+    ('variant-sample', 'VariantSample'),
+    ('variant', 'Variant'),
+    ('-variant-', 'Variant'),
+    ('--variant', 'Variant'),
+    ('higlass-view-config', 'HiglassViewConfig'),
+    ('a-b-c-d', 'ABCD'),
+    ('', ''),
+    ('oneverylongthing1234567895-d', 'Oneverylongthing1234567895D'),
+    ('x-m-l-container', 'XMLContainer'),
+    ('X-M-L-Container', 'XMLContainer'),
+])
+def test_snake_case_to_camel_case_hyphenated(token, expected):
+    assert snake_case_to_camel_case(token, separator='-') == expected
+
+
+@pytest.mark.parametrize('token, expected', [
+    ('', ''),
+    ('x', 'X'),
+    ('foo', 'Foo'),
+    ('FOO', 'FOO'),
+    ('Foo', 'Foo'),
+    ('fooBar', 'FooBar'),
+])
+def test_capitalize1(token, expected):
+    assert capitalize1(token) == expected
 
 
 @pytest.mark.parametrize('obj', [
