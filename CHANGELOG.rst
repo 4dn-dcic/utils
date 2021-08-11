@@ -45,6 +45,11 @@ Change Log
 
   * Add a ``separator=`` argument to ``camel_case_to_snake_case`` and ``snake_case_to_camel_case``.
 
+* In ``s3_utils``:
+
+  * Make initialize attribute ``.metadata_bucket`` better.
+
+  * Add an attribute ``.tibanna_logs_bucket``
 
 
 1.20.0
