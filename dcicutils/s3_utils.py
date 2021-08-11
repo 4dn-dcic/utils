@@ -29,6 +29,8 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     OUTFILE_BUCKET_TEMPLATE = "elasticbeanstalk-%s-wfoutput"
     RAW_BUCKET_TEMPLATE = "elasticbeanstalk-%s-files"
     BLOB_BUCKET_TEMPLATE = "elasticbeanstalk-%s-blobs"
+    METADATA_BUCKET_TEMPLATE = "elasticbeanstalk-%s-metadata-bundles"
+    TIBANNA_LOGS_BUCKET_TEMPLATE = "elasticbeanstalk-%s-tibanna-logs"
 
     @staticmethod
     def verify_and_get_env_config(s3_client, global_bucket: str, env):
@@ -77,7 +79,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             return j
 
     def __init__(self, outfile_bucket=None, sys_bucket=None, raw_file_bucket=None,
-                 blob_bucket=None, metadata_bucket=None, env=None):
+                 blob_bucket=None, metadata_bucket=None, tibanna_logs_bucket=None, env=None):
         """ Initializes s3 utils in one of three ways:
         1) If 'GLOBAL_ENV_BUCKET' is set to an S3 env bucket, use that bucket to fetch the env for the buckets.
            We then use this env to build the bucket names. If there is only one such env, env can be None or omitted.
@@ -113,6 +115,9 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 raw_file_bucket_from_health_page = health_json['file_upload_bucket']
                 blob_bucket_from_health_page = health_json['blob_bucket']
                 metadata_bucket_from_health_page = health_json.get('metadata_bundles_bucket', None)  # N/A for 4DN
+                tibanna_logs_bucket_from_health_page = health_json.get('tibanna_logs_bucket',
+                                                                       # new, so it may be missing
+                                                                       None)
                 sys_bucket = sys_bucket_from_health_page  # OK to overwrite because we checked it's None above
                 if outfile_bucket and outfile_bucket != outfile_bucket_from_health_page:
                     raise InferredBucketConflict(kind="outfile", specified=outfile_bucket,
@@ -134,6 +139,11 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                                                  inferred=metadata_bucket_from_health_page)
                 else:
                     metadata_bucket = metadata_bucket_from_health_page
+                if tibanna_logs_bucket and tibanna_logs_bucket != tibanna_logs_bucket_from_health_page:
+                    raise InferredBucketConflict(kind="tibanna logs", specified=tibanna_logs_bucket,
+                                                 inferred=tibanna_logs_bucket_from_health_page)
+                else:
+                    tibanna_logs_bucket = tibanna_logs_bucket_from_health_page
                 logger.warning('Buckets resolved successfully.')
             else:
                 # staging and production share same buckets
@@ -148,6 +158,8 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 outfile_bucket = self.OUTFILE_BUCKET_TEMPLATE % env
                 raw_file_bucket = self.RAW_BUCKET_TEMPLATE % env
                 blob_bucket = self.BLOB_BUCKET_TEMPLATE % env
+                metadata_bucket = self.METADATA_BUCKET_TEMPLATE % env
+                tibanna_logs_bucket = self.TIBANNA_LOGS_BUCKET_TEMPLATE % env
         else:
             # If at least sys_bucket was given, for legacy reasons (see https://hms-dbmi.atlassian.net/browse/C4-674)
             # we assume that the given buckets are exactly the ones we want and we don't set up any others.
@@ -160,6 +172,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         self.raw_file_bucket = raw_file_bucket
         self.blob_bucket = blob_bucket
         self.metadata_bucket = metadata_bucket
+        self.tibanna_logs_bucket = tibanna_logs_bucket
 
     ACCESS_KEYS_S3_KEY = 'access_key_admin'
 
