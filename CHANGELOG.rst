@@ -12,15 +12,13 @@ Change Log
 
 **PR 150: Add json_leaf_subst, conjoined_list and disjoined_list**
 
-* In ``misc_utils``:
+* In ``deployment_utils``:
 
-  * Add ``json_leaf_subst`` to do substitutions at the leaves
-    (atomic parts) of a JSON object.
+  * Support environment variable ``ENCODED_IDENTITY`` and ``--identity`` to control
+    environment variable ``$IDENTITY`` in construction of ``production.ini``.
 
-  * Add ``NamedObject`` for creating named tokens.
-
-  * Add a ``separator=`` argument to ``camel_case_to_snake_case`` and ``snake_case_to_camel_case``.
-
+  * Support environment variable ``ENCODED_TIBANNA_LOGS_BUCKET`` and ``--tibanna_logs_bucket`` to control
+    environment variable ``$TIBANNA_LOGS_BUCKET`` in construction of ``production.ini``.
 
 * In ``exceptions``:
 
@@ -37,6 +35,16 @@ Change Log
     messages that are commonly needed but require nuanced adjustment of
     wording to sound right in English. (Note that ``must_be_one_of`` also
     supports ``InvalidParameterError``.)
+
+* In ``misc_utils``:
+
+  * Add ``json_leaf_subst`` to do substitutions at the leaves
+    (atomic parts) of a JSON object.
+
+  * Add ``NamedObject`` for creating named tokens.
+
+  * Add a ``separator=`` argument to ``camel_case_to_snake_case`` and ``snake_case_to_camel_case``.
+
 
 
 1.20.0

@@ -714,6 +714,8 @@ def test_deployment_utils_transitional_equivalence():
                                                             "blob_bucket": "b-bucket",
                                                             "system_bucket": "s-bucket",
                                                             "metadata_bundles_bucket": "md-bucket",
+                                                            "identity": "ThisIsMyIdentity",
+                                                            "tibanna_logs_bucket": "tl-bucket",
                                                         }),
                            s3_bucket_env=bs_env,
                            s3_bucket_org=test_alpha_org,
@@ -723,8 +725,10 @@ def test_deployment_utils_transitional_equivalence():
                            system_bucket='s-bucket',
                            metadata_bundles_bucket='md-bucket',
                            sentry_dsn="https://123sample123sample123@o1111111.ingest.sentry.io/1234567",
+                           identity='ThisIsMyIdentity',
                            auth0_client="31415926535",
                            auth0_secret="piepipiepipiepi",
+                           tibanna_logs_bucket="tl-bucket",
                            )
 
                     with override_environ(ENCODED_FILE_UPLOAD_BUCKET='decoy1',
@@ -732,7 +736,8 @@ def test_deployment_utils_transitional_equivalence():
                                           ENCODED_BLOB_BUCKET='decoy3',
                                           ENCODED_SYSTEM_BUCKET='decoy4',
                                           ENCODED_METADATA_BUNDLES_BUCKET='decoy5',
-                                          ENCODED_S3_BUCKET_ORG='decoy6'):
+                                          ENCODED_S3_BUCKET_ORG='decoy6',
+                                          ENCODED_TIBANNA_LOGS_BUCKET='decoy7'):
                         # The decoy values in the environment variables don't matter because we'll be passing
                         # explicit values for these to the builder that will take precedence.
                         tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
@@ -745,6 +750,8 @@ def test_deployment_utils_transitional_equivalence():
                                                                 "blob_bucket": "b-bucket",
                                                                 "system_bucket": "s-bucket",
                                                                 "metadata_bundles_bucket": "md-bucket",
+                                                                "tibanna_logs_bucket": "tl-bucket",
+                                                                "identity": "ThisIsMyIdentity",
                                                             }),
                                s3_bucket_env=bs_env,
                                s3_bucket_org=test_alpha_org,
@@ -752,14 +759,19 @@ def test_deployment_utils_transitional_equivalence():
                                file_wfout_bucket='fw-bucket',
                                blob_bucket='b-bucket',
                                system_bucket='s-bucket',
-                               metadata_bundles_bucket='md-bucket')
+                               metadata_bundles_bucket='md-bucket',
+                               tibanna_logs_bucket="tl-bucket",
+                               identity='ThisIsMyIdentity',
+                               )
 
                     with override_environ(ENCODED_FILE_UPLOAD_BUCKET='fu-bucket',
                                           ENCODED_FILE_WFOUT_BUCKET='fw-bucket',
                                           ENCODED_BLOB_BUCKET='b-bucket',
                                           ENCODED_SYSTEM_BUCKET='s-bucket',
                                           ENCODED_METADATA_BUNDLES_BUCKET='md-bucket',
-                                          ENCODED_S3_BUCKET_ORG=test_alpha_org):
+                                          ENCODED_S3_BUCKET_ORG=test_alpha_org,
+                                          ENCODED_TIBANNA_LOGS_BUCKET='tl-bucket',
+                                          ENCODED_IDENTITY='ThisIsMyIdentity'):
                         # If no explicit args are passed to the builder, the ENCODED_xxx arguments DO matter.
                         tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
@@ -771,6 +783,8 @@ def test_deployment_utils_transitional_equivalence():
                                                                 "blob_bucket": "b-bucket",
                                                                 "system_bucket": "s-bucket",
                                                                 "metadata_bundles_bucket": "md-bucket",
+                                                                "tibanna_logs_bucket": "tl-bucket",
+                                                                "identity": "ThisIsMyIdentity",
                                                             }),
                                s3_bucket_env=bs_env)
 
@@ -984,6 +998,7 @@ def test_deployment_utils_main():
                             'data_set': None,
                             'es_namespace': None,
                             'es_server': None,
+                            'identity': None,
                             'index_server': None,
                             'indexer': None,
                             's3_bucket_org': None,
@@ -996,6 +1011,7 @@ def test_deployment_utils_main():
                             'blob_bucket': None,
                             'system_bucket': None,
                             'metadata_bundles_bucket': None,
+                            'tibanna_logs_bucket': None,
                         })
 
                     # Next 2 tests some sample settings, in particular the settings of indexer and index_server
@@ -1008,6 +1024,7 @@ def test_deployment_utils_main():
                             'data_set': None,
                             'es_namespace': None,
                             'es_server': None,
+                            'identity': None,
                             'index_server': 'true',
                             'indexer': 'false',
                             's3_bucket_org': None,
@@ -1020,6 +1037,7 @@ def test_deployment_utils_main():
                             'blob_bucket': None,
                             'system_bucket': None,
                             'metadata_bundles_bucket': None,
+                            'tibanna_logs_bucket': None,
                         })
 
                     with mock.patch.object(sys, "argv", ['', '--indexer', 'foo']):
@@ -1030,6 +1048,7 @@ def test_deployment_utils_main():
                                 'data_set': None,
                                 'es_namespace': None,
                                 'es_server': None,
+                                'identity': None,
                                 'index_server': 'true',
                                 'indexer': 'false',
                                 's3_bucket_org': None,
@@ -1042,6 +1061,7 @@ def test_deployment_utils_main():
                                 'blob_bucket': None,
                                 'system_bucket': None,
                                 'metadata_bundles_bucket': None,
+                                'tibanna_logs_bucket': None,
                             })
 
 

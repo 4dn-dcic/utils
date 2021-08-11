@@ -403,8 +403,8 @@ class IniFileManager:
     @classmethod
     def build_ini_file_from_template(cls, template_file_name, init_file_name, *,
                                      bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
-                                     data_set=None, es_server=None, es_namespace=None,
-                                     indexer=None, index_server=None, sentry_dsn=None,
+                                     data_set=None, es_server=None, es_namespace=None, identity=None,
+                                     indexer=None, index_server=None, sentry_dsn=None, tibanna_logs_bucket=None,
                                      auth0_client=None, auth0_secret=None,
                                      file_upload_bucket=None, file_wfout_bucket=None,
                                      blob_bucket=None, system_bucket=None, metadata_bundles_bucket=None):
@@ -426,9 +426,11 @@ class IniFileManager:
             data_set (str): An identifier for data to load (either 'prod' for prd/stg envs, or 'test' for others)
             es_server (str): The server name (or server:port) for the ElasticSearch server.
             es_namespace (str): The ElasticSearch namespace to use (probably but not necessarily same as bs_env).
+            identity (str): The AWS application configuration key that represents the current environment.
             indexer (bool): Whether or not we are building an ini file for an indexer.
             index_server (bool): Whether or not we are building an ini file for an index server.
             sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
+            tibanna_logs_bucket (str): Specific name of the bucket to use on S3 for tibanna logs.
             auth0_client (str): A string identifying the auth0 client application.
             auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
@@ -447,9 +449,11 @@ class IniFileManager:
                                                data_set=data_set,
                                                es_server=es_server,
                                                es_namespace=es_namespace,
+                                               identity=identity,
                                                indexer=indexer,
                                                index_server=index_server,
                                                sentry_dsn=sentry_dsn,
+                                               tibanna_logs_bucket=tibanna_logs_bucket,
                                                auth0_client=auth0_client,
                                                auth0_secret=auth0_secret,
                                                file_upload_bucket=file_upload_bucket,
@@ -504,8 +508,8 @@ class IniFileManager:
     @classmethod
     def build_ini_stream_from_template(cls, template_file_name, init_file_stream, *,
                                        bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
-                                       data_set=None, es_server=None, es_namespace=None, indexer=None,
-                                       index_server=None, sentry_dsn=None,
+                                       data_set=None, es_server=None, es_namespace=None, identity=None,
+                                       indexer=None, index_server=None, sentry_dsn=None, tibanna_logs_bucket=None,
                                        auth0_client=None, auth0_secret=None,
                                        file_upload_bucket=None,
                                        file_wfout_bucket=None, blob_bucket=None, system_bucket=None,
@@ -524,9 +528,11 @@ class IniFileManager:
             data_set: 'test' or 'prod'. Default is 'test' unless bs_env is a staging or production environment.
             es_server: The name of an es server to use.
             es_namespace: The namespace to use on the es server. If None, this uses the bs_env.
+            identity (str): The AWS application configuration key that represents the current environment.
             indexer: Whether or not we are building an ini file for an indexer.
             index_server: Whether or not we are building an ini file for an index server.
             sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
+            tibanna_logs_bucket (str): Specific name of the bucket to use on S3 for tibanna logs.
             auth0_client (str): A string identifying the auth0 client application.
             auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
@@ -551,6 +557,7 @@ class IniFileManager:
                     or data_set_for_env(bs_env)
                     or "MISSING_ENCODED_DATA_SET")
         es_namespace = es_namespace or os.environ.get("ENCODED_ES_NAMESPACE", bs_env)
+        identity = identity or os.environ.get("ENCODED_IDENTITY", "")
         sentry_dsn = sentry_dsn or os.environ.get("ENCODED_SENTRY_DSN", "")
         auth0_client = auth0_client or os.environ.get("ENCODED_AUTH0_CLIENT", "")
         auth0_secret = auth0_secret or os.environ.get("ENCODED_AUTH0_SECRET", "")
@@ -569,6 +576,9 @@ class IniFileManager:
         metadata_bundles_bucket = (metadata_bundles_bucket
                                    or os.environ.get("ENCODED_METADATA_BUNDLES_BUCKET")
                                    or f"{s3_bucket_org}-{s3_bucket_env}-metadata-bundles")
+        tibanna_logs_bucket = (tibanna_logs_bucket
+                               or os.environ.get("ENCODED_TIBANNA_LOGS_BUCKET")
+                               or f"{s3_bucket_org}-{s3_bucket_env}-tibanna-logs")
 
         # Set ENCODED_INDEXER to 'true' to deploy an indexer.
         # If the value is missing, the empty string, or any other thing besides 'true' (in any case),
@@ -609,9 +619,11 @@ class IniFileManager:
             'S3_BUCKET_ENV': s3_bucket_env,
             'DATA_SET': data_set,
             'ES_NAMESPACE': es_namespace,
+            'IDENTITY': identity,
             'INDEXER': indexer,
             'INDEX_SERVER': index_server,
             'SENTRY_DSN': sentry_dsn,
+            'TIBANNA_LOGS_BUCKET': tibanna_logs_bucket,
             'AUTH0_CLIENT': auth0_client,
             'AUTH0_SECRET': auth0_secret,
             'FILE_UPLOAD_BUCKET': file_upload_bucket,
@@ -725,6 +737,9 @@ class IniFileManager:
             parser.add_argument("--es_namespace",
                                 help="an ElasticSearch namespace",
                                 default=None)
+            parser.add_argument("--identity",
+                                help="the AWS application configuration key that represents the current environment",
+                                default=None)
             parser.add_argument("--indexer",
                                 help="whether this server does indexing at all",
                                 choices=["true", "false"],
@@ -735,6 +750,9 @@ class IniFileManager:
                                 default=None)
             parser.add_argument("--sentry_dsn",
                                 help="a sentry DSN",
+                                default=None)
+            parser.add_argument("--tibanna_logs_bucket",
+                                help="the name of a Tibanna logs bucket to use",
                                 default=None)
             parser.add_argument("--auth0_client",
                                 help="an auth0 client identifier token",
@@ -770,7 +788,9 @@ class IniFileManager:
                                              data_set=args.data_set,
                                              es_server=args.es_server, es_namespace=args.es_namespace,
                                              indexer=args.indexer, index_server=args.index_server,
+                                             identity=args.identity,
                                              sentry_dsn=args.sentry_dsn,
+                                             tibanna_logs_bucket=args.tibanna_logs_bucket,
                                              auth0_client=args.auth0_client,
                                              auth0_secret=args.auth0_secret,
                                              file_upload_bucket=args.file_upload_bucket,
