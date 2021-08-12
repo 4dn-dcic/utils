@@ -364,6 +364,51 @@ def infer_repo_from_env(envname):
         return None
 
 
+def infer_app_from_env(envname, orchestrated=None):
+    """
+    Returns True if envname is a cgap environment.
+    """
+    if orchestrated is True:
+        # As a transitional matter, all orchestrated implementations are assumed to be cgap.
+        # Once the programmable env_utils goes into play, we can do this less heuristically.
+        # But we assume that will happen long before we have an orchestrated Fourfront. -kmp 12-Aug-2021
+        return 'cgap'
+    if not envname:
+        return None
+    if is_cgap_env(envname):
+        return 'cgap'
+    elif is_fourfront_env(envname):
+        return 'fourfront'
+    else:
+        return None
+
+
+def orchestrated_bucket_prefix(*, app=None, org=None, ecosystem='main', module='application', for_env=None):
+    """
+    :param app: One of 'fourfront' or 'cgap'. If omitted, inferred from for_env. If that fails, 'cgap' is used.
+    :param org: A unique token identifying the organization. If None or missing, that qualifier will be omitted.
+    :param ecosystem: A token is usually 'main' but can be something else if two ecosystems reside in one AWS account.
+    :param module: This should be either 'application' or 'foursight' (default 'application').
+    :param for_env: This is used only to help infer app if the app is not known. It can be None if app is supplied.
+    """
+
+    if not app:
+        app = infer_app_from_env(for_env, orchestrated=True)
+
+    org_part = f"{org}-" if org else ""
+
+    #   This will get names like 'cgap-mgb-main-application-' instead of just 'mgb-', so that:
+    #   - All cgap products are separated from all foursight products.
+    #   - All cgap things for one company are separated from cgap things for another,
+    #     and same for fourfront. This favors our need to separator by product over theirs,
+    #     starting with a given token name, but that's all for the greater good.
+    #   - All things in one product ecosystem are next to each other, and separate from all things
+    #     for another ecosystem within the same account.
+    #   - All things for a given module (e.g., application or foursight) are together.
+    #   But for now we just do the legacy-compatible thing...
+    return f"{app or 'cgap'}-{org_part}{ecosystem or 'main'}-{module}-"
+
+
 def infer_foursight_from_env(request, envname):
     """  Infers the Foursight environment to view based on the given envname and request context
 

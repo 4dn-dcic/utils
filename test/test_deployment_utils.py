@@ -551,10 +551,13 @@ def test_deployment_utils_transitional_equivalence():
         and then compares the result.
         """
 
+        def fix_(x):
+            return x.replace('_', '-')
+
         if bs_env.startswith("fourfront"):
-            assert ref_ini[:-4] == bs_env[10:]  # "xxx.ini" needs to match "fourfront-xxx"
+            assert fix_(ref_ini[:-4]) == fix_(bs_env[10:])  # "xxx.ini" needs to match "fourfront-xxx"
         else:
-            assert ref_ini[:-4] == bs_env  # In a post-fourfront world, "xxx.ini" needs to match "xxx"
+            assert fix_(ref_ini[:-4]) == fix_(bs_env)  # In a post-fourfront world, "xxx.ini" needs to match "xxx"
 
         es_namespace = es_namespace or bs_env
 
@@ -681,7 +684,7 @@ def test_deployment_utils_transitional_equivalence():
                                                         expect_index_server=index_server_default))
 
                     test_alpha_org = "alphatest"
-                    bs_env = "cgap_alpha"
+                    bs_env = "cgap-alpha"
                     data_set = data_set_for_env(bs_env) or "prod"
 
                     tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
@@ -698,12 +701,61 @@ def test_deployment_utils_transitional_equivalence():
                            line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                         expect_index_server=index_server_default,
                                                         expected_values={
-                                                            "file_upload_bucket": f"{test_alpha_org}-{bs_env}-files",
+                                                            "file_upload_bucket": f"elasticbeanstalk-{bs_env}-files",
                                                         }),
                            s3_bucket_env=bs_env,
-                           s3_bucket_org=test_alpha_org)
+                           orchestrated=False)
 
-                    bs_env = "cgap_alfa"
+                    tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                           line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                        expect_index_server=index_server_default,
+                                                        expected_values={
+                                                            "file_upload_bucket":
+                                                                f"cgap-main-application-{bs_env}-files",
+                                                        }),
+                           s3_bucket_env=bs_env,
+                           orchestrated=True)  # if no s3_bucket_org does not mean legacy, you must say so
+
+                    tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                           line_checker=CGAPProdChecker(
+                               expect_indexer=index_default,
+                               expect_index_server=index_server_default,
+                               expected_values={
+                                   "file_upload_bucket":
+                                       f"cgap-{test_alpha_org}-main-application-{bs_env}-files",
+                               }),
+                           s3_bucket_env=bs_env,
+                           s3_bucket_org=test_alpha_org)  # Same as next situation, but with orchestrated=True inferred
+
+                    tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                           line_checker=CGAPProdChecker(
+                               expect_indexer=index_default,
+                               expect_index_server=index_server_default,
+                               expected_values={
+                                   "file_upload_bucket":
+                                       f"cgap-{test_alpha_org}-main-application-{bs_env}-files",
+                               }),
+                           s3_bucket_env=bs_env,
+                           s3_bucket_org=test_alpha_org,
+                           orchestrated=True)  # Same as previous situation, but with orchestrated=True explicit
+
+                    tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                           line_checker=CGAPProdChecker(
+                               expect_indexer=index_default,
+                               expect_index_server=index_server_default,
+                               expected_values={
+                                   "file_upload_bucket":
+                                       f"elasticbeanstalk-{bs_env}-files",
+                               }),
+                           s3_bucket_env=bs_env,
+                           s3_bucket_org=test_alpha_org,
+                           orchestrated=False)  # Even when an s3_bucket_org is given, we can get legacy behavior here
+
+                    bs_env = "cgap-alfa"
                     tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
                            line_checker=CGAPProdChecker(expect_indexer=index_default,
@@ -993,6 +1045,7 @@ def test_deployment_utils_main():
                     # to build_ini_file_from_template default to None.
                     with mock.patch.object(sys, "argv", ['']):
                         check_for_mocked_build({
+                            'app': None,
                             'bs_env': None,
                             'bs_mirror_env': None,
                             'data_set': None,
@@ -1004,6 +1057,9 @@ def test_deployment_utils_main():
                             's3_bucket_org': None,
                             's3_bucket_env': None,
                             'sentry_dsn': None,
+                            'application_bucket_prefix': None,
+                            'foursight_bucket_prefix': None,
+                            'orchestrated': None,
                             'auth0_client': None,
                             'auth0_secret': None,
                             'file_upload_bucket': None,
@@ -1014,11 +1070,15 @@ def test_deployment_utils_main():
                             'tibanna_logs_bucket': None,
                         })
 
-                    # Next 2 tests some sample settings, in particular the settings of indexer and index_server
-                    # when given on the command line, and what gets passed through to build_ini_file_from_template.
+                    # Next few tests some sample settings, in particular ...
+                    # * the settings of indexer and index_server when given on the command line,
+                    #   and what gets passed through to build_ini_file_from_template.
+                    # * the settings of --legacy
 
-                    with mock.patch.object(sys, "argv", ['', '--indexer', 'false', '--index_server', 'true']):
+                    with mock.patch.object(sys, "argv", ['', '--indexer', 'false', '--index_server', 'true',
+                                                         '--legacy']):
                         check_for_mocked_build({
+                            'app': None,
                             'bs_env': None,
                             'bs_mirror_env': None,
                             'data_set': None,
@@ -1030,6 +1090,9 @@ def test_deployment_utils_main():
                             's3_bucket_org': None,
                             's3_bucket_env': None,
                             'sentry_dsn': None,
+                            'application_bucket_prefix': None,
+                            'foursight_bucket_prefix': None,
+                            'orchestrated': False,
                             'auth0_client': None,
                             'auth0_secret': None,
                             'file_upload_bucket': None,
@@ -1040,9 +1103,38 @@ def test_deployment_utils_main():
                             'tibanna_logs_bucket': None,
                         })
 
-                    with mock.patch.object(sys, "argv", ['', '--indexer', 'foo']):
+                    with mock.patch.object(sys, "argv", ['', '--indexer', 'false', '--index_server', 'true',
+                                                         '--orchestrated']):
+                        check_for_mocked_build({
+                            'app': None,
+                            'bs_env': None,
+                            'bs_mirror_env': None,
+                            'data_set': None,
+                            'es_namespace': None,
+                            'es_server': None,
+                            'identity': None,
+                            'index_server': 'true',
+                            'indexer': 'false',
+                            's3_bucket_org': None,
+                            's3_bucket_env': None,
+                            'sentry_dsn': None,
+                            'application_bucket_prefix': None,
+                            'foursight_bucket_prefix': None,
+                            'orchestrated': True,
+                            'auth0_client': None,
+                            'auth0_secret': None,
+                            'file_upload_bucket': None,
+                            'file_wfout_bucket': None,
+                            'blob_bucket': None,
+                            'system_bucket': None,
+                            'metadata_bundles_bucket': None,
+                            'tibanna_logs_bucket': None,
+                        })
+
+                    with mock.patch.object(sys, "argv", ['', '--indexer', 'foo']):  # We get an error for this
                         with pytest.raises(Exception):
                             check_for_mocked_build({
+                                'app': None,
                                 'bs_env': None,
                                 'bs_mirror_env': None,
                                 'data_set': None,
@@ -1054,6 +1146,9 @@ def test_deployment_utils_main():
                                 's3_bucket_org': None,
                                 's3_bucket_env': None,
                                 'sentry_dsn': None,
+                                'application_bucket_prefix': None,
+                                'foursight_bucket_prefix': None,
+                                'orchestrated': None,
                                 'auth0_client': None,
                                 'auth0_secret': None,
                                 'file_upload_bucket': None,

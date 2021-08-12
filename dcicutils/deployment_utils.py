@@ -38,6 +38,7 @@ from .env_utils import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS,
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, is_test_env, is_hotseat_env,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
+    orchestrated_bucket_prefix,
 )
 from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ
 
@@ -400,12 +401,20 @@ class IniFileManager:
     INI_FILE_NAME = "production.ini"
     PYPROJECT_FILE_NAME = None
 
+    # For APP, a subclass may optionally declare a value of 'cgap' or 'fourfront'
+    APP = None
+
+    # For ORCHESTRATED, a subclass may optinally declare a value of True or False,
+    # or this can be specified on the command line
+    ORCHESTRATED = None
+
     @classmethod
     def build_ini_file_from_template(cls, template_file_name, init_file_name, *,
                                      bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
                                      data_set=None, es_server=None, es_namespace=None, identity=None,
                                      indexer=None, index_server=None, sentry_dsn=None, tibanna_logs_bucket=None,
-                                     auth0_client=None, auth0_secret=None,
+                                     application_bucket_prefix=None, foursight_bucket_prefix=None, orchestrated=None,
+                                     app=None, auth0_client=None, auth0_secret=None,
                                      file_upload_bucket=None, file_wfout_bucket=None,
                                      blob_bucket=None, system_bucket=None, metadata_bundles_bucket=None):
 
@@ -431,6 +440,10 @@ class IniFileManager:
             index_server (bool): Whether or not we are building an ini file for an index server.
             sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
             tibanna_logs_bucket (str): Specific name of the bucket to use on S3 for tibanna logs.
+            application_bucket_prefix (str): An application bucket prefix to use, overriding the default one.
+            foursight_bucket_prefix (str): A foursight bucket prefix to use, overriding the default one.
+            orchestrated: True if this is an orchestrated deploy, False if not, and None if unspecified.
+            app: Either 'cgap' or 'fourfront' if known, otherwise None.
             auth0_client (str): A string identifying the auth0 client application.
             auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
@@ -454,6 +467,10 @@ class IniFileManager:
                                                index_server=index_server,
                                                sentry_dsn=sentry_dsn,
                                                tibanna_logs_bucket=tibanna_logs_bucket,
+                                               application_bucket_prefix=application_bucket_prefix,
+                                               foursight_bucket_prefix=foursight_bucket_prefix,
+                                               orchestrated=orchestrated,
+                                               app=app,
                                                auth0_client=auth0_client,
                                                auth0_secret=auth0_secret,
                                                file_upload_bucket=file_upload_bucket,
@@ -503,14 +520,17 @@ class IniFileManager:
 
     AUTO_INDEX_SERVER_TOKEN = "__index_server"
 
-    LEGACY_S3_BUCKET_ORG = "elasticbeanstalk"
+    LEGACY_S3_APPLICATION_BUCKET_ORG = "elasticbeanstalk"
+    LEGACY_S3_APPLICATION_BUCKET_PREFIX = "elasticbeanstalk-"
+    LEGACY_S3_FOURSIGHT_BUCKET_PREFIX = "foursight-"
 
     @classmethod
     def build_ini_stream_from_template(cls, template_file_name, init_file_stream, *,
                                        bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
                                        data_set=None, es_server=None, es_namespace=None, identity=None,
                                        indexer=None, index_server=None, sentry_dsn=None, tibanna_logs_bucket=None,
-                                       auth0_client=None, auth0_secret=None,
+                                       application_bucket_prefix=None, foursight_bucket_prefix=None, orchestrated=None,
+                                       auth0_client=None, auth0_secret=None, app=None,
                                        file_upload_bucket=None,
                                        file_wfout_bucket=None, blob_bucket=None, system_bucket=None,
                                        metadata_bundles_bucket=None):
@@ -533,6 +553,10 @@ class IniFileManager:
             index_server: Whether or not we are building an ini file for an index server.
             sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
             tibanna_logs_bucket (str): Specific name of the bucket to use on S3 for tibanna logs.
+            application_bucket_prefix (str): An application bucket prefix to use, overriding the default one.
+            foursight_bucket_prefix (str): A foursight bucket prefix to use, overriding the default one.
+            orchestrated: True if this is an orchestrated deploy, False if not, and None if unspecified.
+            app: Either 'cgap' or 'fourfront' if known, otherwise None.
             auth0_client (str): A string identifying the auth0 client application.
             auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
@@ -540,6 +564,8 @@ class IniFileManager:
             blob_bucket (str): Specific name of the bucket to use on S3 for blob data.
             system_bucket (str): Specific name of the bucket to use on S3 for system data.
             metadata_bundles_bucket (str): Specific name of the bucket to use on S3 for metadata bundles data.
+            application_bucket_prefix (str): Preferred prefix for 'application' buckets in s3.
+            foursight_bucket_prefix (str): Preferred prefix for 'foursight' buckets in s3.
 
         Returns: None
 
@@ -548,9 +574,31 @@ class IniFileManager:
         es_server = es_server or os.environ.get('ENCODED_ES_SERVER', "MISSING_ENCODED_ES_SERVER")
         bs_env = bs_env or os.environ.get("ENCODED_BS_ENV", "MISSING_ENCODED_BS_ENV")
         bs_mirror_env = bs_mirror_env or os.environ.get("ENCODED_BS_MIRROR_ENV", get_standard_mirror_env(bs_env)) or ""
-        s3_bucket_org = (s3_bucket_org
-                         or os.environ.get("ENCODED_S3_BUCKET_ORG")
-                         or cls.LEGACY_S3_BUCKET_ORG)
+        s3_bucket_org = s3_bucket_org or os.environ.get("ENCODED_S3_BUCKET_ORG")
+
+        if orchestrated is None:
+            # None means unspecified. The value we want is True or False, but during transition we expect
+            # that this value may not always be pssed.
+            # If we don't get an 'orchestrated' argument, which we'd prefer, use the heuristic that legacy
+            # will not have an s3_bucket_org, but orchestrated systems (hopefully) will.
+            orchestrated = bool(s3_bucket_org)
+
+        if not orchestrated and not s3_bucket_org:
+            s3_bucket_org = cls.LEGACY_S3_APPLICATION_BUCKET_ORG
+
+        application_bucket_prefix = (
+                application_bucket_prefix
+                or os.environ.get("ENCODED_APPLICATION_BUCKET_PREFIX")
+                or (orchestrated_bucket_prefix(app=app, org=s3_bucket_org, module='application', for_env=bs_env)
+                    if orchestrated
+                    else cls.LEGACY_S3_APPLICATION_BUCKET_PREFIX))
+        foursight_bucket_prefix = (
+                foursight_bucket_prefix
+                or os.environ.get("ENCODED_FOURSIGHT_BUCKET_PREFIX")
+                or (orchestrated_bucket_prefix(app=app, org=s3_bucket_org, module='foursight', for_env=bs_env)
+                    if orchestrated
+                    else cls.LEGACY_S3_FOURSIGHT_BUCKET_PREFIX))
+
         s3_bucket_env = s3_bucket_env or os.environ.get("ENCODED_S3_BUCKET_ENV", get_bucket_env(bs_env))
         data_set = (data_set
                     or os.environ.get("ENCODED_DATA_SET")
@@ -563,22 +611,22 @@ class IniFileManager:
         auth0_secret = auth0_secret or os.environ.get("ENCODED_AUTH0_SECRET", "")
         file_upload_bucket = (file_upload_bucket
                               or os.environ.get("ENCODED_FILE_UPLOAD_BUCKET")
-                              or f"{s3_bucket_org}-{s3_bucket_env}-files")
+                              or f"{application_bucket_prefix}{s3_bucket_env}-files")
         file_wfout_bucket = (file_wfout_bucket
                              or os.environ.get("ENCODED_FILE_WFOUT_BUCKET")
-                             or f"{s3_bucket_org}-{s3_bucket_env}-wfoutput")
+                             or f"{application_bucket_prefix}{s3_bucket_env}-wfoutput")
         blob_bucket = (blob_bucket
                        or os.environ.get("ENCODED_BLOB_BUCKET")
-                       or f"{s3_bucket_org}-{s3_bucket_env}-blobs")
+                       or f"{application_bucket_prefix}{s3_bucket_env}-blobs")
         system_bucket = (system_bucket
                          or os.environ.get("ENCODED_SYSTEM_BUCKET")
-                         or f"{s3_bucket_org}-{s3_bucket_env}-system")
+                         or f"{application_bucket_prefix}{s3_bucket_env}-system")
         metadata_bundles_bucket = (metadata_bundles_bucket
                                    or os.environ.get("ENCODED_METADATA_BUNDLES_BUCKET")
-                                   or f"{s3_bucket_org}-{s3_bucket_env}-metadata-bundles")
+                                   or f"{application_bucket_prefix}{s3_bucket_env}-metadata-bundles")
         tibanna_logs_bucket = (tibanna_logs_bucket
                                or os.environ.get("ENCODED_TIBANNA_LOGS_BUCKET")
-                               or f"{s3_bucket_org}-{s3_bucket_env}-tibanna-logs")
+                               or f"{application_bucket_prefix}{s3_bucket_env}-tibanna-logs")
 
         # Set ENCODED_INDEXER to 'true' to deploy an indexer.
         # If the value is missing, the empty string, or any other thing besides 'true' (in any case),
@@ -623,7 +671,6 @@ class IniFileManager:
             'INDEXER': indexer,
             'INDEX_SERVER': index_server,
             'SENTRY_DSN': sentry_dsn,
-            'TIBANNA_LOGS_BUCKET': tibanna_logs_bucket,
             'AUTH0_CLIENT': auth0_client,
             'AUTH0_SECRET': auth0_secret,
             'FILE_UPLOAD_BUCKET': file_upload_bucket,
@@ -631,6 +678,9 @@ class IniFileManager:
             'BLOB_BUCKET': blob_bucket,
             'SYSTEM_BUCKET': system_bucket,
             'METADATA_BUNDLES_BUCKET': metadata_bundles_bucket,
+            'TIBANNA_LOGS_BUCKET': tibanna_logs_bucket,
+            'APPLICATION_BUCKET_PREFIX': application_bucket_prefix,
+            'FOURSIGHT_BUCKET_PREFIX': foursight_bucket_prefix,
         }
 
         # if we specify an indexer name for bs_env, we did the deployment wrong and should bail
@@ -754,6 +804,18 @@ class IniFileManager:
             parser.add_argument("--tibanna_logs_bucket",
                                 help="the name of a Tibanna logs bucket to use",
                                 default=None)
+            parser.add_argument("--application_bucket_prefix",
+                                help="an application bucket prefix to use, overriding the default one",
+                                default=None)
+            parser.add_argument("--foursight_bucket_prefix",
+                                help="a foursight bucket prefix to use, overriding the default one",
+                                default=None)
+            parser.add_argument("--orchestrated", action="store_true", dest="orchestrated",
+                                help="Declares that the deploy is an orchestrated deploy, not a legacy deploy",
+                                default=cls.ORCHESTRATED)
+            parser.add_argument("--legacy", action="store_false", dest="orchestrated",
+                                help="Declares that the deploy is a legacy deploy, not an orchestrated deploy",
+                                default=cls.ORCHESTRATED)
             parser.add_argument("--auth0_client",
                                 help="an auth0 client identifier token",
                                 default=None)
@@ -791,6 +853,10 @@ class IniFileManager:
                                              identity=args.identity,
                                              sentry_dsn=args.sentry_dsn,
                                              tibanna_logs_bucket=args.tibanna_logs_bucket,
+                                             application_bucket_prefix=args.application_bucket_prefix,
+                                             foursight_bucket_prefix=args.foursight_bucket_prefix,
+                                             orchestrated=args.orchestrated,
+                                             app=cls.APP,
                                              auth0_client=args.auth0_client,
                                              auth0_secret=args.auth0_secret,
                                              file_upload_bucket=args.file_upload_bucket,

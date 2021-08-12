@@ -15,7 +15,7 @@ from dcicutils.env_utils import (
     FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env, classify_server_url,
     full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
-    make_env_name_cfn_compatible,
+    make_env_name_cfn_compatible, infer_app_from_env, orchestrated_bucket_prefix,
 )
 from dcicutils.qa_utils import raises_regexp
 from unittest import mock
@@ -527,6 +527,97 @@ def test_infer_repo_from_env():
     # Edge cases that the code specifically looks for:
     assert infer_repo_from_env(None) is None
     assert infer_repo_from_env('who-knows') is None
+
+
+def test_infer_app_from_env():
+
+    assert infer_app_from_env(FF_ENV_PRODUCTION_BLUE) == 'fourfront'
+    assert infer_app_from_env(FF_ENV_PRODUCTION_GREEN) == 'fourfront'
+
+    assert infer_app_from_env(FF_ENV_WEBPROD) == 'fourfront'
+    assert infer_app_from_env(FF_ENV_WEBPROD2) == 'fourfront'
+
+    assert infer_app_from_env('fourfront-blue') == 'fourfront'
+    assert infer_app_from_env('fourfront-mastertest') == 'fourfront'
+
+    assert infer_app_from_env('fourfront-foo') == 'fourfront'
+
+    assert infer_app_from_env(CGAP_ENV_PRODUCTION_BLUE) == 'cgap'
+    assert infer_app_from_env(CGAP_ENV_PRODUCTION_BLUE) == 'cgap'
+
+    assert infer_app_from_env(CGAP_ENV_WEBPROD) == 'cgap'
+
+    assert infer_app_from_env('fourfront-cgap') == 'cgap'
+    assert infer_app_from_env('fourfront-cgapwolf') == 'cgap'
+    assert infer_app_from_env('fourfront-cgapdev') == 'cgap'
+
+    assert infer_app_from_env('cgap-green') == 'cgap'
+    assert infer_app_from_env('cgap-blue') == 'cgap'
+    assert infer_app_from_env('cgap-wolf') == 'cgap'
+    assert infer_app_from_env('cgap-dev') == 'cgap'
+
+    assert infer_app_from_env('cgap-foo') == 'cgap'
+    assert infer_app_from_env('fourfront-cgapfoo') == 'cgap'
+
+    # Edge cases that the code specifically looks for:
+    assert infer_app_from_env(None) is None
+    assert infer_app_from_env('who-knows') is None
+
+    # In an orchestrated cgap, oddly, these names are valid for use anew. Not recommended, but it is another namespace,
+    # and it's better than telling people they can't use certain names.
+
+    assert infer_app_from_env(FF_ENV_PRODUCTION_BLUE, orchestrated=True) == 'cgap'
+    assert infer_app_from_env(FF_ENV_PRODUCTION_GREEN, orchestrated=True) == 'cgap'
+
+    assert infer_app_from_env(FF_ENV_WEBPROD, orchestrated=True) == 'cgap'
+    assert infer_app_from_env(FF_ENV_WEBPROD2, orchestrated=True) == 'cgap'
+
+    assert infer_app_from_env('fourfront-blue', orchestrated=True) == 'cgap'
+    assert infer_app_from_env('fourfront-mastertest', orchestrated=True) == 'cgap'
+
+    assert infer_app_from_env('fourfront-foo', orchestrated=True) == 'cgap'
+
+    assert infer_app_from_env(CGAP_ENV_PRODUCTION_BLUE, orchestrated=True) == 'cgap'
+    assert infer_app_from_env(CGAP_ENV_PRODUCTION_BLUE, orchestrated=True) == 'cgap'
+
+    assert infer_app_from_env(CGAP_ENV_WEBPROD, orchestrated=True) == 'cgap'
+
+    assert infer_app_from_env('fourfront-cgap', orchestrated=True) == 'cgap'
+    assert infer_app_from_env('fourfront-cgapwolf', orchestrated=True) == 'cgap'
+    assert infer_app_from_env('fourfront-cgapdev', orchestrated=True) == 'cgap'
+
+    assert infer_app_from_env('cgap-green', orchestrated=True) == 'cgap'
+    assert infer_app_from_env('cgap-blue', orchestrated=True) == 'cgap'
+    assert infer_app_from_env('cgap-wolf', orchestrated=True) == 'cgap'
+    assert infer_app_from_env('cgap-dev', orchestrated=True) == 'cgap'
+
+    assert infer_app_from_env('cgap-foo', orchestrated=True) == 'cgap'
+    assert infer_app_from_env('fourfront-cgapfoo', orchestrated=True) == 'cgap'
+
+    assert infer_app_from_env(None, orchestrated=True) == 'cgap'
+    assert infer_app_from_env('who-knows', orchestrated=True) == 'cgap'
+
+
+def test_orchestrated_bucket_prefix():
+
+    assert orchestrated_bucket_prefix() == 'cgap-main-application-'
+
+    assert orchestrated_bucket_prefix(app='cgap') == 'cgap-main-application-'
+    assert orchestrated_bucket_prefix(app='fourfront') == 'fourfront-main-application-'
+    assert orchestrated_bucket_prefix(app='') == 'cgap-main-application-'
+
+    assert orchestrated_bucket_prefix(app='cgap', org='acme') == 'cgap-acme-main-application-'
+    assert orchestrated_bucket_prefix(app='cgap', ecosystem='demo') == 'cgap-demo-application-'
+    assert orchestrated_bucket_prefix(app='cgap', org='acme', ecosystem='demo') == 'cgap-acme-demo-application-'
+
+    assert orchestrated_bucket_prefix(org='acme', ecosystem='demo', module='foursight') == 'cgap-acme-demo-foursight-'
+
+    assert orchestrated_bucket_prefix(org='acme', ecosystem='demo', module='foursight') == 'cgap-acme-demo-foursight-'
+
+    assert orchestrated_bucket_prefix(org='acme', for_env='cgap-foo') == 'cgap-acme-main-application-'
+    assert (orchestrated_bucket_prefix(org='acme', module='application', for_env='cgap-foo')
+            == 'cgap-acme-main-application-')
+    assert orchestrated_bucket_prefix(org='acme', module='foursight', for_env='cgap-foo') == 'cgap-acme-main-foursight-'
 
 
 def test_infer_foursight_env():
