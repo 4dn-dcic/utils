@@ -12,13 +12,34 @@ Change Log
 
 **PR 150: Add json_leaf_subst, conjoined_list and disjoined_list**
 
+* In ``beanstalk_utils``:
+
+  * Add ``'elasticbeanstalk-%s-metadata-bundles'`` to the list of buckets that ``beanstalk_utils.delete_s3_buckets``
+    is willing to delete.
+
 * In ``deployment_utils``:
 
   * Support environment variable ``ENCODED_IDENTITY`` and ``--identity`` to control
     environment variable ``$IDENTITY`` in construction of ``production.ini``.
 
-  * Support environment variable ``ENCODED_TIBANNA_LOGS_BUCKET`` and ``--tibanna_logs_bucket`` to control
-    environment variable ``$TIBANNA_LOGS_BUCKET`` in construction of ``production.ini``.
+  * Support environment variable ``ENCODED_TIBANNA_OUTPUT_BUCKET`` and ``--tibanna_output_bucket`` to control
+    environment variable ``$TIBANNA_OUTPUT_BUCKET`` in construction of ``production.ini``.
+
+  * Support environment variable ``ENCODED_APPLICATION_BUCKET_PREFIX`` and ``--application_bucket_prefix`` to control
+    environment variable ``$APPLICATION_BUCKET_PREFIX`` in construction of ``production.ini``.
+
+  * Support environment variable ``ENCODED_FOURSIGHT_BUCKET_PREFIX`` and ``--foursight_bucket_prefix`` to control
+    environment variable ``$FOURSIGHT_BUCKET_PREFIX`` in construction of ``production.ini``.
+
+  * New class variable ``APP_KIND`` in ``IniFileManager``.
+    Default is ``None``, but new subclasses adjust the default to ``cgap`` or ``fourfront``.
+
+  * New class variable ``APP_ORCHESTRATED`` in ``IniFileManager``.
+    Default is ``None``, but new subclasses adjust the default to ``True`` or ``False``.
+
+  * New classes ``BasicCgapIniFileManager``, ``BasicFourfrontIniFileManager``, ``LegacyCgapIniFileManager``,
+    ``LegacyFourfrontIniFileManager``, ``OrchestratedCgapIniFileManager``, and ``OrchestratedFourfrontIniFileManager``.
+    In principle, this should allow some better defaulting.
 
 * In ``exceptions``:
 
@@ -49,7 +70,7 @@ Change Log
 
   * Make initialize attribute ``.metadata_bucket`` better.
 
-  * Add an attribute ``.tibanna_logs_bucket``
+  * Add an attribute ``.tibanna_output_bucket``
 
 
 1.20.0
