@@ -471,10 +471,12 @@ def test_deployment_utils_get_app_version():
             with mock.patch("io.open") as mock_open:
                 mock_open.return_value = StringIO('{"VersionLabel": "%s"}' % MOCKED_BUNDLE_VERSION)
                 mock_check_output.side_effect = make_mocked_check_output_for_get_version()
-                assert TestDeployer.get_app_version() == MOCKED_BUNDLE_VERSION
+                assert IniFileManager.get_app_version() == MOCKED_BUNDLE_VERSION
 
         mock_check_output.side_effect = make_mocked_check_output_for_get_version()
         assert TestDeployer.get_app_version() == MOCKED_LOCAL_GIT_VERSION
+        assert TestOrchestratedCgapDeployer.get_app_version() == MOCKED_LOCAL_GIT_VERSION
+        assert TestLegacyCgapDeployer.get_app_version() == MOCKED_LOCAL_GIT_VERSION
 
         # Simulate 'git' command not found.
         mock_check_output.side_effect = make_mocked_check_output_for_get_version(simulate_git_command=False)
