@@ -565,11 +565,14 @@ def test_deployment_utils_transitional_equivalence():
         """
 
         if use_ini_file_manager_kind == 'legacy-cgap':
-            SelectedTestDeployer = TestLegacyCgapDeployer
+            class SelectedTestDeployer (TestLegacyCgapDeployer):
+                pass
         elif use_ini_file_manager_kind == 'orchestrated-cgap':
-            SelectedTestDeployer = TestOrchestratedCgapDeployer
+            class SelectedTestDeployer (TestOrchestratedCgapDeployer):
+                pass
         elif use_ini_file_manager_kind is None:
-            SelectedTestDeployer = TestDeployer
+            class SelectedTestDeployer (TestDeployer):
+                pass
         else:
             raise InvalidParameterError('use_ini_file_manager_kind', use_ini_file_manager_kind,
                                         ['legacy-cgap', 'orchestrated-cgap'])
@@ -602,10 +605,10 @@ def test_deployment_utils_transitional_equivalence():
                 SelectedTestDeployer.build_ini_stream_from_template(ref_ini_path, "this shouldn't get used")
 
         SelectedTestDeployer.build_ini_stream_from_template(ref_ini_path, ref_output,
-                                                    bs_env=bs_env, es_server=es_server, **others)
+                                                            bs_env=bs_env, es_server=es_server, **others)
         SelectedTestDeployer.build_ini_stream_from_template(any_ini_path, any_output,
-                                                    # data_env & es_namespace are something we should be able to default
-                                                    bs_env=bs_env, es_server=es_server, **others)
+                                                            # we should be able to default data_env & es_namespace
+                                                            bs_env=bs_env, es_server=es_server, **others)
 
         ref_content = ref_output.getvalue()
         any_content = any_output.getvalue()
@@ -618,11 +621,11 @@ def test_deployment_utils_transitional_equivalence():
         any_output = StringIO()
 
         SelectedTestDeployer.build_ini_stream_from_template(ref_ini_path, ref_output,
-                                                    bs_env=bs_env, data_set=data_set,
-                                                    es_server=es_server, es_namespace=es_namespace, **others)
+                                                            bs_env=bs_env, data_set=data_set,
+                                                            es_server=es_server, es_namespace=es_namespace, **others)
         SelectedTestDeployer.build_ini_stream_from_template(any_ini_path, any_output,
-                                                    bs_env=bs_env, data_set=data_set,
-                                                    es_server=es_server, es_namespace=es_namespace, **others)
+                                                            bs_env=bs_env, data_set=data_set,
+                                                            es_server=es_server, es_namespace=es_namespace, **others)
 
         ref_content = ref_output.getvalue()
         any_content = any_output.getvalue()
@@ -720,7 +723,7 @@ def test_deployment_utils_transitional_equivalence():
                                                             "app_kind": "cgap",
                                                             "app_deployment": "orchestrated",
                                                         }),
-                           application_bucket_prefix=f"acme-hospital-",
+                           application_bucket_prefix="acme-hospital-",
                            s3_bucket_env=bs_env)
 
                     tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,

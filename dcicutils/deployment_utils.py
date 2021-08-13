@@ -575,7 +575,7 @@ class IniFileManager:
                                      or os.environ.get("ENCODED_APPLICATION_BUCKET_PREFIX")
                                      or ("MISSING_ENCODED_APPLICATION_BUCKET_PREFIX"
                                          if cls.APP_ORCHESTRATED
-                                         else  cls.LEGACY_APPLICATION_BUCKET_PREFIX))
+                                         else cls.LEGACY_APPLICATION_BUCKET_PREFIX))
         foursight_bucket_prefix = (foursight_bucket_prefix
                                    or os.environ.get("ENCODED_FOURSIGHT_BUCKET_PREFIX")
                                    or ("MISSING_ENCODED_FOURSIGHT_BUCKET_PREFIX"
