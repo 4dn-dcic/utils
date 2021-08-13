@@ -11,7 +11,7 @@ from unittest import mock
 
 from dcicutils.deployment_utils import (
     IniFileManager, boolean_setting, CreateMappingOnDeployManager,
-    OrchestratedCgapIniFileManager, LegacyCgapIniFileManager,
+    BasicOrchestratedCGAPIniFileManager, BasicLegacyCGAPIniFileManager,
     # TODO: This isn't yet tested.
     # EBDeployer,
 )
@@ -33,12 +33,12 @@ class TestDeployer(IniFileManager):
     PYPROJECT_FILE_NAME = os.path.join(os.path.dirname(_MY_DIR), "pyproject.toml")
 
 
-class TestOrchestratedCgapDeployer(OrchestratedCgapIniFileManager):
+class TestOrchestratedCgapDeployer(BasicOrchestratedCGAPIniFileManager):
     TEMPLATE_DIR = os.path.join(_MY_DIR, "ini_files")
     PYPROJECT_FILE_NAME = os.path.join(os.path.dirname(_MY_DIR), "pyproject.toml")
 
 
-class TestLegacyCgapDeployer(LegacyCgapIniFileManager):
+class TestLegacyCgapDeployer(BasicLegacyCGAPIniFileManager):
     TEMPLATE_DIR = os.path.join(_MY_DIR, "ini_files")
     PYPROJECT_FILE_NAME = os.path.join(os.path.dirname(_MY_DIR), "pyproject.toml")
 

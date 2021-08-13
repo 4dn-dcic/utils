@@ -37,8 +37,15 @@ Change Log
   * New class variable ``APP_ORCHESTRATED`` in ``IniFileManager``.
     Default is ``None``, but new subclasses adjust the default to ``True`` or ``False``.
 
-  * New classes ``BasicCgapIniFileManager``, ``BasicFourfrontIniFileManager``, ``LegacyCgapIniFileManager``,
-    ``LegacyFourfrontIniFileManager``, ``OrchestratedCgapIniFileManager``, and ``OrchestratedFourfrontIniFileManager``.
+  * New classes
+
+    * ``BasicCGAPIniFileManager``
+    * ``BasicLegacyCGAPIniFileManager``
+    * ``BasicOrchestratedCGAPIniFileManager``
+    * ``BasicFourfrontIniFileManager``
+    * ``BasicLegacyFourfrontIniFileManager``
+    * ``BasicOrchestratedFourfrontIniFileManager``
+
     In principle, this should allow some better defaulting.
 
 * In ``exceptions``:

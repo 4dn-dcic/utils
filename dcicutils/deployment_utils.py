@@ -855,27 +855,27 @@ class IniFileManager:
             sys.exit(1)
 
 
-class BasicCgapIniFileManager(IniFileManager):
+class BasicCGAPIniFileManager(IniFileManager):
     APP_KIND = 'cgap'
+
+
+class BasicLegacyCGAPIniFileManager(BasicCGAPIniFileManager):
+    APP_ORCHESTRATED = False
+
+
+class BasicOrchestratedCGAPIniFileManager(BasicCGAPIniFileManager):
+    APP_ORCHESTRATED = True
 
 
 class BasicFourfrontIniFileManager(IniFileManager):
     APP_KIND = 'fourfront'
 
 
-class LegacyCgapIniFileManager(BasicCgapIniFileManager):
+class BasicLegacyFourfrontIniFileManager(BasicFourfrontIniFileManager):
     APP_ORCHESTRATED = False
 
 
-class LegacyFourfrontIniFileManager(BasicFourfrontIniFileManager):
-    APP_ORCHESTRATED = False
-
-
-class OrchestratedCgapIniFileManager(BasicCgapIniFileManager):
-    APP_ORCHESTRATED = True
-
-
-class OrchestratedFourfrontIniFileManager(BasicFourfrontIniFileManager):
+class BasicOrchestratedFourfrontIniFileManager(BasicFourfrontIniFileManager):
     APP_ORCHESTRATED = True
 
 
