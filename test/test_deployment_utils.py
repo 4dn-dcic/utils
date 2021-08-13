@@ -648,7 +648,7 @@ def test_deployment_utils_transitional_equivalence():
             assert problems == [], "Problems found:\n%s" % "\n".join(problems)
 
     with mock.patch("pkg_resources.get_distribution", return_value=FakeDistribution()):
-        with mock.patch.object(TestDeployer, "get_app_version",
+        with mock.patch.object(IniFileManager, "get_app_version",
                                return_value=MOCKED_PROJECT_VERSION) as mock_get_app_version:
             with mock.patch("toml.load", return_value={"tool": {"poetry": {"version": MOCKED_LOCAL_GIT_VERSION}}}):
                 with override_environ(ENCODED_INDEXER=None, ENCODED_INDEX_SERVER=None):
