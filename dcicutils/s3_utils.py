@@ -140,7 +140,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 else:
                     metadata_bucket = metadata_bucket_from_health_page
                 if tibanna_output_bucket and tibanna_output_bucket != tibanna_output_bucket_from_health_page:
-                    raise InferredBucketConflict(kind="tibanna logs", specified=tibanna_output_bucket,
+                    raise InferredBucketConflict(kind="tibanna output", specified=tibanna_output_bucket,
                                                  inferred=tibanna_output_bucket_from_health_page)
                 else:
                     tibanna_output_bucket = tibanna_output_bucket_from_health_page
