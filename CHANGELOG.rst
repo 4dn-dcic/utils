@@ -17,6 +17,20 @@ Change Log
   * Add ``'elasticbeanstalk-%s-metadata-bundles'`` to the list of buckets that ``beanstalk_utils.delete_s3_buckets``
     is willing to delete.
 
+* In ``cloudformation_utils``:
+
+  * New functions ``camelize`` and ``dehyphenate`` because they're needed a lot in our ``4dn-cloud-infra`` repo.
+
+  * New implementation of functions ``get_ecs_real_url`` and ``get_ecr_repo_url`` that are not Alpha-specific.
+
+  * New classes ``AbstractOrchestrationManager``, ``C4OrchestrationManager``, and ``AwsemOrchestrationManager``
+    with various utilities ported from ``4dn-cloud-infra`` (so they could be used to re-implement
+    ``get_ecs_real_url``and ``get_ecr_repo_url``).
+
+  * New ``test_cloudformation_utils.py`` testing each of the bits of functionality in ``cloudformation_utils``
+    along normal paths, including sometimes mocking both the Alpha and KMP environments, hoping transitions
+    will be smooth.
+
 * In ``deployment_utils``:
 
   * Support environment variable ``ENCODED_IDENTITY`` and ``--identity`` to control
@@ -72,6 +86,9 @@ Change Log
   * Add ``NamedObject`` for creating named tokens.
 
   * Add a ``separator=`` argument to ``camel_case_to_snake_case`` and ``snake_case_to_camel_case``.
+
+* In ``qa_utils``, support for mocking enough of ``boto3.client('cloudformation')`` that we can test
+  ``cloudformation_utils``.
 
 * In ``s3_utils``:
 
