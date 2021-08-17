@@ -856,26 +856,48 @@ class IniFileManager:
 
 
 class BasicCGAPIniFileManager(IniFileManager):
+    """
+    Any IniFileManager used by CGAP should use this class to get better defaulting.
+    This class exists mostly for type inclusion. For actual use, you probably want one of its subclasses.
+    """
     APP_KIND = 'cgap'
 
 
 class BasicLegacyCGAPIniFileManager(BasicCGAPIniFileManager):
+    """
+    A class of IniFileManager for producing a CGAP-style production.ini in a legacy (beanstalk) context.
+    """
     APP_ORCHESTRATED = False
 
 
 class BasicOrchestratedCGAPIniFileManager(BasicCGAPIniFileManager):
+    """
+    A class of IniFileManager for producing a CGAP-style production.ini in a CloudFormation-orechstrated context.
+    """
     APP_ORCHESTRATED = True
 
 
 class BasicFourfrontIniFileManager(IniFileManager):
+    """
+    Any IniFileManager used by Fourfront should use this class to get better defaulting.
+    This class exists mostly for type inclusion. For actual use, you probably want one of its subclasses.
+    """
     APP_KIND = 'fourfront'
 
 
 class BasicLegacyFourfrontIniFileManager(BasicFourfrontIniFileManager):
+    """
+    A class of IniFileManager for producing a Fourfront-style production.ini in a legacy (beanstalk) context.
+    NOTE: For now this is really the only such context, but eventually there may be an orchestrated version as well.
+    """
     APP_ORCHESTRATED = False
 
 
 class BasicOrchestratedFourfrontIniFileManager(BasicFourfrontIniFileManager):
+    """
+    A class of IniFileManager for producing a Fourfront-style production.ini in a CloudFormation-orechstrated context.
+    NOTE: For now there is no such context, but this is intended to be thinking forward.
+    """
     APP_ORCHESTRATED = True
 
 
