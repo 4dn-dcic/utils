@@ -161,15 +161,19 @@ def test_get_ecr_repo_url_hybrid(use_ecosystem_repo):
 
 def test_c4_orchestration_manager_get_stack_output():
 
-    manager = cloudformation_utils.C4OrchestrationManager()
-    mock_outputs = [
-        {'OutputKey': 'alpha', 'OutputValue': 'one'},
-        {'OutputKey': 'beta', 'OutputValue': 'two'}
-    ]
-    s = MockBotoCloudFormationStack('foo', mock_outputs=mock_outputs)
-    assert manager.get_stack_output(s, 'alpha') == 'one'
-    assert manager.get_stack_output(s, 'beta') == 'two'
-    assert manager.get_stack_output(s, 'gamma') is None
+    mocked_boto3 = MockBoto3()
+
+    with mock.patch.object(cloudformation_utils, "boto3", mocked_boto3):
+
+        manager = cloudformation_utils.C4OrchestrationManager()
+        mock_outputs = [
+            {'OutputKey': 'alpha', 'OutputValue': 'one'},
+            {'OutputKey': 'beta', 'OutputValue': 'two'}
+        ]
+        s = MockBotoCloudFormationStack('foo', mock_outputs=mock_outputs)
+        assert manager.get_stack_output(s, 'alpha') == 'one'
+        assert manager.get_stack_output(s, 'beta') == 'two'
+        assert manager.get_stack_output(s, 'gamma') is None
 
 
 def test_c4_orchestration_manager_all_stacks():
@@ -185,32 +189,41 @@ def test_c4_orchestration_manager_all_stacks():
 
 def test_c4_orchestration_manager_extract_stack_name_token():
 
-    def extract(stack_name):
-        stack = MockBotoCloudFormationStack(stack_name)
-        manager = cloudformation_utils.C4OrchestrationManager()
-        return manager._extract_stack_name_token(stack)  # noQA - please don't tell me this is protected. Just testing
+    mocked_boto3 = MockBoto3()
 
-    assert extract('foo-bar') is None
-    assert extract('c4-foo') == 'foo'
-    assert extract('c4-foo-bar') == 'foo'
-    assert extract('c4-foo-bar-baz') == 'foo'
-    assert extract('c4-foo_bar-baz') == 'foo_bar'
+    with mock.patch.object(cloudformation_utils, "boto3", mocked_boto3):
+
+        def extract(stack_name):
+
+                stack = MockBotoCloudFormationStack(stack_name)
+                manager = cloudformation_utils.C4OrchestrationManager()
+                return manager._extract_stack_name_token(stack)  # noQA - please don't tell me this is protected. Just testing
+
+        assert extract('foo-bar') is None
+        assert extract('c4-foo') == 'foo'
+        assert extract('c4-foo-bar') == 'foo'
+        assert extract('c4-foo-bar-baz') == 'foo'
+        assert extract('c4-foo_bar-baz') == 'foo_bar'
 
 
 def test_awseb_orchestration_manager_extract_stack_name_token():
 
-    def extract(stack_name):
-        stack = MockBotoCloudFormationStack(stack_name)
-        manager = cloudformation_utils.AwsebOrchestrationManager()
-        return manager._extract_stack_name_token(stack)  # noQA - please don't tell me this is protected. Just testing
+    mocked_boto3 = MockBoto3()
 
-    assert extract('foo-bar') is None
-    assert extract('c4-foo') is None
-    assert extract('awseb-foo-bar') is None
-    assert extract('awseb-x-bar') is None
-    assert extract('awseb-e-bar') is None
-    assert extract('awseb-e-bar-stack') == 'bar'
-    assert extract('awseb-e-bar-baz-stack') == 'bar-baz'
+    with mock.patch.object(cloudformation_utils, "boto3", mocked_boto3):
+
+        def extract(stack_name):
+            stack = MockBotoCloudFormationStack(stack_name)
+            manager = cloudformation_utils.AwsebOrchestrationManager()
+            return manager._extract_stack_name_token(stack)  # noQA - please don't tell me this is protected. Just testing
+
+        assert extract('foo-bar') is None
+        assert extract('c4-foo') is None
+        assert extract('awseb-foo-bar') is None
+        assert extract('awseb-x-bar') is None
+        assert extract('awseb-e-bar') is None
+        assert extract('awseb-e-bar-stack') == 'bar'
+        assert extract('awseb-e-bar-baz-stack') == 'bar-baz'
 
 
 def test_c4_orchestration_manager_find_stack():
