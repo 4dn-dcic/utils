@@ -11,10 +11,12 @@ from unittest import mock
 
 from dcicutils.deployment_utils import (
     IniFileManager, boolean_setting, CreateMappingOnDeployManager,
+    BasicOrchestratedCGAPIniFileManager, BasicLegacyCGAPIniFileManager,
     # TODO: This isn't yet tested.
     # EBDeployer,
 )
 from dcicutils.env_utils import is_cgap_env, data_set_for_env
+from dcicutils.exceptions import InvalidParameterError
 from dcicutils.misc_utils import ignored
 from dcicutils.qa_utils import override_environ
 
@@ -27,6 +29,16 @@ class FakeDistribution:
 
 
 class TestDeployer(IniFileManager):
+    TEMPLATE_DIR = os.path.join(_MY_DIR, "ini_files")
+    PYPROJECT_FILE_NAME = os.path.join(os.path.dirname(_MY_DIR), "pyproject.toml")
+
+
+class TestOrchestratedCgapDeployer(BasicOrchestratedCGAPIniFileManager):
+    TEMPLATE_DIR = os.path.join(_MY_DIR, "ini_files")
+    PYPROJECT_FILE_NAME = os.path.join(os.path.dirname(_MY_DIR), "pyproject.toml")
+
+
+class TestLegacyCgapDeployer(BasicLegacyCGAPIniFileManager):
     TEMPLATE_DIR = os.path.join(_MY_DIR, "ini_files")
     PYPROJECT_FILE_NAME = os.path.join(os.path.dirname(_MY_DIR), "pyproject.toml")
 
@@ -459,10 +471,12 @@ def test_deployment_utils_get_app_version():
             with mock.patch("io.open") as mock_open:
                 mock_open.return_value = StringIO('{"VersionLabel": "%s"}' % MOCKED_BUNDLE_VERSION)
                 mock_check_output.side_effect = make_mocked_check_output_for_get_version()
-                assert TestDeployer.get_app_version() == MOCKED_BUNDLE_VERSION
+                assert IniFileManager.get_app_version() == MOCKED_BUNDLE_VERSION
 
         mock_check_output.side_effect = make_mocked_check_output_for_get_version()
         assert TestDeployer.get_app_version() == MOCKED_LOCAL_GIT_VERSION
+        assert TestOrchestratedCgapDeployer.get_app_version() == MOCKED_LOCAL_GIT_VERSION
+        assert TestLegacyCgapDeployer.get_app_version() == MOCKED_LOCAL_GIT_VERSION
 
         # Simulate 'git' command not found.
         mock_check_output.side_effect = make_mocked_check_output_for_get_version(simulate_git_command=False)
@@ -544,17 +558,34 @@ def test_deployment_utils_transitional_equivalence():
     # TODO: Once this mechanism is in place, the files cgap.ini, cgapdev.ini, cgaptest.ini, and cgapwolf.ini
     #       can either be removed (and these transitional tests removed) or transitioned to be test data.
 
-    def tester(ref_ini, bs_env, data_set, es_server, *, any_ini=None, es_namespace=None, line_checker=None, **others):
+    def tester(ref_ini, bs_env, data_set, es_server, *, any_ini=None, es_namespace=None, line_checker=None,
+               use_ini_file_manager_kind=None, **others):
         """
         This common tester program checks that the any.ini does the same thing as a given ref ini,
         given a particular set of environment variables.  It does the output to a string in both cases
         and then compares the result.
         """
 
-        if bs_env.startswith("fourfront"):
-            assert ref_ini[:-4] == bs_env[10:]  # "xxx.ini" needs to match "fourfront-xxx"
+        if use_ini_file_manager_kind == 'legacy-cgap':
+            class SelectedTestDeployer (TestLegacyCgapDeployer):
+                pass
+        elif use_ini_file_manager_kind == 'orchestrated-cgap':
+            class SelectedTestDeployer (TestOrchestratedCgapDeployer):
+                pass
+        elif use_ini_file_manager_kind is None:
+            class SelectedTestDeployer (TestDeployer):
+                pass
         else:
-            assert ref_ini[:-4] == bs_env  # In a post-fourfront world, "xxx.ini" needs to match "xxx"
+            raise InvalidParameterError('use_ini_file_manager_kind', use_ini_file_manager_kind,
+                                        ['legacy-cgap', 'orchestrated-cgap'])
+
+        def fix_(x):
+            return x.replace('_', '-')
+
+        if bs_env.startswith("fourfront"):
+            assert fix_(ref_ini[:-4]) == fix_(bs_env[10:])  # "xyz.ini" needs to match "fourfront-xyz"
+        else:
+            assert fix_(ref_ini[:-4]) == fix_(bs_env)  # In a post-fourfront world, "xyz.ini" needs to match "xyz"
 
         es_namespace = es_namespace or bs_env
 
@@ -564,22 +595,22 @@ def test_deployment_utils_transitional_equivalence():
         ref_output = StringIO()
         any_output = StringIO()
 
-        any_ini_path = os.path.join(TestDeployer.TEMPLATE_DIR,
+        any_ini_path = os.path.join(SelectedTestDeployer.TEMPLATE_DIR,
                                     any_ini or ("cg_any.ini" if is_cgap_env(bs_env) else "ff_any.ini"))
-        ref_ini_path = os.path.join(TestDeployer.TEMPLATE_DIR, ref_ini)
+        ref_ini_path = os.path.join(SelectedTestDeployer.TEMPLATE_DIR, ref_ini)
 
         with override_environ(APP_VERSION='externally_defined'):
             # We don't expect variables like APP_VERSION to be globally available because
             # we'd end up shadowing them and confusion could result about which variable
             # the template wanted to reference, ours or theirs. -kmp 9-May-2020
             with pytest.raises(RuntimeError):
-                TestDeployer.build_ini_stream_from_template(ref_ini_path, "this shouldn't get used")
+                SelectedTestDeployer.build_ini_stream_from_template(ref_ini_path, "this shouldn't get used")
 
-        TestDeployer.build_ini_stream_from_template(ref_ini_path, ref_output,
-                                                    bs_env=bs_env, es_server=es_server, **others)
-        TestDeployer.build_ini_stream_from_template(any_ini_path, any_output,
-                                                    # data_env & es_namespace are something we should be able to default
-                                                    bs_env=bs_env, es_server=es_server, **others)
+        SelectedTestDeployer.build_ini_stream_from_template(ref_ini_path, ref_output,
+                                                            bs_env=bs_env, es_server=es_server, **others)
+        SelectedTestDeployer.build_ini_stream_from_template(any_ini_path, any_output,
+                                                            # we should be able to default data_env & es_namespace
+                                                            bs_env=bs_env, es_server=es_server, **others)
 
         ref_content = ref_output.getvalue()
         any_content = any_output.getvalue()
@@ -591,12 +622,12 @@ def test_deployment_utils_transitional_equivalence():
         ref_output = StringIO()
         any_output = StringIO()
 
-        TestDeployer.build_ini_stream_from_template(ref_ini_path, ref_output,
-                                                    bs_env=bs_env, data_set=data_set,
-                                                    es_server=es_server, es_namespace=es_namespace, **others)
-        TestDeployer.build_ini_stream_from_template(any_ini_path, any_output,
-                                                    bs_env=bs_env, data_set=data_set,
-                                                    es_server=es_server, es_namespace=es_namespace, **others)
+        SelectedTestDeployer.build_ini_stream_from_template(ref_ini_path, ref_output,
+                                                            bs_env=bs_env, data_set=data_set,
+                                                            es_server=es_server, es_namespace=es_namespace, **others)
+        SelectedTestDeployer.build_ini_stream_from_template(any_ini_path, any_output,
+                                                            bs_env=bs_env, data_set=data_set,
+                                                            es_server=es_server, es_namespace=es_namespace, **others)
 
         ref_content = ref_output.getvalue()
         any_content = any_output.getvalue()
@@ -617,7 +648,7 @@ def test_deployment_utils_transitional_equivalence():
             assert problems == [], "Problems found:\n%s" % "\n".join(problems)
 
     with mock.patch("pkg_resources.get_distribution", return_value=FakeDistribution()):
-        with mock.patch.object(TestDeployer, "get_app_version",
+        with mock.patch.object(IniFileManager, "get_app_version",
                                return_value=MOCKED_PROJECT_VERSION) as mock_get_app_version:
             with mock.patch("toml.load", return_value={"tool": {"poetry": {"version": MOCKED_LOCAL_GIT_VERSION}}}):
                 with override_environ(ENCODED_INDEXER=None, ENCODED_INDEX_SERVER=None):
@@ -681,19 +712,47 @@ def test_deployment_utils_transitional_equivalence():
                                                         expect_index_server=index_server_default))
 
                     test_alpha_org = "alphatest"
-                    bs_env = "cgap_alpha"
+                    bs_env = "cgap-alpha"
                     data_set = data_set_for_env(bs_env) or "prod"
 
                     tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                           use_ini_file_manager_kind="orchestrated-cgap",
+                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                           line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                        expect_index_server=index_server_default,
+                                                        expected_values={
+                                                            "file_upload_bucket": f"acme-hospital-{bs_env}-files",
+                                                            "app_kind": "cgap",
+                                                            "app_deployment": "orchestrated",
+                                                        }),
+                           application_bucket_prefix="acme-hospital-",
+                           s3_bucket_env=bs_env)
+
+                    tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                           use_ini_file_manager_kind="legacy-cgap",
                            es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
                            line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                         expect_index_server=index_server_default,
                                                         expected_values={
                                                             "file_upload_bucket": f"elasticbeanstalk-{bs_env}-files",
+                                                            "app_kind": "cgap",
+                                                            "app_deployment": "beanstalk",
                                                         }),
                            s3_bucket_env=bs_env)
 
                     tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                           use_ini_file_manager_kind='orchestrated-cgap',
+                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                           line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                        expect_index_server=index_server_default,
+                                                        expected_values={
+                                                            "file_upload_bucket": f"some-prefix-{bs_env}-files",
+                                                        }),
+                           application_bucket_prefix="some-prefix-",
+                           s3_bucket_env=bs_env)
+
+                    tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                           use_ini_file_manager_kind="orchestrated-cgap",
                            es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
                            line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                         expect_index_server=index_server_default,
@@ -701,11 +760,25 @@ def test_deployment_utils_transitional_equivalence():
                                                             "file_upload_bucket": f"{test_alpha_org}-{bs_env}-files",
                                                         }),
                            s3_bucket_env=bs_env,
-                           s3_bucket_org=test_alpha_org)
+                           s3_bucket_org=test_alpha_org,
+                           application_bucket_prefix=f"{test_alpha_org}-")
 
-                    bs_env = "cgap_alfa"
+                    tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                           use_ini_file_manager_kind='orchestrated-cgap',
+                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                           line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                        expect_index_server=index_server_default,
+                                                        expected_values={
+                                                            "file_upload_bucket": f"{test_alpha_org}-{bs_env}-files",
+                                                        }),
+                           s3_bucket_env=bs_env,
+                           s3_bucket_org=test_alpha_org,
+                           application_bucket_prefix=f"{test_alpha_org}-")
+
+                    bs_env = "cgap-alfa"
                     tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
                            es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                           use_ini_file_manager_kind='orchestrated-cgap',
                            line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                         expect_index_server=index_server_default,
                                                         expected_values={
@@ -714,6 +787,8 @@ def test_deployment_utils_transitional_equivalence():
                                                             "blob_bucket": "b-bucket",
                                                             "system_bucket": "s-bucket",
                                                             "metadata_bundles_bucket": "md-bucket",
+                                                            "identity": "ThisIsMyIdentity",
+                                                            "tibanna_output_bucket": "tb-bucket",
                                                         }),
                            s3_bucket_env=bs_env,
                            s3_bucket_org=test_alpha_org,
@@ -723,8 +798,10 @@ def test_deployment_utils_transitional_equivalence():
                            system_bucket='s-bucket',
                            metadata_bundles_bucket='md-bucket',
                            sentry_dsn="https://123sample123sample123@o1111111.ingest.sentry.io/1234567",
+                           identity='ThisIsMyIdentity',
                            auth0_client="31415926535",
                            auth0_secret="piepipiepipiepi",
+                           tibanna_output_bucket="tb-bucket",
                            )
 
                     with override_environ(ENCODED_FILE_UPLOAD_BUCKET='decoy1',
@@ -732,10 +809,12 @@ def test_deployment_utils_transitional_equivalence():
                                           ENCODED_BLOB_BUCKET='decoy3',
                                           ENCODED_SYSTEM_BUCKET='decoy4',
                                           ENCODED_METADATA_BUNDLES_BUCKET='decoy5',
-                                          ENCODED_S3_BUCKET_ORG='decoy6'):
+                                          ENCODED_S3_BUCKET_ORG='decoy6',
+                                          ENCODED_TIBANNA_OUTPUT_BUCKET='decoy7'):
                         # The decoy values in the environment variables don't matter because we'll be passing
                         # explicit values for these to the builder that will take precedence.
                         tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                               use_ini_file_manager_kind="orchestrated-cgap",
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
@@ -745,6 +824,8 @@ def test_deployment_utils_transitional_equivalence():
                                                                 "blob_bucket": "b-bucket",
                                                                 "system_bucket": "s-bucket",
                                                                 "metadata_bundles_bucket": "md-bucket",
+                                                                "tibanna_output_bucket": "tb-bucket",
+                                                                "identity": "ThisIsMyIdentity",
                                                             }),
                                s3_bucket_env=bs_env,
                                s3_bucket_org=test_alpha_org,
@@ -752,16 +833,22 @@ def test_deployment_utils_transitional_equivalence():
                                file_wfout_bucket='fw-bucket',
                                blob_bucket='b-bucket',
                                system_bucket='s-bucket',
-                               metadata_bundles_bucket='md-bucket')
+                               metadata_bundles_bucket='md-bucket',
+                               tibanna_output_bucket="tb-bucket",
+                               identity='ThisIsMyIdentity',
+                               )
 
                     with override_environ(ENCODED_FILE_UPLOAD_BUCKET='fu-bucket',
                                           ENCODED_FILE_WFOUT_BUCKET='fw-bucket',
                                           ENCODED_BLOB_BUCKET='b-bucket',
                                           ENCODED_SYSTEM_BUCKET='s-bucket',
                                           ENCODED_METADATA_BUNDLES_BUCKET='md-bucket',
-                                          ENCODED_S3_BUCKET_ORG=test_alpha_org):
+                                          ENCODED_S3_BUCKET_ORG=test_alpha_org,
+                                          ENCODED_TIBANNA_OUTPUT_BUCKET='tb-bucket',
+                                          ENCODED_IDENTITY='ThisIsMyIdentity'):
                         # If no explicit args are passed to the builder, the ENCODED_xxx arguments DO matter.
                         tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                               use_ini_file_manager_kind="orchestrated-cgap",
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
@@ -771,6 +858,8 @@ def test_deployment_utils_transitional_equivalence():
                                                                 "blob_bucket": "b-bucket",
                                                                 "system_bucket": "s-bucket",
                                                                 "metadata_bundles_bucket": "md-bucket",
+                                                                "tibanna_output_bucket": "tb-bucket",
+                                                                "identity": "ThisIsMyIdentity",
                                                             }),
                                s3_bucket_env=bs_env)
 
@@ -791,6 +880,8 @@ def test_deployment_utils_transitional_equivalence():
                     bs_env = "fourfront-cgapwolf"
                     data_set = data_set_for_env(bs_env)
                     tester(ref_ini="cgapwolf.ini", bs_env=bs_env, data_set=data_set,
+                           # This ini file will have 'app_kind = ccgap' rather than 'app_kind = unknown'.
+                           use_ini_file_manager_kind='legacy-cgap',
                            es_server="search-fourfront-cgapwolf-r5kkbokabymtguuwjzspt2kiqa.%s" % us_east,
                            line_checker=Checker(expect_indexer=index_default,
                                                 expect_index_server=index_server_default))
@@ -984,6 +1075,7 @@ def test_deployment_utils_main():
                             'data_set': None,
                             'es_namespace': None,
                             'es_server': None,
+                            'identity': None,
                             'index_server': None,
                             'indexer': None,
                             's3_bucket_org': None,
@@ -996,6 +1088,9 @@ def test_deployment_utils_main():
                             'blob_bucket': None,
                             'system_bucket': None,
                             'metadata_bundles_bucket': None,
+                            'tibanna_output_bucket': None,
+                            'application_bucket_prefix': None,
+                            'foursight_bucket_prefix': None,
                         })
 
                     # Next 2 tests some sample settings, in particular the settings of indexer and index_server
@@ -1008,6 +1103,7 @@ def test_deployment_utils_main():
                             'data_set': None,
                             'es_namespace': None,
                             'es_server': None,
+                            'identity': None,
                             'index_server': 'true',
                             'indexer': 'false',
                             's3_bucket_org': None,
@@ -1020,6 +1116,9 @@ def test_deployment_utils_main():
                             'blob_bucket': None,
                             'system_bucket': None,
                             'metadata_bundles_bucket': None,
+                            'tibanna_output_bucket': None,
+                            'application_bucket_prefix': None,
+                            'foursight_bucket_prefix': None,
                         })
 
                     with mock.patch.object(sys, "argv", ['', '--indexer', 'foo']):
@@ -1030,6 +1129,7 @@ def test_deployment_utils_main():
                                 'data_set': None,
                                 'es_namespace': None,
                                 'es_server': None,
+                                'identity': None,
                                 'index_server': 'true',
                                 'indexer': 'false',
                                 's3_bucket_org': None,
@@ -1042,6 +1142,9 @@ def test_deployment_utils_main():
                                 'blob_bucket': None,
                                 'system_bucket': None,
                                 'metadata_bundles_bucket': None,
+                                'tibanna_output_bucket': None,
+                                'application_bucket_prefix': None,
+                                'foursight_bucket_prefix': None,
                             })
 
 

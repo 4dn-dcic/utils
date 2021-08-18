@@ -6,6 +6,106 @@ dcicutils
 Change Log
 ----------
 
+
+2.0.0
+=====
+
+**PR 150: Add json_leaf_subst, conjoined_list and disjoined_list**
+
+We do not believe this is an incompatible major version, but there is a lot here, an hence some opportunity for
+difference in behavior to have crept in. As such, we opted to call this a new major version to highlight where
+that big change happened.
+
+* In ``beanstalk_utils``:
+
+  * Add ``'elasticbeanstalk-%s-metadata-bundles'`` to the list of buckets that ``beanstalk_utils.delete_s3_buckets``
+    is willing to delete.
+
+* In ``cloudformation_utils``:
+
+  * New functions ``camelize`` and ``dehyphenate`` because they're needed a lot in our ``4dn-cloud-infra`` repo.
+
+  * New implementation of functions ``get_ecs_real_url`` and ``get_ecr_repo_url`` that are not Alpha-specific.
+
+  * New classes ``AbstractOrchestrationManager``, ``C4OrchestrationManager``, and ``AwsemOrchestrationManager``
+    with various utilities ported from ``4dn-cloud-infra`` (so they could be used to re-implement
+    ``get_ecs_real_url``and ``get_ecr_repo_url``).
+
+  * New ``test_cloudformation_utils.py`` testing each of the bits of functionality in ``cloudformation_utils``
+    along normal paths, including sometimes mocking both the Alpha and KMP environments, hoping transitions
+    will be smooth.
+
+* In ``deployment_utils``:
+
+  * Support environment variable ``ENCODED_IDENTITY`` and ``--identity`` to control
+    environment variable ``$IDENTITY`` in construction of ``production.ini``.
+
+  * Support environment variable ``ENCODED_TIBANNA_OUTPUT_BUCKET`` and ``--tibanna_output_bucket`` to control
+    environment variable ``$TIBANNA_OUTPUT_BUCKET`` in construction of ``production.ini``.
+
+  * Support environment variable ``ENCODED_APPLICATION_BUCKET_PREFIX`` and ``--application_bucket_prefix`` to control
+    environment variable ``$APPLICATION_BUCKET_PREFIX`` in construction of ``production.ini``.
+
+  * Support environment variable ``ENCODED_FOURSIGHT_BUCKET_PREFIX`` and ``--foursight_bucket_prefix`` to control
+    environment variable ``$FOURSIGHT_BUCKET_PREFIX`` in construction of ``production.ini``.
+
+  * New class variable ``APP_KIND`` in ``IniFileManager``.
+    Default is ``None``, but new subclasses adjust the default to ``cgap`` or ``fourfront``.
+
+  * New class variable ``APP_ORCHESTRATED`` in ``IniFileManager``.
+    Default is ``None``, but new subclasses adjust the default to ``True`` or ``False``.
+
+  * New classes
+
+    * ``BasicCGAPIniFileManager``
+    * ``BasicLegacyCGAPIniFileManager``
+    * ``BasicOrchestratedCGAPIniFileManager``
+    * ``BasicFourfrontIniFileManager``
+    * ``BasicLegacyFourfrontIniFileManager``
+    * ``BasicOrchestratedFourfrontIniFileManager``
+
+    In principle, this should allow some better defaulting.
+
+* In ``exceptions``:
+
+  * Add ``InvalidParameterError``.
+
+* In ``lang_utils``:
+
+  * Add ``conjoined_list`` and ``disjoined_list`` to get a comma-separated
+    list in ordinary English form with an "and" or an "or" before the
+    last element. (Note that these also support new functions
+    ``there_are`` and ``must_be_one_of``).
+
+  * Add ``there are`` and ``must_be_one_of`` to handle construction of
+    messages that are commonly needed but require nuanced adjustment of
+    wording to sound right in English. (Note that ``must_be_one_of`` also
+    supports ``InvalidParameterError``.)
+
+* In ``misc_utils``:
+
+  * Add ``json_leaf_subst`` to do substitutions at the leaves
+    (atomic parts) of a JSON object.
+
+  * Add ``NamedObject`` for creating named tokens.
+
+  * Add a ``separator=`` argument to ``camel_case_to_snake_case`` and ``snake_case_to_camel_case``.
+
+* In ``qa_utils``, support for mocking enough of ``boto3.client('cloudformation')`` that we can test
+  ``cloudformation_utils``. The ``MockBoto3Client`` was extended, and several mock classes were added,
+  but most importantly:
+
+  * ``MockBotoCloudFormationClient``
+  * ``MockBotoCloudFormationStack``
+  * ``MockBotoCloudFormationResourceSummary``
+
+* In ``s3_utils``:
+
+  * Make initialize attribute ``.metadata_bucket`` better.
+
+  * Add an attribute ``.tibanna_output_bucket``
+
+
 1.20.0
 ======
 

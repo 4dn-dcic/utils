@@ -1,14 +1,15 @@
 # flake8: noqa
+
 import boto3
 import pytest
 import os
 import requests
 import time
 
-from dcicutils.misc_utils import check_true
-from dcicutils.s3_utils import s3Utils
-from dcicutils.ff_utils import authorized_request, get_health_page
 from dcicutils.beanstalk_utils import describe_beanstalk_environments, REGION
+from dcicutils.ff_utils import authorized_request, get_health_page
+from dcicutils.misc_utils import check_true, PRINT
+from dcicutils.s3_utils import s3Utils
 from .conftest_settings import TEST_DIR
 
 
@@ -43,10 +44,23 @@ def _discover_es_info(envname):
 
 # XXX: Refactor to config
 INTEGRATED_ENV = 'fourfront-mastertest'
-# This used to be:
-# INTEGRATED_ES = 'https://search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.us-east-1.es.amazonaws.com'
-# but it changes too much, so now we discover it from the 'elasticsearch' and 'namespace' parts of health page...
-INTEGRATED_ES, INTEGRATED_ES_NAMESPACE = _discover_es_info(INTEGRATED_ENV)
+
+try:
+
+    # This used to be:
+    # INTEGRATED_ES = 'https://search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.us-east-1.es.amazonaws.com'
+    # but it changes too much, so now we discover it from the 'elasticsearch' and 'namespace' parts of health page...
+    INTEGRATED_ES, INTEGRATED_ES_NAMESPACE = _discover_es_info(INTEGRATED_ENV)
+
+except Exception:
+    # Errors sometimes happen when running tests with the orchestration credentials.
+    PRINT("********************************************")
+    PRINT("**  ERROR DURING ELASTICSEARCH DISCOVERY  **")
+    PRINT("**  Make sure you have legacy credentials **")
+    PRINT("**  enabled while running these tests.    **")
+    PRINT("********************************************")
+    raise  # Continue raising the error
+
 
 # We _think_ these are always the same, but maybe not. Perhaps worth noting if/when they diverge.
 check_true(INTEGRATED_ENV == INTEGRATED_ES_NAMESPACE, "INTEGRATED_ENV and INTEGRATED_ES_NAMESPACE are not the same.")

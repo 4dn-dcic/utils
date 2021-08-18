@@ -1151,14 +1151,28 @@ def file_contents(filename, binary=False):
         return fp.read()
 
 
-def camel_case_to_snake_case(s):
-    """ Converts CamelCase to snake_case """
-    return ''.join('_' + c.lower() if c.isupper() else c for c in s).lstrip('_')
+def camel_case_to_snake_case(s, separator='_'):
+    """
+    Converts CamelCase to snake_case.
+    With a separator argument (default '_'), use that character instead for snake_case.
+    e.g., with separator='-', you'll get snake-case.
+
+    :param s: a string to convert
+    :param separator: the snake-case separator character (default '_')
+    """
+    return ''.join(separator + c.lower() if c.isupper() else c for c in s).lstrip(separator)
 
 
-def snake_case_to_camel_case(s):
-    """ Converts snake_case to CamelCase - note that "our" CamelCase always capitalizes the first character. """
-    return s.title().replace('_', '')
+def snake_case_to_camel_case(s, separator='_'):
+    """
+    Converts snake_case to CamelCase. (Note that "our" CamelCase always capitalizes the first character.)
+    With a separator argument (default '_'), expect that character instead for snake_case.
+    e.g., with separator='-', you'll expect snake-case.
+
+    :param s: a string to convert
+    :param separator: the snake-case separator character (default '_')
+    """
+    return s.title().replace(separator, '')
 
 
 def capitalize1(s):
@@ -1446,6 +1460,40 @@ def dict_zip(dict1, dict2):
                              f" dict1.keys()={list(dict1.keys())}"
                              f" dict2.keys()={list(dict2.keys())}")
     return res
+
+
+def json_leaf_subst(exp, substitutions):
+    """
+    Given an expression and some substitutions, substitutes all occurrences of the given substitutions.
+    For example:
+
+    >>> json_leaf_subst({'xxx': ['foo', 'bar', 'baz']}, {'foo': 'fu', 'bar': 'bah', 'xxx': 'yyy'})
+    {'yyy': ['fu', 'bah', 'baz']}
+
+    :param exp: a JSON expression, represented in Python as a string, a number, a list, or a dict
+    :param substitutions: a dictionary of replacements from keys to values
+    """
+    def do_subst(e):
+        return json_leaf_subst(e, substitutions)
+    if isinstance(exp, dict):
+        return {do_subst(k): do_subst(v) for k, v in exp.items()}
+    elif isinstance(exp, list):
+        return [do_subst(e) for e in exp]
+    elif exp in substitutions:  # Something atomic like a string or number
+        return substitutions[exp]
+    return exp
+
+
+class NamedObject(object):
+
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return f"<{self.name}>"
+
+    def __repr__(self):
+        return f"<{self.name}@{id(self):x}>"
 
 
 # Deprecated names, still supported for a while.

@@ -1213,6 +1213,8 @@ def delete_s3_buckets(env_name):
         'elasticbeanstalk-%s-files' % env_name,
         'elasticbeanstalk-%s-wfoutput' % env_name,
         'elasticbeanstalk-%s-system' % env_name,
+        'elasticbeanstalk-%s-metadata-bundles' % env_name,
+        # note that tibanna logs are shared so are not so easy to delete
     ]
 
     s3 = boto3.resource('s3')

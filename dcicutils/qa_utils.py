@@ -21,7 +21,7 @@ from unittest import mock
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
 from .misc_utils import (
     PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ,
-    environ_bool, exported, override_environ, override_dict, local_attrs,
+    environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name
 )
 
 
@@ -618,6 +618,7 @@ class MockBoto3:
         return {
             's3': MockBotoS3Client,
             'sqs': MockBotoSQSClient,
+            'cloudformation': MockBotoCloudFormationClient,
         }
 
     def __init__(self, **override_mappings):
@@ -632,6 +633,88 @@ class MockBoto3:
         if not mapped_class:
             raise NotImplementedError("Unsupported boto3 mock kind:", kind)
         return mapped_class(boto3=self, **kwargs)
+
+
+class MockBotoCloudFormationClient:
+
+    _SHARED_STACKS_MARKER = '_cloudformation_stacks'
+
+    @property
+    def mocked_stacks(self):
+        return self.boto3.shared_reality.get(self._SHARED_STACKS_MARKER)
+
+    @classmethod
+    def setup_boto3_mocked_stacks(cls, boto3, mocked_stacks=None, mock_stack_names=None):
+
+        shared_reality = boto3.shared_reality
+        stacks = shared_reality.get(cls._SHARED_STACKS_MARKER)
+        if stacks is None:
+            # Export the list in case other clients want the same list.
+            shared_reality[cls._SHARED_STACKS_MARKER] = stacks = []
+
+        for mocked_stack in mocked_stacks or []:
+            if mocked_stack not in stacks:
+                stacks.append(mocked_stack)
+
+        for mock_stack_name in mock_stack_names or []:
+            for s in stacks:
+                if s.name == mock_stack_name:
+                    raise ValueError(f"duplicated mock stack name: {mock_stack_name}")
+            stacks.append(MockBotoCloudFormationStack(mock_name=mock_stack_name))
+
+    def __init__(self, mocked_stacks=None, mock_stack_names=None, boto3=None):
+        self.boto3 = boto3 or MockBoto3()
+        self.setup_boto3_mocked_stacks(self.boto3, mocked_stacks=mocked_stacks, mock_stack_names=mock_stack_names)
+        self.stacks = MockStackCollectionManager(self)
+
+
+class MockStackCollectionManager:
+
+    def __init__(self, mock_cloudformation_client):
+        self.mocked_cloudformation_client = mock_cloudformation_client
+
+    def all(self):
+        for mocked_stack in self.mocked_cloudformation_client.mocked_stacks:
+            yield mocked_stack
+
+
+class MockResourceSummaryCollectionManager:
+
+    def __init__(self, mocked_stack):
+        self.mocked_stack = mocked_stack
+
+    def all(self):
+        for mocked_resource_summary in self.mocked_stack.mocked_resource_summaries:
+            yield mocked_resource_summary
+
+
+class MockBotoCloudFormationStack:
+
+    def __str__(self):
+        return f"<{full_class_name(self)} {self.name} {id(self)}>"
+
+    def __repr__(self):
+        return str(self)
+
+    def __init__(self, mock_name, mock_outputs=None, mock_resource_summaries=None,
+                 mock_resource_summary_logical_ids=None):
+        self.name = mock_name
+        self.outputs = mock_outputs
+        self.mocked_resource_summaries = mock_resource_summaries.copy() if mock_resource_summaries else []
+        for resource_logical_id in mock_resource_summary_logical_ids or []:
+            self.mocked_resource_summaries.append(
+                MockBotoCloudFormationResourceSummary(logical_id=resource_logical_id))
+        for r in self.mocked_resource_summaries:
+            r.stack_name = self.name
+        self.resource_summaries = MockResourceSummaryCollectionManager(self)
+
+
+class MockBotoCloudFormationResourceSummary:
+
+    def __init__(self, logical_id=None, physical_resource_id=None):
+        self.logical_id = logical_id or f"MockedLogicalId{id(self)}"
+        self.physical_resource_id = physical_resource_id or f"MockedPhysicalResourceId{id(self)}"
+        self.stack_name = None  # This will get filled out if used as a resource on a mock stack
 
 
 class MockBotoS3Client:

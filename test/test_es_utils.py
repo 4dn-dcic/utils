@@ -1,16 +1,19 @@
 import pytest
-from unittest import mock
-from dcicutils.qa_utils import timed
-from dcicutils.ff_utils import get_es_metadata
+
 from dcicutils.es_utils import (
     create_es_client, execute_lucene_query_on_es, get_bulk_uuids_embedded, ElasticSearchServiceClient,
 )
+from dcicutils.ff_utils import get_es_metadata
+from dcicutils.misc_utils import ignored
+from dcicutils.qa_utils import timed
+from unittest import mock
 
 
 class TestElasticSearchServiceClient:
 
     @staticmethod
-    def mock_update_es_success(DomainName, ElasticsearchClusterConfig):
+    def mock_update_es_success(DomainName, ElasticsearchClusterConfig):  # noQA - mixed-case params chosen by AWS
+        ignored(DomainName, ElasticsearchClusterConfig)
         return {
             'ResponseMetadata': {
                 'HTTPStatusCode': 200
@@ -18,7 +21,7 @@ class TestElasticSearchServiceClient:
         }
 
     @staticmethod
-    def mock_update_es_fail(DomainName, ElasticsearchClusterConfig):
+    def mock_update_es_fail(DomainName, ElasticsearchClusterConfig):  # noQA - mixed-case params chosen by AWS
         return {
             'ResponseMetadata': {
                 'HTTPStatusCode': 403
@@ -26,7 +29,7 @@ class TestElasticSearchServiceClient:
         }
 
     @staticmethod
-    def mock_update_es_bad_response(DomainName, ElasticsearchClusterConfig):
+    def mock_update_es_bad_response(DomainName, ElasticsearchClusterConfig):  # noQA - mixed-case params chosen by AWS
         return {
             'something_else': {
                 'blah': 403
@@ -34,7 +37,8 @@ class TestElasticSearchServiceClient:
         }
 
     @staticmethod
-    def mock_update_es_unknown(DomainName, ElasticsearchClusterConfig):
+    def mock_update_es_unknown(DomainName, ElasticsearchClusterConfig):  # noQA - mixed-case params chosen by AWS
+        ignored(DomainName, ElasticsearchClusterConfig)
         raise Exception('Literally anything')
 
     def test_elasticsearch_service_client_resize_accepted(self):

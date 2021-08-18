@@ -29,6 +29,8 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     OUTFILE_BUCKET_TEMPLATE = "elasticbeanstalk-%s-wfoutput"
     RAW_BUCKET_TEMPLATE = "elasticbeanstalk-%s-files"
     BLOB_BUCKET_TEMPLATE = "elasticbeanstalk-%s-blobs"
+    METADATA_BUCKET_TEMPLATE = "elasticbeanstalk-%s-metadata-bundles"
+    TIBANNA_OUTPUT_BUCKET_TEMPLATE = 'tibanna-output'
 
     @staticmethod
     def verify_and_get_env_config(s3_client, global_bucket: str, env):
@@ -50,8 +52,8 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             if len(keys) == 1:
                 # If there is only one env, which is the likely case, let's infer that this is the one we want.
                 env = keys[0]
-                logger.warn("No env was specified, but {env} is the only one available, so using that."
-                            .format(env=env))
+                logger.warning("No env was specified, but {env} is the only one available, so using that."
+                               .format(env=env))
             else:
                 raise CannotInferEnvFromManyGlobalEnvs(global_bucket=global_bucket, keys=keys)
         config_filename = None
@@ -77,7 +79,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             return j
 
     def __init__(self, outfile_bucket=None, sys_bucket=None, raw_file_bucket=None,
-                 blob_bucket=None, metadata_bucket=None, env=None):
+                 blob_bucket=None, metadata_bucket=None, tibanna_output_bucket=None, env=None):
         """ Initializes s3 utils in one of three ways:
         1) If 'GLOBAL_ENV_BUCKET' is set to an S3 env bucket, use that bucket to fetch the env for the buckets.
            We then use this env to build the bucket names. If there is only one such env, env can be None or omitted.
@@ -113,6 +115,9 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 raw_file_bucket_from_health_page = health_json['file_upload_bucket']
                 blob_bucket_from_health_page = health_json['blob_bucket']
                 metadata_bucket_from_health_page = health_json.get('metadata_bundles_bucket', None)  # N/A for 4DN
+                tibanna_output_bucket_from_health_page = health_json.get('tibanna_output_bucket',
+                                                                         # new, so it may be missing
+                                                                         None)
                 sys_bucket = sys_bucket_from_health_page  # OK to overwrite because we checked it's None above
                 if outfile_bucket and outfile_bucket != outfile_bucket_from_health_page:
                     raise InferredBucketConflict(kind="outfile", specified=outfile_bucket,
@@ -134,6 +139,11 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                                                  inferred=metadata_bucket_from_health_page)
                 else:
                     metadata_bucket = metadata_bucket_from_health_page
+                if tibanna_output_bucket and tibanna_output_bucket != tibanna_output_bucket_from_health_page:
+                    raise InferredBucketConflict(kind="tibanna output", specified=tibanna_output_bucket,
+                                                 inferred=tibanna_output_bucket_from_health_page)
+                else:
+                    tibanna_output_bucket = tibanna_output_bucket_from_health_page
                 logger.warning('Buckets resolved successfully.')
             else:
                 # staging and production share same buckets
@@ -143,11 +153,16 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                         env = prod_bucket_env(env)
                     else:
                         env = full_env_name(env)
+
+                def apply_template(template, env):
+                    return template % env if "%s" in template else template
                 # we use standardized naming schema, so s3 buckets always have same prefix
-                sys_bucket = self.SYS_BUCKET_TEMPLATE % env
-                outfile_bucket = self.OUTFILE_BUCKET_TEMPLATE % env
-                raw_file_bucket = self.RAW_BUCKET_TEMPLATE % env
-                blob_bucket = self.BLOB_BUCKET_TEMPLATE % env
+                sys_bucket = apply_template(self.SYS_BUCKET_TEMPLATE, env)
+                outfile_bucket = apply_template(self.OUTFILE_BUCKET_TEMPLATE, env)
+                raw_file_bucket = apply_template(self.RAW_BUCKET_TEMPLATE, env)
+                blob_bucket = apply_template(self.BLOB_BUCKET_TEMPLATE, env)
+                metadata_bucket = apply_template(self.METADATA_BUCKET_TEMPLATE, env)
+                tibanna_output_bucket = apply_template(self.TIBANNA_OUTPUT_BUCKET_TEMPLATE, env)
         else:
             # If at least sys_bucket was given, for legacy reasons (see https://hms-dbmi.atlassian.net/browse/C4-674)
             # we assume that the given buckets are exactly the ones we want and we don't set up any others.
@@ -160,6 +175,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         self.raw_file_bucket = raw_file_bucket
         self.blob_bucket = blob_bucket
         self.metadata_bucket = metadata_bucket
+        self.tibanna_output_bucket = tibanna_output_bucket
 
     ACCESS_KEYS_S3_KEY = 'access_key_admin'
 
@@ -231,7 +247,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             raise Exception("key not found")
         one_gb = 1073741824
         add = add_bytes + (add_gb * one_gb)
-        size = meta['ContentLength'] + add
+        size = meta['ContentLength'] + add  # noQA - PyCharm type inferencing is wrong about fussing here
         if size_in_gb:
             size = size / one_gb
         return size

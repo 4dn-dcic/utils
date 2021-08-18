@@ -1,6 +1,9 @@
 import datetime
+import pytest
 
-from dcicutils.lang_utils import EnglishUtils, a_or_an, select_a_or_an, string_pluralize
+from dcicutils.lang_utils import (
+    EnglishUtils, a_or_an, select_a_or_an, string_pluralize, conjoined_list, disjoined_list, there_are, must_be_one_of
+)
 
 
 def test_string_pluralize_case():
@@ -230,3 +233,126 @@ def test_custom_a_or_an():
     assert EnglishUtils.n_of(0, "egg", num_format=maybe_a_or_n) == "no eggs"
     assert EnglishUtils.n_of(1, "egg", num_format=maybe_a_or_n) == "an egg"
     assert EnglishUtils.n_of(3, "egg", num_format=maybe_a_or_n) == "some eggs"
+
+
+def test_conjoined_list():
+
+    with pytest.raises(ValueError):
+        assert conjoined_list([])
+
+    assert conjoined_list([], nothing='nothing') == 'nothing'
+    assert conjoined_list(['a']) == 'a'
+    assert conjoined_list(['a', 'b']) == 'a and b'
+    assert conjoined_list(['a', 'b', 'c']) == 'a, b and c'
+    assert conjoined_list(['a', 'b', 'c'], oxford_comma=True) == 'a, b, and c'
+    assert conjoined_list(['a', 'b', 'c', 'd']) == 'a, b, c and d'
+
+    assert conjoined_list(['a'], conjunction='or') == 'a'
+    assert conjoined_list(['a', 'b'], conjunction='or') == 'a or b'
+    assert conjoined_list(['a', 'b', 'c'], conjunction='or') == 'a, b or c'
+    assert conjoined_list(['a', 'b', 'c', 'd'], conjunction='or') == 'a, b, c or d'
+    assert conjoined_list(['a', 'b', 'c', 'd'], conjunction='or', oxford_comma=True) == 'a, b, c, or d'
+
+    assert conjoined_list(['a'], conjunction='AND') == 'a'
+    assert conjoined_list(['a', 'b'], conjunction='AND') == 'a AND b'
+    assert conjoined_list(['a', 'b', 'c', 'd'], conjunction='AND') == 'a, b, c AND d'
+    assert conjoined_list(['a', 'b', 'c', 'd'], conjunction='AND', oxford_comma=True) == 'a, b, c, AND d'
+
+    assert conjoined_list(['a'], comma=';') == 'a'
+    assert conjoined_list(['a', 'b'], comma=';') == 'a and b'
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=';') == 'a; b; c and d'
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=';', oxford_comma=True) == 'a; b; c; and d'
+
+    assert conjoined_list(['a'], comma=False) == 'a'
+    assert conjoined_list(['a', 'b'], comma=False) == 'a and b'
+    assert conjoined_list(['a', 'b', 'c'], comma=False) == 'a and b and c'
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=False) == 'a and b and c and d'
+    # oxford_comma does nothing if comma is disabled.
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=False, oxford_comma=True) == 'a and b and c and d'
+
+    assert conjoined_list(['a'], comma=False, whitespace='_') == 'a'
+    assert conjoined_list(['a', 'b'], comma=False, whitespace='_') == 'a_and_b'
+    assert conjoined_list(['a', 'b', 'c'], comma=False, whitespace='_') == 'a_and_b_and_c'
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=False, whitespace='_') == 'a_and_b_and_c_and_d'
+    # oxford_comma does nothing if comma is disabled.
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=False, whitespace='_', oxford_comma=True) == 'a_and_b_and_c_and_d'
+
+    # Verify that the same function is a method
+    assert EnglishUtils.conjoined_list([], nothing='nothing') == 'nothing'
+    assert EnglishUtils.conjoined_list(['a']) == 'a'
+    assert EnglishUtils.conjoined_list(['a', 'b']) == 'a and b'
+    assert EnglishUtils.conjoined_list(['a', 'b', 'c']) == 'a, b and c'
+    assert EnglishUtils.conjoined_list(['a', 'b', 'c', 'd']) == 'a, b, c and d'
+
+
+def test_disjoined_list():
+
+    assert disjoined_list(['a']) == 'a'
+    assert disjoined_list(['a', 'b']) == 'a or b'
+    assert disjoined_list(['a', 'b', 'c']) == 'a, b or c'
+    assert disjoined_list(['a', 'b', 'c', 'd']) == 'a, b, c or d'
+
+    assert disjoined_list(['a'], oxford_comma=True) == 'a'
+    assert disjoined_list(['a', 'b'], oxford_comma=True) == 'a or b'
+    assert disjoined_list(['a', 'b', 'c'], oxford_comma=True) == 'a, b, or c'
+    assert disjoined_list(['a', 'b', 'c', 'd'], oxford_comma=True) == 'a, b, c, or d'
+
+
+def test_there_are():
+
+    assert there_are([]) == "There are no things."
+    assert there_are([], zero=0) == "There are 0 things."
+
+    assert there_are(['foo']) == "There is 1 thing: foo"
+    assert there_are(['foo'], punctuate=True) == "There is 1 thing: foo."
+
+    assert there_are(['box', 'bugle', 'bear']) == "There are 3 things: box, bugle, bear"
+    assert there_are(['box', 'bugle', 'bear'], joiner=conjoined_list) == "There are 3 things: box, bugle and bear"
+    assert there_are(['box', 'bugle', 'bear'],
+                     joiner=conjoined_list, oxford_comma=True) == "There are 3 things: box, bugle, and bear"
+    assert there_are(['box', 'bugle', 'bear'],
+                     joiner=conjoined_list, oxford_comma=True, kind="option", conjunction="or"
+                     ) == "There are 3 options: box, bugle, or bear"
+    assert there_are(['apple', 'egg', 'steak'], use_article=True, punctuate=True,
+                     joiner=disjoined_list, oxford_comma=True, kind="option", conjunction="or",
+                     ) == "There are 3 options: an apple, an egg, or a steak."
+    assert there_are(['apple', 'egg', 'steak'], use_article=True, joiner=conjoined_list, kind="option", punctuate=True,
+                     ) == "There are 3 options: an apple, an egg and a steak."
+
+    assert there_are([2, 3, 5, 7], kind="single-digit prime") == "There are 4 single-digit primes: 2, 3, 5, 7"
+    assert there_are([2, 3, 5, 7], kind="single-digit prime", punctuate=True, joiner=conjoined_list,
+                     ) == "There are 4 single-digit primes: 2, 3, 5 and 7."
+
+    # From the doc strings
+
+    assert there_are(['Joe', 'Sally'], kind="user") == "There are 2 users: Joe, Sally"
+    assert there_are(['Joe'], kind="user") == "There is 1 user: Joe"
+    assert there_are([], kind="user") == "There are no users."
+
+    assert there_are(['Joe', 'Sally'], kind="user", joiner=conjoined_list, punctuate=True
+                     ) == "There are 2 users: Joe and Sally."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=True) == "There is 1 user: Joe."
+    assert there_are([], kind="user", joiner=conjoined_list, punctuate=True) == "There are no users."
+
+
+def test_must_be():
+
+    assert must_be_one_of([], possible=False) == "There are no options."
+    assert must_be_one_of(['foo'], possible=False) == "The only option is foo."
+    assert must_be_one_of(['foo', 'bar'], possible=False) == "Options are foo and bar."
+    assert must_be_one_of(['foo', 'bar', 'baz'], possible=False) == "Options are foo, bar and baz."
+
+    assert must_be_one_of([]) == "There are no possible options."
+    assert must_be_one_of(['foo']) == "The only possible option is foo."
+    assert must_be_one_of(['foo', 'bar']) == "Possible options are foo and bar."
+    assert must_be_one_of(['foo', 'bar', 'baz']) == "Possible options are foo, bar and baz."
+
+    assert must_be_one_of([], quote=True) == "There are no possible options."
+    assert must_be_one_of(['foo'], quote=True) == "The only possible option is 'foo'."
+    assert must_be_one_of(['foo', 'bar'], quote=True) == "Possible options are 'foo' and 'bar'."
+    assert must_be_one_of(['foo', 'bar', 'baz'], quote=True) == "Possible options are 'foo', 'bar' and 'baz'."
+
+    assert must_be_one_of([], possible='valid', kind='argument') == "There are no valid arguments."
+    assert must_be_one_of(['A'], possible='valid', kind='argument') == "The only valid argument is A."
+    assert must_be_one_of(['A', 'B'], possible='valid', kind='argument') == "Valid arguments are A and B."
+    assert must_be_one_of(['A', 'B', 'C'], possible='valid', kind='argument') == "Valid arguments are A, B and C."

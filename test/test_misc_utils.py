@@ -23,7 +23,7 @@ from dcicutils.misc_utils import (
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
-    capitalize1, local_attrs, dict_zip,
+    capitalize1, local_attrs, dict_zip, json_leaf_subst,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -1723,20 +1723,23 @@ def test_camel_case_to_snake_case(token, expected):
 
 
 @pytest.mark.parametrize('token, expected', [
+    ('VariantSample', 'variant-sample'),
+    ('Variant', 'variant'),
+    ('HiglassViewConfig', 'higlass-view-config'),
+    ('ABCD', 'a-b-c-d'),
     ('', ''),
-    ('x', 'X'),
-    ('foo', 'Foo'),
-    ('FOO', 'FOO'),
-    ('Foo', 'Foo'),
-    ('fooBar', 'FooBar'),
+    ('Oneverylongthing1234567895D', 'oneverylongthing1234567895-d'),
+    ('XMLContainer', 'x-m-l-container'),
 ])
-def test_capitalize1(token, expected):
-    assert capitalize1(token) == expected
+def test_camel_case_to_snake_case_hyphenated(token, expected):
+    assert camel_case_to_snake_case(token, separator='-') == expected
 
 
 @pytest.mark.parametrize('token, expected', [
     ('variant_sample', 'VariantSample'),
     ('variant', 'Variant'),
+    ('_variant_', 'Variant'),
+    ('__variant', 'Variant'),
     ('higlass_view_config', 'HiglassViewConfig'),
     ('a_b_c_d', 'ABCD'),
     ('', ''),
@@ -1746,6 +1749,34 @@ def test_capitalize1(token, expected):
 ])
 def test_snake_case_to_camel_case(token, expected):
     assert snake_case_to_camel_case(token) == expected
+
+
+@pytest.mark.parametrize('token, expected', [
+    ('variant-sample', 'VariantSample'),
+    ('variant', 'Variant'),
+    ('-variant-', 'Variant'),
+    ('--variant', 'Variant'),
+    ('higlass-view-config', 'HiglassViewConfig'),
+    ('a-b-c-d', 'ABCD'),
+    ('', ''),
+    ('oneverylongthing1234567895-d', 'Oneverylongthing1234567895D'),
+    ('x-m-l-container', 'XMLContainer'),
+    ('X-M-L-Container', 'XMLContainer'),
+])
+def test_snake_case_to_camel_case_hyphenated(token, expected):
+    assert snake_case_to_camel_case(token, separator='-') == expected
+
+
+@pytest.mark.parametrize('token, expected', [
+    ('', ''),
+    ('x', 'X'),
+    ('foo', 'Foo'),
+    ('FOO', 'FOO'),
+    ('Foo', 'Foo'),
+    ('fooBar', 'FooBar'),
+])
+def test_capitalize1(token, expected):
+    assert capitalize1(token) == expected
 
 
 @pytest.mark.parametrize('obj', [
@@ -2458,3 +2489,22 @@ def test_dict_zip():
 
     with pytest.raises(ValueError):
         dict_zip({'a': 'one', 'extra': 2}, {'a': 1})
+
+
+def test_json_leaf_subst():
+
+    subs = {"x": "ex"}
+    assert json_leaf_subst(3, subs) == 3
+    assert json_leaf_subst("x", subs) == "ex"
+    assert json_leaf_subst("y", subs) == "y"
+    assert json_leaf_subst(["x", "y", "z"], subs) == ["ex", "y", "z"]
+    assert json_leaf_subst(["x", "y", "z", "x", "y", "z"], subs) == ["ex", "y", "z", "ex", "y", "z"]
+
+    subs = {3: "three"}
+    assert json_leaf_subst(3, subs) == "three"
+    assert json_leaf_subst(3.0, subs) == "three"  # weird but acceptable
+
+    subs = {"x": "ex", "y": "why", "ex": "y", "why": "y"}
+    assert json_leaf_subst("x", subs) == "ex"
+    assert json_leaf_subst(["x", "y"], subs) == ["ex", "why"]
+    assert json_leaf_subst({"x": "y", "y": "x"}, subs) == {"ex": "why", "why": "ex"}
