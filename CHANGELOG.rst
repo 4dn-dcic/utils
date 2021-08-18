@@ -7,10 +7,14 @@ Change Log
 ----------
 
 
-1.21.0
-======
+2.0.0
+=====
 
 **PR 150: Add json_leaf_subst, conjoined_list and disjoined_list**
+
+We do not believe this is an incompatible major version, but there is a lot here, an hence some opportunity for
+difference in behavior to have crept in. As such, we opted to call this a new major version to highlight where
+that big change happened.
 
 * In ``beanstalk_utils``:
 
@@ -88,7 +92,12 @@ Change Log
   * Add a ``separator=`` argument to ``camel_case_to_snake_case`` and ``snake_case_to_camel_case``.
 
 * In ``qa_utils``, support for mocking enough of ``boto3.client('cloudformation')`` that we can test
-  ``cloudformation_utils``.
+  ``cloudformation_utils``. The ``MockBoto3Client`` was extended, and several mock classes were added,
+  but most importantly:
+
+  * ``MockBotoCloudFormationClient``
+  * ``MockBotoCloudFormationStack``
+  * ``MockBotoCloudFormationResourceSummary``
 
 * In ``s3_utils``:
 
