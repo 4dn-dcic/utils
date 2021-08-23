@@ -27,8 +27,11 @@ def test_dehyphenate():
 
 def test_make_key_for_ecs_application_url():
 
-    assert cloudformation_utils.make_required_key_for_ecs_application_url('cgap-anytest') == 'ECSApplicationURLcgapanytest'
-    assert cloudformation_utils.make_required_key_for_ecs_application_url('cgap-footest') == 'ECSApplicationURLcgapfootest'
+    expected = 'ECSApplicationURLcgapanytest'
+    assert cloudformation_utils.make_required_key_for_ecs_application_url('cgap-anytest') == expected
+
+    expected = 'ECSApplicationURLcgapfootest'
+    assert cloudformation_utils.make_required_key_for_ecs_application_url('cgap-footest') == expected
 
 
 def test_get_ecs_real_url():
@@ -194,10 +197,9 @@ def test_c4_orchestration_manager_extract_stack_name_token():
     with mock.patch.object(cloudformation_utils, "boto3", mocked_boto3):
 
         def extract(stack_name):
-
-                stack = MockBotoCloudFormationStack(stack_name)
-                manager = cloudformation_utils.C4OrchestrationManager()
-                return manager._extract_stack_name_token(stack)  # noQA - please don't tell me this is protected. Just testing
+            stack = MockBotoCloudFormationStack(stack_name)
+            manager = cloudformation_utils.C4OrchestrationManager()
+            return manager._extract_stack_name_token(stack)  # noQA - I know this is protected. Just testing it.
 
         assert extract('foo-bar') is None
         assert extract('c4-foo') == 'foo'

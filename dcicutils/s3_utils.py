@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import boto3
-import contextlib
 import json
 import logging
 import mimetypes
@@ -9,7 +8,6 @@ import os
 import requests
 import urllib.request
 
-from dcicutils.misc_utils import override_environ
 from io import BytesIO
 from zipfile import ZipFile
 from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name
