@@ -35,6 +35,8 @@ Change Log
     * ``s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY == 'metadata_bundles_bucket'``
     * ``s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY == 'tibanna_output_bucket'``
 
+* In ``deployment_utils``, use new variables from ``s3_utils``.
+
 
 2.0.0
 =====
