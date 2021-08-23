@@ -40,6 +40,7 @@ from .env_utils import (
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
 )
 from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ
+from .s3_utils import s3Utils
 
 
 # constants associated with EB-related APIs
@@ -515,9 +516,9 @@ class IniFileManager:
 
     AUTO_INDEX_SERVER_TOKEN = "__index_server"
 
-    LEGACY_APPLICATION_BUCKET_ORG = "elasticbeanstalk"
-    LEGACY_APPLICATION_BUCKET_PREFIX = "elasticbeanstalk-"
-    LEGACY_TIBANNA_OUTPUT_BUCKET = "tibanna-output"
+    LEGACY_APPLICATION_BUCKET_ORG = s3Utils.EB_PREFIX                        # = "elasticbeanstalk"
+    LEGACY_APPLICATION_BUCKET_PREFIX = LEGACY_APPLICATION_BUCKET_ORG + "-"   # = "elasticbeanstalk-"
+    LEGACY_TIBANNA_OUTPUT_BUCKET = s3Utils.TIBANNA_OUTPUT_BUCKET_TEMPLATE    # = "tibanna-output"
     LEGACY_FOURSIGHT_BUCKET_PREFIX = "foursight-"
 
     @classmethod
@@ -591,24 +592,36 @@ class IniFileManager:
         sentry_dsn = sentry_dsn or os.environ.get("ENCODED_SENTRY_DSN", "")
         auth0_client = auth0_client or os.environ.get("ENCODED_AUTH0_CLIENT", "")
         auth0_secret = auth0_secret or os.environ.get("ENCODED_AUTH0_SECRET", "")
+
+        # corresponds to s3Utils legacy "elasticbeanstalk-%s-files"
         file_upload_bucket = (file_upload_bucket
                               or os.environ.get("ENCODED_FILE_UPLOAD_BUCKET")
-                              or f"{application_bucket_prefix}{s3_bucket_env}-files")
+                              or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.RAW_BUCKET_SUFFIX}")
+
+        # corresponds to s3Utils legacy "elasticbeanstalk-%s-wfoutput"
         file_wfout_bucket = (file_wfout_bucket
                              or os.environ.get("ENCODED_FILE_WFOUT_BUCKET")
-                             or f"{application_bucket_prefix}{s3_bucket_env}-wfoutput")
+                             or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.OUTFILE_BUCKET_SUFFIX}")
+
+        # corresponds to s3Utils legacy "elasticbeanstalk-%s-blobs"
         blob_bucket = (blob_bucket
                        or os.environ.get("ENCODED_BLOB_BUCKET")
-                       or f"{application_bucket_prefix}{s3_bucket_env}-blobs")
+                       or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.BLOB_BUCKET_SUFFIX}")
+
+        # corresponds to s3Utils legacy "elasticbeanstalk-%s-system"
         system_bucket = (system_bucket
                          or os.environ.get("ENCODED_SYSTEM_BUCKET")
-                         or f"{application_bucket_prefix}{s3_bucket_env}-system")
+                         or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.SYS_BUCKET_SUFFIX}")
+
+        # corresponds to s3Utils legacy "elasticbeanstalk-%s-metadata-bundles"
         metadata_bundles_bucket = (metadata_bundles_bucket
                                    or os.environ.get("ENCODED_METADATA_BUNDLES_BUCKET")
-                                   or f"{application_bucket_prefix}{s3_bucket_env}-metadata-bundles")
+                                   or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.METADATA_BUCKET_SUFFIX}")
+
+        # corresponses to s3Utils legacy "tibanna-output" (no prefix)
         tibanna_output_bucket = (tibanna_output_bucket
                                  or os.environ.get("ENCODED_TIBANNA_OUTPUT_BUCKET")
-                                 or (f"{application_bucket_prefix}tibanna-output"
+                                 or (f"{application_bucket_prefix}{s3Utils.TIBANNA_OUTPUT_BUCKET_SUFFIX}"
                                      if cls.APP_ORCHESTRATED
                                      else cls.LEGACY_TIBANNA_OUTPUT_BUCKET))
         app_kind = cls.APP_KIND or "unknown"

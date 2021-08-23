@@ -49,6 +49,36 @@ def mocked_s3_integration(integrated_names=None, zip_suffix="", ffenv=None):
         yield s3_connection
 
 
+@pytest.mark.unit
+def test_s3utils_constants():
+
+    # This is a bit concrete, as tests go, but at last it will let us know if something changes. -kmp 22-Aug-2021
+
+    assert s3Utils.SYS_BUCKET_SUFFIX == "system"
+    assert s3Utils.OUTFILE_BUCKET_SUFFIX == "wfoutput"
+    assert s3Utils.RAW_BUCKET_SUFFIX == "files"
+    assert s3Utils.BLOB_BUCKET_SUFFIX == "blobs"
+    assert s3Utils.METADATA_BUCKET_SUFFIX == "metadata-bundles"
+    assert s3Utils.TIBANNA_OUTPUT_BUCKET_SUFFIX == 'tibanna-output'
+
+    assert s3Utils.EB_PREFIX == "elasticbeanstalk"
+    assert s3Utils.EB_AND_ENV_PREFIX == "elasticbeanstalk-%s-"
+
+    assert s3Utils.SYS_BUCKET_TEMPLATE == "elasticbeanstalk-%s-system"
+    assert s3Utils.OUTFILE_BUCKET_TEMPLATE == "elasticbeanstalk-%s-wfoutput"
+    assert s3Utils.RAW_BUCKET_TEMPLATE == "elasticbeanstalk-%s-files"
+    assert s3Utils.BLOB_BUCKET_TEMPLATE == "elasticbeanstalk-%s-blobs"
+    assert s3Utils.METADATA_BUCKET_TEMPLATE == "elasticbeanstalk-%s-metadata-bundles"
+    assert s3Utils.TIBANNA_OUTPUT_BUCKET_TEMPLATE == "tibanna-output"
+
+    assert s3Utils.SYS_BUCKET_HEALTH_PAGE_KEY == 'system_bucket'
+    assert s3Utils.OUTFILE_BUCKET_HEALTH_PAGE_KEY == 'processed_file_bucket'
+    assert s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY == 'file_upload_bucket'
+    assert s3Utils.BLOB_BUCKET_HEALTH_PAGE_KEY == 'blob_bucket'
+    assert s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY == 'metadata_bundles_bucket'
+    assert s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY == 'tibanna_output_bucket'
+
+
 @pytest.mark.integrated
 @pytest.mark.parametrize('ff_ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat'])
 def test_s3utils_creation_ff_ordinary(ff_ordinary_envname):
@@ -189,7 +219,7 @@ def test_s3utils_get_keys_for_staging():
 
 
 @pytest.mark.integrated
-def test_s3utils_get_jupyterhub_key(basestring):
+def test_s3utils_get_jupyterhub_key():
     # TODO: I'm not sure what this is testing, so it's hard to rewrite
     #   But I fear this use of env 'data' implies the GA test environment has overbroad privilege.
     #   We should make this work without access to 'data'.
