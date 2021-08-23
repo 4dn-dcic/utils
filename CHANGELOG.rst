@@ -7,6 +7,37 @@ Change Log
 ----------
 
 
+2.1.0
+=====
+
+* In ``s3_utils``, add various variables that can be used to assure values are synchronized across 4DN/CGAP products:
+
+  * Add new slots on ``s3Utils`` to hold the token at the end of each kind of bucket:
+
+    * ``s3Utils.SYS_BUCKET_SUFFIX == "system"``
+    * ``s3Utils.OUTFILE_BUCKET_SUFFIX == "wfoutput"``
+    * ``s3Utils.RAW_BUCKET_SUFFIX == "files"``
+    * ``s3Utils.BLOB_BUCKET_SUFFIX == "blobs"``
+    * ``s3Utils.METADATA_BUCKET_SUFFIX == "metadata-bundles"``
+    * ``s3Utils.TIBANNA_OUTPUT_BUCKET_SUFFIX == 'tibanna-output'``
+
+  * Add new slots on ``s3Utils`` for various bits of connective glue in setting up the template slots:
+
+    * ``s3Utils.EB_PREFIX == "elasticbeanstalk"``
+    * ``s3Utils.EB_AND_ENV_PREFIX == "elasticbeanstalk-%s-"``
+
+  * Add new slots on ``s3Utils`` for expected keys on a health page corresponding to each kind of bucket:
+
+    * ``s3Utils.SYS_BUCKET_HEALTH_PAGE_KEY == 'system_bucket'``
+    * ``s3Utils.OUTFILE_BUCKET_HEALTH_PAGE_KEY == 'processed_file_bucket'``
+    * ``s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY == 'file_upload_bucket'``
+    * ``s3Utils.BLOB_BUCKET_HEALTH_PAGE_KEY == 'blob_bucket'``
+    * ``s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY == 'metadata_bundles_bucket'``
+    * ``s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY == 'tibanna_output_bucket'``
+
+* In ``deployment_utils``, use new variables from ``s3_utils``.
+
+
 2.0.0
 =====
 

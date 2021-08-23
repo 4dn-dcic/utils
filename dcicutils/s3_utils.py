@@ -1,19 +1,21 @@
 from __future__ import print_function
-import json
+
 import boto3
-import os
-import mimetypes
-import urllib.request
-from zipfile import ZipFile
-from io import BytesIO
+import json
 import logging
+import mimetypes
+import os
 import requests
+import urllib.request
+
+from io import BytesIO
+from zipfile import ZipFile
 from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name
-from .misc_utils import PRINT
 from .exceptions import (
     InferredBucketConflict, CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv,
     GlobalBucketAccessError, SynonymousEnvironmentVariablesMismatched,
 )
+from .misc_utils import PRINT
 
 
 ###########################
@@ -25,14 +27,33 @@ logger = logging.getLogger(__name__)
 
 class s3Utils(object):  # NOQA - This class name violates style rules, but a lot of things might break if we change it.
 
-    SYS_BUCKET_TEMPLATE = "elasticbeanstalk-%s-system"
-    OUTFILE_BUCKET_TEMPLATE = "elasticbeanstalk-%s-wfoutput"
-    RAW_BUCKET_TEMPLATE = "elasticbeanstalk-%s-files"
-    BLOB_BUCKET_TEMPLATE = "elasticbeanstalk-%s-blobs"
-    METADATA_BUCKET_TEMPLATE = "elasticbeanstalk-%s-metadata-bundles"
-    TIBANNA_OUTPUT_BUCKET_TEMPLATE = 'tibanna-output'
+    # Some extra variables used in setup here so that other modules can be consistent with chosen values.
 
-    @staticmethod
+    SYS_BUCKET_SUFFIX = "system"
+    OUTFILE_BUCKET_SUFFIX = "wfoutput"
+    RAW_BUCKET_SUFFIX = "files"
+    BLOB_BUCKET_SUFFIX = "blobs"
+    METADATA_BUCKET_SUFFIX = "metadata-bundles"
+    TIBANNA_OUTPUT_BUCKET_SUFFIX = 'tibanna-output'
+
+    EB_PREFIX = "elasticbeanstalk"
+    EB_AND_ENV_PREFIX = EB_PREFIX + "-%s-"  # = "elasticbeanstalk-%s-"
+
+    SYS_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + SYS_BUCKET_SUFFIX            # = "elasticbeanstalk-%s-system"
+    OUTFILE_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + OUTFILE_BUCKET_SUFFIX    # = "elasticbeanstalk-%s-wfoutput"
+    RAW_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + RAW_BUCKET_SUFFIX            # = "elasticbeanstalk-%s-files"
+    BLOB_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + BLOB_BUCKET_SUFFIX          # = "elasticbeanstalk-%s-blobs"
+    METADATA_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + METADATA_BUCKET_SUFFIX  # = "elasticbeanstalk-%s-metadata-bundles"
+    TIBANNA_OUTPUT_BUCKET_TEMPLATE = TIBANNA_OUTPUT_BUCKET_SUFFIX          # = "tibanna-output" (no prefix)
+
+    SYS_BUCKET_HEALTH_PAGE_KEY = 'system_bucket'
+    OUTFILE_BUCKET_HEALTH_PAGE_KEY = 'processed_file_bucket'
+    RAW_BUCKET_HEALTH_PAGE_KEY = 'file_upload_bucket'
+    BLOB_BUCKET_HEALTH_PAGE_KEY = 'blob_bucket'
+    METADATA_BUCKET_HEALTH_PAGE_KEY = 'metadata_bundles_bucket'
+    TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY = 'tibanna_output_bucket'
+
+    @staticmethod  # backwawrd compatibility in case other repositories are using this
     def verify_and_get_env_config(s3_client, global_bucket: str, env):
         """ Verifies the S3 environment from which the env config is coming from, and returns the S3-based env config
             Throws exceptions if the S3 bucket is unreachable, or an env based on the name of the global S3 bucket
@@ -110,12 +131,14 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 health_json_url = '{ff_url}/health?format=json'.format(ff_url=ff_url)
                 logger.warning('health json url: {}'.format(health_json_url))
                 health_json = self.fetch_health_page_json(url=health_json_url, use_urllib=True)
-                sys_bucket_from_health_page = health_json['system_bucket']
-                outfile_bucket_from_health_page = health_json['processed_file_bucket']
-                raw_file_bucket_from_health_page = health_json['file_upload_bucket']
-                blob_bucket_from_health_page = health_json['blob_bucket']
-                metadata_bucket_from_health_page = health_json.get('metadata_bundles_bucket', None)  # N/A for 4DN
-                tibanna_output_bucket_from_health_page = health_json.get('tibanna_output_bucket',
+                sys_bucket_from_health_page = health_json[self.SYS_BUCKET_HEALTH_PAGE_KEY]
+                outfile_bucket_from_health_page = health_json[self.OUTFILE_BUCKET_HEALTH_PAGE_KEY]
+                raw_file_bucket_from_health_page = health_json[self.RAW_BUCKET_HEALTH_PAGE_KEY]
+                blob_bucket_from_health_page = health_json[self.BLOB_BUCKET_HEALTH_PAGE_KEY]
+                metadata_bucket_from_health_page = health_json.get(self.METADATA_BUCKET_HEALTH_PAGE_KEY,
+                                                                   # N/A for 4DN
+                                                                   None)
+                tibanna_output_bucket_from_health_page = health_json.get(self.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY,
                                                                          # new, so it may be missing
                                                                          None)
                 sys_bucket = sys_bucket_from_health_page  # OK to overwrite because we checked it's None above
