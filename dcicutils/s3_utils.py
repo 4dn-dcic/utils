@@ -1,19 +1,23 @@
 from __future__ import print_function
-import json
+
 import boto3
-import os
-import mimetypes
-import urllib.request
-from zipfile import ZipFile
-from io import BytesIO
+import contextlib
+import json
 import logging
+import mimetypes
+import os
 import requests
+import urllib.request
+
+from dcicutils.misc_utils import override_environ
+from io import BytesIO
+from zipfile import ZipFile
 from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name
-from .misc_utils import PRINT
 from .exceptions import (
     InferredBucketConflict, CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv,
     GlobalBucketAccessError, SynonymousEnvironmentVariablesMismatched,
 )
+from .misc_utils import PRINT
 
 
 ###########################
@@ -25,58 +29,41 @@ logger = logging.getLogger(__name__)
 
 class s3Utils(object):  # NOQA - This class name violates style rules, but a lot of things might break if we change it.
 
-    SYS_BUCKET_TEMPLATE = "elasticbeanstalk-%s-system"
-    OUTFILE_BUCKET_TEMPLATE = "elasticbeanstalk-%s-wfoutput"
-    RAW_BUCKET_TEMPLATE = "elasticbeanstalk-%s-files"
-    BLOB_BUCKET_TEMPLATE = "elasticbeanstalk-%s-blobs"
-    METADATA_BUCKET_TEMPLATE = "elasticbeanstalk-%s-metadata-bundles"
-    TIBANNA_OUTPUT_BUCKET_TEMPLATE = 'tibanna-output'
+    # Some extra variables used in setup here so that other modules can be consistent with chosen values.
 
-    @staticmethod
+    SYS_BUCKET_SUFFIX = "system"
+    OUTFILE_BUCKET_SUFFIX = "wfoutput"
+    RAW_BUCKET_SUFFIX = "files"
+    BLOB_BUCKET_SUFFIX = "blobs"
+    METADATA_BUCKET_SUFFIX = "metadata-bundles"
+    TIBANNA_OUTPUT_BUCKET_SUFFIX = 'tibanna-output'
+
+    EB_PREFIX = "elasticbeanstalk"
+    EB_AND_ENV_PREFIX = EB_PREFIX + "-%s-"  # = "elasticbeanstalk-%s-"
+
+    SYS_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + SYS_BUCKET_SUFFIX            # = "elasticbeanstalk-%s-system"
+    OUTFILE_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + OUTFILE_BUCKET_SUFFIX    # = "elasticbeanstalk-%s-wfoutput"
+    RAW_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + RAW_BUCKET_SUFFIX            # = "elasticbeanstalk-%s-files"
+    BLOB_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + BLOB_BUCKET_SUFFIX          # = "elasticbeanstalk-%s-blobs"
+    METADATA_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + METADATA_BUCKET_SUFFIX  # = "elasticbeanstalk-%s-metadata-bundles"
+    TIBANNA_OUTPUT_BUCKET_TEMPLATE = TIBANNA_OUTPUT_BUCKET_SUFFIX          # = "tibanna-output" (no prefix)
+
+    SYS_BUCKET_HEALTH_PAGE_KEY = 'system_bucket'
+    OUTFILE_BUCKET_HEALTH_PAGE_KEY = 'processed_file_bucket'
+    RAW_BUCKET_HEALTH_PAGE_KEY = 'file_upload_bucket'
+    BLOB_BUCKET_HEALTH_PAGE_KEY = 'blob_bucket'
+    METADATA_BUCKET_HEALTH_PAGE_KEY = 'metadata_bundles_bucket'
+    TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY = 'tibanna_output_bucket'
+
+    @staticmethod  # backwawrd compatibility in case other repositories are using this
     def verify_and_get_env_config(s3_client, global_bucket: str, env):
-        """ Verifies the S3 environment from which the env config is coming from, and returns the S3-based env config
-            Throws exceptions if the S3 bucket is unreachable, or an env based on the name of the global S3 bucket
-            is not present.
-        """
-        head_response = s3_client.head_bucket(Bucket=global_bucket)
-        status = head_response['ResponseMetadata']['HTTPStatusCode']  # should be 200; raise error for 404 or 403
-        if status != 200:
-            raise GlobalBucketAccessError(global_bucket=global_bucket, status=status)
-        # list contents of global env bucket, look for a match with the global env bucket name
-        list_response = s3_client.list_objects_v2(Bucket=global_bucket)
-        # no match, raise exception
-        if list_response['KeyCount'] < 1:
-            raise CannotInferEnvFromNoGlobalEnvs(global_bucket=global_bucket)
-        keys = [content['Key'] for content in list_response['Contents']]
-        if env is None:
-            if len(keys) == 1:
-                # If there is only one env, which is the likely case, let's infer that this is the one we want.
-                env = keys[0]
-                logger.warning("No env was specified, but {env} is the only one available, so using that."
-                               .format(env=env))
-            else:
-                raise CannotInferEnvFromManyGlobalEnvs(global_bucket=global_bucket, keys=keys)
-        config_filename = None
-        for filename in keys:
-            if filename == env:
-                config_filename = filename
-        if not config_filename:
-            raise MissingGlobalEnv(global_bucket=global_bucket, keys=keys, env=env)
-        else:
-            # we found a match, so fetch that file as config
-            get_response = s3_client.get_object(Bucket=global_bucket, Key=config_filename)
-            env_config = json.loads(get_response['Body'].read())
-            return env_config
+        return EnvManager.verify_and_get_env_config(s3_client=s3_client,
+                                                    global_bucket=global_bucket,
+                                                    env=env)
 
-    @staticmethod
+    @staticmethod  # backwawrd compatibility in case other repositories are using this
     def fetch_health_page_json(url, use_urllib):
-        if use_urllib is False:
-            return requests.get(url).json()
-        else:
-            res = urllib.request.urlopen(url)
-            res_body = res.read()
-            j = json.loads(res_body.decode("utf-8"))
-            return j
+        return EnvManager.fetch_health_page_json(url=url, use_urllib=use_urllib)
 
     def __init__(self, outfile_bucket=None, sys_bucket=None, raw_file_bucket=None,
                  blob_bucket=None, metadata_bucket=None, tibanna_output_bucket=None, env=None):
@@ -92,30 +79,26 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         from .beanstalk_utils import get_beanstalk_real_url
         self.url = ''
         self.s3 = boto3.client('s3', region_name='us-east-1')
-        global_bucket_env_var = 'GLOBAL_BUCKET_ENV'  # Deprecated. Supported for now since some tools started using it.
-        global_env_bucket_var = 'GLOBAL_ENV_BUCKET'  # Preferred name. Please transition code to use this.
-        global_bucket_env = os.environ.get(global_bucket_env_var)
-        global_env_bucket = os.environ.get(global_env_bucket_var)
-        if global_env_bucket and global_bucket_env and global_env_bucket != global_bucket_env:
-            raise SynonymousEnvironmentVariablesMismatched(var1=global_bucket_env_var, val1=global_bucket_env,
-                                                           var2=global_env_bucket_var, val2=global_env_bucket)
-        global_bucket = global_env_bucket or global_bucket_env
+        global_bucket = EnvManager.global_env_bucket_name()
         if sys_bucket is None:
             # The choice to discriminate first on sys_bucket being None is part of the resolution of
             # https://hms-dbmi.atlassian.net/browse/C4-674
             if global_bucket:
-                logger.warning('Fetching bucket data via global env bucket: {}'.format(global_bucket))
-                env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket, env=env)
-                ff_url = env_config['fourfront']
+                # env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket, env=env)
+                # ff_url = env_config['fourfront']
+                self.global_env_bucket_manager = global_manager = EnvManager(env_name=env, s3=self.s3)
+                ff_url = global_manager.portal_url
                 health_json_url = '{ff_url}/health?format=json'.format(ff_url=ff_url)
                 logger.warning('health json url: {}'.format(health_json_url))
                 health_json = self.fetch_health_page_json(url=health_json_url, use_urllib=True)
-                sys_bucket_from_health_page = health_json['system_bucket']
-                outfile_bucket_from_health_page = health_json['processed_file_bucket']
-                raw_file_bucket_from_health_page = health_json['file_upload_bucket']
-                blob_bucket_from_health_page = health_json['blob_bucket']
-                metadata_bucket_from_health_page = health_json.get('metadata_bundles_bucket', None)  # N/A for 4DN
-                tibanna_output_bucket_from_health_page = health_json.get('tibanna_output_bucket',
+                sys_bucket_from_health_page = health_json[self.SYS_BUCKET_HEALTH_PAGE_KEY]
+                outfile_bucket_from_health_page = health_json[self.OUTFILE_BUCKET_HEALTH_PAGE_KEY]
+                raw_file_bucket_from_health_page = health_json[self.RAW_BUCKET_HEALTH_PAGE_KEY]
+                blob_bucket_from_health_page = health_json[self.BLOB_BUCKET_HEALTH_PAGE_KEY]
+                metadata_bucket_from_health_page = health_json.get(self.METADATA_BUCKET_HEALTH_PAGE_KEY,
+                                                                   # N/A for 4DN
+                                                                   None)
+                tibanna_output_bucket_from_health_page = health_json.get(self.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY,
                                                                          # new, so it may be missing
                                                                          None)
                 sys_bucket = sys_bucket_from_health_page  # OK to overwrite because we checked it's None above
@@ -369,6 +352,125 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 self.s3_put(the_file, s3_file_name, acl=acl)
 
         return ret_files
+
+
+class EnvManager:
+
+    LEGACY_PORTAL_URL_KEY = 'fourfront'
+    PORTAL_URL_KEY = 'portal_url'
+
+    LEGACY_ES_URL_KEY = 'es'
+    ES_URL_KEY = 'es_url'
+
+    LEGACY_ENV_NAME_KEY = 'ff_env'
+    ENV_NAME_KEY = 'env_name'
+
+    def __init__(self, env_name=None, env_description=None, s3=None):
+        self.s3 = s3 or boto3.client('s3')
+        if env_description and env_description:
+            raise ValueError("You may only specify an env_name or an env_description")
+        if env_description:
+            self.env_description = env_description
+            self._env_name = (self.env_description.get(self.LEGACY_ENV_NAME_KEY) or
+                              self.env_description.get(self.ENV_NAME_KEY))
+        else:  # env_name is given or is None and must be inferred
+            env_description = self.verify_and_get_env_config(s3_client=self.s3,
+                                                             global_bucket=self.global_env_bucket_name(),
+                                                             env=env_name)
+            self.env_description = env_description
+            self._env_name = env_name
+
+        self._portal_url = (env_description.get(self.LEGACY_PORTAL_URL_KEY) or
+                            env_description.get(self.PORTAL_URL_KEY))
+        if not self._portal_url:
+            raise ValueError(f"Missing {self.LEGACY_PORTAL_URL_KEY!r} or {self.PORTAL_URL_KEY!r}"
+                             f" key in global_env {env_description}.")
+
+        self._es_url = (env_description.get(self.LEGACY_ES_URL_KEY) or
+                        env_description.get(self.ES_URL_KEY))
+        if not self._es_url:
+            raise ValueError(f"Missing {self.LEGACY_ES_URL_KEY!r} or {self.ES_URL_KEY!r}"
+                             f" key in global_env {env_description}.")
+
+        self._env_name = (env_description.get(self.LEGACY_ENV_NAME_KEY) or
+                          env_description.get(self.ENV_NAME_KEY))
+        if not self._env_name:
+            raise ValueError(f"Missing {self.LEGACY_ENV_NAME_KEY!r} or {self.ENV_NAME_KEY!r}"
+                             f" key in global_env {env_description}.")
+
+    @property
+    def portal_url(self):
+        return self._portal_url
+
+    @property
+    def es_url(self):
+        return self._es_url
+
+    @property
+    def env_name(self):
+        return self._env_name
+
+    @staticmethod
+    def verify_and_get_env_config(s3_client, global_bucket: str, env):
+        """ Verifies the S3 environment from which the env config is coming from, and returns the S3-based env config
+            Throws exceptions if the S3 bucket is unreachable, or an env based on the name of the global S3 bucket
+            is not present.
+        """
+        logger.warning('Fetching bucket data via global env bucket: {}'.format(global_bucket))
+        head_response = s3_client.head_bucket(Bucket=global_bucket)
+        status = head_response['ResponseMetadata']['HTTPStatusCode']  # should be 200; raise error for 404 or 403
+        if status != 200:
+            raise GlobalBucketAccessError(global_bucket=global_bucket, status=status)
+        # list contents of global env bucket, look for a match with the global env bucket name
+        list_response = s3_client.list_objects_v2(Bucket=global_bucket)
+        # no match, raise exception
+        if list_response['KeyCount'] < 1:
+            raise CannotInferEnvFromNoGlobalEnvs(global_bucket=global_bucket)
+        keys = [content['Key'] for content in list_response['Contents']]
+        if env is None:
+            if len(keys) == 1:
+                # If there is only one env, which is the likely case, let's infer that this is the one we want.
+                env = keys[0]
+                logger.warning(f"No env was specified, but {env} is the only one available, so using that.")
+            else:
+                raise CannotInferEnvFromManyGlobalEnvs(global_bucket=global_bucket, keys=keys)
+        if env not in keys:
+            raise MissingGlobalEnv(global_bucket=global_bucket, keys=keys, env=env)
+        # we found a match, so fetch that file as config
+        get_response = s3_client.get_object(Bucket=global_bucket, Key=env)
+        env_config = json.loads(get_response['Body'].read())
+        return env_config
+
+    @staticmethod
+    def fetch_health_page_json(url, use_urllib):
+        # TODO: Does anyhone know what problem this use_urllib thing was solving?  Was it solving some bug
+        #       in Python 2 that no longer matters? These two solutions should be equivalent. Is there a way
+        #       to simplify this? -kmp 22-Aug-2021
+        if use_urllib is False:
+            return requests.get(url).json()
+        else:
+            res = urllib.request.urlopen(url)
+            res_body = res.read()
+            j = json.loads(res_body.decode("utf-8"))
+            return j
+
+    @classmethod
+    def global_env_bucket_name(cls):
+        global_bucket_env_var = 'GLOBAL_BUCKET_ENV'  # Deprecated. Supported for now since some tools started using it.
+        global_env_bucket_var = 'GLOBAL_ENV_BUCKET'  # Preferred name. Please transition code to use this.
+        global_bucket_env = os.environ.get(global_bucket_env_var)
+        global_env_bucket = os.environ.get(global_env_bucket_var)
+        if global_env_bucket and global_bucket_env and global_env_bucket != global_bucket_env:
+            raise SynonymousEnvironmentVariablesMismatched(var1=global_bucket_env_var, val1=global_bucket_env,
+                                                           var2=global_env_bucket_var, val2=global_env_bucket)
+        global_bucket = global_env_bucket or global_bucket_env
+        return global_bucket
+
+    @classmethod
+    @contextlib.contextmanager
+    def global_env_bucket_named(cls, name):
+        with override_environ(GLOBAL_BUCKET_ENV=name, GLOBAL_ENV_BUCKET=name):
+            yield
 
 
 def find_file(name, zipstream):

@@ -16,6 +16,7 @@ import toml
 import uuid
 import warnings
 
+from botocore.exceptions import ClientError
 from json import dumps as json_dumps, loads as json_loads
 from unittest import mock
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
@@ -738,7 +739,7 @@ class MockBotoS3Client:
         s3_files = shared_reality.get(files_cache_marker)
         if s3_files is None:
             files = self.MOCK_STATIC_FILES.copy()
-            for name, content in mock_s3_files or {}:
+            for name, content in (mock_s3_files or {}).items():
                 files[name] = content
             shared_reality[files_cache_marker] = s3_files = MockFileSystem(files=files)
         self.s3_files = s3_files
@@ -843,6 +844,22 @@ class MockBotoS3Client:
             # For now, just fail in any way since maybe our code doesn't care.
             raise Exception("Mock File Not Found")
 
+    def head_bucket(self, Bucket):
+        bucket_prefix = Bucket + "/"
+        for filename, content in self.s3_files.files.items():
+            if filename.startswith(bucket_prefix):
+                # Returns other things probably, but this will do to start for our mocking.
+                return {"ResponseMetadata": {"HTTPStatusCode": 200}}
+        raise ClientError(operation_name='HeadBucket',
+                          error_response={
+                              "Error": {"Code": "404", "Message": "Not Found"},
+                              "ResponseMetadata": {"HTTPStatusCode": 404},
+                          })
+
+    def list_objects_v2(self, Bucket):  # noQA - AWS argument naming style
+        # This is different but similar to list_objects. However we don't really care about that.
+        return self.list_objects(Bucket=Bucket)
+
     def list_objects(self, Bucket, Prefix=None):  # noQA - AWS argument naming style
         # Ref: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects
         bucket_prefix = Bucket + "/"
@@ -865,7 +882,7 @@ class MockBotoS3Client:
             # "ContinuationToken": ...,
             # "Delimiter": ...,
             # "EncodingType": ...,
-            # "KeyCount": ...,
+            "KeyCount": len(found),
             "IsTruncated": False,
             # "MaxKeys": ...,
             # "NextContinuationToken": ...,

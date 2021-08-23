@@ -7,6 +7,61 @@ Change Log
 ----------
 
 
+2.1.0
+=====
+
+* In ``qa_utils`` add some support for testing new functionality:
+
+  * In ``MockBotoS3Client``:
+
+    * Add minimal support for ``head_bucket``.
+    * Add minimal support for ``list_objects_v2``.
+    * Make ``list_objects`` and ``list_objects_v2``, return a ``KeyCount`` in the result.
+
+* In ``s3_utils``, add various variables that can be used to assure values are synchronized across 4DN/CGAP products:
+
+  * Add new slots on ``s3Utils`` to hold the token at the end of each kind of bucket:
+
+    * ``s3Utils.SYS_BUCKET_SUFFIX == "system"``
+    * ``s3Utils.OUTFILE_BUCKET_SUFFIX == "wfoutput"``
+    * ``s3Utils.RAW_BUCKET_SUFFIX == "files"``
+    * ``s3Utils.BLOB_BUCKET_SUFFIX == "blobs"``
+    * ``s3Utils.METADATA_BUCKET_SUFFIX == "metadata-bundles"``
+    * ``s3Utils.TIBANNA_OUTPUT_BUCKET_SUFFIX == 'tibanna-output'``
+
+  * Add new slots on ``s3Utils`` for various bits of connective glue in setting up the template slots:
+
+    * ``s3Utils.EB_PREFIX == "elasticbeanstalk"``
+    * ``s3Utils.EB_AND_ENV_PREFIX == "elasticbeanstalk-%s-"``
+
+  * Add new slots on ``s3Utils`` for expected keys on a health page corresponding to each kind of bucket:
+
+    * ``s3Utils.SYS_BUCKET_HEALTH_PAGE_KEY == 'system_bucket'``
+    * ``s3Utils.OUTFILE_BUCKET_HEALTH_PAGE_KEY == 'processed_file_bucket'``
+    * ``s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY == 'file_upload_bucket'``
+    * ``s3Utils.BLOB_BUCKET_HEALTH_PAGE_KEY == 'blob_bucket'``
+    * ``s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY == 'metadata_bundles_bucket'``
+    * ``s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY == 'tibanna_output_bucket'``
+
+  * Add an ``EnvManager`` object to manage obtaining and parsing contents of the data in global env bucket.
+    Specific capabilities include:
+
+    * Static methods ``.verify_and_get_env_config()`` and ``.fetch_health_page_json()`` moved from ``s3Utils``.
+      (Trampoline functions have been left behind on that class for compatibility.)
+
+    * Static method ``.global_env_bucket_name()`` to get the current global env bucket environment variable.
+
+    * Static method (and context manager) ``.global_env_bucket_named(name=...)`` to bind the name of the current
+      global env bucket using Python's ``with``.
+
+    * Virtual attributes ``.portal_url``, ``.es_url``, and ``env_name`` for accessing the contents of the dictionary
+      obtained from the global env bucket.
+
+    * This class also creates suitable abstraction to allow for a future in which the contents of this dictionary
+      might include keys ``portal_url``, ``es_url``, and ``env_name`` in lieu of what are now
+      ``fourfront``, ``es``, and ``ff_env``, respectively.
+
+
 2.0.0
 =====
 
