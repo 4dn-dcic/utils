@@ -7,7 +7,7 @@ Change Log
 ----------
 
 
-2.1.0
+2.2.0
 =====
 
 * In ``qa_utils`` add some support for testing new functionality:
@@ -17,6 +17,32 @@ Change Log
     * Add minimal support for ``head_bucket``.
     * Add minimal support for ``list_objects_v2``.
     * Make ``list_objects`` and ``list_objects_v2``, return a ``KeyCount`` in the result.
+
+
+
+* In ``s3_utils``:
+
+  * Add an ``EnvManager`` object to manage obtaining and parsing contents of the data in global env bucket.
+    Specific capabilities include:
+
+    * Static methods ``.verify_and_get_env_config()`` and ``.fetch_health_page_json()`` moved from ``s3Utils``.
+      (Trampoline functions have been left behind on that class for compatibility.)
+
+    * Static method ``.global_env_bucket_name()`` to get the current global env bucket environment variable.
+
+    * Static method (and context manager) ``.global_env_bucket_named(name=...)`` to bind the name of the current
+      global env bucket using Python's ``with``.
+
+    * Virtual attributes ``.portal_url``, ``.es_url``, and ``env_name`` for accessing the contents of the dictionary
+      obtained from the global env bucket.
+
+    * This class also creates suitable abstraction to allow for a future in which the contents of this dictionary
+      might include keys ``portal_url``, ``es_url``, and ``env_name`` in lieu of what are now
+      ``fourfront``, ``es``, and ``ff_env``, respectively.
+
+
+2.1.0
+=====
 
 * In ``s3_utils``, add various variables that can be used to assure values are synchronized across 4DN/CGAP products:
 
@@ -43,23 +69,7 @@ Change Log
     * ``s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY == 'metadata_bundles_bucket'``
     * ``s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY == 'tibanna_output_bucket'``
 
-  * Add an ``EnvManager`` object to manage obtaining and parsing contents of the data in global env bucket.
-    Specific capabilities include:
-
-    * Static methods ``.verify_and_get_env_config()`` and ``.fetch_health_page_json()`` moved from ``s3Utils``.
-      (Trampoline functions have been left behind on that class for compatibility.)
-
-    * Static method ``.global_env_bucket_name()`` to get the current global env bucket environment variable.
-
-    * Static method (and context manager) ``.global_env_bucket_named(name=...)`` to bind the name of the current
-      global env bucket using Python's ``with``.
-
-    * Virtual attributes ``.portal_url``, ``.es_url``, and ``env_name`` for accessing the contents of the dictionary
-      obtained from the global env bucket.
-
-    * This class also creates suitable abstraction to allow for a future in which the contents of this dictionary
-      might include keys ``portal_url``, ``es_url``, and ``env_name`` in lieu of what are now
-      ``fourfront``, ``es``, and ``ff_env``, respectively.
+* In ``deployment_utils``, use new variables from ``s3_utils``.
 
 
 2.0.0
