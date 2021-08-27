@@ -2,7 +2,8 @@ import datetime
 import pytest
 
 from dcicutils.lang_utils import (
-    EnglishUtils, a_or_an, select_a_or_an, string_pluralize, conjoined_list, disjoined_list, there_are, must_be_one_of
+    EnglishUtils, a_or_an, select_a_or_an, string_pluralize, conjoined_list, disjoined_list,
+    there_are, must_be_one_of, maybe_pluralize,
 )
 
 
@@ -356,3 +357,17 @@ def test_must_be():
     assert must_be_one_of(['A'], possible='valid', kind='argument') == "The only valid argument is A."
     assert must_be_one_of(['A', 'B'], possible='valid', kind='argument') == "Valid arguments are A and B."
     assert must_be_one_of(['A', 'B', 'C'], possible='valid', kind='argument') == "Valid arguments are A, B and C."
+
+
+def test_maybe_pluralize():
+
+    assert maybe_pluralize(0, 'gene') == 'genes'
+    assert maybe_pluralize(1, 'gene') == 'gene'
+    assert maybe_pluralize(2, 'gene') == 'genes'
+    assert maybe_pluralize(3, 'gene') == 'genes'
+
+    assert maybe_pluralize([], 'gene') == 'genes'
+    assert maybe_pluralize(['a'], 'gene') == 'gene'
+    assert maybe_pluralize(['a', 'b'], 'gene') == 'genes'
+    assert maybe_pluralize(['a', 'b', 'c'], 'gene') == 'genes'
+

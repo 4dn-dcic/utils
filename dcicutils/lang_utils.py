@@ -120,6 +120,21 @@ class EnglishUtils:
         return "%s %s" % (article, word)
 
     @classmethod
+    def maybe_pluralize(cls, n, thing):
+        """
+        Given a number and a noun, returns the singular or plural of the noun as appropriate.
+
+        The number may simply be a collection (list, tuple, etc.), in which case len is used.
+
+        NOTE: The number itself does not appear in the return value.
+              It is used only to determine if pluralization is needed.
+        """
+
+        if isinstance(n, (list, tuple, set, dict)):
+            n = len(n)
+        return thing if n == 1 else cls.string_pluralize(thing)
+
+    @classmethod
     def n_of(cls, n, thing, num_format=None):
         """
         Given a number and a noun, returns the name for that many of that noun.
@@ -397,6 +412,8 @@ class EnglishUtils:
 # Export specific useful functions
 
 a_or_an = EnglishUtils.a_or_an
+
+maybe_pluralize = EnglishUtils.maybe_pluralize
 
 n_of = EnglishUtils.n_of
 
