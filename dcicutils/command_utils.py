@@ -1,4 +1,5 @@
 import contextlib
+import logging
 import subprocess
 
 from typing import Optional
@@ -111,15 +112,25 @@ class ShellScript:
             self.script = command
 
     def pushd(self, working_dir):
+        """
+        Adds a script element that pushes to a given working directory. See .popd()
+        """
         self.do(f'pushd {working_dir} > /dev/null')
         self.do(f'echo "Selected working directory $(pwd)."')
 
     def popd(self):
+        """
+        Adds a script element that pops back to the last directory pushed from. See .pushd().
+        """
         self.do(f'popd > /dev/null')
         self.do(f'echo "Restored working directory $(pwd)."')
 
     @contextlib.contextmanager
     def using_working_dir(self, working_dir):
+        """
+        When composing a shell script, this will bracket any commands created in the body context
+        with commands that push to the indicated working dir, and then pop back from it after.
+        """
         if working_dir:
             self.pushd(working_dir)
         yield self
@@ -139,6 +150,16 @@ class ShellScript:
 
 @contextlib.contextmanager
 def shell_script(working_dir=None, executable=None, simulate=False, script_class=ShellScript, **script_options):
+    """
+    Context manager for the creation and execution of shell scripts.
+
+    Example:
+
+        with shell_script(working_dir="/some/working/dir") as script:
+            script.do("echo hello from the shell")
+            script.do("pwd")  # should print out /some/working/dir
+
+    """
     script = script_class(executable=executable, simulate=simulate, **script_options)
     if working_dir:
         with script.using_working_dir(working_dir):
@@ -146,3 +167,41 @@ def shell_script(working_dir=None, executable=None, simulate=False, script_class
     else:
         yield script
     script.execute()
+
+
+@contextlib.contextmanager
+def module_warnings_as_ordinary_output(module):
+    """
+    Allows warnings to be turned into regular output so they aren't so scary looking.
+
+    Example:
+
+        > s3Utils()
+        WARNING:dcicutils.s3_utils:Fetching bucket data via global env bucket: cgap-whatever-main-foursight-envs
+        WARNING:dcicutils.s3_utils:No env was specified, but cgap-something is the only one available, so using that.
+        WARNING:dcicutils.s3_utils:health json url: http://cgap-something-blah-blah/health?format=json
+        WARNING:dcicutils.s3_utils:Buckets resolved successfully.
+        <dcicutils.s3_utils.s3Utils object at 0x10ca77048>
+        > with module_warnings_as_ordinary_output(module='dcicutils.s3_utils'):
+            s3Utils()
+        Fetching bucket data via global env bucket: cgap-whatever-main-foursight-envs
+        No env was specified, but cgap-something is the only one available, so using that.
+        health json url: http://cgap-something-blah-blah/health?format=json
+        Buckets resolved successfully.
+        <dcicutils.s3_utils.s3Utils object at 0x10e518a90>
+
+    """
+
+    logger: logging.Logger = logging.getLogger(module)
+
+    def just_print_text(record):
+        PRINT(record.getMessage())
+        return False
+
+    try:
+        logger.addFilter(just_print_text)
+        yield
+
+    finally:
+        # This operation is safe even if the filter didn't get as far as being added.
+        logger.removeFilter(just_print_text)

@@ -18,6 +18,9 @@ Change Log
 
   * Add ``shell_script`` context manager and its implementation class ``ShellScript``.
 
+  * Add ``module_warnings_as_ordinary_output`` to help work around the problem that S3Utils outputs
+    text we'd sometimes rather see as ordinary output, not log output.
+
 * In ``lang_utils``:
 
   * Add support for ``string_pluralize`` to pluralize 'nouns' that have attached prepositional phrases, as in::
