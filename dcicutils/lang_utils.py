@@ -30,6 +30,8 @@ class EnglishUtils:
         "tooth": "teeth",
         "foot": "feet",
         "ox": "oxen",
+        'datum': 'data',
+        'metadatum': 'metadata',
     }
 
     @classmethod
@@ -50,18 +52,88 @@ class EnglishUtils:
     def _adjust_ending(cls, word, strip_chars, add_suffix):
         return (word[:-strip_chars] if strip_chars else word) + add_suffix
 
+    _COMPOUND_PLURAL_SIMPLE_PREPOSITIONS = ['about', 'at', 'by', 'for', 'in', 'of', 'on', 'to', 'with']
+
+    # Phrases like 'using', 'used by', 'used in', etc. function similarly to prepositions when doing pluralization
+    # in that the plural of 'a variant referencing a gene' would be 'variants referencing genes', just as
+    # the plural of 'a gene referenced by a variant' would be 'genes referenced by variants'.
+
+    _COMPOUND_PLURAL_PSEUDO_CONNECTIVES = [
+        'using', 'containing', 'including', 'referencing', 'naming',
+        'used by', 'contained by', 'included by', 'referenced by', 'named by',
+        'used in', 'contained in', 'included in', 'referenced in', 'named in',
+    ]
+
+    _COMPOUND_PLURAL_PREPOSITIONS = _COMPOUND_PLURAL_SIMPLE_PREPOSITIONS + _COMPOUND_PLURAL_PSEUDO_CONNECTIVES
+
+    _NOUN_WITH_PREPOSITIONAL_ATTACHMENT = re.compile(
+        # Note use of *? to get minimal match in group1, so that we'll find the first preposition, not a later one
+        # f"^(?:([a-z]*?)([-])+({'|'.join(COMMON_PREPOSITIONS)})([-]+)([a-z-]*)|([a-z- ]*?[a-z-]?)([ ]+)({'|'.join(COMMON_PREPOSITIONS)})([ ]+)(.*))$",
+
+        # The use of "*?" makes us treat multiple prepositions like a-of-b-of-c by recursing as
+        # (a)(-)(of)(-)(b-of-c). If we used "*" instead of "*?", we would get (a-of-b)(-)(of)(-)(c).
+        # If we were only doing hyphenated items, it wouldn't matter a whole lot.
+        # But in the words part, it matters a great deal because with spaces and hyphens interleaved, there is a
+        # risk of parsing "a-of-b of c-of-d" as (a-of-b of c)(-)(of)(-)(d), whereas I think (a-of-b)( )(of)( )(c-of-d)
+        # is more likely to get a better parse. -kmp 29-Aug-2021
+        f"""^(?:
+                 # Either these 5 will match (and the next 5 will not)
+                 # to ONLY match a hyphenated compound word like son-in-law as (son)(-)(in)(-)(law)
+                 ([a-z][a-z-]*?)  # shortest possible (i.e., first) block of hyphenated words preceding "-<prep>-"
+                 ([-])            # pre-preposition-hyphen to make sure it's part of the same compound.
+                 ({'|'.join(_COMPOUND_PLURAL_PREPOSITIONS).replace(' ', '[ ]')}) # matches the prep, as (about|at|...)  
+                 ([-])            # hyphen on the other side of prep
+                 ([a-z-]*)        # we're less fussy about this. It could contain more preps, for example.
+              |
+                 # or these 5 will match (and the previous 5 will not)...
+                 # to match shortest (i.e., first) words (included hyphenated words) leading to " <prep> "
+                 # so 'the son-in-law of the proband' becomes (the son-in-law)( )(of)( )(the proband)
+                 ([a-z]        # first token starts with an alphabetic,
+                  [a-z- ]*?    # matches any number of words, which may be hyphenated,
+                  [a-z])       # and ends in an alphabetic
+                 ([ ]+)        # unlike with hyphenation, any number of pre-<prep> spaces is ok        
+                 ({'|'.join(_COMPOUND_PLURAL_PREPOSITIONS).replace(' ', '[ ]')}) # matches the prep, as (about|at|...)
+                 ([ ]+)        # any amount of whitespace on the other side
+                 (.*)          # anything else that follows first space-delimeted preposition
+             )$""",
+
+       re.IGNORECASE | re.VERBOSE)
+    _INDEFINITE_NOUN_REF = re.compile(
+        f"^an?[ -]+([^ -].*)$",
+        re.IGNORECASE)
+
     @classmethod
-    def string_pluralize(cls, word: str) -> str:
+    def string_pluralize(cls, word: str, allow_some=False) -> str:
         """
         Returns the probable plural of the given word.
         This is an ad hoc string pluralizer intended for situations where being mostly right is good enough.
         e.g., string_pluralize('sample') => 'sample'
               string_pluralize('community') => 'communities'
         """
+
         charn = word[-1]
-        char1 = word[0]
-        capitalize = char1.isupper()
-        upcase = capitalize and not any(ch.islower() for ch in word)
+        capitalize = word[0].isupper()
+        upcase = word.isupper()  # capitalize and not any(ch.islower() for ch in word)
+
+        # Convert 'a foo' to just 'foo' prior to pluralization. It's pointless to return 'a apples' or 'an apples'.
+        # Arguably, we _could_ return 'some apples'
+        indef_matched = cls._INDEFINITE_NOUN_REF.match(word)
+        if indef_matched:
+            word = indef_matched.group(1)
+            if allow_some:
+                prefix = "SOME " if upcase else ("Some " if capitalize else "some ")
+                return prefix + cls.string_pluralize(word)
+
+        prep_matched = cls._NOUN_WITH_PREPOSITIONAL_ATTACHMENT.match(word)
+        if prep_matched:
+            groups = prep_matched.groups()
+            word, prep_spacing1, prep, prep_spacing2, prep_obj = groups[0:5] if groups[0] is not None else groups[5:10]
+            indef_matched = cls._INDEFINITE_NOUN_REF.match(prep_obj)
+            if indef_matched:
+                # It's important to do this before calling ourselves recursively to avoid getting 'some' in prep phrases
+                prep_obj = indef_matched.group(1)
+                prep_obj = cls.string_pluralize(prep_obj)
+            return cls.string_pluralize(word) + prep_spacing1 + prep + prep_spacing2 + prep_obj
 
         result = cls._special_case_plural(word)
         if result:
@@ -209,9 +281,47 @@ class EnglishUtils:
             result = capitalize1(result)
         return result
 
+    _BE_TENSES = {
+        'past': {'singular': 'was', 'plural': 'were'},
+        'present': {'singular': 'is', 'plural': 'are'},
+        'past-perfect': {'singular': 'has been', 'plural': 'have been'},
+    }
+
+    _MODALS = {'can', 'could', 'may', 'might', 'must', 'shall', 'should', 'will', 'would'}
+
+    @classmethod
+    def _conjugate_be(cls, count, tense):
+        """
+        Returns the conjugation of the verb 'to be' for a subject that has a given count and tense.
+
+        For example:
+
+        >>> EnglishUtils._conjugate_be(count=1, tense='present')
+        'is'
+        >>> EnglishUtils._conjugate_be(count=2, tense='present-perfect')
+        'have been'
+        >>> EnglishUtils._conjugate_be(count=2, tense='would')
+        'would be'
+
+        :param count: The number of items in the subject
+        :param tense: The verb tense (past, past-perfect, or present)
+                      or a modal (can, could, may, might, must, shall, should, will would).
+
+        """
+        is_or_are = cls._BE_TENSES.get(tense, {}).get('singular' if count == 1 else 'plural')
+        if is_or_are is None:
+            if tense in cls._MODALS:
+                is_or_are = f"{tense} be"
+            else:
+                raise ValueError(f"The tense given, {tense}, was neither a supported tense"
+                                 f" ({cls.disjoined_list(sorted(list(cls._BE_TENSES.keys())))})"
+                                 f" nor a modal ({cls.disjoined_list(sorted(list(cls._MODALS)))}).")
+        return is_or_are  # possibly in some other tense. :)
+
     @classmethod
     def there_are(cls, items, *, kind: str = "thing", count: Optional[int] = None, there: str = "there",
                   capitalize=True, joiner=None, zero: object = "no", punctuate=False, use_article=False,
+                  show=True, context=None, tense='present',
                   **joiner_options) -> str:
         """
         Constructs a sentence that enumerates a set of things.
@@ -226,6 +336,9 @@ class EnglishUtils:
         :param punctuate: in the case of one or more values (not zero), whether to end with a period (default False)
         :param use_article: whether to put 'a' or 'an' in front of each option (default False)
         :param joiner_options: additional (keyword) options to be used with a joiner function if one is supplied
+        :param show: whether to show the items if there are any (default True)
+        :param context: an optional prepositional phrase indicating the context of the item(s) (default None)
+        :param tense: one of 'past', 'present', 'future', 'conditional', or 'hypothetical' for the verbs used
 
         By far the most common uses are likely to be:
 
@@ -249,9 +362,12 @@ class EnglishUtils:
 
         there = capitalize1(there) if capitalize else there
         n = len(items) if count is None else count
-        is_or_are = "is" if n == 1 else "are"
+        # If the items is not in the tenses table, it's assumed to be a modal like 'might', 'may', 'must', 'can' etc.
+        is_or_are = cls._conjugate_be(count=n, tense=tense)
         part1 = f"{there} {is_or_are} {n_of(n, kind, num_format=lambda n, thing: zero if n == 0 else None)}"
-        if n == 0:
+        if context:
+            part1 += f" {context}"
+        if n == 0 or not show:
             return part1 + "."
         else:
             if use_article:

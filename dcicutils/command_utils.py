@@ -1,3 +1,7 @@
+import contextlib
+import subprocess
+
+from typing import Optional
 from .misc_utils import PRINT
 
 
@@ -61,3 +65,82 @@ def y_or_n(question, default=None):
     If Enter is pressed after other text than the valid responses, the user is reprompted.
     """
     return _ask_boolean_question(question, quick=True, default=default)
+
+
+class ShellScript:
+    """
+    This is really an internal class. You're intended to work via the shell_script context manager.
+    But there might be uses for this class, too, so we'll give it a pretty name.
+    """
+
+    # This is the shell the script will use to execute
+    EXECUTABLE = "/bin/bash"
+
+    def __init__(self, executable: Optional[str] = None, simulate=False):
+        """
+        Creates an object that will let you compose a script and eventually execute it as a subprocess.
+
+        :param executable: the executable file to use when executing the script (default /bin/bash)
+        :param simulate: a boolean that says whether to simulate the script without executing it (default False)
+        """
+
+        self.executable = executable or self.EXECUTABLE
+        self.simulate = simulate
+        self.script = ""
+
+    def do_first(self, command: str):
+        """This isn't really executing the command, just building it into the script, but at the front, not the back."""
+        if self.script:
+            self.script = f"{command}; {self.script}"
+        else:
+            self.script = command
+
+    def do(self, command: str):
+        """
+        Adds the command to the list of commands to be executed.
+        This isn't really executing the command, just making a note to do it when the script is finally executed.
+        """
+
+        if self.script:
+            self.script = f"{self.script}; {command}"
+        else:
+            self.script = command
+
+        return self
+
+    def pushd(self, working_dir):
+        self.do(f'pushd {working_dir} > /dev/null')
+        self.do(f'echo "Selected working directory $(pwd)."')
+
+    def popd(self):
+        self.do(f'popd > /dev/null')
+        self.do(f'echo "Restored working directory $(pwd)."')
+
+    @contextlib.contextmanager
+    def using_working_dir(self, working_dir):
+        if working_dir:
+            self.pushd(working_dir)
+        yield self
+        if working_dir:
+            self.popd()
+
+    def execute(self, **pipe_args):
+        """This is where it's really executed."""
+        if self.simulate:
+            PRINT("SIMULATED:")
+            PRINT("=" * 80)
+            PRINT(self.script.replace('; ', ';\\\n '))
+            PRINT("=" * 80)
+        elif self.script:
+            return subprocess.run(self.script, shell=True, executable=self.executable, **pipe_args)
+
+
+@contextlib.contextmanager
+def shell_script(working_dir=None, executable=None, simulate=False):
+    script = ShellScript(executable=executable, simulate=simulate)
+    if working_dir:
+        with script.using_working_dir(working_dir):
+            yield script
+    else:
+        yield script
+    script.execute()

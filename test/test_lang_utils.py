@@ -1,5 +1,6 @@
 import datetime
 import pytest
+import re
 
 from dcicutils.lang_utils import (
     EnglishUtils, a_or_an, select_a_or_an, string_pluralize, conjoined_list, disjoined_list,
@@ -50,6 +51,67 @@ def test_string_pluralize():
 
     assert string_pluralize("box") == "boxes"
     assert string_pluralize("ox") == "oxen"
+
+    assert string_pluralize("file to show") == "files to show"
+    assert string_pluralize("bucket to delete") == "buckets to delete"
+    assert string_pluralize("a book about a gene") == "books about genes"
+    assert string_pluralize("a good book about the defective gene") == "good books about the defective gene"
+    assert string_pluralize("a good book about a defective gene") == "good books about defective genes"
+
+    assert string_pluralize("a book about a gene", allow_some=True) == "some books about genes"
+    assert string_pluralize("a bucket of data", allow_some=True) == "some buckets of data"
+    assert string_pluralize("a good book about a defective gene", allow_some=True) == (
+        "some good books about defective genes")
+
+    assert string_pluralize("son-in-law") == "sons-in-law"
+    assert string_pluralize("son-of-a-b") == "sons-of-bs"
+    assert string_pluralize("attorney-at-law") == "attorneys-at-law"
+
+    assert string_pluralize("mother in law") == "mothers in law"
+
+    assert string_pluralize("person of interest") == "persons of interest"
+
+    assert string_pluralize("author of a document") == "authors of documents"
+    assert string_pluralize("author of the document") == "authors of the document"
+
+    assert string_pluralize("father of the author of a document") == "fathers of the author of a document"
+    assert string_pluralize("a father of the author of a document") == "fathers of the author of a document"
+    assert string_pluralize("father of an author of a document") == "fathers of authors of documents"
+    assert string_pluralize("a father of an author of a document") == "fathers of authors of documents"
+
+    assert string_pluralize("middle name of the applicant") == "middle names of the applicant"
+    assert string_pluralize("middle name of an applicant") == "middle names of applicants"
+    assert string_pluralize("son-in-law of an applicant") == "sons-in-law of applicants"
+    assert string_pluralize("son-in-law of a brother-in-law") == "sons-in-law of brothers-in-law"
+
+    assert string_pluralize("half-sister of a mother-in-law") == "half-sisters of mothers-in-law"
+
+    assert string_pluralize("report naming a gene") == "reports naming genes"
+    assert string_pluralize("gene named by a report") == "genes named by reports"
+
+    assert string_pluralize("a variant referencing a gene") == "variants referencing genes"
+    assert string_pluralize("a gene referenced by a variant") == "genes referenced by variants"
+
+    assert string_pluralize("a box") == "boxes"
+    assert string_pluralize("a box", allow_some=True) == "some boxes"
+    assert string_pluralize("the box") == "the boxes"
+    assert string_pluralize("an apple") == "apples"
+    assert string_pluralize("an apple", allow_some=True) == "some apples"
+    assert string_pluralize("the apple") == "the apples"
+
+    assert string_pluralize("A box") == "Boxes"
+    assert string_pluralize("A box", allow_some=True) == "Some boxes"
+    assert string_pluralize("The box") == "The boxes"
+    assert string_pluralize("An apple") == "Apples"
+    assert string_pluralize("An apple", allow_some=True) == "Some apples"
+    assert string_pluralize("The apple") == "The apples"
+
+    assert string_pluralize("A BOX") == "BOXES"
+    assert string_pluralize("A BOX", allow_some=True) == "SOME BOXES"
+    assert string_pluralize("THE BOX") == "THE BOXES"
+    assert string_pluralize("AN APPLE") == "APPLES"
+    assert string_pluralize("AN APPLE", allow_some=True) == "SOME APPLES"
+    assert string_pluralize("THE APPLE") == "THE APPLES"
 
 
 def test_n_of():
@@ -327,13 +389,52 @@ def test_there_are():
     # From the doc strings
 
     assert there_are(['Joe', 'Sally'], kind="user") == "There are 2 users: Joe, Sally"
+    assert there_are(['Joe', 'Sally'], kind="user", show=False) == "There are 2 users."
+    assert there_are(['Joe', 'Sally'], kind="user", show=False, context="online") == "There are 2 users online."
     assert there_are(['Joe'], kind="user") == "There is 1 user: Joe"
     assert there_are([], kind="user") == "There are no users."
+    assert there_are([], kind="user", context="online") == "There are no users online."
 
     assert there_are(['Joe', 'Sally'], kind="user", joiner=conjoined_list, punctuate=True
                      ) == "There are 2 users: Joe and Sally."
     assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=True) == "There is 1 user: Joe."
     assert there_are([], kind="user", joiner=conjoined_list, punctuate=True) == "There are no users."
+
+    def check_tense(tense, if0, if1, if2):
+        assert there_are([], tense=tense, show=False, kind="foo") == if0
+        assert there_are(['x'], tense=tense, show=False, kind="foo") == if1
+        assert there_are(['x', 'y'], tense=tense, show=False, kind="foo") == if2
+
+    check_tense('past',
+                if0="There were no foos.",
+                if1="There was 1 foo.",
+                if2="There were 2 foos.")
+
+    check_tense('present',
+                if0="There are no foos.",
+                if1="There is 1 foo.",
+                if2="There are 2 foos.")
+
+    check_tense('will',
+                if0="There will be no foos.",
+                if1="There will be 1 foo.",
+                if2="There will be 2 foos.")
+
+    check_tense('would',
+                if0="There would be no foos.",
+                if1="There would be 1 foo.",
+                if2="There would be 2 foos.")
+
+    check_tense('past-perfect',
+                if0="There have been no foos.",
+                if1="There has been 1 foo.",
+                if2="There have been 2 foos.")
+
+    expected_error = ("The tense given, randomness, was"
+                      " neither a supported tense (past, past-perfect or present)"
+                      " nor a modal (can, could, may, might, must, shall, should, will or would).")
+    with pytest.raises(ValueError, match=re.escape(expected_error)):
+        there_are([], tense='randomness', show=False, kind="foo")
 
 
 def test_must_be():
@@ -370,4 +471,3 @@ def test_maybe_pluralize():
     assert maybe_pluralize(['a'], 'gene') == 'gene'
     assert maybe_pluralize(['a', 'b'], 'gene') == 'genes'
     assert maybe_pluralize(['a', 'b', 'c'], 'gene') == 'genes'
-

@@ -21,8 +21,18 @@ def test_dehyphenate():
 
     assert cloudformation_utils.dehyphenate('foo') == 'foo'
     assert cloudformation_utils.dehyphenate('foo-bar') == 'foobar'
+    assert cloudformation_utils.dehyphenate('foo_bar') == 'foo_bar'
     assert cloudformation_utils.dehyphenate('-foo-bar--baz----') == 'foobarbaz'
     assert cloudformation_utils.dehyphenate('-foo123-bar7baz--quux----') == 'foo123bar7bazquux'
+
+
+def test_hyphenify():
+
+    assert cloudformation_utils.hyphenify('foo') == 'foo'
+    assert cloudformation_utils.hyphenify('foo-bar') == 'foo-bar'
+    assert cloudformation_utils.hyphenify('foo_bar') == 'foo-bar'
+    assert cloudformation_utils.hyphenify('_foo_bar__baz____') == '-foo-bar--baz----'
+    assert cloudformation_utils.hyphenify('_foo123-bar7baz__quux----') == '-foo123-bar7baz--quux----'
 
 
 def test_make_key_for_ecs_application_url():
