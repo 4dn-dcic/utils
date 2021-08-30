@@ -68,9 +68,7 @@ class EnglishUtils:
 
     _NOUN_WITH_PREPOSITIONAL_ATTACHMENT = re.compile(
         # Note use of *? to get minimal match in group1, so that we'll find the first preposition, not a later one
-        # f"^(?:([a-z]*?)([-])+({'|'.join(COMMON_PREPOSITIONS)})([-]+)([a-z-]*)|([a-z- ]*?[a-z-]?)([ ]+)({'|'.join(COMMON_PREPOSITIONS)})([ ]+)(.*))$",
-
-        # The use of "*?" makes us treat multiple prepositions like a-of-b-of-c by recursing as
+        # Specifically, the use of "*?" makes us treat multiple prepositions like a-of-b-of-c by recursing as
         # (a)(-)(of)(-)(b-of-c). If we used "*" instead of "*?", we would get (a-of-b)(-)(of)(-)(c).
         # If we were only doing hyphenated items, it wouldn't matter a whole lot.
         # But in the words part, it matters a great deal because with spaces and hyphens interleaved, there is a
@@ -81,7 +79,7 @@ class EnglishUtils:
                  # to ONLY match a hyphenated compound word like son-in-law as (son)(-)(in)(-)(law)
                  ([a-z][a-z-]*?)  # shortest possible (i.e., first) block of hyphenated words preceding "-<prep>-"
                  ([-])            # pre-preposition-hyphen to make sure it's part of the same compound.
-                 ({'|'.join(_COMPOUND_PLURAL_PREPOSITIONS).replace(' ', '[ ]')}) # matches the prep, as (about|at|...)  
+                 ({'|'.join(_COMPOUND_PLURAL_PREPOSITIONS).replace(' ', '[ ]')}) # matches the prep, as (about|at|...)
                  ([-])            # hyphen on the other side of prep
                  ([a-z-]*)        # we're less fussy about this. It could contain more preps, for example.
               |
@@ -91,13 +89,13 @@ class EnglishUtils:
                  ([a-z]        # first token starts with an alphabetic,
                   [a-z- ]*?    # matches any number of words, which may be hyphenated,
                   [a-z])       # and ends in an alphabetic
-                 ([ ]+)        # unlike with hyphenation, any number of pre-<prep> spaces is ok        
+                 ([ ]+)        # unlike with hyphenation, any number of pre-<prep> spaces is ok
                  ({'|'.join(_COMPOUND_PLURAL_PREPOSITIONS).replace(' ', '[ ]')}) # matches the prep, as (about|at|...)
                  ([ ]+)        # any amount of whitespace on the other side
                  (.*)          # anything else that follows first space-delimeted preposition
              )$""",
 
-       re.IGNORECASE | re.VERBOSE)
+        re.IGNORECASE | re.VERBOSE)
     _INDEFINITE_NOUN_REF = re.compile(
         f"^an?[ -]+([^ -].*)$",
         re.IGNORECASE)

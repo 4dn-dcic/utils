@@ -4,7 +4,7 @@ import os
 import re
 
 from dcicutils.misc_utils import PRINT, remove_suffix
-from dcicutils.lang_utils import maybe_pluralize, there_are
+from dcicutils.lang_utils import there_are
 
 
 _MY_DIR = os.path.dirname(__file__)
@@ -31,19 +31,19 @@ def test_documentation():
 
     with io.open(_DCICUTILS_DOC_FILE) as fp:
 
-        LINE_NUMBER = 0
+        line_number = 0
         current_module = None
         automodules_seen = 0
         prev_line = None
         problems = []
-        expected_modules = {remove_suffix(".py", os.path.basename(file)) for file in _DCICUTILS_FILES} -  SKIP_MODULES
+        expected_modules = {remove_suffix(".py", os.path.basename(file)) for file in _DCICUTILS_FILES} - SKIP_MODULES
         documented_modules = set()
         for line in fp:
-            LINE_NUMBER += 1  # We count the first line as line 1
+            line_number += 1  # We count the first line as line 1
             line = line.strip()
             if _SUBSUBSECTION_LINE.match(line):
                 if current_module and automodules_seen == 0:
-                    problems.append(f"Line {LINE_NUMBER}: Missing automodule declaration for section {current_module}.")
+                    problems.append(f"Line {line_number}: Missing automodule declaration for section {current_module}.")
                 current_module = prev_line
                 automodules_seen = 0
             elif _SECTION_OR_SUBSECTION_LINE.match(line):
@@ -54,15 +54,18 @@ def test_documentation():
                 if matched:
                     automodule_module = matched.group(1)
                     if not current_module:
-                        problems.append(f"Line {LINE_NUMBER}: Unexpected automodule declaration"
+                        problems.append(f"Line {line_number}: Unexpected automodule declaration"
                                         f" outside of module section.")
                     else:
                         documented_modules.add(automodule_module)
-                        if automodules_seen == 1:  # Below that, no issue. Above that, we already warned, so don't duplicate.
-                            problems.append(f"Line {LINE_NUMBER}: More than one automodule"
+                        if automodules_seen == 1:
+                            # If fewer than 1 seen, no issue.
+                            # If more than 1 seen, we already warned, so don't duplicate.
+                            # So really only the n == 1 case matters to us.
+                            problems.append(f"Line {line_number}: More than one automodule"
                                             f" in section {current_module}?")
                         if automodule_module != current_module:
-                            problems.append(f"Line {LINE_NUMBER}: Unexpected automodule declaration"
+                            problems.append(f"Line {line_number}: Unexpected automodule declaration"
                                             f" for section {current_module}: {automodule_module}.")
                     automodules_seen += 1
             prev_line = line

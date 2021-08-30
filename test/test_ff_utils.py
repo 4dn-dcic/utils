@@ -1264,7 +1264,7 @@ def test_expand_es_metadata(integrated_ff):
     for pos_case in ['file_processed', 'user', 'file_format', 'award', 'lab']:
         assert pos_case in store
     for neg_case in ['workflow_run_awsem', 'workflow', 'file_reference', 'software', 'workflow_run_sbg',
-                     'quality_metric_pairsqc',  'quality_metric_fastqc']:
+                     'quality_metric_pairsqc', 'quality_metric_fastqc']:
         assert neg_case not in store
     # make sure the frame is raw (default)
     test_item = store['file_processed'][0]
@@ -1537,7 +1537,7 @@ def test_expand_es_metadata_add_wfrs(integrated_ff):
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     store, uuids = ff_utils.expand_es_metadata(test_list, add_pc_wfr=True, key=key, ff_env=ff_env)
     for pos_case in ['workflow_run_awsem', 'workflow', 'file_reference', 'software', 'workflow_run_sbg',
-                     'quality_metric_pairsqc',  'quality_metric_fastqc']:
+                     'quality_metric_pairsqc', 'quality_metric_fastqc']:
         assert pos_case in store
 
 
@@ -1562,7 +1562,7 @@ def test_expand_es_metadata_ignore_fields(integrated_ff):
                                                key=key, ff_env=ff_env)
     for pos_case in ['workflow_run_awsem', 'workflow', 'file_reference', 'software', 'workflow_run_sbg']:
         assert pos_case in store
-    for neg_case in ['quality_metric_pairsqc',  'quality_metric_fastqc']:
+    for neg_case in ['quality_metric_pairsqc', 'quality_metric_fastqc']:
         assert neg_case not in store
 
 
