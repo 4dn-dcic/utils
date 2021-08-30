@@ -1,4 +1,6 @@
 import contextlib
+import glob
+import os
 import subprocess
 
 from typing import Optional
@@ -76,7 +78,7 @@ class ShellScript:
     # This is the shell the script will use to execute
     EXECUTABLE = "/bin/bash"
 
-    def __init__(self, executable: Optional[str] = None, simulate=False):
+    def __init__(self, executable: Optional[str] = None, simulate=False, **script_options):
         """
         Creates an object that will let you compose a script and eventually execute it as a subprocess.
 
@@ -84,29 +86,31 @@ class ShellScript:
         :param simulate: a boolean that says whether to simulate the script without executing it (default False)
         """
 
+        if script_options:
+            raise ValueError(f"Unknown script_options supplied: {script_options}")
         self.executable = executable or self.EXECUTABLE
         self.simulate = simulate
         self.script = ""
 
     def do_first(self, command: str):
-        """This isn't really executing the command, just building it into the script, but at the front, not the back."""
+        """
+        Adds the command to the front of the list of commands to be executed.
+        This isn't really executing the command, just attaching it to the script being built (at the start).
+        """
         if self.script:
-            self.script = f"{command}; {self.script}"
+            self.script = f'{command}; {self.script}'
         else:
             self.script = command
 
     def do(self, command: str):
         """
         Adds the command to the list of commands to be executed.
-        This isn't really executing the command, just making a note to do it when the script is finally executed.
+        This isn't really executing the command, just attaching it to the script being built (at the end).
         """
-
         if self.script:
-            self.script = f"{self.script}; {command}"
+            self.script = f'{self.script}; {command}'
         else:
             self.script = command
-
-        return self
 
     def pushd(self, working_dir):
         self.do(f'pushd {working_dir} > /dev/null')
@@ -136,8 +140,8 @@ class ShellScript:
 
 
 @contextlib.contextmanager
-def shell_script(working_dir=None, executable=None, simulate=False):
-    script = ShellScript(executable=executable, simulate=simulate)
+def shell_script(working_dir=None, executable=None, simulate=False, script_class=ShellScript, **script_options):
+    script = script_class(executable=executable, simulate=simulate, **script_options)
     if working_dir:
         with script.using_working_dir(working_dir):
             yield script
