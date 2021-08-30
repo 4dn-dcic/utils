@@ -19,6 +19,11 @@ def dehyphenate(s):
     return s.replace('-', '')
 
 
+def hyphenify(s):
+    """Turns the underscore form of snake_case into the hyphenated form."""
+    return s.replace('_', '-')
+
+
 def make_required_key_for_ecs_application_url(env_name):
     """
     This pattern needs to remain fixed for various things to connect up.

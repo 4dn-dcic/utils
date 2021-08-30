@@ -240,7 +240,10 @@ def _swap_cname(src, dest):
 
 def _create_foursight_new(dest_env):
     """ Helper function that does what create_foursight_auto used to do but slightly differently """
-    fs = {'dest_env': dest_env, 'bs_url': get_beanstalk_real_url(dest_env)}
+    fs = {  # noQA - PyCharm thinks the way this dictionary is set up could be simplified, but it's fine for now.
+        'dest_env': dest_env,
+        'bs_url': get_beanstalk_real_url(dest_env)
+    }
 
     # Get information, pass to create_foursight
     fs['fs_url'] = get_foursight_env(dest_env, fs['bs_url'])
@@ -577,6 +580,7 @@ def create_db_from_snapshot(db_identifier, snapshot_name, delete_db_if_present=T
     Args:
         db_identifier (str): RDS instance identifier
         snapshot_name (str): identifier/ARN of RDS snapshot to restore from
+        delete_db_if_present(bool): whether to drop the database on unwind
 
     Returns:
         str: resource ARN if successful, otherwise "Deleting"
@@ -909,7 +913,9 @@ def create_foursight_auto(dest_env):
     Returns:
         dict: response from Foursight PUT /api/environments
     """
-    fs = {'dest_env': dest_env}
+    fs = {  # noQA - PyCharm thinks the way this dictionary is set up could be simplified, but it's fine for now.
+        'dest_env': dest_env
+    }
 
     # automatically determine info for FS environ creation
     fs['bs_url'] = get_beanstalk_real_url(dest_env)
@@ -989,7 +995,7 @@ def create_foursight(dest_env, bs_url, es_url, fs_url=None):
         fs_url = fs_url[len('fourfront-'):]
 
     foursight_url = FOURSIGHT_URL + 'environments/' + fs_url
-    payload = {'fourfront': bs_url,  'es': es_url, 'ff_env': dest_env}
+    payload = {'fourfront': bs_url, 'es': es_url, 'ff_env': dest_env}
 
     ff_auth = os.environ.get('FS_AUTH')
     headers = {'content-type': 'application/json', 'Authorization': ff_auth}

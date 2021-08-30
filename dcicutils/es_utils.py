@@ -115,7 +115,7 @@ def get_index_list(client, name, days_old=0, timestring='%Y.%m.%d', ilo=None):
     # return ilo
 
 
-def create_snapshot_repo(client, repo_name,  s3_bucket):
+def create_snapshot_repo(client, repo_name, s3_bucket):
     """
     Creates a repo to store ES snapshots on
 
