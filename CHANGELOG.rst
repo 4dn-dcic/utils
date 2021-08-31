@@ -7,7 +7,7 @@ Change Log
 ----------
 
 
-2.2.0
+2.3.0
 =====
 
 * In ``qa_utils`` add some support for testing new functionality:
@@ -17,7 +17,6 @@ Change Log
     * Add minimal support for ``head_bucket``.
     * Add minimal support for ``list_objects_v2``.
     * Make ``list_objects`` and ``list_objects_v2``, return a ``KeyCount`` in the result.
-
 
 
 * In ``s3_utils``:
@@ -39,6 +38,59 @@ Change Log
     * This class also creates suitable abstraction to allow for a future in which the contents of this dictionary
       might include keys ``portal_url``, ``es_url``, and ``env_name`` in lieu of what are now
       ``fourfront``, ``es``, and ``ff_env``, respectively.
+
+2.2.0
+=====
+
+* In ``cloudformation_utils``:
+
+  * Add ``hyphenify`` to change underscores to hyphens.
+
+* In ``command_utils``:
+
+  * Add ``shell_script`` context manager and its implementation class ``ShellScript``.
+
+  * Add ``module_warnings_as_ordinary_output`` to help work around the problem that S3Utils outputs
+    text we'd sometimes rather see as ordinary output, not log output.
+
+* In ``lang_utils``:
+
+  * Add support for ``string_pluralize`` to pluralize 'nouns' that have attached prepositional phrases, as in::
+
+       string_pluralize('file to load')
+       'files to load`
+
+       string_pluralize('brother-in-law of a proband')
+       'brothers-in-law of probands'
+
+       string_pluralize('brother-in-law of the proband')
+       'brothers-in-law of the proband'
+
+    But, importantly, this also means one can give have arguments to functions that use these do something
+    sophisticated in terms of wording with almost no effort at the point of need, such as::
+
+       [there_are(['foo.json', 'bar.json'][:n], kind='file to load') for n in range(3)]
+       [
+         'There are no files to load.',
+         'There is 1 file to load: foo.json',
+         'There are 2 files to load: foo.json, bar.json'
+       ]
+
+       [n_of(n, 'bucket to delete') for n in range(3)]
+       [
+         '0 buckets to delete',
+         '1 bucket to delete',
+         '2 buckets to delete'
+       ]
+
+* Miscellaneous other changes:
+
+  * In ``docs/source/dcicutils.rst``, add autodoc for various modules that are not getting documented.
+
+  * In ``test/test_misc.py``, add unit test to make sure things don't get omitted from autodoc.
+
+    Specifically, a test will now fail if you make a new file in ``dcicutils`` and do not add a
+    corresponding autodoc entry in ``docs/source/dcicutils.rst``.
 
 
 2.1.0

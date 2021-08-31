@@ -1,13 +1,16 @@
 import contextlib
+import os
 import pytest
+import tempfile
 
 from unittest import mock
 from dcicutils import command_utils as command_utils_module
 from dcicutils.command_utils import (
     _ask_boolean_question,  # noQA - access to internal function is so we can test it
-    yes_or_no, y_or_n
+    yes_or_no, y_or_n, ShellScript, shell_script,
 )
 from dcicutils.misc_utils import ignored
+from dcicutils.qa_utils import printed_output
 
 
 @contextlib.contextmanager
@@ -139,3 +142,108 @@ def test_y_or_n():
                         "Please answer 'y' or 'n'."):
         with input_series('foo', 'bar', ''):
             assert y_or_n("foo?", default=False) is False
+
+
+def test_shell_script_class():
+
+    script = ShellScript()
+    assert script.script == ""
+
+    assert script.executable == script.EXECUTABLE == "/bin/bash"
+
+    script.do("foo")
+    expected_script = "foo"
+    assert script.script == expected_script
+
+    script.do("bar")
+    expected_script = "foo; bar"
+    assert script.script == expected_script
+
+    with mock.patch("subprocess.run") as mock_run:
+
+        script.execute()
+        mock_run.assert_called_with(expected_script, executable=script.EXECUTABLE, shell=True)
+
+
+def test_shell_script_class_with_working_dir():
+
+    script = ShellScript()
+
+    with mock.patch("subprocess.run") as mock_run:
+
+        with script.using_working_dir("/some/dir"):
+
+            expected_script = 'pushd /some/dir > /dev/null; echo "Selected working directory $(pwd)."'
+            assert script.script == expected_script
+            mock_run.assert_not_called()
+
+        expected_script = expected_script + '; popd > /dev/null; echo "Restored working directory $(pwd)."'
+        assert script.script == expected_script
+        # The context manager does not finalize, but does restore outer directory context.
+        mock_run.assert_not_called()
+
+        script.execute()  # After finalizing explicitly, it gets called
+        mock_run.assert_called_with(expected_script, executable=script.EXECUTABLE, shell=True)
+
+
+@pytest.mark.parametrize('simulate', [True, False])
+def test_shell_script_class_unmocked(simulate):
+
+    temp_filename = tempfile.mktemp()
+    assert not os.path.exists(temp_filename)  # we were promised a filename that doesn't exist. test that.
+
+    try:
+
+        with printed_output() as printed:
+
+            script = ShellScript(simulate=simulate)
+            script.do(f"touch {temp_filename}")  # script will create the file
+            script.execute()
+
+            if simulate:
+                assert not os.path.exists(temp_filename)  # test that file did NOT get made
+                assert printed.lines == [
+                    f'SIMULATED:',
+                    f'================================================================================',
+                    f'touch {temp_filename}',
+                    f'================================================================================',
+                ]
+            else:
+                assert os.path.exists(temp_filename)  # test that file got made
+
+    finally:
+
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)  # cleanup, not that we actually have to
+        assert not os.path.exists(temp_filename)  # make sure everything is tidy again
+
+
+@pytest.mark.parametrize('simulate', [True, False])
+def test_shell_script_context_manager(simulate):
+
+    temp_filename = tempfile.mktemp()
+    assert not os.path.exists(temp_filename)  # we were promised a filename that doesn't exist. test that.
+
+    try:
+
+        with printed_output() as printed:
+
+            with shell_script(simulate=simulate) as script:
+                script.do(f"touch {temp_filename}")  # script will create the file
+
+            if simulate:
+                assert not os.path.exists(temp_filename)  # test that file did NOT get made
+                assert printed.lines == [
+                    f'SIMULATED:',
+                    f'================================================================================',
+                    f'touch {temp_filename}',
+                    f'================================================================================',
+                ]
+            else:
+                assert os.path.exists(temp_filename)  # test that file got made
+
+    finally:
+
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)  # cleanup, not that we actually have to
+        assert not os.path.exists(temp_filename)  # make sure everything is tidy again
