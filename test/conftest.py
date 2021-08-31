@@ -21,7 +21,7 @@ def _discover_es_health_from_boto3_eb_metadata(envname):
         # except it's robust against AWS throttling us for calling it too often.
         envs_from_eb = describe_beanstalk_environments(eb_client, EnvironmentNames=[envname])['Environments']
         for env in envs_from_eb:
-            print(f"Checking {env.get('EnvironmentName')} for {envname}...")
+            PRINT(f"Checking {env.get('EnvironmentName')} for {envname}...")
             if env.get('EnvironmentName') == envname:
                 cname = env.get('CNAME')
                 # TODO: It would be nice if we were using https: for everything. -kmp 14-Aug-2020
@@ -38,7 +38,7 @@ def _discover_es_url_from_boto3_eb_metadata(integrated_envname):
 
         discovered_health_json_from_eb = _discover_es_health_from_boto3_eb_metadata(integrated_envname)
         assert discovered_health_json_from_eb, f"No health page for {integrated_envname} was discovered."
-        print(f"in _discover_es_url_from_boto3_eb_metadata,"
+        PRINT(f"In _discover_es_url_from_boto3_eb_metadata,"
               f"discovered_health_json_from_eb={json.dumps(discovered_health_json_from_eb, indent=2)}")
         time.sleep(1)  # Reduce throttling risk
         ff_health_json = get_health_page(ff_env=integrated_envname)

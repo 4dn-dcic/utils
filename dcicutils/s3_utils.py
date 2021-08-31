@@ -6,10 +6,8 @@ import json
 import logging
 import mimetypes
 import os
-import requests
 import urllib.request
 
-from dcicutils.misc_utils import override_environ
 from io import BytesIO
 from zipfile import ZipFile
 from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name
@@ -17,7 +15,7 @@ from .exceptions import (
     InferredBucketConflict, CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv,
     GlobalBucketAccessError, SynonymousEnvironmentVariablesMismatched,
 )
-from .misc_utils import PRINT
+from .misc_utils import PRINT, override_environ, ignored
 
 
 ###########################
@@ -62,7 +60,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                                                     env=env)
 
     @staticmethod  # backward compatibility in case other repositories are using this
-    def fetch_health_page_json(url, use_urllib):
+    def fetch_health_page_json(url, use_urllib=True):
         return EnvManager.fetch_health_page_json(url=url, use_urllib=use_urllib)
 
     def __init__(self, outfile_bucket=None, sys_bucket=None, raw_file_bucket=None,
@@ -80,6 +78,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         self.url = ''
         self.s3 = boto3.client('s3', region_name='us-east-1')
         global_bucket = EnvManager.global_env_bucket_name()
+        self.global_env_bucket_manager = None  # In a legacy environment, this will continue to be None
         if sys_bucket is None:
             # The choice to discriminate first on sys_bucket being None is part of the resolution of
             # https://hms-dbmi.atlassian.net/browse/C4-674
@@ -90,7 +89,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 ff_url = global_manager.portal_url
                 health_json_url = '{ff_url}/health?format=json'.format(ff_url=ff_url)
                 logger.warning('health json url: {}'.format(health_json_url))
-                health_json = self.fetch_health_page_json(url=health_json_url, use_urllib=True)
+                health_json = EnvManager.fetch_health_page_json(url=health_json_url)
                 sys_bucket_from_health_page = health_json[self.SYS_BUCKET_HEALTH_PAGE_KEY]
                 outfile_bucket_from_health_page = health_json[self.OUTFILE_BUCKET_HEALTH_PAGE_KEY]
                 raw_file_bucket_from_health_page = health_json[self.RAW_BUCKET_HEALTH_PAGE_KEY]
@@ -442,17 +441,14 @@ class EnvManager:
         return env_config
 
     @staticmethod
-    def fetch_health_page_json(url, use_urllib):
-        # TODO: Does anyhone know what problem this use_urllib thing was solving?  Was it solving some bug
-        #       in Python 2 that no longer matters? These two solutions should be equivalent. Is there a way
-        #       to simplify this? -kmp 22-Aug-2021
-        if use_urllib is False:
-            return requests.get(url).json()
-        else:
-            res = urllib.request.urlopen(url)
-            res_body = res.read()
-            j = json.loads(res_body.decode("utf-8"))
-            return j
+    def fetch_health_page_json(url, use_urllib=True):
+        # Eric&Will found requests.get(url).json() sometimes failed to made this alternative
+        # based on urllib that we now use exclusively.
+        ignored(use_urllib)
+        res = urllib.request.urlopen(url)
+        res_body = res.read()
+        j = json.loads(res_body.decode("utf-8"))
+        return j
 
     @classmethod
     def global_env_bucket_name(cls):
