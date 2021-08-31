@@ -728,25 +728,45 @@ def test_env_manager_fetch_health_page_json():
 
     sample_health_page = {"mocked": "health-page"}
 
-    with mock.patch("requests.get") as mock_get:
+    class MockHelper:
 
-        def mocked_get(url):
+        def __init__(self):
+            self.used_mocked_get = False
+            self.used_mocked_urlopen = False
+
+        def mocked_get(self, url):
             assert url.endswith("/health?format=json")
+            self.used_mocked_get = True
             return MockResponse(json=sample_health_page)
 
-        mock_get.side_effect = mocked_get
-        assert EnvManager.fetch_health_page_json("http://something/health?format=json",
-                                                 use_urllib=False) == sample_health_page
-
-    with mock.patch("urllib.request.urlopen") as mock_urlopen:
-
-        def mocked_urlopen(url):
+        def mocked_urlopen(self, url):
             assert url.endswith("/health?format=json")
+            self.used_mocked_urlopen = True
             return io.BytesIO(json.dumps(sample_health_page).encode('utf-8'))
 
-        mock_urlopen.side_effect = mocked_urlopen
-        assert EnvManager.fetch_health_page_json("http://something/health?format=json",
-                                                 use_urllib=True) == sample_health_page
+
+    with mock.patch("requests.get") as mock_get:
+        with mock.patch("urllib.request.urlopen") as mock_urlopen:
+
+            helper = MockHelper()
+            mock_get.side_effect = helper.mocked_get
+            mock_urlopen.side_effect = helper.mocked_urlopen
+
+            assert EnvManager.fetch_health_page_json("http://something/health?format=json",
+                                                     use_urllib=False) == sample_health_page
+            # We always use urllib now.
+            assert helper.used_mocked_get == False
+            assert helper.used_mocked_urlopen == True
+
+            helper = MockHelper()
+            mock_get.side_effect = helper.mocked_get
+            mock_urlopen.side_effect = helper.mocked_urlopen
+
+            assert EnvManager.fetch_health_page_json("http://something/health?format=json",
+                                                     use_urllib=True) == sample_health_page
+            # We always use urllib now.
+            assert helper.used_mocked_get == False
+            assert helper.used_mocked_urlopen == True
 
 
 def test_env_manager():
