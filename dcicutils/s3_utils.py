@@ -55,13 +55,13 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     METADATA_BUCKET_HEALTH_PAGE_KEY = 'metadata_bundles_bucket'
     TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY = 'tibanna_output_bucket'
 
-    @staticmethod  # backwawrd compatibility in case other repositories are using this
+    @staticmethod  # backward compatibility in case other repositories are using this
     def verify_and_get_env_config(s3_client, global_bucket: str, env):
         return EnvManager.verify_and_get_env_config(s3_client=s3_client,
                                                     global_bucket=global_bucket,
                                                     env=env)
 
-    @staticmethod  # backwawrd compatibility in case other repositories are using this
+    @staticmethod  # backward compatibility in case other repositories are using this
     def fetch_health_page_json(url, use_urllib):
         return EnvManager.fetch_health_page_json(url=url, use_urllib=use_urllib)
 
