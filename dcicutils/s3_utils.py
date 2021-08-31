@@ -366,7 +366,7 @@ class EnvManager:
 
     def __init__(self, env_name=None, env_description=None, s3=None):
         self.s3 = s3 or boto3.client('s3')
-        if env_description and env_description:
+        if env_name and env_description:
             raise ValueError("You may only specify an env_name or an env_description")
         if env_description:
             self.env_description = env_description
