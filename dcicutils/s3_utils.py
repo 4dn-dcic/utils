@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import boto3
+import botocore.client
 import contextlib
 import json
 import logging
@@ -9,6 +10,7 @@ import os
 import urllib.request
 
 from io import BytesIO
+from typing import Optional
 from zipfile import ZipFile
 from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name
 from .exceptions import (
@@ -129,13 +131,25 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 logger.warning('Buckets resolved successfully.')
             else:
                 # staging and production share same buckets
+                # TODO: As noted in some of the comments on this conditional, when the new env_utils with
+                #       orchestration support is in place, this same generality needs to be done
+                #       upstream of the global env bucket branch, too. That's not needed for orchestrated cgap,
+                #       which has no stage, but it will be needed for orchestrated fourfront. -kmp 31-Aug-2021
                 if env:
                     if is_stg_or_prd_env(env):
+                        # TODO: This .url doesn't get set (to non-'') in the other legacy branch of this if statement,
+                        #   but also it doesn't get set in the orchestrated branch above. Why? This function can
+                        #   certainly handle both legacy cases right now and will soon be able to handle it in
+                        #   orchestrated mode, too. -kmp 31-Aug-2021
                         self.url = get_beanstalk_real_url(env)
                         env = prod_bucket_env(env)
                     else:
+                        # TODO: This is the part that is not yet supported in env_utils, but there is a pending
+                        #       patch that will fix that. -kmp 31-AUg-2021
                         env = full_env_name(env)
 
+                # TODO: This branch is not setting self.global_env_bucket_manager, but it _could_ do that from the
+                #       description. -kmp 21-Aug-2021
                 def apply_template(template, env):
                     return template % env if "%s" in template else template
                 # we use standardized naming schema, so s3 buckets always have same prefix
@@ -355,16 +369,38 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
 
 class EnvManager:
 
+    # I have built in an upgrade strategy where these can have some better keys, but for now all code should be
+    # converted to do the following:
+    #
+    # If you are creating an env, add BOTH keys, so we can phase out the old key campatibly at some point in
+    # the future. If you are accessing ane of these descriptions, do so by using this abstraction to create
+    # an EnvManager instance, then access the quantities via the .portal_url, .es_url, or .env_name attributes.
+    # Then you won't have to know whether it came from the old or new key.
+
     LEGACY_PORTAL_URL_KEY = 'fourfront'
-    PORTAL_URL_KEY = 'portal_url'
+    PORTAL_URL_KEY = 'portal_url'  # In the future we may want to convert to these keys, but not yet. See note above.
 
     LEGACY_ES_URL_KEY = 'es'
-    ES_URL_KEY = 'es_url'
+    ES_URL_KEY = 'es_url'  # In the future we may want to convert to these keys, but not yet. See note above.
 
     LEGACY_ENV_NAME_KEY = 'ff_env'
-    ENV_NAME_KEY = 'env_name'
+    ENV_NAME_KEY = 'env_name'  # In the future we may want to convert to these keys, but not yet. See note above.
 
-    def __init__(self, env_name=None, env_description=None, s3=None):
+    def __init__(self, env_name: Optional[str] = None,
+                 env_description: Optional[dict] = None,
+                 s3: Optional[botocore.client.BaseClient] = None):  # really we want an S3 client, but it's not a type
+        """
+        Creates an object that can manage various details of the current Fourfront or CGAP environment,
+        such as 'fourfront-mastertest', 'data', etc.
+
+        :param env_name: an environment name (optional, but preferred)
+        :param env_description: a dictionary (optional, not preferred, a substitute for a name in testing or debugging)
+        :param s3: an s3 client such as from boto3.client('s3') or from the .s3 attribute of an s3Utils instance
+
+        Although the s3 client can be created for you, but if you already have acess to an s3 client via some existing
+        object, you should pass that.
+        """
+
         self.s3 = s3 or boto3.client('s3')
         if env_name and env_description:
             raise ValueError("You may only specify an env_name or an env_description")
@@ -399,23 +435,48 @@ class EnvManager:
 
     @property
     def portal_url(self):
+        """
+        For the environment represented by self, this returns the portal URL, which for now is found
+        by env_description.get('fourfront'), where env_description is the dictionary that was either
+        given as an argument in creating the EnvManager instance or was looked up from the
+        environment's description file in the global env bucket.
+
+        In the future, we'll get it from the 'portal_url' property instead.
+        """
         return self._portal_url
 
     @property
     def es_url(self):
+        """
+        For the environment represented by self, this returns the es URL, which for now is found
+        by env_description.get('es'), where env_description is the dictionary that was either
+        given as an argument in creating the EnvManager instance or was looked up from the
+        environment's description file in the global env bucket.
+
+        In the future, we'll get it from the 'es_url' property instead.
+        """
         return self._es_url
 
     @property
     def env_name(self):
+        """
+        For the environment represented by self, this returns the es URL, which for now is found
+        by env_description.get('ff_env'), where env_description is the dictionary that was either
+        given as an argument in creating the EnvManager instance or was looked up from the
+        environment's description file in the global env bucket.
+
+        In the future, we'll get it from the 'env_name' property instead.
+        """
         return self._env_name
 
     @staticmethod
     def verify_and_get_env_config(s3_client, global_bucket: str, env):
-        """ Verifies the S3 environment from which the env config is coming from, and returns the S3-based env config
-            Throws exceptions if the S3 bucket is unreachable, or an env based on the name of the global S3 bucket
-            is not present.
         """
-        logger.warning('Fetching bucket data via global env bucket: {}'.format(global_bucket))
+        Verifies the S3 environment from which the env config is coming from, and returns the S3-based env config
+        Throws exceptions if the S3 bucket is unreachable, or an env based on the name of the global S3 bucket
+        is not present.
+        """
+        logger.warning(f'Fetching bucket data via global env bucket: {global_bucket}')
         head_response = s3_client.head_bucket(Bucket=global_bucket)
         status = head_response['ResponseMetadata']['HTTPStatusCode']  # should be 200; raise error for 404 or 403
         if status != 200:
@@ -452,6 +513,10 @@ class EnvManager:
 
     @classmethod
     def global_env_bucket_name(cls):
+        """
+        This class method returns the name of the current 'global env bucket', the bucket where meanings of
+        environment names are looked up in orchestrated environments.
+        """
         global_bucket_env_var = 'GLOBAL_BUCKET_ENV'  # Deprecated. Supported for now since some tools started using it.
         global_env_bucket_var = 'GLOBAL_ENV_BUCKET'  # Preferred name. Please transition code to use this.
         global_bucket_env = os.environ.get(global_bucket_env_var)
@@ -465,6 +530,12 @@ class EnvManager:
     @classmethod
     @contextlib.contextmanager
     def global_env_bucket_named(cls, name):
+        """
+        This class method, a 'context manager' useful with the Python 'with' operation, binds the name of
+        the current 'global env bucket', the bucket where meanings of environment names are looked up
+        in orchestrated environments.
+        """
+
         with override_environ(GLOBAL_BUCKET_ENV=name, GLOBAL_ENV_BUCKET=name):
             yield
 
