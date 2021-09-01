@@ -55,6 +55,9 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     METADATA_BUCKET_HEALTH_PAGE_KEY = 'metadata_bundles_bucket'
     TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY = 'tibanna_output_bucket'
 
+    ELASTICSEARCH_HEALTH_PAGE_KEY = 'elasticsearch'
+
+
     @staticmethod  # backward compatibility in case other repositories are using this
     def verify_and_get_env_config(s3_client, global_bucket: str, env):
         return EnvManager.verify_and_get_env_config(s3_client=s3_client,
@@ -80,16 +83,16 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         self.url = ''
         self.s3 = boto3.client('s3', region_name='us-east-1')
         global_bucket = EnvManager.global_env_bucket_name()
-        self.global_env_bucket_manager = None  # In a legacy environment, this will continue to be None
+        self.env_manager = None  # In a legacy environment, this will continue to be None
         if sys_bucket is None:
             # The choice to discriminate first on sys_bucket being None is part of the resolution of
             # https://hms-dbmi.atlassian.net/browse/C4-674
             if global_bucket:
                 # env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket, env=env)
                 # ff_url = env_config['fourfront']
-                self.global_env_bucket_manager = global_manager = EnvManager(env_name=env, s3=self.s3)
-                ff_url = global_manager.portal_url
-                health_json_url = '{ff_url}/health?format=json'.format(ff_url=ff_url)
+                self.env_manager = global_manager = EnvManager(env_name=env, s3=self.s3)
+                self.url = global_manager.portal_url
+                health_json_url = f'{global_manager.portal_url}/health?format=json'
                 logger.warning('health json url: {}'.format(health_json_url))
                 health_json = EnvManager.fetch_health_page_json(url=health_json_url)
                 sys_bucket_from_health_page = health_json[self.SYS_BUCKET_HEALTH_PAGE_KEY]
@@ -136,17 +139,30 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 #       upstream of the global env bucket branch, too. That's not needed for orchestrated cgap,
                 #       which has no stage, but it will be needed for orchestrated fourfront. -kmp 31-Aug-2021
                 if env:
+                    self.url = get_beanstalk_real_url(env)
                     if is_stg_or_prd_env(env):
-                        # TODO: This .url doesn't get set (to non-'') in the other legacy branch of this if statement,
-                        #   but also it doesn't get set in the orchestrated branch above. Why? This function can
-                        #   certainly handle both legacy cases right now and will soon be able to handle it in
-                        #   orchestrated mode, too. -kmp 31-Aug-2021
-                        self.url = get_beanstalk_real_url(env)
                         env = prod_bucket_env(env)
                     else:
                         # TODO: This is the part that is not yet supported in env_utils, but there is a pending
                         #       patch that will fix that. -kmp 31-AUg-2021
                         env = full_env_name(env)
+
+                    health_json_url = f"{self.url}/health?format=json"
+                    # In the orchestrated case, we issue a warning here. Do we need that? -kmp 1-Sep-2021
+                    # logger.warning('health json url: {}'.format(health_json_url))
+                    health_json = EnvManager.fetch_health_page_json(url=health_json_url)
+                    es_url = health_json.get(self.ELASTICSEARCH_HEALTH_PAGE_KEY)
+                    if not es_url.startswith("http"):  # will match http: and https:
+                        es_url = f"https://{es_url}"
+
+                    self.env_manager = EnvManager(
+                        env_description={
+                            EnvManager.LEGACY_PORTAL_URL_KEY: self.url,
+                            EnvManager.LEGACY_ES_URL_KEY: es_url,
+                            EnvManager.LEGACY_ENV_NAME_KEY: env,
+                        },
+                        s3=self.s3,
+                    )
 
                 # TODO: This branch is not setting self.global_env_bucket_manager, but it _could_ do that from the
                 #       description. -kmp 21-Aug-2021
