@@ -143,33 +143,47 @@ def delete_mark_s3_object(*, object_key, bucket_name, s3=None):
         return None
 
 
-def delete_s3_object_version(*, object_key, version_id, bucket_name, s3=None):
-    """ Delete the version of an object in the given bucket
-        ? What happens if you have an unversioned bucket
-        ? This is currently agnostic as to whether the object exists or not
-        ? It appears if you attempt to delete something that doesn't exist
-        ? you still get a 204 and the version_id that you passed is returned
-        ? this is true if you pass any version_id to an unversioned bucket
-        ? test what happens if you set version_id to None on unversioned bucket
-        ? can we just add some logging to indicate version status of the bucket
-        ? and expected behavior if version is passed or not
+def delete_s3_object_version(*, object_key, bucket_name, version_id=None, s3=None):
+    """ Delete the version of an object in the given bucket if the bucket is version enabled
+        Or delete the object if is in an unversioned bucket.  If you do not provide a
+        version_id and a version enabled bucket an Exception is raised.  'null' is returned
+        as the version_id for an version disabled bucket delete
+    NB: providing 'null' as version_id is allowed for version disable buckets
+    NB: This is currently agnostic as to whether the object exists or not
 
     :param object_key: key for the object - string
-    :param version_id: version id for version to delete - string
     :param bucket_name: name of the bucket - string
+    :param version_id: version id for version to delete - string
     :param s3: AWS s3 client
     :return: string - versionId of the deleted version
     """
     s3 = s3 or s3Utils().s3
     try:
-        res = s3.delete_object(Bucket=bucket, Key=key, VersionId=version_id)
-        if res.get('ResponseMetadata').get('HTTPStatusCode') == 204:
-            # the object.version is no longer in the bucket (or maybe never was)
+        versioning = s3.get_bucket_versioning(Bucket=bucket_name).get('Status')
+    except ClientError, AttributeError as e:
+        logger.error(str(e))
+        return None
+
+    try:
+        if versioning == 'Enabled' and version_id and version_id != 'null':
+            logger.info("Deleting version {version_id} of object {object_id} from version enabled {bucket_name}".
+                        format(version_id=version_id, object_id=object_id, bucket_name=bucket_name))
+            res = s3.delete_object(Bucket=bucket, Key=key, VersionId=version_id)
+        elif not version_id or version_id == 'null':
+            logger.info("Deleting object {object_id} from version disabled {bucket_name}".
+                        format(object_id=object_id, bucket_name=bucket_name))
+            res = s3.delete_object(Bucket=bucket, Key=key)
+    except ClientError as e:
+        logger.error(str(e))
+        return None
+    if res.get('ResponseMetadata').get('HTTPStatusCode') == 204:
+        # the object.version is no longer in the bucket (or maybe never was)
+        if 'VersionId' in res:
             return res.get('VersionId')
-        else:
-            # what's a good thing to do here?  logging, raise exception
-            return None
-    except ClientError:
+        return 'null'
+    else:
+        # what's a good thing to do here?  logging, raise exception
+        raise("Unexpected response status - {}".format(res))
         return None
 
 
