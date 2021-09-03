@@ -147,17 +147,18 @@ def delete_s3_object_version(*, object_key, version_id, bucket_name, s3=None):
     """ Delete the version of an object in the given bucket
         ? What happens if you have an unversioned bucket
         ? This is currently agnostic as to whether the object exists or not
-        ? It appears if you attempt to delete something that doesn't exist a delete marker
-        ? gets added for it - this makes it difficult to distinguish the case where
-        ? you might have deleted a delete marker to effectively undelete the object
-        ? vs. just adding a delete marker for a non-existent object?
-        ? maybe logging and exception handling
+        ? It appears if you attempt to delete something that doesn't exist
+        ? you still get a 204 and the version_id that you passed is returned
+        ? this is true if you pass any version_id to an unversioned bucket
+        ? test what happens if you set version_id to None on unversioned bucket
+        ? can we just add some logging to indicate version status of the bucket
+        ? and expected behavior if version is passed or not
 
     :param object_key: key for the object - string
     :param version_id: version id for version to delete - string
     :param bucket_name: name of the bucket - string
     :param s3: AWS s3 client
-    :return: string - versionId of the delete marker
+    :return: string - versionId of the deleted version
     """
     s3 = s3 or s3Utils().s3
     try:
@@ -172,7 +173,7 @@ def delete_s3_object_version(*, object_key, version_id, bucket_name, s3=None):
         return None
 
 
-def delete_object_completely(*, object_key, bucket_name, s3):
+def delete_s3_object_completely(*, object_key, bucket_name, s3):
     """ Delete all the versions of an object in the given bucket
         ? What happens if you have an unversioned bucket
         ? maybe logging and exception handling
