@@ -189,24 +189,43 @@ def delete_s3_object_version(*, object_key, bucket_name, version_id=None, s3=Non
 
 def delete_s3_object_completely(*, object_key, bucket_name, s3):
     """ Delete all the versions of an object in the given bucket
-        ? What happens if you have an unversioned bucket
-        ? maybe logging and exception handling
 
     :param object_key: key for the object - string
     :param bucket_name: name of the bucket - string
     :param s3: AWS s3 client
-    :return: ???
+    :return: boolean - True if all expected versions were deleted
     """
     s3 = s3 or s3Utils().s3
-    ver_res = s3.list_object_versions(Bucket=bucket_name, Prefix=object_key)
-    if ver_res.get('ResponseMetadata').get('HTTPStatusCode') == 200 and not ver_res.get('ResponseMetadata').get('IsTruncated'):
-        delete_markers = ver_res.get('DeleteMarkers', [])
-        versions = ver_res.get('Versions', [])
-        versions.extend(delete_markers)
-        for version in versions:
-            version_id = version.get('VersionId')
-            res = delete_s3_object_version(object_key=key, version_id=version_id, bucket_name=bucket_name, s3)
-
+    expected_cnt = None
+    deleted_cnt = 0
+    if s3.get_bucket_versioning(Bucket=bucket_name).get('Status') == 'Disabled':
+        expected_cnt = 1
+        if delete_s3_object_version(object_key=key, bucket_name=bucket_name, s3):
+            deleted_cnt += 1
+    else:
+        ver_res = s3.list_object_versions(Bucket=bucket_name, Prefix=object_key)
+        if ver_res.get('ResponseMetadata').get('HTTPStatusCode') == 200:
+            if ver_res.get('ResponseMetadata').get('IsTruncated'):
+                logger.warning("Too many versions of {} in {} - incomplete delete".format(object_key, bucket_name))
+            delete_markers = ver_res.get('DeleteMarkers', [])
+            versions = ver_res.get('Versions', [])
+            versions.extend(delete_markers)
+            expected_cnt = len(versions)
+            for version in versions:
+                version_id = version.get('VersionId')
+                res = delete_s3_object_version(object_key=key, bucket_name=bucket_name, version_id=version_id, s3)
+                if not res:
+                    logger.warning("Problem with delete of {} - version id {} from {}".format(object_key, version_id, bucket_name))
+                else:
+                    deleted_cnt += 1
+    if expected_cnt:
+        if expected_cnt == deleted_cnt:
+            logger.info("Deleted {} versions of {} from {}".format(deleted_cnt, object_key, bucket_name))
+            return True
+        else:
+            logger.warning("Expected to delete {expected} and DELETED {delcnt}".format(expected=expected_cnt, delcnt=deleted_cnt))
+            return False
+    return False
 
 # def read_s3_object():
 #     pass
