@@ -27,6 +27,32 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 
 
+class HealthPageKey:
+    APPLICATION_BUCKET_PREFIX = 'application_bucket_prefix'
+    BEANSTALK_APP_VERSION = 'beanstalk_app_version'
+    BEANSTALK_ENV = 'beanstalk_env'
+    BLOB_BUCKET = 'blob_bucket'                              # = s3Utils.BLOB_BUCKET_HEALTH_PAGE_KEY
+    DATABASE = 'database'
+    DISPLAY_TITLE = 'display_title'
+    ELASTICSEARCH = 'elasticsearch'
+    FILE_UPLOAD_BUCKET = 'file_upload_bucket'                # = s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY
+    FOURSIGHT = 'foursight'
+    FOURSIGHT_BUCKET_PREFIX = 'foursight_bucket_prefix'
+    IDENTITY = 'identity'
+    INDEXER = 'indexer'
+    INDEX_SERVER = 'index_server'
+    LOAD_DATA = 'load_data'
+    METADATA_BUNDLES_BUCKET = 'metadata_bundles_bucket'      # = s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY
+    NAMESPACE = 'namespace'
+    PROCESSED_FILE_BUCKET = 'processed_file_bucket'          # = s3Utils.OUTFILE_BUCKET_HEALTH_PAGE_KEY
+    PROJECT_VERSION = 'project_version'
+    SNOVAULT_VERSION = 'snovault_version'
+    SYSTEM_BUCKET = 'system_bucket'                          # = s3Utils.SYS_BUCKET_HEALTH_PAGE_KEY
+    TIBANNA_OUTPUT_BUCKET = 'tibanna_output_bucket'          # = s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY
+    UPTIME = 'uptime'
+    UTILS_VERSION = 'utils_version'
+
+
 class s3Utils(object):  # NOQA - This class name violates style rules, but a lot of things might break if we change it.
 
     # Some extra variables used in setup here so that other modules can be consistent with chosen values.
@@ -48,15 +74,16 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     METADATA_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + METADATA_BUCKET_SUFFIX  # = "elasticbeanstalk-%s-metadata-bundles"
     TIBANNA_OUTPUT_BUCKET_TEMPLATE = TIBANNA_OUTPUT_BUCKET_SUFFIX          # = "tibanna-output" (no prefix)
 
-    SYS_BUCKET_HEALTH_PAGE_KEY = 'system_bucket'
-    OUTFILE_BUCKET_HEALTH_PAGE_KEY = 'processed_file_bucket'
-    RAW_BUCKET_HEALTH_PAGE_KEY = 'file_upload_bucket'
-    BLOB_BUCKET_HEALTH_PAGE_KEY = 'blob_bucket'
-    METADATA_BUCKET_HEALTH_PAGE_KEY = 'metadata_bundles_bucket'
-    TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY = 'tibanna_output_bucket'
+    # NOTE: These are deprecated now and retained for compatibility. Please rewrite uses as HealthPageKey.xyz names.
+    SYS_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.SYSTEM_BUCKET                     # = 'system_bucket'
+    OUTFILE_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.PROCESSED_FILE_BUCKET         # = 'processed_file_bucket'
+    RAW_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.FILE_UPLOAD_BUCKET                # = 'file_upload_bucket'
+    BLOB_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.BLOB_BUCKET                      # = 'blob_bucket'
+    METADATA_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.METADATA_BUNDLES_BUCKET      # = 'metadata_bundles_bucket'
+    TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.TIBANNA_OUTPUT_BUCKET  # = 'tibanna_output_bucket'
 
-    ELASTICSEARCH_HEALTH_PAGE_KEY = 'elasticsearch'
-
+    # NOTE: This is also deprecated, even though not a bucket name. Use HealthPageKey.ELASTICSEARCH.
+    ELASTICSEARCH_HEALTH_PAGE_KEY = HealthPageKey.ELASTICSEARCH                  # = 'elasticsearch'
 
     @staticmethod  # backward compatibility in case other repositories are using this
     def verify_and_get_env_config(s3_client, global_bucket: str, env):
@@ -151,18 +178,10 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                     # In the orchestrated case, we issue a warning here. Do we need that? -kmp 1-Sep-2021
                     # logger.warning('health json url: {}'.format(health_json_url))
                     health_json = EnvManager.fetch_health_page_json(url=health_json_url)
-                    es_url = health_json.get(self.ELASTICSEARCH_HEALTH_PAGE_KEY)
+                    es_url = health_json.get(HealthPageKey.ELASTICSEARCH)
                     if not es_url.startswith("http"):  # will match http: and https:
                         es_url = f"https://{es_url}"
-
-                    self.env_manager = EnvManager(
-                        env_description={
-                            EnvManager.LEGACY_PORTAL_URL_KEY: self.url,
-                            EnvManager.LEGACY_ES_URL_KEY: es_url,
-                            EnvManager.LEGACY_ENV_NAME_KEY: env,
-                        },
-                        s3=self.s3,
-                    )
+                    self.env_manager = EnvManager.compose(portal_url=self.url, es_url=es_url, env_name=env, s3=self.s3)
 
                 # TODO: This branch is not setting self.global_env_bucket_manager, but it _could_ do that from the
                 #       description. -kmp 21-Aug-2021
@@ -402,6 +421,25 @@ class EnvManager:
     LEGACY_ENV_NAME_KEY = 'ff_env'
     ENV_NAME_KEY = 'env_name'  # In the future we may want to convert to these keys, but not yet. See note above.
 
+    @classmethod
+    def compose(cls, *, portal_url, es_url, env_name, s3: Optional[botocore.client.BaseClient] = None):
+        """
+        Creates an EnvManager from a set of required function arguments that together comprise an env_description
+        that would be needed to create an EnvManager with an env_description argument. The s3 argument is not part
+        of that description, but is still needed if available. In other words:
+
+            EnvManager(s3=s3, portal_url=p, es_url=e, env_name=n)
+            ==
+            EnvManager(s3=s3, env_description={'fourfront': p, 'es': e, 'ff_env': n})
+        """
+        # TODO: At some future time, use the non-LEGACY versions of keys.
+        description = {
+            EnvManager.LEGACY_PORTAL_URL_KEY: portal_url,
+            EnvManager.LEGACY_ES_URL_KEY: es_url,
+            EnvManager.LEGACY_ENV_NAME_KEY: env_name,
+        }
+        return cls(env_description=description, s3=s3)
+
     def __init__(self, env_name: Optional[str] = None,
                  env_description: Optional[dict] = None,
                  s3: Optional[botocore.client.BaseClient] = None):  # really we want an S3 client, but it's not a type
@@ -422,14 +460,26 @@ class EnvManager:
             raise ValueError("You may only specify an env_name or an env_description")
         if env_description:
             self.env_description = env_description
-            self._env_name = (self.env_description.get(self.LEGACY_ENV_NAME_KEY) or
-                              self.env_description.get(self.ENV_NAME_KEY))
         else:  # env_name is given or is None and must be inferred
             env_description = self.verify_and_get_env_config(s3_client=self.s3,
                                                              global_bucket=self.global_env_bucket_name(),
                                                              env=env_name)
             self.env_description = env_description
-            self._env_name = env_name
+
+        described_env_name = (env_description.get(self.LEGACY_ENV_NAME_KEY) or
+                              env_description.get(self.ENV_NAME_KEY))
+
+        if described_env_name:
+            if not env_name:
+                env_name = described_env_name
+            elif env_name == described_env_name:
+                raise ValueError(f"The given env name, {env_name},"
+                                 f" does not match the name given in the description, {env_description}.")
+
+        self._env_name = env_name
+        if not self._env_name:
+            raise ValueError(f"Missing {self.LEGACY_ENV_NAME_KEY!r} or {self.ENV_NAME_KEY!r}"
+                             f" key in global_env {env_description}.")
 
         self._portal_url = (env_description.get(self.LEGACY_PORTAL_URL_KEY) or
                             env_description.get(self.PORTAL_URL_KEY))
@@ -443,11 +493,6 @@ class EnvManager:
             raise ValueError(f"Missing {self.LEGACY_ES_URL_KEY!r} or {self.ES_URL_KEY!r}"
                              f" key in global_env {env_description}.")
 
-        self._env_name = (env_description.get(self.LEGACY_ENV_NAME_KEY) or
-                          env_description.get(self.ENV_NAME_KEY))
-        if not self._env_name:
-            raise ValueError(f"Missing {self.LEGACY_ENV_NAME_KEY!r} or {self.ENV_NAME_KEY!r}"
-                             f" key in global_env {env_description}.")
 
     @property
     def portal_url(self):
