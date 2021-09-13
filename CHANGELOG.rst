@@ -12,14 +12,25 @@ Change Log
 
 * In ``qa_utils`` add some support for testing new functionality:
 
+  * In ``MockBoto3``, create a different way to register client classes.
+
   * In ``MockBotoS3Client``:
 
     * Add minimal support for ``head_bucket``.
     * Add minimal support for ``list_objects_v2``.
     * Make ``list_objects`` and ``list_objects_v2``, return a ``KeyCount`` in the result.
 
+  * New class ``MockBotoElasticBeanstalkClient`` for mocking beanstalk behavior.
+
+    * New subclasses ``MockBoto4DNLegacyElasticBeanstalkClient`` and ``MockBotoFooBarElasticBeanstalkClient``
+      that mock behavior of our standard legacy setup and a setup with just a ``fourfront-foo`` and ``fourfront-bar``,
+      respectively.
+
 
 * In ``s3_utils``:
+
+  * Add a class ``HealthPageKey`` that holds names of keys expected in health page json.
+    This was ported from ``cgap-portal``, which can now start importing from here.
 
   * Add an ``EnvManager`` object to manage obtaining and parsing contents of the data in global env bucket.
     Specific capabilities include:

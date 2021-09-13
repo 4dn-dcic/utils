@@ -622,6 +622,13 @@ class MockBoto3:
 
     @classmethod
     def register_client(cls, *, kind):
+        """
+        A decorator for defining classes of mocked clients. Intended use:
+
+            @MockBoto3.register_client(kind='cloudformation')
+            class MockBotoCloudFormationClient:
+                ...etc.
+        """
         def _wrap(cls_to_wrap):
             if cls._CLIENTS.get(kind):
                 raise ValueError(f"A MockBoto3 client for {kind} is already defined.")

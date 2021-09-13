@@ -334,7 +334,10 @@ def beanstalk_info(env):
     res = describe_beanstalk_environments(client, EnvironmentNames=[env])
     envs = res['Environments']
     if not envs:
+        # Raise an error that will be meaningful to the caller, rather than just getting an index out of range error.
         raise ClientError({"Error": {"Code": 404, "Message": f"Environment does not exist: {env}"}},
+                          # Properly speaking, this error does not come from .describe_environments(), so we kind of
+                          # have to make up an operation that's failing, even though it's not a boto3 operation.
                           operation_name="beanstalk_info")
     else:
         return envs[0]

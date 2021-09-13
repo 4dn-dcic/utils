@@ -27,7 +27,7 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 
 
-class HealthPageKey:
+class HealthPageKey:  # This is moving here from cgap-portal.
     APPLICATION_BUCKET_PREFIX = 'application_bucket_prefix'
     BEANSTALK_APP_VERSION = 'beanstalk_app_version'
     BEANSTALK_ENV = 'beanstalk_env'
@@ -81,8 +81,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     BLOB_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.BLOB_BUCKET                      # = 'blob_bucket'
     METADATA_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.METADATA_BUNDLES_BUCKET      # = 'metadata_bundles_bucket'
     TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.TIBANNA_OUTPUT_BUCKET  # = 'tibanna_output_bucket'
-
-    # NOTE: This is also deprecated, even though not a bucket name. Use HealthPageKey.ELASTICSEARCH.
+    # This is also deprecated, even though not a bucket name. Use HealthPageKey.ELASTICSEARCH.
     ELASTICSEARCH_HEALTH_PAGE_KEY = HealthPageKey.ELASTICSEARCH                  # = 'elasticsearch'
 
     @staticmethod  # backward compatibility in case other repositories are using this
