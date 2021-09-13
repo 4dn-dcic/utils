@@ -75,6 +75,7 @@ CGAP_PUBLIC_URL_PRD = 'https://cgap.hms.harvard.edu'
 
 CGAP_PUBLIC_URLS = {
     'cgap': CGAP_PUBLIC_URL_PRD,
+    'fourfront-cgap': CGAP_PUBLIC_URL_PRD,
     'data': CGAP_PUBLIC_URL_PRD,
     'staging': CGAP_PUBLIC_URL_STG,
 }
