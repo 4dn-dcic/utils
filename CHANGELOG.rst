@@ -26,7 +26,6 @@ Change Log
       that mock behavior of our standard legacy setup and a setup with just a ``fourfront-foo`` and ``fourfront-bar``,
       respectively.
 
-
 * In ``s3_utils``:
 
   * Add a class ``HealthPageKey`` that holds names of keys expected in health page json.
@@ -49,6 +48,11 @@ Change Log
     * This class also creates suitable abstraction to allow for a future in which the contents of this dictionary
       might include keys ``portal_url``, ``es_url``, and ``env_name`` in lieu of what are now
       ``fourfront``, ``es``, and ``ff_env``, respectively.
+
+    * When an ``env`` argument is given in creation of ``s3Utils``, an ``EnvManager`` object will be placed in
+      the ``.env_manager`` property of the resulting ``s3Utils`` instance. (If no ``env`` argument is given, no
+      such object can usefully be created since there is insufficient information.)
+
 
 2.2.0
 =====
