@@ -428,9 +428,9 @@ class EnvManager:
         that would be needed to create an EnvManager with an env_description argument. The s3 argument is not part
         of that description, but is still needed if available. In other words:
 
-            EnvManager(s3=s3, portal_url=p, es_url=e, env_name=n)
+            EnvManager.compose(s3=s3, portal_url=portal_url, es_url=es_url, env_name=env_name)
             ==
-            EnvManager(s3=s3, env_description={'fourfront': p, 'es': e, 'ff_env': n})
+            EnvManager(s3=s3, env_description={'fourfront': portal_url, 'es': es_url, 'ff_env': env_name})
         """
         # TODO: At some future time, use the non-LEGACY versions of keys.
         description = {
