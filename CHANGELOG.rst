@@ -54,6 +54,14 @@ Change Log
       such object can usefully be created since there is insufficient information.)
 
 
+2.2.1
+=====
+
+* In ``env_utils``:
+
+  * Add ``fourfront-cgap`` to the table of ``CGAP_PUBLIC_URLS``.
+
+
 2.2.0
 =====
 
