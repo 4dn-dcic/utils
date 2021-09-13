@@ -22,7 +22,7 @@ from unittest import mock
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
 from .misc_utils import (
     PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ,
-    environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name
+    environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name,
 )
 
 
@@ -210,7 +210,8 @@ class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
         unless a different local_timezone was specified when creating the ControlledTime.
         """
         now = self.now()
-        return self._local_timezone.localize(now).astimezone(pytz.UTC).replace(tzinfo=None)
+        return (self._local_timezone.localize(now)  # noQA - PyCharm complains wrongly about args to .localize()
+                .astimezone(pytz.UTC).replace(tzinfo=None))
 
     def sleep(self, secs: float):
         """
@@ -614,13 +615,20 @@ class MockKeysNotImplemented(NotImplementedError):
 
 class MockBoto3:
 
+    _CLIENTS = {}
+
+    @classmethod
+    def register_client(cls, *, kind):
+        def _wrap(cls_to_wrap):
+            if cls._CLIENTS.get(kind):
+                raise ValueError(f"A MockBoto3 client for {kind} is already defined.")
+            cls._CLIENTS[kind] = cls_to_wrap
+            return cls_to_wrap
+        return _wrap
+
     @classmethod
     def _default_mappings(cls):
-        return {
-            's3': MockBotoS3Client,
-            'sqs': MockBotoSQSClient,
-            'cloudformation': MockBotoCloudFormationClient,
-        }
+        return cls._CLIENTS
 
     def __init__(self, **override_mappings):
         self._mappings = dict(self._default_mappings(), **override_mappings)
@@ -636,6 +644,7 @@ class MockBoto3:
         return mapped_class(boto3=self, **kwargs)
 
 
+@MockBoto3.register_client(kind='cloudformation')
 class MockBotoCloudFormationClient:
 
     _SHARED_STACKS_MARKER = '_cloudformation_stacks'
@@ -718,6 +727,7 @@ class MockBotoCloudFormationResourceSummary:
         self.stack_name = None  # This will get filled out if used as a resource on a mock stack
 
 
+@MockBoto3.register_client(kind='s3')
 class MockBotoS3Client:
     """
     This is a mock of certain S3 functionality.
@@ -957,6 +967,7 @@ class MockBotoS3BucketObjects:
         return self.bucket._delete(delete_bucket_too=False)  # noQA - we are effectively a friend of this instance
 
 
+@MockBoto3.register_client(kind='sqs')
 class MockBotoSQSClient:
     """
     This is a mock of certain SQS functionality.
