@@ -332,7 +332,12 @@ def beanstalk_info(env):
     """
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = describe_beanstalk_environments(client, EnvironmentNames=[env])
-    return res['Environments'][0]
+    envs = res['Environments']
+    if not envs:
+        raise ClientError({"Error": {"Code": 404, "Message": f"Environment does not exist: {env}"}},
+                          operation_name="beanstalk_info")
+    else:
+        return envs[0]
 
 
 def get_beanstalk_real_url(env):

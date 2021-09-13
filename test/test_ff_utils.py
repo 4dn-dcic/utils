@@ -8,11 +8,11 @@ import shutil
 import time
 
 from botocore.exceptions import ClientError
-from dcicutils import es_utils, ff_utils, s3_utils
+from dcicutils import es_utils, ff_utils, s3_utils, beanstalk_utils
 from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true
 from dcicutils.qa_utils import (
     check_duplicated_items_by_key, MockResponse, ignored, MockBoto3, MockBotoSQSClient, MockBotoS3Client,
-    override_environ, raises_regexp
+    override_environ, raises_regexp, MockBotoFooBarElasticBeanstalkClient, make_mock_beanstalk_cname
 )
 from types import GeneratorType
 from unittest import mock
@@ -253,9 +253,14 @@ foo_env_auth_dict = {
     'secret': foo_env_auth_secret
 }
 
+FOURFRONT_FOO_HEALTH_PAGE = {
+    s3_utils.HealthPageKey.BEANSTALK_ENV: "fourfront-foo",
+    s3_utils.HealthPageKey.ELASTICSEARCH: "http://fourfront-foo.elasticsearch.whatever",
+}
+
 bar_env = 'fourfront-bar'
 bar_env_auth_key, bar_env_auth_secret = bar_env_auth_tuple = ('barkey', 'barsecret')
-bar_env_url = 'http://fourfront-bar.example/'
+bar_env_url = f"http://{make_mock_beanstalk_cname('fourfront-bar')}/"
 bar_env_url_trimmed = bar_env_url.rstrip('/')
 bar_env_auth_dict = {
     'key': bar_env_auth_key,
@@ -263,6 +268,11 @@ bar_env_auth_dict = {
     'server': bar_env_url,
 }
 bar_env_default_auth_dict = {'default': bar_env_auth_dict}
+
+FOURFRONT_BAR_HEALTH_PAGE = {
+    s3_utils.HealthPageKey.BEANSTALK_ENV: "fourfront-bar",
+    s3_utils.HealthPageKey.ELASTICSEARCH: "http://fourfront-bar.elasticsearch.whatever",
+}
 
 SSE_CUSTOMER_KEY = 'SSECustomerKey'
 SSE_CUSTOMER_ALGORITHM = 'SSECustomerAlgorithm'
@@ -321,17 +331,34 @@ class MockBotoS3WithSSE(MockBotoS3Client):
 def mocked_s3_with_sse():
     """
     This context manager sets up a mock version of boto3 for use by s3_utils and ff_utils during the context
-    of its test. It also sets up the S3_ENCRYPT_KEY environment variable with a sample value for testing.
+    of its test. It also sets up the S3_ENCRYPT_KEY environment variable with a sample value for testing,
+    and it sets up a set of mocked beanstalks for fourfront-foo and fourfront-bar, so that s3_utils will not
+    get confused when it does discovery operations to find them.
     """
     # First we make a mocked boto3 that will use an S3 mock with mock server side encryption.
-    mock_boto3 = MockBoto3(s3=MockBotoS3WithSSE)
+    mock_boto3 = MockBoto3(s3=MockBotoS3WithSSE, elasticbeanstalk=MockBotoFooBarElasticBeanstalkClient)
     # Now we arrange that both s3_utils and ff_utils modules share the illusion that our mock IS the boto3 library
     with mock.patch.object(s3_utils, "boto3", mock_boto3):
         with mock.patch.object(ff_utils, "boto3", mock_boto3):
-            # The mocked encrypt key is expected by various tools in the s3_utils module to be supplied
-            # as an environment variable (i.e., in os.environ), so this sets up that environment variable.
-            with override_environ(S3_ENCRYPT_KEY=MockBotoS3WithSSE.SSE_ENCRYPT_KEY):
-                yield
+            with mock.patch.object(beanstalk_utils, "boto3", mock_boto3):
+                with mock.patch.object(s3_utils.EnvManager, "fetch_health_page_json") as mock_fetch_health_page_json:
+
+                    # This is all that's needed for s3Utils to initialize an EnvManager.
+                    # We might have to add more later.
+                    def mocked_fetch_health_page_json(url, use_urllib=True):
+                        ignored(use_urllib)  # we don't test this
+                        if 'fourfront-foo' in url:
+                            return FOURFRONT_FOO_HEALTH_PAGE
+                        elif 'fourfront-bar' in url:
+                            return FOURFRONT_BAR_HEALTH_PAGE
+                        else:
+                            raise NotImplementedError(f"Mock can't handle URL: {url}")
+
+                    mock_fetch_health_page_json.side_effect = mocked_fetch_health_page_json
+                    # The mocked encrypt key is expected by various tools in the s3_utils module to be supplied
+                    # as an environment variable (i.e., in os.environ), so this sets up that environment variable.
+                    with override_environ(S3_ENCRYPT_KEY=MockBotoS3WithSSE.SSE_ENCRYPT_KEY):
+                        yield
 
 
 def test_unified_authentication_unit():
@@ -415,7 +442,7 @@ def test_unified_authentication_prod_envs_integrated_only():
     auth_is_shared = cgap_prod_auth == ff_prod_auth
     assert not auth_is_shared
 
-    with raises_regexp(ClientError, "The specified bucket does not exist"):
+    with raises_regexp(ClientError, "does not exist"):
         # There is no such environment as 'fourfront-data'
         ff_utils.unified_authentication(ff_env="fourfront-data")
 
@@ -1724,16 +1751,17 @@ def test_are_counts_even_unit(expect_match, sample_counts):
 
         return MockResponse(json=sample_counts)
 
-    with mock.patch.object(ff_utils, "authorized_request", mocked_authorized_request):
-        with mock.patch.object(s3_utils.s3Utils, "get_access_keys",
-                               return_value=bar_env_auth_dict):
+    with mocked_s3_with_sse():
+        with mock.patch.object(ff_utils, "authorized_request", mocked_authorized_request):
+            with mock.patch.object(s3_utils.s3Utils, "get_access_keys",
+                                   return_value=bar_env_auth_dict):
 
-            counts_are_even, totals = ff_utils.get_counts_summary(env='fourfront-foo')
-            print("expect_match=", expect_match, "counts_are_even=", counts_are_even, "totals=", totals)
+                counts_are_even, totals = ff_utils.get_counts_summary(env='fourfront-foo')
+                print("expect_match=", expect_match, "counts_are_even=", counts_are_even, "totals=", totals)
 
-            if expect_match:
-                assert counts_are_even
-                assert 'more items' not in ' '.join(totals)
-            else:
-                assert not counts_are_even
-                assert 'more items' in ' '.join(totals)
+                if expect_match:
+                    assert counts_are_even
+                    assert 'more items' not in ' '.join(totals)
+                else:
+                    assert not counts_are_even
+                    assert 'more items' in ' '.join(totals)

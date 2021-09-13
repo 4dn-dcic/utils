@@ -690,6 +690,7 @@ def test_s3_utils_buckets_modern():
             assert e.es_url == es_server_https
             assert e.env_name == env_name
 
+
 def test_s3_utils_environment_variable_use():
 
     with pytest.raises(SynonymousEnvironmentVariablesMismatched):
@@ -757,7 +758,6 @@ def test_env_manager_fetch_health_page_json():
             self.used_mocked_urlopen = True
             return io.BytesIO(json.dumps(sample_health_page).encode('utf-8'))
 
-
     with mock.patch("requests.get") as mock_get:
         with mock.patch("urllib.request.urlopen") as mock_urlopen:
 
@@ -768,8 +768,8 @@ def test_env_manager_fetch_health_page_json():
             assert EnvManager.fetch_health_page_json("http://something/health?format=json",
                                                      use_urllib=False) == sample_health_page
             # We always use urllib now.
-            assert helper.used_mocked_get == False
-            assert helper.used_mocked_urlopen == True
+            assert helper.used_mocked_get is False
+            assert helper.used_mocked_urlopen is True
 
             helper = MockHelper()
             mock_get.side_effect = helper.mocked_get
@@ -778,8 +778,8 @@ def test_env_manager_fetch_health_page_json():
             assert EnvManager.fetch_health_page_json("http://something/health?format=json",
                                                      use_urllib=True) == sample_health_page
             # We always use urllib now.
-            assert helper.used_mocked_get == False
-            assert helper.used_mocked_urlopen == True
+            assert helper.used_mocked_get is False
+            assert helper.used_mocked_urlopen is True
 
 
 def test_env_manager():

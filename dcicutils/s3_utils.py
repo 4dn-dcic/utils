@@ -493,7 +493,6 @@ class EnvManager:
             raise ValueError(f"Missing {self.LEGACY_ES_URL_KEY!r} or {self.ES_URL_KEY!r}"
                              f" key in global_env {env_description}.")
 
-
     @property
     def portal_url(self):
         """
