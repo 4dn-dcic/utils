@@ -48,6 +48,7 @@ class HealthPageKey:  # This is moving here from cgap-portal.
     PROJECT_VERSION = 'project_version'
     SNOVAULT_VERSION = 'snovault_version'
     SYSTEM_BUCKET = 'system_bucket'                          # = s3Utils.SYS_BUCKET_HEALTH_PAGE_KEY
+    TIBANNA_CWLS_BUCKET = 'tibanna_cwls_bucket'              # = s3Utils.TIBANNA_CWLS_BUCKET_HEALTH_PAGE_KEY
     TIBANNA_OUTPUT_BUCKET = 'tibanna_output_bucket'          # = s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY
     UPTIME = 'uptime'
     UTILS_VERSION = 'utils_version'
@@ -63,6 +64,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     BLOB_BUCKET_SUFFIX = "blobs"
     METADATA_BUCKET_SUFFIX = "metadata-bundles"
     TIBANNA_OUTPUT_BUCKET_SUFFIX = 'tibanna-output'
+    TIBANNA_CWLS_BUCKET_SUFFIX = 'tibanna-cwls'
 
     EB_PREFIX = "elasticbeanstalk"
     EB_AND_ENV_PREFIX = EB_PREFIX + "-%s-"  # = "elasticbeanstalk-%s-"
@@ -73,6 +75,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     BLOB_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + BLOB_BUCKET_SUFFIX          # = "elasticbeanstalk-%s-blobs"
     METADATA_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + METADATA_BUCKET_SUFFIX  # = "elasticbeanstalk-%s-metadata-bundles"
     TIBANNA_OUTPUT_BUCKET_TEMPLATE = TIBANNA_OUTPUT_BUCKET_SUFFIX          # = "tibanna-output" (no prefix)
+    TIBANNA_CWLS_BUCKET_TEMPLATE = TIBANNA_CWLS_BUCKET_SUFFIX              # = "tibanna-output" (no prefix)
 
     # NOTE: These are deprecated now and retained for compatibility. Please rewrite uses as HealthPageKey.xyz names.
     SYS_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.SYSTEM_BUCKET                     # = 'system_bucket'
@@ -80,6 +83,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     RAW_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.FILE_UPLOAD_BUCKET                # = 'file_upload_bucket'
     BLOB_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.BLOB_BUCKET                      # = 'blob_bucket'
     METADATA_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.METADATA_BUNDLES_BUCKET      # = 'metadata_bundles_bucket'
+    # TIBANNA_CWLS_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.TIBANNA_CWLS_BUCKET      # = 'tibanna_cwls_bucket'
     TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.TIBANNA_OUTPUT_BUCKET  # = 'tibanna_output_bucket'
     # This is also deprecated, even though not a bucket name. Use HealthPageKey.ELASTICSEARCH.
     ELASTICSEARCH_HEALTH_PAGE_KEY = HealthPageKey.ELASTICSEARCH                  # = 'elasticsearch'
@@ -95,7 +99,10 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         return EnvManager.fetch_health_page_json(url=url, use_urllib=use_urllib)
 
     def __init__(self, outfile_bucket=None, sys_bucket=None, raw_file_bucket=None,
-                 blob_bucket=None, metadata_bucket=None, tibanna_output_bucket=None, env=None):
+                 blob_bucket=None, metadata_bucket=None, tibanna_output_bucket=None,
+                 tibanna_cwls_bucket=None,
+                 # The env arg is not allowed to be passed positionally because we periodically add preceding args.
+                 *, env=None):
         """ Initializes s3 utils in one of three ways:
         1) If 'GLOBAL_ENV_BUCKET' is set to an S3 env bucket, use that bucket to fetch the env for the buckets.
            We then use this env to build the bucket names. If there is only one such env, env can be None or omitted.
@@ -121,14 +128,17 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 health_json_url = f'{global_manager.portal_url}/health?format=json'
                 logger.warning('health json url: {}'.format(health_json_url))
                 health_json = EnvManager.fetch_health_page_json(url=health_json_url)
-                sys_bucket_from_health_page = health_json[self.SYS_BUCKET_HEALTH_PAGE_KEY]
-                outfile_bucket_from_health_page = health_json[self.OUTFILE_BUCKET_HEALTH_PAGE_KEY]
-                raw_file_bucket_from_health_page = health_json[self.RAW_BUCKET_HEALTH_PAGE_KEY]
-                blob_bucket_from_health_page = health_json[self.BLOB_BUCKET_HEALTH_PAGE_KEY]
-                metadata_bucket_from_health_page = health_json.get(self.METADATA_BUCKET_HEALTH_PAGE_KEY,
+                sys_bucket_from_health_page = health_json[HealthPageKey.SYSTEM_BUCKET]
+                outfile_bucket_from_health_page = health_json[HealthPageKey.PROCESSED_FILE_BUCKET]
+                raw_file_bucket_from_health_page = health_json[HealthPageKey.FILE_UPLOAD_BUCKET]
+                blob_bucket_from_health_page = health_json[HealthPageKey.BLOB_BUCKET]
+                metadata_bucket_from_health_page = health_json.get(HealthPageKey.METADATA_BUNDLES_BUCKET,
                                                                    # N/A for 4DN
                                                                    None)
-                tibanna_output_bucket_from_health_page = health_json.get(self.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY,
+                tibanna_cwls_bucket_from_health_page = health_json.get(HealthPageKey.TIBANNA_CWLS_BUCKET,
+                                                                       # new, so it may be missing
+                                                                       None)
+                tibanna_output_bucket_from_health_page = health_json.get(HealthPageKey.TIBANNA_OUTPUT_BUCKET,
                                                                          # new, so it may be missing
                                                                          None)
                 sys_bucket = sys_bucket_from_health_page  # OK to overwrite because we checked it's None above
@@ -152,6 +162,11 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                                                  inferred=metadata_bucket_from_health_page)
                 else:
                     metadata_bucket = metadata_bucket_from_health_page
+                if tibanna_cwls_bucket and tibanna_cwls_bucket != tibanna_cwls_bucket_from_health_page:
+                    raise InferredBucketConflict(kind="tibanna cwls", specified=tibanna_cwls_bucket,
+                                                 inferred=tibanna_cwls_bucket_from_health_page)
+                else:
+                    tibanna_cwls_bucket = tibanna_cwls_bucket_from_health_page
                 if tibanna_output_bucket and tibanna_output_bucket != tibanna_output_bucket_from_health_page:
                     raise InferredBucketConflict(kind="tibanna output", specified=tibanna_output_bucket,
                                                  inferred=tibanna_output_bucket_from_health_page)
@@ -192,6 +207,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 raw_file_bucket = apply_template(self.RAW_BUCKET_TEMPLATE, env)
                 blob_bucket = apply_template(self.BLOB_BUCKET_TEMPLATE, env)
                 metadata_bucket = apply_template(self.METADATA_BUCKET_TEMPLATE, env)
+                tibanna_cwls_bucket = apply_template(self.TIBANNA_CWLS_BUCKET_TEMPLATE, env)
                 tibanna_output_bucket = apply_template(self.TIBANNA_OUTPUT_BUCKET_TEMPLATE, env)
         else:
             # If at least sys_bucket was given, for legacy reasons (see https://hms-dbmi.atlassian.net/browse/C4-674)
@@ -205,6 +221,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         self.raw_file_bucket = raw_file_bucket
         self.blob_bucket = blob_bucket
         self.metadata_bucket = metadata_bucket
+        self.tibanna_cwls_bucket = tibanna_cwls_bucket
         self.tibanna_output_bucket = tibanna_output_bucket
 
     ACCESS_KEYS_S3_KEY = 'access_key_admin'
