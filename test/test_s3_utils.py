@@ -78,6 +78,7 @@ def test_s3utils_constants():
     assert s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY == 'file_upload_bucket'
     assert s3Utils.BLOB_BUCKET_HEALTH_PAGE_KEY == 'blob_bucket'
     assert s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY == 'metadata_bundles_bucket'
+    assert s3Utils.TIBANNA_CWLS_BUCKET_HEALTH_PAGE_KEY == 'tibanna_cwls_bucket'
     assert s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY == 'tibanna_output_bucket'
 
 
@@ -631,6 +632,7 @@ def test_s3_utils_legacy_behavior():
         assert s.raw_file_bucket == raw_file_bucket
         assert s.blob_bucket is None
         assert s.metadata_bucket is None
+        assert s.tibanna_cwls_bucket is None
         assert s.tibanna_output_bucket is None
 
         s = s3Utils(sys_bucket=sys_bucket)
@@ -639,6 +641,7 @@ def test_s3_utils_legacy_behavior():
         assert s.raw_file_bucket is None
         assert s.blob_bucket is None
         assert s.metadata_bucket is None
+        assert s.tibanna_cwls_bucket is None
         assert s.tibanna_output_bucket is None
 
     test_it()
@@ -651,30 +654,47 @@ def test_s3_utils_legacy_behavior():
 
 def test_s3_utils_buckets_modern():
 
+    env_name = 'fourfront-cgapfoo'
+
+    es_server_short = "some-es-server.com:443"
+    es_server_https = "https://some-es-server.com:443"
+
     with mock.patch("boto3.client"):
-        with mock.patch.object(s3_utils_module.s3Utils, "fetch_health_page_json") as mock_fetch:
+        with mock.patch.object(s3_utils_module.EnvManager, "fetch_health_page_json") as mock_fetch:
             mock_fetch.return_value = {
+                "elasticsearch": es_server_short,
                 "system_bucket": "the-system-bucket",
                 "processed_file_bucket": "the-output-file-bucket",
                 "file_upload_bucket": "the-raw-file-bucket",
                 "blob-bucket": "the-blob-bucket",
                 "metadata_bundles_bucket": "the-metadata-bundles-bucket",
+                "tibanna_cwls_bucket": "the-tibanna-cwls-bucket",
                 "tibanna_output_bucket": "the-tibanna-output-bucket",
             }
-            s = s3Utils(env='fourfront-cgapfoo')
-            assert s.outfile_bucket == 'elasticbeanstalk-fourfront-cgapfoo-wfoutput'
-            assert s.sys_bucket == 'elasticbeanstalk-fourfront-cgapfoo-system'
-            assert s.raw_file_bucket == 'elasticbeanstalk-fourfront-cgapfoo-files'
-            assert s.blob_bucket == 'elasticbeanstalk-fourfront-cgapfoo-blobs'
-            assert s.metadata_bucket == 'elasticbeanstalk-fourfront-cgapfoo-metadata-bundles'
-            assert s.tibanna_output_bucket == 'tibanna-output'
-
+            s = s3Utils(env=env_name)
             assert s.outfile_bucket != 'the-output-file-bucket'
             assert s.sys_bucket != 'the-system-bucket'
             assert s.raw_file_bucket != 'the-raw-file-bucket'
             assert s.blob_bucket != 'the-blog-bucket'
             assert s.metadata_bucket != 'the-metadata-bundles-bucket'
+            assert s.tibanna_cwls_bucket != 'the-tibanna-cwls-bucket'
             assert s.tibanna_output_bucket != 'the-tibanna-output-bucket'
+
+            assert s.outfile_bucket == 'elasticbeanstalk-fourfront-cgapfoo-wfoutput'
+            assert s.sys_bucket == 'elasticbeanstalk-fourfront-cgapfoo-system'
+            assert s.raw_file_bucket == 'elasticbeanstalk-fourfront-cgapfoo-files'
+            assert s.blob_bucket == 'elasticbeanstalk-fourfront-cgapfoo-blobs'
+            assert s.metadata_bucket == 'elasticbeanstalk-fourfront-cgapfoo-metadata-bundles'
+            assert s.tibanna_cwls_bucket == 'tibanna-cwls'
+            assert s.tibanna_output_bucket == 'tibanna-output'
+
+            e = s.env_manager
+
+            assert e.s3 == s.s3
+            # This mock is not elaborate enough for testing how e.portal_url is set up.
+            # assert e.portal_url = ...
+            assert e.es_url == es_server_https
+            assert e.env_name == env_name
 
 
 def test_s3_utils_environment_variable_use():
@@ -744,7 +764,6 @@ def test_env_manager_fetch_health_page_json():
             self.used_mocked_urlopen = True
             return io.BytesIO(json.dumps(sample_health_page).encode('utf-8'))
 
-
     with mock.patch("requests.get") as mock_get:
         with mock.patch("urllib.request.urlopen") as mock_urlopen:
 
@@ -755,8 +774,8 @@ def test_env_manager_fetch_health_page_json():
             assert EnvManager.fetch_health_page_json("http://something/health?format=json",
                                                      use_urllib=False) == sample_health_page
             # We always use urllib now.
-            assert helper.used_mocked_get == False
-            assert helper.used_mocked_urlopen == True
+            assert helper.used_mocked_get is False
+            assert helper.used_mocked_urlopen is True
 
             helper = MockHelper()
             mock_get.side_effect = helper.mocked_get
@@ -765,8 +784,8 @@ def test_env_manager_fetch_health_page_json():
             assert EnvManager.fetch_health_page_json("http://something/health?format=json",
                                                      use_urllib=True) == sample_health_page
             # We always use urllib now.
-            assert helper.used_mocked_get == False
-            assert helper.used_mocked_urlopen == True
+            assert helper.used_mocked_get is False
+            assert helper.used_mocked_urlopen is True
 
 
 def test_env_manager():
@@ -819,6 +838,19 @@ def test_env_manager_verify_and_get_env_config():
         assert config['fourfront'] == 'http://portal'
         assert config['es'] == 'http://es'
         assert config['ff_env'] == 'cgap-footest'
+
+        env_manager_from_desc = EnvManager.compose(portal_url='http://portal',
+                                                   es_url="http://es",
+                                                   env_name='cgap-footest',
+                                                   s3=my_s3)
+
+        assert env_manager_from_desc.env_description == config
+        assert env_manager_from_desc.env_description['fourfront'] == 'http://portal'
+        assert env_manager_from_desc.env_description['es'] == 'http://es'
+        assert env_manager_from_desc.env_description['ff_env'] == 'cgap-footest'
+        assert env_manager_from_desc.portal_url == 'http://portal'
+        assert env_manager_from_desc.es_url == 'http://es'
+        assert env_manager_from_desc.env_name == 'cgap-footest'
 
         config = EnvManager.verify_and_get_env_config(s3_client=my_s3, global_bucket='global-env-1',
                                                       # Env unspecified, but there's only one, so it'll be inferred.

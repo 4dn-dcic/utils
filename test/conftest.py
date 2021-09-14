@@ -77,13 +77,13 @@ INTEGRATED_ENV = 'fourfront-mastertest'
 # but it changes too much, so now we discover it from the 'elasticsearch' and 'namespace' parts of health page...
 INTEGRATED_ES = _discover_es_url_from_boto3_eb_metadata(INTEGRATED_ENV)
 
-@pytest.fixture(scope='session')
-def basestring():
-    try:
-        basestring = basestring  # noQA - PyCharm static analysis doesn't understand this Python 2.7 compatibility issue
-    except NameError:
-        basestring = str
-    return basestring
+# @pytest.fixture(scope='session')
+# def basestring():
+#     try:
+#         basestring = basestring  # noQA - PyCharm static analysis doesn't understand this Python 2.7 compatibility issue
+#     except NameError:
+#         basestring = str
+#     return basestring
 
 
 @pytest.fixture(scope='session')

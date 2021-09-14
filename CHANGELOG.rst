@@ -12,14 +12,31 @@ Change Log
 
 * In ``qa_utils`` add some support for testing new functionality:
 
+  * In ``MockBoto3``, create a different way to register client classes.
+
   * In ``MockBotoS3Client``:
 
     * Add minimal support for ``head_bucket``.
     * Add minimal support for ``list_objects_v2``.
     * Make ``list_objects`` and ``list_objects_v2``, return a ``KeyCount`` in the result.
 
+  * New class ``MockBotoElasticBeanstalkClient`` for mocking beanstalk behavior.
+
+    * New subclasses ``MockBoto4DNLegacyElasticBeanstalkClient`` and ``MockBotoFooBarElasticBeanstalkClient``
+      that mock behavior of our standard legacy setup and a setup with just a ``fourfront-foo`` and ``fourfront-bar``,
+      respectively.
 
 * In ``s3_utils``:
+
+  * Add a class ``HealthPageKey`` that holds names of keys expected in health page json.
+    This was ported from ``cgap-portal``, which can now start importing from here.
+    Also:
+
+    * Add ``HealthPageKey.TIBANNA_CWLS_BUCKET``.
+
+  * In ``s3Utils``:
+
+    * Add ``TIBANNA_CWLS_BUCKET_SUFFIX``.
 
   * Add an ``EnvManager`` object to manage obtaining and parsing contents of the data in global env bucket.
     Specific capabilities include:
@@ -38,6 +55,25 @@ Change Log
     * This class also creates suitable abstraction to allow for a future in which the contents of this dictionary
       might include keys ``portal_url``, ``es_url``, and ``env_name`` in lieu of what are now
       ``fourfront``, ``es``, and ``ff_env``, respectively.
+
+    * When an ``env`` argument is given in creation of ``s3Utils``, an ``EnvManager`` object will be placed in
+      the ``.env_manager`` property of the resulting ``s3Utils`` instance. (If no ``env`` argument is given, no
+      such object can usefully be created since there is insufficient information.)
+
+* In ``deployment_utils``:
+
+  * Support ``ENCODED_TIBANNA_CWLS_BUCKET`` and a ``--tibanna-cwls-bucket`` command line argument that get merged
+    into ``TIBANNA_CWLS_BUCKET`` for use in ``.ini`` templates.  These default similarly to how the
+    Tibanna output bucket does.
+
+
+2.2.1
+=====
+
+* In ``env_utils``:
+
+  * Add ``fourfront-cgap`` to the table of ``CGAP_PUBLIC_URLS``.
+
 
 2.2.0
 =====

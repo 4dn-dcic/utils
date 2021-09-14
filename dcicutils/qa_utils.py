@@ -2,7 +2,9 @@
 qa_utils: Tools for use in quality assurance testing.
 """
 
+
 import contextlib
+import copy
 import datetime
 import dateutil.tz as dateutil_tz
 import hashlib
@@ -22,7 +24,8 @@ from unittest import mock
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
 from .misc_utils import (
     PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ,
-    environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name
+    environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name,
+    find_associations,
 )
 
 
@@ -210,7 +213,8 @@ class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
         unless a different local_timezone was specified when creating the ControlledTime.
         """
         now = self.now()
-        return self._local_timezone.localize(now).astimezone(pytz.UTC).replace(tzinfo=None)
+        return (self._local_timezone.localize(now)  # noQA - PyCharm complains wrongly about args to .localize()
+                .astimezone(pytz.UTC).replace(tzinfo=None))
 
     def sleep(self, secs: float):
         """
@@ -614,13 +618,27 @@ class MockKeysNotImplemented(NotImplementedError):
 
 class MockBoto3:
 
+    _CLIENTS = {}
+
+    @classmethod
+    def register_client(cls, *, kind):
+        """
+        A decorator for defining classes of mocked clients. Intended use:
+
+            @MockBoto3.register_client(kind='cloudformation')
+            class MockBotoCloudFormationClient:
+                ...etc.
+        """
+        def _wrap(cls_to_wrap):
+            if cls._CLIENTS.get(kind):
+                raise ValueError(f"A MockBoto3 client for {kind} is already defined.")
+            cls._CLIENTS[kind] = cls_to_wrap
+            return cls_to_wrap
+        return _wrap
+
     @classmethod
     def _default_mappings(cls):
-        return {
-            's3': MockBotoS3Client,
-            'sqs': MockBotoSQSClient,
-            'cloudformation': MockBotoCloudFormationClient,
-        }
+        return cls._CLIENTS
 
     def __init__(self, **override_mappings):
         self._mappings = dict(self._default_mappings(), **override_mappings)
@@ -636,6 +654,7 @@ class MockBoto3:
         return mapped_class(boto3=self, **kwargs)
 
 
+@MockBoto3.register_client(kind='cloudformation')
 class MockBotoCloudFormationClient:
 
     _SHARED_STACKS_MARKER = '_cloudformation_stacks'
@@ -718,6 +737,7 @@ class MockBotoCloudFormationResourceSummary:
         self.stack_name = None  # This will get filled out if used as a resource on a mock stack
 
 
+@MockBoto3.register_client(kind='s3')
 class MockBotoS3Client:
     """
     This is a mock of certain S3 functionality.
@@ -844,7 +864,7 @@ class MockBotoS3Client:
             # For now, just fail in any way since maybe our code doesn't care.
             raise Exception("Mock File Not Found")
 
-    def head_bucket(self, Bucket):
+    def head_bucket(self, Bucket):  # noQA - AWS argument naming style
         bucket_prefix = Bucket + "/"
         for filename, content in self.s3_files.files.items():
             if filename.startswith(bucket_prefix):
@@ -957,6 +977,7 @@ class MockBotoS3BucketObjects:
         return self.bucket._delete(delete_bucket_too=False)  # noQA - we are effectively a friend of this instance
 
 
+@MockBoto3.register_client(kind='sqs')
 class MockBotoSQSClient:
     """
     This is a mock of certain SQS functionality.
@@ -1210,3 +1231,170 @@ def known_bug_expected(jira_ticket=None, fixed=False, error_class=None):
         else:
             # If no error occurs, that's probably the fix in play.
             pass
+
+
+def client_failer(operation_name, code=400):
+    def fail(message, code=code):
+        raise ClientError({"Error": {"Message": message, "Code": code}}, operation_name=operation_name)
+    return fail
+
+
+@MockBoto3.register_client(kind='elasticbeanstalk')
+class MockBotoElasticBeanstalkClient:
+
+    DEFAULT_MOCKED_BEANSTALKS = []
+    DEFAULT_MOCKED_CONFIGURATION_SETTINGS = []
+
+    def _default_mocked_beanstalks(self, mocked_beanstalks):
+        return mocked_beanstalks or self.DEFAULT_MOCKED_BEANSTALKS
+
+    def _default_mocked_configuration_settings(self, mocked_configuration_settings):
+        return mocked_configuration_settings or self.DEFAULT_MOCKED_CONFIGURATION_SETTINGS
+
+    def __init__(self, mocked_beanstalks=None, mocked_configuration_settings=None, boto3=None, region_name=None):
+        self.boto3 = boto3 or MockBoto3()
+        self.region_name = region_name
+        self.mocked_beanstalks = self._default_mocked_beanstalks(mocked_beanstalks)
+        self.mocked_configuration_settings = self._default_mocked_configuration_settings(mocked_configuration_settings)
+
+    # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/elasticbeanstalk.html#ElasticBeanstalk.Client.describe_environments  # noQA
+    def describe_environments(self, ApplicationName=None, EnvironmentNames=None):  # noQA - AWS picks these names
+        criteria = {}
+        if ApplicationName:
+            criteria['ApplicationName'] = ApplicationName
+        if EnvironmentNames:
+            criteria['EnvironmentName'] = lambda name: name in EnvironmentNames
+        result = find_associations(self.mocked_beanstalks, **criteria)
+        return {
+            "Environments": copy.deepcopy(result),
+            "ResponseMetadata": {
+                "HTTPStatusCode": 200,
+            },
+        }
+
+    # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/elasticbeanstalk.html#ElasticBeanstalk.Client.describe_configuration_settings  # noQA
+    def describe_configuration_settings(self, ApplicationName=None, EnvironmentName=None):  # noQA - AWS picks these names
+        criteria = {}
+        if ApplicationName:
+            criteria['ApplicationName'] = ApplicationName
+        if EnvironmentName:
+            criteria['EnvironmentName'] = EnvironmentName
+        result = find_associations(self.mocked_configuration_settings, **criteria)
+        return {
+            "ConfigurationSettings": copy.deepcopy(result),
+            "ResponseMetadata": {
+                "HTTPStatusCode": 200,
+            },
+        }
+
+    def swap_environment_cnames(self, SourceEnvironmentName, DestinationEnvironmentName):  # noQA - AWS picks these names
+        fail = client_failer("SwapEnvironmentCNAMEs", code=404)
+        source_beanstalk = find_associations(self.mocked_beanstalks, EnvironmentName=SourceEnvironmentName)
+        if not source_beanstalk:
+            fail(f"SourceEnvironmentName {SourceEnvironmentName} not found.")
+        destination_beanstalk = find_associations(self.mocked_beanstalks, EnvironmentName=DestinationEnvironmentName)
+        if not destination_beanstalk:
+            fail(f"DestinationEnvironmentName {DestinationEnvironmentName} not found.")
+        old_source_cname = source_beanstalk['CNAME']
+        source_beanstalk['CNAME'] = destination_beanstalk['CNAME']
+        destination_beanstalk['CNAME'] = old_source_cname
+
+    def restart_app_server(self, EnvironmentName):  # noQA - AWS picks these names
+        fail = client_failer("RestartAppServer", code=404)
+        beanstalk = find_associations(self.mocked_beanstalks, EnvironmentName=EnvironmentName)
+        if not beanstalk:
+            fail(f"EnvironmentName {EnvironmentName} not found.")
+        beanstalk['_restarted_count'] = beanstalk.get('_restarted_count', 0) + 1  # a way to tell it happened.
+
+    def create_environment(self, ApplicationName, EnvironmentName, TemplateName, OptionSettings):  # noQA - AWS picks these names
+        raise NotImplementedError("create_environment")
+
+    def update_environment(self, EnvironmentName, TemplateName=None, OptionSettings=None):  # noQA - AWS picks these names
+        raise NotImplementedError("update_environment")
+
+
+def make_mock_beanstalk_cname(env_name):
+    return f"{env_name}.9wzadzju3p.us-east-1.elasticbeanstalk.com"
+
+
+def make_mock_beanstalk(env_name, cname=None):
+    return {
+        "EnvironmentName": env_name,
+        "ApplicationName": "4dn-web",
+        "CNAME": cname or make_mock_beanstalk_cname(env_name),
+    }
+
+
+_NAMESPACE_AUTOSCALING_LAUNCHCONFIG = "aws:autoscaling:launchconfiguration"
+_NAMESPACE_CLOUDFORMATION_PARAMETER = "aws:cloudformation:template:parameter"
+_NAMESPACE_ENVIRONMENT_VARIABLE = "aws:elasticbeanstalk:application:environment"
+
+
+def make_mock_beanstalk_environment_variables(var_str):
+    # An extra option just as a decoy
+    spec0 = [{"Namespace": _NAMESPACE_AUTOSCALING_LAUNCHCONFIG, "OptionName": "InstanceType", "Value": "c5.xlarge"}]
+    # The string form of the environment variables, as given to CloudFormation
+    spec1 = [{"Namespace": _NAMESPACE_CLOUDFORMATION_PARAMETER, "OptionName": "EnvironmentVariables", "Value": var_str}]
+    # The individually parsed form of the environment variables, like beanstalks use.
+    spec2 = [{"Namespace": _NAMESPACE_ENVIRONMENT_VARIABLE, "OptionName": name, "Value": value}
+             for name, value in [spec.split("=") for spec in var_str.split(",")]]
+    return spec0 + spec1 + spec2
+
+
+_MOCK_APPLICATION_NAME = "4dn-web"
+_MOCK_SERVICE_USERNAME = 'service-accout-name'
+_MOCK_SERVICE_PASSWORD = 'service-accout-pw'
+_MOCK_APPLICATION_OPTIONS_PARTIAL = (
+    f"MOCK_USERNAME={_MOCK_SERVICE_USERNAME},MOCK_PASSWORD={_MOCK_SERVICE_PASSWORD},ENV_NAME="
+)
+
+
+class MockBoto4DNLegacyElasticBeanstalkClient(MockBotoElasticBeanstalkClient):
+
+    DEFAULT_MOCKED_BEANSTALKS = [
+        make_mock_beanstalk("fourfront-cgapdev"),
+        make_mock_beanstalk("fourfront-cgapwolf"),
+        make_mock_beanstalk("fourfront-cgap"),
+        make_mock_beanstalk("fourfront-cgaptest"),
+        make_mock_beanstalk("fourfront-webdev"),
+        make_mock_beanstalk("fourfront-hotseat"),
+        make_mock_beanstalk("fourfront-mastertest"),
+        make_mock_beanstalk("fourfront-green", cname="fourfront-green.us-east-1.elasticbeanstalk.com"),
+        make_mock_beanstalk("fourfront-blue"),
+    ]
+
+    MOCK_APPLICATION_NAME = _MOCK_APPLICATION_NAME
+    MOCK_SERVICE_USERNAME = _MOCK_SERVICE_USERNAME
+    MOCK_SERVICE_PASSWORD = _MOCK_SERVICE_PASSWORD
+
+    DEFAULT_MOCKED_CONFIGURATION_SETTINGS = [
+        {
+            "ApplicationName": _MOCK_APPLICATION_NAME,
+            "EnvironmentName": env_name,
+            "DeploymentStatus": "deployed",
+            "OptionSettings": make_mock_beanstalk_environment_variables(_MOCK_APPLICATION_OPTIONS_PARTIAL + env_name),
+        }
+        for env_name in [beanstalk["EnvironmentName"] for beanstalk in DEFAULT_MOCKED_BEANSTALKS]
+    ]
+
+    @classmethod
+    def all_legacy_beanstalk_names(cls):
+        return [beanstalk["EnvironmentName"] for beanstalk in cls.DEFAULT_MOCKED_BEANSTALKS]
+
+
+class MockBotoFooBarElasticBeanstalkClient(MockBotoElasticBeanstalkClient):
+
+    DEFAULT_MOCKED_BEANSTALKS = [
+        make_mock_beanstalk("fourfront-foo"),
+        make_mock_beanstalk("fourfront-bar"),
+    ]
+
+    DEFAULT_MOCKED_CONFIGURATION_SETTINGS = [
+        {
+            "ApplicationName": _MOCK_APPLICATION_NAME,
+            "EnvironmentName": env_name,
+            "DeploymentStatus": "deployed",
+            "OptionSettings": make_mock_beanstalk_environment_variables(_MOCK_APPLICATION_OPTIONS_PARTIAL + env_name),
+        }
+        for env_name in [beanstalk["EnvironmentName"] for beanstalk in DEFAULT_MOCKED_BEANSTALKS]
+    ]
