@@ -78,7 +78,8 @@ def test_s3utils_constants():
     assert s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY == 'file_upload_bucket'
     assert s3Utils.BLOB_BUCKET_HEALTH_PAGE_KEY == 'blob_bucket'
     assert s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY == 'metadata_bundles_bucket'
-    assert s3Utils.TIBANNA_CWLS_BUCKET_HEALTH_PAGE_KEY == 'tibanna_cwls_bucket'
+    # We didn't add this slot since it would have been born deprecated. Use HealthPageKey instead.
+    # assert s3Utils.TIBANNA_CWLS_BUCKET_HEALTH_PAGE_KEY == 'tibanna_cwls_bucket'
     assert s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY == 'tibanna_output_bucket'
 
 
