@@ -1,8 +1,9 @@
 # flake8: noqa
 
 import boto3
-import pytest
+import json
 import os
+import pytest
 import requests
 import time
 
@@ -13,13 +14,14 @@ from dcicutils.s3_utils import s3Utils
 from .conftest_settings import TEST_DIR
 
 
-def _discover_es_health(envname):
+def _discover_es_health_from_boto3_eb_metadata(envname):
     try:
         eb_client = boto3.client('elasticbeanstalk', region_name=REGION)
         # Calling describe_beanstalk_environments is pretty much the same as doing eb_client.describe_environments(...)
         # except it's robust against AWS throttling us for calling it too often.
-        envs = describe_beanstalk_environments(eb_client, EnvironmentNames=[envname])['Environments']
-        for env in envs:
+        envs_from_eb = describe_beanstalk_environments(eb_client, EnvironmentNames=[envname])['Environments']
+        for env in envs_from_eb:
+            PRINT(f"Checking {env.get('EnvironmentName')} for {envname}...")
             if env.get('EnvironmentName') == envname:
                 cname = env.get('CNAME')
                 # TODO: It would be nice if we were using https: for everything. -kmp 14-Aug-2020
@@ -30,49 +32,58 @@ def _discover_es_health(envname):
         raise RuntimeError("Unable to discover elasticsearch info for %s:\n%s: %s" % (envname, e.__class__.__name__, e))
 
 
-def _discover_es_info(envname):
-    discovered_health_json = _discover_es_health(envname)
-    time.sleep(1)  # Reduce throttling risk
-    ff_health_json = get_health_page(ff_env=envname)
-    # Consistency check that both utilities are returning the same info.
-    assert discovered_health_json['beanstalk_env'] == ff_health_json['beanstalk_env']
-    assert discovered_health_json['elasticsearch'] == ff_health_json['elasticsearch']
-    assert discovered_health_json['namespace'] == ff_health_json['namespace']
-    # This should be all we actually need:
-    return discovered_health_json['elasticsearch'], discovered_health_json['namespace']
 
+def _discover_es_url_from_boto3_eb_metadata(integrated_envname):
+    try:
+
+        discovered_health_json_from_eb = _discover_es_health_from_boto3_eb_metadata(integrated_envname)
+        assert discovered_health_json_from_eb, f"No health page for {integrated_envname} was discovered."
+        PRINT(f"In _discover_es_url_from_boto3_eb_metadata,"
+              f"discovered_health_json_from_eb={json.dumps(discovered_health_json_from_eb, indent=2)}")
+        time.sleep(1)  # Reduce throttling risk
+        ff_health_json = get_health_page(ff_env=integrated_envname)
+        # Consistency check that both utilities are returning the same info.
+        assert discovered_health_json_from_eb['beanstalk_env'] == ff_health_json['beanstalk_env']
+        assert discovered_health_json_from_eb['elasticsearch'] == ff_health_json['elasticsearch']
+        assert discovered_health_json_from_eb['namespace'] == ff_health_json['namespace']
+
+        # Not all health pages have a namespace. Production ones may not.
+        # But they are not good environments for us to use for testing.
+        discovered_namespace = discovered_health_json_from_eb['namespace']
+        # We _think_ these are always the same, but maybe not. Perhaps worth noting if/when they diverge.
+        assert discovered_namespace == integrated_envname, (
+            f"While doing ES URL discovery for integrated envname {integrated_envname},"
+            f" the namespace, {discovered_namespace}, discovered on the health page"
+            f" does not match the integrated envname.")
+        # This should be all we actually need:
+        return discovered_health_json_from_eb['elasticsearch']
+
+    except Exception as e:
+        # Errors sometimes happen when running tests with the orchestration credentials.
+        PRINT("********************************************")
+        PRINT("**  ERROR DURING ELASTICSEARCH DISCOVERY  **")
+        PRINT("**  Make sure you have legacy credentials **")
+        PRINT("**  enabled while running these tests.    **")
+        PRINT("********************************************")
+        PRINT(f"{e.__class__.__name__}: {e}")
+        raise RuntimeError(f"Failed to discover ES URL for {integrated_envname}.")
 
 # XXX: Refactor to config
 INTEGRATED_ENV = 'fourfront-mastertest'
 
-try:
 
-    # This used to be:
-    # INTEGRATED_ES = 'https://search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.us-east-1.es.amazonaws.com'
-    # but it changes too much, so now we discover it from the 'elasticsearch' and 'namespace' parts of health page...
-    INTEGRATED_ES, INTEGRATED_ES_NAMESPACE = _discover_es_info(INTEGRATED_ENV)
+# This used to be:
+# INTEGRATED_ES = 'https://search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.us-east-1.es.amazonaws.com'
+# but it changes too much, so now we discover it from the 'elasticsearch' and 'namespace' parts of health page...
+INTEGRATED_ES = _discover_es_url_from_boto3_eb_metadata(INTEGRATED_ENV)
 
-except Exception:
-    # Errors sometimes happen when running tests with the orchestration credentials.
-    PRINT("********************************************")
-    PRINT("**  ERROR DURING ELASTICSEARCH DISCOVERY  **")
-    PRINT("**  Make sure you have legacy credentials **")
-    PRINT("**  enabled while running these tests.    **")
-    PRINT("********************************************")
-    raise  # Continue raising the error
-
-
-# We _think_ these are always the same, but maybe not. Perhaps worth noting if/when they diverge.
-check_true(INTEGRATED_ENV == INTEGRATED_ES_NAMESPACE, "INTEGRATED_ENV and INTEGRATED_ES_NAMESPACE are not the same.")
-
-
-@pytest.fixture(scope='session')
-def basestring():
-    try:
-        basestring = basestring  # noQA - PyCharm static analysis doesn't understand this Python 2.7 compatibility issue
-    except NameError:
-        basestring = str
-    return basestring
+# @pytest.fixture(scope='session')
+# def basestring():
+#     try:
+#         basestring = basestring  # noQA - PyCharm static analysis doesn't understand this Python 2.7 compatibility issue
+#     except NameError:
+#         basestring = str
+#     return basestring
 
 
 @pytest.fixture(scope='session')
