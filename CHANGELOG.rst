@@ -30,6 +30,13 @@ Change Log
 
   * Add a class ``HealthPageKey`` that holds names of keys expected in health page json.
     This was ported from ``cgap-portal``, which can now start importing from here.
+    Also:
+
+    * Add ``HealthPageKey.TIBANNA_CWLS_BUCKET``.
+
+  * In ``s3Utils``:
+
+    * Add ``TIBANNA_CWLS_BUCKET_SUFFIX``.
 
   * Add an ``EnvManager`` object to manage obtaining and parsing contents of the data in global env bucket.
     Specific capabilities include:
@@ -52,6 +59,12 @@ Change Log
     * When an ``env`` argument is given in creation of ``s3Utils``, an ``EnvManager`` object will be placed in
       the ``.env_manager`` property of the resulting ``s3Utils`` instance. (If no ``env`` argument is given, no
       such object can usefully be created since there is insufficient information.)
+
+* In ``deployment_utils``:
+
+  * Support ``ENCODED_TIBANNA_CWLS_BUCKET`` and a ``--tibanna-cwls-bucket`` command line argument that get merged
+    into ``TIBANNA_CWLS_BUCKET`` for use in ``.ini`` templates.  These default similarly to how the
+    Tibanna output bucket does.
 
 
 2.2.1

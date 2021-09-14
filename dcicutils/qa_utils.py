@@ -1316,6 +1316,7 @@ class MockBotoElasticBeanstalkClient:
 def make_mock_beanstalk_cname(env_name):
     return f"{env_name}.9wzadzju3p.us-east-1.elasticbeanstalk.com"
 
+
 def make_mock_beanstalk(env_name, cname=None):
     return {
         "EnvironmentName": env_name,
