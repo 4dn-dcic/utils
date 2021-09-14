@@ -11,7 +11,7 @@ import os
 import requests
 
 from botocore.exceptions import ClientError
-from .exceptions import ()
+# from .exceptions import ()
 from .misc_utils import PRINT
 from .s3_utils import s3Utils
 
@@ -136,9 +136,11 @@ def delete_mark_s3_object(*, object_key, bucket_name, s3=None):
     """
     s3 = s3 or s3Utils().s3
     try:
-        if not s3.get_bucket_versioning(Bucket=bucket_name).get('Status') == 'Enabled':  # # check that versioning is enabled
-            raise "versioning is disabled on {} - cannot delete mark {}".format(bucket_name, object_key)
-        return s3.delete_object(Bucket=bucket, Key=key)
+        # Check that versioning is enabled
+        if not s3.get_bucket_versioning(Bucket=bucket_name).get('Status') == 'Enabled':
+            # TODO: This error will not be caught and will just be propagated out. Is that OK? -kmp 14-Sep-2021
+            raise RuntimeError(f"versioning is disabled on {bucket_name} - cannot delete mark {object_key}")
+        return s3.delete_object(Bucket=bucket_name, Key=object_key)
     except ClientError:
         return None
 
@@ -160,30 +162,41 @@ def delete_s3_object_version(*, object_key, bucket_name, version_id=None, s3=Non
     s3 = s3 or s3Utils().s3
     try:
         versioning = s3.get_bucket_versioning(Bucket=bucket_name).get('Status')
-    except ClientError, AttributeError as e:
+    except (ClientError, AttributeError) as e:
         logger.error(str(e))
         return None
 
     try:
         if versioning == 'Enabled' and version_id and version_id != 'null':
-            logger.info("Deleting version {version_id} of object {object_id} from version enabled {bucket_name}".
-                        format(version_id=version_id, object_id=object_id, bucket_name=bucket_name))
-            res = s3.delete_object(Bucket=bucket, Key=key, VersionId=version_id)
+            logger.info(f"Deleting version {version_id} of object {object_key} from version enabled {bucket_name}")
+            res = s3.delete_object(Bucket=bucket_name, Key=object_key, VersionId=version_id)
         elif not version_id or version_id == 'null':
-            logger.info("Deleting object {object_id} from version disabled {bucket_name}".
-                        format(object_id=object_id, bucket_name=bucket_name))
-            res = s3.delete_object(Bucket=bucket, Key=key)
+            logger.info(f"Deleting object {object_key} from version disabled {bucket_name}")
+            res = s3.delete_object(Bucket=bucket_name, Key=object_key)
+        else:
+            # TODO: You need to do something here for two reasons:
+            #       (1) You probably don't want to fall through as success.
+            #       (2) You use the res variable below, so if you do fall through, you have to assign it in this branch.
+            #       -kmp 14-Sep-2021
+            raise ValueError(f"Incompatible arguments: versioning={versioning!r}, version_id={version_id!r}")
     except ClientError as e:
         logger.error(str(e))
         return None
+
     if res.get('ResponseMetadata').get('HTTPStatusCode') == 204:
         # the object.version is no longer in the bucket (or maybe never was)
         if 'VersionId' in res:
             return res.get('VersionId')
-        return 'null'
+        return 'null'  # TODO: Is 'null' really right here? Is that not supposed to be None?
     else:
         # what's a good thing to do here?  logging, raise exception
-        raise("Unexpected response status - {}".format(res))
+        # TODO: There are situations above where you log and return None as if caller is expecting no error.
+        #       Consistency may be the way to go here? Not sure.
+        #       If you do raise something, it should be an exception, not a string. I added RuntimeError in
+        #       the commented-out part here.  -kmp 14-Sep-2021
+        # raise RuntimeError(f"Unexpected response status - {res}")
+        # return None
+        logger.info(f"Unexpected response status - {res}")
         return None
 
 
@@ -200,30 +213,31 @@ def delete_s3_object_completely(*, object_key, bucket_name, s3):
     deleted_cnt = 0
     if s3.get_bucket_versioning(Bucket=bucket_name).get('Status') == 'Disabled':
         expected_cnt = 1
-        if delete_s3_object_version(object_key=key, bucket_name=bucket_name, s3):
+        if delete_s3_object_version(object_key=object_key, bucket_name=bucket_name, s3=s3):
             deleted_cnt += 1
     else:
         ver_res = s3.list_object_versions(Bucket=bucket_name, Prefix=object_key)
         if ver_res.get('ResponseMetadata').get('HTTPStatusCode') == 200:
             if ver_res.get('ResponseMetadata').get('IsTruncated'):
-                logger.warning("Too many versions of {} in {} - incomplete delete".format(object_key, bucket_name))
+                logger.warning(f"Too many versions of {object_key} in {bucket_name} - incomplete delete")
             delete_markers = ver_res.get('DeleteMarkers', [])
             versions = ver_res.get('Versions', [])
             versions.extend(delete_markers)
             expected_cnt = len(versions)
             for version in versions:
                 version_id = version.get('VersionId')
-                res = delete_s3_object_version(object_key=key, bucket_name=bucket_name, version_id=version_id, s3)
+                res = delete_s3_object_version(object_key=object_key, bucket_name=bucket_name, version_id=version_id,
+                                               s3=s3)
                 if not res:
-                    logger.warning("Problem with delete of {} - version id {} from {}".format(object_key, version_id, bucket_name))
+                    logger.warning(f"Problem with delete of {object_key} - version id {version_id} from {bucket_name}")
                 else:
                     deleted_cnt += 1
     if expected_cnt:
         if expected_cnt == deleted_cnt:
-            logger.info("Deleted {} versions of {} from {}".format(deleted_cnt, object_key, bucket_name))
+            logger.info(f"Deleted {deleted_cnt} versions of {object_key} from {bucket_name}")
             return True
         else:
-            logger.warning("Expected to delete {expected} and DELETED {delcnt}".format(expected=expected_cnt, delcnt=deleted_cnt))
+            logger.warning(f"Expected to delete {expected_cnt} and DELETED {deleted_cnt}")
             return False
     return False
 
