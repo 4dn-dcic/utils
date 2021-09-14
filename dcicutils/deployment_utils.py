@@ -521,7 +521,7 @@ class IniFileManager:
 
     LEGACY_APPLICATION_BUCKET_ORG = s3Utils.EB_PREFIX                        # = "elasticbeanstalk"
     LEGACY_APPLICATION_BUCKET_PREFIX = LEGACY_APPLICATION_BUCKET_ORG + "-"   # = "elasticbeanstalk-"
-    LEGACY_TIBANNA_CWLS_BUCKET = s3Utils.TIBANNA_OUTPUT_BUCKET_TEMPLATE      # = "tibanna-cwls"
+    LEGACY_TIBANNA_CWLS_BUCKET = s3Utils.TIBANNA_CWLS_BUCKET_TEMPLATE      # = "tibanna-cwls"
     LEGACY_TIBANNA_OUTPUT_BUCKET = s3Utils.TIBANNA_OUTPUT_BUCKET_TEMPLATE    # = "tibanna-output"
     LEGACY_FOURSIGHT_BUCKET_PREFIX = "foursight-"
 

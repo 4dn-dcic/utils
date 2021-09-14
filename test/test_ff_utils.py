@@ -710,7 +710,7 @@ def test_get_metadata_unit():
 
 @pytest.mark.integratedx
 @pytest.mark.flaky(max_runs=3)  # very flaky for some reason
-def test_get_metadata_integrated(integrated_ff, basestring):
+def test_get_metadata_integrated(integrated_ff):  # , basestring
     # use this test biosource
     test_item = '331111bc-8535-4448-903e-854af460b254'
     res_w_key = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'])
@@ -743,7 +743,7 @@ def test_get_metadata_integrated(integrated_ff, basestring):
     # check add_on
     assert isinstance(res_w_key['individual'], dict)
     res_obj = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'], add_on='frame=object')
-    assert isinstance(res_obj['individual'], basestring)
+    assert isinstance(res_obj['individual'], str)  # was basestring
 
 
 @pytest.mark.integrated

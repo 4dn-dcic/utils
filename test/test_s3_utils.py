@@ -78,6 +78,7 @@ def test_s3utils_constants():
     assert s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY == 'file_upload_bucket'
     assert s3Utils.BLOB_BUCKET_HEALTH_PAGE_KEY == 'blob_bucket'
     assert s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY == 'metadata_bundles_bucket'
+    assert s3Utils.TIBANNA_CWLS_BUCKET_HEALTH_PAGE_KEY == 'tibanna_cwls_bucket'
     assert s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY == 'tibanna_output_bucket'
 
 
@@ -631,6 +632,7 @@ def test_s3_utils_legacy_behavior():
         assert s.raw_file_bucket == raw_file_bucket
         assert s.blob_bucket is None
         assert s.metadata_bucket is None
+        assert s.tibanna_cwls_bucket is None
         assert s.tibanna_output_bucket is None
 
         s = s3Utils(sys_bucket=sys_bucket)
@@ -639,6 +641,7 @@ def test_s3_utils_legacy_behavior():
         assert s.raw_file_bucket is None
         assert s.blob_bucket is None
         assert s.metadata_bucket is None
+        assert s.tibanna_cwls_bucket is None
         assert s.tibanna_output_bucket is None
 
     test_it()
@@ -665,6 +668,7 @@ def test_s3_utils_buckets_modern():
                 "file_upload_bucket": "the-raw-file-bucket",
                 "blob-bucket": "the-blob-bucket",
                 "metadata_bundles_bucket": "the-metadata-bundles-bucket",
+                "tibanna_cwls_bucket": "the-tibanna-cwls-bucket",
                 "tibanna_output_bucket": "the-tibanna-output-bucket",
             }
             s = s3Utils(env=env_name)
@@ -673,6 +677,7 @@ def test_s3_utils_buckets_modern():
             assert s.raw_file_bucket != 'the-raw-file-bucket'
             assert s.blob_bucket != 'the-blog-bucket'
             assert s.metadata_bucket != 'the-metadata-bundles-bucket'
+            assert s.tibanna_cwls_bucket != 'the-tibanna-cwls-bucket'
             assert s.tibanna_output_bucket != 'the-tibanna-output-bucket'
 
             assert s.outfile_bucket == 'elasticbeanstalk-fourfront-cgapfoo-wfoutput'
@@ -680,6 +685,7 @@ def test_s3_utils_buckets_modern():
             assert s.raw_file_bucket == 'elasticbeanstalk-fourfront-cgapfoo-files'
             assert s.blob_bucket == 'elasticbeanstalk-fourfront-cgapfoo-blobs'
             assert s.metadata_bucket == 'elasticbeanstalk-fourfront-cgapfoo-metadata-bundles'
+            assert s.tibanna_cwls_bucket == 'tibanna-cwls'
             assert s.tibanna_output_bucket == 'tibanna-output'
 
             e = s.env_manager
