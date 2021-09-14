@@ -412,7 +412,8 @@ class IniFileManager:
     def build_ini_file_from_template(cls, template_file_name, init_file_name, *,
                                      bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
                                      data_set=None, es_server=None, es_namespace=None, identity=None,
-                                     indexer=None, index_server=None, sentry_dsn=None, tibanna_output_bucket=None,
+                                     indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
+                                     tibanna_output_bucket=None,
                                      application_bucket_prefix=None, foursight_bucket_prefix=None,
                                      auth0_client=None, auth0_secret=None,
                                      file_upload_bucket=None, file_wfout_bucket=None,
@@ -439,6 +440,7 @@ class IniFileManager:
             indexer (bool): Whether or not we are building an ini file for an indexer.
             index_server (bool): Whether or not we are building an ini file for an index server.
             sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
+            tibanna_cwls_bucket (str): Specific name of the bucket to use on S3 for tibanna CWLs.
             tibanna_output_bucket (str): Specific name of the bucket to use on S3 for tibanna logs.
             application_bucket_prefix (str): An application bucket prefix to use, overriding the default one.
             foursight_bucket_prefix (str): A foursight bucket prefix to use, overriding the default one.
@@ -464,6 +466,7 @@ class IniFileManager:
                                                indexer=indexer,
                                                index_server=index_server,
                                                sentry_dsn=sentry_dsn,
+                                               tibanna_cwls_bucket=tibanna_cwls_bucket,
                                                tibanna_output_bucket=tibanna_output_bucket,
                                                application_bucket_prefix=application_bucket_prefix,
                                                foursight_bucket_prefix=foursight_bucket_prefix,
@@ -518,6 +521,7 @@ class IniFileManager:
 
     LEGACY_APPLICATION_BUCKET_ORG = s3Utils.EB_PREFIX                        # = "elasticbeanstalk"
     LEGACY_APPLICATION_BUCKET_PREFIX = LEGACY_APPLICATION_BUCKET_ORG + "-"   # = "elasticbeanstalk-"
+    LEGACY_TIBANNA_CWLS_BUCKET = s3Utils.TIBANNA_CWLS_BUCKET_TEMPLATE      # = "tibanna-cwls"
     LEGACY_TIBANNA_OUTPUT_BUCKET = s3Utils.TIBANNA_OUTPUT_BUCKET_TEMPLATE    # = "tibanna-output"
     LEGACY_FOURSIGHT_BUCKET_PREFIX = "foursight-"
 
@@ -525,7 +529,8 @@ class IniFileManager:
     def build_ini_stream_from_template(cls, template_file_name, init_file_stream, *,
                                        bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
                                        data_set=None, es_server=None, es_namespace=None, identity=None,
-                                       indexer=None, index_server=None, sentry_dsn=None, tibanna_output_bucket=None,
+                                       indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
+                                       tibanna_output_bucket=None,
                                        application_bucket_prefix=None, foursight_bucket_prefix=None,
                                        auth0_client=None, auth0_secret=None,
                                        file_upload_bucket=None,
@@ -549,6 +554,7 @@ class IniFileManager:
             indexer: Whether or not we are building an ini file for an indexer.
             index_server: Whether or not we are building an ini file for an index server.
             sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
+            tibanna_cwls_bucket (str): Specific name of the bucket to use on S3 for tibanna CWLs.
             tibanna_output_bucket (str): Specific name of the bucket to use on S3 for tibanna logs.
             application_bucket_prefix (str): An application bucket prefix to use, overriding the default one.
             foursight_bucket_prefix (str): A foursight bucket prefix to use, overriding the default one.
@@ -618,7 +624,13 @@ class IniFileManager:
                                    or os.environ.get("ENCODED_METADATA_BUNDLES_BUCKET")
                                    or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.METADATA_BUCKET_SUFFIX}")
 
-        # corresponses to s3Utils legacy "tibanna-output" (no prefix)
+        # corresponds to s3Utils legacy "tibanna-cwls" (no prefix)
+        tibanna_cwls_bucket = (tibanna_cwls_bucket
+                               or os.environ.get("ENCODED_TIBANNA_CWLS_BUCKET")
+                               or (f"{application_bucket_prefix}{s3Utils.TIBANNA_CWLS_BUCKET_SUFFIX}"
+                                   if cls.APP_ORCHESTRATED
+                                   else cls.LEGACY_TIBANNA_CWLS_BUCKET))
+        # corresponds to s3Utils legacy "tibanna-output" (no prefix)
         tibanna_output_bucket = (tibanna_output_bucket
                                  or os.environ.get("ENCODED_TIBANNA_OUTPUT_BUCKET")
                                  or (f"{application_bucket_prefix}{s3Utils.TIBANNA_OUTPUT_BUCKET_SUFFIX}"
@@ -672,6 +684,7 @@ class IniFileManager:
             'INDEXER': indexer,
             'INDEX_SERVER': index_server,
             'SENTRY_DSN': sentry_dsn,
+            'TIBANNA_CWLS_BUCKET': tibanna_cwls_bucket,
             'TIBANNA_OUTPUT_BUCKET': tibanna_output_bucket,
             'AUTH0_CLIENT': auth0_client,
             'AUTH0_SECRET': auth0_secret,
@@ -802,6 +815,9 @@ class IniFileManager:
             parser.add_argument("--sentry_dsn",
                                 help="a sentry DSN",
                                 default=None)
+            parser.add_argument("--tibanna_cwls_bucket",
+                                help="the name of a Tibanna CWLs bucket to use",
+                                default=None)
             parser.add_argument("--tibanna_output_bucket",
                                 help="the name of a Tibanna logs bucket to use",
                                 default=None)
@@ -854,6 +870,7 @@ class IniFileManager:
                                              indexer=args.indexer, index_server=args.index_server,
                                              identity=args.identity,
                                              sentry_dsn=args.sentry_dsn,
+                                             tibanna_cwls_bucket=args.tibanna_cwls_bucket,
                                              tibanna_output_bucket=args.tibanna_output_bucket,
                                              application_bucket_prefix=args.application_bucket_prefix,
                                              foursight_bucket_prefix=args.foursight_bucket_prefix,

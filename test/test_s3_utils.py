@@ -1,15 +1,17 @@
 import contextlib
 import datetime
 import io
+import json
+import os
 import pytest
 
 from dcicutils import s3_utils as s3_utils_module
 from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
 from dcicutils.env_utils import get_standard_mirror_env, FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, CGAP_PUBLIC_URL_PRD
-from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched
+from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs
 from dcicutils.misc_utils import ignored, ignorable
-from dcicutils.qa_utils import override_environ, MockBoto3
-from dcicutils.s3_utils import s3Utils
+from dcicutils.qa_utils import override_environ, MockBoto3, MockBotoS3Client, MockResponse
+from dcicutils.s3_utils import s3Utils, EnvManager
 from unittest import mock
 
 
@@ -76,6 +78,8 @@ def test_s3utils_constants():
     assert s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY == 'file_upload_bucket'
     assert s3Utils.BLOB_BUCKET_HEALTH_PAGE_KEY == 'blob_bucket'
     assert s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY == 'metadata_bundles_bucket'
+    # We didn't add this slot since it would have been born deprecated. Use HealthPageKey instead.
+    # assert s3Utils.TIBANNA_CWLS_BUCKET_HEALTH_PAGE_KEY == 'tibanna_cwls_bucket'
     assert s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY == 'tibanna_output_bucket'
 
 
@@ -629,6 +633,7 @@ def test_s3_utils_legacy_behavior():
         assert s.raw_file_bucket == raw_file_bucket
         assert s.blob_bucket is None
         assert s.metadata_bucket is None
+        assert s.tibanna_cwls_bucket is None
         assert s.tibanna_output_bucket is None
 
         s = s3Utils(sys_bucket=sys_bucket)
@@ -637,6 +642,7 @@ def test_s3_utils_legacy_behavior():
         assert s.raw_file_bucket is None
         assert s.blob_bucket is None
         assert s.metadata_bucket is None
+        assert s.tibanna_cwls_bucket is None
         assert s.tibanna_output_bucket is None
 
     test_it()
@@ -649,30 +655,47 @@ def test_s3_utils_legacy_behavior():
 
 def test_s3_utils_buckets_modern():
 
+    env_name = 'fourfront-cgapfoo'
+
+    es_server_short = "some-es-server.com:443"
+    es_server_https = "https://some-es-server.com:443"
+
     with mock.patch("boto3.client"):
-        with mock.patch.object(s3_utils_module.s3Utils, "fetch_health_page_json") as mock_fetch:
+        with mock.patch.object(s3_utils_module.EnvManager, "fetch_health_page_json") as mock_fetch:
             mock_fetch.return_value = {
+                "elasticsearch": es_server_short,
                 "system_bucket": "the-system-bucket",
                 "processed_file_bucket": "the-output-file-bucket",
                 "file_upload_bucket": "the-raw-file-bucket",
                 "blob-bucket": "the-blob-bucket",
                 "metadata_bundles_bucket": "the-metadata-bundles-bucket",
+                "tibanna_cwls_bucket": "the-tibanna-cwls-bucket",
                 "tibanna_output_bucket": "the-tibanna-output-bucket",
             }
-            s = s3Utils(env='fourfront-cgapfoo')
-            assert s.outfile_bucket == 'elasticbeanstalk-fourfront-cgapfoo-wfoutput'
-            assert s.sys_bucket == 'elasticbeanstalk-fourfront-cgapfoo-system'
-            assert s.raw_file_bucket == 'elasticbeanstalk-fourfront-cgapfoo-files'
-            assert s.blob_bucket == 'elasticbeanstalk-fourfront-cgapfoo-blobs'
-            assert s.metadata_bucket == 'elasticbeanstalk-fourfront-cgapfoo-metadata-bundles'
-            assert s.tibanna_output_bucket == 'tibanna-output'
-
+            s = s3Utils(env=env_name)
             assert s.outfile_bucket != 'the-output-file-bucket'
             assert s.sys_bucket != 'the-system-bucket'
             assert s.raw_file_bucket != 'the-raw-file-bucket'
             assert s.blob_bucket != 'the-blog-bucket'
             assert s.metadata_bucket != 'the-metadata-bundles-bucket'
+            assert s.tibanna_cwls_bucket != 'the-tibanna-cwls-bucket'
             assert s.tibanna_output_bucket != 'the-tibanna-output-bucket'
+
+            assert s.outfile_bucket == 'elasticbeanstalk-fourfront-cgapfoo-wfoutput'
+            assert s.sys_bucket == 'elasticbeanstalk-fourfront-cgapfoo-system'
+            assert s.raw_file_bucket == 'elasticbeanstalk-fourfront-cgapfoo-files'
+            assert s.blob_bucket == 'elasticbeanstalk-fourfront-cgapfoo-blobs'
+            assert s.metadata_bucket == 'elasticbeanstalk-fourfront-cgapfoo-metadata-bundles'
+            assert s.tibanna_cwls_bucket == 'tibanna-cwls'
+            assert s.tibanna_output_bucket == 'tibanna-output'
+
+            e = s.env_manager
+
+            assert e.s3 == s.s3
+            # This mock is not elaborate enough for testing how e.portal_url is set up.
+            # assert e.portal_url = ...
+            assert e.es_url == es_server_https
+            assert e.env_name == env_name
 
 
 def test_s3_utils_environment_variable_use():
@@ -689,3 +712,210 @@ def test_s3_utils_environment_variable_use():
                 # If we don't initialize the sys_bucket, we have to go through the smart protocols
                 # and expect environment variables to be in order.
                 s3Utils()
+
+
+def test_s3_utils_verify_and_get_env_config():
+
+    with mock.patch.object(EnvManager, "verify_and_get_env_config") as mock_implementation:
+
+        def mocked_implementation(s3_client, global_bucket, env):
+            assert s3_client == 'dummy-s3'
+            assert global_bucket == 'dummy-bucket'
+            assert env == 'dummy-env'
+
+        mock_implementation.side_effect = mocked_implementation
+
+        s3Utils.verify_and_get_env_config(s3_client='dummy-s3', global_bucket='dummy-bucket', env='dummy-env')
+        s3Utils.verify_and_get_env_config(env='dummy-env', s3_client='dummy-s3', global_bucket='dummy-bucket')
+        s3Utils.verify_and_get_env_config('dummy-s3', 'dummy-bucket', 'dummy-env')
+
+
+def test_s3_utils_fetch_health_page_json():
+
+    with mock.patch.object(EnvManager, "fetch_health_page_json") as mock_implementation:
+
+        def mocked_implementation(url, use_urllib):
+            assert url == 'dummy-url'
+            assert use_urllib == 'dummy-use-urllib'
+
+        mock_implementation.side_effect = mocked_implementation
+
+        s3Utils.fetch_health_page_json(url='dummy-url', use_urllib='dummy-use-urllib')
+        s3Utils.fetch_health_page_json(use_urllib='dummy-use-urllib', url='dummy-url')
+        s3Utils.fetch_health_page_json('dummy-url', 'dummy-use-urllib')
+
+
+def test_env_manager_fetch_health_page_json():
+
+    sample_health_page = {"mocked": "health-page"}
+
+    class MockHelper:
+
+        def __init__(self):
+            self.used_mocked_get = False
+            self.used_mocked_urlopen = False
+
+        def mocked_get(self, url):
+            assert url.endswith("/health?format=json")
+            self.used_mocked_get = True
+            return MockResponse(json=sample_health_page)
+
+        def mocked_urlopen(self, url):
+            assert url.endswith("/health?format=json")
+            self.used_mocked_urlopen = True
+            return io.BytesIO(json.dumps(sample_health_page).encode('utf-8'))
+
+    with mock.patch("requests.get") as mock_get:
+        with mock.patch("urllib.request.urlopen") as mock_urlopen:
+
+            helper = MockHelper()
+            mock_get.side_effect = helper.mocked_get
+            mock_urlopen.side_effect = helper.mocked_urlopen
+
+            assert EnvManager.fetch_health_page_json("http://something/health?format=json",
+                                                     use_urllib=False) == sample_health_page
+            # We always use urllib now.
+            assert helper.used_mocked_get is False
+            assert helper.used_mocked_urlopen is True
+
+            helper = MockHelper()
+            mock_get.side_effect = helper.mocked_get
+            mock_urlopen.side_effect = helper.mocked_urlopen
+
+            assert EnvManager.fetch_health_page_json("http://something/health?format=json",
+                                                     use_urllib=True) == sample_health_page
+            # We always use urllib now.
+            assert helper.used_mocked_get is False
+            assert helper.used_mocked_urlopen is True
+
+
+def test_env_manager():
+
+    class MyS3(MockBotoS3Client):
+        MOCK_STATIC_FILES = {
+            # Bucket 'global-env-1'
+            'global-env-1/cgap-footest':
+                '{"fourfront": "http://portal", "es": "http://es", "ff_env": "cgap-footest"}',
+            # Bucket 'global-env-2'
+            'global-env-2/cgap-footest':
+                '{"fourfront": "http://portal-foo", "es": "http://es-foo", "ff_env": "cgap-footest"}',
+            'global-env-2/cgap-bartest':
+                '{"fourfront": "http://portal-bar", "es": "http://es-bar", "ff_env": "cgap-bartest"}',
+        }
+
+    with mock.patch.object(s3_utils_module, "boto3", MockBoto3(s3=MyS3)):
+
+        my_s3 = s3_utils_module.boto3.client('s3')
+
+        with EnvManager.global_env_bucket_named(name='global-env-1'):
+
+            e = EnvManager(s3=my_s3)
+            assert e.portal_url == "http://portal"
+            assert e.es_url == "http://es"
+            assert e.env_name == "cgap-footest"
+
+
+def test_env_manager_verify_and_get_env_config():
+
+    class MyS3(MockBotoS3Client):
+        MOCK_STATIC_FILES = {
+            # Bucket 'global-env-1'
+            'global-env-1/cgap-footest':
+                '{"fourfront": "http://portal", "es": "http://es", "ff_env": "cgap-footest"}',
+            # Bucket 'global-env-2'
+            'global-env-2/cgap-footest':
+                '{"fourfront": "http://portal-foo", "es": "http://es-foo", "ff_env": "cgap-footest"}',
+            'global-env-2/cgap-bartest':
+                '{"fourfront": "http://portal-bar", "es": "http://es-bar", "ff_env": "cgap-bartest"}',
+        }
+
+    with mock.patch.object(s3_utils_module, "boto3", MockBoto3(s3=MyS3)):
+
+        my_s3 = s3_utils_module.boto3.client('s3')
+
+        # Note here we specified the env explicitly.
+        config = EnvManager.verify_and_get_env_config(s3_client=my_s3, global_bucket='global-env-1', env='cgap-footest')
+
+        assert config['fourfront'] == 'http://portal'
+        assert config['es'] == 'http://es'
+        assert config['ff_env'] == 'cgap-footest'
+
+        env_manager_from_desc = EnvManager.compose(portal_url='http://portal',
+                                                   es_url="http://es",
+                                                   env_name='cgap-footest',
+                                                   s3=my_s3)
+
+        assert env_manager_from_desc.env_description == config
+        assert env_manager_from_desc.env_description['fourfront'] == 'http://portal'
+        assert env_manager_from_desc.env_description['es'] == 'http://es'
+        assert env_manager_from_desc.env_description['ff_env'] == 'cgap-footest'
+        assert env_manager_from_desc.portal_url == 'http://portal'
+        assert env_manager_from_desc.es_url == 'http://es'
+        assert env_manager_from_desc.env_name == 'cgap-footest'
+
+        config = EnvManager.verify_and_get_env_config(s3_client=my_s3, global_bucket='global-env-1',
+                                                      # Env unspecified, but there's only one, so it'll be inferred.
+                                                      env=None)
+
+        assert config['fourfront'] == 'http://portal'
+        assert config['es'] == 'http://es'
+        assert config['ff_env'] == 'cgap-footest'
+
+        # The next tests are similar to the above, but in an S3 global bucket env (global-env-2) that has more than
+        # one environment, so the env cannot default.
+
+        config = EnvManager.verify_and_get_env_config(s3_client=my_s3, global_bucket='global-env-2', env='cgap-footest')
+
+        assert config['fourfront'] == 'http://portal-foo'
+        assert config['es'] == 'http://es-foo'
+        assert config['ff_env'] == 'cgap-footest'
+
+        config = EnvManager.verify_and_get_env_config(s3_client=my_s3, global_bucket='global-env-2', env='cgap-bartest')
+
+        assert config['fourfront'] == 'http://portal-bar'
+        assert config['es'] == 'http://es-bar'
+        assert config['ff_env'] == 'cgap-bartest'
+
+        with pytest.raises(CannotInferEnvFromManyGlobalEnvs):
+            EnvManager.verify_and_get_env_config(s3_client=my_s3, global_bucket='global-env-2',
+                                                 # Env unspecified, but alas ambiguous, so no defaulting can occur.
+                                                 env=None)
+
+
+def test_env_manager_global_env_bucket_name():
+
+    # These tests expect to be run in an environment that does not have these buckets bound globally.
+    assert os.environ.get('GLOBAL_ENV_BUCKET') is None
+    assert os.environ.get('GLOBAL_BUCKET_ENV') is None
+
+    with EnvManager.global_env_bucket_named(name='foo'):
+
+        assert os.environ.get('GLOBAL_ENV_BUCKET') == 'foo'
+        assert os.environ.get('GLOBAL_BUCKET_ENV') == 'foo'
+        assert EnvManager.global_env_bucket_name() == 'foo'
+
+        with override_environ(GLOBAL_BUCKET_ENV='bar'):
+
+            assert os.environ.get('GLOBAL_ENV_BUCKET') == 'foo'
+            assert os.environ.get('GLOBAL_BUCKET_ENV') == 'bar'
+            with pytest.raises(SynonymousEnvironmentVariablesMismatched):
+                EnvManager.global_env_bucket_name()
+
+            with override_environ(GLOBAL_ENV_BUCKET='bar'):
+
+                assert os.environ.get('GLOBAL_ENV_BUCKET') == 'bar'
+                assert os.environ.get('GLOBAL_BUCKET_ENV') == 'bar'
+                assert EnvManager.global_env_bucket_name() == 'bar'
+
+        with override_environ(GLOBAL_ENV_BUCKET='bar'):
+
+            assert os.environ.get('GLOBAL_ENV_BUCKET') == 'bar'
+            assert os.environ.get('GLOBAL_BUCKET_ENV') == 'foo'
+            with pytest.raises(SynonymousEnvironmentVariablesMismatched):
+                EnvManager.global_env_bucket_name()
+
+            with override_environ(GLOBAL_BUCKET_ENV='bar'):
+
+                assert os.environ.get('GLOBAL_ENV_BUCKET') == 'bar'
+                assert os.environ.get('GLOBAL_BUCKET_ENV') == 'bar'
+                assert EnvManager.global_env_bucket_name() == 'bar'
