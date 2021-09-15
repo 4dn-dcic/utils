@@ -7,6 +7,13 @@ Change Log
 ----------
 
 
+2.3.1
+=====
+
+* In ``s3_utils``, fix C4-706, where short names of environments were not accepted
+  as env arguments to s3Utils in legacy CGAP.
+
+
 2.3.0
 =====
 

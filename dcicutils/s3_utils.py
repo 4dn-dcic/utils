@@ -75,7 +75,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     BLOB_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + BLOB_BUCKET_SUFFIX          # = "elasticbeanstalk-%s-blobs"
     METADATA_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + METADATA_BUCKET_SUFFIX  # = "elasticbeanstalk-%s-metadata-bundles"
     TIBANNA_OUTPUT_BUCKET_TEMPLATE = TIBANNA_OUTPUT_BUCKET_SUFFIX          # = "tibanna-output" (no prefix)
-    TIBANNA_CWLS_BUCKET_TEMPLATE = TIBANNA_CWLS_BUCKET_SUFFIX              # = "tibanna-output" (no prefix)
+    TIBANNA_CWLS_BUCKET_TEMPLATE = TIBANNA_CWLS_BUCKET_SUFFIX              # = "tibanna-cwls" (no prefix)
 
     # NOTE: These are deprecated now and retained for compatibility. Please rewrite uses as HealthPageKey.xyz names.
     SYS_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.SYSTEM_BUCKET                     # = 'system_bucket'
@@ -180,13 +180,14 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 #       upstream of the global env bucket branch, too. That's not needed for orchestrated cgap,
                 #       which has no stage, but it will be needed for orchestrated fourfront. -kmp 31-Aug-2021
                 if env:
-                    self.url = get_beanstalk_real_url(env)
                     if is_stg_or_prd_env(env):
+                        self.url = get_beanstalk_real_url(env)  # done BEFORE prod_bucket_env blurring stg/prd
                         env = prod_bucket_env(env)
                     else:
                         # TODO: This is the part that is not yet supported in env_utils, but there is a pending
                         #       patch that will fix that. -kmp 31-AUg-2021
                         env = full_env_name(env)
+                        self.url = get_beanstalk_real_url(env)  # done AFTER maybe prepending cgap- or foursight-.
 
                     health_json_url = f"{self.url}/health?format=json"
                     # In the orchestrated case, we issue a warning here. Do we need that? -kmp 1-Sep-2021
