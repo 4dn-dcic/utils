@@ -5,12 +5,13 @@ import json
 import os
 import pytest
 
+from botocore.exceptions import ClientError
 from dcicutils import s3_utils as s3_utils_module
 from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
 from dcicutils.env_utils import get_standard_mirror_env, FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, CGAP_PUBLIC_URL_PRD
 from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs
 from dcicutils.misc_utils import ignored, ignorable
-from dcicutils.qa_utils import override_environ, MockBoto3, MockBotoS3Client, MockResponse
+from dcicutils.qa_utils import override_environ, MockBoto3, MockBotoS3Client, MockResponse, known_bug_expected
 from dcicutils.s3_utils import s3Utils, EnvManager
 from unittest import mock
 
@@ -81,6 +82,17 @@ def test_s3utils_constants():
     # We didn't add this slot since it would have been born deprecated. Use HealthPageKey instead.
     # assert s3Utils.TIBANNA_CWLS_BUCKET_HEALTH_PAGE_KEY == 'tibanna_cwls_bucket'
     assert s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY == 'tibanna_output_bucket'
+
+
+@pytest.mark.integrated
+def test_regression_s3_utils_short_name_c4_706():
+
+    # Environment long names work (at least in legacy CGAP)
+    s3Utils(env="fourfront-cgapwolf")
+
+    with known_bug_expected(jira_ticket="C4-706", fixed=False, error_class=ClientError):
+        # Sort names not allowed.
+        s3Utils(env="cgapwolf")
 
 
 @pytest.mark.integrated
