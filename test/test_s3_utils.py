@@ -90,7 +90,7 @@ def test_regression_s3_utils_short_name_c4_706():
     # Environment long names work (at least in legacy CGAP)
     s3Utils(env="fourfront-cgapwolf")
 
-    with known_bug_expected(jira_ticket="C4-706", fixed=False, error_class=ClientError):
+    with known_bug_expected(jira_ticket="C4-706", fixed=True, error_class=ClientError):
         # Sort names not allowed.
         s3Utils(env="cgapwolf")
 
