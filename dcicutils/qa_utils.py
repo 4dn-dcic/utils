@@ -934,7 +934,8 @@ class MockBotoS3Bucket:
             files[prefix] = b''
         # TODO: Does anything need to be returned here?
 
-    def _keys(self):
+    def _keys(self, operation_name="_keys"):
+        fail = client_failer(operation_name, code=404)
         found = False
         keys = set()  # In real S3, this would be cached info, but for testing we just create it on demand
         prefix = self.name + "/"
@@ -947,7 +948,7 @@ class MockBotoS3Bucket:
         if not keys:
             if not found:
                 # It's OK if we only found "<bucketname>/", which is an empty, but not missing bucket
-                raise Exception("NoSuchBucket")
+                fail("NoSuchBucket")
         return sorted(keys)
 
     def delete(self):
@@ -956,7 +957,7 @@ class MockBotoS3Bucket:
     def _all(self):
         """A callback for <bucket>.objects.all()"""
         return [self.s3.head_object(Bucket=self.name, Key=key)
-                for key in self._keys()]
+                for key in self._keys(operation_name="Bucket.objects.all")]
 
 
 class MockBotoS3ObjectSummary:
@@ -1398,3 +1399,16 @@ class MockBotoFooBarElasticBeanstalkClient(MockBotoElasticBeanstalkClient):
         }
         for env_name in [beanstalk["EnvironmentName"] for beanstalk in DEFAULT_MOCKED_BEANSTALKS]
     ]
+
+
+@contextlib.contextmanager
+def mocked_boto3_object(s3_files=None, **override_mappings):
+    s3_mock_class = override_mappings.pop('s3', MockBotoS3Client)
+    assert issubclass(s3_mock_class, MockBotoS3Client)
+    if s3_files:
+        class MockedS3WithFiles(s3_mock_class):
+            MOCK_STATIC_FILES = s3_files
+        s3_mock_class = MockedS3WithFiles
+    mocked_boto3 = MockBoto3(s3=s3_mock_class, **override_mappings)
+    yield mocked_boto3
+
