@@ -89,6 +89,13 @@ exceptions
   :members:
 
 
+ff_mocks
+^^^^^^^^
+
+.. automodule:: dcicutils.ff_mocks
+   :members:
+
+
 ff_utils
 ^^^^^^^^
 
