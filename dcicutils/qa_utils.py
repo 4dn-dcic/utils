@@ -862,7 +862,11 @@ class MockBotoS3Client:
             # I would need to research what specific error is needed here and hwen,
             # since it might be a 404 (not found) or a 403 (permissions), depending on various details.
             # For now, just fail in any way since maybe our code doesn't care.
-            raise Exception("Mock File Not Found")
+            raise ClientError(operation_name='HeadObject',
+                              error_response={
+                                  "Error": {"Code": "404", "Message": "Not Found"},
+                                  "ResponseMetadata": {"HTTPStatusCode": 404},
+                              })
 
     def head_bucket(self, Bucket):  # noQA - AWS argument naming style
         bucket_prefix = Bucket + "/"
@@ -1411,4 +1415,3 @@ def mocked_boto3_object(s3_files=None, **override_mappings):
         s3_mock_class = MockedS3WithFiles
     mocked_boto3 = MockBoto3(s3=s3_mock_class, **override_mappings)
     yield mocked_boto3
-

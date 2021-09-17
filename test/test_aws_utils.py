@@ -72,7 +72,7 @@ def test_s3_bucket_object_count():
 
     with typical_boto3_mocking():  # Note no files in initial s3 file system, so everything is missing
         with pytest.raises(ClientError):
-            s3_bucket_object_count(bucket_name='no-suck-bucket')
+            s3_bucket_object_count(bucket_name='no-such-bucket')
 
     one_file_in_each_of_two_buckets = {'foo/bar': 'something', 'bar/baz': 'something-else'}
 
@@ -99,11 +99,19 @@ def test_s3_bucket_object_count():
         assert s3_bucket_object_count('bar') == 3
 
 
-@pytest.mark.skip()  # So that running this empty test won't make it look like we did actual testing.
 def test_s3_object_head():
-    ignored(s3_object_head)
-    # TODO: Testing s3_object_head should be easy using tech like what's above. -kmp 15-Sep-2021
-    pass
+    expected_res = {'Bucket': 'foo', 'Key': 'bar', 'ETag': '437b930db84b8079c2dd804a71936b5f', 'ContentLength': 9}
+    with typical_boto3_mocking(s3_files={'foo/bar': 'something'}) as mocked_boto3:
+        res = s3_object_head(object_key='bar', bucket_name='foo')
+        assert res == expected_res
+        assert not s3_object_head(object_key='no-such-object', bucket_name='foo')
+        assert not s3_object_head(object_key='bar', bucket_name='no-such-bucket')
+        assert not s3_object_head(object_key='no-such-bucket', bucket_name='no-such-bucket')
+        # We don't have to pass an s3 argument, but it will have to create a client on each call,
+        # which might have some associated expense.
+        s3 = mocked_boto3.client('s3')
+        res = s3_object_head(object_key='bar', bucket_name='foo', s3=s3)
+        assert res == expected_res
 
 
 @pytest.mark.skip()  # So that running this empty test won't make it look like we did actual testing.
