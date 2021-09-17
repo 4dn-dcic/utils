@@ -4,7 +4,7 @@ import os
 import re
 
 
-from dcicutils.misc_utils import ignored, override_environ
+from dcicutils.misc_utils import ignored, override_environ, remove_prefix
 from dcicutils.qa_utils import (
     MockBoto3, MockBotoElasticBeanstalkClient, MockBotoS3Client,
     make_mock_beanstalk, make_mock_beanstalk_cname, make_mock_beanstalk_environment_variables,
@@ -90,11 +90,9 @@ def mocked_s3utils(beanstalks=None, require_sse=False):
     get confused when it does discovery operations to find them.
     """
     # First we make a mocked boto3 that will use an S3 mock with mock server side encryption.
-    s3_class = MockBotoS3WithSSE if require_sse else MockBotoS3Client
-    mock_boto3 = (MockBoto3(s3=s3_class,
-                            elasticbeanstalk=make_mock_boto_eb_client_class(beanstalks=beanstalks))
-                  if require_sse
-                  else MockBoto3)
+    s3_class = make_mock_boto_s3_with_sse(beanstalks=beanstalks) if require_sse else MockBotoS3Client
+    mock_boto3 = MockBoto3(s3=s3_class,
+                           elasticbeanstalk=make_mock_boto_eb_client_class(beanstalks=beanstalks))
     # Now we arrange that both s3_utils and ff_utils modules share the illusion that our mock IS the boto3 library
     with mock.patch.object(s3_utils, "boto3", mock_boto3):
         with mock.patch.object(ff_utils, "boto3", mock_boto3):
@@ -116,7 +114,10 @@ def mocked_s3utils(beanstalks=None, require_sse=False):
                         mock_fetcher.side_effect = mocked_fetch_health_page_json
                         # The mocked encrypt key is expected by various tools in the s3_utils module to be supplied
                         # as an environment variable (i.e., in os.environ), so this sets up that environment variable.
-                        with override_environ(S3_ENCRYPT_KEY=MockBotoS3WithSSE.SSE_ENCRYPT_KEY):
+                        if require_sse:
+                            with override_environ(S3_ENCRYPT_KEY=s3_class.SSE_ENCRYPT_KEY):
+                                yield
+                        else:
                             yield
 
 
@@ -125,6 +126,42 @@ def mocked_s3utils(beanstalks=None, require_sse=False):
 # and over again in each test.
 
 class TestScenarios:
+
+    DEFAULT_BEANSTALKS = ['fourfront-foo', 'fourfront-bar']
+
+    @classmethod
+    def mocked_auth_key(cls, env):
+        short_env = remove_prefix("fourfront-", env)
+        return f"{short_env}key"
+
+    @classmethod
+    def mocked_auth_secret(cls, env):
+        short_env = remove_prefix("fourfront-", env)
+        return f"{short_env}secret"
+
+    @classmethod
+    def mocked_auth_server(cls, env):
+        return f"http://{make_mock_beanstalk_cname(env)}/"
+
+    @classmethod
+    def mocked_auth_key_secret_tuple(cls, env):
+        return (cls.mocked_auth_key(env),
+                cls.mocked_auth_secret(env))
+
+    @classmethod
+    def mocked_auth_key_secret_dict(cls, env):
+        return {
+            'key': cls.mocked_auth_key(env),
+            'secret': cls.mocked_auth_secret(env),
+        }
+
+    @classmethod
+    def mocked_auth_key_secret_server_dict(cls, env):
+        return {
+            'key': cls.mocked_auth_key(env),
+            'secret': cls.mocked_auth_secret(env),
+            'server': cls.mocked_auth_server(env),
+        }
 
     some_server = 'http://localhost:8000'
     some_auth_key, some_auth_secret = some_auth_tuple = ('mykey', 'mysecret')
@@ -136,8 +173,8 @@ class TestScenarios:
     foo_env = 'fourfront-foo'
     foo_env_auth_key, foo_env_auth_secret = foo_env_auth_tuple = ('fookey', 'foosecret')
     foo_env_auth_dict = {
-        'key': foo_env_auth_key,
-        'secret': foo_env_auth_secret
+        'key': foo_env_auth_key,  # mocked_auth_key('fourfront-foo')
+        'secret': foo_env_auth_secret  # mocked_auth_secret('fourfront-foo')
     }
 
     FOURFRONT_FOO_HEALTH_PAGE = make_mock_health_page('fourfront-foo')
@@ -173,37 +210,47 @@ def _access_key_home(bs_env):
     return os.path.join(s3_utils.s3Utils.SYS_BUCKET_TEMPLATE % bs_env, s3_utils.s3Utils.ACCESS_KEYS_S3_KEY)
 
 
-class MockBotoS3WithSSE(MockBotoS3Client):
-    """
-    This is a specialized mock for a boto3 S3 client that does server-side encryption (SSE).
-    We don't actually test that encryption is done, since that would be done by boto3, but we set up so that
-    that calls to any methods on the mock use certain required keyword arguments beyond the ordinary methods
-    that do the ordinary work of the method. e.g., for this mock definition:
+def make_mock_boto_s3_with_sse(beanstalks=None):
 
-        def upload_file(self, Filename, Bucket, Key, **kwargs)
-            ...
+    if beanstalks is None:
+        beanstalks = TestScenarios.DEFAULT_BEANSTALKS
 
-    if the call does not look like:
+    class MockBotoS3WithSSE(MockBotoS3Client):
+        """
+        This is a specialized mock for a boto3 S3 client that does server-side encryption (SSE).
+        We don't actually test that encryption is done, since that would be done by boto3, but we set up so that
+        that calls to any methods on the mock use certain required keyword arguments beyond the ordinary methods
+        that do the ordinary work of the method. e.g., for this mock definition:
 
-        upload_File(Filename=..., Bucket=..., Key=...,
-                    SSECustomerKey='shazam', SSECustomerAlgorithm='AES256')
+            def upload_file(self, Filename, Bucket, Key, **kwargs)
+                ...
 
-    where the mock value 'shazam' is a wired value supplied in calls to the mock and 'AES256' is a constant we
-    expect is consistently used throughout this code base, then an error is raised in testing. The intent is to
-    make sure the calls are done with a certain degree of consistency.
-    """
+        if the call does not look like:
 
-    SSE_ENCRYPT_KEY = 'shazam'
+            upload_File(Filename=..., Bucket=..., Key=...,
+                        SSECustomerKey='shazam', SSECustomerAlgorithm='AES256')
 
-    MOCK_REQUIRED_ARGUMENTS = {
-        # Our s3 mock for this test must check that all API calls pass these required arguments.
-        SSE_CUSTOMER_KEY: SSE_ENCRYPT_KEY,
-        SSE_CUSTOMER_ALGORITHM: "AES256"
-    }
+        where the mock value 'shazam' is a wired value supplied in calls to the mock and 'AES256' is a constant we
+        expect is consistently used throughout this code base, then an error is raised in testing. The intent is to
+        make sure the calls are done with a certain degree of consistency.
+        """
 
-    MOCK_STATIC_FILES = {
-        # Our s3 mock presumes access keys are stashed in a well-known key
-        # in the system bucket corresponding to the given beanstalk.
-        _access_key_home(TestScenarios.foo_env): json.dumps(TestScenarios.foo_env_auth_dict),
-        _access_key_home(TestScenarios.bar_env): json.dumps(TestScenarios.bar_env_default_auth_dict)
-    }
+        SSE_ENCRYPT_KEY = 'shazam'
+
+        MOCK_REQUIRED_ARGUMENTS = {
+            # Our s3 mock for this test must check that all API calls pass these required arguments.
+            SSE_CUSTOMER_KEY: SSE_ENCRYPT_KEY,
+            SSE_CUSTOMER_ALGORITHM: "AES256"
+        }
+
+        MOCK_STATIC_FILES = {
+            # Our s3 mock presumes access keys are stashed in a well-known key
+            # in the system bucket corresponding to the given beanstalk.
+            _access_key_home(env): json.dumps(TestScenarios.mocked_auth_key_secret_server_dict(env))
+            for env in beanstalks
+        }
+
+    return MockBotoS3WithSSE
+
+
+# MockBotoS3WithSSE = make_mock_boto_s3_with_sse()
