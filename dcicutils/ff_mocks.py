@@ -10,7 +10,7 @@ from dcicutils.qa_utils import (
     make_mock_beanstalk, make_mock_beanstalk_cname, make_mock_beanstalk_environment_variables,
 )
 from unittest import mock
-from . import beanstalk_utils, ff_utils, s3_utils
+from . import beanstalk_utils, c4_base, ff_utils, s3_utils
 
 
 _MOCK_APPLICATION_NAME = "4dn-web"
@@ -99,24 +99,25 @@ def mocked_s3utils(beanstalks=None, require_sse=False):
     with mock.patch.object(s3_utils, "boto3", mock_boto3):
         with mock.patch.object(ff_utils, "boto3", mock_boto3):
             with mock.patch.object(beanstalk_utils, "boto3", mock_boto3):
-                with mock.patch.object(s3_utils.EnvManager, "fetch_health_page_json") as mock_fetch_health_page_json:
+                with mock.patch.object(c4_base, "boto3", mock_boto3):
+                    with mock.patch.object(s3_utils.EnvManager, "fetch_health_page_json") as mock_fetcher:
 
-                    # This is all that's needed for s3Utils to initialize an EnvManager.
-                    # We might have to add more later.
-                    def mocked_fetch_health_page_json(url, use_urllib=True):
-                        ignored(use_urllib)  # we don't test this
-                        m = re.match(r'.*(fourfront-[a-z0-9-]+)(?:[.]|$)', url)
-                        if m:
-                            env_name = m.group(1)
-                            return make_mock_health_page(env_name)
-                        else:
-                            raise NotImplementedError(f"Mock can't handle URL: {url}")
+                        # This is all that's needed for s3Utils to initialize an EnvManager.
+                        # We might have to add more later.
+                        def mocked_fetch_health_page_json(url, use_urllib=True):
+                            ignored(use_urllib)  # we don't test this
+                            m = re.match(r'.*(fourfront-[a-z0-9-]+)(?:[.]|$)', url)
+                            if m:
+                                env_name = m.group(1)
+                                return make_mock_health_page(env_name)
+                            else:
+                                raise NotImplementedError(f"Mock can't handle URL: {url}")
 
-                    mock_fetch_health_page_json.side_effect = mocked_fetch_health_page_json
-                    # The mocked encrypt key is expected by various tools in the s3_utils module to be supplied
-                    # as an environment variable (i.e., in os.environ), so this sets up that environment variable.
-                    with override_environ(S3_ENCRYPT_KEY=MockBotoS3WithSSE.SSE_ENCRYPT_KEY):
-                        yield
+                        mock_fetcher.side_effect = mocked_fetch_health_page_json
+                        # The mocked encrypt key is expected by various tools in the s3_utils module to be supplied
+                        # as an environment variable (i.e., in os.environ), so this sets up that environment variable.
+                        with override_environ(S3_ENCRYPT_KEY=MockBotoS3WithSSE.SSE_ENCRYPT_KEY):
+                            yield
 
 
 # Here we set up some variables, auxiliary functions, and mocks containing common values needed for testing
@@ -153,6 +154,7 @@ class TestScenarios:
     bar_env_default_auth_dict = {'default': bar_env_auth_dict}
 
     FOURFRONT_BAR_HEALTH_PAGE = make_mock_health_page('fourfront-bar')
+
 
 SSE_CUSTOMER_KEY = 'SSECustomerKey'
 SSE_CUSTOMER_ALGORITHM = 'SSECustomerAlgorithm'

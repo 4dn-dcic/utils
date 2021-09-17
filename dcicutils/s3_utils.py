@@ -18,6 +18,7 @@ from .exceptions import (
     GlobalBucketAccessError, SynonymousEnvironmentVariablesMismatched,
 )
 from .misc_utils import PRINT, override_environ, ignored
+from .c4_base import get_beanstalk_real_url
 
 
 ###########################
@@ -111,8 +112,6 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         3) With no GLOBAL_ENV_BUCKET or env kwarg,
            we expect bucket kwargs to be set, and use those as bucket names directly.
         """
-        # avoid circular ref
-        from .beanstalk_utils import get_beanstalk_real_url
         self.url = ''
         self.s3 = boto3.client('s3', region_name='us-east-1')
         global_bucket = EnvManager.global_env_bucket_name()
