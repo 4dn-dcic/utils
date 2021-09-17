@@ -82,15 +82,19 @@ def make_mock_health_page(env_name):
 
 
 @contextlib.contextmanager
-def mocked_s3utils(beanstalks=None, require_sse=False):
+def mocked_s3utils(beanstalks=None, require_sse=False, other_access_key_names=None):
     """
     This context manager sets up a mock version of boto3 for use by s3_utils and ff_utils during the context
     of its test. It also sets up the S3_ENCRYPT_KEY environment variable with a sample value for testing,
     and it sets up a set of mocked beanstalks for fourfront-foo and fourfront-bar, so that s3_utils will not
     get confused when it does discovery operations to find them.
     """
+    if beanstalks is None:
+        beanstalks = TestScenarios.DEFAULT_BEANSTALKS
     # First we make a mocked boto3 that will use an S3 mock with mock server side encryption.
-    s3_class = make_mock_boto_s3_with_sse(beanstalks=beanstalks) if require_sse else MockBotoS3Client
+    s3_class = (make_mock_boto_s3_with_sse(beanstalks=beanstalks, other_access_key_names=other_access_key_names)
+                if require_sse
+                else MockBotoS3Client)
     mock_boto3 = MockBoto3(s3=s3_class,
                            elasticbeanstalk=make_mock_boto_eb_client_class(beanstalks=beanstalks))
     # Now we arrange that both s3_utils and ff_utils modules share the illusion that our mock IS the boto3 library
