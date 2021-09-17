@@ -197,7 +197,7 @@ SSE_CUSTOMER_KEY = 'SSECustomerKey'
 SSE_CUSTOMER_ALGORITHM = 'SSECustomerAlgorithm'
 
 
-def _access_key_home(bs_env):
+def _access_key_home(bs_env, access_key_name):
     """
     Constructs the location in our S3 mock where the stashed access keys live for a given bs_env.
 
@@ -207,10 +207,12 @@ def _access_key_home(bs_env):
     creates bucket/key as a filename in M.  This function, _access_key_home will return the appropriate
     filename for such a mock file system to contain the access keys for a given bs_env.
     """
-    return os.path.join(s3_utils.s3Utils.SYS_BUCKET_TEMPLATE % bs_env, s3_utils.s3Utils.ACCESS_KEYS_S3_KEY)
+    return os.path.join(s3_utils.s3Utils.SYS_BUCKET_TEMPLATE % bs_env, access_key_name)
 
 
-def make_mock_boto_s3_with_sse(beanstalks=None):
+def make_mock_boto_s3_with_sse(beanstalks=None, other_access_key_names=None):
+
+    access_key_names = [s3_utils.s3Utils.ACCESS_KEYS_S3_KEY] + (other_access_key_names or [])
 
     if beanstalks is None:
         beanstalks = TestScenarios.DEFAULT_BEANSTALKS
@@ -246,8 +248,10 @@ def make_mock_boto_s3_with_sse(beanstalks=None):
         MOCK_STATIC_FILES = {
             # Our s3 mock presumes access keys are stashed in a well-known key
             # in the system bucket corresponding to the given beanstalk.
-            _access_key_home(env): json.dumps(TestScenarios.mocked_auth_key_secret_server_dict(env))
+            _access_key_home(env, access_key_name=access_key_name):
+                json.dumps(TestScenarios.mocked_auth_key_secret_server_dict(env))
             for env in beanstalks
+            for access_key_name in access_key_names
         }
 
     return MockBotoS3WithSSE
