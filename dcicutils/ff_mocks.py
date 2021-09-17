@@ -10,7 +10,7 @@ from dcicutils.qa_utils import (
     make_mock_beanstalk, make_mock_beanstalk_cname, make_mock_beanstalk_environment_variables,
 )
 from unittest import mock
-from . import beanstalk_utils, c4_base, ff_utils, s3_utils
+from . import beanstalk_utils, base, ff_utils, s3_utils
 
 
 _MOCK_APPLICATION_NAME = "4dn-web"
@@ -99,7 +99,7 @@ def mocked_s3utils(beanstalks=None, require_sse=False):
     with mock.patch.object(s3_utils, "boto3", mock_boto3):
         with mock.patch.object(ff_utils, "boto3", mock_boto3):
             with mock.patch.object(beanstalk_utils, "boto3", mock_boto3):
-                with mock.patch.object(c4_base, "boto3", mock_boto3):
+                with mock.patch.object(base, "boto3", mock_boto3):
                     with mock.patch.object(s3_utils.EnvManager, "fetch_health_page_json") as mock_fetcher:
 
                         # This is all that's needed for s3Utils to initialize an EnvManager.

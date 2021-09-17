@@ -6,7 +6,7 @@ import os
 import socket
 
 from collections import defaultdict
-from dcicutils import c4_base, env_utils, source_beanstalk_env_vars, compute_prd_env_for_env
+from dcicutils import base, env_utils, source_beanstalk_env_vars, compute_prd_env_for_env
 from dcicutils.env_utils import is_fourfront_env, is_cgap_env, is_stg_or_prd_env
 from dcicutils.qa_utils import mock_not_called
 from dcicutils.misc_utils import ignored
@@ -18,60 +18,60 @@ def _mocked_beanstalk_info(env):
 
 
 def test_get_beanstalk_real_url_blue_data():
-    with mock.patch.object(c4_base, '_compute_prd_env_for_project') as mock_whodaman:
-        with mock.patch.object(c4_base, 'beanstalk_info') as mock_beanstalk_info:
+    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_whodaman:
+        with mock.patch.object(base, 'beanstalk_info') as mock_beanstalk_info:
             mock_whodaman.return_value = 'fourfront-blue'
             mock_beanstalk_info.side_effect = _mocked_beanstalk_info
-            url = c4_base.get_beanstalk_real_url('fourfront-blue')
+            url = base.get_beanstalk_real_url('fourfront-blue')
             assert url == 'https://data.4dnucleome.org'
 
 
 def test_get_beanstalk_real_url_green_data():
-    with mock.patch.object(c4_base, '_compute_prd_env_for_project') as mock_whodaman:
-        with mock.patch.object(c4_base, 'beanstalk_info') as mock_beanstalk_info:
+    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_whodaman:
+        with mock.patch.object(base, 'beanstalk_info') as mock_beanstalk_info:
             mock_whodaman.return_value = 'fourfront-green'
             mock_beanstalk_info.side_effect = _mocked_beanstalk_info
-            url = c4_base.get_beanstalk_real_url('fourfront-green')
+            url = base.get_beanstalk_real_url('fourfront-green')
             assert url == 'https://data.4dnucleome.org'
 
 
 def test_get_beanstalk_real_url_blue_staging():
-    with mock.patch.object(c4_base, '_compute_prd_env_for_project') as mock_whodaman:
-        with mock.patch.object(c4_base, 'beanstalk_info') as mock_beanstalk_info:
+    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_whodaman:
+        with mock.patch.object(base, 'beanstalk_info') as mock_beanstalk_info:
             mock_whodaman.return_value = 'fourfront-green'
             mock_beanstalk_info.side_effect = _mocked_beanstalk_info
-            url = c4_base.get_beanstalk_real_url('fourfront-blue')
+            url = base.get_beanstalk_real_url('fourfront-blue')
             assert url == 'http://staging.4dnucleome.org'
 
 
 def test_get_beanstalk_real_url_green_staging():
-    with mock.patch.object(c4_base, '_compute_prd_env_for_project') as mock_whodaman:
-        with mock.patch.object(c4_base, 'beanstalk_info') as mock_beanstalk_info:
+    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_whodaman:
+        with mock.patch.object(base, 'beanstalk_info') as mock_beanstalk_info:
             mock_whodaman.return_value = 'fourfront-blue'
             mock_beanstalk_info.side_effect = _mocked_beanstalk_info
-            url = c4_base.get_beanstalk_real_url('fourfront-green')
+            url = base.get_beanstalk_real_url('fourfront-green')
             assert url == 'http://staging.4dnucleome.org'
 
 
 # Non-production environments will do this:
 
 def test_get_beanstalk_real_url_other():
-    with mock.patch.object(c4_base, '_compute_prd_env_for_project') as mock_compute_prd_env_for_project:
-        with mock.patch.object(c4_base, 'beanstalk_info') as mock_beanstalk_info:
+    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_compute_prd_env_for_project:
+        with mock.patch.object(base, 'beanstalk_info') as mock_beanstalk_info:
             mock_compute_prd_env_for_project.side_effect = mock_not_called('dcicutils.beanstalk_utils._compute_prd_env_for_project')
             mock_beanstalk_info.side_effect = _mocked_beanstalk_info
-            url = c4_base.get_beanstalk_real_url('beanstalk-name')
+            url = base.get_beanstalk_real_url('beanstalk-name')
             assert url == 'http://blah-beanstalk-name.blahblah.us-east-1.elasticbeanstalk.com'
 
 
 # These will fail in CGAP, which Soo reported (C4-101):
 
 def test_get_beanstalk_real_url_cgap():
-    with mock.patch.object(c4_base, '_compute_prd_env_for_project') as mock_whodaman:
-        with mock.patch.object(c4_base, 'beanstalk_info') as mock_beanstalk_info:
+    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_whodaman:
+        with mock.patch.object(base, 'beanstalk_info') as mock_beanstalk_info:
             mock_whodaman.return_value = 'fourfront-cgap'
             mock_beanstalk_info.side_effect = _mocked_beanstalk_info
-            url = c4_base.get_beanstalk_real_url('fourfront-cgap')
+            url = base.get_beanstalk_real_url('fourfront-cgap')
             assert url == 'https://cgap.hms.harvard.edu'
 
 
@@ -81,8 +81,8 @@ def _ip_addresses(hostname):
 
 def test_magic_cnames_by_production_ip_address():
     # This simple check just makes sure the obvious truths are checked.
-    assert _ip_addresses(c4_base.FF_MAGIC_CNAME) == _ip_addresses("data.4dnucleome.org")
-    assert _ip_addresses(c4_base.CGAP_MAGIC_CNAME) == _ip_addresses("cgap.hms.harvard.edu")
+    assert _ip_addresses(base.FF_MAGIC_CNAME) == _ip_addresses("data.4dnucleome.org")
+    assert _ip_addresses(base.CGAP_MAGIC_CNAME) == _ip_addresses("cgap.hms.harvard.edu")
 
 
 def test_magic_cnames_by_cname_consistency():
@@ -97,8 +97,8 @@ def test_magic_cnames_by_cname_consistency():
     assert ff_magic_envs == ['fourfront-green', 'fourfront-blue']
     assert cgap_magic_envs == ['fourfront-cgap']
 
-    client = boto3.client('elasticbeanstalk', region_name=c4_base.REGION)
-    res = c4_base.describe_beanstalk_environments(client, ApplicationName='4dn-web')
+    client = boto3.client('elasticbeanstalk', region_name=base.REGION)
+    res = base.describe_beanstalk_environments(client, ApplicationName='4dn-web')
     envs = res['Environments']
     roles = defaultdict(lambda: [])
     for env in envs:
@@ -106,7 +106,7 @@ def test_magic_cnames_by_cname_consistency():
         cname = env.get('CNAME')
         ip = socket.gethostbyname(cname)
         note = ""
-        if cname == c4_base.FF_MAGIC_CNAME:
+        if cname == base.FF_MAGIC_CNAME:
             assert env_name in ff_magic_envs
             ff_prod = "data.4dnucleome.org"
             ff_prod_ips = _ip_addresses(ff_prod)
@@ -114,7 +114,7 @@ def test_magic_cnames_by_cname_consistency():
             note = "\n => FF PRODUCTION (%s @ %s)" % (ff_prod, ",".join(ff_prod_ips))
             roles['FF_PRODUCTION'].append(env_name)
             assert env_utils.is_stg_or_prd_env(env_name)
-        elif cname == c4_base.CGAP_MAGIC_CNAME:
+        elif cname == base.CGAP_MAGIC_CNAME:
             assert env_name in cgap_magic_envs
             cgap_prod = "cgap.hms.harvard.edu"
             cgap_prod_ips = _ip_addresses(cgap_prod)
@@ -178,7 +178,7 @@ def test_magic_cnames_by_cname_consistency():
 _FF_BLUEGREEN_CNAMES = {
     env_info['EnvironmentName']: env_info['CNAME']
     for env_info in boto3.client('elasticbeanstalk',
-                                 region_name=c4_base.REGION).describe_environments(
+                                 region_name=base.REGION).describe_environments(
                                                              ApplicationName='4dn-web',
                                                              EnvironmentNames=['fourfront-blue',
                                                                                'fourfront-green'])['Environments']
@@ -196,7 +196,7 @@ def _ff_production_env_for_testing():
 
 
 def test_compute_ff_prod_env_by_alternate_computation():
-    assert c4_base.compute_ff_prd_env() == _ff_production_env_for_testing()
+    assert base.compute_ff_prd_env() == _ff_production_env_for_testing()
 
 
 def test_compute_ff_and_cgap_prd_and_stg_envs():
@@ -213,36 +213,36 @@ def test_compute_ff_and_cgap_prd_and_stg_envs():
         else:
             raise AssertionError("mocked_standard_mirror_env does not handle %r." % envname)
 
-    with mock.patch.object(c4_base, "_compute_prd_env_for_project") as mock_compute:
-        with mock.patch.object(c4_base, "get_standard_mirror_env") as mock_mirror:
+    with mock.patch.object(base, "_compute_prd_env_for_project") as mock_compute:
+        with mock.patch.object(base, "get_standard_mirror_env") as mock_mirror:
             mock_compute.side_effect = mocked_compute_prd_env_for_project
             mock_mirror.side_effect = mocked_standard_mirror_env
 
-            assert c4_base.compute_ff_prd_env() == 'fourfront-prd-env'
-            assert c4_base.compute_ff_stg_env() == 'fourfront-stg-env'
+            assert base.compute_ff_prd_env() == 'fourfront-prd-env'
+            assert base.compute_ff_stg_env() == 'fourfront-stg-env'
 
-            assert c4_base.compute_cgap_prd_env() == 'cgap-prd-env'
-            assert c4_base.compute_cgap_stg_env() is None
+            assert base.compute_cgap_prd_env() == 'cgap-prd-env'
+            assert base.compute_cgap_stg_env() is None
 
 
 def test_compute_ff_stg_env_by_alternate_means():
-    # NOTE: c4_base.compute_ff_prd_env is tested elsewhere in this file. If that test fails, debug it first!
-    actual_ff_prd = c4_base.compute_ff_prd_env()
+    # NOTE: base.compute_ff_prd_env is tested elsewhere in this file. If that test fails, debug it first!
+    actual_ff_prd = base.compute_ff_prd_env()
     expected_prd_options = {env_utils.FF_ENV_PRODUCTION_BLUE, env_utils.FF_ENV_PRODUCTION_GREEN}
     assert actual_ff_prd in expected_prd_options
-    assert c4_base.compute_ff_stg_env() == (expected_prd_options - {actual_ff_prd}).pop()
+    assert base.compute_ff_stg_env() == (expected_prd_options - {actual_ff_prd}).pop()
 
 
 def test_compute_cgap_stg_env_by_alternate_means():
-    # NOTE: c4_base.compute_cgap_prd_env is tested elsewhere in this file. If that test fails, debug it first!
-    actual_cgap_prd = c4_base.compute_cgap_prd_env()
+    # NOTE: base.compute_cgap_prd_env is tested elsewhere in this file. If that test fails, debug it first!
+    actual_cgap_prd = base.compute_cgap_prd_env()
     if actual_cgap_prd == 'fourfront-cgap':
         assert env_utils.get_standard_mirror_env('fourfront-cgap') is None
-        assert c4_base.compute_cgap_stg_env() is None
+        assert base.compute_cgap_stg_env() is None
     else:
         expected_prd_options = {env_utils.CGAP_ENV_PRODUCTION_BLUE_NEW, env_utils.CGAP_ENV_PRODUCTION_GREEN_NEW}
         assert actual_cgap_prd in expected_prd_options
-        assert c4_base.compute_cgap_stg_env() == (expected_prd_options - {actual_cgap_prd}).pop()
+        assert base.compute_cgap_stg_env() == (expected_prd_options - {actual_cgap_prd}).pop()
 
 
 def test_compute_prd_env_for_env():
@@ -261,27 +261,27 @@ def _mocked_describe_beanstalk_environments(*args, **kwargs):
     return {
         'Environments': [
             {
-                "CNAME": "not." + c4_base.CGAP_MAGIC_CNAME,
+                "CNAME": "not." + base.CGAP_MAGIC_CNAME,
                 "EnvironmentName": "cgap-env-1"
             },
             {
-                "CNAME": c4_base.CGAP_MAGIC_CNAME,
+                "CNAME": base.CGAP_MAGIC_CNAME,
                 "EnvironmentName": "cgap-env-2"
             },
             {
-                "CNAME": "also-not." + c4_base.CGAP_MAGIC_CNAME,
+                "CNAME": "also-not." + base.CGAP_MAGIC_CNAME,
                 "EnvironmentName": "cgap-env-3"
             },
             {
-                "CNAME": "not." + c4_base.FF_MAGIC_CNAME,
+                "CNAME": "not." + base.FF_MAGIC_CNAME,
                 "EnvironmentName": "ff-env-1"
             },
             {
-                "CNAME": c4_base.FF_MAGIC_CNAME,
+                "CNAME": base.FF_MAGIC_CNAME,
                 "EnvironmentName": "ff-env-2"
             },
             {
-                "CNAME": "also-not." + c4_base.FF_MAGIC_CNAME,
+                "CNAME": "also-not." + base.FF_MAGIC_CNAME,
                 "EnvironmentName": "ff-env-3"
             },
         ]
@@ -290,7 +290,7 @@ def _mocked_describe_beanstalk_environments(*args, **kwargs):
 
 def test_compute_prd_env_for_project():
     with mock.patch("boto3.client"):
-        with mock.patch.object(c4_base, "describe_beanstalk_environments") as mock_describer:
+        with mock.patch.object(base, "describe_beanstalk_environments") as mock_describer:
             mock_describer.side_effect = _mocked_describe_beanstalk_environments
-            assert c4_base._compute_prd_env_for_project('cgap') == 'cgap-env-2'
-            assert c4_base._compute_prd_env_for_project('ff') == 'ff-env-2'
+            assert base._compute_prd_env_for_project('cgap') == 'cgap-env-2'
+            assert base._compute_prd_env_for_project('ff') == 'ff-env-2'

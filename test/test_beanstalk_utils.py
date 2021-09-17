@@ -10,7 +10,7 @@ from dcicutils.env_utils import is_fourfront_env, is_cgap_env, is_stg_or_prd_env
 from dcicutils.qa_utils import mock_not_called
 from dcicutils.misc_utils import ignored
 from unittest import mock
-from .test_c4_base import _ff_production_env_for_testing
+from .test_base import _ff_production_env_for_testing
 
 
 def test_source_beanstalk_env_vars_no_config_file():

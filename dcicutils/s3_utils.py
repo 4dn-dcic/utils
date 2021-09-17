@@ -18,7 +18,7 @@ from .exceptions import (
     GlobalBucketAccessError, SynonymousEnvironmentVariablesMismatched,
 )
 from .misc_utils import PRINT, override_environ, ignored
-from .c4_base import get_beanstalk_real_url
+from .base import get_beanstalk_real_url
 
 
 ###########################

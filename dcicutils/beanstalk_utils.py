@@ -1,9 +1,9 @@
 """
-Utilities related to ElasticBeanstalk deployment and management.
-This includes, but is not limited to: ES, s3, RDS, Auth0, and Foursight.
+Low-level shared utilities related to C4 (the union of CGAP and 4DN/Fourfront) deployment and management.
+This intends to be a relatively minimal set of things required to bootstrap other libraries, breaking some
+circular dependencies that previously tangled things up.
 """
 
-from __future__ import print_function
 import subprocess
 import logging
 import boto3
@@ -14,7 +14,7 @@ import time
 from datetime import datetime
 from . import ff_utils
 from botocore.exceptions import ClientError
-from .c4_base import (
+from .base import (
     REGION, FOURSIGHT_URL, FF_MAGIC_CNAME, CGAP_MAGIC_CNAME, FF_GOLDEN_DB, CGAP_GOLDEN_DB,
     beanstalk_info, describe_beanstalk_environments, get_beanstalk_real_url,
     compute_ff_prd_env, compute_ff_stg_env, compute_cgap_prd_env, compute_cgap_stg_env, compute_prd_env_for_env,
