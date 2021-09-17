@@ -1,15 +1,11 @@
-import pytest
 import boto3
-import io
 import json
-import os
 import socket
 
 from collections import defaultdict
-from dcicutils import base, env_utils, source_beanstalk_env_vars, compute_prd_env_for_env
+from dcicutils import base, env_utils, compute_prd_env_for_env
 from dcicutils.env_utils import is_fourfront_env, is_cgap_env, is_stg_or_prd_env
 from dcicutils.qa_utils import mock_not_called
-from dcicutils.misc_utils import ignored
 from unittest import mock
 
 
@@ -58,7 +54,7 @@ def test_get_beanstalk_real_url_green_staging():
 def test_get_beanstalk_real_url_other():
     with mock.patch.object(base, '_compute_prd_env_for_project') as mock_compute_prd_env_for_project:
         with mock.patch.object(base, 'beanstalk_info') as mock_beanstalk_info:
-            mock_compute_prd_env_for_project.side_effect = mock_not_called('dcicutils.beanstalk_utils._compute_prd_env_for_project')
+            mock_compute_prd_env_for_project.side_effect = mock_not_called('_compute_prd_env_for_project')
             mock_beanstalk_info.side_effect = _mocked_beanstalk_info
             url = base.get_beanstalk_real_url('beanstalk-name')
             assert url == 'http://blah-beanstalk-name.blahblah.us-east-1.elasticbeanstalk.com'

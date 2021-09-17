@@ -1,12 +1,12 @@
 import pytest
-import boto3
 import io
-import json
 import os
-import socket
-from collections import defaultdict
-from dcicutils import beanstalk_utils as bs, env_utils, source_beanstalk_env_vars, compute_prd_env_for_env
-from dcicutils.env_utils import is_fourfront_env, is_cgap_env, is_stg_or_prd_env
+
+from dcicutils import beanstalk_utils
+from dcicutils.beanstalk_utils import (
+    ENV_VARIABLE_NAMESPACE,
+    compute_ff_prd_env, get_beanstalk_environment_variables, source_beanstalk_env_vars, whodaman,
+)
 from dcicutils.qa_utils import mock_not_called
 from dcicutils.misc_utils import ignored
 from unittest import mock
@@ -65,25 +65,25 @@ def test_source_beanstalk_env_vars_normal():
 
 
 def test_deprecated_whodaman_by_alternate_computation():
-    assert bs.whodaman() == _ff_production_env_for_testing()
+    assert whodaman() == _ff_production_env_for_testing()
 
 
 def test_deprecated_whodaman():
     # This just makes sure that the old name is properly retained, since it's used in a lot of other repos.
-    assert bs.whodaman is bs.compute_ff_prd_env
+    assert whodaman is compute_ff_prd_env
 
 
 @pytest.mark.parametrize('options, expected', [
     ([
          {
-            'Namespace': bs.ENV_VARIABLE_NAMESPACE,
+            'Namespace': ENV_VARIABLE_NAMESPACE,
             'OptionName': 'super_secret',
             'Value': 'i am secret'
          }
      ], {'super_secret': 'i am secret'}),
     ([
          {
-            'Namespace': bs.ENV_VARIABLE_NAMESPACE,
+            'Namespace': ENV_VARIABLE_NAMESPACE,
             'OptionName': 'super_secret',
             'Value': 'i am secret'
          },
@@ -107,19 +107,19 @@ def test_deprecated_whodaman():
      ], {}),
     ([
          {
-            'Namespace': bs.ENV_VARIABLE_NAMESPACE,
+            'Namespace': ENV_VARIABLE_NAMESPACE,
             'OptionName': 'super_secret',
             'Value': 'i am secret'
          },
          {
-            'Namespace': bs.ENV_VARIABLE_NAMESPACE,
+            'Namespace': ENV_VARIABLE_NAMESPACE,
             'OptionName': 'not_secret',
             'Value': 'this one shows up too though'
          }
      ], {'super_secret': 'i am secret', 'not_secret': 'this one shows up too though'}),
 ])
 def test_get_beanstalk_env_variables(options, expected):
-    with mock.patch('dcicutils.beanstalk_utils._get_beanstalk_configuration_settings') as mock_api:
+    with mock.patch.object(beanstalk_utils, '_get_beanstalk_configuration_settings') as mock_api:
         mock_api.return_value = options  # do not call out to AWS
-        actual = bs.get_beanstalk_environment_variables('unused')
+        actual = get_beanstalk_environment_variables('unused')
         assert actual == expected
