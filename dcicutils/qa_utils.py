@@ -9,6 +9,7 @@ import datetime
 import dateutil.tz as dateutil_tz
 import hashlib
 import io
+import logging
 import os
 import pytest
 import pytz
@@ -649,6 +650,7 @@ class MockBoto3:
 
     def client(self, kind, **kwargs):
         mapped_class = self._mappings.get(kind)
+        logging.warning(f"Using {mapped_class} as {kind} boto3.client.")
         if not mapped_class:
             raise NotImplementedError("Unsupported boto3 mock kind:", kind)
         return mapped_class(boto3=self, **kwargs)
@@ -682,7 +684,7 @@ class MockBotoCloudFormationClient:
                     raise ValueError(f"duplicated mock stack name: {mock_stack_name}")
             stacks.append(MockBotoCloudFormationStack(mock_name=mock_stack_name))
 
-    def __init__(self, mocked_stacks=None, mock_stack_names=None, boto3=None):
+    def __init__(self, *, mocked_stacks=None, mock_stack_names=None, boto3=None):
         self.boto3 = boto3 or MockBoto3()
         self.setup_boto3_mocked_stacks(self.boto3, mocked_stacks=mocked_stacks, mock_stack_names=mock_stack_names)
         self.stacks = MockStackCollectionManager(self)
@@ -748,7 +750,7 @@ class MockBotoS3Client:
 
     DEFAULT_STORAGE_CLASS = "STANDARD"
 
-    def __init__(self, region_name=None, mock_other_required_arguments=None, mock_s3_files=None,
+    def __init__(self, *, region_name=None, mock_other_required_arguments=None, mock_s3_files=None,
                  storage_class=None, boto3=None):
         self.boto3 = boto3 or MockBoto3()
         if region_name not in (None, 'us-east-1'):
@@ -983,7 +985,7 @@ class MockBotoSQSClient:
     This is a mock of certain SQS functionality.
     """
 
-    def __init__(self, region_name=None, boto3=None):
+    def __init__(self, *, region_name=None, boto3=None):
         if region_name not in (None, 'us-east-1'):
             raise RuntimeError("Unexpected region:", region_name)
         self._mock_queue_name_seen = None
