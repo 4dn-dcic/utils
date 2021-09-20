@@ -205,6 +205,10 @@ def test_guess_local_timezone_for_testing():
         guess = guess_local_timezone_for_testing()
         assert guess == pytz.timezone("MST")
 
+        mock_tzlocal.side_effect = lambda: MockLocalTimezone(summer_tz='CEST', winter_tz='CET')
+        guess = guess_local_timezone_for_testing()
+        assert guess == pytz.timezone("CET")
+
         with pytest.raises(Exception):
             # Unknown times that disagree will fail.
             mock_tzlocal.side_effect = lambda: MockLocalTimezone(summer_tz='GMT', winter_tz='BST')
