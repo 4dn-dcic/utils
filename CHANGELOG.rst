@@ -7,6 +7,12 @@ Change Log
 ----------
 
 
+2.3.2
+=====
+
+* Support Central European Time for testing.
+
+
 2.3.1
 =====
 

@@ -489,7 +489,7 @@ class EnvManager:
         if described_env_name:
             if not env_name:
                 env_name = described_env_name
-            elif env_name == described_env_name:
+            elif env_name != described_env_name:
                 raise ValueError(f"The given env name, {env_name},"
                                  f" does not match the name given in the description, {env_description}.")
 

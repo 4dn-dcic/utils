@@ -2,11 +2,13 @@ import contextlib
 import datetime
 import io
 import json
+import logging
 import os
 import pytest
+import requests
 
 from botocore.exceptions import ClientError
-from dcicutils import s3_utils as s3_utils_module
+from dcicutils import s3_utils as s3_utils_module, beanstalk_utils
 from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
 from dcicutils.env_utils import get_standard_mirror_env, FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, CGAP_PUBLIC_URL_PRD
 from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs
@@ -95,11 +97,19 @@ def test_regression_s3_utils_short_name_c4_706():
         s3Utils(env="cgapwolf")
 
 
+def _env_is_up_and_healthy(env):
+    env_url = beanstalk_utils.get_beanstalk_real_url(env)
+    health_page_url = f"{env_url}/health?format=json"
+    return requests.get(health_page_url).status_code == 200
+
 @pytest.mark.integrated
 @pytest.mark.parametrize('ff_ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat'])
 def test_s3utils_creation_ff_ordinary(ff_ordinary_envname):
-    util = s3Utils(env=ff_ordinary_envname)
-    assert util.sys_bucket == 'elasticbeanstalk-%s-system' % ff_ordinary_envname
+    if _env_is_up_and_healthy(ff_ordinary_envname):
+        util = s3Utils(env=ff_ordinary_envname)
+        assert util.sys_bucket == 'elasticbeanstalk-%s-system' % ff_ordinary_envname
+    else:
+        pytest.skip(f"Health page for {ff_ordinary_envname} is unavailable, so test is being skipped.")
 
 
 @pytest.mark.integrated
