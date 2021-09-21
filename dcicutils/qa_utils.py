@@ -79,6 +79,7 @@ LOCAL_TIMEZONE_MAPPINGS = {
     ('CST', 'CDT'): "US/Central",
     ('MST', 'MDT'): "US/Mountain",
     ('PST', 'PDT'): "US/Pacific",
+    ('CET', 'CEST'): "CET",
 }
 
 
