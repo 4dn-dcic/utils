@@ -6,6 +6,19 @@ dcicutils
 Change Log
 ----------
 
+2.4.0
+=====
+
+* This change rearranges files to remove some bootstrapping issues caused by circular dependencies.
+  This change is not supposed to affect the visible behavior, but the nature of the change creates
+  a risk of change because things moved from file to file.
+  An attempt was made to retain support for importable functions and variables in a way that would be non-disruptive.
+
+* New module ``ff_mocks`` containing some test facilities that can be used by other repos to test FF and CGAP stuff.
+
+  * Class ``MockBoto4DNLegacyElasticBeanstalkClient``.
+
+  * Context manager ``mocked_s3utils`` for mocking many typical situations.
 
 2.3.2
 =====

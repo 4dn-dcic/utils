@@ -17,8 +17,11 @@ from .exceptions import (
     InferredBucketConflict, CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv,
     GlobalBucketAccessError, SynonymousEnvironmentVariablesMismatched,
 )
-from .misc_utils import PRINT, override_environ, ignored
+from .misc_utils import PRINT, override_environ, ignored, exported
 from .base import get_beanstalk_real_url
+
+
+exported(get_beanstalk_real_url)
 
 
 ###########################
