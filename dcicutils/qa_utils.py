@@ -9,6 +9,7 @@ import datetime
 import dateutil.tz as dateutil_tz
 import hashlib
 import io
+import logging
 import os
 import pytest
 import pytz
@@ -650,6 +651,7 @@ class MockBoto3:
 
     def client(self, kind, **kwargs):
         mapped_class = self._mappings.get(kind)
+        logging.warning(f"Using {mapped_class} as {kind} boto3.client.")
         if not mapped_class:
             raise NotImplementedError("Unsupported boto3 mock kind:", kind)
         return mapped_class(boto3=self, **kwargs)
@@ -683,7 +685,7 @@ class MockBotoCloudFormationClient:
                     raise ValueError(f"duplicated mock stack name: {mock_stack_name}")
             stacks.append(MockBotoCloudFormationStack(mock_name=mock_stack_name))
 
-    def __init__(self, mocked_stacks=None, mock_stack_names=None, boto3=None):
+    def __init__(self, *, mocked_stacks=None, mock_stack_names=None, boto3=None):
         self.boto3 = boto3 or MockBoto3()
         self.setup_boto3_mocked_stacks(self.boto3, mocked_stacks=mocked_stacks, mock_stack_names=mock_stack_names)
         self.stacks = MockStackCollectionManager(self)
@@ -749,7 +751,7 @@ class MockBotoS3Client:
 
     DEFAULT_STORAGE_CLASS = "STANDARD"
 
-    def __init__(self, region_name=None, mock_other_required_arguments=None, mock_s3_files=None,
+    def __init__(self, *, region_name=None, mock_other_required_arguments=None, mock_s3_files=None,
                  storage_class=None, boto3=None):
         self.boto3 = boto3 or MockBoto3()
         if region_name not in (None, 'us-east-1'):
@@ -984,7 +986,7 @@ class MockBotoSQSClient:
     This is a mock of certain SQS functionality.
     """
 
-    def __init__(self, region_name=None, boto3=None):
+    def __init__(self, *, region_name=None, boto3=None):
         if region_name not in (None, 'us-east-1'):
             raise RuntimeError("Unexpected region:", region_name)
         self._mock_queue_name_seen = None
@@ -1340,62 +1342,3 @@ def make_mock_beanstalk_environment_variables(var_str):
     spec2 = [{"Namespace": _NAMESPACE_ENVIRONMENT_VARIABLE, "OptionName": name, "Value": value}
              for name, value in [spec.split("=") for spec in var_str.split(",")]]
     return spec0 + spec1 + spec2
-
-
-_MOCK_APPLICATION_NAME = "4dn-web"
-_MOCK_SERVICE_USERNAME = 'service-accout-name'
-_MOCK_SERVICE_PASSWORD = 'service-accout-pw'
-_MOCK_APPLICATION_OPTIONS_PARTIAL = (
-    f"MOCK_USERNAME={_MOCK_SERVICE_USERNAME},MOCK_PASSWORD={_MOCK_SERVICE_PASSWORD},ENV_NAME="
-)
-
-
-class MockBoto4DNLegacyElasticBeanstalkClient(MockBotoElasticBeanstalkClient):
-
-    DEFAULT_MOCKED_BEANSTALKS = [
-        make_mock_beanstalk("fourfront-cgapdev"),
-        make_mock_beanstalk("fourfront-cgapwolf"),
-        make_mock_beanstalk("fourfront-cgap"),
-        make_mock_beanstalk("fourfront-cgaptest"),
-        make_mock_beanstalk("fourfront-webdev"),
-        make_mock_beanstalk("fourfront-hotseat"),
-        make_mock_beanstalk("fourfront-mastertest"),
-        make_mock_beanstalk("fourfront-green", cname="fourfront-green.us-east-1.elasticbeanstalk.com"),
-        make_mock_beanstalk("fourfront-blue"),
-    ]
-
-    MOCK_APPLICATION_NAME = _MOCK_APPLICATION_NAME
-    MOCK_SERVICE_USERNAME = _MOCK_SERVICE_USERNAME
-    MOCK_SERVICE_PASSWORD = _MOCK_SERVICE_PASSWORD
-
-    DEFAULT_MOCKED_CONFIGURATION_SETTINGS = [
-        {
-            "ApplicationName": _MOCK_APPLICATION_NAME,
-            "EnvironmentName": env_name,
-            "DeploymentStatus": "deployed",
-            "OptionSettings": make_mock_beanstalk_environment_variables(_MOCK_APPLICATION_OPTIONS_PARTIAL + env_name),
-        }
-        for env_name in [beanstalk["EnvironmentName"] for beanstalk in DEFAULT_MOCKED_BEANSTALKS]
-    ]
-
-    @classmethod
-    def all_legacy_beanstalk_names(cls):
-        return [beanstalk["EnvironmentName"] for beanstalk in cls.DEFAULT_MOCKED_BEANSTALKS]
-
-
-class MockBotoFooBarElasticBeanstalkClient(MockBotoElasticBeanstalkClient):
-
-    DEFAULT_MOCKED_BEANSTALKS = [
-        make_mock_beanstalk("fourfront-foo"),
-        make_mock_beanstalk("fourfront-bar"),
-    ]
-
-    DEFAULT_MOCKED_CONFIGURATION_SETTINGS = [
-        {
-            "ApplicationName": _MOCK_APPLICATION_NAME,
-            "EnvironmentName": env_name,
-            "DeploymentStatus": "deployed",
-            "OptionSettings": make_mock_beanstalk_environment_variables(_MOCK_APPLICATION_OPTIONS_PARTIAL + env_name),
-        }
-        for env_name in [beanstalk["EnvironmentName"] for beanstalk in DEFAULT_MOCKED_BEANSTALKS]
-    ]

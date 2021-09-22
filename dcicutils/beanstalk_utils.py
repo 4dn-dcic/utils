@@ -1,24 +1,36 @@
 """
-Utilities related to ElasticBeanstalk deployment and management.
-This includes, but is not limited to: ES, s3, RDS, Auth0, and Foursight.
+Low-level shared utilities related to C4 (the union of CGAP and 4DN/Fourfront) deployment and management.
+This intends to be a relatively minimal set of things required to bootstrap other libraries, breaking some
+circular dependencies that previously tangled things up.
 """
 
-from __future__ import print_function
 import subprocess
 import logging
 import boto3
 import os
 import json
 import requests
-import sys
 import time
 from datetime import datetime
 from . import ff_utils
 from botocore.exceptions import ClientError
-from .misc_utils import PRINT, obsolete, remove_suffix
-from .env_utils import (
-    is_fourfront_env, is_cgap_env, is_stg_or_prd_env, public_url_mappings,
-    blue_green_mirror_env, get_standard_mirror_env,
+from .base import (
+    REGION, FOURSIGHT_URL, FF_MAGIC_CNAME, CGAP_MAGIC_CNAME, FF_GOLDEN_DB, CGAP_GOLDEN_DB,
+    beanstalk_info, describe_beanstalk_environments, get_beanstalk_real_url,
+    compute_ff_prd_env, compute_ff_stg_env, compute_cgap_prd_env, compute_cgap_stg_env, compute_prd_env_for_env,
+)
+from .env_utils import is_stg_or_prd_env
+from .misc_utils import PRINT, exported, obsolete, remove_suffix
+
+
+exported(
+    # These used to be defined here, and there may be other files or even repos that import these,
+    # so retain them even if they aren't otherwise used in this file. This is NOT a full list of all
+    # things defined in this file, but only what's needed to keep these looking like unused imports.
+    # -kmp 16-Sep-2021
+    REGION, FOURSIGHT_URL, FF_MAGIC_CNAME, CGAP_MAGIC_CNAME, FF_GOLDEN_DB, CGAP_GOLDEN_DB,
+    beanstalk_info, describe_beanstalk_environments, get_beanstalk_real_url,
+    compute_ff_prd_env, compute_ff_stg_env, compute_cgap_prd_env, compute_cgap_stg_env, compute_prd_env_for_env,
 )
 
 
@@ -32,36 +44,23 @@ logger.setLevel(logging.INFO)
 # use a 'try' expression to sort things out and call the safe function 'use_input' to avoid confusion.
 # But PyCharm found that 'try' expression confusing, so now that we are Python 3 only, we're phasing that
 # out. For a time, we'll retain the transitional naming, though, along with an affirmative error check, so
-# we don't open any security holes. We can remove this naming and check once we're we're only using Python 3.
+# we don't open any security holes.
+# TODO: We can remove this naming and check once we're we're only using Python 3.
 # -kmp 27-Mar-2020
 
-_python_major_version = sys.version_info[0]
-if _python_major_version < 3:
-    raise EnvironmentError("The 'dcicutils.beanstalk_utils' package only works in Python 3.")
 use_input = input  # In Python 3, this does 'safe' input reading.
 
+whodaman = compute_ff_prd_env  # This naming is obsolete but retained for compatibility.
 
-FOURSIGHT_URL = 'https://foursight.4dnucleome.org/'
-
-# FF_MAGIC_CNAME corresponds to data.4dnucleome.org
-FF_MAGIC_CNAME = 'fourfront-green.us-east-1.elasticbeanstalk.com'
-# CGAP_MAGIC_CNAME corresponds to cgap.hms.harvard.edu
-CGAP_MAGIC_CNAME = 'fourfront-cgap.9wzadzju3p.us-east-1.elasticbeanstalk.com'
 # The legacy name MAGIC_CNAME is deprecated (retained for backward compatibility until a major release boundary).
 MAGIC_CNAME = FF_MAGIC_CNAME
 
-# FF_GOLDEN_DB is the database behind data.4dnucleome.org (and shared by staging.4dnucleome.org)
-FF_GOLDEN_DB = 'fourfront-production.co3gwj7b7tpq.us-east-1.rds.amazonaws.com'
-# CGAP_GOLDEN_DB is the database behind cgap.hms.harvard.edu
-CGAP_GOLDEN_DB = 'fourfront-cgap.co3gwj7b7tpq.us-east-1.rds.amazonaws.com'
 # The name GOLDEN_DB is deprecated (retained for backward compatibility until a major release boundary).
 # Although not visibly used in this repository, this variable is imported by Torb.
 GOLDEN_DB = FF_GOLDEN_DB
 
 # identifier for locating environment variables in EB config
 ENV_VARIABLE_NAMESPACE = 'aws:elasticbeanstalk:application:environment'
-
-REGION = 'us-east-1'
 
 
 class WaitingForBoto3(Exception):
@@ -270,111 +269,6 @@ def swap_cname(src, dest):
           % (res_stag['fs_url'], res_stag['dest_env'], res_stag['foursight']))
 
 
-def _compute_prd_env_for_project(project):
-    """
-    Determines which ElasticBeanstalk environment is currently hosting
-    data.4dnucleome.org. Requires IAM permissions for EB!
-
-    Returns:
-        str: EB environment name hosting data.4dnucleome
-    """
-    magic_cname = CGAP_MAGIC_CNAME if project == 'cgap' else FF_MAGIC_CNAME
-    client = boto3.client('elasticbeanstalk', region_name=REGION)
-    res = describe_beanstalk_environments(client, ApplicationName="4dn-web")
-    for env in res['Environments']:
-        if env.get('CNAME') == magic_cname:
-            # we found data
-            return env.get('EnvironmentName')
-
-
-def compute_ff_prd_env():
-    """Returns the name of the current Fourfront production environment."""
-    return _compute_prd_env_for_project('fourfront')
-
-
-def compute_ff_stg_env():
-    """Returns the name of the current Fourfront staging environment."""
-    return get_standard_mirror_env(compute_ff_prd_env())
-
-
-whodaman = compute_ff_prd_env  # This naming is obsolete but retained for compatibility.
-
-
-def compute_cgap_prd_env():
-    """Returns the name of the current CGAP production environment."""
-    return _compute_prd_env_for_project('cgap')
-
-
-def compute_cgap_stg_env():
-    """Returns the name of the current CGAP staging environment, or None if there is none."""
-    return get_standard_mirror_env(compute_cgap_prd_env())
-
-
-def compute_prd_env_for_env(envname):
-    """Given an environment, returns the name of the prod environment for its owning project."""
-    if is_cgap_env(envname):
-        return compute_cgap_prd_env()
-    elif is_fourfront_env(envname):
-        return compute_ff_prd_env()
-    else:
-        raise ValueError("Unknown environment: %s" % envname)
-
-
-def beanstalk_info(env):
-    """
-    Describe a ElasticBeanstalk environment given an environment name
-
-    Args:
-        env (str): ElasticBeanstalk environment name
-
-    Returns:
-        dict: Environments result from describe_beanstalk_environments
-    """
-    client = boto3.client('elasticbeanstalk', region_name=REGION)
-    res = describe_beanstalk_environments(client, EnvironmentNames=[env])
-    envs = res['Environments']
-    if not envs:
-        # Raise an error that will be meaningful to the caller, rather than just getting an index out of range error.
-        raise ClientError({"Error": {"Code": 404, "Message": f"Environment does not exist: {env}"}},
-                          # Properly speaking, this error does not come from .describe_environments(), so we kind of
-                          # have to make up an operation that's failing, even though it's not a boto3 operation.
-                          operation_name="beanstalk_info")
-    else:
-        return envs[0]
-
-
-def get_beanstalk_real_url(env):
-    """
-    Return the real url for the elasticbeanstalk with given environment name.
-    Name can be 'cgap', 'data', 'staging', or an actual environment.
-
-    Args:
-        env (str): ElasticBeanstalk environment name
-
-    Returns:
-        str: url of the ElasticBeanstalk environment
-    """
-    urls = public_url_mappings(env)
-
-    if env in urls:  # Special case handling of 'cgap', 'data', or 'staging' as an argument.
-        return urls[env]
-
-    if is_stg_or_prd_env(env):
-        # What counts as staging/prod depends on whether we're in the CGAP or Fourfront space.
-        data_env = compute_cgap_prd_env() if is_cgap_env(env) else compute_ff_prd_env()
-        # There is only one production environment. Everything else is staging, but everything
-        # else is not staging.4dnucleome.org. Only one is that.
-        if env == data_env:
-            return urls['data']
-        elif env == blue_green_mirror_env(data_env):
-            # Mirror env might be None, in which case this clause will not be entered
-            return urls['staging']
-
-    bs_info = beanstalk_info(env)
-    url = "http://" + bs_info['CNAME']
-    return url
-
-
 def _get_beanstalk_configuration_settings(env):
     """ Helper function for the below method (that is easy to mock for testing).
         This function should not be called directly.
@@ -453,36 +347,6 @@ def is_beanstalk_ready(env):
         raise WaitingForBoto3("Beanstalk environment status is %s" % status)
 
     return True, 'http://' + res['Environments'][0].get('CNAME')
-
-
-def describe_beanstalk_environments(client, **kwargs):
-    """
-    Generic function for retrying client.describe_environments to avoid
-    AWS throttling errors. Passes all given kwargs to describe_environments
-
-    Args:
-        client (botocore.client.ElasticBeanstalk): boto3 client
-
-    Returns:
-        dict: response from client.describe_environments
-
-    Raises:
-        Exception: if a non-ClientError exception is encountered during
-            describe_environments or cannot complete within retry framework
-    """
-    env_info = kwargs.get('EnvironmentNames', kwargs.get('ApplicationName', 'Unknown environment'))
-    for retry in [1, 1, 1, 1, 2, 2, 2, 4, 4, 6, 8, 10, 12, 14, 16, 18, 20]:
-        try:
-            res = client.describe_environments(**kwargs)
-        except ClientError as e:
-            PRINT('Client exception encountered while getting BS info for %s. Error: %s' % (env_info, str(e)))
-            time.sleep(retry)
-        except Exception as e:
-            PRINT('Unhandled exception encountered while getting BS info for %s. Error: %s' % (env_info, str(e)))
-            raise e
-        else:
-            return res
-    raise Exception('Could not describe Beanstalk environments due ClientErrors, likely throttled connections.')
 
 
 def is_snapshot_ready(snapshot_name):
