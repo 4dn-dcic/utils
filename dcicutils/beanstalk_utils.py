@@ -15,12 +15,12 @@ from datetime import datetime
 from . import ff_utils
 from botocore.exceptions import ClientError
 from .base import (
-    REGION, FOURSIGHT_URL, FF_MAGIC_CNAME, CGAP_MAGIC_CNAME, FF_GOLDEN_DB, CGAP_GOLDEN_DB,
+    REGION, FOURSIGHT_URL, _FF_MAGIC_CNAME, _CGAP_MAGIC_CNAME, _FF_GOLDEN_DB, _CGAP_GOLDEN_DB,
     beanstalk_info, describe_beanstalk_environments, get_beanstalk_real_url,
     compute_ff_prd_env, compute_ff_stg_env, compute_cgap_prd_env, compute_cgap_stg_env, compute_prd_env_for_env,
 )
 from .env_utils import is_stg_or_prd_env
-from .misc_utils import PRINT, exported, obsolete, remove_suffix
+from .misc_utils import PRINT, exported, obsolete, remove_suffix, prompt_for_input
 
 
 exported(
@@ -28,7 +28,7 @@ exported(
     # so retain them even if they aren't otherwise used in this file. This is NOT a full list of all
     # things defined in this file, but only what's needed to keep these looking like unused imports.
     # -kmp 16-Sep-2021
-    REGION, FOURSIGHT_URL, FF_MAGIC_CNAME, CGAP_MAGIC_CNAME, FF_GOLDEN_DB, CGAP_GOLDEN_DB,
+    REGION, FOURSIGHT_URL, _FF_MAGIC_CNAME, _CGAP_MAGIC_CNAME, _FF_GOLDEN_DB, _CGAP_GOLDEN_DB,
     beanstalk_info, describe_beanstalk_environments, get_beanstalk_real_url,
     compute_ff_prd_env, compute_ff_stg_env, compute_cgap_prd_env, compute_cgap_stg_env, compute_prd_env_for_env,
 )
@@ -48,16 +48,16 @@ logger.setLevel(logging.INFO)
 # TODO: We can remove this naming and check once we're we're only using Python 3.
 # -kmp 27-Mar-2020
 
-use_input = input  # In Python 3, this does 'safe' input reading.
+# The name whodaman was deprecated and has been removed as of dcicutils 3.0
+# Please use compute_ff_prd_env instead.
+#
+# whodaman = compute_ff_prd_env  # This naming is obsolete but retained for compatibility.
 
-whodaman = compute_ff_prd_env  # This naming is obsolete but retained for compatibility.
+# The legacy name MAGIC_CNAME was deprecated and is finally removed as of dcicutils 3.0.
+# MAGIC_CNAME = _FF_MAGIC_CNAME
 
-# The legacy name MAGIC_CNAME is deprecated (retained for backward compatibility until a major release boundary).
-MAGIC_CNAME = FF_MAGIC_CNAME
-
-# The name GOLDEN_DB is deprecated (retained for backward compatibility until a major release boundary).
-# Although not visibly used in this repository, this variable is imported by Torb.
-GOLDEN_DB = FF_GOLDEN_DB
+# The legacy name GOLDEN_DB was deprecated and is finally removed as of dcicutils 3.0.
+# GOLDEN_DB = _FF_GOLDEN_DB
 
 # identifier for locating environment variables in EB config
 ENV_VARIABLE_NAMESPACE = 'aws:elasticbeanstalk:application:environment'
@@ -1343,9 +1343,9 @@ def clone_beanstalk_command_line(old, new, prod=False, copy_s3=False):
         PRINT('This command must be called from an eb initialized repo! Exiting...')
         return
     PRINT('### eb status (END)')
-    name = use_input("This will create an environment named %s, cloned from %s."
-                     " This includes s3, ES, RDS, and Auth0 callbacks. If you "
-                     "are sure, type the new env name to confirm: " % (new, old))
+    name = prompt_for_input(f"This will create an environment named {new}, cloned from {old}."
+                            f" This includes s3, ES, RDS, and Auth0 callbacks."
+                            f" If you are sure, type the new env name to confirm: ")
     if str(name) != new:
         PRINT('Could not confirm env. Exiting...')
         return
@@ -1397,9 +1397,9 @@ def delete_beanstalk_command_line(env):
         PRINT('This command must be called from an eb initialized repo! Exiting...')
         return
     PRINT('### eb status (END)')
-    name = use_input('This will totally blow away the environment, including s3,'
-                     'ES, RDS, and Auth0 callbacks. If you are sure, type the '
-                     'env name to confirm: ')
+    name = prompt_for_input("This will totally blow away the environment,"
+                            " including s3, ES, RDS, and Auth0 callbacks."
+                            " If you are sure, type the env name to confirm: ")
     if str(name) != env:
         PRINT('Could not confirm env. Exiting...')
         return

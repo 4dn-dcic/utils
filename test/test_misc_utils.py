@@ -20,7 +20,7 @@ from dcicutils.misc_utils import (
     LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
     keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
     CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json, url_path_join,
-    as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
+    as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ,
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
     capitalize1, local_attrs, dict_zip, json_leaf_subst,
@@ -770,20 +770,14 @@ def test_as_seconds():
     assert as_seconds(milliseconds=250) == 0.25
 
 
-def test_hms_tz():
-
-    assert HMS_TZ == REF_TZ, "HMS_TZ was deprectead, but is still expected to be a synonym for REF_TZ."
-
-
-@pytest.mark.parametrize('now', [hms_now, ref_now])  # hms_now is a deprecated name for ref_now
-def test_hms_now_and_ref_now(now):
+def test_ref_now():
 
     t0 = datetime_module.datetime(2015, 7, 4, 12, 0, 0)
     dt = ControlledTime(t0)
 
     with mock.patch("dcicutils.misc_utils.datetime", dt):
 
-        t1 = now()
+        t1 = ref_now()
         t1_utc = t1.replace(tzinfo=pytz.UTC)
         assert t1.replace(tzinfo=None) == t0 + datetime_module.timedelta(seconds=1)
         delta = (t1 - t1_utc)
