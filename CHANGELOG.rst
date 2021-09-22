@@ -62,6 +62,12 @@ Specifics:
   * ``s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY`` replaced by ``HealthPageKey.METADATA_BUNDLES_BUCKET``
   * ``s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY`` replaced by ``HealthPageKey.TIBANNA_OUTPUT_BUCKET``
 
+  Among ``4dn-dcic`` repos, there was only one active use of any of these, ``TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY``,
+  in ``src/commands/setup_tibanna.py`` in ``4dn-cloud-infra``. It will need to be rewritten.
+
+  Among ``dbmi-bgm`` repos, all are mentioned only in ``src/encoded/root.py`` and ``src/encoded/tests/test_root.py``,
+  but rewrites to use ``HealthPageKey`` attributes will be needed there as well.
+
 
 2.4.0
 =====
