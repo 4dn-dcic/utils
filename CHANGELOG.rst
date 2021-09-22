@@ -6,6 +6,63 @@ dcicutils
 Change Log
 ----------
 
+3.0.0
+=====
+
+The major version bump is to allow removal of some deprecated items
+and to further constrain the Python version.
+
+Strictly speaking, this is an **INCOMPATIBLE CHANGE**, though we expect little or no
+impact.
+
+In particular, searches of all ``4dn-dcic`` and ``dbmi-cgap`` repositories on GitHub show
+that only the ``torb`` repository is impacted, and since that repo is not
+in active use, we're not worried about that. Also, minor code adjustments would
+fix the problem uses allowing uses of version 3.0 or higher.
+
+Specifics:
+
+* Supports versions of Python starting with 3.6.1 and below 3.8.
+
+* Removes support for previously-deprecated function name ``whodaman``, which only ``torb`` was still using.
+  ``compute_ff_prd_env`` can be used as a direct replacement.
+
+* Removes support for previously-deprecated variable ``MAGIC_CNAME`` which no one was using any more.
+
+* Removes support for previously-deprecated variable ``GOLDEN_DB`` which only ``torb`` was still using.
+  ``_FF_GOLDEN_DB`` could be used as a direct replacement in an emergency,
+  but only for legacy environments. This is not a good solution for orchestrated environments (C4-689).
+
+* The variables ``FF_MAGIC_CNAME``, ``CGAP_MAGIC_CNAME``, ``FF_GOLDEN_DB``, and ``CGAP_GOLDEN_DB``,
+  which had no uses outside of ``dcicutils`` itself,
+  now have underscores ahead of their names to emphasize that they are internal to ``dcicutils`` only.
+  ``_FF_MAGIC_CNAME``, ``_CGAP_MAGIC_CNAME``, ``_FF_GOLDEN_DB``, and ``_CGAP_GOLDEN_DB``, respectively,
+  could be used as a direct replacement in an emergency,
+  but only for legacy environments. This is not a good solution for orchestrated environments (C4-689).
+
+* The function name ``use_input`` has been renamed ``prompt_for_input`` and the preferred place to
+  import it from is now ``misc_utils``, not ``beanstalk_utils``. (This is just a synonym for the
+  poorly named Python function ``input``.)
+
+* The previously-deprecated class name ``deployment_utils.Deployer`` has been removed.
+  ``IniFileManager`` can be used as a direct replacement.
+
+* The previously-deprecated function name ``guess_mirror_env`` has been removed.
+  ``get_standard_mirror_env`` can be used as a direct replacement.
+
+* The deprecated function name ``hms_now`` and the deprecated variable name ``HMS_TZ`` have been removed.
+  ``ref_now`` and ``REF_TZ``, respectively, can be used as direct replacements.
+
+* These previously-deprecated ``s3_utils.s3Utils`` class variables have been removed:
+
+  * ``s3Utils.SYS_BUCKET_HEALTH_PAGE_KEY`` replaced by ``HealthPageKey.SYSTEM_BUCKET``
+  * ``s3Utils.OUTFILE_BUCKET_HEALTH_PAGE_KEY`` replaced by ``HealthPageKey.PROCESSED_FILE_BUCKET``
+  * ``s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY`` replaced by ``HealthPageKey.FILE_UPLOAD_BUCKET``
+  * ``s3Utils.BLOB_BUCKET_HEALTH_PAGE_KEY`` replaced by ``HealthPageKey.BLOB_BUCKET``
+  * ``s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY`` replaced by ``HealthPageKey.METADATA_BUNDLES_BUCKET``
+  * ``s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY`` replaced by ``HealthPageKey.TIBANNA_OUTPUT_BUCKET``
+
+
 2.4.0
 =====
 
