@@ -13,32 +13,32 @@ packages = [
 
 [tool.poetry.dependencies]
 python = ">=3.6.1,<3.8"
-boto3 = "^1.10.46"
-botocore = "^1.13.46"
+boto3 = "^1.17.39"
+botocore = "^1.20.39"
 # TODO: elasticsearch is on version 7. -kmp 15-Feb-2020
 elasticsearch = "6.8.1"
 aws-requests-auth = ">=0.4.2,<1"
 docker = "^4.4.4"
 gitpython = "^3.1.2"
-pytz = ">=2016.4"
+pytz = ">=2020.4"
 requests = "^2.21.0"
 rfc3986 = "^1.4.0"
 structlog = "^19.2.0"
-toml = ">=0.10.0,<1"
-urllib3 = "^1.24.3"
+toml = ">=0.10.1,<1"
+urllib3 = "^1.26.6"
 webtest = "^2.0.34"
 
 [tool.poetry.dev-dependencies]
-# PyCharm says boto3-stubs contains useful type hints
-# This version will work in our Python 3.4 to Python 3.7 span:
-boto3-stubs = "1.10.40.0"
+botocore-stubs = "1.21.22"
+boto3-stubs = "1.18.23"
+coverage = ">=5.3.1"
+flake8 = ">=3.9.2"
+flaky = ">=3.7.0"
 pytest = ">=4.5.0"
 pytest-cov = ">=2.7.1"
-pytest-mock = ">=1.10.4"
+pytest-mock = ">=1.11.0"
 pytest-runner = ">=5.1"
-flaky = ">=3.6.1"
-flake8 = ">=3.7.8"
-coverage = ">=4.5.4"
+
 
 [build-system]
 requires = ["poetry>=0.12"]
