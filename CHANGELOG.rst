@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+2.4.1
+=====
+
+* No functional change. Cosmetic edits to various files in order to
+  make certain file comparisons tidier.
+
+
 2.4.0
 =====
 
