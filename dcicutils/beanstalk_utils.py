@@ -15,7 +15,7 @@ from datetime import datetime
 from . import ff_utils
 from botocore.exceptions import ClientError
 from .base import (
-    REGION, FOURSIGHT_URL, _FF_MAGIC_CNAME, _CGAP_MAGIC_CNAME, _FF_GOLDEN_DB, _CGAP_GOLDEN_DB,
+    REGION, FOURSIGHT_URL,  # _FF_MAGIC_CNAME, _CGAP_MAGIC_CNAME, _FF_GOLDEN_DB, _CGAP_GOLDEN_DB,
     beanstalk_info, describe_beanstalk_environments, get_beanstalk_real_url,
     compute_ff_prd_env, compute_ff_stg_env, compute_cgap_prd_env, compute_cgap_stg_env, compute_prd_env_for_env,
 )
@@ -28,7 +28,7 @@ exported(
     # so retain them even if they aren't otherwise used in this file. This is NOT a full list of all
     # things defined in this file, but only what's needed to keep these looking like unused imports.
     # -kmp 16-Sep-2021
-    REGION, FOURSIGHT_URL, _FF_MAGIC_CNAME, _CGAP_MAGIC_CNAME, _FF_GOLDEN_DB, _CGAP_GOLDEN_DB,
+    REGION, FOURSIGHT_URL,  # _FF_MAGIC_CNAME, _CGAP_MAGIC_CNAME, _FF_GOLDEN_DB, _CGAP_GOLDEN_DB,
     beanstalk_info, describe_beanstalk_environments, get_beanstalk_real_url,
     compute_ff_prd_env, compute_ff_stg_env, compute_cgap_prd_env, compute_cgap_stg_env, compute_prd_env_for_env,
 )
