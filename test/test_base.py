@@ -4,7 +4,11 @@ import socket
 
 from collections import defaultdict
 from dcicutils import base, env_utils, compute_prd_env_for_env
-from dcicutils.env_utils import is_fourfront_env, is_cgap_env, is_stg_or_prd_env
+from dcicutils.env_utils import (
+    is_fourfront_env, is_cgap_env, is_stg_or_prd_env,
+    FF_ENV_PRODUCTION_GREEN, FF_ENV_PRODUCTION_BLUE,
+    CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_WEBPROD,
+)
 from dcicutils.qa_utils import mock_not_called
 from unittest import mock
 
@@ -87,8 +91,8 @@ def test_magic_cnames_by_cname_consistency():
     # But such is magic. The values should not be casually changed, and such overhead is appropriate.
     # It's good to have tests that will catch unwanted tinkering, typos, etc.
 
-    ff_magic_envs = [env_utils.FF_ENV_PRODUCTION_GREEN, env_utils.FF_ENV_PRODUCTION_BLUE]
-    cgap_magic_envs = [env_utils.CGAP_ENV_WEBPROD]
+    ff_magic_envs = [FF_ENV_PRODUCTION_GREEN, FF_ENV_PRODUCTION_BLUE]
+    cgap_magic_envs = [CGAP_ENV_WEBPROD]
 
     assert ff_magic_envs == ['fourfront-green', 'fourfront-blue']
     assert cgap_magic_envs == ['fourfront-cgap']
@@ -224,7 +228,7 @@ def test_compute_ff_and_cgap_prd_and_stg_envs():
 def test_compute_ff_stg_env_by_alternate_means():
     # NOTE: base.compute_ff_prd_env is tested elsewhere in this file. If that test fails, debug it first!
     actual_ff_prd = base.compute_ff_prd_env()
-    expected_prd_options = {env_utils.FF_ENV_PRODUCTION_BLUE, env_utils.FF_ENV_PRODUCTION_GREEN}
+    expected_prd_options = {FF_ENV_PRODUCTION_BLUE, FF_ENV_PRODUCTION_GREEN}
     assert actual_ff_prd in expected_prd_options
     assert base.compute_ff_stg_env() == (expected_prd_options - {actual_ff_prd}).pop()
 
@@ -236,7 +240,7 @@ def test_compute_cgap_stg_env_by_alternate_means():
         assert env_utils.get_standard_mirror_env('fourfront-cgap') is None
         assert base.compute_cgap_stg_env() is None
     else:
-        expected_prd_options = {env_utils.CGAP_ENV_PRODUCTION_BLUE_NEW, env_utils.CGAP_ENV_PRODUCTION_GREEN_NEW}
+        expected_prd_options = {CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_PRODUCTION_GREEN_NEW}
         assert actual_cgap_prd in expected_prd_options
         assert base.compute_cgap_stg_env() == (expected_prd_options - {actual_cgap_prd}).pop()
 
