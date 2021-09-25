@@ -932,8 +932,8 @@ class BasicOrchestratedFourfrontIniFileManager(BasicFourfrontIniFileManager):
     APP_ORCHESTRATED = True
 
 
-# The name Deployer is deprecated. Please use IniFileManager instead of Deployer.
-Deployer = IniFileManager
+# The name Deployer was deprecated and is removed as of dcicutils 3.0. Please use IniFileManager instead of Deployer.
+# Deployer = IniFileManager
 
 
 class DeploymentFailure(RuntimeError):

@@ -47,6 +47,8 @@ class _PRINT:
             self._printer(*args, **kwargs)
 
 
+prompt_for_input = input  # In Python 3, this does 'safe' input reading.
+
 PRINT = _PRINT()
 PRINT.__name__ = 'PRINT'
 
@@ -1496,6 +1498,6 @@ class NamedObject(object):
         return f"<{self.name}@{id(self):x}>"
 
 
-# Deprecated names, still supported for a while.
-HMS_TZ = REF_TZ
-hms_now = ref_now
+# The names HMS_TZ and hms_now were deprecated for a while and are removed in dcicutils 3.0
+# HMS_TZ = REF_TZ
+# hms_now = ref_now

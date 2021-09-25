@@ -14,14 +14,14 @@ REGION = 'us-east-1'
 FOURSIGHT_URL = 'https://foursight.4dnucleome.org/'
 
 # FF_MAGIC_CNAME corresponds to data.4dnucleome.org
-FF_MAGIC_CNAME = 'fourfront-green.us-east-1.elasticbeanstalk.com'
+_FF_MAGIC_CNAME = 'fourfront-green.us-east-1.elasticbeanstalk.com'
 # CGAP_MAGIC_CNAME corresponds to cgap.hms.harvard.edu
-CGAP_MAGIC_CNAME = 'fourfront-cgap.9wzadzju3p.us-east-1.elasticbeanstalk.com'
+_CGAP_MAGIC_CNAME = 'fourfront-cgap.9wzadzju3p.us-east-1.elasticbeanstalk.com'
 
 # FF_GOLDEN_DB is the database behind data.4dnucleome.org (and shared by staging.4dnucleome.org)
-FF_GOLDEN_DB = 'fourfront-production.co3gwj7b7tpq.us-east-1.rds.amazonaws.com'
+_FF_GOLDEN_DB = 'fourfront-production.co3gwj7b7tpq.us-east-1.rds.amazonaws.com'
 # CGAP_GOLDEN_DB is the database behind cgap.hms.harvard.edu
-CGAP_GOLDEN_DB = 'fourfront-cgap.co3gwj7b7tpq.us-east-1.rds.amazonaws.com'
+_CGAP_GOLDEN_DB = 'fourfront-cgap.co3gwj7b7tpq.us-east-1.rds.amazonaws.com'
 
 
 def describe_beanstalk_environments(client, **kwargs):
@@ -117,7 +117,7 @@ def _compute_prd_env_for_project(project):
     Returns:
         str: EB environment name hosting data.4dnucleome
     """
-    magic_cname = CGAP_MAGIC_CNAME if project == 'cgap' else FF_MAGIC_CNAME
+    magic_cname = _CGAP_MAGIC_CNAME if project == 'cgap' else _FF_MAGIC_CNAME
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = describe_beanstalk_environments(client, ApplicationName="4dn-web")
     for env in res['Environments']:
@@ -126,7 +126,7 @@ def _compute_prd_env_for_project(project):
             return env.get('EnvironmentName')
 
 
-def compute_ff_prd_env():  # a.k.a. "whodaman" (its historical name, only defined in beanstalk_utils)
+def compute_ff_prd_env():  # a.k.a. "whodaman" (its historical name, which has gone away)
     """Returns the name of the current Fourfront production environment."""
     return _compute_prd_env_for_project('fourfront')
 

@@ -322,7 +322,7 @@ def get_mirror_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT
         return declared
     elif allow_guess:
         who_i_am = get_env_from_context(settings, allow_environ=allow_environ)
-        return guess_mirror_env(who_i_am)
+        return get_standard_mirror_env(who_i_am)
     else:
         return None
 
@@ -346,12 +346,14 @@ def get_standard_mirror_env(envname):
     return BEANSTALK_PROD_MIRRORS.get(envname, None)
 
 
-def guess_mirror_env(envname):
-    """
-    Deprecated. This function returns what get_standard_mirror_env(envname) returns.
-    (The name guess_mirror_env is believed to be confusing.)
-    """
-    return get_standard_mirror_env(envname)
+# guess_mirror_env was reatained for a while for compatibility. Please prefer get_standard_mirror_env.
+#
+# def guess_mirror_env(envname):
+#     """
+#     Deprecated. This function returns what get_standard_mirror_env(envname) returns.
+#     (The name guess_mirror_env is believed to be confusing.)
+#     """
+#     return get_standard_mirror_env(envname)
 
 
 def infer_repo_from_env(envname):

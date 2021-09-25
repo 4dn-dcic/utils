@@ -5,7 +5,7 @@ import os
 from dcicutils import beanstalk_utils
 from dcicutils.beanstalk_utils import (
     ENV_VARIABLE_NAMESPACE,
-    compute_ff_prd_env, get_beanstalk_environment_variables, source_beanstalk_env_vars, whodaman,
+    compute_ff_prd_env, get_beanstalk_environment_variables, source_beanstalk_env_vars,
 )
 from dcicutils.qa_utils import mock_not_called
 from dcicutils.misc_utils import ignored
@@ -64,13 +64,8 @@ def test_source_beanstalk_env_vars_normal():
                 }
 
 
-def test_deprecated_whodaman_by_alternate_computation():
-    assert whodaman() == _ff_production_env_for_testing()
-
-
-def test_deprecated_whodaman():
-    # This just makes sure that the old name is properly retained, since it's used in a lot of other repos.
-    assert whodaman is compute_ff_prd_env
+def test_compute_ff_prd_env_by_alternate_computation():
+    assert compute_ff_prd_env() == _ff_production_env_for_testing()
 
 
 @pytest.mark.parametrize('options, expected', [

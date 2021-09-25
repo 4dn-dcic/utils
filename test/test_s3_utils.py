@@ -79,15 +79,6 @@ def test_s3utils_constants():
     assert s3Utils.METADATA_BUCKET_TEMPLATE == "elasticbeanstalk-%s-metadata-bundles"
     assert s3Utils.TIBANNA_OUTPUT_BUCKET_TEMPLATE == "tibanna-output"
 
-    assert s3Utils.SYS_BUCKET_HEALTH_PAGE_KEY == 'system_bucket'
-    assert s3Utils.OUTFILE_BUCKET_HEALTH_PAGE_KEY == 'processed_file_bucket'
-    assert s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY == 'file_upload_bucket'
-    assert s3Utils.BLOB_BUCKET_HEALTH_PAGE_KEY == 'blob_bucket'
-    assert s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY == 'metadata_bundles_bucket'
-    # We didn't add this slot since it would have been born deprecated. Use HealthPageKey instead.
-    # assert s3Utils.TIBANNA_CWLS_BUCKET_HEALTH_PAGE_KEY == 'tibanna_cwls_bucket'
-    assert s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY == 'tibanna_output_bucket'
-
 
 @pytest.mark.integrated
 def test_regression_s3_utils_short_name_c4_706():

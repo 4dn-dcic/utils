@@ -18,36 +18,36 @@ def _mocked_beanstalk_info(env):
 
 
 def test_get_beanstalk_real_url_blue_data():
-    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_whodaman:
+    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_compute_prd_env_for_project:
         with mock.patch.object(base, 'beanstalk_info') as mock_beanstalk_info:
-            mock_whodaman.return_value = 'fourfront-blue'
+            mock_compute_prd_env_for_project.return_value = 'fourfront-blue'
             mock_beanstalk_info.side_effect = _mocked_beanstalk_info
             url = base.get_beanstalk_real_url('fourfront-blue')
             assert url == 'https://data.4dnucleome.org'
 
 
 def test_get_beanstalk_real_url_green_data():
-    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_whodaman:
+    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_compute_prd_env_for_project:
         with mock.patch.object(base, 'beanstalk_info') as mock_beanstalk_info:
-            mock_whodaman.return_value = 'fourfront-green'
+            mock_compute_prd_env_for_project.return_value = 'fourfront-green'
             mock_beanstalk_info.side_effect = _mocked_beanstalk_info
             url = base.get_beanstalk_real_url('fourfront-green')
             assert url == 'https://data.4dnucleome.org'
 
 
 def test_get_beanstalk_real_url_blue_staging():
-    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_whodaman:
+    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_compute_prd_env_for_project:
         with mock.patch.object(base, 'beanstalk_info') as mock_beanstalk_info:
-            mock_whodaman.return_value = 'fourfront-green'
+            mock_compute_prd_env_for_project.return_value = 'fourfront-green'
             mock_beanstalk_info.side_effect = _mocked_beanstalk_info
             url = base.get_beanstalk_real_url('fourfront-blue')
             assert url == 'http://staging.4dnucleome.org'
 
 
 def test_get_beanstalk_real_url_green_staging():
-    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_whodaman:
+    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_compute_prd_env_for_project:
         with mock.patch.object(base, 'beanstalk_info') as mock_beanstalk_info:
-            mock_whodaman.return_value = 'fourfront-blue'
+            mock_compute_prd_env_for_project.return_value = 'fourfront-blue'
             mock_beanstalk_info.side_effect = _mocked_beanstalk_info
             url = base.get_beanstalk_real_url('fourfront-green')
             assert url == 'http://staging.4dnucleome.org'
@@ -67,9 +67,9 @@ def test_get_beanstalk_real_url_other():
 # These will fail in CGAP, which Soo reported (C4-101):
 
 def test_get_beanstalk_real_url_cgap():
-    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_whodaman:
+    with mock.patch.object(base, '_compute_prd_env_for_project') as mock_compute_prd_env_for_project:
         with mock.patch.object(base, 'beanstalk_info') as mock_beanstalk_info:
-            mock_whodaman.return_value = 'fourfront-cgap'
+            mock_compute_prd_env_for_project.return_value = 'fourfront-cgap'
             mock_beanstalk_info.side_effect = _mocked_beanstalk_info
             url = base.get_beanstalk_real_url('fourfront-cgap')
             assert url == 'https://cgap.hms.harvard.edu'
@@ -81,8 +81,8 @@ def _ip_addresses(hostname):
 
 def test_magic_cnames_by_production_ip_address():
     # This simple check just makes sure the obvious truths are checked.
-    assert _ip_addresses(base.FF_MAGIC_CNAME) == _ip_addresses("data.4dnucleome.org")
-    assert _ip_addresses(base.CGAP_MAGIC_CNAME) == _ip_addresses("cgap.hms.harvard.edu")
+    assert _ip_addresses(base._FF_MAGIC_CNAME) == _ip_addresses("data.4dnucleome.org")
+    assert _ip_addresses(base._CGAP_MAGIC_CNAME) == _ip_addresses("cgap.hms.harvard.edu")
 
 
 def test_magic_cnames_by_cname_consistency():
@@ -106,7 +106,7 @@ def test_magic_cnames_by_cname_consistency():
         cname = env.get('CNAME')
         ip = socket.gethostbyname(cname)
         note = ""
-        if cname == base.FF_MAGIC_CNAME:
+        if cname == base._FF_MAGIC_CNAME:
             assert env_name in ff_magic_envs
             ff_prod = "data.4dnucleome.org"
             ff_prod_ips = _ip_addresses(ff_prod)
@@ -114,7 +114,7 @@ def test_magic_cnames_by_cname_consistency():
             note = "\n => FF PRODUCTION (%s @ %s)" % (ff_prod, ",".join(ff_prod_ips))
             roles['FF_PRODUCTION'].append(env_name)
             assert env_utils.is_stg_or_prd_env(env_name)
-        elif cname == base.CGAP_MAGIC_CNAME:
+        elif cname == base._CGAP_MAGIC_CNAME:
             assert env_name in cgap_magic_envs
             cgap_prod = "cgap.hms.harvard.edu"
             cgap_prod_ips = _ip_addresses(cgap_prod)
@@ -261,27 +261,27 @@ def _mocked_describe_beanstalk_environments(*args, **kwargs):
     return {
         'Environments': [
             {
-                "CNAME": "not." + base.CGAP_MAGIC_CNAME,
+                "CNAME": "not." + base._CGAP_MAGIC_CNAME,
                 "EnvironmentName": "cgap-env-1"
             },
             {
-                "CNAME": base.CGAP_MAGIC_CNAME,
+                "CNAME": base._CGAP_MAGIC_CNAME,
                 "EnvironmentName": "cgap-env-2"
             },
             {
-                "CNAME": "also-not." + base.CGAP_MAGIC_CNAME,
+                "CNAME": "also-not." + base._CGAP_MAGIC_CNAME,
                 "EnvironmentName": "cgap-env-3"
             },
             {
-                "CNAME": "not." + base.FF_MAGIC_CNAME,
+                "CNAME": "not." + base._FF_MAGIC_CNAME,
                 "EnvironmentName": "ff-env-1"
             },
             {
-                "CNAME": base.FF_MAGIC_CNAME,
+                "CNAME": base._FF_MAGIC_CNAME,
                 "EnvironmentName": "ff-env-2"
             },
             {
-                "CNAME": "also-not." + base.FF_MAGIC_CNAME,
+                "CNAME": "also-not." + base._FF_MAGIC_CNAME,
                 "EnvironmentName": "ff-env-3"
             },
         ]
