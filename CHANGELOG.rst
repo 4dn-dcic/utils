@@ -6,6 +6,7 @@ dcicutils
 Change Log
 ----------
 
+
 3.0.0
 =====
 
@@ -67,6 +68,13 @@ Specifics:
 
   Among ``dbmi-bgm`` repos, all are mentioned only in ``src/encoded/root.py`` and ``src/encoded/tests/test_root.py``,
   but rewrites to use ``HealthPageKey`` attributes will be needed there as well.
+
+
+2.4.1
+=====
+
+* No functional change. Cosmetic edits to various files in order to
+  make certain file comparisons tidier.
 
 
 2.4.0

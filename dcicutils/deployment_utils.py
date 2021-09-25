@@ -35,9 +35,10 @@ from git import Repo
 
 from .beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env
 from .env_utils import (
-    get_standard_mirror_env, data_set_for_env, get_bucket_env, INDEXER_ENVS,
+    get_standard_mirror_env, data_set_for_env, get_bucket_env,
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, is_test_env, is_hotseat_env,
-    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env,
+    is_indexer_env, indexer_env_for_env,
+    FF_ENV_INDEXER, CGAP_ENV_INDEXER, INDEXER_ENVS,
 )
 from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ
 from .s3_utils import s3Utils
