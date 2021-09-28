@@ -114,11 +114,16 @@ def test_s3_object_head():
         assert res == expected_res
 
 
-@pytest.mark.skip()  # So that running this empty test won't make it look like we did actual testing.
 def test_s3_object_exists():
-    ignored(s3_object_exists)
-    # TODO: Testing s3_object_exists should be easy using tech like what's above. -kmp 15-Sep-2021
-    pass
+    with typical_boto3_mocking(s3_files={'foo/bar': 'something'}) as mocked_boto3:
+        assert s3_object_exists(object_key='bar', bucket_name='foo')
+        assert not s3_object_exists(object_key='no-such-object', bucket_name='foo')
+        assert not s3_object_exists(object_key='bar', bucket_name='no-such-bucket')
+        assert not s3_object_exists(object_key='no-such-bucket', bucket_name='no-such-bucket')
+        # We don't have to pass an s3 argument, but it will have to create a client on each call,
+        # which might have some associated expense.
+        s3 = mocked_boto3.client('s3')
+        assert s3_object_exists(object_key='bar', bucket_name='foo', s3=s3)
 
 
 @pytest.mark.skip()  # So that running this empty test won't make it look like we did actual testing.
