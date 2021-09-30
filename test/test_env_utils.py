@@ -130,6 +130,9 @@ def test_blue_green_mirror_env():
     assert blue_green_mirror_env('xyz-blueish') == 'xyz-greenish'
     assert blue_green_mirror_env('xyz-greenish') == 'xyz-blueish'
 
+    with pytest.raises(ValueError):
+        blue_green_mirror_env('green-blue')  # needs to be one or the other
+
 
 def test_is_cgap_server():
 
@@ -550,6 +553,17 @@ def test_infer_foursight_env():
     assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), 'fourfront-blue')
             == FF_STAGING_IDENTIFIER)
     assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), 'fourfront-green')
+            == FF_STAGING_IDENTIFIER)
+
+    # These next four are pathological and hopefully not used, but they illustrate that the domain dominates.
+    # This does not illustrate intended use.
+    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_PRD), FF_PRODUCTION_IDENTIFIER)
+            == FF_PRODUCTION_IDENTIFIER)
+    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_PRD), FF_STAGING_IDENTIFIER)
+            == FF_PRODUCTION_IDENTIFIER)
+    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), FF_PRODUCTION_IDENTIFIER)
+            == FF_STAGING_IDENTIFIER)
+    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), FF_STAGING_IDENTIFIER)
             == FF_STAGING_IDENTIFIER)
 
     # (active) cgap environments

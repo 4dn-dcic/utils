@@ -195,6 +195,8 @@ def blue_green_mirror_env(envname):
     For other envnames that aren't blue/green participants, this returns None.
     """
     if 'blue' in envname:
+        if 'green' in envname:
+            raise ValueError('A blue/green mirror env must have only one of blue or green in its name.')
         return envname.replace('blue', 'green')
     elif 'green' in envname:
         return envname.replace('green', 'blue')
