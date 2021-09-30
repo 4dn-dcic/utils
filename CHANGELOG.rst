@@ -7,6 +7,16 @@ Change Log
 ----------
 
 
+3.0.1
+=====
+
+* In ``env_utils``:
+
+  * A small bit of error checking in ``blue_green_mirror_env``.
+
+  * A bit of extra testing for ``infer_foursight_from_env``.
+
+
 3.0.0
 =====
 

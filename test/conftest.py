@@ -72,18 +72,9 @@ def _discover_es_url_from_boto3_eb_metadata(integrated_envname):
 INTEGRATED_ENV = 'fourfront-mastertest'
 
 
-# This used to be:
-# INTEGRATED_ES = 'https://search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.us-east-1.es.amazonaws.com'
-# but it changes too much, so now we discover it from the 'elasticsearch' and 'namespace' parts of health page...
+# We used to wire in this URL, but it's better to discover it dynamically
+# so that it can change.
 INTEGRATED_ES = _discover_es_url_from_boto3_eb_metadata(INTEGRATED_ENV)
-
-# @pytest.fixture(scope='session')
-# def basestring():
-#     try:
-#         basestring = basestring  # noQA - PyCharm static analysis doesn't understand this Python 2.7 compatibility issue
-#     except NameError:
-#         basestring = str
-#     return basestring
 
 
 @pytest.fixture(scope='session')
