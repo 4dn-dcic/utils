@@ -2,14 +2,13 @@ import boto3
 import time
 
 from botocore.exceptions import ClientError
+from dcicutils.common import REGION
 from dcicutils.misc_utils import PRINT
 from dcicutils.env_utils import (
     is_cgap_env, is_fourfront_env, is_stg_or_prd_env, public_url_mappings,
     blue_green_mirror_env, get_standard_mirror_env,
 )
 
-
-REGION = 'us-east-1'
 
 FOURSIGHT_URL = 'https://foursight.4dnucleome.org/'
 
@@ -69,7 +68,7 @@ def beanstalk_info(env):
     envs = res['Environments']
     if not envs:
         # Raise an error that will be meaningful to the caller, rather than just getting an index out of range error.
-        raise ClientError({"Error": {"Code": 404, "Message": f"Environment does not exist: {env}"}},
+        raise ClientError({"Error": {"Code": 404, "Message": f"Environment does not exist: {env}"}},  # noQA
                           # Properly speaking, this error does not come from .describe_environments(), so we kind of
                           # have to make up an operation that's failing, even though it's not a boto3 operation.
                           operation_name="beanstalk_info")

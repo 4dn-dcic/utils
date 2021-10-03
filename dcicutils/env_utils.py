@@ -1,7 +1,20 @@
 import os
 
+from .common import EnvName, OrchestratedApp, APP_CGAP, APP_FOURFRONT, ORCHESTRATED_APPS
+from .exceptions import InvalidParameterError
 from .misc_utils import get_setting_from_context, check_true
 from urllib.parse import urlparse
+
+
+# Mechanisms for returning app-dependent values.
+
+def _orchestrated_app_case(orchestrated_app: OrchestratedApp, if_cgap, if_fourfront):
+    if orchestrated_app == APP_CGAP:
+        return if_cgap
+    elif orchestrated_app == APP_FOURFRONT:
+        return if_fourfront
+    else:
+        raise InvalidParameterError(parameter='orchestrated_app', value=orchestrated_app, options=ORCHESTRATED_APPS)
 
 
 FF_ENV_DEV = 'fourfront-dev'  # Maybe not used
@@ -152,7 +165,7 @@ BEANSTALK_DEV_DATA_SETS = {
 }
 
 
-def is_indexer_env(envname):
+def is_indexer_env(envname: EnvName):
     """ Checks whether envname is an indexer environment.
 
     :param envname:  envname to check
@@ -219,6 +232,16 @@ def prod_bucket_env(envname):
     that ecosystem.
     """
     return BEANSTALK_PROD_BUCKET_ENVS.get(envname)
+
+
+def default_workflow_env(orchestrated_app) -> EnvName:
+    """
+    Given orchestrated app ('cgap' or 'fourfront'), this returns the default env name (in case None is supplied)
+    to use for actual and simulated tibanna workflow runs.
+    """
+    return _orchestrated_app_case(orchestrated_app=orchestrated_app,
+                                  if_cgap=CGAP_ENV_WEBDEV,
+                                  if_fourfront=FF_ENV_WEBDEV)
 
 
 def get_bucket_env(envname):

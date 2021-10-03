@@ -1,6 +1,7 @@
 import pytest
 import os
 
+from dcicutils.common import APP_CGAP, APP_FOURFRONT
 from dcicutils.env_utils import (
     is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env, BEANSTALK_PROD_MIRRORS,
     FF_ENV_PRODUCTION_BLUE, FF_ENV_PRODUCTION_GREEN, FF_ENV_WEBPROD, FF_ENV_WEBPROD2, FF_ENV_MASTERTEST,
@@ -15,10 +16,20 @@ from dcicutils.env_utils import (
     FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env, classify_server_url,
     full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
-    make_env_name_cfn_compatible,
+    make_env_name_cfn_compatible, default_workflow_env,
 )
+from dcicutils.exceptions import InvalidParameterError
 from dcicutils.qa_utils import raises_regexp
 from unittest import mock
+
+
+def test_default_workflow_env():
+
+    assert default_workflow_env('fourfront') == default_workflow_env(APP_FOURFRONT) == FF_ENV_WEBDEV
+    assert default_workflow_env('cgap') == default_workflow_env(APP_CGAP) == CGAP_ENV_WEBDEV
+
+    with pytest.raises(InvalidParameterError):
+        default_workflow_env('foo')
 
 
 def test_get_bucket_env():

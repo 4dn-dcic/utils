@@ -7,6 +7,29 @@ Change Log
 ----------
 
 
+3.1.0
+=====
+
+This PR is intended to phase out any importation of named constants from ``env_utils``.
+Named functions are preferred.
+
+* New module ``common`` for things that might otherwise go in ``base`` but are OK to import.
+  (The ``base`` module is internal and not for use outside of ``dcicutils``.)
+
+  * Moved ``REGION`` from ``base`` to ``common``, leaving behind an import/exported pair for compatibility,
+    but please import ``REGION`` from ``dcicutils.common`` going forward.
+
+  * ``OrchestratedApp`` and ``EnvName`` for type hinting.
+
+  * ``APP_CGAP`` and ``APP_FOURFRONT`` as a more abstract way of referring to ``'cgap'`` and ``'fourfront'``,
+    respectively, to talk about which orchestrated app is in play.
+
+* In ``env_utils``:
+
+  * New function ``default_workflow_env`` for use in CGAP and Fourfront functions ``run_workflow`` and ``pseudo_run``
+    (in ``src/types/workflow.py``) so that ``CGAP_ENV_WEBDEV`` and ``FF_ENV_WEBDEV`` do not need to be imported.
+
+
 3.0.1
 =====
 

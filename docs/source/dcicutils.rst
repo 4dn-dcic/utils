@@ -26,6 +26,13 @@ command_utils
    :members:
 
 
+common
+^^^^^^
+
+.. automodule:: dcicutils.common
+   :members:
+
+
 cloudformation_utils
 ^^^^^^^^^^^^^^^^^^^^
 
