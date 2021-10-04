@@ -1,4 +1,3 @@
-import logging
 import os
 import structlog
 
@@ -8,7 +7,6 @@ from .misc_utils import get_setting_from_context, check_true, remove_prefix
 from urllib.parse import urlparse
 
 
-logging.basicConfig()
 logger = structlog.getLogger(__name__)
 
 
@@ -214,20 +212,41 @@ def permit_load_data(envname, allow_prod, orchestrated_app):
 
     :param envname: env we are on
     :param allow_prod: prod argument supplied with '--prod', defaults to False
+    :param orchestrated_app: a string token to indicate which app we're using (either 'cgap' or 'fourfront')
     :return: True if load_data should continue, False otherwise
     """
-    permitted_to_load = _orchestrated_app_case(orchestrated_app=orchestrated_app,
-                                               if_cgap=[CGAP_ENV_MASTERTEST],
-                                               if_fourfront=[FF_ENV_HOTSEAT])
-    if envname in permitted_to_load:
-        logger.info('load_data: proceeding since we are on %s' % envname)
-        return True
-    elif envname and not allow_prod:  # old logic, allow run on servers if prod is specified
-        logger.info('load_data: skipping, since on %s' % envname)
-        return False
-    else:  # allow run on local, which will not have env set
+
+    if orchestrated_app == 'cgap':
+
+        # run on cgaptest
+        if envname == CGAP_ENV_MASTERTEST:
+            logger.info('load_data: proceeding since we are on %s' % envname)
+            return True
+
+        if envname and not allow_prod:  # old logic, allow run on servers if --prod is specified
+            logger.info('load_data: skipping, since on %s' % envname)
+            return False
+
+        # Allow run on local, which will not have env set, or if --prod was given.
         logger.info('load_data: proceeding since we are either on local or specified the prod option')
         return True
+
+    elif orchestrated_app == 'fourfront':
+
+        # do not run on a production environment unless we set --prod flag
+        if is_stg_or_prd_env(envname) and not allow_prod:
+            logger.info('load_data: skipping, since we are on a production environment and --prod not used')
+            return False
+
+        # do not run on hotseat since it is a prod snapshot
+        if 'hotseat' in envname:
+            logger.info('load_data: skipping, since we are on hotseat')
+            return False
+
+        return True
+
+    else:
+        raise InvalidParameterError(parameter='orchestrated_app', value=orchestrated_app, options=['cgap', 'fourfront'])
 
 
 def blue_green_mirror_env(envname):
