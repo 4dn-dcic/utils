@@ -34,6 +34,8 @@ Named functions are preferred.
 
   * New function ``short_env_name`` that computes the short name of an environment.
 
+  * New function ``test_permit_load_data`` to gate whether a ``load-data`` command should actually load any data.
+
 
 3.0.1
 =====

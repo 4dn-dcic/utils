@@ -1,4 +1,6 @@
+import logging
 import os
+import structlog
 
 from .common import EnvName, OrchestratedApp, APP_CGAP, APP_FOURFRONT, ORCHESTRATED_APPS
 from .exceptions import InvalidParameterError
@@ -6,8 +8,11 @@ from .misc_utils import get_setting_from_context, check_true, remove_prefix
 from urllib.parse import urlparse
 
 
-# Mechanisms for returning app-dependent values.
+logging.basicConfig()
+logger = structlog.getLogger(__name__)
 
+
+# Mechanism for returning app-dependent values.
 def _orchestrated_app_case(orchestrated_app: OrchestratedApp, if_cgap, if_fourfront):
     if orchestrated_app == APP_CGAP:
         return if_cgap
@@ -202,6 +207,27 @@ def data_set_for_env(envname, default=None):
         return 'prod'
     else:
         return BEANSTALK_DEV_DATA_SETS.get(envname, default)
+
+
+def permit_load_data(envname, allow_prod, orchestrated_app):
+    """ Returns True on whether or not load_data should proceed (presumably in a load-data command line operation).
+
+    :param envname: env we are on
+    :param allow_prod: prod argument supplied with '--prod', defaults to False
+    :return: True if load_data should continue, False otherwise
+    """
+    permitted_to_load = _orchestrated_app_case(orchestrated_app=orchestrated_app,
+                                               if_cgap=[CGAP_ENV_MASTERTEST],
+                                               if_fourfront=[FF_ENV_HOTSEAT])
+    if envname in permitted_to_load:
+        logger.info('load_data: proceeding since we are on %s' % envname)
+        return True
+    elif envname and not allow_prod:  # old logic, allow run on servers if prod is specified
+        logger.info('load_data: skipping, since on %s' % envname)
+        return False
+    else:  # allow run on local, which will not have env set
+        logger.info('load_data: proceeding since we are either on local or specified the prod option')
+        return True
 
 
 def blue_green_mirror_env(envname):

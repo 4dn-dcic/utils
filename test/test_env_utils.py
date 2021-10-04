@@ -17,7 +17,7 @@ from dcicutils.env_utils import (
     FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV, CGAP_PUBLIC_DOMAIN_PRD,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env, classify_server_url,
     short_env_name, full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
-    make_env_name_cfn_compatible, default_workflow_env,
+    make_env_name_cfn_compatible, default_workflow_env, permit_load_data,
 )
 from dcicutils.exceptions import InvalidParameterError
 from dcicutils.qa_utils import raises_regexp
@@ -79,6 +79,74 @@ def test_prod_bucket_env():
 
     assert prod_bucket_env('fourfront-cgapdev') is None
     assert prod_bucket_env('fourfront-cgapwolf') is None
+
+
+def test_permit_load_data():
+
+    # Fourfront envs
+
+    fourfront_envs = ['fourfront-blue', 'fourfront-green', 'fourfront-hotseat', 'fourfront-webdev',
+                      'fourfront-webprod', 'fourfront-webprod2']
+
+    for fourfront_env in fourfront_envs:
+        for allow_prod in [True, False]:
+            expected = True if fourfront_env == 'fourfront-hotseat' else allow_prod
+            assert permit_load_data(fourfront_env, allow_prod=allow_prod, orchestrated_app='fourfront') == expected
+
+    # assert permit_load_data('fourfront-blue', allow_prod=True, orchestrated_app='fourfront') is True
+    # assert permit_load_data('fourfront-blue', allow_prod=False, orchestrated_app='fourfront') is False
+    #
+    # assert permit_load_data('fourfront-green', allow_prod=True, orchestrated_app='fourfront') is True
+    # assert permit_load_data('fourfront-green', allow_prod=False, orchestrated_app='fourfront') is False
+    #
+    # assert permit_load_data('fourfront-hotseat', allow_prod=True, orchestrated_app='fourfront') is True
+    # assert permit_load_data('fourfront-hotseat', allow_prod=False, orchestrated_app='fourfront') is True
+    #
+    # assert permit_load_data('fourfront-webdev', allow_prod=True, orchestrated_app='fourfront') is True
+    # assert permit_load_data('fourfront-webdev', allow_prod=False, orchestrated_app='fourfront') is False
+    #
+    # assert permit_load_data('fourfront-webprod', allow_prod=True, orchestrated_app='fourfront') is True
+    # assert permit_load_data('fourfront-webprod', allow_prod=False, orchestrated_app='fourfront') is False
+    #
+    # assert permit_load_data('fourfront-webprod2', allow_prod=True, orchestrated_app='fourfront') is True
+    # assert permit_load_data('fourfront-webprod2', allow_prod=False, orchestrated_app='fourfront') is False
+
+    # CGAP envs
+
+    cgap_envs = ['fourfront-cgap', 'fourfront-cgapdev', 'fourfront-cgaptest', 'fourfront-cgapwolf',
+                 'cgap-blue', 'cgap-green', 'cgap-dev', 'cgap-test', 'cgap-wolf']
+
+    for cgap_env in cgap_envs:
+        for allow_prod in [True, False]:
+            expected = True if cgap_env == 'fourfront-cgaptest' else allow_prod
+            assert permit_load_data(cgap_env, allow_prod=allow_prod, orchestrated_app='cgap') == expected
+
+    # assert permit_load_data('fourfront-cgap', allow_prod=True, orchestrated_app='cgap') is True
+    # assert permit_load_data('fourfront-cgap', allow_prod=False, orchestrated_app='cgap') is False
+    #
+    # assert permit_load_data('fourfront-cgapdev', allow_prod=True, orchestrated_app='cgap') is True
+    # assert permit_load_data('fourfront-cgapdev', allow_prod=False, orchestrated_app='cgap') is False
+    #
+    # assert permit_load_data('fourfront-cgaptest', allow_prod=True, orchestrated_app='cgap') is True
+    # assert permit_load_data('fourfront-cgaptest', allow_prod=False, orchestrated_app='cgap') is True
+    #
+    # assert permit_load_data('fourfront-cgapwolf', allow_prod=True, orchestrated_app='cgap') is True
+    # assert permit_load_data('fourfront-cgapwolf', allow_prod=False, orchestrated_app='cgap') is False
+    #
+    # assert permit_load_data('cgap-blue', allow_prod=True, orchestrated_app='cgap') is True
+    # assert permit_load_data('cgap-blue', allow_prod=False, orchestrated_app='cgap') is False
+    #
+    # assert permit_load_data('cgap-green', allow_prod=True, orchestrated_app='cgap') is True
+    # assert permit_load_data('cgap-green', allow_prod=False, orchestrated_app='cgap') is False
+    #
+    # assert permit_load_data('cgap-dev', allow_prod=True, orchestrated_app='cgap') is True
+    # assert permit_load_data('cgap-dev', allow_prod=False, orchestrated_app='cgap') is False
+    #
+    # assert permit_load_data('cgap-test', allow_prod=True, orchestrated_app='cgap') is True
+    # assert permit_load_data('cgap-test', allow_prod=False, orchestrated_app='cgap') is False
+    #
+    # assert permit_load_data('cgap-wolf', allow_prod=True, orchestrated_app='cgap') is True
+    # assert permit_load_data('cgap-wolf', allow_prod=False, orchestrated_app='cgap') is False
 
 
 def test_data_set_for_env():
