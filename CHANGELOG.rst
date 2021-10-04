@@ -29,6 +29,11 @@ Named functions are preferred.
   * New function ``default_workflow_env`` for use in CGAP and Fourfront functions ``run_workflow`` and ``pseudo_run``
     (in ``src/types/workflow.py``) so that ``CGAP_ENV_WEBDEV`` and ``FF_ENV_WEBDEV`` do not need to be imported.
 
+  * New function ``infer_foursight_url_from_env``, similar to ``infer_foursight_from_env`` but returns a URL
+    rather than an environment short name.
+
+  * New function ``short_env_name`` that computes the short name of an environment.
+
 
 3.0.1
 =====

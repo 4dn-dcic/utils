@@ -10,12 +10,13 @@ from dcicutils.env_utils import (
     CGAP_ENV_HOTSEAT, CGAP_ENV_STAGING, CGAP_ENV_WEBDEV, CGAP_ENV_WOLF,
     CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_WEBPROD_NEW, CGAP_ENV_MASTERTEST_NEW,
     CGAP_ENV_HOTSEAT_NEW, CGAP_ENV_STAGING_NEW, CGAP_ENV_WEBDEV_NEW, CGAP_ENV_WOLF_NEW,
+    FF_PRODUCTION_IDENTIFIER, CGAP_PRODUCTION_IDENTIFIER,
     get_mirror_env_from_context, is_test_env, is_hotseat_env, get_standard_mirror_env,
     prod_bucket_env, public_url_mappings, CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
-    infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env, FF_PRODUCTION_IDENTIFIER,
-    FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV,
+    infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env, infer_foursight_url_from_env,
+    FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV, CGAP_PUBLIC_DOMAIN_PRD,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env, classify_server_url,
-    full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
+    short_env_name, full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
     make_env_name_cfn_compatible, default_workflow_env,
 )
 from dcicutils.exceptions import InvalidParameterError
@@ -539,7 +540,7 @@ def test_infer_repo_from_env():
     assert infer_repo_from_env('who-knows') is None
 
 
-def test_infer_foursight_env():
+def test_infer_foursight_from_env():
 
     class MockedRequest:
         def __init__(self, domain):
@@ -551,37 +552,109 @@ def test_infer_foursight_env():
         else:
             return MockedRequest(domain)
 
+    def check(token_in, token_out, request=None):
+        request = request or mock_request()
+        assert infer_foursight_from_env(request, token_in) == token_out
+
     # (active) fourfront testing environments
-    assert infer_foursight_from_env(mock_request(), FF_ENV_MASTERTEST) == 'mastertest'
-    assert infer_foursight_from_env(mock_request(), FF_ENV_WEBDEV) == 'webdev'
-    assert infer_foursight_from_env(mock_request(), FF_ENV_HOTSEAT) == 'hotseat'
+    check(FF_ENV_MASTERTEST, 'mastertest')
+    check(FF_ENV_WEBDEV, 'webdev')
+    check(FF_ENV_HOTSEAT, 'hotseat')
 
     # (active) fourfront production environments
-    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_PRD), 'fourfront-blue')
-            == FF_PRODUCTION_IDENTIFIER)
-    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_PRD), 'fourfront-green')
-            == FF_PRODUCTION_IDENTIFIER)
-    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), 'fourfront-blue')
-            == FF_STAGING_IDENTIFIER)
-    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), 'fourfront-green')
-            == FF_STAGING_IDENTIFIER)
+    check('fourfront-blue', FF_PRODUCTION_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_PRD))
+    check('fourfront-green', FF_PRODUCTION_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_PRD))
+
+    check('fourfront-blue', FF_STAGING_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_STG))
+    check('fourfront-green', FF_STAGING_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_STG))
 
     # These next four are pathological and hopefully not used, but they illustrate that the domain dominates.
     # This does not illustrate intended use.
-    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_PRD), FF_PRODUCTION_IDENTIFIER)
-            == FF_PRODUCTION_IDENTIFIER)
-    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_PRD), FF_STAGING_IDENTIFIER)
-            == FF_PRODUCTION_IDENTIFIER)
-    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), FF_PRODUCTION_IDENTIFIER)
-            == FF_STAGING_IDENTIFIER)
-    assert (infer_foursight_from_env(mock_request(domain=FF_PUBLIC_DOMAIN_STG), FF_STAGING_IDENTIFIER)
-            == FF_STAGING_IDENTIFIER)
+    check(FF_PRODUCTION_IDENTIFIER, FF_PRODUCTION_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_PRD))
+    check(FF_STAGING_IDENTIFIER, FF_PRODUCTION_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_PRD))
+
+    check(FF_PRODUCTION_IDENTIFIER, FF_STAGING_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_STG))
+    check(FF_STAGING_IDENTIFIER, FF_STAGING_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_STG))
+
+    # Traditionally these didn't work as inputs, but that seems silly, so I made them work, too. -kmp 4-Oct-2021
+    check('data', FF_PRODUCTION_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_PRD))
+    check('staging', FF_STAGING_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_STG))
+
+    check('', None)
+    check(None, None)
 
     # (active) cgap environments
-    assert infer_foursight_from_env(mock_request(), CGAP_ENV_DEV) == 'cgapdev'
-    assert infer_foursight_from_env(mock_request(), CGAP_ENV_MASTERTEST) == 'cgaptest'
-    assert infer_foursight_from_env(mock_request(), CGAP_ENV_WOLF) == 'cgapwolf'
-    assert infer_foursight_from_env(mock_request(), CGAP_ENV_WEBPROD) == 'cgap'
+    check(CGAP_ENV_DEV, 'cgapdev')
+    check(CGAP_ENV_MASTERTEST, 'cgaptest')
+    check(CGAP_ENV_WOLF, 'cgapwolf')
+    check(CGAP_ENV_WEBPROD, 'cgap')
+
+    # Traditionally this didn't work as inputs, but that seems silly, so I made it work, too. -kmp 4-Oct-2021
+    check('cgap', CGAP_PRODUCTION_IDENTIFIER, request=mock_request(CGAP_PUBLIC_DOMAIN_PRD))
+
+    check('', None)
+    check(None, None)
+
+
+def test_infer_foursight_url_from_env():
+
+    class MockedRequest:
+        def __init__(self, domain):
+            self.domain = domain
+
+    def mock_request(domain=None):  # build a dummy request with the 'domain' member, checked in the method
+        if domain is None:
+            return None
+        else:
+            return MockedRequest(domain)
+
+    ff_foursight_prefix = 'https://foursight.4dnucleome.org/view/'
+    cg_foursight_prefix = "https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/"
+
+    def check(token_in, token_out, request=None, cgap=False):
+        request = request or mock_request()
+        prefix = cg_foursight_prefix if cgap else ff_foursight_prefix
+        expected = prefix + token_out if token_out else None
+        assert infer_foursight_url_from_env(request, token_in) == expected
+
+    # (active) fourfront testing environments
+    check(FF_ENV_MASTERTEST, 'mastertest')
+    check(FF_ENV_WEBDEV, 'webdev')
+    check(FF_ENV_HOTSEAT, 'hotseat')
+
+    # (active) fourfront production environments
+    check('fourfront-blue', FF_PRODUCTION_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_PRD))
+    check('fourfront-green', FF_PRODUCTION_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_PRD))
+
+    check('fourfront-blue', FF_STAGING_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_STG))
+    check('fourfront-green', FF_STAGING_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_STG))
+
+    # These next four are pathological and hopefully not used, but they illustrate that the domain dominates.
+    # This does not illustrate intended use.
+    check(FF_PRODUCTION_IDENTIFIER, FF_PRODUCTION_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_PRD))
+    check(FF_STAGING_IDENTIFIER, FF_PRODUCTION_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_PRD))
+
+    check(FF_PRODUCTION_IDENTIFIER, FF_STAGING_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_STG))
+    check(FF_STAGING_IDENTIFIER, FF_STAGING_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_STG))
+
+    # Traditionally these didn't work as inputs, but that seems silly, so I made them work, too. -kmp 4-Oct-2021
+    check('data', FF_PRODUCTION_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_PRD))
+    check('staging', FF_STAGING_IDENTIFIER, request=mock_request(FF_PUBLIC_DOMAIN_STG))
+
+    check('', None)
+    check(None, None)
+
+    # (active) cgap environments
+    check(CGAP_ENV_DEV, 'cgapdev', cgap=True)
+    check(CGAP_ENV_MASTERTEST, 'cgaptest', cgap=True)
+    check(CGAP_ENV_WOLF, 'cgapwolf', cgap=True)
+    check(CGAP_ENV_WEBPROD, 'cgap', cgap=True)
+
+    # Traditionally this didn't work as inputs, but that seems silly, so I made it work, too. -kmp 4-Oct-2021
+    check('cgap', CGAP_PRODUCTION_IDENTIFIER, request=mock_request(CGAP_PUBLIC_DOMAIN_PRD), cgap=True)
+
+    check('', None, cgap=True)
+    check(None, None, cgap=True)
 
 
 def test_indexer_env_for_env():
@@ -616,6 +689,26 @@ def test_is_indexer_env():
     assert not is_indexer_env('fourfront-green')
     assert not is_indexer_env('fourfront-mastertest')
     assert not is_indexer_env('fourfront-cgapwolf')
+
+
+def test_short_env_name():
+
+    assert short_env_name('cgapdev') == 'cgapdev'
+    assert short_env_name('mastertest') == 'mastertest'
+
+    assert short_env_name('fourfront-cgapdev') == 'cgapdev'
+    assert short_env_name('fourfront-mastertest') == 'mastertest'
+
+    # Does not require a registered env
+    assert short_env_name('foo') == 'foo'
+    assert short_env_name('cgapfoo') == 'cgapfoo'
+
+    # Names like 'staging' and 'data' are not specially recognized, but are unperturbed
+    # because this just returns the token when it doesn't start with 'fourfront-'.
+    assert short_env_name('staging') == 'staging'
+    assert short_env_name('data') == 'data'
+    assert short_env_name('cgap') == 'cgap'
+    assert short_env_name('anything') == 'anything'
 
 
 def test_full_env_name():

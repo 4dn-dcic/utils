@@ -2,7 +2,7 @@ import os
 
 from .common import EnvName, OrchestratedApp, APP_CGAP, APP_FOURFRONT, ORCHESTRATED_APPS
 from .exceptions import InvalidParameterError
-from .misc_utils import get_setting_from_context, check_true
+from .misc_utils import get_setting_from_context, check_true, remove_prefix
 from urllib.parse import urlparse
 
 
@@ -85,6 +85,8 @@ FF_PUBLIC_URLS = {
 
 CGAP_PUBLIC_URL_STG = 'https://staging.cgap.hms.harvard.edu'  # This is a stopgap for testing and may have to change
 CGAP_PUBLIC_URL_PRD = 'https://cgap.hms.harvard.edu'
+CGAP_PUBLIC_DOMAIN_PRD = 'cgap.hms.harvard.edu'
+CGAP_PRODUCTION_IDENTIFIER = 'cgap'
 
 CGAP_PUBLIC_URLS = {
     'cgap': CGAP_PUBLIC_URL_PRD,
@@ -392,6 +394,20 @@ def infer_repo_from_env(envname):
         return None
 
 
+# TODO: Figure out if these two actually designate different hosts or if we could make CGAP prettier. -kmp 4-Oct-2021
+CGAP_FOURSIGHT_URL_PREFIX = "https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/"
+FF_FOURSIGHT_URL_PREFIX = "https://foursight.4dnucleome.org/view/"
+
+
+def infer_foursight_url_from_env(request, envname):
+    token = infer_foursight_from_env(request, envname)
+    if token is not None:
+        prefix = CGAP_FOURSIGHT_URL_PREFIX if is_cgap_env(envname) else FF_FOURSIGHT_URL_PREFIX
+        return prefix + token
+    else:
+        return None
+
+
 def infer_foursight_from_env(request, envname):
     """  Infers the Foursight environment to view based on the given envname and request context
 
@@ -399,8 +415,10 @@ def infer_foursight_from_env(request, envname):
     :param envname: name of the environment we are on
     :return: Foursight env at the end of the url ie: for fourfront-green, could be either 'data' or 'staging'
     """
-    if is_cgap_env(envname):
-        return envname[len('fourfront-'):]  # all cgap envs are prefixed and the FS envs directly match
+    if not envname or (not is_stg_or_prd_env(envname) and not envname.startswith('fourfront-')):
+        return None
+    elif is_cgap_env(envname):
+        return short_env_name(envname)  # all cgap envs are prefixed and the FS envs directly match
     else:
         if is_stg_or_prd_env(envname):
             if FF_PUBLIC_DOMAIN_PRD in request.domain:
@@ -408,7 +426,35 @@ def infer_foursight_from_env(request, envname):
             else:
                 return FF_STAGING_IDENTIFIER
         else:
-            return envname[len('fourfront-'):]  # if not data/staging, behaves exactly like CGAP
+            return short_env_name(envname)  # if not data/staging, behaves exactly like CGAP
+
+
+def short_env_name(envname):
+    """
+    Given a short or long environment name, return the long name (e.g., with a 'fourfront-' prefix if not present).
+
+    Examples:
+            short_env_name('cgapdev') => 'cgapdev'
+            short_env_name('fourfront-cgapdev') => 'cgapdev'
+
+    Args:
+        envname str: the short or long name of a beanstalk environment
+
+    Returns:
+        a string that is the short name of the specified beanstalk environment
+    """
+
+    if not envname:
+        return None
+    elif envname.startswith('fourfront-'):
+        # Note that EVEN FOR CGAP we do not look for 'cgap-' because this is the legacy implementation,
+        # not the orchestrated implementation. We'll fix that problem elsewhere. Within the legacy
+        # beanstalk environment, the short name of 'fourfront-cgapdev' is 'cgapdev' and not 'dev'.
+        # Likewise, the long name of 'cgapdev' is 'fourfront-cgapdev', not 'cgap-dev' etc.
+        # -kmp 4-Oct-2021
+        return remove_prefix('fourfront-', envname)
+    else:
+        return envname
 
 
 def full_env_name(envname):
@@ -428,6 +474,11 @@ def full_env_name(envname):
         a string that is the long name of the specified beanstalk environment
     """
     if envname in ('data', 'staging'):
+        # This is problematic for Fourfront because of mirroring.
+        # For cgap, it's OK for us to just return fourfront-cgap because there's no ambiguity.
+        # Also, with 'data' and 'staging', you can tell it didn't come from fourfront-data and fourfront-staging,
+        # whereas with 'cgap' it's harder to be sure it didn't start out 'fourfront-cgap' and get shortened,
+        # so it's best not to get too fussy about 'cgap'. -kmp 4-Oct-2021
         raise ValueError("The special token '%s' is not a beanstalk environment name." % envname)
     elif not envname.startswith('fourfront-'):
         return 'fourfront-' + envname
