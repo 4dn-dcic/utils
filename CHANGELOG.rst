@@ -36,6 +36,10 @@ Named functions are preferred.
 
   * New function ``test_permit_load_data`` to gate whether a ``load-data`` command should actually load any data.
 
+  * New function ``prod_bucket_env_for_app`` to return the prod_bucket_env for an app.
+
+  * New function ``public_url_for_app`` to return the public production URL for an app.
+
 
 3.0.1
 =====

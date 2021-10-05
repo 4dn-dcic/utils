@@ -264,7 +264,38 @@ def blue_green_mirror_env(envname):
         return None
 
 
-def prod_bucket_env(envname):
+def public_url_for_app(appname):
+    """
+    Returns the public production URL for the given application.
+
+    :param appname: the application name token ('cgap' or 'fourfront')
+    """
+
+    return _orchestrated_app_case(orchestrated_app=appname,
+                                  if_cgap=CGAP_PUBLIC_URL_PRD,
+                                  if_fourfront=FF_PUBLIC_URL_PRD)
+
+
+def prod_bucket_env_for_app(appname=None):
+    """
+    Returns the prod bucket app for a given application name.
+    If no application is given, the legacy beanstalk default is 'fourfront',
+    but the orchestrated default will be the currently orchestrated app.
+    That's weird because it means that prod_bucket_env_for_app() will return 'fourfront-webprod' even for cgap
+    when using beanstalks, but that's what we want for compatibility purposes.
+    This will all be better in containers.
+    Passing an explicit argument can still obtain the cgap prod bucket.
+
+    :param appname: the name of the app (either 'cgap' or 'fourfront')
+    """
+    if appname is None:
+        appname = 'fourfront'
+    return _orchestrated_app_case(orchestrated_app=appname,
+                                  if_cgap=CGAP_PROD_BUCKET_ENV,
+                                  if_fourfront=FF_PROD_BUCKET_ENV)
+
+
+def prod_bucket_env(envname=None):
     """
     Given a production-class envname returns the envname of the associated production bucket.
     For other envnames that aren't production envs, this returns None.

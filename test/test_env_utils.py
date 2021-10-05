@@ -11,13 +11,14 @@ from dcicutils.env_utils import (
     CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_WEBPROD_NEW, CGAP_ENV_MASTERTEST_NEW,
     CGAP_ENV_HOTSEAT_NEW, CGAP_ENV_STAGING_NEW, CGAP_ENV_WEBDEV_NEW, CGAP_ENV_WOLF_NEW,
     FF_PRODUCTION_IDENTIFIER, CGAP_PRODUCTION_IDENTIFIER,
-    get_mirror_env_from_context, is_test_env, is_hotseat_env, get_standard_mirror_env,
+    get_mirror_env_from_context, is_test_env, is_hotseat_env, get_standard_mirror_env, prod_bucket_env_for_app,
     prod_bucket_env, public_url_mappings, CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
+    CGAP_PUBLIC_URL_PRD, FF_PUBLIC_URL_PRD,
     infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env, infer_foursight_url_from_env,
     FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV, CGAP_PUBLIC_DOMAIN_PRD,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env, classify_server_url,
     short_env_name, full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
-    make_env_name_cfn_compatible, default_workflow_env, permit_load_data,
+    make_env_name_cfn_compatible, default_workflow_env, permit_load_data, public_url_for_app,
 )
 from dcicutils.exceptions import InvalidParameterError
 from dcicutils.qa_utils import raises_regexp
@@ -55,6 +56,18 @@ def test_get_bucket_env():
 
     assert get_bucket_env('fourfront-cgapdev') == 'fourfront-cgapdev'
     assert get_bucket_env('fourfront-cgapwolf') == 'fourfront-cgapwolf'
+
+
+def test_prod_bucket_env_for_app():
+
+    assert prod_bucket_env_for_app('fourfront') == FF_PROD_BUCKET_ENV
+    assert prod_bucket_env_for_app('cgap') == CGAP_PROD_BUCKET_ENV
+
+    assert prod_bucket_env_for_app() == FF_PROD_BUCKET_ENV
+    assert prod_bucket_env_for_app(None) == FF_PROD_BUCKET_ENV
+
+    with pytest.raises(InvalidParameterError):
+        prod_bucket_env_for_app('foo')
 
 
 def test_prod_bucket_env():
@@ -192,6 +205,15 @@ def test_public_url_mappings():
     assert public_url_mappings('fourfront-cgap-green') == CGAP_PUBLIC_URLS
     assert public_url_mappings('cgap-blue') == CGAP_PUBLIC_URLS
     assert public_url_mappings('cgap-green') == CGAP_PUBLIC_URLS
+
+
+def test_public_url_for_app():
+
+    assert public_url_for_app('cgap') == CGAP_PUBLIC_URL_PRD
+    assert public_url_for_app('fourfront') == FF_PUBLIC_URL_PRD
+
+    with pytest.raises(InvalidParameterError):
+        public_url_for_app('foo')
 
 
 def test_blue_green_mirror_env():
