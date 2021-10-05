@@ -27,8 +27,14 @@ from unittest import mock
 
 def test_default_workflow_env():
 
-    assert default_workflow_env('fourfront') == default_workflow_env(APP_FOURFRONT) == FF_ENV_WEBDEV
-    assert default_workflow_env('cgap') == default_workflow_env(APP_CGAP) == CGAP_ENV_WEBDEV
+    assert (default_workflow_env('fourfront')
+            == default_workflow_env(APP_FOURFRONT)
+            == FF_ENV_WEBDEV
+            == 'fourfront-webdev')
+    assert (default_workflow_env('cgap')
+            == default_workflow_env(APP_CGAP)
+            == CGAP_ENV_WOLF
+            == 'fourfront-cgapwolf')
 
     with pytest.raises(InvalidParameterError):
         default_workflow_env('foo')
