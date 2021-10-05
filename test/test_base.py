@@ -261,27 +261,27 @@ def _mocked_describe_beanstalk_environments(*args, **kwargs):
     return {
         'Environments': [
             {
-                "CNAME": "not." + base._CGAP_MAGIC_CNAME,
+                "CNAME": "not." + base._CGAP_MAGIC_CNAME,  # noQA - for testing, don't fuss access protected member
                 "EnvironmentName": "cgap-env-1"
             },
             {
-                "CNAME": base._CGAP_MAGIC_CNAME,
+                "CNAME": base._CGAP_MAGIC_CNAME,  # noQA - for testing, don't fuss access protected member
                 "EnvironmentName": "cgap-env-2"
             },
             {
-                "CNAME": "also-not." + base._CGAP_MAGIC_CNAME,
+                "CNAME": "also-not." + base._CGAP_MAGIC_CNAME,  # noQA - for testing, don't fuss access protected member
                 "EnvironmentName": "cgap-env-3"
             },
             {
-                "CNAME": "not." + base._FF_MAGIC_CNAME,
+                "CNAME": "not." + base._FF_MAGIC_CNAME,  # noQA - for testing, don't fuss access protected member
                 "EnvironmentName": "ff-env-1"
             },
             {
-                "CNAME": base._FF_MAGIC_CNAME,
+                "CNAME": base._FF_MAGIC_CNAME,  # noQA - for testing, don't fuss access protected member
                 "EnvironmentName": "ff-env-2"
             },
             {
-                "CNAME": "also-not." + base._FF_MAGIC_CNAME,
+                "CNAME": "also-not." + base._FF_MAGIC_CNAME,  # noQA - for testing, don't fuss access protected member
                 "EnvironmentName": "ff-env-3"
             },
         ]

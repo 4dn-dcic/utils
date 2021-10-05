@@ -2,7 +2,6 @@ import contextlib
 import datetime
 import io
 import json
-import logging
 import os
 import pytest
 import requests
@@ -95,6 +94,7 @@ def _env_is_up_and_healthy(env):
     env_url = beanstalk_utils.get_beanstalk_real_url(env)
     health_page_url = f"{env_url}/health?format=json"
     return requests.get(health_page_url).status_code == 200
+
 
 @pytest.mark.integrated
 @pytest.mark.parametrize('ff_ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat'])

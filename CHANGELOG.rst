@@ -7,6 +7,40 @@ Change Log
 ----------
 
 
+3.1.0
+=====
+
+This PR is intended to phase out any importation of named constants from ``env_utils``.
+Named functions are preferred.
+
+* New module ``common`` for things that might otherwise go in ``base`` but are OK to import.
+  (The ``base`` module is internal and not for use outside of ``dcicutils``.)
+
+  * Moved ``REGION`` from ``base`` to ``common``, leaving behind an import/exported pair for compatibility,
+    but please import ``REGION`` from ``dcicutils.common`` going forward.
+
+  * ``OrchestratedApp`` and ``EnvName`` for type hinting.
+
+  * ``APP_CGAP`` and ``APP_FOURFRONT`` as a more abstract way of referring to ``'cgap'`` and ``'fourfront'``,
+    respectively, to talk about which orchestrated app is in play.
+
+* In ``env_utils``:
+
+  * New function ``default_workflow_env`` for use in CGAP and Fourfront functions ``run_workflow`` and ``pseudo_run``
+    (in ``src/types/workflow.py``) so that ``CGAP_ENV_WEBDEV`` and ``FF_ENV_WEBDEV`` do not need to be imported.
+
+  * New function ``infer_foursight_url_from_env``, similar to ``infer_foursight_from_env`` but returns a URL
+    rather than an environment short name.
+
+  * New function ``short_env_name`` that computes the short name of an environment.
+
+  * New function ``test_permit_load_data`` to gate whether a ``load-data`` command should actually load any data.
+
+  * New function ``prod_bucket_env_for_app`` to return the prod_bucket_env for an app.
+
+  * New function ``public_url_for_app`` to return the public production URL for an app.
+
+
 3.0.1
 =====
 
