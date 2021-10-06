@@ -9,7 +9,7 @@ from dcicutils.aws_utils import (
     s3_object_exists, s3_object_head, s3_put_object,
 )
 from dcicutils.misc_utils import ignored
-from dcicutils.qa_utils import (
+from dcicutils.ff_mocks import (
     mocked_boto3_object,
     # For now, no need to explicitly use these now because the mocked_boto3_object hides them. -kmp 15-Sep-2021
     # MockBoto3, MockBotoS3Client
