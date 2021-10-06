@@ -5,6 +5,13 @@ API Documentation
 Note that JH utils is excluded due to side-effects of importing the module. See the source file for details.
 
 
+base
+^^^^
+
+.. automodule:: dcicutils.base
+   :members:
+
+
 beanstalk_utils
 ^^^^^^^^^^^^^^^
 
@@ -16,6 +23,13 @@ command_utils
 ^^^^^^^^^^^^^
 
 .. automodule:: dcicutils.command_utils
+   :members:
+
+
+common
+^^^^^^
+
+.. automodule:: dcicutils.common
    :members:
 
 
@@ -87,6 +101,13 @@ exceptions
 
 .. automodule:: dcicutils.exceptions
   :members:
+
+
+ff_mocks
+^^^^^^^^
+
+.. automodule:: dcicutils.ff_mocks
+   :members:
 
 
 ff_utils

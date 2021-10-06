@@ -12,12 +12,16 @@ import urllib.request
 from io import BytesIO
 from typing import Optional
 from zipfile import ZipFile
+from .base import get_beanstalk_real_url
 from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name
 from .exceptions import (
     InferredBucketConflict, CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv,
     GlobalBucketAccessError, SynonymousEnvironmentVariablesMismatched,
 )
-from .misc_utils import PRINT, override_environ, ignored
+from .misc_utils import PRINT, override_environ, ignored, exported
+
+
+exported(get_beanstalk_real_url)
 
 
 ###########################
@@ -75,18 +79,19 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     BLOB_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + BLOB_BUCKET_SUFFIX          # = "elasticbeanstalk-%s-blobs"
     METADATA_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + METADATA_BUCKET_SUFFIX  # = "elasticbeanstalk-%s-metadata-bundles"
     TIBANNA_OUTPUT_BUCKET_TEMPLATE = TIBANNA_OUTPUT_BUCKET_SUFFIX          # = "tibanna-output" (no prefix)
-    TIBANNA_CWLS_BUCKET_TEMPLATE = TIBANNA_CWLS_BUCKET_SUFFIX              # = "tibanna-output" (no prefix)
+    TIBANNA_CWLS_BUCKET_TEMPLATE = TIBANNA_CWLS_BUCKET_SUFFIX              # = "tibanna-cwls" (no prefix)
 
-    # NOTE: These are deprecated now and retained for compatibility. Please rewrite uses as HealthPageKey.xyz names.
-    SYS_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.SYSTEM_BUCKET                     # = 'system_bucket'
-    OUTFILE_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.PROCESSED_FILE_BUCKET         # = 'processed_file_bucket'
-    RAW_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.FILE_UPLOAD_BUCKET                # = 'file_upload_bucket'
-    BLOB_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.BLOB_BUCKET                      # = 'blob_bucket'
-    METADATA_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.METADATA_BUNDLES_BUCKET      # = 'metadata_bundles_bucket'
+    # NOTE: These were deprecated and retained for compatibility in dcicutils 2.
+    #       For dcicutils 3.0, please rewrite uses as HealthPageKey.xyz names.
+    # SYS_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.SYSTEM_BUCKET                     # = 'system_bucket'
+    # OUTFILE_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.PROCESSED_FILE_BUCKET         # = 'processed_file_bucket'
+    # RAW_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.FILE_UPLOAD_BUCKET                # = 'file_upload_bucket'
+    # BLOB_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.BLOB_BUCKET                      # = 'blob_bucket'
+    # METADATA_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.METADATA_BUNDLES_BUCKET      # = 'metadata_bundles_bucket'
     # TIBANNA_CWLS_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.TIBANNA_CWLS_BUCKET      # = 'tibanna_cwls_bucket'
-    TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.TIBANNA_OUTPUT_BUCKET  # = 'tibanna_output_bucket'
+    # TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.TIBANNA_OUTPUT_BUCKET  # = 'tibanna_output_bucket'
     # This is also deprecated, even though not a bucket name. Use HealthPageKey.ELASTICSEARCH.
-    ELASTICSEARCH_HEALTH_PAGE_KEY = HealthPageKey.ELASTICSEARCH                  # = 'elasticsearch'
+    # ELASTICSEARCH_HEALTH_PAGE_KEY = HealthPageKey.ELASTICSEARCH                  # = 'elasticsearch'
 
     @staticmethod  # backward compatibility in case other repositories are using this
     def verify_and_get_env_config(s3_client, global_bucket: str, env):
@@ -111,8 +116,6 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         3) With no GLOBAL_ENV_BUCKET or env kwarg,
            we expect bucket kwargs to be set, and use those as bucket names directly.
         """
-        # avoid circular ref
-        from .beanstalk_utils import get_beanstalk_real_url
         self.url = ''
         self.s3 = boto3.client('s3', region_name='us-east-1')
         global_bucket = EnvManager.global_env_bucket_name()
@@ -180,13 +183,14 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 #       upstream of the global env bucket branch, too. That's not needed for orchestrated cgap,
                 #       which has no stage, but it will be needed for orchestrated fourfront. -kmp 31-Aug-2021
                 if env:
-                    self.url = get_beanstalk_real_url(env)
                     if is_stg_or_prd_env(env):
+                        self.url = get_beanstalk_real_url(env)  # done BEFORE prod_bucket_env blurring stg/prd
                         env = prod_bucket_env(env)
                     else:
                         # TODO: This is the part that is not yet supported in env_utils, but there is a pending
                         #       patch that will fix that. -kmp 31-AUg-2021
                         env = full_env_name(env)
+                        self.url = get_beanstalk_real_url(env)  # done AFTER maybe prepending cgap- or foursight-.
 
                     health_json_url = f"{self.url}/health?format=json"
                     # In the orchestrated case, we issue a warning here. Do we need that? -kmp 1-Sep-2021
@@ -488,7 +492,7 @@ class EnvManager:
         if described_env_name:
             if not env_name:
                 env_name = described_env_name
-            elif env_name == described_env_name:
+            elif env_name != described_env_name:
                 raise ValueError(f"The given env name, {env_name},"
                                  f" does not match the name given in the description, {env_description}.")
 

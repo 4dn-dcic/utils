@@ -1,16 +1,13 @@
-from __future__ import print_function
-
 import boto3
 import json
 import os
 import random
 import requests
 import time
-import urllib.parse as urlparse
 
 from collections import namedtuple
 from elasticsearch.exceptions import AuthorizationException
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from . import (
     s3_utils,
     es_utils,
@@ -410,7 +407,6 @@ def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=F
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
     """
-    from urllib.parse import urlparse
     auth = get_authentication_with_server(key, ff_env)
     if search.startswith('/'):
         search = search[1:]
@@ -1306,12 +1302,12 @@ def process_add_on(add_on):
 
 def get_url_params(url):
     """
-    Returns a dictionary of url params using urlparse.parse_qs.
+    Returns a dictionary of url params using parse_qs.
     Example: get_url_params('<server>/search/?type=Biosample&limit=5') returns
     {'type': ['Biosample'], 'limit': '5'}
     """
-    parsed_url = urlparse.urlparse(url)
-    return urlparse.parse_qs(parsed_url.query)
+    parsed_url = urlparse(url)
+    return parse_qs(parsed_url.query)
 
 
 def update_url_params_and_unparse(url, url_params):
@@ -1321,8 +1317,8 @@ def update_url_params_and_unparse(url, url_params):
     """
     # Note: Although it upsets linting tools, ._replace() is an advertised interface of url.parse -kmp 17-Oct-2020
     #       See https://docs.python.org/3/library/urllib.parse.html
-    parsed_url = urlparse.urlparse(url)._replace(query=urlencode(url_params, True))  # noQA
-    return urlparse.urlunparse(parsed_url)
+    parsed_url = urlparse(url)._replace(query=urlencode(url_params, True))  # noQA
+    return urlunparse(parsed_url)
 
 
 def convert_param(parameter_dict, vals_as_string=False):

@@ -7,6 +7,147 @@ Change Log
 ----------
 
 
+3.1.0
+=====
+
+This PR is intended to phase out any importation of named constants from ``env_utils``.
+Named functions are preferred.
+
+* New module ``common`` for things that might otherwise go in ``base`` but are OK to import.
+  (The ``base`` module is internal and not for use outside of ``dcicutils``.)
+
+  * Moved ``REGION`` from ``base`` to ``common``, leaving behind an import/exported pair for compatibility,
+    but please import ``REGION`` from ``dcicutils.common`` going forward.
+
+  * ``OrchestratedApp`` and ``EnvName`` for type hinting.
+
+  * ``APP_CGAP`` and ``APP_FOURFRONT`` as a more abstract way of referring to ``'cgap'`` and ``'fourfront'``,
+    respectively, to talk about which orchestrated app is in play.
+
+* In ``env_utils``:
+
+  * New function ``default_workflow_env`` for use in CGAP and Fourfront functions ``run_workflow`` and ``pseudo_run``
+    (in ``src/types/workflow.py``) so that ``CGAP_ENV_WEBDEV`` and ``FF_ENV_WEBDEV`` do not need to be imported.
+
+  * New function ``infer_foursight_url_from_env``, similar to ``infer_foursight_from_env`` but returns a URL
+    rather than an environment short name.
+
+  * New function ``short_env_name`` that computes the short name of an environment.
+
+  * New function ``test_permit_load_data`` to gate whether a ``load-data`` command should actually load any data.
+
+  * New function ``prod_bucket_env_for_app`` to return the prod_bucket_env for an app.
+
+  * New function ``public_url_for_app`` to return the public production URL for an app.
+
+
+3.0.1
+=====
+
+* In ``env_utils``:
+
+  * A small bit of error checking in ``blue_green_mirror_env``.
+
+  * A bit of extra testing for ``infer_foursight_from_env``.
+
+
+3.0.0
+=====
+
+The major version bump is to allow removal of some deprecated items
+and to further constrain the Python version.
+
+Strictly speaking, this is an **INCOMPATIBLE CHANGE**, though we expect little or no
+impact.
+
+In particular, searches of all ``4dn-dcic`` and ``dbmi-cgap`` repositories on GitHub show
+that only the ``torb`` repository is impacted, and since that repo is not
+in active use, we're not worried about that. Also, minor code adjustments would
+fix the problem uses allowing uses of version 3.0 or higher.
+
+Specifics:
+
+* Supports versions of Python starting with 3.6.1 and below 3.8.
+
+* Removes support for previously-deprecated function name ``whodaman``, which only ``torb`` was still using.
+  ``compute_ff_prd_env`` can be used as a direct replacement.
+
+* Removes support for previously-deprecated variable ``MAGIC_CNAME`` which no one was using any more.
+
+* Removes support for previously-deprecated variable ``GOLDEN_DB`` which only ``torb`` was still using.
+  ``_FF_GOLDEN_DB`` could be used as a direct replacement in an emergency,
+  but only for legacy environments. This is not a good solution for orchestrated environments (C4-689).
+
+* The variables ``FF_MAGIC_CNAME``, ``CGAP_MAGIC_CNAME``, ``FF_GOLDEN_DB``, and ``CGAP_GOLDEN_DB``,
+  which had no uses outside of ``dcicutils`` itself,
+  now have underscores ahead of their names to emphasize that they are internal to ``dcicutils`` only.
+  ``_FF_MAGIC_CNAME``, ``_CGAP_MAGIC_CNAME``, ``_FF_GOLDEN_DB``, and ``_CGAP_GOLDEN_DB``, respectively,
+  could be used as a direct replacement in an emergency,
+  but only for legacy environments. This is not a good solution for orchestrated environments (C4-689).
+
+* The function name ``use_input`` has been renamed ``prompt_for_input`` and the preferred place to
+  import it from is now ``misc_utils``, not ``beanstalk_utils``. (This is just a synonym for the
+  poorly named Python function ``input``.)
+
+* The previously-deprecated class name ``deployment_utils.Deployer`` has been removed.
+  ``IniFileManager`` can be used as a direct replacement.
+
+* The previously-deprecated function name ``guess_mirror_env`` has been removed.
+  ``get_standard_mirror_env`` can be used as a direct replacement.
+
+* The deprecated function name ``hms_now`` and the deprecated variable name ``HMS_TZ`` have been removed.
+  ``ref_now`` and ``REF_TZ``, respectively, can be used as direct replacements.
+
+* These previously-deprecated ``s3_utils.s3Utils`` class variables have been removed:
+
+  * ``s3Utils.SYS_BUCKET_HEALTH_PAGE_KEY`` replaced by ``HealthPageKey.SYSTEM_BUCKET``
+  * ``s3Utils.OUTFILE_BUCKET_HEALTH_PAGE_KEY`` replaced by ``HealthPageKey.PROCESSED_FILE_BUCKET``
+  * ``s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY`` replaced by ``HealthPageKey.FILE_UPLOAD_BUCKET``
+  * ``s3Utils.BLOB_BUCKET_HEALTH_PAGE_KEY`` replaced by ``HealthPageKey.BLOB_BUCKET``
+  * ``s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY`` replaced by ``HealthPageKey.METADATA_BUNDLES_BUCKET``
+  * ``s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY`` replaced by ``HealthPageKey.TIBANNA_OUTPUT_BUCKET``
+
+  Among ``4dn-dcic`` repos, there was only one active use of any of these, ``TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY``,
+  in ``src/commands/setup_tibanna.py`` in ``4dn-cloud-infra``. It will need to be rewritten.
+
+  Among ``dbmi-bgm`` repos, all are mentioned only in ``src/encoded/root.py`` and ``src/encoded/tests/test_root.py``,
+  but rewrites to use ``HealthPageKey`` attributes will be needed there as well.
+
+
+2.4.1
+=====
+
+* No functional change. Cosmetic edits to various files in order to
+  make certain file comparisons tidier.
+
+
+2.4.0
+=====
+
+* This change rearranges files to remove some bootstrapping issues caused by circular dependencies.
+  This change is not supposed to affect the visible behavior, but the nature of the change creates
+  a risk of change because things moved from file to file.
+  An attempt was made to retain support for importable functions and variables in a way that would be non-disruptive.
+
+* New module ``ff_mocks`` containing some test facilities that can be used by other repos to test FF and CGAP stuff.
+
+  * Class ``MockBoto4DNLegacyElasticBeanstalkClient``.
+
+  * Context manager ``mocked_s3utils`` for mocking many typical situations.
+
+2.3.2
+=====
+
+* Support Central European Time for testing.
+
+
+2.3.1
+=====
+
+* In ``s3_utils``, fix C4-706, where short names of environments were not accepted
+  as env arguments to s3Utils in legacy CGAP.
+
+
 2.3.0
 =====
 

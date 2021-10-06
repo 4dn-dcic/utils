@@ -4,13 +4,18 @@ import io
 import json
 import os
 import pytest
+import requests
 
-from dcicutils import s3_utils as s3_utils_module
+from botocore.exceptions import ClientError
+from dcicutils import s3_utils as s3_utils_module, beanstalk_utils
 from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
-from dcicutils.env_utils import get_standard_mirror_env, FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, CGAP_PUBLIC_URL_PRD
+from dcicutils.env_utils import (
+    get_standard_mirror_env,
+    FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, CGAP_PUBLIC_URL_PRD
+)
 from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs
 from dcicutils.misc_utils import ignored, ignorable
-from dcicutils.qa_utils import override_environ, MockBoto3, MockBotoS3Client, MockResponse
+from dcicutils.qa_utils import override_environ, MockBoto3, MockBotoS3Client, MockResponse, known_bug_expected
 from dcicutils.s3_utils import s3Utils, EnvManager
 from unittest import mock
 
@@ -73,21 +78,32 @@ def test_s3utils_constants():
     assert s3Utils.METADATA_BUCKET_TEMPLATE == "elasticbeanstalk-%s-metadata-bundles"
     assert s3Utils.TIBANNA_OUTPUT_BUCKET_TEMPLATE == "tibanna-output"
 
-    assert s3Utils.SYS_BUCKET_HEALTH_PAGE_KEY == 'system_bucket'
-    assert s3Utils.OUTFILE_BUCKET_HEALTH_PAGE_KEY == 'processed_file_bucket'
-    assert s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY == 'file_upload_bucket'
-    assert s3Utils.BLOB_BUCKET_HEALTH_PAGE_KEY == 'blob_bucket'
-    assert s3Utils.METADATA_BUCKET_HEALTH_PAGE_KEY == 'metadata_bundles_bucket'
-    # We didn't add this slot since it would have been born deprecated. Use HealthPageKey instead.
-    # assert s3Utils.TIBANNA_CWLS_BUCKET_HEALTH_PAGE_KEY == 'tibanna_cwls_bucket'
-    assert s3Utils.TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY == 'tibanna_output_bucket'
+
+@pytest.mark.integrated
+def test_regression_s3_utils_short_name_c4_706():
+
+    # Environment long names work (at least in legacy CGAP)
+    s3Utils(env="fourfront-cgapwolf")
+
+    with known_bug_expected(jira_ticket="C4-706", fixed=True, error_class=ClientError):
+        # Sort names not allowed.
+        s3Utils(env="cgapwolf")
+
+
+def _env_is_up_and_healthy(env):
+    env_url = beanstalk_utils.get_beanstalk_real_url(env)
+    health_page_url = f"{env_url}/health?format=json"
+    return requests.get(health_page_url).status_code == 200
 
 
 @pytest.mark.integrated
 @pytest.mark.parametrize('ff_ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat'])
 def test_s3utils_creation_ff_ordinary(ff_ordinary_envname):
-    util = s3Utils(env=ff_ordinary_envname)
-    assert util.sys_bucket == 'elasticbeanstalk-%s-system' % ff_ordinary_envname
+    if _env_is_up_and_healthy(ff_ordinary_envname):
+        util = s3Utils(env=ff_ordinary_envname)
+        assert util.sys_bucket == 'elasticbeanstalk-%s-system' % ff_ordinary_envname
+    else:
+        pytest.skip(f"Health page for {ff_ordinary_envname} is unavailable, so test is being skipped.")
 
 
 @pytest.mark.integrated

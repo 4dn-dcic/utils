@@ -19,7 +19,7 @@ class MockMath:
             raise MockMathError("Math is not enabled.")
 
 
-@pytest.yield_fixture()
+@pytest.fixture()  # formerly pytest.yield_fixture, but that is now deprecated. -kmp 3-Oct-2021
 def math_enabled():
     with mock.patch.object(MockMath, "MATH_ENABLED", True):
         yield

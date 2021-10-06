@@ -20,10 +20,10 @@ from dcicutils.misc_utils import (
     LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
     keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
     CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json, url_path_join,
-    as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ, hms_now, HMS_TZ,
+    as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ,
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
-    capitalize1, local_attrs, dict_zip, json_leaf_subst,
+    capitalize1, local_attrs, dict_zip, json_leaf_subst, _is_function_of_exactly_one_required_arg,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -770,20 +770,14 @@ def test_as_seconds():
     assert as_seconds(milliseconds=250) == 0.25
 
 
-def test_hms_tz():
-
-    assert HMS_TZ == REF_TZ, "HMS_TZ was deprectead, but is still expected to be a synonym for REF_TZ."
-
-
-@pytest.mark.parametrize('now', [hms_now, ref_now])  # hms_now is a deprecated name for ref_now
-def test_hms_now_and_ref_now(now):
+def test_ref_now():
 
     t0 = datetime_module.datetime(2015, 7, 4, 12, 0, 0)
     dt = ControlledTime(t0)
 
     with mock.patch("dcicutils.misc_utils.datetime", dt):
 
-        t1 = now()
+        t1 = ref_now()
         t1_utc = t1.replace(tzinfo=pytz.UTC)
         assert t1.replace(tzinfo=None) == t0 + datetime_module.timedelta(seconds=1)
         delta = (t1 - t1_utc)
@@ -1461,6 +1455,48 @@ def test_ancestor_classes():
 
     assert ancestor_classes(FooBar) == [Foo, object]
     assert ancestor_classes(FooBar, reverse=True) == [object, Foo]
+
+
+def test_is_function_of_exactly_one_required_arg():
+
+    def f0():
+        return ['n_args', 0]
+
+    def f1(x):
+        return ['n_args', 1]
+
+    def f2(x, y):
+        return ['n_args', 2]
+
+    def f0_k1(*, k):
+        return ['n_args', 0, 'n_kwargs', 1]
+
+    def f1_k1(*, k):
+        return ['n_args', 1, 'n_kwargs', 1]
+
+    def f2_k1(*, k):
+        return ['n_args', 2, 'n_kwargs', 1]
+
+    def f0_1(x=0):
+        return ['n_args_min', 0, 'n_args_max', 1]
+
+    def f0_2(x=0, y=0):
+        return ['n_args_min', 0, 'n_args_max', 1]
+
+    def f0_k0_1(*, k=0):
+        return ['n_args', 0, 'n_kwargs_min', 0, 'n_kwargs_max', 1]
+
+    assert _is_function_of_exactly_one_required_arg(f0) is False
+    assert _is_function_of_exactly_one_required_arg(f1) is True
+    assert _is_function_of_exactly_one_required_arg(f2) is False
+
+    assert _is_function_of_exactly_one_required_arg(f0_k1) is False
+    assert _is_function_of_exactly_one_required_arg(f1_k1) is False
+    assert _is_function_of_exactly_one_required_arg(f2_k1) is False
+
+    assert _is_function_of_exactly_one_required_arg(f0_1) is False
+    assert _is_function_of_exactly_one_required_arg(f0_2) is False
+    assert _is_function_of_exactly_one_required_arg(f0_k0_1) is False
 
 
 def test_is_proper_subclass():
