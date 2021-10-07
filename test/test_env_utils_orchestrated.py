@@ -6,10 +6,11 @@ from dcicutils import env_utils
 from dcicutils.env_utils import (
     is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env,
     get_mirror_env_from_context, is_test_env, is_hotseat_env, get_standard_mirror_env,
-    prod_bucket_env, public_url_mappings,
+    prod_bucket_env, prod_bucket_env_for_app, public_url_mappings, public_url_for_app, permit_load_data,
+    default_workflow_env, infer_foursight_url_from_env,
     infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env,
     is_indexer_env, indexer_env_for_env, classify_server_url,
-    full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
+    short_env_name, full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
     make_env_name_cfn_compatible,
     # New support
     EnvUtils, p, c,
@@ -127,6 +128,106 @@ def test_orchestrated_prod_bucket_env():
 
             assert prod_bucket_env('acme-stg') == 'production-data'      # WIT mirroring enabled, this uses prod bucket
             assert prod_bucket_env('stg') == 'production-data'           # WITH mirroring enabled, this uses prod bucket
+
+
+@using_orchestrated_behavior()
+def test_orchestrated_prod_bucket_env_for_app():
+
+    assert prod_bucket_env_for_app() == EnvUtils.PRD_BUCKET
+    assert prod_bucket_env_for_app('cgap') == EnvUtils.PRD_BUCKET
+    with pytest.raises(Exception):
+        prod_bucket_env_for_app('fourfront')
+
+    with local_attrs(EnvUtils, **CGAP_SETTINGS_FOR_TESTING):
+        assert prod_bucket_env_for_app() == EnvUtils.PRD_BUCKET == 'fourfront-cgap'
+        assert prod_bucket_env_for_app('cgap') == EnvUtils.PRD_BUCKET
+        with pytest.raises(Exception):
+            prod_bucket_env_for_app('fourfront')
+
+    with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
+        assert prod_bucket_env_for_app() == EnvUtils.PRD_BUCKET == 'fourfront-webprod'
+        assert prod_bucket_env_for_app('fourfront') == EnvUtils.PRD_BUCKET
+        with pytest.raises(Exception):
+            prod_bucket_env_for_app('cgap')
+
+
+@using_orchestrated_behavior()
+def test_orchestrated_infer_foursight_url_from_env():
+
+    assert (infer_foursight_url_from_env('ignored-request', 'demo')
+            == 'https://foursight.genetics.example.com/api/view/demo')
+    assert (infer_foursight_url_from_env('ignored-request', 'acme-foo')
+            == 'https://foursight.genetics.example.com/api/view/foo')
+    assert (infer_foursight_url_from_env('ignored-request', 'fourfront-cgapwolf')
+            == 'https://foursight.genetics.example.com/api/view/fourfront-cgapwolf')
+
+    with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
+        assert (infer_foursight_url_from_env('ignored-request', 'data')
+                == 'https://foursight.4dnucleome.org/api/view/data')
+        assert (infer_foursight_url_from_env('ignored-request', 'acme-foo')
+                == 'https://foursight.4dnucleome.org/api/view/acme-foo')
+        assert (infer_foursight_url_from_env('ignored-request', 'fourfront-cgapwolf')
+                == 'https://foursight.4dnucleome.org/api/view/cgapwolf')
+
+    with local_attrs(EnvUtils, **CGAP_SETTINGS_FOR_TESTING):
+        assert (infer_foursight_url_from_env('ignored-request', 'data')
+                == 'https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/data')
+        assert (infer_foursight_url_from_env('ignored-request', 'acme-foo')
+                == 'https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/acme-foo')
+        assert (infer_foursight_url_from_env('ignored-request', 'fourfront-cgapwolf')
+                == 'https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/cgapwolf')
+
+
+@using_orchestrated_behavior()
+def test_orchestrated_default_workflow_env():
+
+    assert default_workflow_env('cgap') == EnvUtils.PRD_BUCKET == 'production-data'  # the Acme producton bucket
+    with pytest.raises(Exception):
+        default_workflow_env('fourfront')
+    with pytest.raises(Exception):
+        default_workflow_env(None)  # noQA - We're expecting a problem
+
+    with local_attrs(EnvUtils, **CGAP_SETTINGS_FOR_TESTING):
+        assert default_workflow_env('cgap') == EnvUtils.PRD_BUCKET == 'fourfront-cgap'
+        with pytest.raises(Exception):
+            default_workflow_env('fourfront')
+        with pytest.raises(Exception):
+            default_workflow_env(None)  # noQA - We're expecting a problem
+
+    with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
+        assert default_workflow_env('fourfront') == EnvUtils.PRD_BUCKET == 'fourfront-webprod'
+        with pytest.raises(Exception):
+            default_workflow_env('cgap')
+        with pytest.raises(Exception):
+            default_workflow_env(None)  # noQA - We're expecting a problem
+
+
+@using_orchestrated_behavior()
+def test_orchestrated_permit_load_data():
+
+    def test_it():
+        assert permit_load_data(envname=EnvUtils.PRD_ENV_NAME, allow_prod=True, orchestrated_app='cgap') is True
+        assert permit_load_data(envname=EnvUtils.PRD_ENV_NAME, allow_prod=False, orchestrated_app='cgap') is False
+
+        assert permit_load_data(envname=EnvUtils.PRD_ENV_NAME, allow_prod=True, orchestrated_app='fourfront') is True
+        assert permit_load_data(envname=EnvUtils.PRD_ENV_NAME, allow_prod=False, orchestrated_app='fourfront') is False
+
+        assert permit_load_data(envname='anything', allow_prod=True, orchestrated_app='cgap') is True
+        assert permit_load_data(envname='anything', allow_prod=False, orchestrated_app='cgap') is False
+
+        assert permit_load_data(envname='anything', allow_prod=True, orchestrated_app='fourfront') is True
+        assert permit_load_data(envname='anything', allow_prod=False, orchestrated_app='fourfront') is False
+
+    # The orchestrated definition is not dependent on the environment name or orchestrated app,
+    # so our testing reflects the constancy of effect...
+
+    test_it()
+
+    with local_attrs(EnvUtils, **CGAP_SETTINGS_FOR_TESTING):
+        test_it()
+
+    with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
+        test_it()
 
 
 @using_orchestrated_behavior()
@@ -271,6 +372,27 @@ def test_orchestrated_blue_green_mirror_env():
 
     with pytest.raises(ValueError):
         blue_green_mirror_env('xyz-blue-green')  # needs to be one or the other
+
+
+@using_orchestrated_behavior()
+def test_orchestrated_public_url_for_app():
+
+    assert public_url_for_app() == "https://genetics.example.com"
+    assert public_url_for_app('cgap') == "https://genetics.example.com"
+    with pytest.raises(Exception):
+        public_url_for_app('fourfront')  # The example app is not a fourfront app
+
+    with local_attrs(EnvUtils, **CGAP_SETTINGS_FOR_TESTING):
+        assert public_url_for_app() == "https://cgap.hms.harvard.edu"
+        assert public_url_for_app('cgap') == "https://cgap.hms.harvard.edu"
+        with pytest.raises(Exception):
+            public_url_for_app('fourfront')  # A cgap app won't know about fourfront
+
+    with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
+        assert public_url_for_app() == "https://data.4dnucleome.org"
+        assert public_url_for_app('fourfront') == "https://data.4dnucleome.org"
+        with pytest.raises(Exception):
+            public_url_for_app('cgap')  # A fourfront app won't know about fourfront
 
 
 @using_orchestrated_behavior()
@@ -1358,6 +1480,7 @@ def test_orchestrated_infer_repo_from_env_for_fourfront():
 
 CGAP_SETTINGS_FOR_TESTING = dict(
     ORCHESTRATED_APP='cgap',
+    FOURSIGHT_URL_PREFIX='https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/',
     FULL_ENV_PREFIX='fourfront-',
     DEV_ENV_DOMAIN_SUFFIX=EnvUtils.DEV_SUFFIX_FOR_TESTING,
     PRD_BUCKET='fourfront-cgap',
@@ -1375,6 +1498,7 @@ CGAP_SETTINGS_FOR_TESTING = dict(
 
 FOURFRONT_SETTINGS_FOR_TESTING = dict(
     ORCHESTRATED_APP='fourfront',
+    FOURSIGHT_URL_PREFIX='https://foursight.4dnucleome.org/api/view/',
     FULL_ENV_PREFIX='fourfront-',
     DEV_ENV_DOMAIN_SUFFIX=EnvUtils.DEV_SUFFIX_FOR_TESTING,
     PRD_BUCKET='fourfront-webprod',
@@ -1494,11 +1618,56 @@ def test_orchestrated_is_indexer_env():
 
 
 @using_orchestrated_behavior()
+def test_orchestrated_short_env_name():
+
+    assert short_env_name(None) is None
+    assert short_env_name('demo') == 'demo'
+    assert short_env_name('anything') == 'anything'
+    assert short_env_name('acme-anything') == 'anything'
+    assert short_env_name('cgap-anything') == 'cgap-anything'
+    assert short_env_name('fourfront-cgapfoo') == 'fourfront-cgapfoo'
+    assert short_env_name('fourfront-anything') == 'fourfront-anything'
+
+    with local_attrs(EnvUtils, **CGAP_SETTINGS_FOR_TESTING):  # Legacy CGAP settings use a 'fourfront-' prefix!
+
+        assert short_env_name(None) is None
+        assert short_env_name('demo') == 'demo'
+        assert short_env_name('anything') == 'anything'
+        assert short_env_name('acme-anything') == 'acme-anything'
+        assert short_env_name('cgap-anything') == 'cgap-anything'
+        assert short_env_name('fourfront-cgapfoo') == 'cgapfoo'
+        assert short_env_name('fourfront-anything') == 'anything'
+
+        with local_attrs(EnvUtils, FULL_ENV_PREFIX='cgap-'):  # Of course, we could have defined it otherwise.
+
+            assert short_env_name(None) is None
+            assert short_env_name('demo') == 'demo'
+            assert short_env_name('anything') == 'anything'
+            assert short_env_name('acme-anything') == 'acme-anything'
+            assert short_env_name('cgap-anything') == 'anything'
+            assert short_env_name('fourfront-cgapfoo') == 'fourfront-cgapfoo'
+            assert short_env_name('fourfront-anything') == 'fourfront-anything'
+
+    with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
+
+        assert short_env_name(None) is None
+        assert short_env_name('demo') == 'demo'
+        assert short_env_name('anything') == 'anything'
+        assert short_env_name('acme-anything') == 'acme-anything'
+        assert short_env_name('cgap-anything') == 'cgap-anything'
+        assert short_env_name('fourfront-cgapfoo') == 'cgapfoo'
+        assert short_env_name('fourfront-anything') == 'anything'
+
+
+@using_orchestrated_behavior()
 def test_orchestrated_full_env_name():
 
     assert full_env_name('cgap') == 'acme-prd'
     assert full_env_name('acme-foo') == 'acme-foo'
     assert full_env_name('foo') == 'acme-foo'
+
+    with pytest.raises(Exception):
+        full_env_name(None)
 
     with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
 
@@ -1548,6 +1717,9 @@ def test_orchestrated_full_cgap_env_name_for_cgap():
     assert full_cgap_env_name('cgap') == 'acme-prd'
     assert full_cgap_env_name('test') == 'acme-test'
 
+    with pytest.raises(Exception):
+        full_cgap_env_name(None)
+
 
 @using_orchestrated_behavior(data=EnvUtils.SAMPLE_TEMPLATE_FOR_FOURFRONT_TESTING)
 def test_orchestrated_full_cgap_env_name_for_fourfront():
@@ -1586,6 +1758,9 @@ def test_orchestrated_full_fourfront_env_name_for_fourfront():
     assert full_fourfront_env_name('acme-foo') == 'acme-foo'
     assert full_fourfront_env_name('cgap') == 'acme-cgap'  # cgap is just an ordinary name in a fourfront orchestration
     assert full_fourfront_env_name('test') == 'acme-pubtest'
+
+    with pytest.raises(Exception):
+        full_fourfront_env_name(None)
 
 
 @using_orchestrated_behavior()

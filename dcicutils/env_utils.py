@@ -7,6 +7,7 @@ from typing import Optional
 from urllib.parse import urlparse
 from . import env_utils_legacy as legacy
 from .common import EnvName, OrchestratedApp
+from .env_base import EnvManager
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
 from .misc_utils import decorator, full_object_name, ignored, remove_prefix, check_true, find_association
 
@@ -73,6 +74,7 @@ def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, a
 class EnvNames:
     DEV_DATA_SET_TABLE = 'dev_data_set_table'  # dictionary mapping envnames to their preferred data set
     DEV_ENV_DOMAIN_SUFFIX = 'dev_env_domain_suffix'  # e.g., .abc123def456ghi789.us-east-1.rds.amazonaws.com
+    FOURSIGHT_URL_PREFIX = 'foursight_url_prefix'
     FULL_ENV_PREFIX = 'full_env_prefix'  # a string like "cgap-" that precedes all env names
     HOTSEAT_ENVS = 'hotseat_envs'  # a list of environments that are for testing with hot data
     INDEXER_ENV_NAME = 'indexer_env_name'  # the environment name used for indexing
@@ -126,6 +128,7 @@ class EnvUtils:
 
     DEV_DATA_SET_TABLE = None  # dictionary mapping envnames to their preferred data set
     DEV_ENV_DOMAIN_SUFFIX = None
+    FOURSIGHT_URL_PREFIX = None
     FULL_ENV_PREFIX = None  # a string like "cgap-" that precedes all env names (does NOT have to include 'cgap')
     HOTSEAT_ENVS = None
     INDEXER_ENV_NAME = None  # the environment name used for indexing
@@ -142,6 +145,7 @@ class EnvUtils:
     SAMPLE_TEMPLATE_FOR_CGAP_TESTING = {
         e.DEV_DATA_SET_TABLE: {'acme-hotseat': 'prod', 'acme-test': 'test'},
         e.DEV_ENV_DOMAIN_SUFFIX: DEV_SUFFIX_FOR_TESTING,
+        e.FOURSIGHT_URL_PREFIX: 'https://foursight.genetics.example.com/api/view/',
         e.FULL_ENV_PREFIX: 'acme-',
         e.HOTSEAT_ENVS: ['acme-hotseat', 'acme-pubdemo'],
         e.INDEXER_ENV_NAME: 'acme-indexer',
@@ -185,6 +189,7 @@ class EnvUtils:
     SAMPLE_TEMPLATE_FOR_FOURFRONT_TESTING = {
         e.DEV_DATA_SET_TABLE: {'acme-hotseat': 'prod', 'acme-test': 'test'},
         e.DEV_ENV_DOMAIN_SUFFIX: DEV_SUFFIX_FOR_TESTING,
+        e.FOURSIGHT_URL_PREFIX: 'https://foursight.genetics.example.com/api/view/',
         e.FULL_ENV_PREFIX: 'acme-',
         e.HOTSEAT_ENVS: ['acme-hotseat'],
         e.INDEXER_ENV_NAME: 'acme-indexer',
@@ -253,10 +258,10 @@ class EnvUtils:
                     setattr(EnvUtils, var, None)
 
     @classmethod
-    def load_declared_data(cls):
-        bucket = os.environ.get('GLOBAL_BUCKET_ENV') or os.environ.get('GLOBAL_ENV_BUCKET')
+    def load_declared_data(cls, env_name=None):
+        bucket = EnvManager.global_env_bucket_name()
         if bucket:
-            env_name = os.environ.get('ENV_NAME')
+            env_name = env_name or os.environ.get('ENV_NAME')
             if env_name:
                 s3 = boto3.client('s3')
                 metadata = s3.get_object(Bucket=bucket, Key=env_name)
@@ -295,9 +300,12 @@ def data_set_for_env(envname, default=None):
         return info.get(envname, default)
 
 
-@if_orchestrated(unimplemented=True)
+@if_orchestrated()
 def permit_load_data(envname: Optional[EnvName], allow_prod: bool, orchestrated_app: OrchestratedApp):
-    ignored(envname, allow_prod, orchestrated_app)
+    ignored(envname, orchestrated_app)
+    # This does something way more complicated in legacy systems, but we're experimenting with a simpler rule
+    # as our first approximation in an orchestrated environment. -kmp 7-Oct-2021
+    return bool(allow_prod)  # in case a non-bool allow_prod value is given, canonicalize the result
 
 
 @if_orchestrated(use_legacy=True)
@@ -309,14 +317,10 @@ def blue_green_mirror_env(envname):
     ignored(envname)
 
 
-@if_orchestrated(unimplemented=True)
-def public_url_for_app(appname: Optional[OrchestratedApp] = None):
-    ignored(appname)
-
-
-@if_orchestrated(unimplemented=True)
+@if_orchestrated()
 def prod_bucket_env_for_app(appname: Optional[OrchestratedApp] = None):
-    ignored(appname)
+    _check_appname(appname)
+    return prod_bucket_env(EnvUtils.PRD_ENV_NAME)
 
 
 @if_orchestrated
@@ -327,9 +331,10 @@ def prod_bucket_env(envname):
         return None
 
 
-@if_orchestrated(unimplemented=True)
+@if_orchestrated()
 def default_workflow_env(orchestrated_app: OrchestratedApp) -> EnvName:
-    ignored(orchestrated_app)
+    _check_appname(orchestrated_app, required=True)
+    return EnvUtils.PRD_BUCKET
 
 
 @if_orchestrated
@@ -344,6 +349,20 @@ def get_bucket_env(envname):
 def public_url_mappings(envname):
     ignored(envname)
     return {entry[p.NAME]: entry[p.URL] for entry in EnvUtils.PUBLIC_URL_TABLE}
+
+
+def _check_appname(appname: Optional[OrchestratedApp], required=False):
+    if appname or required:  # VERY IMPORTANT: Only do this check if we are given a specific app name (or it's required)
+        if appname != EnvUtils.ORCHESTRATED_APP:
+            raise RuntimeError(f"The orchestrated app is {EnvUtils.ORCHESTRATED_APP}, not {appname}.")
+
+
+@if_orchestrated
+def public_url_for_app(appname: Optional[OrchestratedApp] = None):
+    _check_appname(appname)
+    entry = find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.ENVIRONMENT: EnvUtils.PRD_ENV_NAME})
+    if entry:
+        return entry.get('url')
 
 
 @if_orchestrated
@@ -535,9 +554,10 @@ def infer_repo_from_env(envname):
         return None
 
 
-@if_orchestrated(unimplemented=True)
+@if_orchestrated()
 def infer_foursight_url_from_env(request, envname: Optional[EnvName]):
-    ignored(request, envname)
+    ignored(request)
+    return EnvUtils.FOURSIGHT_URL_PREFIX + short_env_name(envname)
 
 
 @if_orchestrated
@@ -555,13 +575,17 @@ def infer_foursight_from_env(request, envname):
     return remove_prefix(EnvUtils.FULL_ENV_PREFIX, envname, required=False)
 
 
-@if_orchestrated(unimplemented=True)
+@if_orchestrated()
 def short_env_name(envname: Optional[EnvName]):
-    ignored(envname)
+    if not envname:
+        return None
+
+    return remove_prefix(EnvUtils.FULL_ENV_PREFIX, envname, required=False)
 
 
 @if_orchestrated
 def full_env_name(envname):
+    check_true(isinstance(envname, str), "The envname is not a string.", error_class=ValueError)
 
     entry = find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname)
     if entry:
