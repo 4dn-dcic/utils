@@ -2,6 +2,7 @@ import contextlib
 import datetime
 import io
 import json
+import logging
 import os
 import pytest
 import requests
@@ -11,6 +12,8 @@ from dcicutils import s3_utils as s3_utils_module, beanstalk_utils
 from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
 from dcicutils.env_utils import (
     get_standard_mirror_env,
+)
+from dcicutils.env_utils_legacy import (
     FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, CGAP_PUBLIC_URL_PRD
 )
 from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs

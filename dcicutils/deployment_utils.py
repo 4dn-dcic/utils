@@ -38,7 +38,6 @@ from .env_utils import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env,
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, is_test_env, is_hotseat_env,
     is_indexer_env, indexer_env_for_env,
-    FF_ENV_INDEXER, CGAP_ENV_INDEXER, INDEXER_ENVS,
 )
 from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ
 from .s3_utils import s3Utils
@@ -307,20 +306,21 @@ class EBDeployer:
         :raises RuntimeError if bad env given
         """
         eb_client = boto3.client('elasticbeanstalk')
+        indexer_env = indexer_env_for_env(env_name)
         if is_cgap_env(env_name):
             return eb_client.create_environment(
                 ApplicationName=cls.EB_APPLICATION,
-                EnvironmentName=CGAP_ENV_INDEXER,
-                TemplateName=CGAP_ENV_INDEXER,
+                EnvironmentName=indexer_env,
+                TemplateName=indexer_env,
                 VersionLabel=app_version
-            )[STATUS] == LAUNCHING and cls.delete_indexer_template(eb_client, CGAP_ENV_INDEXER)
+            )[STATUS] == LAUNCHING and cls.delete_indexer_template(eb_client, indexer_env)
         elif is_fourfront_env(env_name):
             return eb_client.create_environment(
                 ApplicationName=cls.EB_APPLICATION,
-                EnvironmentName=FF_ENV_INDEXER,
-                TemplateName=FF_ENV_INDEXER,
+                EnvironmentName=indexer_env,
+                TemplateName=indexer_env,
                 VersionLabel=app_version
-            )[STATUS] == LAUNCHING and cls.delete_indexer_template(eb_client, FF_ENV_INDEXER)
+            )[STATUS] == LAUNCHING and cls.delete_indexer_template(eb_client, indexer_env)
         else:  # should never get here, but for good measure
             raise RuntimeError('Tried to deploy indexer from an unknown environment: %s' % env_name)
 
@@ -699,7 +699,7 @@ class IniFileManager:
         }
 
         # if we specify an indexer name for bs_env, we did the deployment wrong and should bail
-        if bs_env in INDEXER_ENVS:
+        if is_indexer_env(bs_env):
             raise RuntimeError("Deployed with bs_env %s, which is an indexer env."
                                " Re-deploy with the env you want to index and set the 'ENCODED_INDEXER'"
                                " environment variable." % bs_env)

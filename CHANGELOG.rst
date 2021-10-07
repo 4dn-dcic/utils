@@ -7,6 +7,12 @@ Change Log
 ----------
 
 
+4.0.0
+=====
+
+Configurable support for orchestrated CGAP in ``env_utils``.
+
+
 3.1.0
 =====
 

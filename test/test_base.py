@@ -6,6 +6,8 @@ from collections import defaultdict
 from dcicutils import base, env_utils, compute_prd_env_for_env
 from dcicutils.env_utils import (
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env,
+)
+from dcicutils.env_utils_legacy import (
     FF_ENV_PRODUCTION_GREEN, FF_ENV_PRODUCTION_BLUE,
     CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_WEBPROD,
 )

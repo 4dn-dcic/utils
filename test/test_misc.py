@@ -24,7 +24,7 @@ _SUBSUBSECTION_LINE = re.compile(r"^[\^]+$")
 _AUTOMODULE_LINE = re.compile(r"^[.][.][ ]+automodule::[ ]+dcicutils[.](.*)$")
 
 
-SKIP_MODULES = {'jh_utils', '__init__'}
+SKIP_MODULES = {'jh_utils', 'env_utils_legacy', '__init__'}
 
 
 def test_documentation():

@@ -1,431 +1,463 @@
+import boto3
+import functools
+import json
 import os
-import structlog
 
-from typing import Optional
+from .misc_utils import decorator, full_object_name, ignored, remove_prefix, check_true, find_association
+from . import env_utils_legacy as legacy
 from urllib.parse import urlparse
-from .common import EnvName, OrchestratedApp, APP_CGAP, APP_FOURFRONT, ORCHESTRATED_APPS
-from .exceptions import InvalidParameterError
-from .misc_utils import get_setting_from_context, check_true, remove_prefix
+from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
 
 
-logger = structlog.getLogger(__name__)
-
-
-# Mechanism for returning app-dependent values.
-def _orchestrated_app_case(orchestrated_app: OrchestratedApp, if_cgap, if_fourfront):
-    if orchestrated_app == APP_CGAP:
-        return if_cgap
-    elif orchestrated_app == APP_FOURFRONT:
-        return if_fourfront
-    else:
-        raise InvalidParameterError(parameter='orchestrated_app', value=orchestrated_app, options=ORCHESTRATED_APPS)
-
-
-FF_ENV_DEV = 'fourfront-dev'  # Maybe not used
-FF_ENV_HOTSEAT = 'fourfront-hotseat'
-FF_ENV_MASTERTEST = 'fourfront-mastertest'
-FF_ENV_PRODUCTION_BLUE = 'fourfront-blue'
-FF_ENV_PRODUCTION_GREEN = 'fourfront-green'
-FF_ENV_STAGING = 'fourfront-staging'
-FF_ENV_WEBDEV = 'fourfront-webdev'
-FF_ENV_WEBPROD = 'fourfront-webprod'
-FF_ENV_WEBPROD2 = 'fourfront-webprod2'
-FF_ENV_WOLF = 'fourfront-wolf'
-FF_ENV_INDEXER = 'fourfront-indexer'  # to be used by ELB Indexer
-
-CGAP_ENV_DEV = 'fourfront-cgapdev'
-CGAP_ENV_HOTSEAT = 'fourfront-cgaphotseat'  # Maybe not used
-CGAP_ENV_MASTERTEST = 'fourfront-cgaptest'
-CGAP_ENV_PRODUCTION_BLUE = 'fourfront-cgap-blue'  # reserved for transition use
-CGAP_ENV_PRODUCTION_GREEN = 'fourfront-cgap-green'  # reserved for transition use
-CGAP_ENV_STAGING = 'fourfront-cgapstaging'
-CGAP_ENV_WEBDEV = 'fourfront-cgapwebdev'  # Maybe not used
-CGAP_ENV_WEBPROD = 'fourfront-cgap'
-# CGAP_ENV_WEBPROD2 is meaningless here. See CGAP_ENV_STAGING.
-CGAP_ENV_WOLF = 'fourfront-cgapwolf'  # Maybe not used
-CGAP_ENV_INDEXER = 'cgap-indexer'  # to be used by ELB Indexer
-
-CGAP_ENV_DEV_NEW = 'cgap-dev'
-CGAP_ENV_HOTSEAT_NEW = 'cgap-hotseat'
-CGAP_ENV_MASTERTEST_NEW = 'cgap-test'
-CGAP_ENV_PRODUCTION_BLUE_NEW = 'cgap-blue'
-CGAP_ENV_PRODUCTION_GREEN_NEW = 'cgap-green'
-CGAP_ENV_STAGING_NEW = 'cgap-staging'
-CGAP_ENV_WEBDEV_NEW = 'cgap-webdev'  # Maybe not used
-CGAP_ENV_WEBPROD_NEW = 'cgap-green'
-# CGAP_ENV_WEBPROD2_NEW is meaningless here. See CGAP_ENV_STAGING_NEW.
-CGAP_ENV_WOLF_NEW = 'cgap-wolf'  # Maybe not used
-
-# The bucket names were allocated originally and needn't change.
-
-FF_PROD_BUCKET_ENV = FF_ENV_WEBPROD
-CGAP_PROD_BUCKET_ENV = CGAP_ENV_WEBPROD
-
-# Done this way to get maximally compatible behavior.
-FOURFRONT_STG_OR_PRD_TOKENS = ['webprod', 'blue', 'green']
-FOURFRONT_STG_OR_PRD_NAMES = ['staging', 'stagging', 'data']
-
-# We should know which BS Envs are indexing envs
-INDEXER_ENVS = [FF_ENV_INDEXER, CGAP_ENV_INDEXER]
-
-# Done this way because it's safer going forward.
-CGAP_STG_OR_PRD_TOKENS = []
-CGAP_STG_OR_PRD_NAMES = [CGAP_ENV_WEBPROD, CGAP_ENV_PRODUCTION_GREEN, CGAP_ENV_PRODUCTION_BLUE,
-                         CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_PRODUCTION_BLUE_NEW,
-                         'cgap']
-
-
-FF_PUBLIC_URL_STG = 'http://staging.4dnucleome.org'
-FF_PUBLIC_URL_PRD = 'https://data.4dnucleome.org'
-FF_PUBLIC_DOMAIN_STG = 'staging.4dnucleome.org'
-FF_PUBLIC_DOMAIN_PRD = 'data.4dnucleome.org'
-FF_PRODUCTION_IDENTIFIER = 'data'
-FF_STAGING_IDENTIFIER = 'staging'
-
-FF_PUBLIC_URLS = {
-    'staging': FF_PUBLIC_URL_STG,
-    'data': FF_PUBLIC_URL_PRD,
-}
-
-CGAP_PUBLIC_URL_STG = 'https://staging.cgap.hms.harvard.edu'  # This is a stopgap for testing and may have to change
-CGAP_PUBLIC_URL_PRD = 'https://cgap.hms.harvard.edu'
-CGAP_PUBLIC_DOMAIN_PRD = 'cgap.hms.harvard.edu'
-CGAP_PRODUCTION_IDENTIFIER = 'cgap'
-
-CGAP_PUBLIC_URLS = {
-    'cgap': CGAP_PUBLIC_URL_PRD,
-    'fourfront-cgap': CGAP_PUBLIC_URL_PRD,
-    'data': CGAP_PUBLIC_URL_PRD,
-    'staging': CGAP_PUBLIC_URL_STG,
-}
-
-BEANSTALK_PROD_BUCKET_ENVS = {
-    'staging': FF_PROD_BUCKET_ENV,
-    'data': FF_PROD_BUCKET_ENV,
-    FF_ENV_WEBPROD: FF_PROD_BUCKET_ENV,
-    FF_ENV_WEBPROD2: FF_PROD_BUCKET_ENV,
-    FF_ENV_PRODUCTION_BLUE: FF_PROD_BUCKET_ENV,
-    FF_ENV_PRODUCTION_GREEN: FF_PROD_BUCKET_ENV,
-    'cgap': CGAP_PROD_BUCKET_ENV,
-    CGAP_ENV_PRODUCTION_BLUE: CGAP_PROD_BUCKET_ENV,
-    CGAP_ENV_PRODUCTION_GREEN: CGAP_PROD_BUCKET_ENV,
-    CGAP_ENV_WEBPROD: CGAP_PROD_BUCKET_ENV,
-    CGAP_ENV_PRODUCTION_BLUE_NEW: CGAP_PROD_BUCKET_ENV,
-    CGAP_ENV_PRODUCTION_GREEN_NEW: CGAP_PROD_BUCKET_ENV,
-}
-
-BEANSTALK_PROD_MIRRORS = {
-
-    FF_ENV_PRODUCTION_BLUE: FF_ENV_PRODUCTION_GREEN,
-    FF_ENV_PRODUCTION_GREEN: FF_ENV_PRODUCTION_BLUE,
-    FF_ENV_WEBPROD: FF_ENV_WEBPROD2,
-    FF_ENV_WEBPROD2: FF_ENV_WEBPROD,
-
-    'staging': 'data',
-    'data': 'staging',
-
-    CGAP_ENV_PRODUCTION_BLUE: CGAP_ENV_PRODUCTION_GREEN,
-    CGAP_ENV_PRODUCTION_GREEN: CGAP_ENV_PRODUCTION_BLUE,
-    CGAP_ENV_WEBPROD: None,
-
-    CGAP_ENV_PRODUCTION_BLUE_NEW: CGAP_ENV_PRODUCTION_GREEN_NEW,
-    CGAP_ENV_PRODUCTION_GREEN_NEW: CGAP_ENV_PRODUCTION_BLUE_NEW,
-
-    'cgap': None,
-
-}
-
-BEANSTALK_TEST_ENVS = [
-
-    FF_ENV_HOTSEAT,
-    FF_ENV_MASTERTEST,
-    FF_ENV_WEBDEV,
-    FF_ENV_WOLF,
-
-    CGAP_ENV_HOTSEAT,
-    CGAP_ENV_MASTERTEST,
-    CGAP_ENV_WEBDEV,
-    CGAP_ENV_WOLF,
-
-    CGAP_ENV_HOTSEAT_NEW,
-    CGAP_ENV_MASTERTEST_NEW,
-    CGAP_ENV_WEBDEV_NEW,
-    CGAP_ENV_WOLF_NEW,
-
-]
-
-BEANSTALK_DEV_DATA_SETS = {
-
-    'fourfront-hotseat': 'prod',
-    'fourfront-mastertest': 'test',
-    'fourfront-webdev': 'prod',
-
-    'fourfront-cgapdev': 'test',
-    'fourfront-cgaptest': 'prod',
-    'fourfront-cgapwolf': 'prod',
-
-    'cgap-dev': 'test',
-    'cgap-test': 'prod',
-    'cgap-wolf': 'prod',
-
-}
-
-
-def is_indexer_env(envname: EnvName):
-    """ Checks whether envname is an indexer environment.
-
-    :param envname:  envname to check
-    :return: True if envname is an indexer application, False otherwise
+class UseLegacy(BaseException):
     """
-    return envname in [FF_ENV_INDEXER, CGAP_ENV_INDEXER]
+    Raise this class inside an @if_orchestrated definition in order to dynamically go to using legacy behavior,
+    usually after having considered or attempted some different way of doing these things first.  If you want to
+    go straight to that, it's better (more efficienct) to use @if_orchestrated(use_legacy=True).
 
-
-def indexer_env_for_env(envname: EnvName):
-    """ Returns the corresponding indexer-env name for the given env.
-
-    :param envname: envname we want to determine the indexer for
-    :returns: either FF_ENV_INDEXER or CGAP_ENV_INDEXER or None
+    This class inherits from BaseException, not Exception, because it doesn't want to be trapped by any other
+    exception handlers. It wants to dive straight through them and go straight to alternative handling.
     """
-    if is_fourfront_env(envname) and envname != FF_ENV_INDEXER:
-        return FF_ENV_INDEXER
-    elif is_cgap_env(envname) and envname != CGAP_ENV_INDEXER:
-        return CGAP_ENV_INDEXER
-    else:
+    pass
+
+
+@decorator()
+def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, assumes_no_mirror=False):
+    """
+    This is a decorator intended to manage new versions of these functions as they apply to orchestrated CGAP
+    without disturbing legacy behavior (now found in env_utils_legacy.py and still supported for the original
+    beanstalk-oriented deploys at HMS for cgap-portal AND fourfront.
+
+    The arguments to this decorator are as follows:
+
+    :param unimplemented: a boolean saying if orchestrated functionality is unimplemented (so gets an automatic error).
+    :param use_legacy: a boolean saying if the legacy definition is suitably general to be used directly
+    :param assumes_cgap: a boolean saying whether the orchestrated definition is CGAP-specific
+    :param assumes_no_mirror: a boolean saying whether the orchestrated definition is expected to fail if mirroring on
+    """
+
+    def _decorate(fn):
+
+        EnvUtils.init()
+
+        legacy_fn = getattr(legacy, fn.__name__)
+
+        if use_legacy:
+            return legacy_fn
+
+        @functools.wraps(legacy_fn)
+        def wrapped(*args, **kwargs):
+            if EnvUtils.IS_LEGACY:
+                return legacy_fn(*args, **kwargs)
+            elif unimplemented:
+                raise NotImplementedError(f"Unimplemented: {full_object_name(fn)}")
+            elif assumes_no_mirror and STAGE_MIRRORING_ENABLED:
+                raise NotImplementedError(f"In {full_object_name(fn)}:"
+                                          f" Mirroring is not supported in an orchestrated environment.")
+            elif assumes_cgap and EnvUtils.ORCHESTRATED_APP != 'cgap':
+                raise NotImplementedError(f"In {full_object_name(fn)}:"
+                                          f" Non-cgap applications are not supported.")
+            else:
+                try:
+                    return fn(*args, **kwargs)
+                except UseLegacy:
+                    return legacy_fn(*args, **kwargs)
+
+        return wrapped
+
+    return _decorate
+
+
+class EnvNames:
+    DEV_DATA_SET_TABLE = 'dev_data_set_table'  # dictionary mapping envnames to their preferred data set
+    DEV_ENV_DOMAIN_SUFFIX = 'dev_env_domain_suffix'  # e.g., .abc123def456ghi789.us-east-1.rds.amazonaws.com
+    FULL_ENV_PREFIX = 'full_env_prefix'  # a string like "cgap-" that precedes all env names
+    HOTSEAT_ENVS = 'hotseat_envs'  # a list of environments that are for testing with hot data
+    INDEXER_ENV_NAME = 'indexer_env_name'  # the environment name used for indexing
+    IS_LEGACY = 'is_legacy'
+    ORCHESTRATED_APP = 'orchestrated_app'  # This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
+    PRD_BUCKET = 'prd_bucket'
+    PRD_ENV_NAME = 'prd_env_name'  # the name of the prod env
+    PUBLIC_URL_TABLE = 'public_url_table'  # dictionary mapping envnames & pseudo_envnames to public urls
+    STG_ENV_NAME = 'stg_env_name'  # the name of the stage env (or None)
+    TEST_ENVS = 'test_envs'  # a list of environments that are for testing
+
+
+class PublicUrlParts:
+    ENVIRONMENT = 'environment'
+    HOST = 'host'
+    NAME = 'name'
+    URL = 'url'
+
+
+class ClassificationParts:
+
+    BUCKET_ENV = 'bucket_env'
+    ENVIRONMENT = 'environment'  # Obsolete. Use BUCKET_ENV or SERVER_ENV going forward
+    IS_STG_OR_PRD = 'is_stg_or_prd'
+    KIND = 'kind'
+    PUBLIC_NAME = 'public_name'
+    SERVER_ENV = 'server_env'
+
+
+e = EnvNames
+p = PublicUrlParts
+c = ClassificationParts
+
+_MISSING = object()
+
+
+class EnvUtils:
+    """
+    This class offers internal bookeeping support for the env_utils functionality.
+
+    ************************* NOTE WELL ******************************
+    This class is not intended for use outside this file. Its name does not begin with a leading underscore
+    to mark it as internal, but that's more a practical accomodation to the number of places it's used across
+    several files within this repository. But this implementation needs to be able to change in the future
+    without such change being regarded as incompatible. All functionality here should be accessed through the
+    functions exported by env_utils (which will often use this class internally) but never directly.
+    ******************************************************************
+    """
+
+    _DECLARED_DATA = None
+
+    DEV_DATA_SET_TABLE = None  # dictionary mapping envnames to their preferred data set
+    DEV_ENV_DOMAIN_SUFFIX = None
+    FULL_ENV_PREFIX = None  # a string like "cgap-" that precedes all env names (does NOT have to include 'cgap')
+    HOTSEAT_ENVS = None
+    INDEXER_ENV_NAME = None  # the environment name used for indexing
+    IS_LEGACY = None
+    ORCHESTRATED_APP = None  # This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
+    PRD_BUCKET = None
+    PRD_ENV_NAME = None  # the name of the prod env
+    PUBLIC_URL_TABLE = None  # dictionary mapping envnames & pseudo_envnames to public urls
+    STG_ENV_NAME = None  # the name of the stage env (or None)
+    TEST_ENVS = None  # a list of environments that are for testing
+
+    DEV_SUFFIX_FOR_TESTING = ".abc123def456ghi789.us-east-1.rds.amazonaws.com"
+
+    SAMPLE_TEMPLATE_FOR_CGAP_TESTING = {
+        e.DEV_DATA_SET_TABLE: {'acme-hotseat': 'prod', 'acme-test': 'test'},
+        e.DEV_ENV_DOMAIN_SUFFIX: DEV_SUFFIX_FOR_TESTING,
+        e.FULL_ENV_PREFIX: 'acme-',
+        e.HOTSEAT_ENVS: ['acme-hotseat', 'acme-pubdemo'],
+        e.INDEXER_ENV_NAME: 'acme-indexer',
+        e.IS_LEGACY: False,
+        e.ORCHESTRATED_APP: 'cgap',
+        e.PRD_BUCKET: 'production-data',
+        e.PRD_ENV_NAME: 'acme-prd',
+        e.PUBLIC_URL_TABLE: [
+            {
+                p.NAME: 'cgap',
+                p.URL: 'https://genetics.example.com',
+                p.HOST: 'genetics.example.com',
+                p.ENVIRONMENT: 'acme-prd',
+            },
+            {
+                p.NAME: 'stg',
+                p.URL: 'https://staging.genetics.example.com',
+                p.HOST: 'staging.genetics.example.com',
+                p.ENVIRONMENT: 'acme-stg',
+            },
+            {
+                p.NAME: 'testing',
+                p.URL: 'https://testing.genetics.example.com',
+                p.HOST: 'testing.genetics.example.com',
+                p.ENVIRONMENT: 'acme-pubtest',
+            },
+            {
+                p.NAME: 'demo',
+                p.URL: 'https://demo.genetics.example.com',
+                p.HOST: 'demo.genetics.example.com',
+                p.ENVIRONMENT: 'acme-pubdemo',
+            },
+        ],
+        # We don't do stage mirroring in the orchestrated world, and probably should not confuse users by inviting
+        # these to be set. For extra security, even if you did set them they wouldn't work without enabling mirroring.
+        # -kmp 24-Jul-2021
+        # e.STG_ENV_NAME: None,
+        e.TEST_ENVS: ['acme-test', 'acme-mastertest', 'acme-pubtest'],
+    }
+
+    SAMPLE_TEMPLATE_FOR_FOURFRONT_TESTING = {
+        e.DEV_DATA_SET_TABLE: {'acme-hotseat': 'prod', 'acme-test': 'test'},
+        e.DEV_ENV_DOMAIN_SUFFIX: DEV_SUFFIX_FOR_TESTING,
+        e.FULL_ENV_PREFIX: 'acme-',
+        e.HOTSEAT_ENVS: ['acme-hotseat'],
+        e.INDEXER_ENV_NAME: 'acme-indexer',
+        e.IS_LEGACY: False,
+        e.ORCHESTRATED_APP: 'fourfront',
+        e.PRD_BUCKET: 'production-data',
+        e.PRD_ENV_NAME: 'acme-prd',
+        e.PUBLIC_URL_TABLE: [
+            {
+                p.NAME: 'data',
+                p.URL: 'https://genetics.example.com',
+                p.HOST: 'genetics.example.com',
+                p.ENVIRONMENT: 'acme-prd',
+            },
+            {
+                p.NAME: 'staging',
+                p.URL: 'https://stg.genetics.example.com',
+                p.HOST: 'stg.genetics.example.com',
+                p.ENVIRONMENT: 'acme-stg',
+            },
+            {
+                p.NAME: 'test',
+                p.URL: 'https://testing.genetics.example.com',
+                p.HOST: 'testing.genetics.example.com',
+                p.ENVIRONMENT: 'acme-pubtest',
+            },
+            {
+                p.NAME: 'demo',
+                p.URL: 'https://demo.genetics.example.com',
+                p.HOST: 'demo.genetics.example.com',
+                p.ENVIRONMENT: 'acme-pubdemo',
+            },
+            {
+                p.NAME: 'hot',
+                p.URL: 'https://hot.genetics.example.com',
+                p.HOST: 'hot.genetics.example.com',
+                p.ENVIRONMENT: 'acme-hotseat',
+            },
+
+        ],
+        # We don't do stage mirroring in the orchestrated world, and probably should not confuse users by inviting
+        # these to be set. For extra security, even if you did set them they wouldn't work without enabling mirroring.
+        # -kmp 24-Jul-2021
+        # e.STG_ENV_NAME: None,
+        e.TEST_ENVS: ['acme-test', 'acme-mastertest', 'acme-pubtest'],
+    }
+
+    @classmethod
+    def init(cls):
+        if cls._DECLARED_DATA is None:
+            cls.load_declared_data()
+
+    @classmethod
+    def declared_data(cls):
+        cls.init()
+        return cls._DECLARED_DATA
+
+    @classmethod
+    def set_declared_data(cls, data):
+        cls._DECLARED_DATA = data
+        for var, key in EnvNames.__dict__.items():
+            if var.isupper():
+                if key in data:
+                    setattr(EnvUtils, var, data[key])
+                else:
+                    setattr(EnvUtils, var, None)
+
+    @classmethod
+    def load_declared_data(cls):
+        bucket = os.environ.get('GLOBAL_BUCKET_ENV') or os.environ.get('GLOBAL_ENV_BUCKET')
+        if bucket:
+            env_name = os.environ.get('ENV_NAME')
+            if env_name:
+                s3 = boto3.client('s3')
+                metadata = s3.get_object(Bucket=bucket, Key=env_name)
+                data = json.load(metadata['Body'])
+                cls.set_declared_data(data)
+                return
+        cls.set_declared_data({e.IS_LEGACY: True})
+
+    @classmethod
+    def lookup(cls, entry, default=_MISSING):
+        if default is _MISSING:
+            return cls.declared_data()[entry]
+        else:
+            return cls.declared_data().get(entry, default)
+
+
+@if_orchestrated
+def is_indexer_env(envname):
+    return envname == EnvUtils.INDEXER_ENV_NAME
+
+
+@if_orchestrated
+def indexer_env_for_env(envname):
+    if envname == EnvUtils.INDEXER_ENV_NAME:
         return None
+    else:
+        return EnvUtils.INDEXER_ENV_NAME
 
 
-def data_set_for_env(envname: Optional[EnvName], default=None):
-    """
-    This relates to which data set to load.
-    For production environments, really the null set is loaded because the data is already there and trusted.
-    This must always work for all production environments and there is deliberately no provision to override that.
-    In all other environments, the question is whether to load ADDITIONAL data, and that's a kind of custom choice,
-    so we consult a table for now, pending a better theory of organization.
-    """
+@if_orchestrated
+def data_set_for_env(envname, default=None):
     if is_stg_or_prd_env(envname):
         return 'prod'
     else:
-        return BEANSTALK_DEV_DATA_SETS.get(envname, default)
+        info = EnvUtils.DEV_DATA_SET_TABLE or {}
+        return info.get(envname, default)
 
 
-def permit_load_data(envname: Optional[EnvName], allow_prod: bool, orchestrated_app: OrchestratedApp):
-    """ Returns True on whether or not load_data should proceed (presumably in a load-data command line operation).
-
-    :param envname: env we are on
-    :param allow_prod: prod argument supplied with '--prod', defaults to False
-    :param orchestrated_app: a string token to indicate which app we're using (either 'cgap' or 'fourfront')
-    :return: True if load_data should continue, False otherwise
-    """
-
-    if orchestrated_app == 'cgap':
-
-        # run on cgaptest
-        if envname == CGAP_ENV_MASTERTEST:
-            logger.info('load_data: proceeding since we are on %s' % envname)
-            return True
-
-        if envname and not allow_prod:  # old logic, allow run on servers if --prod is specified
-            logger.info('load_data: skipping, since on %s' % envname)
-            return False
-
-        # Allow run on local, which will not have env set, or if --prod was given.
-        logger.info('load_data: proceeding since we are either on local or specified the prod option')
-        return True
-
-    elif orchestrated_app == 'fourfront':
-
-        # do not run on a production environment unless we set --prod flag
-        if is_stg_or_prd_env(envname) and not allow_prod:
-            logger.info('load_data: skipping, since we are on a production environment and --prod not used')
-            return False
-
-        # do not run on hotseat since it is a prod snapshot
-        if 'hotseat' in envname:
-            logger.info('load_data: skipping, since we are on hotseat')
-            return False
-
-        return True
-
-    else:
-        raise InvalidParameterError(parameter='orchestrated_app', value=orchestrated_app, options=['cgap', 'fourfront'])
-
-
-def blue_green_mirror_env(envname: EnvName):
+@if_orchestrated(use_legacy=True)
+def blue_green_mirror_env(envname):
     """
     Given a blue envname, returns its green counterpart, or vice versa.
     For other envnames that aren't blue/green participants, this returns None.
     """
-    if 'blue' in envname:
-        if 'green' in envname:
-            raise ValueError('A blue/green mirror env must have only one of blue or green in its name.')
-        return envname.replace('blue', 'green')
-    elif 'green' in envname:
-        return envname.replace('green', 'blue')
+    ignored(envname)
+
+
+@if_orchestrated
+def prod_bucket_env(envname):
+    if is_stg_or_prd_env(envname):
+        return EnvUtils.PRD_BUCKET
     else:
         return None
 
 
-def public_url_for_app(appname: Optional[OrchestratedApp] = None):
-    """
-    Returns the public production URL for the given application.
-    If no application is given, the legacy beanstalk default is 'fourfront',
-    but the orchestrated default will be the currently orchestrated app.
-    That's weird because it means that prod_bucket_env_for_app() will return 'http://data.4dnucleome.org' even for cgap
-    when using beanstalks, but that's what we want for compatibility purposes.
-    This will all be better in containers.
-    Passing an explicit argument can still obtain the cgap prod bucket.
-
-    :param appname: the application name token ('cgap' or 'fourfront')
-    """
-
-    if appname is None:
-        appname = 'fourfront'
-    return _orchestrated_app_case(orchestrated_app=appname,
-                                  if_cgap=CGAP_PUBLIC_URL_PRD,
-                                  if_fourfront=FF_PUBLIC_URL_PRD)
+@if_orchestrated
+def get_bucket_env(envname):
+    if is_stg_or_prd_env(envname):
+        return EnvUtils.PRD_BUCKET
+    else:
+        return envname
 
 
-def prod_bucket_env_for_app(appname: Optional[OrchestratedApp] = None):
-    """
-    Returns the prod bucket app for a given application name.
-    If no application is given, the legacy beanstalk default is 'fourfront',
-    but the orchestrated default will be the currently orchestrated app.
-    That's weird because it means that prod_bucket_env_for_app() will return 'fourfront-webprod' even for cgap
-    when using beanstalks, but that's what we want for compatibility purposes.
-    This will all be better in containers.
-    Passing an explicit argument can still obtain the cgap prod bucket.
-
-    :param appname: the name of the app (either 'cgap' or 'fourfront')
-    """
-    if appname is None:
-        appname = 'fourfront'
-    return _orchestrated_app_case(orchestrated_app=appname,
-                                  if_cgap=CGAP_PROD_BUCKET_ENV,
-                                  if_fourfront=FF_PROD_BUCKET_ENV)
+@if_orchestrated
+def public_url_mappings(envname):
+    ignored(envname)
+    return {entry[p.NAME]: entry[p.URL] for entry in EnvUtils.PUBLIC_URL_TABLE}
 
 
-def prod_bucket_env(envname: Optional[EnvName] = None):
-    """
-    Given a production-class envname returns the envname of the associated production bucket.
-    For other envnames that aren't production envs, this returns None.
-
-    The envname is something that is either a staging or production env, in particular something
-    that is_stg_or_prd_env returns True for.
-
-    This is intended for use when configuring a beanstalk. This functionality is agnostic
-    about whether we're asking on behalf of CGAP or Fourfront, and whether we're using an old or new
-    naming scheme. Just give the current envname as an argument, and it will know (by declaration,
-    see the BEANSTALK_PROD_ENV_BUCKET_TOKENS table) what the appropriate production bucket name token is for
-    that ecosystem.
-    """
-    return BEANSTALK_PROD_BUCKET_ENVS.get(envname)
-
-
-def default_workflow_env(orchestrated_app: OrchestratedApp) -> EnvName:
-    """
-    Given orchestrated app ('cgap' or 'fourfront'), this returns the default env name (in case None is supplied)
-    to use for actual and simulated tibanna workflow runs.
-    """
-    return _orchestrated_app_case(orchestrated_app=orchestrated_app,
-                                  if_cgap=CGAP_ENV_WOLF,
-                                  if_fourfront=FF_ENV_WEBDEV)
-
-
-def get_bucket_env(envname: EnvName):
-    return prod_bucket_env(envname) if is_stg_or_prd_env(envname) else envname
-
-
-def public_url_mappings(envname: EnvName):
-    """
-    Returns a table of the public URLs we use for the ecosystem in which the envname resides.
-    For example, if envname is a CGAP URL, this returns a set table of CGAP public URLs,
-    and otherwise it returns a set of Fourfront URLs.
-
-    The envname may be 'cgap', 'data', 'staging', or an environment name.
-    """
-    return CGAP_PUBLIC_URLS if is_cgap_env(envname) else FF_PUBLIC_URLS
-
-
+@if_orchestrated
 def is_cgap_server(server, allow_localhost=False):
-    """
-    Returns True if the given string looks like a CGAP server name. Otherwise returns False.
-
-    If allow_localhost (default False) is True, then 'localhost' will be treated as a CGAP host.
-    """
-    check_true(isinstance(server, str), "Server name must be a string.", error_class=ValueError)
-    return 'cgap' in server or (allow_localhost and 'localhost' in server)
-
-
-def is_fourfront_server(server, allow_localhost=False):
-    """
-    Returns True if the given string looks like a Fourfront server name. Otherwise returns False.
-
-    If allow_localhost (default False) is True, then 'localhost' will be treated as a Fourfront host.
-    """
-    check_true(isinstance(server, str), "Server name must be a string.", error_class=ValueError)
-    return (("fourfront" in server or "4dnucleome" in server) and not is_cgap_server(server)
-            or (allow_localhost and 'localhost' in server))
-
-
-def is_cgap_env(envname: EnvName):
-    """
-    Returns True of the given string looks like a CGAP elasticbeanstalk environment name.
-    Otherwise returns False.
-    """
-    return 'cgap' in envname if envname else False
-
-
-def is_fourfront_env(envname: EnvName):
-    """
-    Returns True of the given string looks like a Fourfront elasticbeanstalk environment name.
-    Otherwise returns False.
-    """
-    return ('fourfront' in envname and 'cgap' not in envname) if envname else False
-
-
-def is_stg_or_prd_env(envname: Optional[EnvName]):
-    """
-    Returns True if the given envname is the name of something that might be either live data or something
-    that is ready to be swapped in as live.  So things like 'staging' and either of 'blue/green' will return
-    True whether or not they are actually the currently live instance. (This function doesn't change its
-    state as blue or green is deployed, in other words.)
-    """
-    if not envname:
+    check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
+    is_cgap = EnvUtils.ORCHESTRATED_APP == 'cgap'
+    if not is_cgap:
         return False
-    stg_or_prd_tokens = CGAP_STG_OR_PRD_TOKENS if is_cgap_env(envname) else FOURFRONT_STG_OR_PRD_TOKENS
-    stg_or_prd_names = CGAP_STG_OR_PRD_NAMES if is_cgap_env(envname) else FOURFRONT_STG_OR_PRD_NAMES
-    if envname in stg_or_prd_names:
+    kind = classify_server_url(server, raise_error=False).get(c.KIND)
+    if kind == 'cgap':
         return True
-    elif any(token in envname for token in stg_or_prd_tokens):
+    elif allow_localhost and kind == 'localhost':
         return True
-    return False
+    else:
+        return False
 
 
-def is_test_env(envname: EnvName):
-    return envname in BEANSTALK_TEST_ENVS if envname else False
+@if_orchestrated
+def is_fourfront_server(server, allow_localhost=False):
+    check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
+    is_fourfront = EnvUtils.ORCHESTRATED_APP == 'fourfront'
+    if not is_fourfront:
+        return False
+    kind = classify_server_url(server, raise_error=False).get(c.KIND)
+    if kind == 'fourfront':
+        return True
+    elif allow_localhost and kind == 'localhost':
+        return True
+    else:
+        return False
 
 
-def is_hotseat_env(envname: EnvName):
-    return 'hot' in envname if envname else False
+@if_orchestrated
+def is_cgap_env(envname):
+    if not isinstance(envname, str):
+        return False
+    elif EnvUtils.ORCHESTRATED_APP != 'cgap':
+        return False
+    elif envname.startswith(EnvUtils.FULL_ENV_PREFIX):
+        return True
+    elif find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.NAME: envname}):
+        return True
+    else:
+        return False
 
 
-# TODO: This variable and all the 'allow_environ=' arguments could go away in the next major version release.
-#       --Kent & Will 15-Apr-2020
-ALLOW_ENVIRON_BY_DEFAULT = True
+@if_orchestrated
+def is_fourfront_env(envname):
+    if not isinstance(envname, str):
+        return False
+    elif EnvUtils.ORCHESTRATED_APP != 'fourfront':
+        return False
+    elif envname.startswith(EnvUtils.FULL_ENV_PREFIX):
+        return True
+    elif find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.NAME: envname}):
+        return True
+    else:
+        return False
 
 
-def get_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT):
-    return get_setting_from_context(settings, ini_var='env.name', env_var=None if allow_environ else False)
+# Don't enable this casually. It's intended only if we make some decision to engage mirroring.
+# Although it's fine to call an environment your staging environment without enabling this,
+# what the system means about something being the stg environment is that it's the stage side of a mirror.
+# -kmp 24-Jul-2021
+STAGE_MIRRORING_ENABLED = False
 
 
+def _is_raw_stg_or_prd_env(envname):
+    return (envname == EnvUtils.PRD_ENV_NAME or
+            (STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME and envname == EnvUtils.STG_ENV_NAME))
+
+
+@if_orchestrated
+def is_stg_or_prd_env(envname):
+    # The legacy version does something much more elaborate that involves heuristics on names.
+    # Note, too, that in the legacy version, this would return true both of CGAP or Fourfront names,
+    # but really you're only supposed to call it on one or the other's environments. It's rarely the
+    # case that the same code would ever be implicating both.  So here we assume every orchestrated
+    # ecosystem is one or the other, and hence there is a canonical PRD_ENV_NAME and STG_ENV_NAME.
+    # -kmp 24-Jul-2021
+
+    if not isinstance(envname, str):
+        return False
+    elif _is_raw_stg_or_prd_env(envname):
+        return True
+    else:
+        alias_entry = find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname)
+        if alias_entry:
+            return _is_raw_stg_or_prd_env(alias_entry[p.ENVIRONMENT])
+        else:
+            return False
+
+
+@if_orchestrated
+def is_test_env(envname):
+    envs = EnvUtils.TEST_ENVS or []
+    if not isinstance(envname, str):
+        return False
+    elif envname in envs:
+        return True
+    else:
+        alias_entry = find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname)
+        if alias_entry:
+            return alias_entry[p.ENVIRONMENT] in envs
+        else:
+            return False
+
+
+@if_orchestrated
+def is_hotseat_env(envname):
+    envs = EnvUtils.HOTSEAT_ENVS or []
+    if not isinstance(envname, str):
+        return False
+    elif envname in envs:
+        return True
+    else:
+        alias_entry = find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname)
+        if alias_entry:
+            return alias_entry[p.ENVIRONMENT] in envs
+        else:
+            return False
+
+
+@if_orchestrated(use_legacy=True)
+def get_env_from_context(settings, allow_environ=True):
+    # The legacy handler will look in settings or in an environemnt variable. Probably that's OK for us.
+    ignored(settings, allow_environ)
+
+
+@if_orchestrated
 def get_mirror_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT, allow_guess=True):
-    """
-    Figures out who the mirror beanstalk Env is if applicable
-    This is important in our production environment because in our
-    blue-green deployment we maintain two elasticsearch intances that
-    must be up to date with each other.
-    """
-    if allow_environ:
+    # This is the same text as the legacy environment, but it needs to call get_standard_mirror_env
+    # from this file. -kmp 26-Jul-2021
+    if not STAGE_MIRRORING_ENABLED:
+        return None
+    elif allow_environ:
         environ_mirror_env_name = os.environ.get('MIRROR_ENV_NAME')
         if environ_mirror_env_name:
             return environ_mirror_env_name
@@ -439,36 +471,38 @@ def get_mirror_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT
         return None
 
 
-def get_standard_mirror_env(envname: EnvName):
-    """
-    This function knows about the standard mirroring rules and infers a mirror env only from that.
-    (In tha sense, it is not guessing and probably needs to be renamed.)
-    If there is no mirror, it returns None.
-
-    An envname is usually a beanstalk environment name,
-    but this will also swap the special mirror names like 'staging' <=> 'data'.
-    For cgap, it may return None until/unless we start using a mirror for that, but the important thing
-    there is that again it will return a mirror if there is one, and otherwise None.
-
-    This is not the same as blue_green_mirror_env(envname), which is purely syntactic.
-
-    This is also not the same as get_mirror_env_from_context(...), which infers the mirror from contextual
-    information such as config files and environment variables.
-    """
-    return BEANSTALK_PROD_MIRRORS.get(envname, None)
-
-
-# guess_mirror_env was reatained for a while for compatibility. Please prefer get_standard_mirror_env.
-#
-# def guess_mirror_env(envname):
-#     """
-#     Deprecated. This function returns what get_standard_mirror_env(envname) returns.
-#     (The name guess_mirror_env is believed to be confusing.)
-#     """
-#     return get_standard_mirror_env(envname)
+@if_orchestrated
+def get_standard_mirror_env(envname):
+    if not STAGE_MIRRORING_ENABLED:
+        return None
+    elif envname == EnvUtils.PRD_ENV_NAME:
+        return EnvUtils.STG_ENV_NAME
+    elif envname == EnvUtils.STG_ENV_NAME:
+        return EnvUtils.PRD_ENV_NAME
+    else:
+        entry = find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname)
+        if entry:
+            real_envname = entry[p.ENVIRONMENT]
+            if real_envname == EnvUtils.PRD_ENV_NAME:
+                found = EnvUtils.STG_ENV_NAME
+            elif real_envname == EnvUtils.STG_ENV_NAME:
+                found = EnvUtils.PRD_ENV_NAME
+            else:
+                return False
+            rev_entry = find_association(EnvUtils.PUBLIC_URL_TABLE, environment=found)
+            if rev_entry:
+                return rev_entry[p.NAME]
+            else:
+                return found
+    return None
 
 
-def infer_repo_from_env(envname: Optional[EnvName]):
+# guess_mirror_env was reatained deprecated for a while for compatibility, but
+# as of dcicutils 3.0.0, it's gone. Please use get_standard_mirror_env.
+
+
+@if_orchestrated
+def infer_repo_from_env(envname):
     if not envname:
         return None
     if is_cgap_env(envname):
@@ -479,168 +513,93 @@ def infer_repo_from_env(envname: Optional[EnvName]):
         return None
 
 
-# TODO: Figure out if these two actually designate different hosts or if we could make CGAP prettier. -kmp 4-Oct-2021
-CGAP_FOURSIGHT_URL_PREFIX = "https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/"
-FF_FOURSIGHT_URL_PREFIX = "https://foursight.4dnucleome.org/view/"
+@if_orchestrated
+def infer_foursight_from_env(request, envname):
+    ignored(request)
+    if STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME:
+        classification = classify_server_url(request.domain)
+        if classification[c.IS_STG_OR_PRD]:
+            public_name = classification[c.PUBLIC_NAME]
+            if public_name:
+                return public_name
+    entry = find_association(EnvUtils.PUBLIC_URL_TABLE, environment=envname)
+    if entry:
+        envname = entry[p.NAME]
+    return remove_prefix(EnvUtils.FULL_ENV_PREFIX, envname, required=False)
 
 
-def infer_foursight_url_from_env(request, envname: Optional[EnvName]):
-    token = infer_foursight_from_env(request, envname)
-    if token is not None:
-        prefix = CGAP_FOURSIGHT_URL_PREFIX if is_cgap_env(envname) else FF_FOURSIGHT_URL_PREFIX
-        return prefix + token
-    else:
-        return None
+@if_orchestrated
+def full_env_name(envname):
 
+    entry = find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname)
+    if entry:
+        return entry[p.ENVIRONMENT]
 
-def infer_foursight_from_env(request, envname: Optional[EnvName]):
-    """  Infers the Foursight environment to view based on the given envname and request context
-
-    :param request: the current request (or an object that has member 'domain')
-    :param envname: name of the environment we are on
-    :return: Foursight env at the end of the url ie: for fourfront-green, could be either 'data' or 'staging'
-    """
-    if not envname or (not is_stg_or_prd_env(envname) and not envname.startswith('fourfront-')):
-        return None
-    elif is_cgap_env(envname):
-        return short_env_name(envname)  # all cgap envs are prefixed and the FS envs directly match
-    else:
-        if is_stg_or_prd_env(envname):
-            if FF_PUBLIC_DOMAIN_PRD in request.domain:
-                return FF_PRODUCTION_IDENTIFIER
-            else:
-                return FF_STAGING_IDENTIFIER
-        else:
-            return short_env_name(envname)  # if not data/staging, behaves exactly like CGAP
-
-
-def short_env_name(envname: Optional[EnvName]):
-    """
-    Given a short or long environment name, return the short name.
-    For legacy systems, this implies that 'fourfront-' will be removed if present.
-    For orchestrated systems in the future, this may remove some other prefix, subject to declarations.
-    (In any case, this is the right way to shorten a name.
-    Please do NOT use substrings based on len of some presumed prefix string.)
-
-    Examples:
-            short_env_name('cgapdev') => 'cgapdev'
-            short_env_name('fourfront-cgapdev') => 'cgapdev'
-
-    Args:
-        envname str: the short or long name of a beanstalk environment
-
-    Returns:
-        a string that is the short name of the specified beanstalk environment
-    """
-
-    if not envname:
-        return None
-    elif envname.startswith('fourfront-'):
-        # Note that EVEN FOR CGAP we do not look for 'cgap-' because this is the legacy implementation,
-        # not the orchestrated implementation. We'll fix that problem elsewhere. Within the legacy
-        # beanstalk environment, the short name of 'fourfront-cgapdev' is 'cgapdev' and not 'dev'.
-        # Likewise, the long name of 'cgapdev' is 'fourfront-cgapdev', not 'cgap-dev' etc.
-        # -kmp 4-Oct-2021
-        return remove_prefix('fourfront-', envname)
-    else:
+    if envname.startswith(EnvUtils.FULL_ENV_PREFIX):
         return envname
-
-
-def full_env_name(envname: EnvName):
-    """
-    Given the possibly-short name of a Fourfront or CGAP beanstalk environment, return the long name.
-
-    The short name is allowed to omit 'fourfront-' but the long name is not.
-
-    Examples:
-        full_env_name('cgapdev') => 'fourfront-cgapdev'
-        full_env_name('fourfront-cgapdev') => 'fourfront-cgapdev'
-
-    Args:
-        envname str: the short or long name of a beanstalk environment
-
-    Returns:
-        a string that is the long name of the specified beanstalk environment
-    """
-    if envname in ('data', 'staging'):
-        # This is problematic for Fourfront because of mirroring.
-        # For cgap, it's OK for us to just return fourfront-cgap because there's no ambiguity.
-        # Also, with 'data' and 'staging', you can tell it didn't come from fourfront-data and fourfront-staging,
-        # whereas with 'cgap' it's harder to be sure it didn't start out 'fourfront-cgap' and get shortened,
-        # so it's best not to get too fussy about 'cgap'. -kmp 4-Oct-2021
-        raise ValueError("The special token '%s' is not a beanstalk environment name." % envname)
-    elif not envname.startswith('fourfront-'):
-        return 'fourfront-' + envname
     else:
-        return envname
+        return EnvUtils.FULL_ENV_PREFIX + envname
 
 
-def full_cgap_env_name(envname: EnvName):
-    check_true(isinstance(envname, str) and "cgap" in envname, "The envname is not a CGAP env name.",
+@if_orchestrated
+def full_cgap_env_name(envname):
+    check_true(isinstance(envname, str) and EnvUtils.ORCHESTRATED_APP == 'cgap', "The envname is not a CGAP env name.",
                error_class=ValueError)
     return full_env_name(envname)
 
 
-def full_fourfront_env_name(envname: EnvName):
-    check_true(isinstance(envname, str) and "cgap" not in envname, "The envname is not a Fourfront env name.",
+@if_orchestrated
+def full_fourfront_env_name(envname):
+    check_true(isinstance(envname, str) and EnvUtils.ORCHESTRATED_APP == 'fourfront',
+               "The envname is not a Fourfront env name.",
                error_class=ValueError)
     return full_env_name(envname)
 
 
+@if_orchestrated
 def classify_server_url(url, raise_error=True):
-    """
-    Given a server url, returns a dictionary of information about how it relates to the Fourfront & CGAP ecosystem.
 
-    If a useful result cannot be be computed, and raise_error is True, an error is raised.
-    Otherwise, a three values are computed and returned as part of a single dictionary:
+    public_name = None
+    check_true(isinstance(url, str), "The 'url' argument must be a string.", error_class=ValueError)
 
-    * a "kind", which is 'fourfront', 'cgap', 'localhost', or (if raise_error is False) 'unknown'.
-    * an "environment", which is the name of a fourfront or cgap environment (as appropriate) or 'unknown'.
-    * a boolean "is_stg_or_prd" that is True if the environment is a production (staging or production) environment,
-      and False otherwise.
-
-    Parameters:
-
-      url: a server url to be classified
-      raise_error(bool): whether to raise an error if the classification is unknown
-
-    Returns:
-
-      a dictionary of information containing keys "kind", "environment", and "is_stg_or_prd"
-    """
-
+    if not url.startswith("http"):
+        url = "http://" + url  # without a prefix, the url parser does badly
     parsed = urlparse(url)
     hostname = parsed.hostname
     hostname1 = hostname.split('.', 1)[0]  # The part before the first dot (if any)
 
-    environment = get_bucket_env(hostname1)  # First approximation, maybe overridden below
-
-    is_stg_or_prd = is_stg_or_prd_env(hostname1)
-
     if hostname1 == 'localhost' or hostname == '127.0.0.1':
         environment = 'unknown'
         kind = 'localhost'
-    elif 'cgap' in hostname1:
-        kind = 'cgap'
-    elif is_stg_or_prd or 'fourfront-' in hostname1:
-        kind = 'fourfront'
+    elif hostname1.startswith(EnvUtils.FULL_ENV_PREFIX) and hostname.endswith(EnvUtils.DEV_ENV_DOMAIN_SUFFIX):
+        environment = hostname1
+        kind = EnvUtils.ORCHESTRATED_APP
+        entry = find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.ENVIRONMENT: environment})
+        if entry:
+            public_name = entry[p.NAME]
     else:
-        if raise_error:
-            raise RuntimeError("%s is not a Fourfront or CGAP server." % url)
+        entry = find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.HOST: hostname})
+        if entry:
+            environment = entry[p.ENVIRONMENT]
+            kind = EnvUtils.ORCHESTRATED_APP
+            public_name = entry[p.NAME]
+        elif raise_error:
+            raise RuntimeError(f"{url} is not a {EnvUtils.ORCHESTRATED_APP} server.")
         else:
             environment = 'unknown'
             kind = 'unknown'
 
+    bucket_env = get_bucket_env(environment)  # note that 'unknown' may go through this, returning still 'unknown'
     return {
-        'kind': kind,
-        'environment': environment,
-        'is_stg_or_prd': is_stg_or_prd
+        c.KIND: kind,
+        c.ENVIRONMENT: bucket_env,  # Obsolete. Really a bucket_env, so use that instead.
+        c.BUCKET_ENV: bucket_env,
+        c.SERVER_ENV: environment,
+        c.IS_STG_OR_PRD: is_stg_or_prd_env(environment),  # _is_raw_stg_or_prd_env(environment),
+        c.PUBLIC_NAME: public_name,
     }
 
 
-def make_env_name_cfn_compatible(env_name: EnvName) -> str:
-    """ Common IDs in Cloudformation forbid the use of '-', and we don't want to change
-        our environment name formatting so this simple method is provided to document this
-        behavior. ex: cgap-mastertest -> cgapmastertest
-    """
-    return env_name.replace('-', '')
+@if_orchestrated(use_legacy=True)
+def make_env_name_cfn_compatible(env_name):
+    ignored(env_name)

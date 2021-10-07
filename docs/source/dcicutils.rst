@@ -4,6 +4,10 @@ API Documentation
 
 Note that JH utils is excluded due to side-effects of importing the module. See the source file for details.
 
+Note also that although the modules named ``base`` and ``env_base`` are documented here, they are considered
+internals for the implementation of ``dcicutils`` and should not be relied upon by other libraries outside of
+that scope.
+
 
 base
 ^^^^
@@ -79,6 +83,13 @@ ecs_utils
 ^^^^^^^^^
 
 .. automodule:: dcicutils.ecs_utils
+  :members:
+
+
+env_base
+^^^^^^^^
+
+.. automodule:: dcicutils.env_base
   :members:
 
 
