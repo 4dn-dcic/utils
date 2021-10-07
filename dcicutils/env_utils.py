@@ -3,10 +3,12 @@ import functools
 import json
 import os
 
-from .misc_utils import decorator, full_object_name, ignored, remove_prefix, check_true, find_association
-from . import env_utils_legacy as legacy
+from typing import Optional
 from urllib.parse import urlparse
+from . import env_utils_legacy as legacy
+from .common import EnvName, OrchestratedApp
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
+from .misc_utils import decorator, full_object_name, ignored, remove_prefix, check_true, find_association
 
 
 class UseLegacy(BaseException):
@@ -293,6 +295,11 @@ def data_set_for_env(envname, default=None):
         return info.get(envname, default)
 
 
+@if_orchestrated(unimplemented=True)
+def permit_load_data(envname: Optional[EnvName], allow_prod: bool, orchestrated_app: OrchestratedApp):
+    ignored(envname, allow_prod, orchestrated_app)
+
+
 @if_orchestrated(use_legacy=True)
 def blue_green_mirror_env(envname):
     """
@@ -302,12 +309,27 @@ def blue_green_mirror_env(envname):
     ignored(envname)
 
 
+@if_orchestrated(unimplemented=True)
+def public_url_for_app(appname: Optional[OrchestratedApp] = None):
+    ignored(appname)
+
+
+@if_orchestrated(unimplemented=True)
+def prod_bucket_env_for_app(appname: Optional[OrchestratedApp] = None):
+    ignored(appname)
+
+
 @if_orchestrated
 def prod_bucket_env(envname):
     if is_stg_or_prd_env(envname):
         return EnvUtils.PRD_BUCKET
     else:
         return None
+
+
+@if_orchestrated(unimplemented=True)
+def default_workflow_env(orchestrated_app: OrchestratedApp) -> EnvName:
+    ignored(orchestrated_app)
 
 
 @if_orchestrated
@@ -513,6 +535,11 @@ def infer_repo_from_env(envname):
         return None
 
 
+@if_orchestrated(unimplemented=True)
+def infer_foursight_url_from_env(request, envname: Optional[EnvName]):
+    ignored(request, envname)
+
+
 @if_orchestrated
 def infer_foursight_from_env(request, envname):
     ignored(request)
@@ -526,6 +553,11 @@ def infer_foursight_from_env(request, envname):
     if entry:
         envname = entry[p.NAME]
     return remove_prefix(EnvUtils.FULL_ENV_PREFIX, envname, required=False)
+
+
+@if_orchestrated(unimplemented=True)
+def short_env_name(envname: Optional[EnvName]):
+    ignored(envname)
 
 
 @if_orchestrated

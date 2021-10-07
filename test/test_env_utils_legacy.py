@@ -2,23 +2,32 @@ import pytest
 import os
 
 from dcicutils.common import APP_CGAP, APP_FOURFRONT
+from dcicutils.env_utils import (
+    is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env,
+    get_mirror_env_from_context, is_test_env, is_hotseat_env, get_standard_mirror_env,
+    prod_bucket_env, prod_bucket_env_for_app, public_url_mappings,
+    infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env,
+    infer_foursight_url_from_env,
+    is_indexer_env, indexer_env_for_env, classify_server_url,
+    short_env_name, full_env_name, full_cgap_env_name, full_fourfront_env_name,
+    is_cgap_server, is_fourfront_server,
+    make_env_name_cfn_compatible, default_workflow_env, permit_load_data, public_url_for_app,
+
+
+)
 from dcicutils.env_utils_legacy import (
-    is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env, BEANSTALK_PROD_MIRRORS,
+    BEANSTALK_PROD_MIRRORS,
     FF_ENV_PRODUCTION_BLUE, FF_ENV_PRODUCTION_GREEN, FF_ENV_WEBPROD, FF_ENV_WEBPROD2, FF_ENV_MASTERTEST,
     FF_ENV_HOTSEAT, FF_ENV_WEBDEV, FF_ENV_WOLF,
     CGAP_ENV_PRODUCTION_BLUE, CGAP_ENV_PRODUCTION_GREEN, CGAP_ENV_WEBPROD, CGAP_ENV_MASTERTEST,
     CGAP_ENV_HOTSEAT, CGAP_ENV_STAGING, CGAP_ENV_WEBDEV, CGAP_ENV_WOLF,
     CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_WEBPROD_NEW, CGAP_ENV_MASTERTEST_NEW,
     CGAP_ENV_HOTSEAT_NEW, CGAP_ENV_STAGING_NEW, CGAP_ENV_WEBDEV_NEW, CGAP_ENV_WOLF_NEW,
+    CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
     FF_PRODUCTION_IDENTIFIER, CGAP_PRODUCTION_IDENTIFIER,
-    get_mirror_env_from_context, is_test_env, is_hotseat_env, get_standard_mirror_env, prod_bucket_env_for_app,
-    prod_bucket_env, public_url_mappings, CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
-    CGAP_PUBLIC_URL_PRD, FF_PUBLIC_URL_PRD,
-    infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env, infer_foursight_url_from_env,
+    CGAP_PUBLIC_URL_PRD, FF_PUBLIC_URL_PRD, 
     FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV, CGAP_PUBLIC_DOMAIN_PRD,
-    FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env, classify_server_url,
-    short_env_name, full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
-    make_env_name_cfn_compatible, default_workflow_env, permit_load_data, public_url_for_app,
+    FF_ENV_INDEXER, CGAP_ENV_INDEXER,
 )
 from dcicutils.exceptions import InvalidParameterError
 from dcicutils.qa_utils import raises_regexp
@@ -37,7 +46,7 @@ def test_default_workflow_env():
             == 'fourfront-cgapwolf')
 
     with pytest.raises(InvalidParameterError):
-        default_workflow_env('foo')
+        default_workflow_env('foo')  # noQA - we expect this error
 
 
 def test_get_bucket_env():
@@ -73,7 +82,7 @@ def test_prod_bucket_env_for_app():
     assert prod_bucket_env_for_app(None) == FF_PROD_BUCKET_ENV
 
     with pytest.raises(InvalidParameterError):
-        prod_bucket_env_for_app('foo')
+        prod_bucket_env_for_app('foo')  # noQA - we expect this error
 
 
 def test_prod_bucket_env():
@@ -219,7 +228,7 @@ def test_public_url_for_app():
     assert public_url_for_app('fourfront') == FF_PUBLIC_URL_PRD
 
     with pytest.raises(InvalidParameterError):
-        public_url_for_app('foo')
+        public_url_for_app('foo')  # noQA - we expect this error
 
 
 def test_blue_green_mirror_env():
