@@ -2,7 +2,6 @@ import contextlib
 import datetime
 import io
 import json
-import logging
 import os
 import pytest
 import requests

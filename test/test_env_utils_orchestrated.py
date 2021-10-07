@@ -1764,7 +1764,7 @@ def test_orchestrated_full_fourfront_env_name_for_fourfront():
 
 
 @using_orchestrated_behavior()
-def test_orchestrated_full_cgap_env_name_for_cgap():
+def test_orchestrated_full_fourfront_env_name_for_cgap():
 
     # Everything is just going to return errors if you try this in a Fourfront orchestration
     with pytest.raises(ValueError):
