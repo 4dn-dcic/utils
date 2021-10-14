@@ -261,4 +261,16 @@ def make_mock_boto_s3_with_sse(beanstalks=None, other_access_key_names=None):
     return MockBotoS3WithSSE
 
 
+@contextlib.contextmanager
+def mocked_boto3_object(s3_files=None, **override_mappings):
+    s3_mock_class = override_mappings.pop('s3', MockBotoS3Client)
+    assert issubclass(s3_mock_class, MockBotoS3Client)
+    if s3_files:
+        class MockedS3WithFiles(s3_mock_class):
+            MOCK_STATIC_FILES = s3_files
+        s3_mock_class = MockedS3WithFiles
+    mocked_boto3 = MockBoto3(s3=s3_mock_class, **override_mappings)
+    yield mocked_boto3
+
+
 # MockBotoS3WithSSE = make_mock_boto_s3_with_sse()
