@@ -21,9 +21,15 @@ from dcicutils.qa_utils import raises_regexp
 from unittest import mock
 from urllib.parse import urlparse
 
+# @contextlib.contextmanager
+# def stage_mirroring(*, enabled=True):
+#     with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=enabled):
+#         yield
+
+
 @contextlib.contextmanager
 def stage_mirroring(*, enabled=True):
-    with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=enabled):
+    with local_attrs(EnvUtils, STAGE_MIRRORING_ENABLED=enabled):
         yield
 
 
