@@ -3,7 +3,6 @@ import functools
 import os
 import pytest
 
-from dcicutils import env_utils
 from dcicutils.env_utils import (
     is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env,
     get_mirror_env_from_context, is_test_env, is_hotseat_env, get_standard_mirror_env,
@@ -20,11 +19,6 @@ from dcicutils.misc_utils import decorator, local_attrs
 from dcicutils.qa_utils import raises_regexp
 from unittest import mock
 from urllib.parse import urlparse
-
-# @contextlib.contextmanager
-# def stage_mirroring(*, enabled=True):
-#     with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=enabled):
-#         yield
 
 
 @contextlib.contextmanager

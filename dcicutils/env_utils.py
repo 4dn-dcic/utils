@@ -79,7 +79,7 @@ class EnvNames:
     HOTSEAT_ENVS = 'hotseat_envs'  # a list of environments that are for testing with hot data
     INDEXER_ENV_NAME = 'indexer_env_name'  # the environment name used for indexing
     IS_LEGACY = 'is_legacy'
-    STAGE_MIRRORING_ENABLED = "stage_mirroring_enabled"
+    STAGE_MIRRORING_ENABLED = 'stage_mirroring_enabled'
     ORCHESTRATED_APP = 'orchestrated_app'  # This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
     PRD_BUCKET = 'prd_bucket'
     PRD_ENV_NAME = 'prd_env_name'  # the name of the prod env
