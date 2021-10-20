@@ -54,7 +54,7 @@ def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, a
                 return legacy_fn(*args, **kwargs)
             elif unimplemented:
                 raise NotImplementedError(f"Unimplemented: {full_object_name(fn)}")
-            elif assumes_no_mirror and STAGE_MIRRORING_ENABLED:
+            elif assumes_no_mirror and EnvUtils.STAGE_MIRRORING_ENABLED:
                 raise NotImplementedError(f"In {full_object_name(fn)}:"
                                           f" Mirroring is not supported in an orchestrated environment.")
             elif assumes_cgap and EnvUtils.ORCHESTRATED_APP != 'cgap':
@@ -79,6 +79,7 @@ class EnvNames:
     HOTSEAT_ENVS = 'hotseat_envs'  # a list of environments that are for testing with hot data
     INDEXER_ENV_NAME = 'indexer_env_name'  # the environment name used for indexing
     IS_LEGACY = 'is_legacy'
+    STAGE_MIRRORING_ENABLED = 'stage_mirroring_enabled'
     ORCHESTRATED_APP = 'orchestrated_app'  # This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
     PRD_BUCKET = 'prd_bucket'
     PRD_ENV_NAME = 'prd_env_name'  # the name of the prod env
@@ -133,6 +134,11 @@ class EnvUtils:
     HOTSEAT_ENVS = None
     INDEXER_ENV_NAME = None  # the environment name used for indexing
     IS_LEGACY = None
+    # Don't enable this casually. It's intended only if we make some decision to engage mirroring.
+    # Although it's fine to call an environment your staging environment without enabling this,
+    # what the system means about something being the stg environment is that it's the stage side of a mirror.
+    # -kmp 24-Jul-2021
+    STAGE_MIRRORING_ENABLED = None  # if True, orchestration-enabled function may offer mirroring behavior
     ORCHESTRATED_APP = None  # This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
     PRD_BUCKET = None
     PRD_ENV_NAME = None  # the name of the prod env
@@ -423,16 +429,9 @@ def is_fourfront_env(envname):
         return False
 
 
-# Don't enable this casually. It's intended only if we make some decision to engage mirroring.
-# Although it's fine to call an environment your staging environment without enabling this,
-# what the system means about something being the stg environment is that it's the stage side of a mirror.
-# -kmp 24-Jul-2021
-STAGE_MIRRORING_ENABLED = False
-
-
 def _is_raw_stg_or_prd_env(envname):
     return (envname == EnvUtils.PRD_ENV_NAME or
-            (STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME and envname == EnvUtils.STG_ENV_NAME))
+            (EnvUtils.STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME and envname == EnvUtils.STG_ENV_NAME))
 
 
 @if_orchestrated
@@ -496,7 +495,7 @@ def get_env_from_context(settings, allow_environ=True):
 def get_mirror_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT, allow_guess=True):
     # This is the same text as the legacy environment, but it needs to call get_standard_mirror_env
     # from this file. -kmp 26-Jul-2021
-    if not STAGE_MIRRORING_ENABLED:
+    if not EnvUtils.STAGE_MIRRORING_ENABLED:
         return None
     elif allow_environ:
         environ_mirror_env_name = os.environ.get('MIRROR_ENV_NAME')
@@ -514,7 +513,7 @@ def get_mirror_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT
 
 @if_orchestrated
 def get_standard_mirror_env(envname):
-    if not STAGE_MIRRORING_ENABLED:
+    if not EnvUtils.STAGE_MIRRORING_ENABLED:
         return None
     elif envname == EnvUtils.PRD_ENV_NAME:
         return EnvUtils.STG_ENV_NAME
@@ -563,7 +562,7 @@ def infer_foursight_url_from_env(request, envname: Optional[EnvName]):
 @if_orchestrated
 def infer_foursight_from_env(request, envname):
     ignored(request)
-    if STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME:
+    if EnvUtils.STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME:
         classification = classify_server_url(request.domain)
         if classification[c.IS_STG_OR_PRD]:
             public_name = classification[c.PUBLIC_NAME]

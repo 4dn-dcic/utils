@@ -1,8 +1,8 @@
+import contextlib
 import functools
 import os
 import pytest
 
-from dcicutils import env_utils
 from dcicutils.env_utils import (
     is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env,
     get_mirror_env_from_context, is_test_env, is_hotseat_env, get_standard_mirror_env,
@@ -19,6 +19,12 @@ from dcicutils.misc_utils import decorator, local_attrs
 from dcicutils.qa_utils import raises_regexp
 from unittest import mock
 from urllib.parse import urlparse
+
+
+@contextlib.contextmanager
+def stage_mirroring(*, enabled=True):
+    with local_attrs(EnvUtils, STAGE_MIRRORING_ENABLED=enabled):
+        yield
 
 
 @decorator()
@@ -66,9 +72,9 @@ def test_orchestrated_get_bucket_env():
     # we can only test that by a mock of is_stg_or_prd_env. -kmp 24-Jul-2021
     with local_attrs(EnvUtils, STG_ENV_NAME='acme-stg'):
 
-        test_the_usual_scenario()  # The STG_ENV_NAME is ignored if STAGE_MIRRORING_ENABLED is False
+        test_the_usual_scenario()  # The STG_ENV_NAME is ignored if "stage_mirroring_enabled": false
 
-        with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=True):
+        with stage_mirroring(enabled=True):
 
             assert EnvUtils.STG_ENV_NAME == 'acme-stg'
 
@@ -113,9 +119,9 @@ def test_orchestrated_prod_bucket_env():
     # we can only test that by a mock of is_stg_or_prd_env. -kmp 24-Jul-2021
     with local_attrs(EnvUtils, STG_ENV_NAME='acme-stg'):
 
-        test_the_usual_scenario()  # The STG_ENV_NAME is ignored if STAGE_MIRRORING_ENABLED is False
+        test_the_usual_scenario()  # The STG_ENV_NAME is ignored if "stage_mirroring_enabled": false
 
-        with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=True):
+        with stage_mirroring(enabled=True):
 
             assert EnvUtils.STG_ENV_NAME == 'acme-stg'
 
@@ -264,13 +270,13 @@ def test_orchestrated_data_set_for_env():
 
     with local_attrs(EnvUtils, STG_ENV_NAME='acme-stg'):
 
-        # Setting EnvUtils.STG_ENV_NAME doesn't work unless STAGE_MIRRORING_ENABLED is enabled at top-level.
+        # Setting EnvUtils.STG_ENV_NAME doesn't work unless "stage_mirroring_enabled": true at top-level.
         assert data_set_for_env('acme-stg') is None
         assert data_set_for_env('stg') is None
         assert data_set_for_env('acme-stg', 'test') == 'test'
         assert data_set_for_env('stg', 'test') == 'test'
 
-        with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=True):
+        with stage_mirroring(enabled=True):
 
             assert data_set_for_env('acme-stg') == 'prod'
             assert data_set_for_env('stg') == 'prod'
@@ -748,7 +754,7 @@ def test_orchestrated_is_fourfront_server_for_fourfront():
         assert is_fourfront_server("https://staging.4dnucleome.org") is False  # ditto
         assert is_fourfront_server("https://staging.4dnucleome.org") is False  # ditto
 
-        with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=True):
+        with stage_mirroring(enabled=True):
 
             assert is_fourfront_server("https://staging.4dnucleome.org") is False
             assert is_fourfront_server("https://staging.4dnucleome.org") is False
@@ -1090,7 +1096,7 @@ def test_orchestrated_is_stg_or_prd_env_for_cgap():
 
         assert is_stg_or_prd_env('acme-stg') is False
 
-        with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=True):
+        with stage_mirroring(enabled=True):
 
             assert is_stg_or_prd_env('acme-stg') is True
 
@@ -1110,7 +1116,7 @@ def test_orchestrated_is_stg_or_prd_env_for_fourfront():
 
         assert is_stg_or_prd_env('acme-stg') is False
 
-        with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=True):
+        with stage_mirroring(enabled=True):
 
             assert is_stg_or_prd_env('acme-stg') is True
 
@@ -1235,7 +1241,7 @@ def test_orchestrated_get_mirror_env_from_context_without_environ_with_mirror_di
 def test_orchestrated_get_mirror_env_from_context_without_environ_with_mirror_enabled():
     """ Tests that when getting mirror env on various envs returns the correct mirror """
 
-    with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=True):
+    with stage_mirroring(enabled=True):
         with local_attrs(EnvUtils, STG_ENV_NAME='acme-stg'):
             for allow_environ in (False, True):
                 # If the environment doesn't have either the ENV_NAME or MIRROR_ENV_NAME environment variables,
@@ -1317,7 +1323,7 @@ def test_orchestrated_get_mirror_env_from_context_with_environ_has_env_with_mirr
 def test_orchestrated_get_mirror_env_from_context_with_environ_has_env_with_mirror_enabled():
     """ Tests override of env name from os.environ when getting mirror env on various envs """
 
-    with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=True):
+    with stage_mirroring(enabled=True):
         with local_attrs(EnvUtils, STG_ENV_NAME='acme-stg'):
 
             with mock.patch.object(os, "environ", {'ENV_NAME': 'foo'}):
@@ -1372,7 +1378,7 @@ def test_orchestrated_get_mirror_env_from_context_with_environ_has_mirror_env_wi
 def test_orchestrated_get_mirror_env_from_context_with_environ_has_mirror_env_with_mirror_enabled():
     """ Tests override of mirror env name from os.environ when getting mirror env on various envs """
 
-    with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=True):
+    with stage_mirroring(enabled=True):
         with local_attrs(EnvUtils, STG_ENV_NAME='acme-stg'):
 
             with mock.patch.object(os, "environ", {"MIRROR_ENV_NAME": 'bar'}):
@@ -1395,7 +1401,7 @@ def test_orchestrated_get_mirror_env_from_context_with_environ_has_env_and_mirro
 def test_orchestrated_get_mirror_env_from_context_with_environ_has_env_and_mirror_env_with_mirror_enabled():
     """ Tests override of env name and mirror env name from os.environ when getting mirror env on various envs """
 
-    with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=True):
+    with stage_mirroring(enabled=True):
         with local_attrs(EnvUtils, STG_ENV_NAME='acme-stg'):
 
             with mock.patch.object(os, "environ", {'ENV_NAME': 'acme-stg', "MIRROR_ENV_NAME": 'bar'}):
@@ -1409,7 +1415,7 @@ def test_orchestrated_get_standard_mirror_env_for_cgap():
 
     for mirroring_enabled in [True, False]:
         with local_attrs(EnvUtils, STG_ENV_NAME='acme-stg'):
-            with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=mirroring_enabled):
+            with stage_mirroring(enabled=mirroring_enabled):
 
                 def expected_result(value):
                     return value if mirroring_enabled else None
@@ -1428,7 +1434,7 @@ def test_orchestrated_get_standard_mirror_env_for_fourfront():
 
     for mirroring_enabled in [True, False]:
         with local_attrs(EnvUtils, STG_ENV_NAME='acme-stg'):
-            with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=mirroring_enabled):
+            with stage_mirroring(enabled=mirroring_enabled):
 
                 def expected_result(value):
                     return value if mirroring_enabled else None
@@ -1538,7 +1544,7 @@ def test_orchestrated_infer_foursight_env():
     assert infer_foursight_from_env(mock_request('acme-webdev' + dev_suffix), 'acme-webdev') == 'webdev'
     assert infer_foursight_from_env(mock_request('acme-hotseat' + dev_suffix), 'acme-hotseat') == 'hotseat'
 
-    with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=True):
+    with stage_mirroring(enabled=True):
 
         with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
 
@@ -1846,7 +1852,7 @@ def test_orchestrated_classify_server_url_cgap():
 @using_orchestrated_behavior()
 def test_orchestrated_classify_server_url_fourfront():
 
-    with local_attrs(env_utils, STAGE_MIRRORING_ENABLED=True):
+    with stage_mirroring(enabled=True):
 
         with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
 
