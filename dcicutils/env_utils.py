@@ -314,12 +314,19 @@ class EnvUtils:
 
 
 @if_orchestrated
-def is_indexer_env(envname):
+def is_indexer_env(envname: EnvName) -> bool:
+    """
+    Returns true if the given envname is the indexer env name.
+    """
     return envname == EnvUtils.INDEXER_ENV_NAME
 
 
 @if_orchestrated
-def indexer_env_for_env(envname):
+def indexer_env_for_env(envname: EnvName) -> Optional[EnvName]:
+    """
+    Given any environment, returns the associated indexer env.
+    (If the environment is the indexer env itself, returns None.)
+    """
     if envname == EnvUtils.INDEXER_ENV_NAME:
         return None
     else:
@@ -327,7 +334,7 @@ def indexer_env_for_env(envname):
 
 
 @if_orchestrated
-def data_set_for_env(envname, default=None):
+def data_set_for_env(envname: EnvName, default=None):
     if is_stg_or_prd_env(envname):
         return 'prod'
     else:
@@ -359,7 +366,7 @@ def prod_bucket_env_for_app(appname: Optional[OrchestratedApp] = None):
 
 
 @if_orchestrated
-def prod_bucket_env(envname):
+def prod_bucket_env(envname: EnvName) -> Optional[EnvName]:
     if is_stg_or_prd_env(envname):
         return EnvUtils.PRD_BUCKET
     else:
@@ -393,7 +400,7 @@ def _check_appname(appname: Optional[OrchestratedApp], required=False):
 
 
 @if_orchestrated
-def public_url_for_app(appname: Optional[OrchestratedApp] = None):
+def public_url_for_app(appname: Optional[OrchestratedApp] = None) -> Optional[str]:
     _check_appname(appname)
     entry = find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.ENVIRONMENT: EnvUtils.PRD_ENV_NAME})
     if entry:
@@ -401,7 +408,7 @@ def public_url_for_app(appname: Optional[OrchestratedApp] = None):
 
 
 @if_orchestrated
-def is_cgap_server(server, allow_localhost=False):
+def is_cgap_server(server, allow_localhost=False) -> bool:
     check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
     is_cgap = EnvUtils.ORCHESTRATED_APP == 'cgap'
     if not is_cgap:
@@ -416,7 +423,7 @@ def is_cgap_server(server, allow_localhost=False):
 
 
 @if_orchestrated
-def is_fourfront_server(server, allow_localhost=False):
+def is_fourfront_server(server, allow_localhost=False) -> bool:
     check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
     is_fourfront = EnvUtils.ORCHESTRATED_APP == 'fourfront'
     if not is_fourfront:
@@ -431,7 +438,7 @@ def is_fourfront_server(server, allow_localhost=False):
 
 
 @if_orchestrated
-def is_cgap_env(envname):
+def is_cgap_env(envname: Optional[EnvName]) -> bool:
     if not isinstance(envname, str):
         return False
     elif EnvUtils.ORCHESTRATED_APP != 'cgap':
@@ -445,7 +452,7 @@ def is_cgap_env(envname):
 
 
 @if_orchestrated
-def is_fourfront_env(envname):
+def is_fourfront_env(envname: Optional[EnvName]) -> bool:
     if not isinstance(envname, str):
         return False
     elif EnvUtils.ORCHESTRATED_APP != 'fourfront':
@@ -458,30 +465,30 @@ def is_fourfront_env(envname):
         return False
 
 
-def _is_raw_stg_or_prd_env(envname):
+def _is_raw_stg_or_prd_env(envname: EnvName) -> bool:
     return (envname == EnvUtils.PRD_ENV_NAME or
             (EnvUtils.STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME and envname == EnvUtils.STG_ENV_NAME))
 
 
 @if_orchestrated
-def is_orchestrated():
+def is_orchestrated() -> bool:
     return True
 
 
 @if_orchestrated
-def get_prd_env_name(project: OrchestratedApp):
+def get_prd_env_name(project: OrchestratedApp) -> Optional[EnvName]:
     _check_appname(appname=project)
     return EnvUtils.PRD_ENV_NAME
 
 
 @if_orchestrated
-def get_stg_env_name(project: OrchestratedApp):
+def get_stg_env_name(project: OrchestratedApp) -> Optional[EnvName]:
     _check_appname(appname=project)
     return EnvUtils.STG_ENV_NAME
 
 
 @if_orchestrated
-def is_stg_or_prd_env(envname):
+def is_stg_or_prd_env(envname: Optional[EnvName]) -> bool:
     # The legacy version does something much more elaborate that involves heuristics on names.
     # Note, too, that in the legacy version, this would return true both of CGAP or Fourfront names,
     # but really you're only supposed to call it on one or the other's environments. It's rarely the
@@ -502,7 +509,7 @@ def is_stg_or_prd_env(envname):
 
 
 @if_orchestrated
-def is_test_env(envname):
+def is_test_env(envname: Optional[EnvName]) -> bool:
     envs = EnvUtils.TEST_ENVS or []
     if not isinstance(envname, str):
         return False
@@ -517,7 +524,7 @@ def is_test_env(envname):
 
 
 @if_orchestrated
-def is_hotseat_env(envname):
+def is_hotseat_env(envname: Optional[EnvName]) -> bool:
     envs = EnvUtils.HOTSEAT_ENVS or []
     if not isinstance(envname, str):
         return False
