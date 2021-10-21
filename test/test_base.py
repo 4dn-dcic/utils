@@ -3,7 +3,8 @@ import json
 import socket
 
 from collections import defaultdict
-from dcicutils import base, env_utils, compute_prd_env_for_env
+from dcicutils import base, env_utils
+from dcicutils.base import compute_prd_env_for_env
 from dcicutils.env_utils import (
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env,
 )

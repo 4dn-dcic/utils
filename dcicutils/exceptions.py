@@ -180,3 +180,12 @@ class InvalidParameterError(ValueError):
             message = f"The value{parameter_part}{value_part} was not {valid}. {restriction}"
 
         super().__init__(message)
+
+
+class EnvUtilsLoadError(ValueError):
+
+    def __init__(self, msg, *, bucket_name, env, encapsulated_error):
+        self.bucket_name = bucket_name
+        self.env = env
+        self.encapsulated_error = encapsulated_error
+        super().__init__(f"{msg} (bucket_name={bucket_name}, env={env})")

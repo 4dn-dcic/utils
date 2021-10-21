@@ -2,13 +2,16 @@ import boto3
 import functools
 import json
 import os
+import re
 
+from botocore.exceptions import HTTPClientError, ClientError
 from typing import Optional
 from urllib.parse import urlparse
 from . import env_utils_legacy as legacy
 from .common import EnvName, OrchestratedApp
 from .env_base import EnvManager
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
+from .exceptions import EnvUtilsLoadError
 from .misc_utils import decorator, full_object_name, ignored, remove_prefix, check_true, find_association
 
 
@@ -263,17 +266,43 @@ class EnvUtils:
                 else:
                     setattr(EnvUtils, var, None)
 
+    # Vaguely, the thing we're trying to recognize is this (sanitized slightly here),
+    # which we first call str() on and then check with a regular expression:
+    #
+    # ValueError("Invalid header value b'AWS4-HMAC-SHA256 Credential=ABCDEF1234PQRST99999\\n"
+    #            "AKIA5NVXX3EKMJOCZ4VE/20211021/us-east-1/s3/aws4_request,"
+    #            " SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-security-token,"
+    #            " Signature=123abc456def789xyz1a2b3c4d'",)
+    _CREDENTIALS_ERROR_PATTERN = re.compile(".*Invalid header value.*(Credentials|SignedHeaders)")
+
     @classmethod
     def load_declared_data(cls, env_name=None):
         bucket = EnvManager.global_env_bucket_name()
         if bucket:
             env_name = env_name or os.environ.get('ENV_NAME')
             if env_name:
-                s3 = boto3.client('s3')
-                metadata = s3.get_object(Bucket=bucket, Key=env_name)
-                data = json.load(metadata['Body'])
-                cls.set_declared_data(data)
-                return
+                try:
+                    s3 = boto3.client('s3')
+                    metadata = s3.get_object(Bucket=bucket, Key=env_name)
+                    data = json.load(metadata['Body'])
+                    cls.set_declared_data(data)
+                    return
+                except HTTPClientError as err_obj:
+                    if cls._CREDENTIALS_ERROR_PATTERN.match(str(err_obj)):  # Some sort of plausibility test
+                        raise EnvUtilsLoadError("Credentials problem, perhaps expired or wrong account.",
+                                                bucket_name=bucket, env=env_name, encapsulated_error=err_obj)
+                    raise
+                except ClientError as err_obj:
+                    response_data = getattr(err_obj, 'response', {})
+                    response_error = response_data.get('Error', {})
+                    if response_error:
+                        response_error_code = response_error.get('Code', None)
+                        msg = response_error.get('Message') or response_error_code or "Load Error"
+                        raise EnvUtilsLoadError(msg, bucket_name=bucket, env=env_name, encapsulated_error=err_obj)
+                    raise
+                except Exception as err_obj:
+                    raise EnvUtilsLoadError(str(err_obj), bucket_name=bucket, env=env_name, encapsulated_error=err_obj)
+
         cls.set_declared_data({e.IS_LEGACY: True})
 
     @classmethod
@@ -432,6 +461,23 @@ def is_fourfront_env(envname):
 def _is_raw_stg_or_prd_env(envname):
     return (envname == EnvUtils.PRD_ENV_NAME or
             (EnvUtils.STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME and envname == EnvUtils.STG_ENV_NAME))
+
+
+@if_orchestrated
+def is_orchestrated():
+    return True
+
+
+@if_orchestrated
+def get_prd_env_name(project: OrchestratedApp):
+    _check_appname(appname=project)
+    return EnvUtils.PRD_ENV_NAME
+
+
+@if_orchestrated
+def get_stg_env_name(project: OrchestratedApp):
+    _check_appname(appname=project)
+    return EnvUtils.STG_ENV_NAME
 
 
 @if_orchestrated
