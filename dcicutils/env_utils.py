@@ -476,15 +476,15 @@ def is_orchestrated() -> bool:
 
 
 @if_orchestrated
-def get_prd_env_name(project: OrchestratedApp) -> Optional[EnvName]:
+def maybe_get_declared_prd_env_name(project: OrchestratedApp) -> Optional[EnvName]:
     _check_appname(appname=project)
     return EnvUtils.PRD_ENV_NAME
 
 
 @if_orchestrated
-def get_stg_env_name(project: OrchestratedApp) -> Optional[EnvName]:
+def has_declared_stg_env(project: OrchestratedApp) -> bool:
     _check_appname(appname=project)
-    return EnvUtils.STG_ENV_NAME
+    return True if EnvUtils.STG_ENV_NAME else False
 
 
 @if_orchestrated

@@ -6,7 +6,7 @@ from dcicutils.common import REGION, OrchestratedApp, EnvName
 from dcicutils.misc_utils import PRINT
 from dcicutils.env_utils import (
     is_cgap_env, is_fourfront_env, is_stg_or_prd_env, public_url_mappings, is_orchestrated,
-    blue_green_mirror_env, get_standard_mirror_env, get_stg_env_name, get_prd_env_name,
+    blue_green_mirror_env, get_standard_mirror_env, has_declared_stg_env, maybe_get_declared_prd_env_name,
 )
 from typing import Optional
 
@@ -118,8 +118,8 @@ def _compute_prd_env_for_project(project: OrchestratedApp) -> Optional[EnvName]:
         str: EB environment name hosting data.4dnucleome
     """
 
-    if not get_stg_env_name(project):
-        return get_prd_env_name(project)
+    if not has_declared_stg_env(project):
+        return maybe_get_declared_prd_env_name(project)
     elif is_orchestrated():
         return _compute_orchestrated_prd_env_for_project(project)
     else:

@@ -387,16 +387,16 @@ def is_orchestrated():
     return False
 
 
-def get_prd_env_name(project: OrchestratedApp):
+def maybe_get_declared_prd_env_name(project: OrchestratedApp) -> Optional[EnvName]:
     return _orchestrated_app_case(orchestrated_app=project,
-                                  if_fourfront='data',
-                                  if_cgap='cgap')
+                                  if_fourfront=None,
+                                  if_cgap='fourfront-cgap')
 
 
-def get_stg_env_name(project: OrchestratedApp):
+def has_declared_stg_env(project: OrchestratedApp) -> bool:
     return _orchestrated_app_case(orchestrated_app=project,
-                                  if_fourfront='staging',
-                                  if_cgap=None)
+                                  if_fourfront=True,
+                                  if_cgap=False)
 
 
 def is_stg_or_prd_env(envname: Optional[EnvName]):
