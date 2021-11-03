@@ -1,10 +1,8 @@
 import contextlib
 import os
 import pytest
-import sys
 import tempfile
 
-from io import StringIO
 from unittest import mock
 from dcicutils import command_utils as command_utils_module
 from dcicutils.command_utils import (
@@ -228,7 +226,6 @@ def test_shell_script_with_done_first(simulate):
         if os.path.exists(temp_filename):
             os.remove(temp_filename)  # cleanup, not that we actually have to
         assert not os.path.exists(temp_filename)  # make sure everything is tidy again
-
 
 
 @pytest.mark.parametrize('simulate', [True, False])

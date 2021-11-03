@@ -229,7 +229,9 @@ def module_warnings_as_ordinary_output(module):
         # This operation is safe even if the filter didn't get as far as being added.
         logger.removeFilter(just_print_text)
 
+
 C4_PROJECTS = ["dbmi-bgm", "4dn-dcic"]
+
 
 def guess_c4_git_url(c4_repo, all_projects=None):
     for project in all_projects or C4_PROJECTS:
