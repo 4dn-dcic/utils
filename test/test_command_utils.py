@@ -9,7 +9,7 @@ from dcicutils.command_utils import (
     _ask_boolean_question,  # noQA - access to internal function is so we can test it
     yes_or_no, y_or_n, ShellScript, shell_script,
 )
-from dcicutils.misc_utils import ignored
+from dcicutils.misc_utils import ignored, file_contents
 from dcicutils.qa_utils import printed_output
 
 
@@ -184,6 +184,48 @@ def test_shell_script_class_with_working_dir():
 
         script.execute()  # After finalizing explicitly, it gets called
         mock_run.assert_called_with(expected_script, executable=script.EXECUTABLE, shell=True)
+
+
+@pytest.mark.parametrize('simulate', [False, True])
+def test_shell_script_with_done_first(simulate):
+
+    temp_filename = tempfile.mktemp()
+    assert not os.path.exists(temp_filename)  # we were promised a filename that doesn't exist. test that.
+
+    try:
+
+        with printed_output() as printed:
+
+            script = ShellScript(simulate=simulate)
+            script.do(f"echo baz >> {temp_filename}")
+            with script.done_first() as script_setup:
+                script_setup.do(f"echo foo >> {temp_filename}")
+                script_setup.do(f"echo bar >> {temp_filename}")
+            script.execute()
+
+            if simulate:
+                assert not os.path.exists(temp_filename)  # test that file did NOT get made
+                expected = [
+                    f"SIMULATED:",
+                    f"================================================================================",
+                    f"echo foo >> {temp_filename};\\\n"
+                    f" echo bar >> {temp_filename};\\\n"
+                    f" echo baz >> {temp_filename}",
+                    f"================================================================================"
+                ]
+                import json
+                print(json.dumps(printed.lines, indent=2))
+                print(json.dumps(expected, indent=2))
+                assert printed.lines == expected
+            else:
+                assert os.path.exists(temp_filename)  # test that file got made
+                assert file_contents(temp_filename) == 'foo\nbar\nbaz\n'
+
+    finally:
+
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)  # cleanup, not that we actually have to
+        assert not os.path.exists(temp_filename)  # make sure everything is tidy again
 
 
 @pytest.mark.parametrize('simulate', [True, False])
