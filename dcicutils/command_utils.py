@@ -180,7 +180,7 @@ def shell_script(working_dir=None, executable=None, simulate=False, script_class
             script.do("pwd")  # should print out /some/working/dir
 
     """
-    # Note that we deliberately don't offer the 'no_execute' option in the arguemnt list,
+    # Note that we deliberately don't offer the 'no_execute' option in the argument list,
     # since it can be provided in **script_options in the few cases where it's needed,
     # and to not distract from 'the 'simulate' option which is probably what users usually want.  -kmp 2-Nov-2021
     script = script_class(executable=executable, simulate=simulate, **script_options)
