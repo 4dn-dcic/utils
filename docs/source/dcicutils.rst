@@ -22,7 +22,7 @@ beanstalk_utils
 codebuild_utils
 ^^^^^^^^^^^^^^^
 
-.. automodeul:: dcicutils.codebuild_utils
+.. automodule:: dcicutils.codebuild_utils
    :members:
 
 
