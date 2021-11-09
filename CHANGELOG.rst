@@ -7,6 +7,21 @@ Change Log
 ----------
 
 
+3.2.0
+=====
+
+* In ``command_utils``:
+
+  * Allow a ``no_execute`` argument to ``ShellScript`` to suppress all evaluation.
+    (This is subprimitive. Most users still want ``simulate=``)
+
+  * New context manager method ``ShellScript.done_first`` usable in place of ``ShellScript.do_first`` when there are several things to go at the start, so that they can execute forward instead of backward.
+
+  * New function ``setup_subrepo`` to download a repository and set up its virtual env.
+
+    * New function ``script_assure_env`` to help with that.
+
+
 3.1.0
 =====
 
