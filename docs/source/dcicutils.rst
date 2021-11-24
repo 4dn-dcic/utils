@@ -19,6 +19,13 @@ beanstalk_utils
    :members:
 
 
+codebuild_utils
+^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.codebuild_utils
+   :members:
+
+
 command_utils
 ^^^^^^^^^^^^^
 
