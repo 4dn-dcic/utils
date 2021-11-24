@@ -127,19 +127,23 @@ def test_s3_object_exists():
         assert s3_object_exists(object_key='bar', bucket_name='foo', s3=s3)
 
 
-#@pytest.mark.skip()  # So that running this empty test won't make it look like we did actual testing.
+@pytest.mark.skip()  # So that running this empty test won't make it look like we did actual testing.
 # do we want to parameterize to check all valid extensions?
+# this is a work in progress so skipped for now
 def test_s3_put_object():
-    keys_to_test = ['tester.txt'
+    keys_to_test = ['tester.txt', 'test_uuid_1/test.txt']
     obj_content = 'teststring'.encode()
     bucket = 'foo'
+    with typical_boto3_mocking(s3_files={'foo': None}) as mocked_boto3:
+        for obj_key in keys_to_test:
+            res = s3_put_object(object_key=obj_key, obj=obj_content, bucket_name=bucket)
+            assert res.get('ETag') == hashlib.md5(obj_content).hexdigest()
+            assert s3_object_exists(object_key=obj_key, bucket_name=bucket)
 
-    with typical_boto3_mocking(s3_files={}) as mocked_boto3:
-        res = s3_put_object(object_key=objkey, obj=obj_content, bucket_name=bucket)
-        assert res.get('ETag') == hashlib.md5(obj_content).hexdigest()
-        assert s3_object_exists(object_key='tester.txt', bucket_name='foo')
-        # s3_put_object(*, object_key, obj, bucket_name, acl=None, s3=None):
-    #ignored(s3_put_object)
+        # put to non-existent bucket
+        res = s3_put_object(object_key=keys_to_test[0], obj=obj_content, bucket_name='baz')
+
+        assert False
     # TODO: Making a test of s3_object_exists means extending the mocks in qa_utils.py to handle ACL.
     #       If you want to just accept the argument and ignore it. That's easy enough.
     #       If you want to test that the argument was received, you can probably do something with
@@ -150,7 +154,6 @@ def test_s3_put_object():
     #       occurred due to the logic of the function you're building around the AWS functions),
     #       but I can talk to you about what is needed to do the modeling if you want,
     #       or I could extend it to do that and you could review the extension. -kmp 15-Sep-2021
-
 
 
 @pytest.mark.skip()  # So that running this empty test won't make it look like we did actual testing.
