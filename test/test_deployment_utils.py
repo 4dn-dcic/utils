@@ -712,6 +712,7 @@ def test_deployment_utils_transitional_equivalence():
                                                         expect_index_server=index_server_default))
 
                     test_alpha_org = "alphatest"
+                    test_encrypt_key_id = 'sample-encrypt-key-id-for-testing'
                     bs_env = "cgap-alpha"
                     data_set = data_set_for_env(bs_env) or "prod"
 
@@ -761,6 +762,7 @@ def test_deployment_utils_transitional_equivalence():
                                                         }),
                            s3_bucket_env=bs_env,
                            s3_bucket_org=test_alpha_org,
+                           s3_encrypt_key_id=test_encrypt_key_id,
                            application_bucket_prefix=f"{test_alpha_org}-")
 
                     tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
@@ -773,6 +775,7 @@ def test_deployment_utils_transitional_equivalence():
                                                         }),
                            s3_bucket_env=bs_env,
                            s3_bucket_org=test_alpha_org,
+                           s3_encrypt_key_id=test_encrypt_key_id,
                            application_bucket_prefix=f"{test_alpha_org}-")
 
                     bs_env = "cgap-alfa"
@@ -790,6 +793,7 @@ def test_deployment_utils_transitional_equivalence():
                                                             "identity": "ThisIsMyIdentity",
                                                             "tibanna_cwls_bucket": "cwls-bucket",
                                                             "tibanna_output_bucket": "tb-bucket",
+                                                            "s3_encrypt_key_id": "MyKey",
                                                         }),
                            s3_bucket_env=bs_env,
                            s3_bucket_org=test_alpha_org,
@@ -804,6 +808,7 @@ def test_deployment_utils_transitional_equivalence():
                            auth0_secret="piepipiepipiepi",
                            tibanna_cwls_bucket="cwls-bucket",
                            tibanna_output_bucket="tb-bucket",
+                           s3_encrypt_key_id="MyKey",
                            )
 
                     with override_environ(ENCODED_FILE_UPLOAD_BUCKET='decoy1',
@@ -813,7 +818,9 @@ def test_deployment_utils_transitional_equivalence():
                                           ENCODED_METADATA_BUNDLES_BUCKET='decoy5',
                                           ENCODED_S3_BUCKET_ORG='decoy6',
                                           ENCODED_TIBANNA_OUTPUT_BUCKET='decoy7',
-                                          ENCODED_TIBANNA_CWLS_BUCKET='decoy8'):
+                                          ENCODED_TIBANNA_CWLS_BUCKET='decoy8',
+                                          ENCODED_S3_ENCRYPT_KEY_ID='decoy9',
+                                          ):
                         # The decoy values in the environment variables don't matter because we'll be passing
                         # explicit values for these to the builder that will take precedence.
                         tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
@@ -830,6 +837,7 @@ def test_deployment_utils_transitional_equivalence():
                                                                 "tibanna_cwls_bucket": "cwls-bucket",
                                                                 "tibanna_output_bucket": "tb-bucket",
                                                                 "identity": "ThisIsMyIdentity",
+                                                                "s3_encrypt_key_id": "MyKeyId",
                                                             }),
                                s3_bucket_env=bs_env,
                                s3_bucket_org=test_alpha_org,
@@ -841,6 +849,7 @@ def test_deployment_utils_transitional_equivalence():
                                tibanna_cwls_bucket="cwls-bucket",
                                tibanna_output_bucket="tb-bucket",
                                identity='ThisIsMyIdentity',
+                               s3_encrypt_key_id='MyKeyId',
                                )
 
                     with override_environ(ENCODED_FILE_UPLOAD_BUCKET='fu-bucket',
@@ -851,7 +860,8 @@ def test_deployment_utils_transitional_equivalence():
                                           ENCODED_S3_BUCKET_ORG=test_alpha_org,
                                           ENCODED_TIBANNA_OUTPUT_BUCKET='tb-bucket',
                                           ENCODED_TIBANNA_CWLS_BUCKET='cwls-bucket',
-                                          ENCODED_IDENTITY='ThisIsMyIdentity'):
+                                          ENCODED_IDENTITY='ThisIsMyIdentity',
+                                          ENCODED_S3_ENCRYPT_KEY_ID='MyKeyId'):
                         # If no explicit args are passed to the builder, the ENCODED_xxx arguments DO matter.
                         tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
                                use_ini_file_manager_kind="orchestrated-cgap",
@@ -867,6 +877,7 @@ def test_deployment_utils_transitional_equivalence():
                                                                 "tibanna_cwls_bucket": "cwls-bucket",
                                                                 "tibanna_output_bucket": "tb-bucket",
                                                                 "identity": "ThisIsMyIdentity",
+                                                                "s3_encrypt_key_id": "MyKeyId",
                                                             }),
                                s3_bucket_env=bs_env)
 
@@ -1087,6 +1098,7 @@ def test_deployment_utils_main():
                             'indexer': None,
                             's3_bucket_org': None,
                             's3_bucket_env': None,
+                            's3_encrypt_key_id': None,
                             'sentry_dsn': None,
                             'auth0_client': None,
                             'auth0_secret': None,
@@ -1116,6 +1128,7 @@ def test_deployment_utils_main():
                             'indexer': 'false',
                             's3_bucket_org': None,
                             's3_bucket_env': None,
+                            's3_encrypt_key_id': None,
                             'sentry_dsn': None,
                             'auth0_client': None,
                             'auth0_secret': None,
@@ -1143,6 +1156,7 @@ def test_deployment_utils_main():
                                 'indexer': 'false',
                                 's3_bucket_org': None,
                                 's3_bucket_env': None,
+                                's3_encrypt_key_id': None,
                                 'sentry_dsn': None,
                                 'auth0_client': None,
                                 'auth0_secret': None,
