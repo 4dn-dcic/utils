@@ -412,6 +412,7 @@ class IniFileManager:
     @classmethod
     def build_ini_file_from_template(cls, template_file_name, init_file_name, *,
                                      bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
+                                     s3_encrypt_key_id=None,
                                      data_set=None, es_server=None, es_namespace=None, identity=None,
                                      indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
                                      tibanna_output_bucket=None,
@@ -434,6 +435,7 @@ class IniFileManager:
               is necessary for legacy reasons but will fail for any other organization than the original HMS/DBMI use.
               You really need to specify this argument or use the ENCODED_S3_BUCKET_ORG environment variable.
             s3_bucket_env (str): Environment name that is part of the s3 bucket name. (Usually defaults properly.)
+            s3_encrypt_key_id (str): The name of the secret that contains s3_encrypt_key.
             data_set (str): An identifier for data to load (either 'prod' for prd/stg envs, or 'test' for others)
             es_server (str): The server name (or server:port) for the ElasticSearch server.
             es_namespace (str): The ElasticSearch namespace to use (probably but not necessarily same as bs_env).
@@ -460,6 +462,7 @@ class IniFileManager:
                                                bs_mirror_env=bs_mirror_env,
                                                s3_bucket_org=s3_bucket_org,
                                                s3_bucket_env=s3_bucket_env,
+                                               s3_encrypt_key_id=s3_encrypt_key_id,
                                                data_set=data_set,
                                                es_server=es_server,
                                                es_namespace=es_namespace,
@@ -529,6 +532,7 @@ class IniFileManager:
     @classmethod
     def build_ini_stream_from_template(cls, template_file_name, init_file_stream, *,
                                        bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
+                                       s3_encrypt_key_id=None,
                                        data_set=None, es_server=None, es_namespace=None, identity=None,
                                        indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
                                        tibanna_output_bucket=None,
@@ -548,6 +552,7 @@ class IniFileManager:
             bs_mirror_env: A beanstalk environment.
             s3_bucket_org: Short name token unique to the organization, for use as a low-tech namespace separator.
             s3_bucket_env: Environment name that is part of the s3 bucket name. (Usually defaults properly.)
+            s3_encrypt_key_id (str): The name of the secret that contains s3_encrypt_key.
             data_set: 'test' or 'prod'. Default is 'test' unless bs_env is a staging or production environment.
             es_server: The name of an es server to use.
             es_namespace: The namespace to use on the es server. If None, this uses the bs_env.
@@ -590,6 +595,9 @@ class IniFileManager:
                                        if cls.APP_ORCHESTRATED
                                        else cls.LEGACY_FOURSIGHT_BUCKET_PREFIX))
         s3_bucket_env = s3_bucket_env or os.environ.get("ENCODED_S3_BUCKET_ENV", get_bucket_env(bs_env))
+        s3_encrypt_key_id = (s3_encrypt_key_id
+                             or os.environ.get("ENCODED_S3_ENCRYPT_KEY_ID")
+                             or "MISSING_ENCODED_S3_ENCRYPT_KEY_ID")
         data_set = (data_set
                     or os.environ.get("ENCODED_DATA_SET")
                     or data_set_for_env(bs_env)
@@ -679,6 +687,7 @@ class IniFileManager:
             'BS_MIRROR_ENV': bs_mirror_env,
             'S3_BUCKET_ORG': s3_bucket_org,
             'S3_BUCKET_ENV': s3_bucket_env,
+            'S3_ENCRYPT_KEY_ID': s3_encrypt_key_id,
             'DATA_SET': data_set,
             'ES_NAMESPACE': es_namespace,
             'IDENTITY': identity,
@@ -792,6 +801,9 @@ class IniFileManager:
             parser.add_argument("--s3_bucket_env",
                                 help="name of env to use in s3 bucket name, usually defaulted without specifying",
                                 default=None)
+            parser.add_argument("--s3_encrypt_key_id",
+                                help="the encrypt key id that holds the encrypt key",
+                                default=None)
             parser.add_argument("--data_set",
                                 help="a data set name",
                                 choices=['test', 'prod'],
@@ -866,7 +878,7 @@ class IniFileManager:
             cls.build_ini_file_from_template(template_file_name, ini_file_name,
                                              bs_env=args.bs_env, bs_mirror_env=args.bs_mirror_env,
                                              s3_bucket_org=args.s3_bucket_org, s3_bucket_env=args.s3_bucket_env,
-                                             data_set=args.data_set,
+                                             data_set=args.data_set, s3_encrypt_key_id=args.s3_encrypt_key_id,
                                              es_server=args.es_server, es_namespace=args.es_namespace,
                                              indexer=args.indexer, index_server=args.index_server,
                                              identity=args.identity,
