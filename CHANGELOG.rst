@@ -7,6 +7,14 @@ Change Log
 ----------
 
 
+3.3.1
+=====
+
+* In ``s3_utils``:
+
+  * Add ``HealthPageKey.S3_ENCRYPT_KEY_ID``.
+
+
 3.3.0
 =====
 
