@@ -7,6 +7,12 @@ Change Log
 ----------
 
 
+3.3.0
+=====
+
+* Add support for environment variable ``ENCODED_S3_ENCRYPT_KEY_ID``, to allow ``S3_ENCRYPT_KEY_ID`` in ``.ini`` files.
+
+
 3.2.1
 =====
 
