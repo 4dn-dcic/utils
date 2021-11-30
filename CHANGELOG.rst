@@ -12,8 +12,6 @@ Change Log
 
 * Configurable support for orchestrated CGAP in ``env_utils`` (C4-689).
 
-* Add support for environment variable ``ENCODED_S3_ENCRYPT_KEY_ID``, to allow ``S3_ENCRYPT_KEY_ID`` in ``.ini`` files.
-
 * Extend that support to allow mirroring to be enabled (C4-734).
 
 The net result is a configurable environment in which the env descriptor in the global env bucket can contain
@@ -37,6 +35,12 @@ these new items:
 ``"stg_env_name"``             The name of the stage env (or None)
 ``"test_envs"``                A list of environments that are for testing
 =============================  ============================================================
+
+
+3.3.0
+=====
+
+* Add support for environment variable ``ENCODED_S3_ENCRYPT_KEY_ID``, to allow ``S3_ENCRYPT_KEY_ID`` in ``.ini`` files.
 
 
 3.2.0
