@@ -597,7 +597,7 @@ class IniFileManager:
         s3_bucket_env = s3_bucket_env or os.environ.get("ENCODED_S3_BUCKET_ENV", get_bucket_env(bs_env))
         s3_encrypt_key_id = (s3_encrypt_key_id
                              or os.environ.get("ENCODED_S3_ENCRYPT_KEY_ID")
-                             or "MISSING_ENCODED_S3_ENCRYPT_KEY_ID")
+                             or None)
         data_set = (data_set
                     or os.environ.get("ENCODED_DATA_SET")
                     or data_set_for_env(bs_env)
