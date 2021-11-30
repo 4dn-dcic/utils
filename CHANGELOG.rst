@@ -49,7 +49,6 @@ these new items:
 * Codebuild support
 
 
-
 3.2.0
 =====
 
