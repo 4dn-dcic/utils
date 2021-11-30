@@ -7,6 +7,12 @@ Change Log
 ----------
 
 
+3.2.1
+=====
+
+* Codebuild support
+
+
 3.2.0
 =====
 
