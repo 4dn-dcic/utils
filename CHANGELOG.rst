@@ -23,6 +23,13 @@ Change Log
   * Add ``s3Utils.s3_encrypt_key_id``.
   * Add ``HealthPageKey.S3_ENCRYPT_KEY_ID``.
 
+* In ``test/test_base.py``:
+
+  * Disable unit tests that are believed broken by WAF changes.
+
+    * ``test_magic_cnames_by_production_ip_address``
+    * ``test_magic_cnames_by_cname_consistency``
+
 
 3.3.0
 =====
