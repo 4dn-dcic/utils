@@ -721,18 +721,10 @@ class IniFileManager:
                                    % (extra_var, os.environ[extra_var], extra_var_val))
 
         # When we've checked everything, go ahead and do the bindings.
-        with override_environ(**extra_vars):
-
-            with io.open(template_file_name, 'r') as template_fp:
-                for line in template_fp:
-                    expanded_line = os.path.expandvars(line)
-                    # Uncomment for debugging, but this must not be disabled for production code so that passwords
-                    # are not echoed into logs. -kmp 26-Feb-2020
-                    # if '$' in line:
-                    #     print("line=", line)
-                    #     print("expanded_line=", expanded_line)
-                    if not cls.omittable(line, expanded_line):
-                        init_file_stream.write(expanded_line)
+        create_file_from_template(template_file=template_file_name,
+                                  to_stream=init_file_stream,
+                                  extra_environment_variables=extra_vars,
+                                  omittable=cls.omittable)
 
     @classmethod
     def any_environment_template_filename(cls):
@@ -896,6 +888,47 @@ class IniFileManager:
         except Exception as e:
             PRINT("Error (%s): %s" % (e.__class__.__name__, e))
             sys.exit(1)
+
+
+def create_file_from_template(template_file, to_file=None, to_stream=None,
+                              extra_environment_variables=None, omittable=None):
+    """
+    Copies the contents of a template file or an open stream, expanding environment variables as encountered.
+
+    :param template_file: The name of the template file to copy.
+    :param to_file: The name of a file to create.
+    :param to_stream: An already-open stream to use instead of creating a file. (Not allowed if to_file was given.)
+    :param extra_environment_variables: A dictionary of additional environment variable bindings to instantiate.
+    :param omittable: A function of two arguments, a line in a template and its expansion, that returns True if the
+        line can be omitted. If this argument is omitted or None, the function behaves as if it always returned False.
+    """
+
+    if not to_file and not to_stream:
+        raise ValueError("You must specify exactly one of 'to_file' or 'to_stream'. You supplied neither.")
+    elif to_file:
+        if to_stream:
+            raise ValueError("You must specify exactly one of 'to_file' or 'to_stream'. You supplied both.")
+        with io.open(to_file, 'w') as output_stream:
+            return create_file_from_template(template_file=template_file,
+                                             to_stream=output_stream, to_file=None,
+                                             extra_environment_variables=extra_environment_variables,
+                                             omittable=omittable)
+
+    # Beyond here, we assume to_stream has been supplied.
+    if not getattr(to_stream, "write", None):
+        raise ValueError(f"The stream {to_stream} does not have a .write() operation.")
+
+    with override_environ(**extra_environment_variables):
+        with io.open(template_file, 'r') as template_fp:
+            for line in template_fp:
+                expanded_line = os.path.expandvars(line)
+                # Uncomment for debugging, but this must not be disabled for production code so that passwords
+                # are not echoed into logs. -kmp 26-Feb-2020
+                # if '$' in line:
+                #     print("line=", line)
+                #     print("expanded_line=", expanded_line)
+                if omittable is None or not omittable(line, expanded_line):
+                    to_stream.write(expanded_line)
 
 
 class BasicCGAPIniFileManager(IniFileManager):

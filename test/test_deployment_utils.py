@@ -1,5 +1,6 @@
 import datetime
 import io
+import json
 import os
 import pytest
 import re
@@ -12,12 +13,14 @@ from unittest import mock
 from dcicutils.deployment_utils import (
     IniFileManager, boolean_setting, CreateMappingOnDeployManager,
     BasicOrchestratedCGAPIniFileManager, BasicLegacyCGAPIniFileManager,
+    create_file_from_template,
     # TODO: This isn't yet tested.
     # EBDeployer,
 )
 from dcicutils.env_utils import is_cgap_env, data_set_for_env
 from dcicutils.exceptions import InvalidParameterError
-from dcicutils.misc_utils import ignored
+from dcicutils.qa_utils import MockFileSystem
+from dcicutils.misc_utils import ignored, file_contents
 from dcicutils.qa_utils import override_environ
 
 
@@ -1413,3 +1416,54 @@ def test_get_deployment_config_cgap_prod_uncorrelated_but_allowed():
     # assert cfg['STRICT'] is ...
     assert my_log.last_msg == ("Environment cgap-blue is an uncorrelated production-class environment"
                                " (neither production nor its staging mirror). Processing mode: SKIP")
+
+
+def test_create_file_from_template():
+
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove():
+
+        with io.open("my.template", "w") as fp:
+            fp.write('{\n "x": "$X",\n "y": "$Y",\n "xy": "($X,$Y)",\n "another": "value"\n}')
+
+        # If all lines from the above-written expression get written, this will be the JSON it describes:
+        full_expectation = {"x": "1", "y": "2", "xy": "(1,2)", "another": "value"}
+
+        variables = {"X": "1", "Y": "2"}
+
+        s = StringIO()
+        create_file_from_template("my.template", to_stream=s, extra_environment_variables=variables)
+        assert json.loads(s.getvalue()) == full_expectation
+
+        assert os.path.exists("my.template")
+        assert not os.path.exists("my.file")
+
+        create_file_from_template("my.template", to_file="my.file", extra_environment_variables=variables)
+        assert os.path.exists("my.file")
+        assert json.loads(file_contents("my.file")) == full_expectation
+
+        def line_contains_1(line, expanded):
+            ignored(expanded)
+            return "1" in line
+
+        def expanded_contains_1(line, expanded):
+            ignored(line)
+            return "1" in expanded
+
+        os.remove("my.file")
+        assert not os.path.exists("my.file")
+
+        create_file_from_template("my.template", to_file="my.file", extra_environment_variables=variables,
+                                  omittable=line_contains_1)
+        assert os.path.exists("my.file")
+        filtered = file_contents("my.file")
+        assert json.loads(filtered) == full_expectation  # NOTE: The "1" is not visible until an expansion
+
+        os.remove("my.file")
+        assert not os.path.exists("my.file")
+        create_file_from_template("my.template", to_file="my.file", extra_environment_variables=variables,
+                                  omittable=expanded_contains_1)
+        assert os.path.exists("my.file")
+        filtered = file_contents("my.file")
+        assert json.loads(filtered) == {"y": "2", "another": "value"}

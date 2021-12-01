@@ -7,8 +7,12 @@ Change Log
 ----------
 
 
-3.3.1
+3.4.0
 =====
+
+* In ``deployment_utils``:
+
+  * Add ``create_file_from_template``.
 
 * In ``s3_utils``:
 
