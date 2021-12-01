@@ -71,6 +71,8 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     TIBANNA_OUTPUT_BUCKET_SUFFIX = 'tibanna-output'
     TIBANNA_CWLS_BUCKET_SUFFIX = 'tibanna-cwls'
 
+    S3_ENCRYPT_KEY_ID = None  # default. might be overridden below
+
     EB_PREFIX = "elasticbeanstalk"
     EB_AND_ENV_PREFIX = EB_PREFIX + "-%s-"  # = "elasticbeanstalk-%s-"
 
@@ -132,6 +134,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 health_json_url = f'{global_manager.portal_url}/health?format=json'
                 logger.warning('health json url: {}'.format(health_json_url))
                 health_json = EnvManager.fetch_health_page_json(url=health_json_url)
+                self.S3_ENCRYPT_KEY_ID = health_json.get(HealthPageKey.S3_ENCRYPT_KEY_ID, None)
                 sys_bucket_from_health_page = health_json[HealthPageKey.SYSTEM_BUCKET]
                 outfile_bucket_from_health_page = health_json[HealthPageKey.PROCESSED_FILE_BUCKET]
                 raw_file_bucket_from_health_page = health_json[HealthPageKey.FILE_UPLOAD_BUCKET]
@@ -201,6 +204,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                     if not es_url.startswith("http"):  # will match http: and https:
                         es_url = f"https://{es_url}"
                     self.env_manager = EnvManager.compose(portal_url=self.url, es_url=es_url, env_name=env, s3=self.s3)
+                    self.S3_ENCRYPT_KEY_ID = health_json.get(HealthPageKey.S3_ENCRYPT_KEY_ID, None)
 
                 # TODO: This branch is not setting self.global_env_bucket_manager, but it _could_ do that from the
                 #       description. -kmp 21-Aug-2021

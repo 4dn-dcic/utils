@@ -19,7 +19,7 @@ from dcicutils.deployment_utils import (
 )
 from dcicutils.env_utils import is_cgap_env, data_set_for_env
 from dcicutils.exceptions import InvalidParameterError
-from dcicutils.qa_utils import MockFileSystem
+from dcicutils.qa_utils import MockFileSystem, printed_output
 from dcicutils.misc_utils import ignored, file_contents
 from dcicutils.qa_utils import override_environ
 
@@ -1460,10 +1460,22 @@ def test_create_file_from_template():
         filtered = file_contents("my.file")
         assert json.loads(filtered) == full_expectation  # NOTE: The "1" is not visible until an expansion
 
-        os.remove("my.file")
-        assert not os.path.exists("my.file")
-        create_file_from_template("my.template", to_file="my.file", extra_environment_variables=variables,
-                                  omittable=expanded_contains_1)
-        assert os.path.exists("my.file")
-        filtered = file_contents("my.file")
-        assert json.loads(filtered) == {"y": "2", "another": "value"}
+        with printed_output() as printed:
+
+            os.remove("my.file")
+            assert not os.path.exists("my.file")
+            create_file_from_template("my.template", to_file="my.file", extra_environment_variables=variables,
+                                      omittable=expanded_contains_1, warn_if_changed="my.file changed")
+            assert os.path.exists("my.file")
+            filtered = file_contents("my.file")
+            assert json.loads(filtered) == {"y": "2", "another": "value"}
+            assert printed.lines == []
+
+        with printed_output() as printed:
+
+            create_file_from_template("my.template", to_file="my.file", extra_environment_variables=variables,
+                                      omittable=line_contains_1, warn_if_changed="my.file changed")
+            assert os.path.exists("my.file")
+            filtered = file_contents("my.file")
+            assert json.loads(filtered) == full_expectation  # NOTE: The "1" is not visible until an expansion
+            assert printed.lines == ["Warning: my.file changed"]

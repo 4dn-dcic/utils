@@ -40,7 +40,7 @@ from .env_utils import (
     is_indexer_env, indexer_env_for_env,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, INDEXER_ENVS,
 )
-from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ
+from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ, file_contents
 from .s3_utils import s3Utils
 
 
@@ -890,8 +890,9 @@ class IniFileManager:
             sys.exit(1)
 
 
-def create_file_from_template(template_file, to_file=None, to_stream=None,
-                              extra_environment_variables=None, omittable=None):
+def create_file_from_template(template_file, *, to_file=None, to_stream=None,
+                              extra_environment_variables=None, omittable=None,
+                              warn_if_changed=None):
     """
     Copies the contents of a template file or an open stream, expanding environment variables as encountered.
 
@@ -901,24 +902,36 @@ def create_file_from_template(template_file, to_file=None, to_stream=None,
     :param extra_environment_variables: A dictionary of additional environment variable bindings to instantiate.
     :param omittable: A function of two arguments, a line in a template and its expansion, that returns True if the
         line can be omitted. If this argument is omitted or None, the function behaves as if it always returned False.
+    :param warn_if_changed: An optional string to be printed to stdout as a warning if the file being created exists
+        already and has changed.
     """
+
+    if warn_if_changed and not to_file:
+        raise ValueError("The 'warn_if_changed' parameter is only useful when 'to_file' is used.")
 
     if not to_file and not to_stream:
         raise ValueError("You must specify exactly one of 'to_file' or 'to_stream'. You supplied neither.")
     elif to_file:
         if to_stream:
             raise ValueError("You must specify exactly one of 'to_file' or 'to_stream'. You supplied both.")
-        with io.open(to_file, 'w') as output_stream:
-            return create_file_from_template(template_file=template_file,
-                                             to_stream=output_stream, to_file=None,
-                                             extra_environment_variables=extra_environment_variables,
-                                             omittable=omittable)
+        output_stream = io.StringIO()
+        create_file_from_template(template_file=template_file,
+                                  to_stream=output_stream, to_file=None,
+                                  extra_environment_variables=extra_environment_variables,
+                                  omittable=omittable)
+        output = output_stream.getvalue()
+        if warn_if_changed and os.path.exists(to_file):
+            if file_contents(to_file) != output:
+                PRINT(f"Warning: {warn_if_changed}")
+        with io.open(to_file, 'w') as file_output_stream:
+            file_output_stream.write(output)
+        return
 
     # Beyond here, we assume to_stream has been supplied.
     if not getattr(to_stream, "write", None):
         raise ValueError(f"The stream {to_stream} does not have a .write() operation.")
 
-    with override_environ(**extra_environment_variables):
+    with override_environ(**(extra_environment_variables or {})):
         with io.open(template_file, 'r') as template_fp:
             for line in template_fp:
                 expanded_line = os.path.expandvars(line)

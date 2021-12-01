@@ -16,6 +16,7 @@ Change Log
 
 * In ``s3_utils``:
 
+  * Add ``s3Utils.S3_ENCRYPT_KEY_ID``.
   * Add ``HealthPageKey.S3_ENCRYPT_KEY_ID``.
 
 
