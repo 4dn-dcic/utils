@@ -14,6 +14,10 @@ Change Log
 
   * Add ``create_file_from_template``.
 
+* In ``qa_utils``:
+
+  * Fix an obscure bug in ``os.remove`` mocking by ``MockFileSystem``.
+
 * In ``s3_utils``:
 
   * Add ``s3Utils.s3_encrypt_key_id``.

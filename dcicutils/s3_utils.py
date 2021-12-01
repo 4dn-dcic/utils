@@ -71,7 +71,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
     TIBANNA_OUTPUT_BUCKET_SUFFIX = 'tibanna-output'
     TIBANNA_CWLS_BUCKET_SUFFIX = 'tibanna-cwls'
 
-    S3_ENCRYPT_KEY_ID = None  # default. might be overridden below
+    s3_encrypt_key_id = None  # default. might be overridden based on health page in various places below
 
     EB_PREFIX = "elasticbeanstalk"
     EB_AND_ENV_PREFIX = EB_PREFIX + "-%s-"  # = "elasticbeanstalk-%s-"
