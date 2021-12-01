@@ -687,6 +687,7 @@ def test_s3_utils_buckets_modern():
                 "metadata_bundles_bucket": "the-metadata-bundles-bucket",
                 "tibanna_cwls_bucket": "the-tibanna-cwls-bucket",
                 "tibanna_output_bucket": "the-tibanna-output-bucket",
+                "s3_encrypt_key_id": "my-encrypt-key",
             }
             s = s3Utils(env=env_name)
             assert s.outfile_bucket != 'the-output-file-bucket'
@@ -704,6 +705,8 @@ def test_s3_utils_buckets_modern():
             assert s.metadata_bucket == 'elasticbeanstalk-fourfront-cgapfoo-metadata-bundles'
             assert s.tibanna_cwls_bucket == 'tibanna-cwls'
             assert s.tibanna_output_bucket == 'tibanna-output'
+
+            assert s.s3_encrypt_key_id == 'my-encrypt-key'
 
             e = s.env_manager
 
