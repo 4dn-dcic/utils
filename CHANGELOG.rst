@@ -7,6 +7,42 @@ Change Log
 ----------
 
 
+3.4.0
+=====
+
+* In ``deployment_utils``:
+
+  * Add ``create_file_from_template``.
+
+* In ``qa_utils``:
+
+  * Fix an obscure bug in ``os.remove`` mocking by ``MockFileSystem``.
+
+* In ``s3_utils``:
+
+  * Add ``s3Utils.s3_encrypt_key_id``.
+  * Add ``HealthPageKey.S3_ENCRYPT_KEY_ID``.
+
+* In ``test/test_base.py``:
+
+  * Disable unit tests that are believed broken by WAF changes.
+
+    * ``test_magic_cnames_by_production_ip_address``
+    * ``test_magic_cnames_by_cname_consistency``
+
+
+3.3.0
+=====
+
+* Add support for environment variable ``ENCODED_S3_ENCRYPT_KEY_ID``, to allow ``S3_ENCRYPT_KEY_ID`` in ``.ini`` files.
+
+
+3.2.1
+=====
+
+* Codebuild support
+
+
 3.2.0
 =====
 

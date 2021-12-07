@@ -40,7 +40,7 @@ from .env_utils import (
     is_indexer_env, indexer_env_for_env,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, INDEXER_ENVS,
 )
-from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ
+from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ, file_contents
 from .s3_utils import s3Utils
 
 
@@ -412,6 +412,7 @@ class IniFileManager:
     @classmethod
     def build_ini_file_from_template(cls, template_file_name, init_file_name, *,
                                      bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
+                                     s3_encrypt_key_id=None,
                                      data_set=None, es_server=None, es_namespace=None, identity=None,
                                      indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
                                      tibanna_output_bucket=None,
@@ -434,6 +435,7 @@ class IniFileManager:
               is necessary for legacy reasons but will fail for any other organization than the original HMS/DBMI use.
               You really need to specify this argument or use the ENCODED_S3_BUCKET_ORG environment variable.
             s3_bucket_env (str): Environment name that is part of the s3 bucket name. (Usually defaults properly.)
+            s3_encrypt_key_id (str): The name of the secret that contains s3_encrypt_key.
             data_set (str): An identifier for data to load (either 'prod' for prd/stg envs, or 'test' for others)
             es_server (str): The server name (or server:port) for the ElasticSearch server.
             es_namespace (str): The ElasticSearch namespace to use (probably but not necessarily same as bs_env).
@@ -460,6 +462,7 @@ class IniFileManager:
                                                bs_mirror_env=bs_mirror_env,
                                                s3_bucket_org=s3_bucket_org,
                                                s3_bucket_env=s3_bucket_env,
+                                               s3_encrypt_key_id=s3_encrypt_key_id,
                                                data_set=data_set,
                                                es_server=es_server,
                                                es_namespace=es_namespace,
@@ -529,6 +532,7 @@ class IniFileManager:
     @classmethod
     def build_ini_stream_from_template(cls, template_file_name, init_file_stream, *,
                                        bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
+                                       s3_encrypt_key_id=None,
                                        data_set=None, es_server=None, es_namespace=None, identity=None,
                                        indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
                                        tibanna_output_bucket=None,
@@ -548,6 +552,7 @@ class IniFileManager:
             bs_mirror_env: A beanstalk environment.
             s3_bucket_org: Short name token unique to the organization, for use as a low-tech namespace separator.
             s3_bucket_env: Environment name that is part of the s3 bucket name. (Usually defaults properly.)
+            s3_encrypt_key_id (str): The name of the secret that contains s3_encrypt_key.
             data_set: 'test' or 'prod'. Default is 'test' unless bs_env is a staging or production environment.
             es_server: The name of an es server to use.
             es_namespace: The namespace to use on the es server. If None, this uses the bs_env.
@@ -590,6 +595,9 @@ class IniFileManager:
                                        if cls.APP_ORCHESTRATED
                                        else cls.LEGACY_FOURSIGHT_BUCKET_PREFIX))
         s3_bucket_env = s3_bucket_env or os.environ.get("ENCODED_S3_BUCKET_ENV", get_bucket_env(bs_env))
+        s3_encrypt_key_id = (s3_encrypt_key_id
+                             or os.environ.get("ENCODED_S3_ENCRYPT_KEY_ID")
+                             or None)
         data_set = (data_set
                     or os.environ.get("ENCODED_DATA_SET")
                     or data_set_for_env(bs_env)
@@ -679,6 +687,7 @@ class IniFileManager:
             'BS_MIRROR_ENV': bs_mirror_env,
             'S3_BUCKET_ORG': s3_bucket_org,
             'S3_BUCKET_ENV': s3_bucket_env,
+            'S3_ENCRYPT_KEY_ID': s3_encrypt_key_id,
             'DATA_SET': data_set,
             'ES_NAMESPACE': es_namespace,
             'IDENTITY': identity,
@@ -712,18 +721,10 @@ class IniFileManager:
                                    % (extra_var, os.environ[extra_var], extra_var_val))
 
         # When we've checked everything, go ahead and do the bindings.
-        with override_environ(**extra_vars):
-
-            with io.open(template_file_name, 'r') as template_fp:
-                for line in template_fp:
-                    expanded_line = os.path.expandvars(line)
-                    # Uncomment for debugging, but this must not be disabled for production code so that passwords
-                    # are not echoed into logs. -kmp 26-Feb-2020
-                    # if '$' in line:
-                    #     print("line=", line)
-                    #     print("expanded_line=", expanded_line)
-                    if not cls.omittable(line, expanded_line):
-                        init_file_stream.write(expanded_line)
+        create_file_from_template(template_file=template_file_name,
+                                  to_stream=init_file_stream,
+                                  extra_environment_variables=extra_vars,
+                                  omittable=cls.omittable)
 
     @classmethod
     def any_environment_template_filename(cls):
@@ -791,6 +792,9 @@ class IniFileManager:
                                 default=None)
             parser.add_argument("--s3_bucket_env",
                                 help="name of env to use in s3 bucket name, usually defaulted without specifying",
+                                default=None)
+            parser.add_argument("--s3_encrypt_key_id",
+                                help="the encrypt key id that holds the encrypt key",
                                 default=None)
             parser.add_argument("--data_set",
                                 help="a data set name",
@@ -866,7 +870,7 @@ class IniFileManager:
             cls.build_ini_file_from_template(template_file_name, ini_file_name,
                                              bs_env=args.bs_env, bs_mirror_env=args.bs_mirror_env,
                                              s3_bucket_org=args.s3_bucket_org, s3_bucket_env=args.s3_bucket_env,
-                                             data_set=args.data_set,
+                                             data_set=args.data_set, s3_encrypt_key_id=args.s3_encrypt_key_id,
                                              es_server=args.es_server, es_namespace=args.es_namespace,
                                              indexer=args.indexer, index_server=args.index_server,
                                              identity=args.identity,
@@ -884,6 +888,60 @@ class IniFileManager:
         except Exception as e:
             PRINT("Error (%s): %s" % (e.__class__.__name__, e))
             sys.exit(1)
+
+
+def create_file_from_template(template_file, *, to_file=None, to_stream=None,
+                              extra_environment_variables=None, omittable=None,
+                              warn_if_changed=None):
+    """
+    Copies the contents of a template file or an open stream, expanding environment variables as encountered.
+
+    :param template_file: The name of the template file to copy.
+    :param to_file: The name of a file to create.
+    :param to_stream: An already-open stream to use instead of creating a file. (Not allowed if to_file was given.)
+    :param extra_environment_variables: A dictionary of additional environment variable bindings to instantiate.
+    :param omittable: A function of two arguments, a line in a template and its expansion, that returns True if the
+        line can be omitted. If this argument is omitted or None, the function behaves as if it always returned False.
+    :param warn_if_changed: An optional string to be printed to stdout as a warning if the file being created exists
+        already and has changed.
+    """
+
+    if warn_if_changed and not to_file:
+        raise ValueError("The 'warn_if_changed' parameter is only useful when 'to_file' is used.")
+
+    if not to_file and not to_stream:
+        raise ValueError("You must specify exactly one of 'to_file' or 'to_stream'. You supplied neither.")
+    elif to_file:
+        if to_stream:
+            raise ValueError("You must specify exactly one of 'to_file' or 'to_stream'. You supplied both.")
+        output_stream = io.StringIO()
+        create_file_from_template(template_file=template_file,
+                                  to_stream=output_stream, to_file=None,
+                                  extra_environment_variables=extra_environment_variables,
+                                  omittable=omittable)
+        output = output_stream.getvalue()
+        if warn_if_changed and os.path.exists(to_file):
+            if file_contents(to_file) != output:
+                PRINT(f"Warning: {warn_if_changed}")
+        with io.open(to_file, 'w') as file_output_stream:
+            file_output_stream.write(output)
+        return
+
+    # Beyond here, we assume to_stream has been supplied.
+    if not getattr(to_stream, "write", None):
+        raise ValueError(f"The stream {to_stream} does not have a .write() operation.")
+
+    with override_environ(**(extra_environment_variables or {})):
+        with io.open(template_file, 'r') as template_fp:
+            for line in template_fp:
+                expanded_line = os.path.expandvars(line)
+                # Uncomment for debugging, but this must not be disabled for production code so that passwords
+                # are not echoed into logs. -kmp 26-Feb-2020
+                # if '$' in line:
+                #     print("line=", line)
+                #     print("expanded_line=", expanded_line)
+                if omittable is None or not omittable(line, expanded_line):
+                    to_stream.write(expanded_line)
 
 
 class BasicCGAPIniFileManager(IniFileManager):
