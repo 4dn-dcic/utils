@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+3.4.1
+=====
+
+* ``deployment_utils``:
+
+  * Default the value of ``s3_encode_key_id`` to the empty string, not ``None``.
+
 
 3.4.0
 =====
