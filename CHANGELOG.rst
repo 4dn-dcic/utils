@@ -6,6 +6,36 @@ dcicutils
 Change Log
 ----------
 
+4.0.0
+=====
+
+* Configurable support for orchestrated CGAP in ``env_utils`` (C4-689).
+
+* Extend that support to allow mirroring to be enabled (C4-734).
+
+The net result is a configurable environment in which the env descriptor in the global env bucket can contain
+these new items:
+
+=============================  ============================================================
+    Key                            Notes
+=============================  ============================================================
+``"dev_data_set_table"``       Dictionary mapping envnames to their preferred data set
+``"dev_env_domain_suffix"``    e.g., .abc123def456ghi789.us-east-1.rds.amazonaws.com
+``"foursight_url_prefix"``
+``"full_env_prefix"``          A string like "cgap-" that precedes all env names
+``"hotseat_envs"``             A list of environments that are for testing with hot data
+``"indexer_env_name"``         The environment name used for indexing
+``"is_legacy"``
+``"stage_mirroring_enabled"``
+``"orchestrated_app"``         This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
+``"prd_bucket"``
+``"prd_env_name"``             The name of the prod env
+``"public_url_table"``         Dictionary mapping envnames & pseudo_envnames to public urls
+``"stg_env_name"``             The name of the stage env (or None)
+``"test_envs"``                A list of environments that are for testing
+=============================  ============================================================
+
+
 3.4.1
 =====
 
@@ -36,42 +66,6 @@ Change Log
 
     * ``test_magic_cnames_by_production_ip_address``
     * ``test_magic_cnames_by_cname_consistency``
-
-
-3.3.0
-=====
-
-* Add support for environment variable ``ENCODED_S3_ENCRYPT_KEY_ID``, to allow ``S3_ENCRYPT_KEY_ID`` in ``.ini`` files.
-
-
-4.0.0
-=====
-
-* Configurable support for orchestrated CGAP in ``env_utils`` (C4-689).
-
-* Extend that support to allow mirroring to be enabled (C4-734).
-
-The net result is a configurable environment in which the env descriptor in the global env bucket can contain
-these new items:
-
-=============================  ============================================================
-    Key                            Notes
-=============================  ============================================================
-``"dev_data_set_table"``       Dictionary mapping envnames to their preferred data set
-``"dev_env_domain_suffix"``    e.g., .abc123def456ghi789.us-east-1.rds.amazonaws.com
-``"foursight_url_prefix"``
-``"full_env_prefix"``          A string like "cgap-" that precedes all env names
-``"hotseat_envs"``             A list of environments that are for testing with hot data
-``"indexer_env_name"``         The environment name used for indexing
-``"is_legacy"``
-``"stage_mirroring_enabled"``
-``"orchestrated_app"``         This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
-``"prd_bucket"``
-``"prd_env_name"``             The name of the prod env
-``"public_url_table"``         Dictionary mapping envnames & pseudo_envnames to public urls
-``"stg_env_name"``             The name of the stage env (or None)
-``"test_envs"``                A list of environments that are for testing
-=============================  ============================================================
 
 
 3.3.0
