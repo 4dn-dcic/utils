@@ -1,5 +1,6 @@
 import datetime
 import io
+import json
 import os
 import pytest
 import re
@@ -12,12 +13,14 @@ from unittest import mock
 from dcicutils.deployment_utils import (
     IniFileManager, boolean_setting, CreateMappingOnDeployManager,
     BasicOrchestratedCGAPIniFileManager, BasicLegacyCGAPIniFileManager,
+    create_file_from_template,
     # TODO: This isn't yet tested.
     # EBDeployer,
 )
 from dcicutils.env_utils import is_cgap_env, data_set_for_env
 from dcicutils.exceptions import InvalidParameterError
-from dcicutils.misc_utils import ignored
+from dcicutils.qa_utils import MockFileSystem, printed_output
+from dcicutils.misc_utils import ignored, file_contents
 from dcicutils.qa_utils import override_environ
 
 
@@ -712,6 +715,7 @@ def test_deployment_utils_transitional_equivalence():
                                                         expect_index_server=index_server_default))
 
                     test_alpha_org = "alphatest"
+                    test_encrypt_key_id = 'sample-encrypt-key-id-for-testing'
                     bs_env = "cgap-alpha"
                     data_set = data_set_for_env(bs_env) or "prod"
 
@@ -761,6 +765,7 @@ def test_deployment_utils_transitional_equivalence():
                                                         }),
                            s3_bucket_env=bs_env,
                            s3_bucket_org=test_alpha_org,
+                           s3_encrypt_key_id=test_encrypt_key_id,
                            application_bucket_prefix=f"{test_alpha_org}-")
 
                     tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
@@ -773,6 +778,7 @@ def test_deployment_utils_transitional_equivalence():
                                                         }),
                            s3_bucket_env=bs_env,
                            s3_bucket_org=test_alpha_org,
+                           s3_encrypt_key_id=test_encrypt_key_id,
                            application_bucket_prefix=f"{test_alpha_org}-")
 
                     bs_env = "cgap-alfa"
@@ -790,6 +796,7 @@ def test_deployment_utils_transitional_equivalence():
                                                             "identity": "ThisIsMyIdentity",
                                                             "tibanna_cwls_bucket": "cwls-bucket",
                                                             "tibanna_output_bucket": "tb-bucket",
+                                                            "s3_encrypt_key_id": "MyKey",
                                                         }),
                            s3_bucket_env=bs_env,
                            s3_bucket_org=test_alpha_org,
@@ -804,6 +811,7 @@ def test_deployment_utils_transitional_equivalence():
                            auth0_secret="piepipiepipiepi",
                            tibanna_cwls_bucket="cwls-bucket",
                            tibanna_output_bucket="tb-bucket",
+                           s3_encrypt_key_id="MyKey",
                            )
 
                     with override_environ(ENCODED_FILE_UPLOAD_BUCKET='decoy1',
@@ -813,7 +821,9 @@ def test_deployment_utils_transitional_equivalence():
                                           ENCODED_METADATA_BUNDLES_BUCKET='decoy5',
                                           ENCODED_S3_BUCKET_ORG='decoy6',
                                           ENCODED_TIBANNA_OUTPUT_BUCKET='decoy7',
-                                          ENCODED_TIBANNA_CWLS_BUCKET='decoy8'):
+                                          ENCODED_TIBANNA_CWLS_BUCKET='decoy8',
+                                          ENCODED_S3_ENCRYPT_KEY_ID='decoy9',
+                                          ):
                         # The decoy values in the environment variables don't matter because we'll be passing
                         # explicit values for these to the builder that will take precedence.
                         tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
@@ -830,6 +840,7 @@ def test_deployment_utils_transitional_equivalence():
                                                                 "tibanna_cwls_bucket": "cwls-bucket",
                                                                 "tibanna_output_bucket": "tb-bucket",
                                                                 "identity": "ThisIsMyIdentity",
+                                                                "s3_encrypt_key_id": "MyKeyId",
                                                             }),
                                s3_bucket_env=bs_env,
                                s3_bucket_org=test_alpha_org,
@@ -841,6 +852,7 @@ def test_deployment_utils_transitional_equivalence():
                                tibanna_cwls_bucket="cwls-bucket",
                                tibanna_output_bucket="tb-bucket",
                                identity='ThisIsMyIdentity',
+                               s3_encrypt_key_id='MyKeyId',
                                )
 
                     with override_environ(ENCODED_FILE_UPLOAD_BUCKET='fu-bucket',
@@ -851,7 +863,8 @@ def test_deployment_utils_transitional_equivalence():
                                           ENCODED_S3_BUCKET_ORG=test_alpha_org,
                                           ENCODED_TIBANNA_OUTPUT_BUCKET='tb-bucket',
                                           ENCODED_TIBANNA_CWLS_BUCKET='cwls-bucket',
-                                          ENCODED_IDENTITY='ThisIsMyIdentity'):
+                                          ENCODED_IDENTITY='ThisIsMyIdentity',
+                                          ENCODED_S3_ENCRYPT_KEY_ID='MyKeyId'):
                         # If no explicit args are passed to the builder, the ENCODED_xxx arguments DO matter.
                         tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
                                use_ini_file_manager_kind="orchestrated-cgap",
@@ -867,6 +880,7 @@ def test_deployment_utils_transitional_equivalence():
                                                                 "tibanna_cwls_bucket": "cwls-bucket",
                                                                 "tibanna_output_bucket": "tb-bucket",
                                                                 "identity": "ThisIsMyIdentity",
+                                                                "s3_encrypt_key_id": "MyKeyId",
                                                             }),
                                s3_bucket_env=bs_env)
 
@@ -1087,6 +1101,7 @@ def test_deployment_utils_main():
                             'indexer': None,
                             's3_bucket_org': None,
                             's3_bucket_env': None,
+                            's3_encrypt_key_id': None,
                             'sentry_dsn': None,
                             'auth0_client': None,
                             'auth0_secret': None,
@@ -1116,6 +1131,7 @@ def test_deployment_utils_main():
                             'indexer': 'false',
                             's3_bucket_org': None,
                             's3_bucket_env': None,
+                            's3_encrypt_key_id': None,
                             'sentry_dsn': None,
                             'auth0_client': None,
                             'auth0_secret': None,
@@ -1143,6 +1159,7 @@ def test_deployment_utils_main():
                                 'indexer': 'false',
                                 's3_bucket_org': None,
                                 's3_bucket_env': None,
+                                's3_encrypt_key_id': None,
                                 'sentry_dsn': None,
                                 'auth0_client': None,
                                 'auth0_secret': None,
@@ -1399,3 +1416,66 @@ def test_get_deployment_config_cgap_prod_uncorrelated_but_allowed():
     # assert cfg['STRICT'] is ...
     assert my_log.last_msg == ("Environment cgap-blue is an uncorrelated production-class environment"
                                " (neither production nor its staging mirror). Processing mode: SKIP")
+
+
+def test_create_file_from_template():
+
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove():
+
+        with io.open("my.template", "w") as fp:
+            fp.write('{\n "x": "$X",\n "y": "$Y",\n "xy": "($X,$Y)",\n "another": "value"\n}')
+
+        # If all lines from the above-written expression get written, this will be the JSON it describes:
+        full_expectation = {"x": "1", "y": "2", "xy": "(1,2)", "another": "value"}
+
+        variables = {"X": "1", "Y": "2"}
+
+        s = StringIO()
+        create_file_from_template("my.template", to_stream=s, extra_environment_variables=variables)
+        assert json.loads(s.getvalue()) == full_expectation
+
+        assert os.path.exists("my.template")
+        assert not os.path.exists("my.file")
+
+        create_file_from_template("my.template", to_file="my.file", extra_environment_variables=variables)
+        assert os.path.exists("my.file")
+        assert json.loads(file_contents("my.file")) == full_expectation
+
+        def line_contains_1(line, expanded):
+            ignored(expanded)
+            return "1" in line
+
+        def expanded_contains_1(line, expanded):
+            ignored(line)
+            return "1" in expanded
+
+        os.remove("my.file")
+        assert not os.path.exists("my.file")
+
+        create_file_from_template("my.template", to_file="my.file", extra_environment_variables=variables,
+                                  omittable=line_contains_1)
+        assert os.path.exists("my.file")
+        filtered = file_contents("my.file")
+        assert json.loads(filtered) == full_expectation  # NOTE: The "1" is not visible until an expansion
+
+        with printed_output() as printed:
+
+            os.remove("my.file")
+            assert not os.path.exists("my.file")
+            create_file_from_template("my.template", to_file="my.file", extra_environment_variables=variables,
+                                      omittable=expanded_contains_1, warn_if_changed="my.file changed")
+            assert os.path.exists("my.file")
+            filtered = file_contents("my.file")
+            assert json.loads(filtered) == {"y": "2", "another": "value"}
+            assert printed.lines == []
+
+        with printed_output() as printed:
+
+            create_file_from_template("my.template", to_file="my.file", extra_environment_variables=variables,
+                                      omittable=line_contains_1, warn_if_changed="my.file changed")
+            assert os.path.exists("my.file")
+            filtered = file_contents("my.file")
+            assert json.loads(filtered) == full_expectation  # NOTE: The "1" is not visible until an expansion
+            assert printed.lines == ["Warning: my.file changed"]
