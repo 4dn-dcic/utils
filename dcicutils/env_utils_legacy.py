@@ -383,6 +383,22 @@ def is_fourfront_env(envname: EnvName):
     return ('fourfront' in envname and 'cgap' not in envname) if envname else False
 
 
+def is_orchestrated():
+    return False
+
+
+def maybe_get_declared_prd_env_name(project: OrchestratedApp) -> Optional[EnvName]:
+    return _orchestrated_app_case(orchestrated_app=project,
+                                  if_fourfront=None,
+                                  if_cgap='fourfront-cgap')
+
+
+def has_declared_stg_env(project: OrchestratedApp) -> bool:
+    return _orchestrated_app_case(orchestrated_app=project,
+                                  if_fourfront=True,
+                                  if_cgap=False)
+
+
 def is_stg_or_prd_env(envname: Optional[EnvName]):
     """
     Returns True if the given envname is the name of something that might be either live data or something

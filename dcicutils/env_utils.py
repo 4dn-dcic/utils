@@ -2,13 +2,16 @@ import boto3
 import functools
 import json
 import os
+import re
 
+from botocore.exceptions import HTTPClientError, ClientError
 from typing import Optional
 from urllib.parse import urlparse
 from . import env_utils_legacy as legacy
 from .common import EnvName, OrchestratedApp
 from .env_base import EnvManager
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
+from .exceptions import EnvUtilsLoadError
 from .misc_utils import decorator, full_object_name, ignored, remove_prefix, check_true, find_association
 
 
@@ -263,17 +266,43 @@ class EnvUtils:
                 else:
                     setattr(EnvUtils, var, None)
 
+    # Vaguely, the thing we're trying to recognize is this (sanitized slightly here),
+    # which we first call str() on and then check with a regular expression:
+    #
+    # ValueError("Invalid header value b'AWS4-HMAC-SHA256 Credential=ABCDEF1234PQRST99999\\n"
+    #            "AKIA5NVXX3EKMJOCZ4VE/20211021/us-east-1/s3/aws4_request,"
+    #            " SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-security-token,"
+    #            " Signature=123abc456def789xyz1a2b3c4d'",)
+    _CREDENTIALS_ERROR_PATTERN = re.compile(".*Invalid header value.*(Credentials|SignedHeaders)")
+
     @classmethod
     def load_declared_data(cls, env_name=None):
         bucket = EnvManager.global_env_bucket_name()
         if bucket:
             env_name = env_name or os.environ.get('ENV_NAME')
             if env_name:
-                s3 = boto3.client('s3')
-                metadata = s3.get_object(Bucket=bucket, Key=env_name)
-                data = json.load(metadata['Body'])
-                cls.set_declared_data(data)
-                return
+                try:
+                    s3 = boto3.client('s3')
+                    metadata = s3.get_object(Bucket=bucket, Key=env_name)
+                    data = json.load(metadata['Body'])
+                    cls.set_declared_data(data)
+                    return
+                except HTTPClientError as err_obj:
+                    if cls._CREDENTIALS_ERROR_PATTERN.match(str(err_obj)):  # Some sort of plausibility test
+                        raise EnvUtilsLoadError("Credentials problem, perhaps expired or wrong account.",
+                                                bucket_name=bucket, env=env_name, encapsulated_error=err_obj)
+                    raise
+                except ClientError as err_obj:
+                    response_data = getattr(err_obj, 'response', {})
+                    response_error = response_data.get('Error', {})
+                    if response_error:
+                        response_error_code = response_error.get('Code', None)
+                        msg = response_error.get('Message') or response_error_code or "Load Error"
+                        raise EnvUtilsLoadError(msg, bucket_name=bucket, env=env_name, encapsulated_error=err_obj)
+                    raise
+                except Exception as err_obj:
+                    raise EnvUtilsLoadError(str(err_obj), bucket_name=bucket, env=env_name, encapsulated_error=err_obj)
+
         cls.set_declared_data({e.IS_LEGACY: True})
 
     @classmethod
@@ -285,12 +314,19 @@ class EnvUtils:
 
 
 @if_orchestrated
-def is_indexer_env(envname):
+def is_indexer_env(envname: EnvName) -> bool:
+    """
+    Returns true if the given envname is the indexer env name.
+    """
     return envname == EnvUtils.INDEXER_ENV_NAME
 
 
 @if_orchestrated
-def indexer_env_for_env(envname):
+def indexer_env_for_env(envname: EnvName) -> Optional[EnvName]:
+    """
+    Given any environment, returns the associated indexer env.
+    (If the environment is the indexer env itself, returns None.)
+    """
     if envname == EnvUtils.INDEXER_ENV_NAME:
         return None
     else:
@@ -298,7 +334,7 @@ def indexer_env_for_env(envname):
 
 
 @if_orchestrated
-def data_set_for_env(envname, default=None):
+def data_set_for_env(envname: EnvName, default=None):
     if is_stg_or_prd_env(envname):
         return 'prod'
     else:
@@ -330,7 +366,7 @@ def prod_bucket_env_for_app(appname: Optional[OrchestratedApp] = None):
 
 
 @if_orchestrated
-def prod_bucket_env(envname):
+def prod_bucket_env(envname: EnvName) -> Optional[EnvName]:
     if is_stg_or_prd_env(envname):
         return EnvUtils.PRD_BUCKET
     else:
@@ -364,7 +400,7 @@ def _check_appname(appname: Optional[OrchestratedApp], required=False):
 
 
 @if_orchestrated
-def public_url_for_app(appname: Optional[OrchestratedApp] = None):
+def public_url_for_app(appname: Optional[OrchestratedApp] = None) -> Optional[str]:
     _check_appname(appname)
     entry = find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.ENVIRONMENT: EnvUtils.PRD_ENV_NAME})
     if entry:
@@ -372,7 +408,7 @@ def public_url_for_app(appname: Optional[OrchestratedApp] = None):
 
 
 @if_orchestrated
-def is_cgap_server(server, allow_localhost=False):
+def is_cgap_server(server, allow_localhost=False) -> bool:
     check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
     is_cgap = EnvUtils.ORCHESTRATED_APP == 'cgap'
     if not is_cgap:
@@ -387,7 +423,7 @@ def is_cgap_server(server, allow_localhost=False):
 
 
 @if_orchestrated
-def is_fourfront_server(server, allow_localhost=False):
+def is_fourfront_server(server, allow_localhost=False) -> bool:
     check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
     is_fourfront = EnvUtils.ORCHESTRATED_APP == 'fourfront'
     if not is_fourfront:
@@ -402,7 +438,7 @@ def is_fourfront_server(server, allow_localhost=False):
 
 
 @if_orchestrated
-def is_cgap_env(envname):
+def is_cgap_env(envname: Optional[EnvName]) -> bool:
     if not isinstance(envname, str):
         return False
     elif EnvUtils.ORCHESTRATED_APP != 'cgap':
@@ -416,7 +452,7 @@ def is_cgap_env(envname):
 
 
 @if_orchestrated
-def is_fourfront_env(envname):
+def is_fourfront_env(envname: Optional[EnvName]) -> bool:
     if not isinstance(envname, str):
         return False
     elif EnvUtils.ORCHESTRATED_APP != 'fourfront':
@@ -429,13 +465,30 @@ def is_fourfront_env(envname):
         return False
 
 
-def _is_raw_stg_or_prd_env(envname):
+def _is_raw_stg_or_prd_env(envname: EnvName) -> bool:
     return (envname == EnvUtils.PRD_ENV_NAME or
             (EnvUtils.STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME and envname == EnvUtils.STG_ENV_NAME))
 
 
 @if_orchestrated
-def is_stg_or_prd_env(envname):
+def is_orchestrated() -> bool:
+    return True
+
+
+@if_orchestrated
+def maybe_get_declared_prd_env_name(project: OrchestratedApp) -> Optional[EnvName]:
+    _check_appname(appname=project)
+    return EnvUtils.PRD_ENV_NAME
+
+
+@if_orchestrated
+def has_declared_stg_env(project: OrchestratedApp) -> bool:
+    _check_appname(appname=project)
+    return True if EnvUtils.STG_ENV_NAME else False
+
+
+@if_orchestrated
+def is_stg_or_prd_env(envname: Optional[EnvName]) -> bool:
     # The legacy version does something much more elaborate that involves heuristics on names.
     # Note, too, that in the legacy version, this would return true both of CGAP or Fourfront names,
     # but really you're only supposed to call it on one or the other's environments. It's rarely the
@@ -456,7 +509,7 @@ def is_stg_or_prd_env(envname):
 
 
 @if_orchestrated
-def is_test_env(envname):
+def is_test_env(envname: Optional[EnvName]) -> bool:
     envs = EnvUtils.TEST_ENVS or []
     if not isinstance(envname, str):
         return False
@@ -471,7 +524,7 @@ def is_test_env(envname):
 
 
 @if_orchestrated
-def is_hotseat_env(envname):
+def is_hotseat_env(envname: Optional[EnvName]) -> bool:
     envs = EnvUtils.HOTSEAT_ENVS or []
     if not isinstance(envname, str):
         return False

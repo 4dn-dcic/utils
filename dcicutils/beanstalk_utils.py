@@ -19,7 +19,7 @@ from .base import (
     beanstalk_info, describe_beanstalk_environments, get_beanstalk_real_url,
     compute_ff_prd_env, compute_ff_stg_env, compute_cgap_prd_env, compute_cgap_stg_env, compute_prd_env_for_env,
 )
-from .env_utils import is_stg_or_prd_env
+from .env_utils import is_stg_or_prd_env, is_orchestrated
 from .misc_utils import PRINT, exported, obsolete, remove_suffix, prompt_for_input
 
 
@@ -248,6 +248,11 @@ def _create_foursight_new(dest_env):
     fs['fs_url'] = get_foursight_env(dest_env, fs['bs_url'])
     fs['es_url'] = ff_utils.get_health_page(ff_env=dest_env)['elasticsearch']
     fs['foursight'] = create_foursight(**fs)
+    if is_orchestrated():
+        # TODO: Probably want to inherit some values from the old file in this case, since not all of those change.
+        raise NotImplementedError("Need to add orchestration support here.")
+    else:
+        fs['is_legacy'] = True
 
     # delete initial checks (? not clear why this was happening before)
     if fs['foursight'].get('initial_checks'):

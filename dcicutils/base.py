@@ -2,12 +2,13 @@ import boto3
 import time
 
 from botocore.exceptions import ClientError
-from dcicutils.common import REGION
+from dcicutils.common import REGION, OrchestratedApp, EnvName
 from dcicutils.misc_utils import PRINT
 from dcicutils.env_utils import (
-    is_cgap_env, is_fourfront_env, is_stg_or_prd_env, public_url_mappings,
-    blue_green_mirror_env, get_standard_mirror_env,
+    is_cgap_env, is_fourfront_env, is_stg_or_prd_env, public_url_mappings, is_orchestrated,
+    blue_green_mirror_env, get_standard_mirror_env, has_declared_stg_env, maybe_get_declared_prd_env_name,
 )
+from typing import Optional
 
 
 FOURSIGHT_URL = 'https://foursight.4dnucleome.org/'
@@ -108,7 +109,7 @@ def get_beanstalk_real_url(env):
     return url
 
 
-def _compute_prd_env_for_project(project):
+def _compute_prd_env_for_project(project: OrchestratedApp) -> Optional[EnvName]:
     """
     Determines which ElasticBeanstalk environment is currently hosting
     data.4dnucleome.org. Requires IAM permissions for EB!
@@ -116,6 +117,28 @@ def _compute_prd_env_for_project(project):
     Returns:
         str: EB environment name hosting data.4dnucleome
     """
+
+    if not has_declared_stg_env(project):
+        return maybe_get_declared_prd_env_name(project)
+    elif is_orchestrated():
+        return _compute_orchestrated_prd_env_for_project(project)
+    else:
+        return _compute_beanstalk_prd_env_for_project(project)
+
+
+def _compute_orchestrated_prd_env_for_project(project: OrchestratedApp) -> Optional[EnvName]:
+    raise NotImplementedError("_compute_orchestrated_prd_env_for_project is not implemented.")
+
+
+def _compute_beanstalk_prd_env_for_project(project: OrchestratedApp) -> Optional[EnvName]:
+    """
+    Determines which ElasticBeanstalk environment is currently hosting
+    data.4dnucleome.org. Requires IAM permissions for EB!
+
+    Returns:
+        str: EB environment name hosting data.4dnucleome
+    """
+
     magic_cname = _CGAP_MAGIC_CNAME if project == 'cgap' else _FF_MAGIC_CNAME
     client = boto3.client('elasticbeanstalk', region_name=REGION)
     res = describe_beanstalk_environments(client, ApplicationName="4dn-web")
