@@ -418,7 +418,7 @@ class MockFileSystem:
 
     def remove(self, file):
         self._maybe_auto_mirror_file(file)
-        if not self.files.pop(file, None):
+        if self.files.pop(file, None) is None:
             raise FileNotFoundError("No such file or directory: %s" % file)
 
     def open(self, file, mode='r', encoding=None):

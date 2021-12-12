@@ -6,7 +6,6 @@ dcicutils
 Change Log
 ----------
 
-
 4.0.0
 =====
 
@@ -35,6 +34,38 @@ these new items:
 ``"stg_env_name"``             The name of the stage env (or None)
 ``"test_envs"``                A list of environments that are for testing
 =============================  ============================================================
+
+
+3.4.1
+=====
+
+* ``deployment_utils``:
+
+  * Default the value of ``s3_encode_key_id`` to the empty string, not ``None``.
+
+
+3.4.0
+=====
+
+* In ``deployment_utils``:
+
+  * Add ``create_file_from_template``.
+
+* In ``qa_utils``:
+
+  * Fix an obscure bug in ``os.remove`` mocking by ``MockFileSystem``.
+
+* In ``s3_utils``:
+
+  * Add ``s3Utils.s3_encrypt_key_id``.
+  * Add ``HealthPageKey.S3_ENCRYPT_KEY_ID``.
+
+* In ``test/test_base.py``:
+
+  * Disable unit tests that are believed broken by WAF changes.
+
+    * ``test_magic_cnames_by_production_ip_address``
+    * ``test_magic_cnames_by_cname_consistency``
 
 
 3.3.0
