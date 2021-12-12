@@ -95,7 +95,6 @@ these new items:
     * New function ``script_assure_env`` to help with that.
 
 
-
 3.1.0
 =====
 
