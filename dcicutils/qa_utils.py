@@ -772,7 +772,6 @@ class MockBotoS3Client:
             other_required_arguments[name] = content
         self.other_required_arguments = other_required_arguments
         self.storage_class = storage_class or self.DEFAULT_STORAGE_CLASS
-        self.storage_class_map = dict()
 
     def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
         if kwargs != self.other_required_arguments:
@@ -884,11 +883,17 @@ class MockBotoS3Client:
         # This is different but similar to list_objects. However we don't really care about that.
         return self.list_objects(Bucket=Bucket)
 
+    def _storage_class_map(self):
+        storage_class_map = self.boto3.shared_reality.get('storage_class_map')
+        if not storage_class_map:
+            self.boto3.shared_reality['storage_class_map'] = storage_class_map = {}
+        return storage_class_map
+
     def _object_storage_class(self, filename):
-        return self.storage_class_map.get(filename) or self.storage_class
+        return self._storage_class_map().get(filename) or self.storage_class
 
     def _set_object_storage_class(self, filename, value):
-        self.storage_class_map[filename] = value
+        self._storage_class_map()[filename] = value
 
     def list_objects(self, Bucket, Prefix=None):  # noQA - AWS argument naming style
         # Ref: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects
