@@ -772,7 +772,7 @@ class MockBotoS3Client:
             other_required_arguments[name] = content
         self.other_required_arguments = other_required_arguments
         self.storage_class = storage_class or self.DEFAULT_STORAGE_CLASS
-
+        self.storage_class_map = dict()
 
     def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
         if kwargs != self.other_required_arguments:
@@ -859,6 +859,7 @@ class MockBotoS3Client:
                 'Key': Key,
                 'ETag': self._content_etag(content),
                 'ContentLength': len(content),
+                'StorageClass': self._object_storage_class(filename=pseudo_filename),
                 # Numerous others, but this is enough to make the dictionary non-empty and to satisfy some of our tools
             }
         else:
@@ -883,6 +884,12 @@ class MockBotoS3Client:
         # This is different but similar to list_objects. However we don't really care about that.
         return self.list_objects(Bucket=Bucket)
 
+    def _object_storage_class(self, filename):
+        return self.storage_class_map.get(filename) or self.storage_class
+
+    def _set_object_storage_class(self, filename, value):
+        self.storage_class_map[filename] = value
+
     def list_objects(self, Bucket, Prefix=None):  # noQA - AWS argument naming style
         # Ref: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects
         bucket_prefix = Bucket + "/"
@@ -897,7 +904,7 @@ class MockBotoS3Client:
                     # "LastModified": ...,
                     # "Owner": {"DisplayName": ..., "ID"...},
                     "Size": len(content),
-                    "StorageClass": self.storage_class,
+                    "StorageClass": self._object_storage_class(filename=filename),
                 })
         return {
             # "CommonPrefixes": {"Prefix": ...},

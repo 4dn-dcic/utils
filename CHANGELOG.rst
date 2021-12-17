@@ -6,6 +6,18 @@ dcicutils
 Change Log
 ----------
 
+3.4.2
+=====
+
+* In ``qa_utils``:
+
+  * Fix S3 ``head_object`` operation to return the ``StorageClass`` since
+    the mock already allows you to declare it.
+
+  * Add internal support to be expanded later for making individual S3 files
+    have different storage class.
+
+
 3.4.1
 =====
 
