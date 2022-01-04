@@ -6,6 +6,14 @@ dcicutils
 Change Log
 ----------
 
+3.5.0
+=====
+
+* In ``ff_utils``:
+
+  * Add ``parse_s3_bucket_and_key_url``.
+
+
 3.4.2
 =====
 
