@@ -1652,3 +1652,19 @@ def test_are_counts_even_unit(expect_match, sample_counts):
                 else:
                     assert not counts_are_even
                     assert 'more items' in ' '.join(totals)
+
+
+@pytest.mark.parametrize('url, expected_bucket, expected_key', [
+    ('https://s3.amazonaws.com/cgap-devtest-main-application-cgap-devtest-wfout/GAPFI1HVXJ5F/fastqc_report.html',
+     'cgap-devtest-main-application-cgap-devtest-wfout', 'GAPFI1HVXJ5F/fastqc_report.html'),
+    ('https://cgap-devtest-main-application-tibanna-logs.s3.amazonaws.com/41c2fJDQcLk3.metrics/metrics.html',
+     'cgap-devtest-main-application-tibanna-logs', '41c2fJDQcLk3.metrics/metrics.html'),
+    ('https://elasticbeanstalk-fourfront-cgap-files.s3.amazonaws.com/GAPFIDUMMY/GAPFIDUMMY.fastq.gz',
+     'elasticbeanstalk-fourfront-cgap-files', 'GAPFIDUMMY/GAPFIDUMMY.fastq.gz')
+])
+def test_parse_s3_bucket_key_url(url, expected_bucket, expected_key):
+    """ Tests that we correctly parse the given URls into their bucket, key identifiers.
+        Note that these tests cases are specific to our DB!
+    """
+    bucket, key = ff_utils.parse_s3_bucket_and_key_url(url)
+    assert expected_bucket == bucket and key == expected_key
