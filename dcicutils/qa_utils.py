@@ -773,7 +773,6 @@ class MockBotoS3Client:
         self.other_required_arguments = other_required_arguments
         self.storage_class = storage_class or self.DEFAULT_STORAGE_CLASS
 
-
     def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
         if kwargs != self.other_required_arguments:
             raise MockKeysNotImplemented("upload_file_obj", kwargs.keys())
@@ -859,6 +858,7 @@ class MockBotoS3Client:
                 'Key': Key,
                 'ETag': self._content_etag(content),
                 'ContentLength': len(content),
+                'StorageClass': self._object_storage_class(filename=pseudo_filename),
                 # Numerous others, but this is enough to make the dictionary non-empty and to satisfy some of our tools
             }
         else:
@@ -883,6 +883,42 @@ class MockBotoS3Client:
         # This is different but similar to list_objects. However we don't really care about that.
         return self.list_objects(Bucket=Bucket)
 
+    def _storage_class_map(self):
+        """
+        Returns the storage class map for this mock.
+
+        Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
+        so that if another client is created by that same boto3 mock, it will see the same storage classes.
+        """
+        storage_class_map = self.boto3.shared_reality.get('storage_class_map')
+        if not storage_class_map:
+            self.boto3.shared_reality['storage_class_map'] = storage_class_map = {}
+        return storage_class_map
+
+    def _object_storage_class(self, filename):
+        """
+        Returns the storage class for the 'filename' in this S3 mock.
+        Because this is an internal routine, 'filename' is 'bucket/key' to match the mock file system we use internally.
+
+        Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
+        so that if another client is created by that same boto3 mock, it will see the same storage classes.
+        """
+        return self._storage_class_map().get(filename) or self.storage_class
+
+    def _set_object_storage_class(self, filename, value):
+        """
+        Sets the storage class for the 'filename' in this S3 mock to the given value.
+        Because this is an internal routine, 'filename' is 'bucket/key' to match the mock file system we use internally.
+
+        Presently the value is not error-checked. That might change.
+        By special exception, passing value=None will revert the storage class to the default for the given mock,
+        for which the default default is 'STANDARD'.
+
+        Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
+        so that if another client is created by that same boto3 mock, it will see the same storage classes.
+        """
+        self._storage_class_map()[filename] = value
+
     def list_objects(self, Bucket, Prefix=None):  # noQA - AWS argument naming style
         # Ref: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects
         bucket_prefix = Bucket + "/"
@@ -897,7 +933,7 @@ class MockBotoS3Client:
                     # "LastModified": ...,
                     # "Owner": {"DisplayName": ..., "ID"...},
                     "Size": len(content),
-                    "StorageClass": self.storage_class,
+                    "StorageClass": self._object_storage_class(filename=filename),
                 })
         return {
             # "CommonPrefixes": {"Prefix": ...},
