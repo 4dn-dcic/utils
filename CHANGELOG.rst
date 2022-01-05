@@ -6,6 +6,7 @@ dcicutils
 Change Log
 ----------
 
+
 4.0.0
 =====
 
@@ -34,6 +35,28 @@ these new items:
 ``"stg_env_name"``             The name of the stage env (or None)
 ``"test_envs"``                A list of environments that are for testing
 =============================  ============================================================
+
+
+3.5.0
+=====
+
+* In ``ff_utils``:
+
+  * Add ``parse_s3_bucket_and_key_url``.
+
+
+3.4.2
+=====
+
+* In ``qa_utils``:
+
+  * In ``MockBotoS3Client``:
+
+    * Fix ``head_object`` operation to return the ``StorageClass``
+      (since the mock already allows you to declare it per-S3-client-class).
+
+    * Add internal support to be expanded later for making individual S3 files
+      have different storage classes from one another.
 
 
 3.4.1

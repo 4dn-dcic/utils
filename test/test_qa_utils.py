@@ -1054,12 +1054,29 @@ def test_mock_boto3_client_use():
                 myfile_content2 = file_contents("myfile2")
                 assert myfile_content == myfile_content2 == "some content"
 
+    s3 = mock_boto3.client('s3')
+
     # No matter what clients you get, they all share the same MockFileSystem, which we can get from s3_files
-    s3fs = mock_boto3.client('s3').s3_files
+    s3fs = s3.s3_files
     # We saved an s3 file to bucket "foo" and key "bar", so it will be in the s3fs as "foo/bar"
     assert sorted(s3fs.files.keys()) == ['foo/bar']
     # The content is stored in binary format
     assert s3fs.files['foo/bar'] == b'some content'
+
+    assert isinstance(s3, MockBotoS3Client)
+
+    assert s3._object_storage_class('foo/bar') == s3.DEFAULT_STORAGE_CLASS
+    s3._set_object_storage_class('foo/bar', 'DEEP_ARCHIVE')
+    assert s3._object_storage_class('foo/bar') == 'DEEP_ARCHIVE'
+    assert s3._object_storage_class('foo/baz') == 'STANDARD'
+
+    # Because of shared reality in our mock_boto3, we'll see those same results with a new client.
+    s3_client2 = mock_boto3.client('s3')
+    assert s3_client2._object_storage_class('foo/bar') == 'DEEP_ARCHIVE'
+    assert s3_client2._object_storage_class('foo/baz') == 'STANDARD'
+
+    # Creating a new boto3 and asking for a client will see a different reality and get a different value.
+    assert MockBoto3().client('s3')._object_storage_class('foo/bar') == 'STANDARD'
 
 
 def test_mock_uuid_module_documentation_example():
