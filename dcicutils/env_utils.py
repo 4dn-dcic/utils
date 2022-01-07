@@ -88,7 +88,7 @@ class EnvNames:
     PUBLIC_URL_TABLE = 'public_url_table'  # dictionary mapping envnames & pseudo_envnames to public urls
     STG_ENV_NAME = 'stg_env_name'  # the name of the stage env (or None)
     TEST_ENVS = 'test_envs'  # a list of environments that are for testing
-    WEBPROD_PSEUDO_ENV = 'WEBPROD_PSEUDO_ENV'
+    WEBPROD_PSEUDO_ENV = 'webprod_pseudo_env'
 
 
 class PublicUrlParts:
