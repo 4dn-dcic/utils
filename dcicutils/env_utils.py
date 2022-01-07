@@ -84,11 +84,11 @@ class EnvNames:
     IS_LEGACY = 'is_legacy'
     STAGE_MIRRORING_ENABLED = 'stage_mirroring_enabled'
     ORCHESTRATED_APP = 'orchestrated_app'  # This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
-    PRD_BUCKET = 'prd_bucket'
     PRD_ENV_NAME = 'prd_env_name'  # the name of the prod env
     PUBLIC_URL_TABLE = 'public_url_table'  # dictionary mapping envnames & pseudo_envnames to public urls
     STG_ENV_NAME = 'stg_env_name'  # the name of the stage env (or None)
     TEST_ENVS = 'test_envs'  # a list of environments that are for testing
+    WEBPROD_PSEUDO_ENV = 'WEBPROD_PSEUDO_ENV'
 
 
 class PublicUrlParts:
@@ -143,11 +143,11 @@ class EnvUtils:
     # -kmp 24-Jul-2021
     STAGE_MIRRORING_ENABLED = None  # if True, orchestration-enabled function may offer mirroring behavior
     ORCHESTRATED_APP = None  # This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
-    PRD_BUCKET = None
     PRD_ENV_NAME = None  # the name of the prod env
     PUBLIC_URL_TABLE = None  # dictionary mapping envnames & pseudo_envnames to public urls
     STG_ENV_NAME = None  # the name of the stage env (or None)
     TEST_ENVS = None  # a list of environments that are for testing
+    WEBPROD_PSEUDO_ENV = None
 
     DEV_SUFFIX_FOR_TESTING = ".abc123def456ghi789.us-east-1.rds.amazonaws.com"
 
@@ -160,7 +160,6 @@ class EnvUtils:
         e.INDEXER_ENV_NAME: 'acme-indexer',
         e.IS_LEGACY: False,
         e.ORCHESTRATED_APP: 'cgap',
-        e.PRD_BUCKET: 'production-data',
         e.PRD_ENV_NAME: 'acme-prd',
         e.PUBLIC_URL_TABLE: [
             {
@@ -193,6 +192,7 @@ class EnvUtils:
         # -kmp 24-Jul-2021
         # e.STG_ENV_NAME: None,
         e.TEST_ENVS: ['acme-test', 'acme-mastertest', 'acme-pubtest'],
+        e.WEBPROD_PSEUDO_ENV: 'production-data',
     }
 
     SAMPLE_TEMPLATE_FOR_FOURFRONT_TESTING = {
@@ -204,7 +204,6 @@ class EnvUtils:
         e.INDEXER_ENV_NAME: 'acme-indexer',
         e.IS_LEGACY: False,
         e.ORCHESTRATED_APP: 'fourfront',
-        e.PRD_BUCKET: 'production-data',
         e.PRD_ENV_NAME: 'acme-prd',
         e.PUBLIC_URL_TABLE: [
             {
@@ -244,6 +243,7 @@ class EnvUtils:
         # -kmp 24-Jul-2021
         # e.STG_ENV_NAME: None,
         e.TEST_ENVS: ['acme-test', 'acme-mastertest', 'acme-pubtest'],
+        e.WEBPROD_PSEUDO_ENV: 'production-data',
     }
 
     @classmethod
@@ -368,7 +368,7 @@ def prod_bucket_env_for_app(appname: Optional[OrchestratedApp] = None):
 @if_orchestrated
 def prod_bucket_env(envname: EnvName) -> Optional[EnvName]:
     if is_stg_or_prd_env(envname):
-        return EnvUtils.PRD_BUCKET
+        return EnvUtils.WEBPROD_PSEUDO_ENV
     else:
         return None
 
@@ -376,13 +376,13 @@ def prod_bucket_env(envname: EnvName) -> Optional[EnvName]:
 @if_orchestrated()
 def default_workflow_env(orchestrated_app: OrchestratedApp) -> EnvName:
     _check_appname(orchestrated_app, required=True)
-    return EnvUtils.PRD_BUCKET
+    return EnvUtils.WEBPROD_PSEUDO_ENV
 
 
 @if_orchestrated
 def get_bucket_env(envname):
     if is_stg_or_prd_env(envname):
-        return EnvUtils.PRD_BUCKET
+        return EnvUtils.WEBPROD_PSEUDO_ENV
     else:
         return envname
 

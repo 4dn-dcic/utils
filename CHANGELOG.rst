@@ -17,24 +17,27 @@ Change Log
 The net result is a configurable environment in which the env descriptor in the global env bucket can contain
 these new items:
 
-=============================  ============================================================
-    Key                            Notes
-=============================  ============================================================
-``"dev_data_set_table"``       Dictionary mapping envnames to their preferred data set
-``"dev_env_domain_suffix"``    e.g., .abc123def456ghi789.us-east-1.rds.amazonaws.com
-``"foursight_url_prefix"``
-``"full_env_prefix"``          A string like "cgap-" that precedes all env names
-``"hotseat_envs"``             A list of environments that are for testing with hot data
-``"indexer_env_name"``         The environment name used for indexing
-``"is_legacy"``
-``"stage_mirroring_enabled"``
-``"orchestrated_app"``         This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
-``"prd_bucket"``
-``"prd_env_name"``             The name of the prod env
-``"public_url_table"``         Dictionary mapping envnames & pseudo_envnames to public urls
-``"stg_env_name"``             The name of the stage env (or None)
-``"test_envs"``                A list of environments that are for testing
-=============================  ============================================================
+===============================  ===============================================================================
+    Key                              Notes
+===============================  ===============================================================================
+``"dev_data_set_table"``         Dictionary mapping envnames to their preferred data set
+``"dev_env_domain_suffix"``      e.g., .abc123def456ghi789.us-east-1.rds.amazonaws.com
+``"foursight_url_prefix"``       A prefix string for use by foursight.
+``"full_env_prefix"``            A string like "cgap-" that precedes all env names
+``"hotseat_envs"``               A list of environments that are for testing with hot data
+``"indexer_env_name"``           The environment name used for indexing
+``"is_legacy"``                  Should be ``"true"`` if legacy effect is desired, otherwise omitted.
+``"stage_mirroring_enabled"``    Should be ``"true"`` if mirroring is desired, otherwise omitted.
+``"orchestrated_app"``           This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
+``"prd_env_name"``               The name of the prod env
+``"public_url_table"``           Dictionary mapping envnames & pseudo_envnames to public urls
+``"stg_env_name"``               The name of the stage env (or None)
+``"test_envs"``                  A list of environments that are for testing
+``"webprod_pseudo_env"``         The pseudo-env that is a token name to use in place of the prd env for shared
+                                 stg/prd situations, replacing ``fourfront-webprod`` in the legacy system.
+                                 (In orchestrations, this should usually be the same as the ``prd_env_name``.
+                                 It may or may not need to be different if we orchestrate the legacy system.)
+===============================  ===============================================================================
 
 
 3.5.0
