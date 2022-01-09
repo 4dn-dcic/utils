@@ -1186,6 +1186,12 @@ def capitalize1(s):
 
 
 def string_list(s):
+    """
+    Turns a comma-separated list into an actual list, trimming whitespace and ignoring nulls.
+        >>> string_list('foo, bar,,baz ')
+        ['foo', 'bar', 'baz']
+    """
+
     if not isinstance(s, str):
         raise ValueError(f"Not a string: {s!r}")
     return [p for p in [part.strip() for part in s.split(",")] if p]
