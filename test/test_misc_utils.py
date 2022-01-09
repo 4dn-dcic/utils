@@ -23,7 +23,7 @@ from dcicutils.misc_utils import (
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ,
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
-    capitalize1, local_attrs, dict_zip, json_leaf_subst, _is_function_of_exactly_one_required_arg,
+    capitalize1, local_attrs, dict_zip, json_leaf_subst, _is_function_of_exactly_one_required_arg, string_list,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -1813,6 +1813,19 @@ def test_snake_case_to_camel_case_hyphenated(token, expected):
 ])
 def test_capitalize1(token, expected):
     assert capitalize1(token) == expected
+
+
+def test_string_list():
+
+    assert string_list('') == []
+    assert string_list('foo') == ['foo']
+    assert string_list('foo,bar') == ['foo', 'bar']
+    assert string_list('foo,bar,baz') == ['foo', 'bar', 'baz']
+
+    # Edge cases
+    assert string_list(' ') == []
+    assert string_list('  foo   ') == ['foo']
+    assert string_list('  foo   ,,bar ,  ') == ['foo', 'bar']
 
 
 @pytest.mark.parametrize('obj', [

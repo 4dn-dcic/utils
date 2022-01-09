@@ -1185,6 +1185,12 @@ def capitalize1(s):
     return s[:1].upper() + s[1:]
 
 
+def string_list(s):
+    if not isinstance(s, str):
+        raise ValueError(f"Not a string: {s!r}")
+    return [p for p in [part.strip() for part in s.split(",")] if p]
+
+
 class CachedField:
     def __init__(self, name, update_function, timeout=600):
         """ Provides a named field that is cached for a certain period of time. The value is computed
