@@ -5,6 +5,7 @@ This file contains functions that might be generally useful.
 import contextlib
 import datetime
 import functools
+import hashlib
 import inspect
 import math
 import io
@@ -1195,6 +1196,13 @@ def string_list(s):
     if not isinstance(s, str):
         raise ValueError(f"Not a string: {s!r}")
     return [p for p in [part.strip() for part in s.split(",")] if p]
+
+
+def string_md5(unicode_string):
+    """
+    Returns the md5 signature for the given u unicode string.
+    """
+    return hashlib.md5(unicode_string.encode('utf-8')).hexdigest()
 
 
 class CachedField:

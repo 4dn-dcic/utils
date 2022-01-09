@@ -24,6 +24,7 @@ from dcicutils.misc_utils import (
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
     capitalize1, local_attrs, dict_zip, json_leaf_subst, _is_function_of_exactly_one_required_arg, string_list,
+    string_md5,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -1826,6 +1827,14 @@ def test_string_list():
     assert string_list(' ') == []
     assert string_list('  foo   ') == ['foo']
     assert string_list('  foo   ,,bar ,  ') == ['foo', 'bar']
+
+
+def test_string_md5():
+
+    # Result of "echo -n 'xyzzy' | md5" or "md5 -s 'xyzzy'"
+    assert string_md5("xyzzy") == "1271ed5ef305aadabc605b1609e24c52"
+    # Result of "echo 'xyzzy' | md5"
+    assert string_md5("xyzzy\n") == "89d447eb9afaeb94e463615e8ded6479"
 
 
 @pytest.mark.parametrize('obj', [

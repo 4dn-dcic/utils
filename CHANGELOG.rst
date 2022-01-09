@@ -12,6 +12,7 @@ Change Log
 * In ``string_utils``:
 
   * Add ``string_list``
+  * Add ``string_md5``
 
 
 3.5.0
