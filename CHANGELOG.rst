@@ -6,6 +6,15 @@ dcicutils
 Change Log
 ----------
 
+3.6.0
+=====
+
+* In ``string_utils``:
+
+  * Add ``string_list``
+  * Add ``string_md5``
+
+
 3.5.0
 =====
 
