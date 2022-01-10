@@ -310,6 +310,6 @@ def test_compute_prd_env_for_project():
             # For better or worse, we used to assume anything that's not cgap is ff.
             # But now we're enforcing this. We call that a bug fix, though someone might call it an incompatible change.
             with pytest.raises(InvalidParameterError):
-                 assert base._compute_prd_env_for_project('anything') == 'ff-env-2'
+                assert base._compute_prd_env_for_project('anything') == 'ff-env-2'
             with pytest.raises(InvalidParameterError):
                 assert base._compute_prd_env_for_project('ff') == 'ff-env-2'

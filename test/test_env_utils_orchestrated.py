@@ -49,8 +49,8 @@ def using_orchestrated_behavior(data=None):
 def test_orchestrated_get_bucket_env():
 
     assert EnvUtils.PRD_ENV_NAME == 'acme-prd'
-    assert EnvUtils.PRD_BUCKET == 'production-data'
-    assert get_bucket_env(EnvUtils.PRD_ENV_NAME) == EnvUtils.PRD_BUCKET
+    assert EnvUtils.WEBPROD_PSEUDO_ENV == 'production-data'
+    assert get_bucket_env(EnvUtils.PRD_ENV_NAME) == EnvUtils.WEBPROD_PSEUDO_ENV
     assert EnvUtils.STG_ENV_NAME is None
 
     def test_the_usual_scenario():
@@ -95,8 +95,8 @@ def test_orchestrated_get_bucket_env():
 def test_orchestrated_prod_bucket_env():
 
     assert EnvUtils.PRD_ENV_NAME == 'acme-prd'
-    assert EnvUtils.PRD_BUCKET == 'production-data'
-    assert prod_bucket_env(EnvUtils.PRD_ENV_NAME) == EnvUtils.PRD_BUCKET
+    assert EnvUtils.WEBPROD_PSEUDO_ENV == 'production-data'
+    assert prod_bucket_env(EnvUtils.PRD_ENV_NAME) == EnvUtils.WEBPROD_PSEUDO_ENV
     assert EnvUtils.STG_ENV_NAME is None
 
     def test_the_usual_scenario():
@@ -139,20 +139,20 @@ def test_orchestrated_prod_bucket_env():
 @using_orchestrated_behavior()
 def test_orchestrated_prod_bucket_env_for_app():
 
-    assert prod_bucket_env_for_app() == EnvUtils.PRD_BUCKET
-    assert prod_bucket_env_for_app('cgap') == EnvUtils.PRD_BUCKET
+    assert prod_bucket_env_for_app() == EnvUtils.WEBPROD_PSEUDO_ENV
+    assert prod_bucket_env_for_app('cgap') == EnvUtils.WEBPROD_PSEUDO_ENV
     with pytest.raises(Exception):
         prod_bucket_env_for_app('fourfront')
 
     with local_attrs(EnvUtils, **CGAP_SETTINGS_FOR_TESTING):
-        assert prod_bucket_env_for_app() == EnvUtils.PRD_BUCKET == 'fourfront-cgap'
-        assert prod_bucket_env_for_app('cgap') == EnvUtils.PRD_BUCKET
+        assert prod_bucket_env_for_app() == EnvUtils.WEBPROD_PSEUDO_ENV == 'fourfront-cgap'
+        assert prod_bucket_env_for_app('cgap') == EnvUtils.WEBPROD_PSEUDO_ENV
         with pytest.raises(Exception):
             prod_bucket_env_for_app('fourfront')
 
     with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
-        assert prod_bucket_env_for_app() == EnvUtils.PRD_BUCKET == 'fourfront-webprod'
-        assert prod_bucket_env_for_app('fourfront') == EnvUtils.PRD_BUCKET
+        assert prod_bucket_env_for_app() == EnvUtils.WEBPROD_PSEUDO_ENV == 'fourfront-webprod'
+        assert prod_bucket_env_for_app('fourfront') == EnvUtils.WEBPROD_PSEUDO_ENV
         with pytest.raises(Exception):
             prod_bucket_env_for_app('cgap')
 
@@ -187,21 +187,21 @@ def test_orchestrated_infer_foursight_url_from_env():
 @using_orchestrated_behavior()
 def test_orchestrated_default_workflow_env():
 
-    assert default_workflow_env('cgap') == EnvUtils.PRD_BUCKET == 'production-data'  # the Acme producton bucket
+    assert default_workflow_env('cgap') == EnvUtils.WEBPROD_PSEUDO_ENV == 'production-data'  # the Acme producton bucket
     with pytest.raises(Exception):
         default_workflow_env('fourfront')
     with pytest.raises(Exception):
         default_workflow_env(None)  # noQA - We're expecting a problem
 
     with local_attrs(EnvUtils, **CGAP_SETTINGS_FOR_TESTING):
-        assert default_workflow_env('cgap') == EnvUtils.PRD_BUCKET == 'fourfront-cgap'
+        assert default_workflow_env('cgap') == EnvUtils.WEBPROD_PSEUDO_ENV == 'fourfront-cgap'
         with pytest.raises(Exception):
             default_workflow_env('fourfront')
         with pytest.raises(Exception):
             default_workflow_env(None)  # noQA - We're expecting a problem
 
     with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
-        assert default_workflow_env('fourfront') == EnvUtils.PRD_BUCKET == 'fourfront-webprod'
+        assert default_workflow_env('fourfront') == EnvUtils.WEBPROD_PSEUDO_ENV == 'fourfront-webprod'
         with pytest.raises(Exception):
             default_workflow_env('cgap')
         with pytest.raises(Exception):
@@ -1489,7 +1489,7 @@ CGAP_SETTINGS_FOR_TESTING = dict(
     FOURSIGHT_URL_PREFIX='https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/',
     FULL_ENV_PREFIX='fourfront-',
     DEV_ENV_DOMAIN_SUFFIX=EnvUtils.DEV_SUFFIX_FOR_TESTING,
-    PRD_BUCKET='fourfront-cgap',
+    WEBPROD_PSEUDO_ENV='fourfront-cgap',
     PRD_ENV_NAME='fourfront-cgap',
     STG_ENV_NAME=None,
     PUBLIC_URL_TABLE=[
@@ -1507,7 +1507,7 @@ FOURFRONT_SETTINGS_FOR_TESTING = dict(
     FOURSIGHT_URL_PREFIX='https://foursight.4dnucleome.org/api/view/',
     FULL_ENV_PREFIX='fourfront-',
     DEV_ENV_DOMAIN_SUFFIX=EnvUtils.DEV_SUFFIX_FOR_TESTING,
-    PRD_BUCKET='fourfront-webprod',
+    WEBPROD_PSEUDO_ENV='fourfront-webprod',
     PRD_ENV_NAME='fourfront-blue',
     STG_ENV_NAME='fourfront-green',
     PUBLIC_URL_TABLE=[
