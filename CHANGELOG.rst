@@ -6,6 +6,14 @@ dcicutils
 Change Log
 ----------
 
+3.6.1
+=====
+
+* In ``ecs_utils``:
+
+  * Add ``list_ecs_tasks``
+  * Add ``run_ecs_task``
+
 3.6.0
 =====
 

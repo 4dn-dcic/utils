@@ -43,3 +43,25 @@ class ECSUtils:
         for service_name in self.list_ecs_services(cluster_name=cluster_name):
             self.update_ecs_service(cluster_name=cluster_name, service_name=service_name)
         return True
+
+    def list_ecs_tasks(self):
+        """ Lists all available ECS task definitions. """
+        return self.client.list_task_definitions().get('taskDefinitionArns', [])
+
+    def run_ecs_task(self, *, cluster_name, task_name, subnet, security_group):
+        """ Runs the given task name on the given cluster. """
+        return self.client.run_task(
+            cluster=cluster_name,
+            count=1,
+            taskDefinition=task_name,
+            networkConfiguration={
+                'awsvpcConfiguration': {
+                    'subnets': [
+                        subnet
+                    ],
+                    'securityGroups': [
+                        security_group
+                    ]
+                }
+            }
+        )
