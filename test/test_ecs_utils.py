@@ -26,6 +26,33 @@ def mock_list_ecs_services(*, cluster):
     }
 
 
+def mock_list_ecs_tasks():
+    """ list_task_definitions structure - for future tests """
+    return {
+        'taskDefinitionArns':
+            [
+                'arn:aws:ecs:us-east-1:262461168236:task-definition/c4-ecs-cgap-devtest-stack-CGAPDeployment-FwJgj7hSQA2p:1',
+                'arn:aws:ecs:us-east-1:262461168236:task-definition/c4-ecs-cgap-devtest-stack-CGAPIndexer-iHDWcWOG5r9m:1',
+                'arn:aws:ecs:us-east-1:262461168236:task-definition/c4-ecs-cgap-devtest-stack-CGAPIngester-tU6SCdUoTAT0:1',
+                'arn:aws:ecs:us-east-1:262461168236:task-definition/c4-ecs-cgap-devtest-stack-CGAPInitialDeployment-FPYnleE9YwvH:1',
+                'arn:aws:ecs:us-east-1:262461168236:task-definition/c4-ecs-cgap-devtest-stack-CGAPInitialDeployment-FPYnleE9YwvH:2',
+                'arn:aws:ecs:us-east-1:262461168236:task-definition/c4-ecs-cgap-devtest-stack-CGAPportal-9kgkd5ZfVtxP:1',
+                'arn:aws:ecs:us-east-1:262461168236:task-definition/c4-ecs-cgap-devtest-stack-CGAPportal-9kgkd5ZfVtxP:2',
+                'arn:aws:ecs:us-east-1:262461168236:task-definition/c4-ecs-cgap-devtest-stack-CGAPportal-9kgkd5ZfVtxP:3', ],
+        'ResponseMetadata': {
+            'RequestId': '82c590ec-980e-4eea-8fea-2843b5ffdd6a',
+            'HTTPStatusCode': 200,
+            'HTTPHeaders': {
+                'x-amzn-requestid': '82c590ec-980e-4eea-8fea-2843b5ffdd6a',
+                'content-type': 'application/x-amz-json-1.1',
+                'content-length': '1393',
+                'date': 'Mon, 10 Jan 2022 19:52:06 GMT'
+            },
+            'RetryAttempts': 0
+        }
+    }
+
+
 def mock_update_service(*, cluster, service, forceNewDeployment):  # noQA - AWS chose mixed case argument name
     """ Mock matching the relevant API signature for below (we don't actually want
         to trigger an ECS deploy in unit testing.
