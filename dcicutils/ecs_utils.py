@@ -49,7 +49,14 @@ class ECSUtils:
         return self.client.list_task_definitions().get('taskDefinitionArns', [])
 
     def run_ecs_task(self, *, cluster_name, task_name, subnet, security_group):
-        """ Runs the given task name on the given cluster. """
+        """ Runs the given task name on the given cluster.
+
+        :param cluster_name: name of cluster to run task on
+        :param task_name: name of task (including revision) to run
+        :param subnet: subnet to run task in
+        :param security_group: SG to associate with task
+        :return: dict response
+        """
         return self.client.run_task(
             cluster=cluster_name,
             count=1,
