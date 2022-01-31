@@ -6,6 +6,15 @@ dcicutils
 Change Log
 ----------
 
+=======
+3.7.0
+=====
+
+* In ``s3_utils``:
+
+  * Add ``HealthPageKey.PYTHON_VERSION``
+
+
 3.6.1
 =====
 
@@ -13,6 +22,7 @@ Change Log
 
   * Add ``list_ecs_tasks``
   * Add ``run_ecs_task``
+
 
 3.6.0
 =====

@@ -21,8 +21,6 @@ class ECSUtils:
             adding more is considered a compatible change.
         """
         services = self.client.list_services(cluster=cluster_name).get('serviceArns', [])
-        if len(services) < 4:
-            raise Exception('Environment error! Expected at least 4 services - check that ECS finished orchestrating.')
         return services
 
     def update_ecs_service(self, *, cluster_name, service_name):
