@@ -73,6 +73,9 @@ target/
 # pyenv
 .python-version
 
+# Kent's env tools
+.python-cmd
+
 # celery beat schedule file
 celerybeat-schedule
 

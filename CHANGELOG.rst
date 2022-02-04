@@ -6,7 +6,13 @@ dcicutils
 Change Log
 ----------
 
+
+3.8.0
 =====
+
+* Allow dcicutils to work in Python 3.8.
+
+
 3.7.1
 =====
 
@@ -15,7 +21,6 @@ Change Log
   * No longer throw exception when listing services if <4 are returned
 
 
-=====
 3.7.0
 =====
 
