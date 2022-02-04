@@ -7,6 +7,12 @@ Change Log
 ----------
 
 
+3.9.0
+=====
+
+* Allow dcicutils to work in Python 3.9.
+
+
 3.8.0
 =====
 
