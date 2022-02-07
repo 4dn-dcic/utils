@@ -169,7 +169,8 @@ def test_s3utils_creation_ff_prd():
 
 
 @pytest.mark.integrated
-@pytest.mark.parametrize('cgap_ordinary_envname', ['fourfront-cgaptest', 'fourfront-cgapdev', 'fourfront-cgapwolf'])
+@pytest.mark.parametrize('cgap_ordinary_envname', ['fourfront-cgaptest', 'fourfront-cgapwolf'])
+# 'fourfront-cgapdev' has been decommissioned.
 def test_s3utils_creation_cgap_ordinary(cgap_ordinary_envname):
     util = s3Utils(env=cgap_ordinary_envname)
     assert util.sys_bucket == 'elasticbeanstalk-%s-system' % cgap_ordinary_envname
