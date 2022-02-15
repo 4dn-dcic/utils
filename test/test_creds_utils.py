@@ -42,13 +42,13 @@ def test_cgap_keymanager_creation():
 
     assert sample_cgap_key_manager_2.keys_file == SAMPLE_CGAP_KEYS_FILE
 
-    with override_environ(CGAP_DEFAULT_ENV=SAMPLE_CGAP_LOCAL_PSEUDOENV):
+    with override_environ(CGAP_KEYS_FILE=SAMPLE_CGAP_KEYS_FILE):
 
         sample_cgap_key_manager_3 = CGAPKeyManager()
 
-        assert sample_cgap_key_manager_3.keys_file == CGAPKeyManager._default_keys_file()
+        assert sample_cgap_key_manager_3.keys_file == SAMPLE_CGAP_KEYS_FILE
         # Make sure class default is different than test value. More of a test-integrity test than an absolute need.
-        assert sample_cgap_key_manager_3.keys_file != SAMPLE_CGAP_KEYS_FILE
+        assert sample_cgap_key_manager_3.keys_file != CGAPKeyManager._default_keys_file()
 
     other_keys_file = "other-cgap-keys.json"
 
