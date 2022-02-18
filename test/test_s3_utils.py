@@ -83,11 +83,11 @@ def test_s3utils_constants():
 def test_regression_s3_utils_short_name_c4_706():
 
     # Environment long names work (at least in legacy CGAP)
-    s3Utils(env="fourfront-cgapwolf")
+    s3Utils(env="fourfront-mastertest")
 
     with known_bug_expected(jira_ticket="C4-706", fixed=True, error_class=ClientError):
         # Sort names not allowed.
-        s3Utils(env="cgapwolf")
+        s3Utils(env="mastertest")
 
 
 def _env_is_up_and_healthy(env):
@@ -168,12 +168,14 @@ def test_s3utils_creation_ff_prd():
     test_prd(prd_beanstalk_env)
 
 
-@pytest.mark.integrated
-@pytest.mark.parametrize('cgap_ordinary_envname', ['fourfront-cgaptest', 'fourfront-cgapwolf'])
-# 'fourfront-cgapdev' has been decommissioned.
-def test_s3utils_creation_cgap_ordinary(cgap_ordinary_envname):
-    util = s3Utils(env=cgap_ordinary_envname)
-    assert util.sys_bucket == 'elasticbeanstalk-%s-system' % cgap_ordinary_envname
+# cgap beanstalks have been discontinued. -kmp 18-Feb-2022
+#
+# @pytest.mark.integrated
+# @pytest.mark.parametrize('cgap_ordinary_envname', ['fourfront-cgaptest', 'fourfront-cgapwolf'])
+# # 'fourfront-cgapdev' has been decommissioned.
+# def test_s3utils_creation_cgap_ordinary(cgap_ordinary_envname):
+#     util = s3Utils(env=cgap_ordinary_envname)
+#     assert util.sys_bucket == 'elasticbeanstalk-%s-system' % cgap_ordinary_envname
 
 
 @pytest.mark.integrated
