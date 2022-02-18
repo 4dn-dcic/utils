@@ -659,18 +659,18 @@ class MockBoto3:
     @property
     def session(self):
 
-        class SessionModule:
+        class _SessionModule:
 
             def __init__(self, boto3):
                 self.boto3 = boto3
 
             def Session(self, **kwargs):  # noQA - This name was chosen by AWS, so please don't warn about mixed case
-                return MockSession(boto3=self.boto3, **kwargs)
+                return MockBoto3Session(boto3=self.boto3, **kwargs)
 
-        return SessionModule(boto3=self)
+        return _SessionModule(boto3=self)
 
 
-class MockSession:
+class MockBoto3Session:
 
     def __init__(self, *, region_name, boto3):
         self.region_name = region_name
@@ -681,7 +681,7 @@ class MockSession:
 
 
 @MockBoto3.register_client(kind='secretsmanager')
-class MockSecretsManager:
+class MockBoto3SecretsManager:
 
     _SECRETS_MARKER = '_MOCKED_SECRETS'
 

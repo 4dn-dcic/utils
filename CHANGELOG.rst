@@ -19,6 +19,9 @@ Change Log
   * Remove ``test_s3utils_creation_cgap_ordinary`` because there are no more CGAP beanstalks.
   * Revise ``test_regression_s3_utils_short_name_c4_706`` to use ``fourfront-mastertest``
     rather than a CGAP env, since the CGAP beanstalk envs have gone away.
+* In ``qa_utils.py``:
+  * ``MockBoto3Session``.
+  * ``MockBoto3SecretsManager`` and support for ``MockBoto3`` to make it.
 * In ``secrets_utils.py`` and ``test_secrets_utils.py``:
   * Add support for ``SecretsTable``.
   * Add unit tests for existing ``secrets_utils.assume_identity`` and for new ``SecretsTable`` functionality.
