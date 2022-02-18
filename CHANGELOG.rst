@@ -24,6 +24,8 @@ Change Log
   * Add unit tests for existing ``secrets_utils.assume_identity`` and for new ``SecretsTable`` functionality.
 * Small cosmetic adjustments to ``Makefile`` to show a timestamp and info about current branch state
   when ``make test`` starts and again when it ends.
+* A name containing an underscore will not be shortened by ``short_env_name`` nor lengthened by
+  ``full_env_name`` (nor ``full_cgap_env_name`` nor ``full_fourfront_env_name``).
 
 
 3.9.0
