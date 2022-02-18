@@ -1,11 +1,9 @@
 import json
 import pytest
-import re
 
 from dcicutils import secrets_utils as secrets_utils_module
-from dcicutils import qa_utils as qa_utils_module
-from dcicutils.misc_utils import override_environ, ignored, remove_prefix
-from dcicutils.qa_utils import MockBoto3, MockSecretsManager
+from dcicutils.misc_utils import override_environ, ignored
+from dcicutils.qa_utils import MockBoto3
 from dcicutils.secrets_utils import assume_identity, SecretsTable
 from unittest import mock
 
@@ -18,7 +16,8 @@ some_secret_string = json.dumps(some_secret_table)
 some_common_identity_substring = "SecretIdentityToken"
 some_common_identity_pattern = "Secret.*Token"
 some_unique_secret_identity_token = "Mastertest"
-some_secret_identity = f'Mocked{some_unique_secret_identity_token}ApplicationConfiguration{some_common_identity_substring}'
+some_secret_identity = (f'Mocked{some_unique_secret_identity_token}'
+                        f'ApplicationConfiguration{some_common_identity_substring}')
 decoy_1_string = '{"decoy": 1}'
 decoy_1_identity = f'MockedDecoy1Something{some_common_identity_substring}'
 decoy_2_string = '{"decoy": 2}'
@@ -28,6 +27,7 @@ decoy_2_identity = some_unique_decoy_name
 some_secret_identities_with_common_pattern = [some_secret_identity, decoy_1_identity]
 some_secret_identities = [some_secret_identity, decoy_1_identity, decoy_2_identity]
 
+
 def boto3_for_some_secrets_testing():
     mocked_boto3 = MockBoto3()
     manager = mocked_boto3.client('secretsmanager')
@@ -35,6 +35,7 @@ def boto3_for_some_secrets_testing():
     manager.put_secret_value_for_testing(SecretId=decoy_1_identity, Value=decoy_1_string)
     manager.put_secret_value_for_testing(SecretId=decoy_2_identity, Value=decoy_2_string)
     return mocked_boto3
+
 
 def test_assume_identity():
 
@@ -73,7 +74,7 @@ def test_mock_secrets_table_str_and_repr():
         some_id = 12345678
         hex_id = "%x" % some_id
         assert hex_id == 'bc614e'
-        mocked_id.return_value=some_id
+        mocked_id.return_value = some_id
         some_name = "some_name"
         str_form = str(SecretsTable(name=some_name))
         assert str_form == "<dcicutils.secrets_utils.SecretsTable 'some_name' @bc614e>"
@@ -108,7 +109,7 @@ def test_secrets_table_get():
         secret_foo = secrets_table.get('foo')
         assert secret_foo == some_secret_table['foo']
         secret_missing = secrets_table.get('missing')
-        assert secret_missing == None
+        assert secret_missing is None
 
 
 def test_secrets_table_getitem():
@@ -206,6 +207,7 @@ def test_secrets_table_find_secret():
 
         with pytest.raises(RuntimeError):  # Error if too few matches
             SecretsTable.find_secret(pattern="this will not match")
+
 
 def test_find_application_secrets_table():
 

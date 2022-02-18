@@ -1,10 +1,9 @@
 import pytest
-import subprocess
 
 from unittest import mock
 from dcicutils.ecr_utils import ECRUtils
 from dcicutils.docker_utils import DockerUtils
-from dcicutils.misc_utils import ignored, PRINT
+from dcicutils.misc_utils import ignored
 
 
 REPO_URL = '123456789.dkr.ecr.us-east-2.amazonaws.com/cgap-mastertest'  # dummy URL
