@@ -535,6 +535,9 @@ def short_env_name(envname: Optional[EnvName]):
 
     if not envname:
         return None
+    elif '_' in envname:
+        # e.g., "fourfront_mastertest" does not shorten.
+        return envname
     elif envname.startswith('fourfront-'):
         # Note that EVEN FOR CGAP we do not look for 'cgap-' because this is the legacy implementation,
         # not the orchestrated implementation. We'll fix that problem elsewhere. Within the legacy
@@ -569,6 +572,9 @@ def full_env_name(envname: EnvName):
         # whereas with 'cgap' it's harder to be sure it didn't start out 'fourfront-cgap' and get shortened,
         # so it's best not to get too fussy about 'cgap'. -kmp 4-Oct-2021
         raise ValueError("The special token '%s' is not a beanstalk environment name." % envname)
+    elif '_' in envname:
+        # e.g., "fourfront_mastertest" does not shorten.
+        return envname
     elif not envname.startswith('fourfront-'):
         return 'fourfront-' + envname
     else:
