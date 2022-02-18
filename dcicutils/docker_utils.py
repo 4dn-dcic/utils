@@ -1,4 +1,6 @@
 import docker
+import subprocess
+
 from .misc_utils import PRINT
 
 
@@ -35,3 +37,11 @@ class DockerUtils:
         for line in self.client.images.push(ecr_repo_name, tag=tag, stream=True, decode=True,
                                             auth_config=auth_config):
             PRINT(line)
+
+    @staticmethod
+    def docker_is_running():
+        try:
+            subprocess.check_output(["docker", "ps"])
+            return True
+        except subprocess.CalledProcessError:
+            return False
