@@ -74,7 +74,8 @@ class SecretsTable:
         """
         if not str or not isinstance(name, str):
             raise ValueError(f"Bad secret name: {name}")
-        self.secretsmanager_client = secretsmanager_client or boto3.client('secretsmanager')
+        self.secretsmanager_client = (secretsmanager_client
+                                      or boto3.client('secretsmanager', region_name=CGAP_ECR_REGION))
         self.name = name
         self.stage = stage
 

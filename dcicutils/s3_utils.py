@@ -13,6 +13,7 @@ from io import BytesIO
 from typing import Optional
 from zipfile import ZipFile
 from .base import get_beanstalk_real_url
+from .common import REGION
 from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name
 from .exceptions import (
     InferredBucketConflict, CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv,
