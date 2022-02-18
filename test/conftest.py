@@ -11,100 +11,70 @@ from dcicutils.beanstalk_utils import describe_beanstalk_environments, REGION
 from dcicutils.ff_utils import authorized_request, get_health_page
 from dcicutils.misc_utils import check_true, PRINT
 from dcicutils.s3_utils import s3Utils
-from dcicutils.secrets_utils import SecretsTable
 from .conftest_settings import TEST_DIR
 
 
-# def _discover_es_health_from_boto3_eb_metadata(envname):
-#     try:
-#         eb_client = boto3.client('elasticbeanstalk', region_name=REGION)
-#         # Calling describe_beanstalk_environments is pretty much the same as doing eb_client.describe_environments(...)
-#         # except it's robust against AWS throttling us for calling it too often.
-#         envs_from_eb = describe_beanstalk_environments(eb_client, EnvironmentNames=[envname])['Environments']
-#         for env in envs_from_eb:
-#             PRINT(f"Checking {env.get('EnvironmentName')} for {envname}...")
-#             if env.get('EnvironmentName') == envname:
-#                 cname = env.get('CNAME')
-#                 # TODO: It would be nice if we were using https: for everything. -kmp 14-Aug-2020
-#                 res = requests.get("http://%s/health?format=json" % cname)
-#                 health_json = res.json()
-#                 return health_json
-#     except Exception as e:
-#         raise RuntimeError("Unable to discover elasticsearch info for %s:\n%s: %s" % (envname, e.__class__.__name__, e))
-#
-#
-#
-# def _discover_es_url_from_boto3_eb_metadata(integrated_envname):
-#     try:
-#
-#         discovered_health_json_from_eb = _discover_es_health_from_boto3_eb_metadata(integrated_envname)
-#         assert discovered_health_json_from_eb, f"No health page for {integrated_envname} was discovered."
-#         PRINT(f"In _discover_es_url_from_boto3_eb_metadata,"
-#               f"discovered_health_json_from_eb={json.dumps(discovered_health_json_from_eb, indent=2)}")
-#         time.sleep(1)  # Reduce throttling risk
-#         ff_health_json = get_health_page(ff_env=integrated_envname)
-#         # Consistency check that both utilities are returning the same info.
-#         assert discovered_health_json_from_eb['beanstalk_env'] == ff_health_json['beanstalk_env']
-#         assert discovered_health_json_from_eb['elasticsearch'] == ff_health_json['elasticsearch']
-#         assert discovered_health_json_from_eb['namespace'] == ff_health_json['namespace']
-#
-#         # Not all health pages have a namespace. Production ones may not.
-#         # But they are not good environments for us to use for testing.
-#         discovered_namespace = discovered_health_json_from_eb['namespace']
-#         # We _think_ these are always the same, but maybe not. Perhaps worth noting if/when they diverge.
-#         assert discovered_namespace == integrated_envname, (
-#             f"While doing ES URL discovery for integrated envname {integrated_envname},"
-#             f" the namespace, {discovered_namespace}, discovered on the health page"
-#             f" does not match the integrated envname.")
-#         # This should be all we actually need:
-#         return discovered_health_json_from_eb['elasticsearch']
-#
-#     except Exception as e:
-#         # Errors sometimes happen when running tests with the orchestration credentials.
-#         PRINT("********************************************")
-#         PRINT("**  ERROR DURING ELASTICSEARCH DISCOVERY  **")
-#         PRINT("**  Make sure you have legacy credentials **")
-#         PRINT("**  enabled while running these tests.    **")
-#         PRINT("********************************************")
-#         PRINT(f"{e.__class__.__name__}: {e}")
-#         raise RuntimeError(f"Failed to discover ES URL for {integrated_envname}.")
+def _discover_es_health_from_boto3_eb_metadata(envname):
+    try:
+        eb_client = boto3.client('elasticbeanstalk', region_name=REGION)
+        # Calling describe_beanstalk_environments is pretty much the same as doing eb_client.describe_environments(...)
+        # except it's robust against AWS throttling us for calling it too often.
+        envs_from_eb = describe_beanstalk_environments(eb_client, EnvironmentNames=[envname])['Environments']
+        for env in envs_from_eb:
+            PRINT(f"Checking {env.get('EnvironmentName')} for {envname}...")
+            if env.get('EnvironmentName') == envname:
+                cname = env.get('CNAME')
+                # TODO: It would be nice if we were using https: for everything. -kmp 14-Aug-2020
+                res = requests.get("http://%s/health?format=json" % cname)
+                health_json = res.json()
+                return health_json
+    except Exception as e:
+        raise RuntimeError("Unable to discover elasticsearch info for %s:\n%s: %s" % (envname, e.__class__.__name__, e))
 
-# INTEGRATED_ENV = 'fourfront-mastertest'
+
+
+def _discover_es_url_from_boto3_eb_metadata(integrated_envname):
+    try:
+
+        discovered_health_json_from_eb = _discover_es_health_from_boto3_eb_metadata(integrated_envname)
+        assert discovered_health_json_from_eb, f"No health page for {integrated_envname} was discovered."
+        PRINT(f"In _discover_es_url_from_boto3_eb_metadata,"
+              f"discovered_health_json_from_eb={json.dumps(discovered_health_json_from_eb, indent=2)}")
+        time.sleep(1)  # Reduce throttling risk
+        ff_health_json = get_health_page(ff_env=integrated_envname)
+        # Consistency check that both utilities are returning the same info.
+        assert discovered_health_json_from_eb['beanstalk_env'] == ff_health_json['beanstalk_env']
+        assert discovered_health_json_from_eb['elasticsearch'] == ff_health_json['elasticsearch']
+        assert discovered_health_json_from_eb['namespace'] == ff_health_json['namespace']
+
+        # Not all health pages have a namespace. Production ones may not.
+        # But they are not good environments for us to use for testing.
+        discovered_namespace = discovered_health_json_from_eb['namespace']
+        # We _think_ these are always the same, but maybe not. Perhaps worth noting if/when they diverge.
+        assert discovered_namespace == integrated_envname, (
+            f"While doing ES URL discovery for integrated envname {integrated_envname},"
+            f" the namespace, {discovered_namespace}, discovered on the health page"
+            f" does not match the integrated envname.")
+        # This should be all we actually need:
+        return discovered_health_json_from_eb['elasticsearch']
+
+    except Exception as e:
+        # Errors sometimes happen when running tests with the orchestration credentials.
+        PRINT("********************************************")
+        PRINT("**  ERROR DURING ELASTICSEARCH DISCOVERY  **")
+        PRINT("**  Make sure you have legacy credentials **")
+        PRINT("**  enabled while running these tests.    **")
+        PRINT("********************************************")
+        PRINT(f"{e.__class__.__name__}: {e}")
+        raise RuntimeError(f"Failed to discover ES URL for {integrated_envname}.")
+
+# XXX: Refactor to config
+INTEGRATED_ENV = 'fourfront-mastertest'
+
+
 # We used to wire in this URL, but it's better to discover it dynamically
 # so that it can change.
-# INTEGRATED_ES = _discover_es_url_from_boto3_eb_metadata(INTEGRATED_ENV)
-#
-# Now need to find it a new way. -kmp 17-Feb-2022
-
-_EXPECTED_ENV = 'fourfront_mastertest'
-_EXPECTED_CONFIG_PATTERN = 'MastertestApplicationConfiguration'
-
-def _find_env_and_es():
-
-    identity = SecretsTable.find_application_secrets_table(
-        application_configuration_pattern=_EXPECTED_CONFIG_PATTERN
-    )
-    env = identity['ENV_NAME']
-    es =  f"https://{identity['ENCODED_ES_SERVER']}"
-    return env, es
-
-try:
-    INTEGRATED_ENV, INTEGRATED_ES = _find_env_and_es()
-except Exception as e:
-    PRINT("An error occurred while loading test infrastructure:")
-    PRINT(f"{type(e)}: {e}")
-    INTEGRATED_ENV, INTEGRATED_ES = "unknown", "unknown"
-
-if INTEGRATED_ENV != _EXPECTED_ENV:
-    PRINT("********************************************")
-    PRINT("**  ERROR DURING ELASTICSEARCH DISCOVERY  **")
-    PRINT("**  Make sure you have legacy credentials **")
-    PRINT("**  enabled while running these tests.    **")
-    PRINT("********************************************")
-    raise RuntimeError(f"The current application server is {INTEGRATED_ENV}, not {_EXPECTED_ENV}.")
-
-PRINT(f"INTEGRATED_ENV = {INTEGRATED_ENV}")
-PRINT(f"INTEGRATED_ES = {INTEGRATED_ES}")
+INTEGRATED_ES = _discover_es_url_from_boto3_eb_metadata(INTEGRATED_ENV)
 
 
 @pytest.fixture(scope='session')

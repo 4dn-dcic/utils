@@ -20,7 +20,7 @@ test-all:
 	poetry run pytest -vv -r w
 
 test-units:  # runs unit tests (and integration tests not backed by a unit test)
-	poetry run pytest -vv -r w -m "not integratedx"
+	@scripts/check-docker && poetry run pytest -vv -r w -m "not integratedx"
 
 test-integrations:  # runs integration tests
 	poetry run pytest -vv -r w -m "integrated or integratedx"

@@ -1,0 +1,18 @@
+docker ps > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+  exit 0
+else
+  echo "************************************************************"
+  echo "***                       WARNING                        ***"
+  echo "***     Docker is not running. Some tests might fail.    ***"
+  echo "***     For reliable results, you should start docker.   ***"
+  if [ -z "$FORCE_TEST" ]; then
+      echo "***     Use FORCE_TEST=TRUE to make tests run anyway.    ***"
+  else
+      echo "***     Continuing because FORCE_TEST=TRUE is set.       ***"
+  fi
+  echo "************************************************************"
+  if [ -z "$FORCE_TEST" ]; then
+      exit 1
+  fi
+fi
