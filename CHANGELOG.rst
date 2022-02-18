@@ -7,6 +7,25 @@ Change Log
 ----------
 
 
+3.10.0
+=======
+
+* In ``docker_utils.py``:
+  * Add ``docker_is_running`` predicate (used by the fix to ``test_ecr_utils_workflow`` to skip that test
+    if docker is not running.
+* In ``test_ecr_utils.py``:
+  * Fix ``test_ecr_utils_workflow`` to skip if docker is not enabled.
+* In ``test_s3_utils.py``:
+  * Remove ``test_s3utils_creation_cgap_ordinary`` because there are no more CGAP beanstalks.
+  * Revise ``test_regression_s3_utils_short_name_c4_706`` to use ``fourfront-mastertest``
+    rather than a CGAP env, since the CGAP beanstalk envs have gone away.
+* In ``secrets_utils.py`` and ``test_secrets_utils.py``:
+  * Add support for ``SecretsTable``.
+  * Add unit tests for existing ``secrets_utils.assume_identity`` and for new ``SecretsTable`` functionality.
+* Small cosmetic adjustments to ``Makefile`` to show a timestamp and info about current branch state
+  when ``make test`` starts and again when it ends.
+
+
 3.9.0
 =====
 
