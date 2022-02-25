@@ -39,15 +39,16 @@ class KeyManager:
         if not self.keys_file:
             raise ValueError(f"No KEYS_FILE attribute in {self}, and no {self.KEYS_FILE_VAR} environment variable.")
 
-    @property
-    def KEYS_FILE(self):  # noQA
-        # By default this will be computed dynamically, but a KeyManager class can declare a static value by doing
-        # something like this:
-        #
-        #     class MyKeyManager(KeyManager):
-        #         KEY_FILE = 'some file'
-        #
-        return self._default_keys_file()
+    KEYS_FILE = None
+    # @property
+    # def KEYS_FILE(self):  # noQA
+    #     # By default this will be computed dynamically, but a KeyManager class can declare a static value by doing
+    #     # something like this:
+    #     #
+    #     #     class MyKeyManager(KeyManager):
+    #     #         KEY_FILE = 'some file'
+    #     #
+    #     return self._default_keys_file()
 
     @classmethod
     def register(cls, *, name):
@@ -90,6 +91,8 @@ class KeyManager:
             cls.KEYS_FILE_VAR = f"{app_prefix}KEYS_FILE"
         elif not cls.KEYS_FILE_VAR.startswith(app_prefix):
             raise ValueError("The {class_name}.KEYS_FILE_VAR must begin with {app_prefix!r}.")
+        if not cls.KEYS_FILE:
+            cls.KEYS_FILE = cls._default_keys_file()
         # print(f"Defining {class_name} "
         #       f"with APP_NAME={app_name!r} APP_TOKEN={app_token!r} KEYS_FILE_VAR={cls.KEYS_FILE_VAR!r}.")
 
@@ -246,4 +249,4 @@ class CGAPKeyManager(KeyManager):
 
 @KeyManager.register(name='fourfront')
 class FourfrontKeyManager(KeyManager):
-    APP_TOKEN = 'FF'
+    pass
