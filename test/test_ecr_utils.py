@@ -1,3 +1,5 @@
+import pytest
+
 from unittest import mock
 from dcicutils.ecr_utils import ECRUtils
 from dcicutils.docker_utils import DockerUtils
@@ -27,6 +29,7 @@ def test_ecr_utils_basic():
         assert url == REPO_URL
 
 
+@pytest.mark.skipif(not DockerUtils.docker_is_running(), reason="Docker is not running.")
 def test_ecr_utils_workflow():
     """ Tests URL + Login via Docker_cli"""
     ecr_cli = ECRUtils()
