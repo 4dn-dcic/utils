@@ -1,5 +1,6 @@
 # import contextlib
 # import functools
+import contextlib
 import io
 import json
 import os
@@ -49,6 +50,24 @@ class KeyManager:
     #     #         KEY_FILE = 'some file'
     #     #
     #     return self._default_keys_file()
+
+    @classmethod
+    @contextlib.contextmanager
+    def default_key_file_for_testing(cls, filename):
+        """
+        Sets the default key file for in cls.KEY_FILE to the indicated filename.
+        Ordinarily, in a non-testing environment, one would set an environment variable to do this,
+        but in the testing environment that has been set already and to a value that has nothing to
+        do with testing. So this bypasses the normal environment variable setup and sets it directly
+        in the class and only for the duration of an evaluation context.
+        """
+
+        old_filename = cls.KEYS_FILE
+        try:
+            cls.KEYS_FILE = filename
+            yield
+        finally:
+            cls.KEYS_FILE = old_filename
 
     @classmethod
     def register(cls, *, name):
