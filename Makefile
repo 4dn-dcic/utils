@@ -20,7 +20,11 @@ test-all:
 	poetry run pytest -vv -r w
 
 test-units:  # runs unit tests (and integration tests not backed by a unit test)
+	@git log -1 --decorate | head -1
+	@date
 	poetry run pytest -vv -r w -m "not integratedx"
+	@git log -1 --decorate | head -1
+	@date
 
 test-integrations:  # runs integration tests
 	poetry run pytest -vv -r w -m "integrated or integratedx"

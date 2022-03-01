@@ -651,10 +651,64 @@ class MockBoto3:
 
     def client(self, kind, **kwargs):
         mapped_class = self._mappings.get(kind)
-        logging.warning(f"Using {mapped_class} as {kind} boto3.client.")
+        logging.info(f"Using {mapped_class} as {kind} boto3.client.")
         if not mapped_class:
             raise NotImplementedError("Unsupported boto3 mock kind:", kind)
         return mapped_class(boto3=self, **kwargs)
+
+    @property
+    def session(self):
+
+        class _SessionModule:
+
+            def __init__(self, boto3):
+                self.boto3 = boto3
+
+            def Session(self, **kwargs):  # noQA - This name was chosen by AWS, so please don't warn about mixed case
+                return MockBoto3Session(boto3=self.boto3, **kwargs)
+
+        return _SessionModule(boto3=self)
+
+
+class MockBoto3Session:
+
+    def __init__(self, *, region_name, boto3):
+        self.region_name = region_name
+        self.boto3 = boto3
+
+    def client(self, service_name, **kwargs):
+        return self.boto3.client(service_name, **kwargs)
+
+
+@MockBoto3.register_client(kind='secretsmanager')
+class MockBoto3SecretsManager:
+
+    _SECRETS_MARKER = '_MOCKED_SECRETS'
+
+    def __init__(self, region_name=None, boto3=None):
+        self.region_name = region_name
+        self.boto3 = boto3 or MockBoto3()
+
+    def _mocked_secrets(self):
+        shared_reality = self.boto3.shared_reality
+        secrets = shared_reality.get(self._SECRETS_MARKER)
+        if secrets is None:
+            # Export the list in case other clients want the same list.
+            shared_reality[self._SECRETS_MARKER] = secrets = {}
+        return secrets
+
+    def put_secret_value_for_testing(self, SecretId, Value):  # noQA - Argument names chosen for AWS consistency
+        secrets = self._mocked_secrets()
+        secrets[SecretId] = Value
+
+    def get_secret_value(self, SecretId):  # noQA - Argument names must be compatible with AWS
+        secrets = self._mocked_secrets()
+        return {'SecretString': secrets[SecretId]}
+
+    def list_secrets(self):
+        secrets = self._mocked_secrets()
+        # This really returns dictionaries with lots more things, but we'll start slow. :) -kmp 17-Feb-2022
+        return {'SecretList': [{'Name': key} for key, _ in secrets.items()]}
 
 
 @MockBoto3.register_client(kind='cloudformation')
@@ -874,7 +928,7 @@ class MockBotoS3Client:
                 # Returns other things probably, but this will do to start for our mocking.
                 return {"ResponseMetadata": {"HTTPStatusCode": 200}}
         raise ClientError(operation_name='HeadBucket',
-                          error_response={
+                          error_response={  # noQA - PyCharm wrongly complains about this dictionary
                               "Error": {"Code": "404", "Message": "Not Found"},
                               "ResponseMetadata": {"HTTPStatusCode": 404},
                           })
@@ -1274,7 +1328,11 @@ def known_bug_expected(jira_ticket=None, fixed=False, error_class=None):
 
 def client_failer(operation_name, code=400):
     def fail(message, code=code):
-        raise ClientError({"Error": {"Message": message, "Code": code}}, operation_name=operation_name)
+        raise ClientError(
+            {  # noQA - PyCharm wrongly complains about this dictionary
+                "Error": {"Message": message, "Code": code}
+            },
+            operation_name=operation_name)
     return fail
 
 

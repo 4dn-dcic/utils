@@ -631,7 +631,8 @@ def infer_foursight_from_env(request, envname):
 def short_env_name(envname: Optional[EnvName]):
     if not envname:
         return None
-
+    elif not EnvUtils.FULL_ENV_PREFIX:  # "" or None
+        return envname
     return remove_prefix(EnvUtils.FULL_ENV_PREFIX, envname, required=False)
 
 
@@ -642,8 +643,8 @@ def full_env_name(envname):
     entry = find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname)
     if entry:
         return entry[p.ENVIRONMENT]
-
-    if envname.startswith(EnvUtils.FULL_ENV_PREFIX):
+    elif (not EnvUtils.FULL_ENV_PREFIX
+          or envname.startswith(EnvUtils.FULL_ENV_PREFIX)):
         return envname
     else:
         return EnvUtils.FULL_ENV_PREFIX + envname

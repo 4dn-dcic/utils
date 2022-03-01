@@ -813,6 +813,8 @@ def test_short_env_name():
     assert short_env_name('cgap') == 'cgap'
     assert short_env_name('anything') == 'anything'
 
+    assert short_env_name('fourfront_mastertest') == 'fourfront_mastertest'
+
 
 def test_full_env_name():
 
@@ -821,6 +823,8 @@ def test_full_env_name():
 
     assert full_env_name('fourfront-cgapdev') == 'fourfront-cgapdev'
     assert full_env_name('fourfront-mastertest') == 'fourfront-mastertest'
+
+    assert full_env_name('fourfront_mastertest') == 'fourfront_mastertest'
 
     # Does not require a registered env
     assert full_env_name('foo') == 'fourfront-foo'
@@ -848,6 +852,9 @@ def test_full_cgap_env_name():
         full_cgap_env_name('fourfront-mastertest')
 
     with pytest.raises(ValueError):
+        full_cgap_env_name('fourfront_mastertest')
+
+    with pytest.raises(ValueError):
         full_cgap_env_name('foo')
 
     # Special names 'staging' and 'data' don't work here.
@@ -862,6 +869,8 @@ def test_full_fourfront_env_name():
 
     assert full_fourfront_env_name('mastertest') == 'fourfront-mastertest'
     assert full_fourfront_env_name('fourfront-mastertest') == 'fourfront-mastertest'
+
+    assert full_fourfront_env_name('fourfront_mastertest') == 'fourfront_mastertest'
 
     # Does not require a registered env
     assert full_fourfront_env_name('foo') == 'fourfront-foo'
