@@ -64,7 +64,7 @@ class KeyManager:
 
         old_filename = cls.KEYS_FILE
         try:
-            cls.KEYS_FILE = filename
+            cls.KEYS_FILE = filename or cls._default_keys_file()
             yield
         finally:
             cls.KEYS_FILE = old_filename
