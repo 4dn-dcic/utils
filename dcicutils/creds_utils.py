@@ -53,9 +53,9 @@ class KeyManager:
 
     @classmethod
     @contextlib.contextmanager
-    def default_key_file_for_testing(cls, filename):
+    def default_keys_file_for_testing(cls, filename):
         """
-        Sets the default key file for in cls.KEYS_FILE to the indicated filename.
+        Sets the default keys file for in cls.KEYS_FILE to the indicated filename.
         Ordinarily, in a non-testing environment, one would set an environment variable to do this,
         but in the testing environment that has been set already and to a value that has nothing to
         do with testing. So this bypasses the normal environment variable setup and sets it directly
