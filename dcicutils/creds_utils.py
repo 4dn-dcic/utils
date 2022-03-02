@@ -64,7 +64,7 @@ class KeyManager:
 
         old_filename = cls.KEYS_FILE
         try:
-            cls.KEYS_FILE = filename or cls._default_keys_file()
+            cls.KEYS_FILE = filename or cls._default_keys_file(for_testing=True)
             yield
         finally:
             cls.KEYS_FILE = old_filename
@@ -131,8 +131,9 @@ class KeyManager:
     # Class Methods
 
     @classmethod
-    def _default_keys_file(cls):
-        return os.path.expanduser(f"~/.{cls.APP_TOKEN.lower()}-keys.json")
+    def _default_keys_file(cls, for_testing=False):
+        suffix = "-for-testing" if for_testing else ""
+        return os.path.expanduser(f"~/.{cls.APP_TOKEN.lower()}-keys{suffix}.json")
 
     # Replaced by an instance variable. Rewrites weill be needed.
     #
