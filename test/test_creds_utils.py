@@ -1,5 +1,6 @@
 # import contextlib
 import json
+import io
 import os
 import pytest
 
@@ -7,7 +8,7 @@ from dcicutils.creds_utils import KeyManager, CGAPKeyManager, FourfrontKeyManage
 from dcicutils.exceptions import AppEnvKeyMissing, AppServerKeyMissing  # , AppKeyMissing
 # from dcicutils.misc_utils import ignored
 from dcicutils.qa_utils import override_environ, MockFileSystem
-from unittest import mock
+
 
 SAMPLE_CGAP_DEFAULT_ENV = 'cgap-sample'
 SAMPLE_CGAP_KEYS_FILE = 'cgap.keys'
@@ -153,8 +154,34 @@ def test_get_cgap_keydicts_missing():
 
     mfs = MockFileSystem()
 
-    with mock.patch.object(os.path, "exists", mfs.exists):
-        assert _make_sample_cgap_key_manager().get_keydicts() == {}  # When missing, it appears empty
+    with mfs.mock_exists_open_remove():
+
+        key_manager = _make_sample_cgap_key_manager()
+
+        # When keys file is missing, it appears empty.
+        assert key_manager.get_keydicts() == {}
+
+        # When keys file contains valid JSON, but not a dictionary, ValueError is raised.
+        with io.open(key_manager.keys_file, 'w') as fp:
+            fp.write('"i am not a dictionary"')
+        with pytest.raises(ValueError):
+            key_manager.get_keydicts()
+
+        # When keys file contains invalid JSON, ValueError is raised.
+        # Note: In fact, the error class is more specific, but it inherits from ValueError.
+        with io.open(key_manager.keys_file, 'w') as fp:
+            fp.write('i am not json')
+        with pytest.raises(ValueError):
+            key_manager.get_keydicts()
+
+        with io.open(key_manager.keys_file, 'w') as fp:
+            keys_file_content_for_testing = {
+                "fourfront-cgapdev":
+                    {"key": "my-key", "secret": "my-pw", "server": "http://localhost:8000"}
+            }
+            fp.write(json.dumps(keys_file_content_for_testing))
+        parsed_keydicts = key_manager.get_keydicts()
+        assert parsed_keydicts == keys_file_content_for_testing
 
 
 SAMPLE_MISSING_ENV = 'fourfront-cgapwolf'

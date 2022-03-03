@@ -1,22 +1,10 @@
-# import contextlib
-# import functools
 import contextlib
 import io
 import json
 import os
 
-# from dcicutils.misc_utils import local_attrs
 from dcicutils.exceptions import AppEnvKeyMissing, AppServerKeyMissing
 from dcicutils.misc_utils import remove_suffix
-
-
-# LOCAL_SERVER = "http://localhost:8000"
-# LOCAL_PSEUDOENV = 'fourfront-cgaplocal'
-#
-# PRODUCTION_SERVER = 'https://cgap.hms.harvard.edu'
-# PRODUCTION_ENV = 'fourfront-cgap'
-#
-# keys_file_var='CGAP_KEYS_FILE'
 
 
 _KEY_MANAGERS = {}
@@ -27,6 +15,7 @@ class KeyManager:
     APP_NAME = None
     APP_TOKEN = None  # Set this to a string to override APP_NAME.lower() as the app token
 
+    KEYS_FILE = None
     KEYS_FILE_VAR = None
 
     _REGISTERED = False
@@ -34,22 +23,109 @@ class KeyManager:
     # Instance Methods
 
     def __init__(self, keys_file=None):
+        """
+        Defines what is done upon creation of a key manager instance.
+
+        NOTE: The only such classes that are instantiable are those that have been registered.
+              The reason is that the register decorator performs important initializations of class variables.
+
+        Args:
+            keys_file: the name of a filename to use instead of the name chosen by default
+        """
+
         if not self._REGISTERED:
             raise RuntimeError("Only registered KeyManagers can be instantiated.")
         self.keys_file = keys_file or os.environ.get(self.KEYS_FILE_VAR) or self.KEYS_FILE
         if not self.keys_file:
             raise ValueError(f"No KEYS_FILE attribute in {self}, and no {self.KEYS_FILE_VAR} environment variable.")
 
-    KEYS_FILE = None
-    # @property
-    # def KEYS_FILE(self):  # noQA
-    #     # By default this will be computed dynamically, but a KeyManager class can declare a static value by doing
-    #     # something like this:
-    #     #
-    #     #     class MyKeyManager(KeyManager):
-    #     #         KEYS_FILE = 'some file'
-    #     #
-    #     return self._default_keys_file()
+    def get_keydicts(self) -> dict:
+        """
+        Parses and returns the keys file (held by self.keys_file)
+
+        Returns:
+            a dictionary that maps an environment name to its auth information,
+            which is a dict with keys 'key', 'secret', and 'server'.
+
+        NOTE: No caching is done on a theory that you don't do this super-often, and you might have edited the
+              keys file since last look, so you'd want most-up-to-date credentials. If those assumptions don't
+              hold, please request additional support for this class rather than creating ad hoc solutions outside.
+        """
+        if not os.path.exists(self.keys_file):
+            return {}
+        with io.open(self.keys_file) as fp:
+            keys = json.load(fp)
+            if not isinstance(keys, dict):
+                raise ValueError(f"The file {self.keys_file} did not contain a Python dictionary (in JSON format).")
+            return keys
+
+    def get_keydict_for_env(self, env):
+        """
+        Gets the appropriate auth info (as a dict) for talking to a given beanstalk environment.
+
+        Args:
+            env: the name of a beanstalk environment
+
+        Returns:
+            Auth information as a dict with keys 'key', 'secret', and 'server'.
+        """
+
+        self._check_env(env)
+
+        keydicts = self.get_keydicts()
+        keydict = keydicts.get(env)
+        if not keydict:
+            raise AppEnvKeyMissing(env=env, key_manager=self)
+        return keydict
+
+    def get_keypair_for_env(self, env):
+        """
+        Gets the appropriate auth info (as a pair/tuple) for talking to a given beanstalk environment.
+
+        Args:
+            env: the name of an environment
+
+        Returns:
+            Auth information as a (key, secret) tuple.
+        """
+
+        return self.keydict_to_keypair(self.get_keydict_for_env(env=env))
+
+    def get_keydict_for_server(self, server):  # tested
+        """
+        Gets the appropriate auth info (as a dict) for talking to a given beanstalk environment.
+
+        Args:
+            server: the name of a server
+
+        Returns:
+            Auth information.
+            The auth is a keypair, though we might change this to include a JWT token in the the future.
+        """
+
+        self._check_server(server)
+
+        keydicts = self.get_keydicts()
+        server_to_find = server.rstrip('/')
+        for keydict in keydicts.values():
+            if keydict['server'].rstrip('/') == server_to_find:
+                return keydict
+        raise AppServerKeyMissing(server=server, key_manager=self)
+
+    def get_keypair_for_server(self, server):  # tested
+        """
+        Gets the appropriate auth info (as a pair/tuple) for talking to a given beanstalk environment.
+
+        Args:
+            server: the name of a server
+
+        Returns:
+            Auth information as a (key, secret) tuple.
+        """
+
+        return self.keydict_to_keypair(self.get_keydict_for_server(server=server))
+
+    # Class Methods
 
     @classmethod
     @contextlib.contextmanager
@@ -71,6 +147,17 @@ class KeyManager:
 
     @classmethod
     def register(cls, *, name):
+        """
+        A decorator that used to register a key manager class, so that it can be later looked up by the given name.
+        This also does important class variable initialization for the key manager class,
+        so no key manager class can be instantiated unless it has been registered in this way.
+
+        Args:
+
+            name:  a name token (a str) that should match the first part of the class name, before 'KeyManager'.
+                   e.g., for CGAPKeyManager, the name should be 'cgap'.
+
+        """
         def _register_class(key_manager_class):
             assert issubclass(key_manager_class, KeyManager)
             if name in _KEY_MANAGERS:
@@ -117,52 +204,40 @@ class KeyManager:
 
     @classmethod
     def create(cls, name, **kwargs):
+        """
+        Allows creation of a registered key manager class using an alternate protocol that uses name lookup.
+        For example, the following two are equivalent ways of creating an instance:
+            CGAPKeyManager(**kwargs)
+            KeyManager.create('cgap', **kwargs)
+        """
+
         key_manager_class = _KEY_MANAGERS.get(name)
         if not key_manager_class:
             raise ValueError(f"There is no registered KeyManager class named {name!r}.")
         return key_manager_class(**kwargs)
-
-    # @contextlib.contextmanager
-    # def alternate_keys_file_from_environ(self):
-    #     filename = os.environ.get(self.KEYS_FILE_VAR) or None  # Treats empty string as undefined
-    #     with self.alternate_keys_file(filename=filename):
-    #         yield
-
-    # Class Methods
 
     @classmethod
     def _default_keys_file(cls, for_testing=False):
         suffix = "-for-testing" if for_testing else ""
         return os.path.expanduser(f"~/.{cls.APP_TOKEN.lower()}-keys{suffix}.json")
 
-    # Replaced by an instance variable. Rewrites weill be needed.
-    #
-    # @classmethod
-    # def keys_file(cls):
-    #     app_token = cls.APP_TOKEN or cls.APP_NAME.lower()
-    #     return os.path.expanduser(cls.KEYS_FILE or f"~/.{app_token}-keys.json")
-
-    # # Formerly a function / classmethod, now a normal instance method of an instance (of KeyManager)
-    # @contextlib.contextmanager
-    # def alternate_keys_file(self, filename):
-    #     if filename is None:
-    #         yield  # If no alternate filename given, change nothing
-    #     else:
-    #         with local_attrs(self, keys_file=filename):
-    #             yield
-
-    # @classmethod
-    # def UsingKeysFile(cls, key_manager):
-    #     def _UsingKeysFile(fn):  # TO DO: declare as decorator
-    #         @functools.wraps(fn)
-    #         def wrapped(*args, **kwargs):
-    #             with key_manager.alternate_keys_file_from_environ():
-    #                 return fn(*args, **kwargs)
-    #         return wrapped
-    #     return _UsingKeysFile
-
-    @classmethod  # tested. good as class method
+    @classmethod
     def keypair_to_keydict(cls, auth_tuple, *, server):
+        """
+        Translates an auth tuple (key, secret) to a keydict with {"key": ..., "secret": ..., "server": ...}.
+        Since the tuple must contain a secret and the keydict requires it, a server argument must be provided.
+        That argument is required to be passed as a keyword.
+
+        >>> KeyManager.keypair_to_keydict(('my-key', 'abra-cadabra'), server='http://whatever')
+        {"key": "my-key", "secret": "abra-cadabra", "server": "http://whatever"}
+
+        Args:
+            auth_tuple (tuple): an auth tuple of the form (key, secret)
+            server (str): a server name, such as "https://cgap.hms.harvard.edu" or "http://localhost:8000"
+        Returns:
+            a keydict of the form {"key": ..., "secret": ..., "server": ...}
+        """
+
         auth_dict = {
             'key': auth_tuple[0],
             'secret': auth_tuple[1],
@@ -170,96 +245,36 @@ class KeyManager:
         }
         return auth_dict
 
-    @classmethod  # tested. good as class method
+    @classmethod
     def keydict_to_keypair(cls, auth_dict):
+        """
+        Translates a keydict with {"key": ..., "secret": ..., "server": ...} to an auth tuple (key, secret).
+        Since the tuple does not have a place for the server, it will be discarded.
+
+        >>> KeyManager.keydict_to_keypair({"key": "my-key", "secret": "abra-cadabra", "server": "http://whatever"})
+        ('my-key', 'abra-cadabra')
+
+        Args:
+            auth_tuple (tuple): an auth tuple of the form (key, secret)
+            server (str): a server name, such as "https://cgap.hms.harvard.edu" or "http://localhost:8000"
+        Returns:
+            a keydict of the form {"key": ..., "secret": ..., "server": ...}
+
+        """
         return (
             auth_dict['key'],
             auth_dict['secret']
         )
-
-    # formerly a class method. no longer can be.
-    def get_keydicts(self):  # tested
-        if not os.path.exists(self.keys_file):
-            return {}
-        with io.open(self.keys_file) as fp:
-            keys = json.load(fp)
-            return keys
 
     @classmethod
     def _check_env(cls, env):
         if not env or not isinstance(env, str):
             raise ValueError(f"Not a valid environment: {env}")
 
-    def get_keydict_for_env(self, env):
-        """
-        Gets the appropriate auth info (as a dict) for talking to a given beanstalk environment.
-
-        Args:
-            env: the name of a beanstalk environment
-
-        Returns:
-            Auth information as a dict with keys 'key', 'secret', and 'server'.
-        """
-
-        self._check_env(env)
-
-        keydicts = self.get_keydicts()
-        keydict = keydicts.get(env)
-        if not keydict:
-            raise AppEnvKeyMissing(env=env, key_manager=self)
-        return keydict
-
-    def get_keypair_for_env(self, env):
-        """
-        Gets the appropriate auth info (as a pair/tuple) for talking to a given beanstalk environment.
-
-        Args:
-            env: the name of an environment
-
-        Returns:
-            Auth information as a (key, secret) tuple.
-        """
-
-        return self.keydict_to_keypair(self.get_keydict_for_env(env=env))
-
     @classmethod
     def _check_server(cls, server):
         if not server or not isinstance(server, str):
             raise ValueError(f"Not a valid server: {server}")
-
-    def get_keydict_for_server(self, server):  # tested
-        """
-        Gets the appropriate auth info (as a dict) for talking to a given beanstalk environment.
-
-        Args:
-            server: the name of a server
-
-        Returns:
-            Auth information.
-            The auth is a keypair, though we might change this to include a JWT token in the the future.
-        """
-
-        self._check_server(server)
-
-        keydicts = self.get_keydicts()
-        server_to_find = server.rstrip('/')
-        for keydict in keydicts.values():
-            if keydict['server'].rstrip('/') == server_to_find:
-                return keydict
-        raise AppServerKeyMissing(server=server, key_manager=self)
-
-    def get_keypair_for_server(self, server):  # tested
-        """
-        Gets the appropriate auth info (as a pair/tuple) for talking to a given beanstalk environment.
-
-        Args:
-            server: the name of a server
-
-        Returns:
-            Auth information as a (key, secret) tuple.
-        """
-
-        return self.keydict_to_keypair(self.get_keydict_for_server(server=server))
 
 
 @KeyManager.register(name='cgap')
