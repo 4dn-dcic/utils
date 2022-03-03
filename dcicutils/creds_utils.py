@@ -43,13 +43,16 @@ class KeyManager:
         """
         Parses and returns the keys file (held by self.keys_file)
 
+        NOTE: No caching is done on a theory that you don't do this super-often, and you might have edited the
+              keys file since last look, so you'd want most-up-to-date credentials. If those assumptions don't
+              hold, please request additional support for this class rather than creating ad hoc solutions outside.
+
         Returns:
             a dictionary that maps an environment name to its auth information,
             which is a dict with keys 'key', 'secret', and 'server'.
 
-        NOTE: No caching is done on a theory that you don't do this super-often, and you might have edited the
-              keys file since last look, so you'd want most-up-to-date credentials. If those assumptions don't
-              hold, please request additional support for this class rather than creating ad hoc solutions outside.
+        Raises:
+            ValueError: if the file is ill-formatted (does not contain JSON or JSON is not a dictionary)
         """
         if not os.path.exists(self.keys_file):
             return {}
@@ -68,6 +71,9 @@ class KeyManager:
 
         Returns:
             Auth information as a dict with keys 'key', 'secret', and 'server'.
+
+        Raises:
+            ValueError: if the file is ill-formatted (does not contain JSON or JSON is not a dictionary)
         """
 
         self._check_env(env)

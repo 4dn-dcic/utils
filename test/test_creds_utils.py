@@ -1,12 +1,10 @@
-# import contextlib
-import json
 import io
+import json
 import os
 import pytest
 
 from dcicutils.creds_utils import KeyManager, CGAPKeyManager, FourfrontKeyManager
 from dcicutils.exceptions import AppEnvKeyMissing, AppServerKeyMissing  # , AppKeyMissing
-# from dcicutils.misc_utils import ignored
 from dcicutils.qa_utils import override_environ, MockFileSystem
 
 
@@ -97,24 +95,16 @@ def test_keymanager_keys_file():
 
     assert isinstance(original_file, str)
 
-    # with key_manager.alternate_keys_file(None):
-    #     assert key_manager.keys_file == original_file
-
     assert key_manager.keys_file == original_file
 
     with override_environ(CGAP_KEYS_FILE=None):
         assert os.environ.get('CGAP_KEYS_FILE') is None
         assert key_manager.keys_file == original_file
 
-        # with key_manager.alternate_keys_file_from_environ():
-        #     assert key_manager.keys_file == original_file
-        # assert key_manager.keys_file == original_file
-
     assert key_manager.keys_file == original_file
 
     with override_environ(CGAP_KEYS_FILE=""):
         assert os.environ.get('CGAP_KEYS_FILE') == ""
-        # with key_manager.alternate_keys_file_from_environ():
         assert key_manager.keys_file == original_file
 
     assert key_manager.keys_file == original_file
