@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "3.10.0"
+version = "3.11.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -40,7 +40,8 @@ classifiers = [
 python = ">=3.6.1,<3.10"
 boto3 = "^1.17.39"
 botocore = "^1.20.39"
-# TODO: elasticsearch is on version 7. -kmp 15-Feb-2020
+# The DCIC portals (cgap-portal and fourfront) are very particular about which ElasticSearch version.
+# This value is intentionally pinned and must not be changed casually.
 elasticsearch = "6.8.1"
 aws-requests-auth = ">=0.4.2,<1"
 docker = "^4.4.4"

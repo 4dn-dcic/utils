@@ -7,8 +7,34 @@ Change Log
 ----------
 
 
+3.11.0
+======
+
+* Adds support for ``creds_utils``.
+
+  * Class ``KeyManager``, with methods:
+
+    * ``KeyManager.get_keydict_for_env(self, env)``
+
+    * ``KeyManager.get_keydict_for_server(self, server)``
+
+    * ``KeyManager.get_keydicts(self)``
+
+    * ``KeyManager.get_keypair_for_env(self, env)``
+
+    * ``KeyManager.get_keypair_for_server(self, server)``
+
+    * ``KeyManager.keydict_to_keypair(auth_dict)``
+
+    * ``KeyManager.keypair_to_keydict(auth_tuple, *, server)``
+
+  * Class ``FourfrontKeyManager``
+
+  * Class ``CGAPKeyManager``
+
+
 3.10.0
-=======
+======
 
 * In ``docker_utils.py``:
   * Add ``docker_is_running`` predicate (used by the fix to ``test_ecr_utils_workflow`` to skip that test
