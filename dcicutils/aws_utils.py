@@ -6,13 +6,9 @@
 import boto3
 import logging
 import mimetypes
-import json
-import os
-import requests
 
 from botocore.exceptions import ClientError
 # from .exceptions import ()
-from .misc_utils import PRINT
 from .s3_utils import s3Utils
 
 ###########################
