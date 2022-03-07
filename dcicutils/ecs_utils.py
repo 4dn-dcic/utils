@@ -21,8 +21,6 @@ class ECSUtils:
             adding more is considered a compatible change.
         """
         services = self.client.list_services(cluster=cluster_name).get('serviceArns', [])
-        if len(services) < 4:
-            raise Exception('Environment error! Expected at least 4 services - check that ECS finished orchestrating.')
         return services
 
     def update_ecs_service(self, *, cluster_name, service_name):
@@ -43,3 +41,32 @@ class ECSUtils:
         for service_name in self.list_ecs_services(cluster_name=cluster_name):
             self.update_ecs_service(cluster_name=cluster_name, service_name=service_name)
         return True
+
+    def list_ecs_tasks(self):
+        """ Lists all available ECS task definitions. """
+        return self.client.list_task_definitions().get('taskDefinitionArns', [])
+
+    def run_ecs_task(self, *, cluster_name, task_name, subnet, security_group):
+        """ Runs the given task name on the given cluster.
+
+        :param cluster_name: name of cluster to run task on
+        :param task_name: name of task (including revision) to run
+        :param subnet: subnet to run task in
+        :param security_group: SG to associate with task
+        :return: dict response
+        """
+        return self.client.run_task(
+            cluster=cluster_name,
+            count=1,
+            taskDefinition=task_name,
+            networkConfiguration={
+                'awsvpcConfiguration': {
+                    'subnets': [
+                        subnet
+                    ],
+                    'securityGroups': [
+                        security_group
+                    ]
+                }
+            }
+        )

@@ -7,6 +7,132 @@ Change Log
 ----------
 
 
+3.11.0
+======
+
+* Adds support for ``creds_utils``.
+
+  * Class ``KeyManager``, with methods:
+
+    * ``KeyManager.get_keydict_for_env(self, env)``
+
+    * ``KeyManager.get_keydict_for_server(self, server)``
+
+    * ``KeyManager.get_keydicts(self)``
+
+    * ``KeyManager.get_keypair_for_env(self, env)``
+
+    * ``KeyManager.get_keypair_for_server(self, server)``
+
+    * ``KeyManager.keydict_to_keypair(auth_dict)``
+
+    * ``KeyManager.keypair_to_keydict(auth_tuple, *, server)``
+
+  * Class ``FourfrontKeyManager``
+
+  * Class ``CGAPKeyManager``
+
+
+3.10.0
+======
+
+* In ``docker_utils.py``:
+  * Add ``docker_is_running`` predicate (used by the fix to ``test_ecr_utils_workflow`` to skip that test
+    if docker is not running.
+* In ``test_ecr_utils.py``:
+  * Fix ``test_ecr_utils_workflow`` to skip if docker is not enabled.
+* In ``test_s3_utils.py``:
+  * Remove ``test_s3utils_creation_cgap_ordinary`` because there are no more CGAP beanstalks.
+  * Revise ``test_regression_s3_utils_short_name_c4_706`` to use ``fourfront-mastertest``
+    rather than a CGAP env, since the CGAP beanstalk envs have gone away.
+* In ``qa_utils.py``:
+  * ``MockBoto3Session``.
+  * ``MockBoto3SecretsManager`` and support for ``MockBoto3`` to make it.
+* In ``secrets_utils.py`` and ``test_secrets_utils.py``:
+  * Add support for ``SecretsTable``.
+  * Add unit tests for existing ``secrets_utils.assume_identity`` and for new ``SecretsTable`` functionality.
+* Small cosmetic adjustments to ``Makefile`` to show a timestamp and info about current branch state
+  when ``make test`` starts and again when it ends.
+* A name containing an underscore will not be shortened by ``short_env_name`` nor lengthened by
+  ``full_env_name`` (nor ``full_cgap_env_name`` nor ``full_fourfront_env_name``).
+
+
+3.9.0
+=====
+
+* Allow dcicutils to work in Python 3.9.
+
+
+3.8.0
+=====
+
+* Allow dcicutils to work in Python 3.8.
+
+
+3.7.1
+=====
+
+* In ``ecs_utils``:
+  
+  * No longer throw exception when listing services if <4 are returned
+
+
+3.7.0
+=====
+
+* In ``s3_utils``:
+
+  * Add ``HealthPageKey.PYTHON_VERSION``
+
+
+3.6.1
+=====
+
+* In ``ecs_utils``:
+
+  * Add ``list_ecs_tasks``
+  * Add ``run_ecs_task``
+
+
+3.6.0
+=====
+
+* In ``string_utils``:
+
+  * Add ``string_list``
+  * Add ``string_md5``
+
+
+3.5.0
+=====
+
+* In ``ff_utils``:
+
+  * Add ``parse_s3_bucket_and_key_url``.
+
+
+3.4.2
+=====
+
+* In ``qa_utils``:
+
+  * In ``MockBotoS3Client``:
+
+    * Fix ``head_object`` operation to return the ``StorageClass``
+      (since the mock already allows you to declare it per-S3-client-class).
+
+    * Add internal support to be expanded later for making individual S3 files
+      have different storage classes from one another.
+
+
+3.4.1
+=====
+
+* ``deployment_utils``:
+
+  * Default the value of ``s3_encode_key_id`` to the empty string, not ``None``.
+
+
 3.4.0
 =====
 

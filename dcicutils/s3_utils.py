@@ -50,6 +50,7 @@ class HealthPageKey:  # This is moving here from cgap-portal.
     NAMESPACE = 'namespace'
     PROCESSED_FILE_BUCKET = 'processed_file_bucket'          # = s3Utils.OUTFILE_BUCKET_HEALTH_PAGE_KEY
     PROJECT_VERSION = 'project_version'
+    PYTHON_VERSION = 'python_version'
     S3_ENCRYPT_KEY_ID = 's3_encrypt_key_id'
     SNOVAULT_VERSION = 'snovault_version'
     SYSTEM_BUCKET = 'system_bucket'                          # = s3Utils.SYS_BUCKET_HEALTH_PAGE_KEY

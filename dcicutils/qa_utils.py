@@ -651,10 +651,64 @@ class MockBoto3:
 
     def client(self, kind, **kwargs):
         mapped_class = self._mappings.get(kind)
-        logging.warning(f"Using {mapped_class} as {kind} boto3.client.")
+        logging.info(f"Using {mapped_class} as {kind} boto3.client.")
         if not mapped_class:
             raise NotImplementedError("Unsupported boto3 mock kind:", kind)
         return mapped_class(boto3=self, **kwargs)
+
+    @property
+    def session(self):
+
+        class _SessionModule:
+
+            def __init__(self, boto3):
+                self.boto3 = boto3
+
+            def Session(self, **kwargs):  # noQA - This name was chosen by AWS, so please don't warn about mixed case
+                return MockBoto3Session(boto3=self.boto3, **kwargs)
+
+        return _SessionModule(boto3=self)
+
+
+class MockBoto3Session:
+
+    def __init__(self, *, region_name, boto3):
+        self.region_name = region_name
+        self.boto3 = boto3
+
+    def client(self, service_name, **kwargs):
+        return self.boto3.client(service_name, **kwargs)
+
+
+@MockBoto3.register_client(kind='secretsmanager')
+class MockBoto3SecretsManager:
+
+    _SECRETS_MARKER = '_MOCKED_SECRETS'
+
+    def __init__(self, region_name=None, boto3=None):
+        self.region_name = region_name
+        self.boto3 = boto3 or MockBoto3()
+
+    def _mocked_secrets(self):
+        shared_reality = self.boto3.shared_reality
+        secrets = shared_reality.get(self._SECRETS_MARKER)
+        if secrets is None:
+            # Export the list in case other clients want the same list.
+            shared_reality[self._SECRETS_MARKER] = secrets = {}
+        return secrets
+
+    def put_secret_value_for_testing(self, SecretId, Value):  # noQA - Argument names chosen for AWS consistency
+        secrets = self._mocked_secrets()
+        secrets[SecretId] = Value
+
+    def get_secret_value(self, SecretId):  # noQA - Argument names must be compatible with AWS
+        secrets = self._mocked_secrets()
+        return {'SecretString': secrets[SecretId]}
+
+    def list_secrets(self):
+        secrets = self._mocked_secrets()
+        # This really returns dictionaries with lots more things, but we'll start slow. :) -kmp 17-Feb-2022
+        return {'SecretList': [{'Name': key} for key, _ in secrets.items()]}
 
 
 @MockBoto3.register_client(kind='cloudformation')
@@ -773,7 +827,6 @@ class MockBotoS3Client:
         self.other_required_arguments = other_required_arguments
         self.storage_class = storage_class or self.DEFAULT_STORAGE_CLASS
 
-
     def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
         if kwargs != self.other_required_arguments:
             raise MockKeysNotImplemented("upload_file_obj", kwargs.keys())
@@ -860,6 +913,7 @@ class MockBotoS3Client:
                 'Key': Key,
                 'ETag': self._content_etag(content),
                 'ContentLength': len(content),
+                'StorageClass': self._object_storage_class(filename=pseudo_filename),
                 # Numerous others, but this is enough to make the dictionary non-empty and to satisfy some of our tools
             }
         else:
@@ -879,7 +933,7 @@ class MockBotoS3Client:
                 # Returns other things probably, but this will do to start for our mocking.
                 return {"ResponseMetadata": {"HTTPStatusCode": 200}}
         raise ClientError(operation_name='HeadBucket',
-                          error_response={
+                          error_response={  # noQA - PyCharm wrongly complains about this dictionary
                               "Error": {"Code": "404", "Message": "Not Found"},
                               "ResponseMetadata": {"HTTPStatusCode": 404},
                           })
@@ -887,6 +941,42 @@ class MockBotoS3Client:
     def list_objects_v2(self, Bucket):  # noQA - AWS argument naming style
         # This is different but similar to list_objects. However we don't really care about that.
         return self.list_objects(Bucket=Bucket)
+
+    def _storage_class_map(self):
+        """
+        Returns the storage class map for this mock.
+
+        Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
+        so that if another client is created by that same boto3 mock, it will see the same storage classes.
+        """
+        storage_class_map = self.boto3.shared_reality.get('storage_class_map')
+        if not storage_class_map:
+            self.boto3.shared_reality['storage_class_map'] = storage_class_map = {}
+        return storage_class_map
+
+    def _object_storage_class(self, filename):
+        """
+        Returns the storage class for the 'filename' in this S3 mock.
+        Because this is an internal routine, 'filename' is 'bucket/key' to match the mock file system we use internally.
+
+        Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
+        so that if another client is created by that same boto3 mock, it will see the same storage classes.
+        """
+        return self._storage_class_map().get(filename) or self.storage_class
+
+    def _set_object_storage_class(self, filename, value):
+        """
+        Sets the storage class for the 'filename' in this S3 mock to the given value.
+        Because this is an internal routine, 'filename' is 'bucket/key' to match the mock file system we use internally.
+
+        Presently the value is not error-checked. That might change.
+        By special exception, passing value=None will revert the storage class to the default for the given mock,
+        for which the default default is 'STANDARD'.
+
+        Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
+        so that if another client is created by that same boto3 mock, it will see the same storage classes.
+        """
+        self._storage_class_map()[filename] = value
 
     def list_objects(self, Bucket, Prefix=None):  # noQA - AWS argument naming style
         # Ref: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects
@@ -902,7 +992,7 @@ class MockBotoS3Client:
                     # "LastModified": ...,
                     # "Owner": {"DisplayName": ..., "ID"...},
                     "Size": len(content),
-                    "StorageClass": self.storage_class,
+                    "StorageClass": self._object_storage_class(filename=filename),
                 })
         return {
             # "CommonPrefixes": {"Prefix": ...},
@@ -1244,7 +1334,11 @@ def known_bug_expected(jira_ticket=None, fixed=False, error_class=None):
 
 def client_failer(operation_name, code=400):
     def fail(message, code=code):
-        raise ClientError({"Error": {"Message": message, "Code": code}}, operation_name=operation_name)
+        raise ClientError(
+            {  # noQA - PyCharm wrongly complains about this dictionary
+                "Error": {"Message": message, "Code": code}
+            },
+            operation_name=operation_name)
     return fail
 
 

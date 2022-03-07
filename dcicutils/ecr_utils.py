@@ -1,5 +1,7 @@
 import boto3
 import base64
+
+from .common import REGION
 from .misc_utils import PRINT
 from .env_utils import is_cgap_env
 
@@ -14,7 +16,7 @@ CGAP_ECR_LAYOUT = {
     'stable-indexer': 'Stable version of Indexer Application',
     'stable-ingester': 'Stable version of the Ingester Application'
 }
-CGAP_ECR_REGION = 'us-east-1'
+CGAP_ECR_REGION = REGION
 
 
 class ECRUtils(object):

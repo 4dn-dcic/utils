@@ -24,6 +24,9 @@ HIGLASS_BUCKETS = ['elasticbeanstalk-fourfront-webprod-wfoutput',
 # TODO (C4-102): Does this need to include CGAP envs? As part of the same list, or as a separate list?
 PRODUCTION_ENVS = ['fourfront-blue', 'fourfront-green']
 
+# S3 URL identifier
+S3_BUCKET_DOMAIN_SUFFIX = '.s3.amazonaws.com'
+
 
 ##################################
 # Widely used metadata functions #
@@ -1368,3 +1371,20 @@ def dump_results_to_json(store, folder):
         filename = folder + '/' + a_type + '.json'
         with open(filename, 'w') as outfile:
             json.dump(store[a_type], outfile, indent=4)
+
+
+def parse_s3_bucket_and_key_url(url: str) -> (str, str):
+    """ Parses the given s3 URL into its pair of bucket, key
+        Note that this function works the way it does because of how these
+        urls end up in our database. Eventually we should clean this up.
+        Format:
+            https://s3.amazonaws.com/cgap-devtest-main-application-cgap-devtest-wfout/GAPFI1HVXJ5F/fastqc_report.html
+            https://cgap-devtest-main-application-tibanna-logs.s3.amazonaws.com/41c2fJDQcLk3.metrics/metrics.html
+    """
+    parsed_url = urlparse(url)
+    if parsed_url.hostname.endswith(S3_BUCKET_DOMAIN_SUFFIX):
+        bucket = parsed_url.hostname[:-len(S3_BUCKET_DOMAIN_SUFFIX)]
+        key = parsed_url.path.lstrip('/')
+    else:
+        [bucket, key] = parsed_url.path.lstrip('/').split('/', 1)
+    return bucket, key

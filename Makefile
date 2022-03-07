@@ -1,5 +1,8 @@
 .PHONY: test
 
+clear-poetry-cache:  # clear poetry/pypi cache. for user to do explicitly, never automatic
+	poetry cache clear pypi --all
+
 configure:  # does any pre-requisite installs
 	pip install poetry
 
@@ -20,7 +23,11 @@ test-all:
 	poetry run pytest -vv -r w
 
 test-units:  # runs unit tests (and integration tests not backed by a unit test)
+	@git log -1 --decorate | head -1
+	@date
 	poetry run pytest -vv -r w -m "not integratedx"
+	@git log -1 --decorate | head -1
+	@date
 
 test-integrations:  # runs integration tests
 	poetry run pytest -vv -r w -m "integrated or integratedx"
@@ -45,3 +52,4 @@ info:
 	   $(info - Use 'make publish' to publish this library, but only if auto-publishing has failed.)
 	   $(info - Use 'make test' to run tests with the normal options we use on travis)
 	   $(info - Use 'make update' to update dependencies (and the lock file))
+	   $(info - Use 'make clear-poetry-cache' to clear the poetry pypi cache if in a bad state. (Safe, but later recaching can be slow.))

@@ -5,6 +5,7 @@ This file contains functions that might be generally useful.
 import contextlib
 import datetime
 import functools
+import hashlib
 import inspect
 import math
 import io
@@ -1183,6 +1184,25 @@ def capitalize1(s):
     This is in contrast to the string's .capitalize() method, which would force the rest of the string to lowercase.
     """
     return s[:1].upper() + s[1:]
+
+
+def string_list(s):
+    """
+    Turns a comma-separated list into an actual list, trimming whitespace and ignoring nulls.
+        >>> string_list('foo, bar,,baz ')
+        ['foo', 'bar', 'baz']
+    """
+
+    if not isinstance(s, str):
+        raise ValueError(f"Not a string: {s!r}")
+    return [p for p in [part.strip() for part in s.split(",")] if p]
+
+
+def string_md5(unicode_string):
+    """
+    Returns the md5 signature for the given u unicode string.
+    """
+    return hashlib.md5(unicode_string.encode('utf-8')).hexdigest()
 
 
 class CachedField:
