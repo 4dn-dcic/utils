@@ -5,6 +5,12 @@ API Documentation
 Note that JH utils is excluded due to side-effects of importing the module. See the source file for details.
 
 
+aws_utils
+^^^^^^^^^
+
+.. automodule:: dcicutils.aws_utils
+   :members:
+
 base
 ^^^^
 
