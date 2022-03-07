@@ -104,7 +104,8 @@ def test_s3_object_head():
     expected_res = {'Bucket': 'foo', 'Key': 'bar', 'ETag': '437b930db84b8079c2dd804a71936b5f', 'ContentLength': 9}
     with typical_boto3_mocking(s3_files={'foo/bar': 'something'}) as mocked_boto3:
         res = s3_object_head(object_key='bar', bucket_name='foo')
-        assert res == expected_res
+        for k, v in expected_res.items():
+            assert res.get(k) == v
         assert not s3_object_head(object_key='no-such-object', bucket_name='foo')
         assert not s3_object_head(object_key='bar', bucket_name='no-such-bucket')
         assert not s3_object_head(object_key='no-such-bucket', bucket_name='no-such-bucket')
@@ -112,7 +113,8 @@ def test_s3_object_head():
         # which might have some associated expense.
         s3 = mocked_boto3.client('s3')
         res = s3_object_head(object_key='bar', bucket_name='foo', s3=s3)
-        assert res == expected_res
+        for k, v in expected_res.items():
+            assert res.get(k) == v
 
 
 def test_s3_object_exists():
