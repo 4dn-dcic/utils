@@ -442,7 +442,7 @@ def get_item_facets(item_type, key=None, ff_env=None):
     """
     Gets facet query string information ie: mapping from facet to query string
     """
-    resp = get_metadata('/profiles/' + item_type + '.json', key=key, ff_env=ff_env)
+    resp = get_metadata('profiles/' + item_type + '.json', key=key, ff_env=ff_env)
     facets = {}
     for query_url, info in resp.get('facets', {}).items():
         facets[info['title']] = query_url
@@ -460,7 +460,7 @@ def get_item_facet_values(item_type, key=None, ff_env=None):
     for that facet mapping to the count for that value
     format: {'Project': {'4DN': 2, 'Other': 6}, 'Lab': {...}}
     """
-    resp = get_metadata('/search/?type=' + item_type, key=key, ff_env=ff_env)['facets']
+    resp = get_metadata('search/?type=' + item_type, key=key, ff_env=ff_env)['facets']
     facets = {}
     for facet in resp:
         name = facet['title']
@@ -493,7 +493,7 @@ def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
     """
     item_facets = kwargs.get('item_facets', None)
     item_type = 'ExperimentSetReplicate' if item_type is None else item_type
-    search = '/search/?type=' + item_type
+    search = 'search/?type=' + item_type
     if item_facets is None:
         item_facets = get_item_facets(item_type, key=key, ff_env=ff_env)
     for facet, values in kwargs.items():
@@ -569,7 +569,7 @@ def fetch_files_qc_metrics(data, associated_files=None,
                                           'source_file': source_file,
                                           'source_file_type': source_file_type
                                           }
-                                        }
+                            }
                             qc_metrics.update(qc_info)
 
                     else:
@@ -585,7 +585,7 @@ def fetch_files_qc_metrics(data, associated_files=None,
                                       'source_file': source_file,
                                       'source_file_type': source_file_type
                                       }
-                                    }
+                        }
                         qc_metrics.update(qc_info)
     return qc_metrics
 
@@ -902,7 +902,7 @@ def get_schema_names(key=None, ff_env=None):
     """
     auth = get_authentication_with_server(key, ff_env)
     schema_name = {}
-    profiles = get_metadata('/profiles/', key=auth, add_on='frame=raw')
+    profiles = get_metadata('profiles/', key=auth, add_on='frame=raw')
     for key, value in profiles.items():
         # skip abstract types
         if value.get('isAbstract') is True:
