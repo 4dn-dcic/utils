@@ -235,6 +235,12 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     return result
 
 
+def _sls(val):
+    """general helper to check for and strip leading slashes on ids in API fxns
+    """
+    return val.lstrip('/')
+
+
 def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
     """
     Function to get metadata for a given obj_id (uuid or @id, most likely).
@@ -251,7 +257,7 @@ def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
     auth = get_authentication_with_server(key, ff_env)
     if check_queue and stuff_in_queues(ff_env, check_secondary=False):
         add_on += '&datastore=database'
-    get_url = '/'.join([auth['server'], obj_id]) + process_add_on(add_on)
+    get_url = '/'.join([auth['server'], _sls(obj_id)]) + process_add_on(add_on)
     # check the queues if check_queue is True
     response = authorized_request(get_url, auth=auth, verb='GET')
     return get_response_json(response)
@@ -269,7 +275,7 @@ def patch_metadata(patch_item, obj_id='', key=None, ff_env=None, add_on=''):
     if not obj_id:
         raise Exception("ERROR getting id from given object %s for the request to"
                         " patch item. Supply a uuid or accession." % obj_id)
-    patch_url = '/'.join([auth['server'], obj_id]) + process_add_on(add_on)
+    patch_url = '/'.join([auth['server'], _sls(obj_id)]) + process_add_on(add_on)
     # format item to json
     patch_item = json.dumps(patch_item)
     response = authorized_request(patch_url, auth=auth, verb='PATCH', data=patch_item)
