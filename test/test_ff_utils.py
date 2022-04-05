@@ -594,6 +594,18 @@ def test_get_metadata_unit():
         assert ff_utils.get_metadata(test_item, key=ts.bar_env_auth_dict, check_queue=False) == error_message_json
 
 
+def test_sls():
+    in_and_out = {
+        'my_id/': 'my_id/',
+        '/my_id/': 'my_id/',
+        '//my_id': 'my_id',
+        'my/id': 'my/id',
+        '/my/id': 'my/id',
+    }
+    for i, o in in_and_out.items():
+        assert ff_utils._sls(i) == o
+
+
 @pytest.mark.integratedx
 @pytest.mark.flaky(max_runs=3)  # very flaky for some reason
 def test_get_metadata_integrated(integrated_ff):
