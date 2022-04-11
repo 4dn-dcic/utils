@@ -7,6 +7,25 @@ Change Log
 ----------
 
 
+3.12.0
+======
+
+* In ``diff_utils``:
+
+  * Add support for ``.diffs(..., include_mappings=True)``
+  * Add support for ``.diffs(..., normalizer=<fn>)`` where ``<fn>`` is a function of two keyword arguments,
+    ``item`` and ``label`` that can rewrite a given expression to be compared into a canonical form (e.g.,
+    reducing a dictionary with a ``uuid`` to just the ``uuid``, which is what we added the functionality for).
+
+
+3.11.1
+======
+
+* In ``ff_utils``:
+
+  * In ``get_metadata``, strip leading slashes on ids in API functions.
+
+
 3.11.0
 ======
 
