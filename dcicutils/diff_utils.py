@@ -59,7 +59,7 @@ class DiffManager:
 
     CONSTANTS_MAP = {None: 'null', True: 'true', False: 'false'}
 
-    def unroll(self, item, _omit_subscripts=False):
+    def unroll(self, item, normalizer=None, _omit_subscripts=False):
         """
         Unrolls a JSON structure (a multi-level Python dictionary) into a (flat) dictionary of dotted keys.
         The keys in the dictionary depend on the DiffManager's style attribute.
@@ -72,6 +72,8 @@ class DiffManager:
         result = {}
 
         def traverse(item, result, label):
+            if normalizer:
+                item = normalizer(label=label, item=item)
             if isinstance(item, dict):
                 for k, v in item.items():
                     traverse(v, result, self._merge_label_key(label=label, key=k))
@@ -87,22 +89,24 @@ class DiffManager:
 
         return result
 
-    def diffs(self, item1, item2, _omit_subscripts=False):
+    def diffs(self, item1, item2, include_mappings=False, normalizer=None, _omit_subscripts=False):
         """
         Args:
             item1: a python dictionary (representing its JSON equivalent)
             item2: a python dictionary (representing its JSON equivalent)
+            include_mappings (bool): a boolean indicating whether old/new mappings should be returned
             _omit_subscripts: Used INTERNALLY ONLY by .patch_diffs to cause some detail to be elided.
         Returns:
             a dictionary of with keys "added", "changed", "same", and "removed" containing names of keys of each kind.
+            If include_mappings=True, then "old" and "new" will be among the keys.
         """
 
-        d1 = self.unroll(item1, _omit_subscripts=_omit_subscripts)
-        d2 = self.unroll(item2, _omit_subscripts=_omit_subscripts)
-        return self._diffs(d1, d2)
+        d1 = self.unroll(item1, _omit_subscripts=_omit_subscripts, normalizer=normalizer)
+        d2 = self.unroll(item2, _omit_subscripts=_omit_subscripts, normalizer=normalizer)
+        return self._diffs(d1, d2, include_mappings=include_mappings)
 
     @classmethod
-    def _diffs(cls, d1, d2):
+    def _diffs(cls, d1, d2, include_mappings=False):
         removed = []
         added = []
         same = []
@@ -127,6 +131,9 @@ class DiffManager:
             res['same'] = same
         if added:
             res['added'] = added
+        if include_mappings:
+            res['old'] = d1
+            res['new'] = d2
         return res
 
     def patch_diffs(self, item):
@@ -142,7 +149,7 @@ class DiffManager:
         else:
             return items if for_change_type else sorted(items)
 
-    def comparison(self, item1, item2):
+    def comparison(self, item1, item2, normalizer=None):
         """
         Returns a description of the changes between two JSON items (represented as Python dictionaries).
         Each line is a string of the form "<key-path>: <old> => <new>".
@@ -150,8 +157,8 @@ class DiffManager:
         For removals, the <new> will be absent.
         Items remaining the same will not be listed.
         """
-        d1 = self.unroll(item1)
-        d2 = self.unroll(item2)
+        d1 = self.unroll(item1, normalizer=normalizer)
+        d2 = self.unroll(item2, normalizer=normalizer)
         diffs = self._diffs(d1, d2)
         result = []
 

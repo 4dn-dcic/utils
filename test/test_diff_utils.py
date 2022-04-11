@@ -1,5 +1,6 @@
 import pytest
 
+from dcicutils.misc_utils import ignored
 from dcicutils.diff_utils import DiffManager
 
 
@@ -174,6 +175,94 @@ def test_diffs():
         "removed": ["item.c"],
         "changed": ["item.b"],
         "same": ["item.a"],
+    }
+
+
+def test_diffs_mappings():
+
+    dm = DiffManager(label="item")
+
+    result = dm.diffs({"a": "foo", "b": "bar", "c": "zzz"}, {"a": "foo", "b": "baz"}, include_mappings=True)
+
+    assert result == {
+        "removed": ["item.c"],
+        "changed": ["item.b"],
+        "same": ["item.a"],
+        "old": {"item.a": "foo", "item.b": "bar", "item.c": "zzz"},
+        "new": {"item.a": "foo", "item.b": "baz"}
+    }
+
+    result = dm.diffs({"a": ["alpha", "beta"], "b": "bar", "c": "zzz"},
+                      {"a": ["alpha", "omega"], "b": {"uuid": "bar", "other": "stuff"}},
+                      include_mappings=True)
+
+    assert result == {
+        "removed": [
+            "item.b",
+            "item.c"
+          ],
+        "changed": [
+            "item.a[1]"
+        ],
+        "same": [
+            "item.a[0]"
+        ],
+        "added": [
+            "item.b.uuid",
+            "item.b.other"
+        ],
+        "old": {
+            "item.a[0]": "alpha",
+            "item.a[1]": "beta",
+            "item.b": "bar",
+            "item.c": "zzz"
+        },
+        "new": {
+            "item.a[0]": "alpha",
+            "item.a[1]": "omega",
+            "item.b.uuid": "bar",
+            "item.b.other": "stuff"
+        }
+    }
+
+
+def test_diffs_normalizer():
+
+    def uuid_normalizer(*, label, item):
+        ignored(label)
+        if isinstance(item, dict) and 'uuid' in item:
+            return item['uuid']
+        else:
+            return item
+
+    dm = DiffManager(label="item")
+
+    result = dm.diffs({"a": ["alpha", "beta"], "b": "bar", "c": "zzz"},
+                      {"a": ["alpha", "omega"], "b": {"uuid": "bar", "other": "stuff"}},
+                      include_mappings=True, normalizer=uuid_normalizer)
+
+    assert result == {
+        "removed": [
+            "item.c"
+        ],
+        "changed": [
+            "item.a[1]"
+        ],
+        "same": [
+            "item.a[0]",
+            "item.b"
+        ],
+        "old": {
+            "item.a[0]": "alpha",
+            "item.a[1]": "beta",
+            "item.b": "bar",
+            "item.c": "zzz"
+        },
+        "new": {
+            "item.a[0]": "alpha",
+            "item.a[1]": "omega",
+            "item.b": "bar"  # Note that this value was normalized prior to comparison, so normalized value is here.
+        }
     }
 
 
