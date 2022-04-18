@@ -18,7 +18,7 @@ from dcicutils.env_utils import (
     FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV, CGAP_PUBLIC_DOMAIN_PRD,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env, classify_server_url,
     short_env_name, full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
-    make_env_name_cfn_compatible, default_workflow_env, permit_load_data, public_url_for_app,
+    make_env_name_cfn_compatible, default_workflow_env, permit_load_data, public_url_for_app, is_beanstalk_env,
 )
 from dcicutils.exceptions import InvalidParameterError
 from dcicutils.qa_utils import raises_regexp
@@ -332,6 +332,46 @@ def test_is_fourfront_env():
     assert is_fourfront_env('fourfront-blue') is True
 
     assert is_fourfront_env(None) is False
+
+
+def test_is_beanstalk_env():
+
+    assert is_beanstalk_env('fourfront-webprod') is True
+    assert is_beanstalk_env('fourfront-webprod2') is True
+    assert is_beanstalk_env('fourfront-blue') is True
+    assert is_beanstalk_env('fourfront-green') is True
+    assert is_beanstalk_env('fourfront-hotseat') is True
+    assert is_beanstalk_env('fourfront-webdev') is True
+    assert is_beanstalk_env('fourfront-mastertest') is True
+
+    assert is_beanstalk_env('fourfront-cgap') is True
+    assert is_beanstalk_env('fourfront-cgaptest') is True
+    assert is_beanstalk_env('fourfront-cgapdev') is True
+    assert is_beanstalk_env('fourfront-cgapwolf') is True
+
+    # The magic non-beanstalk names return False
+    assert is_beanstalk_env('data') is False
+    assert is_beanstalk_env('staging') is False
+    assert is_beanstalk_env('cgap') is False
+
+    # Other potential FF and CGAP environment names return False
+    assert is_beanstalk_env('fourfront-devtest') is False
+    assert is_beanstalk_env('fourfront-supertest') is False
+    assert is_beanstalk_env('fourfront-megatest') is False
+    assert is_beanstalk_env('fourfront-anything') is False
+
+    assert is_beanstalk_env('fourfront-cgapanything') is False
+
+    assert is_beanstalk_env('cgap-wolf') is False
+    assert is_beanstalk_env('cgap-mgb') is False
+    assert is_beanstalk_env('cgap-msa') is False
+    assert is_beanstalk_env('cgap-dfci') is False
+    assert is_beanstalk_env('cgap-core') is False
+    assert is_beanstalk_env('cgap-training') is False
+    assert is_beanstalk_env('cgap-clalit') is False
+    assert is_beanstalk_env('cgap-anything') is False
+
+    assert is_beanstalk_env('anything-at-all') is False
 
 
 def test_is_stg_or_prd_env():

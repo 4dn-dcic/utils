@@ -33,6 +33,9 @@ FF_ENV_WEBPROD2 = 'fourfront-webprod2'
 FF_ENV_WOLF = 'fourfront-wolf'
 FF_ENV_INDEXER = 'fourfront-indexer'  # to be used by ELB Indexer
 
+FF_ENV_PRODUCTION_BLUE_NEW = 'fourfront-production-blue'
+FF_ENV_PRODUCTION_GREEN_NEW = 'fourfront-production-green'
+
 CGAP_ENV_DEV = 'fourfront-cgapdev'
 CGAP_ENV_HOTSEAT = 'fourfront-cgaphotseat'  # Maybe not used
 CGAP_ENV_MASTERTEST = 'fourfront-cgaptest'
@@ -55,6 +58,25 @@ CGAP_ENV_WEBDEV_NEW = 'cgap-webdev'  # Maybe not used
 CGAP_ENV_WEBPROD_NEW = 'cgap-green'
 # CGAP_ENV_WEBPROD2_NEW is meaningless here. See CGAP_ENV_STAGING_NEW.
 CGAP_ENV_WOLF_NEW = 'cgap-wolf'  # Maybe not used
+
+_ALL_BEANSTALK_NAMES = [
+    # You can peek at contents of this variable to see how is_beanstalk_env will work,
+    # but DO NOT reference this directly from code outside of th is module. -kmp 18-Apr-2022
+
+    # Fourfront beansstalks
+    'fourfront-webprod',      # FF_ENV_WEBPROD (superseded by fourfront-green)
+    'fourfront-webprod2',     # FF_ENV_WEBPROD2 (superseded by fourfront-blue)
+    'fourfront-green',        # FF_ENV_PRODUCTION_GREEN
+    'fourfront-blue',         # FF_ENV_PRODUCTION_BLUE
+    'fourfront-mastertest',   # FF_ENV_MASTERTEST
+    'fourfront-webdev',       # FF_ENV_WEBDEV
+    'fourfront-hotseat',      # FF_ENV_HOTSEAT
+    # CGAP beanstalks
+    'fourfront-cgap',         # CGAP_ENV_WEBPROD (decomissionsed, replaced by AWS orchestration)
+    'fourfront-cgapdev',      # CGAP_ENV_DEV (decomissionsed, replaced by AWS orchestration)
+    'fourfront-cgaptest',     # CGAP_ENV_MASTERTEST (decomissionsed, replaced by AWS orchestration)
+    'fourfront-cgapwolf',     # CGAP_ENV_WOLF (decommissioned, replaced by AWS orchestration
+]
 
 # The bucket names were allocated originally and needn't change.
 
@@ -106,6 +128,8 @@ BEANSTALK_PROD_BUCKET_ENVS = {
     FF_ENV_WEBPROD2: FF_PROD_BUCKET_ENV,
     FF_ENV_PRODUCTION_BLUE: FF_PROD_BUCKET_ENV,
     FF_ENV_PRODUCTION_GREEN: FF_PROD_BUCKET_ENV,
+    FF_ENV_PRODUCTION_BLUE_NEW: FF_PROD_BUCKET_ENV,
+    FF_ENV_PRODUCTION_GREEN_NEW: FF_PROD_BUCKET_ENV,
     'cgap': CGAP_PROD_BUCKET_ENV,
     CGAP_ENV_PRODUCTION_BLUE: CGAP_PROD_BUCKET_ENV,
     CGAP_ENV_PRODUCTION_GREEN: CGAP_PROD_BUCKET_ENV,
@@ -118,6 +142,8 @@ BEANSTALK_PROD_MIRRORS = {
 
     FF_ENV_PRODUCTION_BLUE: FF_ENV_PRODUCTION_GREEN,
     FF_ENV_PRODUCTION_GREEN: FF_ENV_PRODUCTION_BLUE,
+    FF_ENV_PRODUCTION_BLUE_NEW: FF_ENV_PRODUCTION_GREEN_NEW,
+    FF_ENV_PRODUCTION_GREEN_NEW: FF_ENV_PRODUCTION_BLUE_NEW,
     FF_ENV_WEBPROD: FF_ENV_WEBPROD2,
     FF_ENV_WEBPROD2: FF_ENV_WEBPROD,
 
@@ -381,6 +407,16 @@ def is_fourfront_env(envname: EnvName):
     Otherwise returns False.
     """
     return ('fourfront' in envname and 'cgap' not in envname) if envname else False
+
+
+def is_beanstalk_env(envname):
+    """
+    Returns True if envname is one of the traditional/legacy beanstalk names, and False otherwise.
+
+    NOTE: The list of names is heled in _ALL_BEANSTALK_NAMES, but you MUST NOT reference that variable directly.
+          Always use this function.
+    """
+    return envname in _ALL_BEANSTALK_NAMES
 
 
 def is_stg_or_prd_env(envname: Optional[EnvName]):

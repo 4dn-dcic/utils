@@ -7,6 +7,19 @@ Change Log
 ----------
 
 
+3.13.0
+======
+
+* In ``env_utils``:
+
+  * Add ``FF_ENV_PRODUCTION_BLUE_NEW`` (value ``'fourfront-production-blue'``)
+    and ``FF_ENV_PRODUCTION_GREEN_NEW`` (value ``'fourfront-production-green'``)
+    and teach ``is_stg_or_prd_env`` and ``get_standard_mirror_env`` about them
+    as alternative stg/prd hosts.
+
+  * Add ``is_beanstalk_env`` to detect traditional/legacy beanstalk names during transition.
+
+
 3.12.0
 ======
 
