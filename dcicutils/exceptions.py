@@ -204,3 +204,10 @@ class AppServerKeyMissing(AppKeyMissing):
         self.server = server
         super().__init__(context=f"{key_manager.APP_NAME} server {server}",
                          key_manager=key_manager)
+
+
+class NotBeanstalkEnvironment(Exception):
+
+    def __init__(self, message=None, *, envname):
+        self.envname = envname
+        super().__init__(message or f"Not a beanstalk environment: {envname}")

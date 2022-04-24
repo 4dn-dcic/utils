@@ -10,6 +10,7 @@ from dcicutils.env_utils import (
     FF_ENV_PRODUCTION_GREEN, FF_ENV_PRODUCTION_BLUE,
     CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_WEBPROD,
 )
+from dcicutils.exceptions import NotBeanstalkEnvironment
 from dcicutils.qa_utils import mock_not_called
 from unittest import mock
 
@@ -257,6 +258,9 @@ def test_compute_prd_env_for_env():
     computed_cgap_prd = compute_prd_env_for_env('fourfront-cgapwolf')
     assert is_cgap_env(computed_cgap_prd)
     assert is_stg_or_prd_env(computed_cgap_prd)
+
+    with pytest.raises(NotBeanstalkEnvironment):
+        compute_prd_env_for_env('fourfront-production-blue')
 
 
 def _mocked_describe_beanstalk_environments(*args, **kwargs):

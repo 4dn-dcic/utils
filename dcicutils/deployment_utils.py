@@ -40,7 +40,7 @@ from .env_utils import (
     is_indexer_env, indexer_env_for_env,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, INDEXER_ENVS,
 )
-from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ, file_contents
+from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ, file_contents, full_class_name
 from .s3_utils import s3Utils
 
 
@@ -1013,16 +1013,52 @@ class CreateMappingOnDeployManager:
         return "SKIP" if options['SKIP'] else ",".join(k for k in ('STRICT', 'WIPE_ES') if options[k]) or "default"
 
     @classmethod
+    def get_app_env(cls, app):
+        """
+        Gets the env name of the currently running environment
+
+        :param app: handle to Pyramid app
+        :return: current env
+        """
+        # Return value is presumably one of the above-declared environments
+        return app.registry.settings.get('env.name')
+
+    @staticmethod
+    def get_deploy_config(cls, *, env, args, log, client=None, allow_other_prod=False):
+        raise NotImplementedError(f"{full_class_name(cls)}.get_deploy_config was called. Method customization on"
+                                  " a subclass of AbstractCreateMappingOnDeployManager was expected to avoid this.")
+
+    @staticmethod
+    def add_argparse_arguments(parser):
+        parser.add_argument('--wipe-es', help="Specify to wipe ES", action='store_true', default=False)
+        parser.add_argument('--skip', help='Specify to skip this step altogether', action='store_true', default=False)
+        parser.add_argument('--strict', help='Specify to do a strict reindex', action='store_true', default=False)
+
+
+    @classmethod
     def get_deploy_config(cls, *, env, args, log, client=None, allow_other_prod=False):
         """
-        Returns a dictionary describing appropriate options for creating mapping on deploy of a non-prd server.
-            {)
+        :param env: the name of the active portal environment
+        :param args: the args provided on the command line of a create-mapping-on-deploy call
+        :param log: a logger
+        :param client: a string naming the caller so that error messages can reference that instead of this function
+            (default None)
+        :param allow_other_prod: true if it's OK that the current env is a production environment other than
+            data or staging (default False)
+
+        :returns:
+            a dictionary describing appropriate options for creating mapping on deploy of a non-prd server.
+
+            {
                 "ENV_NAME": env,    # what environment we're working with
                 "WIPE_ES": <bool>,  # whether to wipe ElasticSearch before reindex
                 "STRICT": <bool>,   # whether to do a 'strict' reindex
                 "SKIP": <bool>,     # whether to skip this step (notwithstanding other options)
             }
-        NOTE WELL: This method will fail (raising DeploymentFailure) if called on production.
+
+        :raises DeploymentFailure:
+            if called on a production environment
+
         """
 
         deploy_cfg = {
@@ -1032,7 +1068,10 @@ class CreateMappingOnDeployManager:
         current_prod_env = compute_ff_prd_env() if is_fourfront_env(env) else compute_cgap_prd_env()
 
         apply_dict_overrides(deploy_cfg, **cls.DEFAULT_DEPLOYMENT_OPTIONS)
-        apply_dict_overrides(deploy_cfg, WIPE_ES=args.wipe_es, SKIP=args.skip, STRICT=args.strict)
+
+        for key, val in [('WIPE_ES', args.wipe_es), ('SKIP', args.skip), ('STRICT', args.strict)]:
+            if val:
+                deploy_cfg[key] = val
 
         if env == get_standard_mirror_env(current_prod_env):
             description = "currently the staging environment"
@@ -1065,12 +1104,6 @@ class CreateMappingOnDeployManager:
                  % (env, description, # noQA - PyCharm wrongly worries description might be unassigned
                     cls._summarize_deploy_options(deploy_cfg)))
         return deploy_cfg
-
-    @staticmethod
-    def add_argparse_arguments(parser):
-        parser.add_argument('--wipe-es', help="Specify to wipe ES", action='store_true', default=None)
-        parser.add_argument('--skip', help='Specify to skip this step altogether', default=None)
-        parser.add_argument('--strict', help='Specify to do a strict reindex', default=False)
 
 
 if __name__ == "__main__":

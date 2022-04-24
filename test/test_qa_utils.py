@@ -16,7 +16,7 @@ from dcicutils.exceptions import ExpectedErrorNotSeen, WrongErrorSeen, Unexpecte
 from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ
 from dcicutils.qa_utils import (
     mock_not_called, override_environ, override_dict, show_elapsed_time, timed,
-    ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule,
+    ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
 )
@@ -1430,3 +1430,16 @@ def test_known_bug_expected_regression_2():
     with known_bug_expected(jira_ticket="TST-00002", error_class=UnexpectedErrorAfterFix):
         with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError, fixed=True):
             raise RuntimeError("foo")
+
+
+def test_mocked_command_args():
+    with pytest.raises(AssertionError):
+        MockedCommandArgs(foo='x')
+
+    class MockedFooBarArgs(MockedCommandArgs):
+        VALID_ARGS=['foo', 'bar', 'foobar']
+
+    args = MockedFooBarArgs(foo='x', bar='y', foobar='xy')
+    assert args.foo == 'x'      # noQA - PyCharm can't see we declared this arg
+    assert args.bar == 'y'      # noQA - PyCharm can't see we declared this arg
+    assert args.foobar == 'xy'  # noQA - PyCharm can't see we declared this arg
