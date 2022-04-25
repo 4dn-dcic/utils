@@ -61,7 +61,7 @@ CGAP_ENV_WOLF_NEW = 'cgap-wolf'  # Maybe not used
 
 _ALL_BEANSTALK_NAMES = [
     # You can peek at contents of this variable to see how is_beanstalk_env will work,
-    # but DO NOT reference this directly from code outside of th is module. -kmp 18-Apr-2022
+    # but DO NOT reference this directly from code outside of this module. -kmp 18-Apr-2022
 
     # Fourfront beansstalks
     'fourfront-webprod',      # FF_ENV_WEBPROD (superseded by fourfront-green)
@@ -72,9 +72,9 @@ _ALL_BEANSTALK_NAMES = [
     'fourfront-webdev',       # FF_ENV_WEBDEV
     'fourfront-hotseat',      # FF_ENV_HOTSEAT
     # CGAP beanstalks
-    'fourfront-cgap',         # CGAP_ENV_WEBPROD (decomissionsed, replaced by AWS orchestration)
-    'fourfront-cgapdev',      # CGAP_ENV_DEV (decomissionsed, replaced by AWS orchestration)
-    'fourfront-cgaptest',     # CGAP_ENV_MASTERTEST (decomissionsed, replaced by AWS orchestration)
+    'fourfront-cgap',         # CGAP_ENV_WEBPROD (decommissioned, replaced by AWS orchestration)
+    'fourfront-cgapdev',      # CGAP_ENV_DEV (decommissioned, replaced by AWS orchestration)
+    'fourfront-cgaptest',     # CGAP_ENV_MASTERTEST (decommissioned, replaced by AWS orchestration)
     'fourfront-cgapwolf',     # CGAP_ENV_WOLF (decommissioned, replaced by AWS orchestration
 ]
 
