@@ -1437,7 +1437,7 @@ def test_mocked_command_args():
         MockedCommandArgs(foo='x')
 
     class MockedFooBarArgs(MockedCommandArgs):
-        VALID_ARGS=['foo', 'bar', 'foobar']
+        VALID_ARGS = ['foo', 'bar', 'foobar']
 
     args = MockedFooBarArgs(foo='x', bar='y', foobar='xy')
     assert args.foo == 'x'      # noQA - PyCharm can't see we declared this arg

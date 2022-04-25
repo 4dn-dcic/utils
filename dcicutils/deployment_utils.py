@@ -40,7 +40,7 @@ from .env_utils import (
     is_indexer_env, indexer_env_for_env,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, INDEXER_ENVS,
 )
-from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ, file_contents, full_class_name
+from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ, file_contents
 from .s3_utils import s3Utils
 
 
@@ -1024,16 +1024,10 @@ class CreateMappingOnDeployManager:
         return app.registry.settings.get('env.name')
 
     @staticmethod
-    def get_deploy_config(cls, *, env, args, log, client=None, allow_other_prod=False):
-        raise NotImplementedError(f"{full_class_name(cls)}.get_deploy_config was called. Method customization on"
-                                  " a subclass of AbstractCreateMappingOnDeployManager was expected to avoid this.")
-
-    @staticmethod
     def add_argparse_arguments(parser):
         parser.add_argument('--wipe-es', help="Specify to wipe ES", action='store_true', default=False)
         parser.add_argument('--skip', help='Specify to skip this step altogether', action='store_true', default=False)
         parser.add_argument('--strict', help='Specify to do a strict reindex', action='store_true', default=False)
-
 
     @classmethod
     def get_deploy_config(cls, *, env, args, log, client=None, allow_other_prod=False):
