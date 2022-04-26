@@ -7,6 +7,37 @@ Change Log
 ----------
 
 
+3.13.0
+======
+
+* In ``deployment_utils``:
+
+  * In ``CreateMappingOnDeployManager``:
+
+    * Add ``get_deploy_config`` with slightly different arguments than ``get_deployment_config``,
+      so CGAP and FF can be more easily compared.
+
+    * Change ``--strict`` and ``--skip`` to not take an argument on the command line, and to default to False.
+
+      NOTE: After some discussion, this was decided to be treated as a bug fix, not as an incompatible change,
+      so the semantic version will not require a major version bump.
+
+  * When testing, test with switch arguments, too.
+
+* In ``env_utils``:
+
+  * Add ``FF_ENV_PRODUCTION_BLUE_NEW`` (value ``'fourfront-production-blue'``)
+    and ``FF_ENV_PRODUCTION_GREEN_NEW`` (value ``'fourfront-production-green'``)
+    and teach ``is_stg_or_prd_env`` and ``get_standard_mirror_env`` about them
+    as alternative stg/prd hosts.
+
+  * Add ``is_beanstalk_env`` to detect traditional/legacy beanstalk names during transition.
+
+* In ``qa_utils``:
+
+  * Add ``MockedCommandArgs``.
+
+
 3.12.0
 ======
 

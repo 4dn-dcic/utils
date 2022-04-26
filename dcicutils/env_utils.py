@@ -33,6 +33,9 @@ FF_ENV_WEBPROD2 = 'fourfront-webprod2'
 FF_ENV_WOLF = 'fourfront-wolf'
 FF_ENV_INDEXER = 'fourfront-indexer'  # to be used by ELB Indexer
 
+FF_ENV_PRODUCTION_BLUE_NEW = 'fourfront-production-blue'
+FF_ENV_PRODUCTION_GREEN_NEW = 'fourfront-production-green'
+
 CGAP_ENV_DEV = 'fourfront-cgapdev'
 CGAP_ENV_HOTSEAT = 'fourfront-cgaphotseat'  # Maybe not used
 CGAP_ENV_MASTERTEST = 'fourfront-cgaptest'
@@ -55,6 +58,25 @@ CGAP_ENV_WEBDEV_NEW = 'cgap-webdev'  # Maybe not used
 CGAP_ENV_WEBPROD_NEW = 'cgap-green'
 # CGAP_ENV_WEBPROD2_NEW is meaningless here. See CGAP_ENV_STAGING_NEW.
 CGAP_ENV_WOLF_NEW = 'cgap-wolf'  # Maybe not used
+
+_ALL_BEANSTALK_NAMES = [
+    # You can peek at contents of this variable to see how is_beanstalk_env will work,
+    # but DO NOT reference this directly from code outside of this module. -kmp 18-Apr-2022
+
+    # Fourfront beansstalks
+    'fourfront-webprod',      # FF_ENV_WEBPROD (superseded by fourfront-green)
+    'fourfront-webprod2',     # FF_ENV_WEBPROD2 (superseded by fourfront-blue)
+    'fourfront-green',        # FF_ENV_PRODUCTION_GREEN
+    'fourfront-blue',         # FF_ENV_PRODUCTION_BLUE
+    'fourfront-mastertest',   # FF_ENV_MASTERTEST
+    'fourfront-webdev',       # FF_ENV_WEBDEV
+    'fourfront-hotseat',      # FF_ENV_HOTSEAT
+    # CGAP beanstalks
+    'fourfront-cgap',         # CGAP_ENV_WEBPROD (decommissioned, replaced by AWS orchestration)
+    'fourfront-cgapdev',      # CGAP_ENV_DEV (decommissioned, replaced by AWS orchestration)
+    'fourfront-cgaptest',     # CGAP_ENV_MASTERTEST (decommissioned, replaced by AWS orchestration)
+    'fourfront-cgapwolf',     # CGAP_ENV_WOLF (decommissioned, replaced by AWS orchestration
+]
 
 # The bucket names were allocated originally and needn't change.
 
@@ -87,16 +109,19 @@ FF_PUBLIC_URLS = {
     'data': FF_PUBLIC_URL_PRD,
 }
 
-CGAP_PUBLIC_URL_STG = 'https://staging.cgap.hms.harvard.edu'  # This is a stopgap for testing and may have to change
-CGAP_PUBLIC_URL_PRD = 'https://cgap.hms.harvard.edu'
-CGAP_PUBLIC_DOMAIN_PRD = 'cgap.hms.harvard.edu'
-CGAP_PRODUCTION_IDENTIFIER = 'cgap'
+# These names are recently changed but are only used internally to this repo. I did a github-wide search.
+_CGAP_MGB_PUBLIC_URL_STG = 'https://staging.cgap-mgb.hms.harvard.edu'  # A stopgap for testing that may have to change
+_CGAP_MGB_PUBLIC_URL_PRD = 'https://cgap-mgb.hms.harvard.edu'
+_CGAP_MGB_PUBLIC_DOMAIN_PRD = 'cgap.hms.harvard.edu'
+_CGAP_MGB_PRODUCTION_IDENTIFIER = 'cgap'
 
+# This table exists to keep legacy use of names that help through blue/green deployments on Fourfront, and that
+# left us room (that might one day be needed) for the option of such deployments on CGAP, too. -kmp 26-Apr-2022
 CGAP_PUBLIC_URLS = {
-    'cgap': CGAP_PUBLIC_URL_PRD,
-    'fourfront-cgap': CGAP_PUBLIC_URL_PRD,
-    'data': CGAP_PUBLIC_URL_PRD,
-    'staging': CGAP_PUBLIC_URL_STG,
+    'cgap': _CGAP_MGB_PUBLIC_URL_PRD,
+    'fourfront-cgap': _CGAP_MGB_PUBLIC_URL_PRD,
+    'data': _CGAP_MGB_PUBLIC_URL_PRD,
+    'staging': _CGAP_MGB_PUBLIC_URL_STG,
 }
 
 BEANSTALK_PROD_BUCKET_ENVS = {
@@ -106,6 +131,8 @@ BEANSTALK_PROD_BUCKET_ENVS = {
     FF_ENV_WEBPROD2: FF_PROD_BUCKET_ENV,
     FF_ENV_PRODUCTION_BLUE: FF_PROD_BUCKET_ENV,
     FF_ENV_PRODUCTION_GREEN: FF_PROD_BUCKET_ENV,
+    FF_ENV_PRODUCTION_BLUE_NEW: FF_PROD_BUCKET_ENV,
+    FF_ENV_PRODUCTION_GREEN_NEW: FF_PROD_BUCKET_ENV,
     'cgap': CGAP_PROD_BUCKET_ENV,
     CGAP_ENV_PRODUCTION_BLUE: CGAP_PROD_BUCKET_ENV,
     CGAP_ENV_PRODUCTION_GREEN: CGAP_PROD_BUCKET_ENV,
@@ -118,6 +145,8 @@ BEANSTALK_PROD_MIRRORS = {
 
     FF_ENV_PRODUCTION_BLUE: FF_ENV_PRODUCTION_GREEN,
     FF_ENV_PRODUCTION_GREEN: FF_ENV_PRODUCTION_BLUE,
+    FF_ENV_PRODUCTION_BLUE_NEW: FF_ENV_PRODUCTION_GREEN_NEW,
+    FF_ENV_PRODUCTION_GREEN_NEW: FF_ENV_PRODUCTION_BLUE_NEW,
     FF_ENV_WEBPROD: FF_ENV_WEBPROD2,
     FF_ENV_WEBPROD2: FF_ENV_WEBPROD,
 
@@ -281,7 +310,7 @@ def public_url_for_app(appname: Optional[OrchestratedApp] = None):
     if appname is None:
         appname = 'fourfront'
     return _orchestrated_app_case(orchestrated_app=appname,
-                                  if_cgap=CGAP_PUBLIC_URL_PRD,
+                                  if_cgap=_CGAP_MGB_PUBLIC_URL_PRD,
                                   if_fourfront=FF_PUBLIC_URL_PRD)
 
 
@@ -381,6 +410,16 @@ def is_fourfront_env(envname: EnvName):
     Otherwise returns False.
     """
     return ('fourfront' in envname and 'cgap' not in envname) if envname else False
+
+
+def is_beanstalk_env(envname):
+    """
+    Returns True if envname is one of the traditional/legacy beanstalk names, and False otherwise.
+
+    NOTE: The list of names is heled in _ALL_BEANSTALK_NAMES, but you MUST NOT reference that variable directly.
+          Always use this function.
+    """
+    return envname in _ALL_BEANSTALK_NAMES
 
 
 def is_stg_or_prd_env(envname: Optional[EnvName]):

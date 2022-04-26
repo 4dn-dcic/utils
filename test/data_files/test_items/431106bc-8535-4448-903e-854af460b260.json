@@ -1,0 +1,4124 @@
+{
+  "lab": {
+    "@id": "/labs/test-4dn-lab/",
+    "status": "current",
+    "display_title": "4DN Testing Lab",
+    "uuid": "828cd4fe-ebb0-4b22-a94a-d2e3a36cc988",
+    "title": "4DN Testing Lab",
+    "@type": [
+      "Lab",
+      "Item"
+    ],
+    "principals_allowed": {
+      "view": [
+        "system.Everyone"
+      ],
+      "edit": [
+        "group.admin",
+        "submits_for.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988"
+      ]
+    }
+  },
+  "award": {
+    "@type": [
+      "Award",
+      "Item"
+    ],
+    "status": "current",
+    "display_title": "SOME EXTERNAL AWARD",
+    "description": "A test external award.",
+    "center_title": "External Center",
+    "center": "External Center",
+    "uuid": "b0b9c607-f8b4-4f02-93f4-9895b4613349",
+    "name": "1U01CA200059-02",
+    "project": "External",
+    "@id": "/awards/1U01CA200059-02/",
+    "pi": {
+      "display_title": "4dn DCIC",
+      "@type": [
+        "User",
+        "Item"
+      ],
+      "last_name": "DCIC",
+      "@id": "/users/986b362f-4eb6-4a9c-8173-3ab267307e3a/",
+      "uuid": "986b362f-4eb6-4a9c-8173-3ab267307e3a",
+      "status": "current",
+      "principals_allowed": {
+        "view": [
+          "group.admin",
+          "group.read-only-admin",
+          "remoteuser.EMBED",
+          "remoteuser.INDEXER",
+          "userid.986b362f-4eb6-4a9c-8173-3ab267307e3a"
+        ],
+        "edit": [
+          "group.admin",
+          "userid.986b362f-4eb6-4a9c-8173-3ab267307e3a"
+        ]
+      }
+    },
+    "principals_allowed": {
+      "view": [
+        "system.Everyone"
+      ],
+      "edit": [
+        "group.admin"
+      ]
+    }
+  },
+  "notes": "This should be a consistent Hi-C replicate set",
+  "status": "released",
+  "accession": "4DNESAAAAAA1",
+  "condition": "Control",
+  "description": "Sample replicate experiment set which is an experiment set of experiments testing user interface and other aspects of the 4DN Portal, including but not limited to a long text description (this) in order to test fit, resizing, and related with a long block of text that would likely vary from very short -- e.g. a few words -- to multiple paragraphs. Figured this description would be more descriptive than Lorem Ipsum text yet still has the potential to be quite long as it keeps rambling on. Normally this would be more of an interesting read.",
+  "date_created": "2011-03-25",
+  "submitted_by": {
+    "@type": [
+      "User",
+      "Item"
+    ],
+    "timezone": "US/Pacific",
+    "status": "current",
+    "job_title": "wrangler",
+    "last_name": "Data Wrangler",
+    "@id": "/users/986b362f-4eb6-4a9c-8173-3ab267307e3b/",
+    "first_name": "Wrangler",
+    "uuid": "986b362f-4eb6-4a9c-8173-3ab267307e3b",
+    "display_title": "Wrangler Data Wrangler",
+    "principals_allowed": {
+      "view": [
+        "group.admin",
+        "group.read-only-admin",
+        "remoteuser.EMBED",
+        "remoteuser.INDEXER",
+        "userid.986b362f-4eb6-4a9c-8173-3ab267307e3b"
+      ],
+      "edit": [
+        "group.admin",
+        "userid.986b362f-4eb6-4a9c-8173-3ab267307e3b"
+      ]
+    }
+  },
+  "dataset_label": "X et al. HiC - ligation volumes",
+  "last_modified": {
+    "modified_by": {
+      "display_title": "loadxl loadxl",
+      "@id": "/users/3202fd57-44d2-44fb-a131-afb1e43d8ae5/",
+      "status": "current",
+      "@type": [
+        "User",
+        "Item"
+      ],
+      "uuid": "3202fd57-44d2-44fb-a131-afb1e43d8ae5",
+      "principals_allowed": {
+        "view": [
+          "group.admin",
+          "group.read-only-admin",
+          "remoteuser.EMBED",
+          "remoteuser.INDEXER",
+          "userid.3202fd57-44d2-44fb-a131-afb1e43d8ae5"
+        ],
+        "edit": [
+          "group.admin",
+          "userid.3202fd57-44d2-44fb-a131-afb1e43d8ae5"
+        ]
+      }
+    },
+    "date_modified": "2022-04-19T21:51:15.357028+00:00"
+  },
+  "public_release": "2018-04-04",
+  "replicate_exps": [
+    {
+      "bio_rep_no": 1,
+      "tec_rep_no": 1,
+      "replicate_exp": {
+        "accession": "4DNEXO67APU1",
+        "display_title": "Dilution Hi-C on GM12878 with DNaseI - 4DNEXO67APU1",
+        "uuid": "75041e2f-3e43-4388-8bbb-e861f209c444",
+        "@id": "/experiments-hi-c/4DNEXO67APU1/",
+        "@type": [
+          "ExperimentHiC",
+          "Experiment",
+          "Item"
+        ],
+        "status": "in review by lab",
+        "principals_allowed": {
+          "view": [
+            "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+            "group.admin",
+            "group.read-only-admin",
+            "lab.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988",
+            "remoteuser.EMBED",
+            "remoteuser.INDEXER"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988"
+          ]
+        }
+      }
+    },
+    {
+      "bio_rep_no": 1,
+      "tec_rep_no": 2,
+      "replicate_exp": {
+        "accession": "4DNEXO67APT1",
+        "display_title": "Dilution Hi-C on GM12878 with DNaseI - 4DNEXO67APT1",
+        "uuid": "75041e2f-3e43-4388-8bbb-e861f209c4fb",
+        "@id": "/experiments-hi-c/4DNEXO67APT1/",
+        "@type": [
+          "ExperimentHiC",
+          "Experiment",
+          "Item"
+        ],
+        "status": "in review by lab",
+        "principals_allowed": {
+          "view": [
+            "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+            "group.admin",
+            "group.read-only-admin",
+            "lab.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988",
+            "remoteuser.EMBED",
+            "remoteuser.INDEXER"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988"
+          ]
+        }
+      }
+    },
+    {
+      "bio_rep_no": 2,
+      "tec_rep_no": 1,
+      "replicate_exp": {
+        "accession": "4DNEXO67APV1",
+        "display_title": "Dilution Hi-C on GM12878 with DNaseI - 4DNEXO67APV1",
+        "uuid": "75041e2f-3e43-4388-8bbb-e861f209b3fb",
+        "@id": "/experiments-hi-c/4DNEXO67APV1/",
+        "@type": [
+          "ExperimentHiC",
+          "Experiment",
+          "Item"
+        ],
+        "status": "released",
+        "principals_allowed": {
+          "view": [
+            "system.Everyone"
+          ],
+          "edit": [
+            "group.admin"
+          ]
+        }
+      }
+    }
+  ],
+  "schema_version": "2",
+  "static_headers": [
+    {
+      "body": "**Data Use Guidelines:** This is a data set generated by the 4DN Network and made freely available to the scientific community. If you are intending to use these data for a publication, we ask that you please contact the data generating lab to discuss possible coordinated publication. In your manuscript, please cite the 4DN White Paper ([doi:10.1038/nature23884](https://doi.org/10.1038/nature23884)), and please acknowledge the 4DN lab which generated the data. Please direct any questions to the [Data Coordination and Integration Center](mailto:support@4dnucleome.org).",
+      "name": "item-page-headers.ExperimentSet.data-usage-guidelines",
+      "award": {
+        "uuid": "b0b9c607-f8b4-4f02-93f4-9895b461334b",
+        "@type": [
+          "Award",
+          "Item"
+        ],
+        "@id": "/awards/1U01CA200059-01/",
+        "display_title": "4D NUCLEOME NETWORK DATA COORDINATION AND INTEGRATION CENTER",
+        "status": "current",
+        "principals_allowed": {
+          "view": [
+            "system.Everyone"
+          ],
+          "edit": [
+            "group.admin"
+          ]
+        }
+      },
+      "title": "Public Data Usage Guidelines",
+      "status": "draft",
+      "options": {
+        "filetype": "md",
+        "title_icon": "exclamation-circle",
+        "collapsible": false,
+        "default_open": true
+      },
+      "date_created": "2022-04-19T21:48:01.224914+00:00",
+      "section_type": "Item Page Header",
+      "last_modified": {
+        "modified_by": {
+          "status": "current",
+          "@id": "/users/3202fd57-44d2-44fb-a131-afb1e43d8ae5/",
+          "uuid": "3202fd57-44d2-44fb-a131-afb1e43d8ae5",
+          "@type": [
+            "User",
+            "Item"
+          ],
+          "display_title": "loadxl loadxl",
+          "principals_allowed": {
+            "view": [
+              "group.admin",
+              "group.read-only-admin",
+              "remoteuser.EMBED",
+              "remoteuser.INDEXER",
+              "userid.3202fd57-44d2-44fb-a131-afb1e43d8ae5"
+            ],
+            "edit": [
+              "group.admin",
+              "userid.3202fd57-44d2-44fb-a131-afb1e43d8ae5"
+            ]
+          }
+        },
+        "date_modified": "2022-04-19T21:48:12.158119+00:00"
+      },
+      "schema_version": "2",
+      "@id": "/static-sections/621e8359-3885-40ce-965d-91894aa7b758/",
+      "@type": [
+        "StaticSection",
+        "UserContent",
+        "Item"
+      ],
+      "uuid": "621e8359-3885-40ce-965d-91894aa7b758",
+      "principals_allowed": {
+        "view": [
+          "group.admin",
+          "group.read-only-admin",
+          "remoteuser.EMBED",
+          "remoteuser.INDEXER"
+        ],
+        "edit": [
+          "group.admin"
+        ]
+      },
+      "display_title": "Public Data Usage Guidelines",
+      "external_references": [],
+      "content": "**Data Use Guidelines:** This is a data set generated by the 4DN Network and made freely available to the scientific community. If you are intending to use these data for a publication, we ask that you please contact the data generating lab to discuss possible coordinated publication. In your manuscript, please cite the 4DN White Paper ([doi:10.1038/nature23884](https://doi.org/10.1038/nature23884)), and please acknowledge the 4DN lab which generated the data. Please direct any questions to the [Data Coordination and Integration Center](mailto:support@4dnucleome.org).",
+      "filetype": "md"
+    },
+    {
+      "body": "<h4 style=\"margin-top:0px;font-weight:400\">All data released to public between 2018-02-13 and 2018-02-14 with tag 4DN Joint Analysis 2018</h4>",
+      "name": "release-updates.TEST1",
+      "award": {
+        "uuid": "b0b9c607-f8b4-4f02-93f4-9895b461334b",
+        "@type": [
+          "Award",
+          "Item"
+        ],
+        "@id": "/awards/1U01CA200059-01/",
+        "display_title": "4D NUCLEOME NETWORK DATA COORDINATION AND INTEGRATION CENTER",
+        "status": "current",
+        "principals_allowed": {
+          "view": [
+            "system.Everyone"
+          ],
+          "edit": [
+            "group.admin"
+          ]
+        }
+      },
+      "status": "draft",
+      "options": {
+        "filetype": "html",
+        "collapsible": false,
+        "default_open": false
+      },
+      "date_created": "2022-04-19T21:48:00.830990+00:00",
+      "section_type": "Page Section",
+      "last_modified": {
+        "modified_by": {
+          "status": "current",
+          "@id": "/users/3202fd57-44d2-44fb-a131-afb1e43d8ae5/",
+          "uuid": "3202fd57-44d2-44fb-a131-afb1e43d8ae5",
+          "@type": [
+            "User",
+            "Item"
+          ],
+          "display_title": "loadxl loadxl",
+          "principals_allowed": {
+            "view": [
+              "group.admin",
+              "group.read-only-admin",
+              "remoteuser.EMBED",
+              "remoteuser.INDEXER",
+              "userid.3202fd57-44d2-44fb-a131-afb1e43d8ae5"
+            ],
+            "edit": [
+              "group.admin",
+              "userid.3202fd57-44d2-44fb-a131-afb1e43d8ae5"
+            ]
+          }
+        },
+        "date_modified": "2022-04-19T21:48:12.040850+00:00"
+      },
+      "schema_version": "2",
+      "@id": "/static-sections/442c8aa0-dc6c-43d7-814a-854af460b987/",
+      "@type": [
+        "StaticSection",
+        "UserContent",
+        "Item"
+      ],
+      "uuid": "442c8aa0-dc6c-43d7-814a-854af460b987",
+      "principals_allowed": {
+        "view": [
+          "group.admin",
+          "group.read-only-admin",
+          "remoteuser.EMBED",
+          "remoteuser.INDEXER"
+        ],
+        "edit": [
+          "group.admin"
+        ]
+      },
+      "display_title": "release-updates.TEST1",
+      "external_references": [],
+      "content": "<h4 style=\"margin-top:0px;font-weight:400\">All data released to public between 2018-02-13 and 2018-02-14 with tag 4DN Joint Analysis 2018</h4>",
+      "filetype": "html"
+    },
+    {
+      "body": "Lorem ipsum dolor amet offal plaid readymade unicorn kombucha skateboard. Direct trade pop-up salvia organic. Truffaut lomo food truck man bun gastropub hella portland seitan post-ironic quinoa swag. Franzen flexitarian pour-over fam ennui. Freegan fanny pack tumeric vaporware tacos gluten-free quinoa +1 activated charcoal portland pok pok chartreuse actually. Church-key unicorn brooklyn migas paleo wolf.\n\n### Another Header\n\nTaxidermy celiac scenester sustainable disrupt vaporware. Authentic chicharrones direct trade narwhal VHS iceland. Messenger bag intelligentsia seitan quinoa, hashtag YOLO cornhole VHS bitters. Gochujang sriracha messenger bag, mlkshk lyft authentic sartorial vinyl flexitarian godard green juice vice fam roof party jianbing.",
+      "name": "resources.analysis.file-formats.hic",
+      "award": {
+        "uuid": "b0b9c607-f8b4-4f02-93f4-9895b461334b",
+        "@type": [
+          "Award",
+          "Item"
+        ],
+        "@id": "/awards/1U01CA200059-01/",
+        "display_title": "4D NUCLEOME NETWORK DATA COORDINATION AND INTEGRATION CENTER",
+        "status": "current",
+        "principals_allowed": {
+          "view": [
+            "system.Everyone"
+          ],
+          "edit": [
+            "group.admin"
+          ]
+        }
+      },
+      "title": "Hi-C",
+      "status": "draft",
+      "options": {
+        "filetype": "md",
+        "collapsible": true,
+        "default_open": false
+      },
+      "date_created": "2022-04-19T21:47:46.930289+00:00",
+      "section_type": "Page Section",
+      "last_modified": {
+        "modified_by": {
+          "status": "current",
+          "@id": "/users/3202fd57-44d2-44fb-a131-afb1e43d8ae5/",
+          "uuid": "3202fd57-44d2-44fb-a131-afb1e43d8ae5",
+          "@type": [
+            "User",
+            "Item"
+          ],
+          "display_title": "loadxl loadxl",
+          "principals_allowed": {
+            "view": [
+              "group.admin",
+              "group.read-only-admin",
+              "remoteuser.EMBED",
+              "remoteuser.INDEXER",
+              "userid.3202fd57-44d2-44fb-a131-afb1e43d8ae5"
+            ],
+            "edit": [
+              "group.admin",
+              "userid.3202fd57-44d2-44fb-a131-afb1e43d8ae5"
+            ]
+          }
+        },
+        "date_modified": "2022-04-19T21:48:09.298029+00:00"
+      },
+      "schema_version": "2",
+      "@id": "/static-sections/10000000-0000-0000-0000-ffff00000005/",
+      "@type": [
+        "StaticSection",
+        "UserContent",
+        "Item"
+      ],
+      "uuid": "10000000-0000-0000-0000-ffff00000005",
+      "principals_allowed": {
+        "view": [
+          "group.admin",
+          "group.read-only-admin",
+          "remoteuser.EMBED",
+          "remoteuser.INDEXER"
+        ],
+        "edit": [
+          "group.admin"
+        ]
+      },
+      "display_title": "Hi-C",
+      "external_references": [],
+      "content": "Lorem ipsum dolor amet offal plaid readymade unicorn kombucha skateboard. Direct trade pop-up salvia organic. Truffaut lomo food truck man bun gastropub hella portland seitan post-ironic quinoa swag. Franzen flexitarian pour-over fam ennui. Freegan fanny pack tumeric vaporware tacos gluten-free quinoa +1 activated charcoal portland pok pok chartreuse actually. Church-key unicorn brooklyn migas paleo wolf.\n\n### Another Header\n\nTaxidermy celiac scenester sustainable disrupt vaporware. Authentic chicharrones direct trade narwhal VHS iceland. Messenger bag intelligentsia seitan quinoa, hashtag YOLO cornhole VHS bitters. Gochujang sriracha messenger bag, mlkshk lyft authentic sartorial vinyl flexitarian godard green juice vice fam roof party jianbing.",
+      "filetype": "md"
+    },
+    {
+      "lab": {
+        "@id": "/labs/4dn-dcic-lab/",
+        "@type": [
+          "Lab",
+          "Item"
+        ],
+        "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+        "status": "current",
+        "display_title": "4DN DCIC, HMS",
+        "principals_allowed": {
+          "view": [
+            "system.Everyone"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+          ]
+        }
+      },
+      "name": "00000000-1111-0000-1111-000000000001",
+      "award": {
+        "uuid": "b0b9c607-f8b4-4f02-93f4-9895b461334b",
+        "@type": [
+          "Award",
+          "Item"
+        ],
+        "@id": "/awards/1U01CA200059-01/",
+        "display_title": "4D NUCLEOME NETWORK DATA COORDINATION AND INTEGRATION CENTER",
+        "status": "current",
+        "principals_allowed": {
+          "view": [
+            "system.Everyone"
+          ],
+          "edit": [
+            "group.admin"
+          ]
+        }
+      },
+      "title": "Test BigWig Display",
+      "status": "released",
+      "viewconfig": {
+        "views": [
+          {
+            "uid": "view-4dn-bigwig-0",
+            "layout": {
+              "h": 12,
+              "w": 12,
+              "x": 0,
+              "y": 0
+            },
+            "tracks": {
+              "top": [],
+              "left": [],
+              "right": [],
+              "whole": [],
+              "bottom": [],
+              "center": [
+                {
+                  "uid": "Go5AjPP9QD6c-fN3fKeS5Q",
+                  "type": "combined",
+                  "width": 1110,
+                  "height": 513,
+                  "options": {},
+                  "contents": [
+                    {
+                      "uid": "ZAIAbsxZTz-Xkt4wPG43Bg",
+                      "type": "heatmap",
+                      "width": 1110,
+                      "height": 513,
+                      "server": "https://higlass.4dnucleome.org/api/v1",
+                      "options": {
+                        "name": "File for Biosource Dataset Assay",
+                        "extent": "full",
+                        "maxZoom": null,
+                        "colorRange": [
+                          "white",
+                          "rgba(245,166,35,1.0)",
+                          "rgba(208,2,27,1.0)",
+                          "black"
+                        ],
+                        "showTooltip": false,
+                        "labelPosition": "bottomRight",
+                        "labelTopMargin": 0,
+                        "backgroundColor": "#eeeeee",
+                        "labelLeftMargin": 0,
+                        "scaleEndPercent": "1.00000",
+                        "colorbarPosition": "topRight",
+                        "labelRightMargin": 0,
+                        "trackBorderColor": "black",
+                        "trackBorderWidth": 0,
+                        "labelBottomMargin": 0,
+                        "scaleStartPercent": "0.00000",
+                        "showMousePosition": false,
+                        "mousePositionColor": "#000000",
+                        "heatmapValueScaling": "log",
+                        "labelShowResolution": true,
+                        "colorbarBackgroundColor": "#ffffff"
+                      },
+                      "position": "center",
+                      "tilesetUid": "OxZJjFLwRYq8PA_cRgipbQ"
+                    }
+                  ],
+                  "position": "center"
+                }
+              ],
+              "gallery": []
+            },
+            "initialXDomain": [
+              -166316769.39873636,
+              3257874853.005984
+            ],
+            "initialYDomain": [
+              654868407.8925054,
+              1605004461.6768782
+            ],
+            "autocompleteSource": "/api/v1/suggest/?d=IUcqX4GzTNWJIzE2-b_sZg&",
+            "genomePositionSearchBox": {
+              "visible": true,
+              "chromInfoId": "GRCm38",
+              "autocompleteId": "IUcqX4GzTNWJIzE2-b_sZg",
+              "chromInfoServer": "https://higlass.4dnucleome.org/api/v1",
+              "autocompleteServer": "https://higlass.4dnucleome.org/api/v1"
+            }
+          }
+        ],
+        "editable": true,
+        "zoomFixed": false,
+        "zoomLocks": {
+          "locksDict": {},
+          "locksByViewUid": {}
+        },
+        "exportViewUrl": "/api/v1/viewconfs",
+        "locationLocks": {
+          "locksDict": {},
+          "locksByViewUid": {}
+        },
+        "valueScaleLocks": {
+          "locksDict": {},
+          "locksByViewUid": {}
+        },
+        "trackSourceServers": [
+          "https://higlass.4dnucleome.org/api/v1"
+        ]
+      },
+      "description": "Two BigWig tracks plus annotations for gene GRCm38 (tileset 'IUcqX4GzTNWJIzE2-b_sZg') and chromosome 'Z_YbBZW9RAq5V1oKvvp3hg'.",
+      "date_created": "2019-09-04T06:41:55.889092+00:00",
+      "submitted_by": {
+        "@id": "/users/986b362f-4eb6-4a9c-8173-3ab267307e3a/",
+        "@type": [
+          "User",
+          "Item"
+        ],
+        "uuid": "986b362f-4eb6-4a9c-8173-3ab267307e3a",
+        "status": "current",
+        "display_title": "4dn DCIC",
+        "principals_allowed": {
+          "view": [
+            "group.admin",
+            "group.read-only-admin",
+            "remoteuser.EMBED",
+            "remoteuser.INDEXER",
+            "userid.986b362f-4eb6-4a9c-8173-3ab267307e3a"
+          ],
+          "edit": [
+            "group.admin",
+            "userid.986b362f-4eb6-4a9c-8173-3ab267307e3a"
+          ]
+        }
+      },
+      "last_modified": {
+        "modified_by": {
+          "status": "current",
+          "@id": "/users/3202fd57-44d2-44fb-a131-afb1e43d8ae5/",
+          "uuid": "3202fd57-44d2-44fb-a131-afb1e43d8ae5",
+          "@type": [
+            "User",
+            "Item"
+          ],
+          "display_title": "loadxl loadxl",
+          "principals_allowed": {
+            "view": [
+              "group.admin",
+              "group.read-only-admin",
+              "remoteuser.EMBED",
+              "remoteuser.INDEXER",
+              "userid.3202fd57-44d2-44fb-a131-afb1e43d8ae5"
+            ],
+            "edit": [
+              "group.admin",
+              "userid.3202fd57-44d2-44fb-a131-afb1e43d8ae5"
+            ]
+          }
+        },
+        "date_modified": "2022-04-19T21:50:58.337253+00:00"
+      },
+      "schema_version": "1",
+      "genome_assembly": "GRCm38",
+      "instance_height": 500,
+      "@id": "/higlass-view-configs/00000000-1111-0000-1111-000000000001/",
+      "@type": [
+        "HiglassViewConfig",
+        "UserContent",
+        "Item"
+      ],
+      "uuid": "00000000-1111-0000-1111-000000000001",
+      "principals_allowed": {
+        "view": [
+          "system.Everyone"
+        ],
+        "edit": [
+          "group.admin",
+          "userid.986b362f-4eb6-4a9c-8173-3ab267307e3a"
+        ]
+      },
+      "display_title": "Test BigWig Display",
+      "external_references": [],
+      "filetype": "HiglassViewConfig"
+    }
+  ],
+  "processed_files": [
+    {
+      "upload_key": "8571c559-22b4-487e-9cb8-7ac402e93a9f/4DNFIAAAAAA4.cool",
+      "accession": "4DNFIAAAAAA4",
+      "file_classification": "processed file",
+      "@type": [
+        "FileProcessed",
+        "File",
+        "Item"
+      ],
+      "status": "uploaded",
+      "uuid": "8571c559-22b4-487e-9cb8-7ac402e93a9f",
+      "display_title": "4DNFIAAAAAA4.cool",
+      "href": "/files-processed/4DNFIAAAAAA4/@@download/4DNFIAAAAAA4.cool",
+      "@id": "/files-processed/4DNFIAAAAAA4/",
+      "file_type_detailed": "File (cool)",
+      "file_format": {
+        "status": "released",
+        "@type": [
+          "FileFormat",
+          "Item"
+        ],
+        "display_title": "cool",
+        "@id": "/file-formats/cool/",
+        "uuid": "d13d06cf-218e-4f61-bbf0-91f226248b2c",
+        "principals_allowed": {
+          "view": [
+            "system.Everyone"
+          ],
+          "edit": [
+            "group.admin"
+          ]
+        }
+      },
+      "file_type": "File",
+      "lab": {
+        "@id": "/labs/4dn-dcic-lab/",
+        "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+        "name": "4dn-dcic-lab",
+        "display_title": "4DN DCIC, HMS",
+        "@type": [
+          "Lab",
+          "Item"
+        ],
+        "status": "current",
+        "principals_allowed": {
+          "view": [
+            "system.Everyone"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+          ]
+        }
+      },
+      "last_modified": {
+        "date_modified": "2022-04-19T21:51:19.772701+00:00"
+      },
+      "track_and_facet_info": {
+        "experiment_type": "Dataset",
+        "assay_info": "Assay",
+        "biosource_name": "Biosource",
+        "lab_name": "4DN DCIC, HMS"
+      },
+      "external_references": [],
+      "principals_allowed": {
+        "view": [
+          "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+          "group.admin",
+          "group.read-only-admin",
+          "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+          "remoteuser.EMBED",
+          "remoteuser.INDEXER"
+        ],
+        "edit": [
+          "group.admin",
+          "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+        ]
+      }
+    },
+    {
+      "upload_key": "5b58e449-b7f0-4120-b20b-634f19c67f9e/4DNFIAAAAAA5.hic",
+      "accession": "4DNFIAAAAAA5",
+      "file_classification": "processed file",
+      "@type": [
+        "FileProcessed",
+        "File",
+        "Item"
+      ],
+      "status": "released",
+      "uuid": "5b58e449-b7f0-4120-b20b-634f19c67f9e",
+      "display_title": "4DNFIAAAAAA5.hic",
+      "href": "/files-processed/4DNFIAAAAAA5/@@download/4DNFIAAAAAA5.hic",
+      "@id": "/files-processed/4DNFIAAAAAA5/",
+      "file_type_detailed": "File (hic)",
+      "file_format": {
+        "status": "released",
+        "@type": [
+          "FileFormat",
+          "Item"
+        ],
+        "display_title": "hic",
+        "@id": "/file-formats/hic/",
+        "uuid": "d13d11cf-218e-4f61-bbf0-91f226248b2c",
+        "principals_allowed": {
+          "view": [
+            "system.Everyone"
+          ],
+          "edit": [
+            "group.admin"
+          ]
+        }
+      },
+      "file_type": "File",
+      "genome_assembly": "GRCh38",
+      "lab": {
+        "@id": "/labs/4dn-dcic-lab/",
+        "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+        "name": "4dn-dcic-lab",
+        "display_title": "4DN DCIC, HMS",
+        "@type": [
+          "Lab",
+          "Item"
+        ],
+        "status": "current",
+        "principals_allowed": {
+          "view": [
+            "system.Everyone"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+          ]
+        }
+      },
+      "last_modified": {
+        "date_modified": "2022-04-19T21:51:19.824863+00:00"
+      },
+      "track_and_facet_info": {
+        "experiment_type": "Dataset",
+        "assay_info": "Assay",
+        "biosource_name": "Biosource",
+        "lab_name": "4DN DCIC, HMS"
+      },
+      "external_references": [],
+      "principals_allowed": {
+        "view": [
+          "system.Everyone"
+        ],
+        "edit": [
+          "group.admin"
+        ]
+      }
+    }
+  ],
+  "project_release": "2018-04-04",
+  "experiments_in_set": [
+    {
+      "display_title": "Dilution Hi-C on GM12878 with DNaseI - 4DNEXO67APU1",
+      "@type": [
+        "ExperimentHiC",
+        "Experiment",
+        "Item"
+      ],
+      "accession": "4DNEXO67APU1",
+      "status": "in review by lab",
+      "uuid": "75041e2f-3e43-4388-8bbb-e861f209c444",
+      "@id": "/experiments-hi-c/4DNEXO67APU1/",
+      "dbxrefs": [
+        "SRA:SRX764985",
+        "GEO:GSM1551599"
+      ],
+      "files": [
+        {
+          "paired_end": "1",
+          "status": "released",
+          "file_type_detailed": "reads (fastq)",
+          "accession": "4DNFIO67APU1",
+          "@type": [
+            "FileFastq",
+            "File",
+            "Item"
+          ],
+          "file_type": "reads",
+          "upload_key": "46e82a90-49e5-4c33-afab-9ec90d65faa0/4DNFIO67APU1.fastq.gz",
+          "file_classification": "raw file",
+          "md5sum": "bc80aabb3ad8264da7307185dfe9fab1",
+          "@id": "/files-fastq/4DNFIO67APU1/",
+          "href": "/files-fastq/4DNFIO67APU1/@@download/4DNFIO67APU1.fastq.gz",
+          "uuid": "46e82a90-49e5-4c33-afab-9ec90d65faa0",
+          "display_title": "4DNFIO67APU1.fastq.gz",
+          "file_size": 23523523,
+          "related_files": [
+            {
+              "relationship_type": "paired with",
+              "file": {
+                "display_title": "4DNFIO67APT1.fastq.gz",
+                "@type": [
+                  "FileFastq",
+                  "File",
+                  "Item"
+                ],
+                "accession": "4DNFIO67APT1",
+                "paired_end": "2",
+                "uuid": "46e82a90-49e5-4c33-afab-9ec90d65faa1",
+                "@id": "/files-fastq/4DNFIO67APT1/",
+                "status": "released",
+                "file_type": "reads",
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin"
+                  ]
+                }
+              }
+            }
+          ],
+          "file_format": {
+            "@type": [
+              "FileFormat",
+              "Item"
+            ],
+            "@id": "/file-formats/fastq/",
+            "display_title": "fastq",
+            "status": "released",
+            "uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+            "file_format": "fastq",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin"
+              ]
+            }
+          },
+          "quality_metric": {
+            "@id": "/quality-metrics-fastqc/4c9dabc6-61d6-4054-a951-c4fdd0023800/",
+            "display_title": "QualityMetricFastqc from 2017-06-30",
+            "Sequence length": "100",
+            "@type": [
+              "QualityMetricFastqc",
+              "QualityMetric",
+              "Item"
+            ],
+            "url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webdev-wfoutput/4DNFIZ7G79A9/fastqc_report.html",
+            "overall_quality_status": "PASS",
+            "status": "in review by lab",
+            "uuid": "4c9dabc6-61d6-4054-a951-c4fdd0023800",
+            "Total Sequences": 32563157,
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          "lab": {
+            "@type": [
+              "Lab",
+              "Item"
+            ],
+            "@id": "/labs/4dn-dcic-lab/",
+            "display_title": "4DN DCIC, HMS",
+            "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "name": "4dn-dcic-lab",
+            "status": "current",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          "external_references": [],
+          "principals_allowed": {
+            "view": [
+              "system.Everyone"
+            ],
+            "edit": [
+              "group.admin"
+            ]
+          },
+          "track_and_facet_info": {
+            "experimental_lab": "4DN Testing Lab",
+            "experiment_type": "Dilution Hi-C",
+            "experiment_bucket": "raw file",
+            "assay_info": "DNaseI",
+            "dataset": "X et al. HiC - ligation volumes",
+            "condition": "Control",
+            "replicate_info": "Biorep 1, Techrep 1",
+            "biosource_name": "GM12878",
+            "lab_name": "4DN DCIC, HMS"
+          }
+        },
+        {
+          "paired_end": "2",
+          "status": "released",
+          "file_type_detailed": "reads (fastq)",
+          "accession": "4DNFIO67APT1",
+          "@type": [
+            "FileFastq",
+            "File",
+            "Item"
+          ],
+          "file_type": "reads",
+          "upload_key": "46e82a90-49e5-4c33-afab-9ec90d65faa1/4DNFIO67APT1.fastq.gz",
+          "file_classification": "raw file",
+          "@id": "/files-fastq/4DNFIO67APT1/",
+          "href": "/files-fastq/4DNFIO67APT1/@@download/4DNFIO67APT1.fastq.gz",
+          "uuid": "46e82a90-49e5-4c33-afab-9ec90d65faa1",
+          "display_title": "4DNFIO67APT1.fastq.gz",
+          "file_size": 5434000534634,
+          "related_files": [
+            {
+              "relationship_type": "paired with",
+              "file": {
+                "display_title": "4DNFIO67APU1.fastq.gz",
+                "@type": [
+                  "FileFastq",
+                  "File",
+                  "Item"
+                ],
+                "accession": "4DNFIO67APU1",
+                "paired_end": "1",
+                "uuid": "46e82a90-49e5-4c33-afab-9ec90d65faa0",
+                "@id": "/files-fastq/4DNFIO67APU1/",
+                "status": "released",
+                "file_type": "reads",
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin"
+                  ]
+                }
+              }
+            }
+          ],
+          "file_format": {
+            "@type": [
+              "FileFormat",
+              "Item"
+            ],
+            "@id": "/file-formats/fastq/",
+            "display_title": "fastq",
+            "status": "released",
+            "uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+            "file_format": "fastq",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin"
+              ]
+            }
+          },
+          "lab": {
+            "@type": [
+              "Lab",
+              "Item"
+            ],
+            "@id": "/labs/4dn-dcic-lab/",
+            "display_title": "4DN DCIC, HMS",
+            "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "name": "4dn-dcic-lab",
+            "status": "current",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          "external_references": [],
+          "principals_allowed": {
+            "view": [
+              "system.Everyone"
+            ],
+            "edit": [
+              "group.admin"
+            ]
+          },
+          "track_and_facet_info": {
+            "experimental_lab": "4DN Testing Lab",
+            "experiment_type": "Dilution Hi-C",
+            "experiment_bucket": "raw file",
+            "assay_info": "DNaseI",
+            "dataset": "X et al. HiC - ligation volumes",
+            "condition": "Control",
+            "replicate_info": "Biorep 1, Techrep 1",
+            "biosource_name": "GM12878",
+            "lab_name": "4DN DCIC, HMS"
+          }
+        },
+        {
+          "paired_end": "1",
+          "status": "released",
+          "file_type_detailed": "reads (fastq)",
+          "accession": "4DNFIO67AHH1",
+          "@type": [
+            "FileFastq",
+            "File",
+            "Item"
+          ],
+          "file_type": "reads",
+          "upload_key": "47e82a90-49e5-4c33-afab-9ec90d65faa0/4DNFIO67AHH1.fastq.gz",
+          "file_classification": "raw file",
+          "@id": "/files-fastq/4DNFIO67AHH1/",
+          "href": "/files-fastq/4DNFIO67AHH1/@@download/4DNFIO67AHH1.fastq.gz",
+          "uuid": "47e82a90-49e5-4c33-afab-9ec90d65faa0",
+          "display_title": "4DNFIO67AHH1.fastq.gz",
+          "file_size": 3453463463,
+          "related_files": [
+            {
+              "relationship_type": "paired with",
+              "file": {
+                "display_title": "4DNFIO67AHI1.fastq.gz",
+                "@type": [
+                  "FileFastq",
+                  "File",
+                  "Item"
+                ],
+                "accession": "4DNFIO67AHI1",
+                "paired_end": "2",
+                "uuid": "47e72a90-49e5-4c33-afab-9ec90d65faa1",
+                "@id": "/files-fastq/4DNFIO67AHI1/",
+                "status": "released",
+                "file_type": "reads",
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin"
+                  ]
+                }
+              }
+            }
+          ],
+          "file_format": {
+            "@type": [
+              "FileFormat",
+              "Item"
+            ],
+            "@id": "/file-formats/fastq/",
+            "display_title": "fastq",
+            "status": "released",
+            "uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+            "file_format": "fastq",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin"
+              ]
+            }
+          },
+          "lab": {
+            "@type": [
+              "Lab",
+              "Item"
+            ],
+            "@id": "/labs/4dn-dcic-lab/",
+            "display_title": "4DN DCIC, HMS",
+            "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "name": "4dn-dcic-lab",
+            "status": "current",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          "external_references": [],
+          "principals_allowed": {
+            "view": [
+              "system.Everyone"
+            ],
+            "edit": [
+              "group.admin"
+            ]
+          },
+          "track_and_facet_info": {
+            "experimental_lab": "4DN Testing Lab",
+            "experiment_type": "Dilution Hi-C",
+            "experiment_bucket": "raw file",
+            "assay_info": "DNaseI",
+            "dataset": "X et al. HiC - ligation volumes",
+            "condition": "Control",
+            "replicate_info": "Biorep 1, Techrep 1",
+            "biosource_name": "GM12878",
+            "lab_name": "4DN DCIC, HMS"
+          }
+        },
+        {
+          "paired_end": "2",
+          "status": "released",
+          "file_type_detailed": "reads (fastq)",
+          "accession": "4DNFIO67AHI1",
+          "@type": [
+            "FileFastq",
+            "File",
+            "Item"
+          ],
+          "file_type": "reads",
+          "upload_key": "47e72a90-49e5-4c33-afab-9ec90d65faa1/4DNFIO67AHI1.fastq.gz",
+          "file_classification": "raw file",
+          "@id": "/files-fastq/4DNFIO67AHI1/",
+          "href": "/files-fastq/4DNFIO67AHI1/@@download/4DNFIO67AHI1.fastq.gz",
+          "uuid": "47e72a90-49e5-4c33-afab-9ec90d65faa1",
+          "display_title": "4DNFIO67AHI1.fastq.gz",
+          "file_size": 345345435345,
+          "related_files": [
+            {
+              "relationship_type": "paired with",
+              "file": {
+                "display_title": "4DNFIO67AHH1.fastq.gz",
+                "@type": [
+                  "FileFastq",
+                  "File",
+                  "Item"
+                ],
+                "accession": "4DNFIO67AHH1",
+                "paired_end": "1",
+                "uuid": "47e82a90-49e5-4c33-afab-9ec90d65faa0",
+                "@id": "/files-fastq/4DNFIO67AHH1/",
+                "status": "released",
+                "file_type": "reads",
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin"
+                  ]
+                }
+              }
+            }
+          ],
+          "file_format": {
+            "@type": [
+              "FileFormat",
+              "Item"
+            ],
+            "@id": "/file-formats/fastq/",
+            "display_title": "fastq",
+            "status": "released",
+            "uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+            "file_format": "fastq",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin"
+              ]
+            }
+          },
+          "lab": {
+            "@type": [
+              "Lab",
+              "Item"
+            ],
+            "@id": "/labs/4dn-dcic-lab/",
+            "display_title": "4DN DCIC, HMS",
+            "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "name": "4dn-dcic-lab",
+            "status": "current",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          "external_references": [],
+          "principals_allowed": {
+            "view": [
+              "system.Everyone"
+            ],
+            "edit": [
+              "group.admin"
+            ]
+          },
+          "track_and_facet_info": {
+            "experimental_lab": "4DN Testing Lab",
+            "experiment_type": "Dilution Hi-C",
+            "experiment_bucket": "raw file",
+            "assay_info": "DNaseI",
+            "dataset": "X et al. HiC - ligation volumes",
+            "condition": "Control",
+            "replicate_info": "Biorep 1, Techrep 1",
+            "biosource_name": "GM12878",
+            "lab_name": "4DN DCIC, HMS"
+          }
+        }
+      ],
+      "other_processed_files": [
+        {
+          "type": "archived",
+          "description": "fileset from previous workflow run",
+          "title": "archived fileset 1",
+          "files": [
+            {
+              "href": "/files-processed/4DNFIFYGNO9R/@@download/4DNFIFYGNO9R.bam",
+              "accession": "4DNFIFYGNO9R",
+              "file_type_detailed": "other (bam)",
+              "display_title": "4DNFIFYGNO9R.bam",
+              "@id": "/files-processed/4DNFIFYGNO9R/",
+              "@type": [
+                "FileProcessed",
+                "File",
+                "Item"
+              ],
+              "status": "released",
+              "uuid": "b4002377-49e5-4c33-afab-9ec90d65faf3",
+              "quality_metric": {
+                "status": "in review by lab",
+                "@type": [
+                  "QualityMetricQclist",
+                  "QualityMetric",
+                  "Item"
+                ],
+                "overall_quality_status": "PASS",
+                "uuid": "e2caceec-ffac-44f2-8614-8a901ce9ea0f",
+                "@id": "/quality-metrics-qclist/e2caceec-ffac-44f2-8614-8a901ce9ea0f/",
+                "display_title": "QualityMetricQclist from 2022-04-19",
+                "principals_allowed": {
+                  "view": [
+                    "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                    "group.admin",
+                    "group.read-only-admin",
+                    "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                    "remoteuser.EMBED",
+                    "remoteuser.INDEXER"
+                  ],
+                  "edit": [
+                    "group.admin",
+                    "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                  ]
+                },
+                "quality_metric_summary": [
+                  {
+                    "title": "Filtered Reads",
+                    "value": "651962",
+                    "numberType": "integer"
+                  },
+                  {
+                    "title": "Cis reads (>20kb)",
+                    "value": "42.397",
+                    "tooltip": "Percent of filtered reads (=0.28m)",
+                    "numberType": "percent"
+                  },
+                  {
+                    "title": "Short cis reads",
+                    "value": "33.9",
+                    "tooltip": "Percent of filtered reads (=0.22m)",
+                    "numberType": "percent"
+                  },
+                  {
+                    "title": "Trans Reads",
+                    "value": "23.703",
+                    "tooltip": "Percent of filtered reads (=0.15m)",
+                    "numberType": "percent"
+                  }
+                ]
+              },
+              "lab": {
+                "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "@id": "/labs/4dn-dcic-lab/",
+                "status": "current",
+                "name": "4dn-dcic-lab",
+                "display_title": "4DN DCIC, HMS",
+                "@type": [
+                  "Lab",
+                  "Item"
+                ],
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin",
+                    "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                  ]
+                }
+              },
+              "file_format": {
+                "file_format": "bam",
+                "display_title": "bam",
+                "uuid": "d13d06cf-218e-4f61-aaf0-91f226248b3c",
+                "status": "released",
+                "@id": "/file-formats/bam/",
+                "@type": [
+                  "FileFormat",
+                  "Item"
+                ],
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin"
+                  ]
+                }
+              },
+              "last_modified": {
+                "date_modified": "2022-04-19T21:51:16.265974+00:00"
+              },
+              "principals_allowed": {
+                "view": [
+                  "system.Everyone"
+                ],
+                "edit": [
+                  "group.admin"
+                ]
+              },
+              "track_and_facet_info": {
+                "experimental_lab": "4DN Testing Lab",
+                "experiment_type": "Dilution Hi-C",
+                "experiment_bucket": "archived fileset 1",
+                "assay_info": "DNaseI",
+                "dataset": "X et al. HiC - ligation volumes",
+                "condition": "Control",
+                "replicate_info": "Biorep 1, Techrep 1",
+                "biosource_name": "GM12878",
+                "lab_name": "4DN DCIC, HMS"
+              }
+            },
+            {
+              "href": "/files-processed/4DNFIEOP3UAO/@@download/4DNFIEOP3UAO.cool",
+              "accession": "4DNFIEOP3UAO",
+              "file_type_detailed": "other (cool)",
+              "display_title": "4DNFIEOP3UAO.cool",
+              "@id": "/files-processed/4DNFIEOP3UAO/",
+              "@type": [
+                "FileProcessed",
+                "File",
+                "Item"
+              ],
+              "status": "released",
+              "uuid": "ccf48ccd-49e5-4c33-afab-9ec90d65faf3",
+              "lab": {
+                "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "@id": "/labs/4dn-dcic-lab/",
+                "status": "current",
+                "name": "4dn-dcic-lab",
+                "display_title": "4DN DCIC, HMS",
+                "@type": [
+                  "Lab",
+                  "Item"
+                ],
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin",
+                    "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                  ]
+                }
+              },
+              "file_format": {
+                "file_format": "cool",
+                "display_title": "cool",
+                "uuid": "d13d06cf-218e-4f61-bbf0-91f226248b2c",
+                "status": "released",
+                "@id": "/file-formats/cool/",
+                "@type": [
+                  "FileFormat",
+                  "Item"
+                ],
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin"
+                  ]
+                }
+              },
+              "last_modified": {
+                "date_modified": "2022-04-19T21:51:16.720219+00:00"
+              },
+              "principals_allowed": {
+                "view": [
+                  "system.Everyone"
+                ],
+                "edit": [
+                  "group.admin"
+                ]
+              },
+              "track_and_facet_info": {
+                "experimental_lab": "4DN Testing Lab",
+                "experiment_type": "Dilution Hi-C",
+                "experiment_bucket": "archived fileset 1",
+                "assay_info": "DNaseI",
+                "dataset": "X et al. HiC - ligation volumes",
+                "condition": "Control",
+                "replicate_info": "Biorep 1, Techrep 1",
+                "biosource_name": "GM12878",
+                "lab_name": "4DN DCIC, HMS"
+              }
+            }
+          ]
+        }
+      ],
+      "biosample": {
+        "uuid": "231111bc-8535-4448-903e-854af460b254",
+        "@type": [
+          "Biosample",
+          "Item"
+        ],
+        "modifications_summary": "Stable Transfection for MFG and Other",
+        "@id": "/biosamples/4DNBS1234567/",
+        "biosample_type": "immortalized cells",
+        "biosource_summary": "GM12878",
+        "status": "in review by lab",
+        "accession": "4DNBS1234567",
+        "biosample_category": [
+          "GM12878"
+        ],
+        "display_title": "4DNBS1234567",
+        "treatments_summary": "siRNA of MFG and shRNA of MFG",
+        "biosource": [
+          {
+            "accession": "4DNSR35OABJB",
+            "biosource_type": "immortalized cell line",
+            "display_title": "GM12878 - 4DNSR35OABJB",
+            "cell_line_tier": "Unclassified",
+            "uuid": "331111bc-8535-4448-903e-854af460b254",
+            "@id": "/biosources/4DNSR35OABJB/",
+            "status": "in review by lab",
+            "@type": [
+              "Biosource",
+              "Item"
+            ],
+            "cell_line": {
+              "status": "released",
+              "@id": "/ontology-terms/EFO:0002784/",
+              "preferred_name": "GM12878",
+              "term_name": "GM12878",
+              "uuid": "530036bc-8535-4448-903e-854af460b24c",
+              "display_title": "GM12878",
+              "term_id": "EFO:0002784",
+              "slim_terms": [
+                {
+                  "status": "released",
+                  "display_title": "cell line",
+                  "@type": [
+                    "OntologyTerm",
+                    "Item"
+                  ],
+                  "uuid": "111189bc-8535-4448-903e-854af460a233",
+                  "@id": "/ontology-terms/EFO:0000322/",
+                  "principals_allowed": {
+                    "view": [
+                      "system.Everyone"
+                    ],
+                    "edit": [
+                      "group.admin"
+                    ]
+                  }
+                }
+              ],
+              "@type": [
+                "OntologyTerm",
+                "Item"
+              ],
+              "principals_allowed": {
+                "view": [
+                  "system.Everyone"
+                ],
+                "edit": [
+                  "group.admin"
+                ]
+              }
+            },
+            "organism": {
+              "@id": "/organisms/9606/",
+              "display_title": "H. sapiens",
+              "@type": [
+                "Organism",
+                "Item"
+              ],
+              "scientific_name": "Homo sapiens",
+              "name": "human",
+              "uuid": "7745b647-ff15-4ff3-9ced-b897d4e2983c",
+              "status": "released",
+              "principals_allowed": {
+                "view": [
+                  "system.Everyone"
+                ],
+                "edit": [
+                  "group.admin"
+                ]
+              }
+            },
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          }
+        ],
+        "badges": [
+          {
+            "messages": [
+              "Biosample is missing a morphology image",
+              "Biosample is missing culture duration",
+              "Biosample is missing passage number"
+            ],
+            "badge": {
+              "title": "Tier1 Metadata Missing",
+              "warning": "Tier1 Metadata Missing",
+              "status": "released",
+              "display_title": "Tier1 Metadata Missing",
+              "description": "Tier 1 biosample missing required metadata",
+              "uuid": "e39777c6-8fe4-4424-bac1-40406342e026",
+              "@type": [
+                "Badge",
+                "Item"
+              ],
+              "badge_icon": "/static/img/badges/biosample-orange-circle.svg",
+              "@id": "/badges/tier1-metadata-missing/",
+              "badge_classification": "Warning",
+              "principals_allowed": {
+                "view": [
+                  "system.Everyone"
+                ],
+                "edit": [
+                  "group.admin"
+                ]
+              }
+            }
+          }
+        ],
+        "modifications": [
+          {
+            "display_title": "Stable Transfection for MFG",
+            "uuid": "431106bc-8535-4448-903e-854af460b265",
+            "status": "in review by lab",
+            "@type": [
+              "Modification",
+              "Item"
+            ],
+            "modification_type": "Stable Transfection",
+            "modification_name": "Stable Transfection for MFG",
+            "@id": "/modifications/431106bc-8535-4448-903e-854af460b265/",
+            "target_of_mod": [
+              {
+                "preferred_label": "MFG",
+                "@id": "/bio-features/a8ab8bca-4840-41b7-88d7-04cc19a54657/",
+                "feature_type": {
+                  "@id": "/ontology-terms/SO:0000704/",
+                  "uuid": "0231da78-1adc-4b8a-89b9-4f91908412a3",
+                  "display_title": "gene",
+                  "@type": [
+                    "OntologyTerm",
+                    "Item"
+                  ],
+                  "status": "released",
+                  "principals_allowed": {
+                    "view": [
+                      "system.Everyone"
+                    ],
+                    "edit": [
+                      "group.admin"
+                    ]
+                  }
+                },
+                "genome_location": [
+                  {
+                    "@type": [
+                      "GenomicRegion",
+                      "Item"
+                    ],
+                    "display_title": "GRCh38:1:1-1000000",
+                    "@id": "/genomic-regions/d1115d5e-40aa-43bc-b81c-32c70c9afb01/",
+                    "status": "in review by lab",
+                    "uuid": "d1115d5e-40aa-43bc-b81c-32c70c9afb01",
+                    "principals_allowed": {
+                      "view": [
+                        "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                        "group.admin",
+                        "group.read-only-admin",
+                        "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                        "remoteuser.EMBED",
+                        "remoteuser.INDEXER"
+                      ],
+                      "edit": [
+                        "group.admin",
+                        "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                      ]
+                    }
+                  }
+                ],
+                "@type": [
+                  "BioFeature",
+                  "Item"
+                ],
+                "display_title": "MFG",
+                "relevant_genes": [
+                  {
+                    "display_title": "CTCF",
+                    "status": "in review by lab",
+                    "@id": "/genes/10664/",
+                    "@type": [
+                      "Gene",
+                      "Item"
+                    ],
+                    "uuid": "3f3496f7-31bf-429f-8da7-7f1fdf840dcc",
+                    "principals_allowed": {
+                      "view": [
+                        "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                        "group.admin",
+                        "group.read-only-admin",
+                        "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                        "remoteuser.EMBED",
+                        "remoteuser.INDEXER"
+                      ],
+                      "edit": [
+                        "group.admin",
+                        "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                      ]
+                    }
+                  }
+                ],
+                "uuid": "a8ab8bca-4840-41b7-88d7-04cc19a54657",
+                "status": "in review by lab",
+                "organism_name": "human",
+                "principals_allowed": {
+                  "view": [
+                    "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                    "group.admin",
+                    "group.read-only-admin",
+                    "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                    "remoteuser.EMBED",
+                    "remoteuser.INDEXER"
+                  ],
+                  "edit": [
+                    "group.admin",
+                    "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                  ]
+                }
+              }
+            ],
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          {
+            "display_title": "Other",
+            "uuid": "431106bc-8535-4448-903e-854af460b276",
+            "status": "in review by lab",
+            "@type": [
+              "Modification",
+              "Item"
+            ],
+            "modification_type": "Other",
+            "modification_name": "Other",
+            "@id": "/modifications/431106bc-8535-4448-903e-854af460b276/",
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          }
+        ],
+        "cell_culture_details": [
+          {
+            "uuid": "131106bc-8535-4448-903e-854af460b212",
+            "@id": "/biosample-cell-cultures/131106bc-8535-4448-903e-854af460b212/",
+            "status": "in review by lab",
+            "@type": [
+              "BiosampleCellCulture",
+              "Item"
+            ],
+            "display_title": "BiosampleCellCulture from 2022-04-19",
+            "in_vitro_differentiated": "No",
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          }
+        ],
+        "treatments": [
+          {
+            "description": "RNAi treatment for rS3",
+            "status": "in review by lab",
+            "@type": [
+              "TreatmentRnai",
+              "Treatment",
+              "Item"
+            ],
+            "treatment_type": "RNAi",
+            "uuid": "686b362f-4eb6-4a9c-8173-3ab267307e3b",
+            "@id": "/treatments-rnai/686b362f-4eb6-4a9c-8173-3ab267307e3b/",
+            "display_title": "siRNA of MFG",
+            "constructs": [
+              {
+                "status": "in review by lab",
+                "name": "GFP_Construct",
+                "display_title": "GFP_Construct",
+                "@type": [
+                  "Construct",
+                  "Item"
+                ],
+                "@id": "/constructs/131106bc-8535-4448-903e-854af460b211/",
+                "uuid": "131106bc-8535-4448-903e-854af460b211",
+                "principals_allowed": {
+                  "view": [
+                    "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                    "group.admin",
+                    "group.read-only-admin",
+                    "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                    "remoteuser.EMBED",
+                    "remoteuser.INDEXER"
+                  ],
+                  "edit": [
+                    "group.admin",
+                    "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                  ]
+                }
+              }
+            ],
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          {
+            "description": "RNAi treatment for rS5",
+            "status": "in review by lab",
+            "@type": [
+              "TreatmentRnai",
+              "Treatment",
+              "Item"
+            ],
+            "treatment_type": "RNAi",
+            "uuid": "686b362f-4eb6-4a9c-8173-3ab267307a8d",
+            "@id": "/treatments-rnai/686b362f-4eb6-4a9c-8173-3ab267307a8d/",
+            "display_title": "shRNA of MFG",
+            "constructs": [
+              {
+                "status": "in review by lab",
+                "name": "GFP_Construct",
+                "display_title": "GFP_Construct",
+                "@type": [
+                  "Construct",
+                  "Item"
+                ],
+                "@id": "/constructs/131106bc-8535-4448-903e-854af460b211/",
+                "uuid": "131106bc-8535-4448-903e-854af460b211",
+                "principals_allowed": {
+                  "view": [
+                    "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                    "group.admin",
+                    "group.read-only-admin",
+                    "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                    "remoteuser.EMBED",
+                    "remoteuser.INDEXER"
+                  ],
+                  "edit": [
+                    "group.admin",
+                    "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                  ]
+                }
+              }
+            ],
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          }
+        ],
+        "principals_allowed": {
+          "view": [
+            "award.b0b9c607-f8b4-4f02-93f4-9895b461224b",
+            "group.admin",
+            "group.read-only-admin",
+            "lab.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988",
+            "remoteuser.EMBED",
+            "remoteuser.INDEXER"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988"
+          ]
+        }
+      },
+      "processed_files": [
+        {
+          "file_type_detailed": "other (pairs)",
+          "@id": "/files-processed/4DNFIAAAAAA1/",
+          "href": "/files-processed/4DNFIAAAAAA1/@@download/4DNFIAAAAAA1.pairs.gz",
+          "file_format": {
+            "@id": "/file-formats/pairs/",
+            "status": "released",
+            "@type": [
+              "FileFormat",
+              "Item"
+            ],
+            "display_title": "pairs",
+            "uuid": "d13d06cf-218e-4f61-aaf0-91f226248b2c",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin"
+              ]
+            }
+          },
+          "file_classification": "processed file",
+          "accession": "4DNFIAAAAAA1",
+          "upload_key": "7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f/4DNFIAAAAAA1.pairs.gz",
+          "@type": [
+            "FileProcessed",
+            "File",
+            "Item"
+          ],
+          "status": "uploaded",
+          "uuid": "7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f",
+          "display_title": "4DNFIAAAAAA1.pairs.gz",
+          "lab": {
+            "display_title": "4DN DCIC, HMS",
+            "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "@id": "/labs/4dn-dcic-lab/",
+            "@type": [
+              "Lab",
+              "Item"
+            ],
+            "name": "4dn-dcic-lab",
+            "status": "current",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          "last_modified": {
+            "date_modified": "2022-04-19T21:51:19.588202+00:00"
+          },
+          "external_references": [],
+          "track_and_facet_info": {
+            "experimental_lab": "4DN Testing Lab",
+            "experiment_type": "Dilution Hi-C",
+            "experiment_bucket": "processed file",
+            "assay_info": "DNaseI",
+            "dataset": "X et al. HiC - ligation volumes",
+            "condition": "Control",
+            "replicate_info": "Biorep 1, Techrep 1",
+            "biosource_name": "GM12878",
+            "lab_name": "4DN DCIC, HMS"
+          },
+          "principals_allowed": {
+            "view": [
+              "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+              "group.admin",
+              "group.read-only-admin",
+              "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+              "remoteuser.EMBED",
+              "remoteuser.INDEXER"
+            ],
+            "edit": [
+              "group.admin",
+              "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+            ]
+          }
+        }
+      ],
+      "digestion_enzyme": {
+        "name": "DNaseI",
+        "@id": "/enzymes/DNaseI/",
+        "uuid": "e646edb2-d4d5-405b-aab1-03e4754b0705",
+        "@type": [
+          "Enzyme",
+          "Item"
+        ],
+        "display_title": "DNaseI",
+        "status": "in review by lab",
+        "principals_allowed": {
+          "view": [
+            "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+            "group.admin",
+            "group.read-only-admin",
+            "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "remoteuser.EMBED",
+            "remoteuser.INDEXER"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+          ]
+        }
+      },
+      "experiment_type": {
+        "title": "Dilution Hi-C",
+        "display_title": "Dilution Hi-C",
+        "uuid": "b17b17cd-544a-3a3b-abc3-17a544544b3c",
+        "status": "in review by lab",
+        "@type": [
+          "ExperimentType",
+          "Item"
+        ],
+        "assay_subclass_short": "Hi-C",
+        "assay_subclassification": "DNA-DNA Pairwise Interactions",
+        "@id": "/experiment-types/dilution-hi-c/",
+        "other_tags": [
+          "DNA-DNA"
+        ],
+        "assay_classification": "3C via Ligation",
+        "experiment_category": "Sequencing",
+        "principals_allowed": {
+          "view": [
+            "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+            "group.admin",
+            "group.read-only-admin",
+            "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "remoteuser.EMBED",
+            "remoteuser.INDEXER"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+          ]
+        }
+      },
+      "experiment_categorizer": {
+        "field": "Enzyme",
+        "value": "DNaseI",
+        "combined": "Enzyme: DNaseI"
+      },
+      "external_references": [
+        {
+          "ref": "SRA:SRX764985",
+          "uri": "https://www.ncbi.nlm.nih.gov/sra/?term=SRX764985"
+        },
+        {
+          "ref": "GEO:GSM1551599",
+          "uri": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM1551599"
+        }
+      ],
+      "principals_allowed": {
+        "view": [
+          "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+          "group.admin",
+          "group.read-only-admin",
+          "lab.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988",
+          "remoteuser.EMBED",
+          "remoteuser.INDEXER"
+        ],
+        "edit": [
+          "group.admin",
+          "submits_for.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988"
+        ]
+      },
+      "last_modified": {
+        "date_modified": "2022-04-19T21:51:23.165448+00:00"
+      }
+    },
+    {
+      "display_title": "Dilution Hi-C on GM12878 with DNaseI - 4DNEXO67APT1",
+      "@type": [
+        "ExperimentHiC",
+        "Experiment",
+        "Item"
+      ],
+      "accession": "4DNEXO67APT1",
+      "status": "in review by lab",
+      "uuid": "75041e2f-3e43-4388-8bbb-e861f209c4fb",
+      "@id": "/experiments-hi-c/4DNEXO67APT1/",
+      "dbxrefs": [
+        "SRA:SRX764989",
+        "GEO:GSM1551603"
+      ],
+      "files": [
+        {
+          "paired_end": "1",
+          "status": "released",
+          "file_type_detailed": "reads (fastq)",
+          "accession": "4DNFIO67APV1",
+          "@type": [
+            "FileFastq",
+            "File",
+            "Item"
+          ],
+          "file_type": "reads",
+          "upload_key": "46e82a90-49e5-4c33-afab-9ec90d65faa2/4DNFIO67APV1.fastq.gz",
+          "file_classification": "raw file",
+          "@id": "/files-fastq/4DNFIO67APV1/",
+          "href": "/files-fastq/4DNFIO67APV1/@@download/4DNFIO67APV1.fastq.gz",
+          "uuid": "46e82a90-49e5-4c33-afab-9ec90d65faa2",
+          "display_title": "4DNFIO67APV1.fastq.gz",
+          "file_size": 4563645656,
+          "related_files": [
+            {
+              "relationship_type": "paired with",
+              "file": {
+                "display_title": "4DNFIO67APY1.fastq.gz",
+                "@type": [
+                  "FileFastq",
+                  "File",
+                  "Item"
+                ],
+                "accession": "4DNFIO67APY1",
+                "paired_end": "2",
+                "uuid": "46e82a90-49e5-4c33-afab-9ec90d65faa3",
+                "@id": "/files-fastq/4DNFIO67APY1/",
+                "status": "released",
+                "file_type": "reads",
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin"
+                  ]
+                }
+              }
+            }
+          ],
+          "file_format": {
+            "@type": [
+              "FileFormat",
+              "Item"
+            ],
+            "@id": "/file-formats/fastq/",
+            "display_title": "fastq",
+            "status": "released",
+            "uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+            "file_format": "fastq",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin"
+              ]
+            }
+          },
+          "lab": {
+            "@type": [
+              "Lab",
+              "Item"
+            ],
+            "@id": "/labs/4dn-dcic-lab/",
+            "display_title": "4DN DCIC, HMS",
+            "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "name": "4dn-dcic-lab",
+            "status": "current",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          "external_references": [],
+          "principals_allowed": {
+            "view": [
+              "system.Everyone"
+            ],
+            "edit": [
+              "group.admin"
+            ]
+          },
+          "track_and_facet_info": {
+            "experimental_lab": "4DN Testing Lab",
+            "experiment_type": "Dilution Hi-C",
+            "experiment_bucket": "raw file",
+            "assay_info": "DNaseI",
+            "dataset": "X et al. HiC - ligation volumes",
+            "condition": "Control",
+            "replicate_info": "Biorep 1, Techrep 2",
+            "biosource_name": "GM12878",
+            "lab_name": "4DN DCIC, HMS"
+          }
+        },
+        {
+          "paired_end": "2",
+          "status": "released",
+          "file_type_detailed": "reads (fastq)",
+          "accession": "4DNFIO67APY1",
+          "@type": [
+            "FileFastq",
+            "File",
+            "Item"
+          ],
+          "file_type": "reads",
+          "upload_key": "46e82a90-49e5-4c33-afab-9ec90d65faa3/4DNFIO67APY1.fastq.gz",
+          "file_classification": "raw file",
+          "@id": "/files-fastq/4DNFIO67APY1/",
+          "href": "/files-fastq/4DNFIO67APY1/@@download/4DNFIO67APY1.fastq.gz",
+          "uuid": "46e82a90-49e5-4c33-afab-9ec90d65faa3",
+          "display_title": "4DNFIO67APY1.fastq.gz",
+          "file_size": 34645645,
+          "related_files": [
+            {
+              "relationship_type": "paired with",
+              "file": {
+                "display_title": "4DNFIO67APV1.fastq.gz",
+                "@type": [
+                  "FileFastq",
+                  "File",
+                  "Item"
+                ],
+                "accession": "4DNFIO67APV1",
+                "paired_end": "1",
+                "uuid": "46e82a90-49e5-4c33-afab-9ec90d65faa2",
+                "@id": "/files-fastq/4DNFIO67APV1/",
+                "status": "released",
+                "file_type": "reads",
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin"
+                  ]
+                }
+              }
+            }
+          ],
+          "file_format": {
+            "@type": [
+              "FileFormat",
+              "Item"
+            ],
+            "@id": "/file-formats/fastq/",
+            "display_title": "fastq",
+            "status": "released",
+            "uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+            "file_format": "fastq",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin"
+              ]
+            }
+          },
+          "lab": {
+            "@type": [
+              "Lab",
+              "Item"
+            ],
+            "@id": "/labs/4dn-dcic-lab/",
+            "display_title": "4DN DCIC, HMS",
+            "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "name": "4dn-dcic-lab",
+            "status": "current",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          "external_references": [],
+          "principals_allowed": {
+            "view": [
+              "system.Everyone"
+            ],
+            "edit": [
+              "group.admin"
+            ]
+          },
+          "track_and_facet_info": {
+            "experimental_lab": "4DN Testing Lab",
+            "experiment_type": "Dilution Hi-C",
+            "experiment_bucket": "raw file",
+            "assay_info": "DNaseI",
+            "dataset": "X et al. HiC - ligation volumes",
+            "condition": "Control",
+            "replicate_info": "Biorep 1, Techrep 2",
+            "biosource_name": "GM12878",
+            "lab_name": "4DN DCIC, HMS"
+          }
+        }
+      ],
+      "other_processed_files": [
+        {
+          "type": "preliminary",
+          "description": "preliminary files",
+          "title": "preliminary fileset",
+          "files": [
+            {
+              "href": "/files-processed/4DNFIM172I2T/@@download/4DNFIM172I2T.bam",
+              "accession": "4DNFIM172I2T",
+              "file_type_detailed": "other (bam)",
+              "display_title": "4DNFIM172I2T.bam",
+              "@id": "/files-processed/4DNFIM172I2T/",
+              "@type": [
+                "FileProcessed",
+                "File",
+                "Item"
+              ],
+              "status": "released",
+              "uuid": "165e9eeb-49e5-4c33-afab-9ec90d65faf3",
+              "lab": {
+                "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "@id": "/labs/4dn-dcic-lab/",
+                "status": "current",
+                "name": "4dn-dcic-lab",
+                "display_title": "4DN DCIC, HMS",
+                "@type": [
+                  "Lab",
+                  "Item"
+                ],
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin",
+                    "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                  ]
+                }
+              },
+              "file_format": {
+                "file_format": "bam",
+                "display_title": "bam",
+                "uuid": "d13d06cf-218e-4f61-aaf0-91f226248b3c",
+                "status": "released",
+                "@id": "/file-formats/bam/",
+                "@type": [
+                  "FileFormat",
+                  "Item"
+                ],
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin"
+                  ]
+                }
+              },
+              "last_modified": {
+                "date_modified": "2022-04-19T21:51:17.171206+00:00"
+              },
+              "principals_allowed": {
+                "view": [
+                  "system.Everyone"
+                ],
+                "edit": [
+                  "group.admin"
+                ]
+              },
+              "track_and_facet_info": {
+                "experimental_lab": "4DN Testing Lab",
+                "experiment_type": "Dilution Hi-C",
+                "experiment_bucket": "preliminary fileset",
+                "assay_info": "DNaseI",
+                "dataset": "X et al. HiC - ligation volumes",
+                "condition": "Control",
+                "replicate_info": "Biorep 1, Techrep 2",
+                "biosource_name": "GM12878",
+                "lab_name": "4DN DCIC, HMS"
+              }
+            },
+            {
+              "href": "/files-processed/4DNFIO3QGVR4/@@download/4DNFIO3QGVR4.other",
+              "accession": "4DNFIO3QGVR4",
+              "file_type_detailed": "other (other)",
+              "display_title": "4DNFIO3QGVR4.other",
+              "@id": "/files-processed/4DNFIO3QGVR4/",
+              "@type": [
+                "FileProcessed",
+                "File",
+                "Item"
+              ],
+              "status": "released",
+              "uuid": "9e316323-49e5-4c33-afab-9ec90d65faf3",
+              "lab": {
+                "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "@id": "/labs/4dn-dcic-lab/",
+                "status": "current",
+                "name": "4dn-dcic-lab",
+                "display_title": "4DN DCIC, HMS",
+                "@type": [
+                  "Lab",
+                  "Item"
+                ],
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin",
+                    "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                  ]
+                }
+              },
+              "file_format": {
+                "file_format": "other",
+                "display_title": "other",
+                "uuid": "d13d06cf-218e-4f61-11f0-91f226248b2c",
+                "status": "released",
+                "@id": "/file-formats/other/",
+                "@type": [
+                  "FileFormat",
+                  "Item"
+                ],
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin"
+                  ]
+                }
+              },
+              "last_modified": {
+                "date_modified": "2022-04-19T21:51:17.284905+00:00"
+              },
+              "principals_allowed": {
+                "view": [
+                  "system.Everyone"
+                ],
+                "edit": [
+                  "group.admin"
+                ]
+              },
+              "track_and_facet_info": {
+                "experimental_lab": "4DN Testing Lab",
+                "experiment_type": "Dilution Hi-C",
+                "experiment_bucket": "preliminary fileset",
+                "assay_info": "DNaseI",
+                "dataset": "X et al. HiC - ligation volumes",
+                "condition": "Control",
+                "replicate_info": "Biorep 1, Techrep 2",
+                "biosource_name": "GM12878",
+                "lab_name": "4DN DCIC, HMS"
+              }
+            }
+          ]
+        }
+      ],
+      "biosample": {
+        "uuid": "231111bc-8535-4448-903e-854af460b254",
+        "@type": [
+          "Biosample",
+          "Item"
+        ],
+        "modifications_summary": "Stable Transfection for MFG and Other",
+        "@id": "/biosamples/4DNBS1234567/",
+        "biosample_type": "immortalized cells",
+        "biosource_summary": "GM12878",
+        "status": "in review by lab",
+        "accession": "4DNBS1234567",
+        "biosample_category": [
+          "GM12878"
+        ],
+        "display_title": "4DNBS1234567",
+        "treatments_summary": "siRNA of MFG and shRNA of MFG",
+        "biosource": [
+          {
+            "accession": "4DNSR35OABJB",
+            "biosource_type": "immortalized cell line",
+            "display_title": "GM12878 - 4DNSR35OABJB",
+            "cell_line_tier": "Unclassified",
+            "uuid": "331111bc-8535-4448-903e-854af460b254",
+            "@id": "/biosources/4DNSR35OABJB/",
+            "status": "in review by lab",
+            "@type": [
+              "Biosource",
+              "Item"
+            ],
+            "cell_line": {
+              "status": "released",
+              "@id": "/ontology-terms/EFO:0002784/",
+              "preferred_name": "GM12878",
+              "term_name": "GM12878",
+              "uuid": "530036bc-8535-4448-903e-854af460b24c",
+              "display_title": "GM12878",
+              "term_id": "EFO:0002784",
+              "slim_terms": [
+                {
+                  "status": "released",
+                  "display_title": "cell line",
+                  "@type": [
+                    "OntologyTerm",
+                    "Item"
+                  ],
+                  "uuid": "111189bc-8535-4448-903e-854af460a233",
+                  "@id": "/ontology-terms/EFO:0000322/",
+                  "principals_allowed": {
+                    "view": [
+                      "system.Everyone"
+                    ],
+                    "edit": [
+                      "group.admin"
+                    ]
+                  }
+                }
+              ],
+              "@type": [
+                "OntologyTerm",
+                "Item"
+              ],
+              "principals_allowed": {
+                "view": [
+                  "system.Everyone"
+                ],
+                "edit": [
+                  "group.admin"
+                ]
+              }
+            },
+            "organism": {
+              "@id": "/organisms/9606/",
+              "display_title": "H. sapiens",
+              "@type": [
+                "Organism",
+                "Item"
+              ],
+              "scientific_name": "Homo sapiens",
+              "name": "human",
+              "uuid": "7745b647-ff15-4ff3-9ced-b897d4e2983c",
+              "status": "released",
+              "principals_allowed": {
+                "view": [
+                  "system.Everyone"
+                ],
+                "edit": [
+                  "group.admin"
+                ]
+              }
+            },
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          }
+        ],
+        "badges": [
+          {
+            "messages": [
+              "Biosample is missing a morphology image",
+              "Biosample is missing culture duration",
+              "Biosample is missing passage number"
+            ],
+            "badge": {
+              "title": "Tier1 Metadata Missing",
+              "warning": "Tier1 Metadata Missing",
+              "status": "released",
+              "display_title": "Tier1 Metadata Missing",
+              "description": "Tier 1 biosample missing required metadata",
+              "uuid": "e39777c6-8fe4-4424-bac1-40406342e026",
+              "@type": [
+                "Badge",
+                "Item"
+              ],
+              "badge_icon": "/static/img/badges/biosample-orange-circle.svg",
+              "@id": "/badges/tier1-metadata-missing/",
+              "badge_classification": "Warning",
+              "principals_allowed": {
+                "view": [
+                  "system.Everyone"
+                ],
+                "edit": [
+                  "group.admin"
+                ]
+              }
+            }
+          }
+        ],
+        "modifications": [
+          {
+            "display_title": "Stable Transfection for MFG",
+            "uuid": "431106bc-8535-4448-903e-854af460b265",
+            "status": "in review by lab",
+            "@type": [
+              "Modification",
+              "Item"
+            ],
+            "modification_type": "Stable Transfection",
+            "modification_name": "Stable Transfection for MFG",
+            "@id": "/modifications/431106bc-8535-4448-903e-854af460b265/",
+            "target_of_mod": [
+              {
+                "preferred_label": "MFG",
+                "@id": "/bio-features/a8ab8bca-4840-41b7-88d7-04cc19a54657/",
+                "feature_type": {
+                  "@id": "/ontology-terms/SO:0000704/",
+                  "uuid": "0231da78-1adc-4b8a-89b9-4f91908412a3",
+                  "display_title": "gene",
+                  "@type": [
+                    "OntologyTerm",
+                    "Item"
+                  ],
+                  "status": "released",
+                  "principals_allowed": {
+                    "view": [
+                      "system.Everyone"
+                    ],
+                    "edit": [
+                      "group.admin"
+                    ]
+                  }
+                },
+                "genome_location": [
+                  {
+                    "@type": [
+                      "GenomicRegion",
+                      "Item"
+                    ],
+                    "display_title": "GRCh38:1:1-1000000",
+                    "@id": "/genomic-regions/d1115d5e-40aa-43bc-b81c-32c70c9afb01/",
+                    "status": "in review by lab",
+                    "uuid": "d1115d5e-40aa-43bc-b81c-32c70c9afb01",
+                    "principals_allowed": {
+                      "view": [
+                        "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                        "group.admin",
+                        "group.read-only-admin",
+                        "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                        "remoteuser.EMBED",
+                        "remoteuser.INDEXER"
+                      ],
+                      "edit": [
+                        "group.admin",
+                        "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                      ]
+                    }
+                  }
+                ],
+                "@type": [
+                  "BioFeature",
+                  "Item"
+                ],
+                "display_title": "MFG",
+                "relevant_genes": [
+                  {
+                    "display_title": "CTCF",
+                    "status": "in review by lab",
+                    "@id": "/genes/10664/",
+                    "@type": [
+                      "Gene",
+                      "Item"
+                    ],
+                    "uuid": "3f3496f7-31bf-429f-8da7-7f1fdf840dcc",
+                    "principals_allowed": {
+                      "view": [
+                        "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                        "group.admin",
+                        "group.read-only-admin",
+                        "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                        "remoteuser.EMBED",
+                        "remoteuser.INDEXER"
+                      ],
+                      "edit": [
+                        "group.admin",
+                        "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                      ]
+                    }
+                  }
+                ],
+                "uuid": "a8ab8bca-4840-41b7-88d7-04cc19a54657",
+                "status": "in review by lab",
+                "organism_name": "human",
+                "principals_allowed": {
+                  "view": [
+                    "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                    "group.admin",
+                    "group.read-only-admin",
+                    "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                    "remoteuser.EMBED",
+                    "remoteuser.INDEXER"
+                  ],
+                  "edit": [
+                    "group.admin",
+                    "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                  ]
+                }
+              }
+            ],
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          {
+            "display_title": "Other",
+            "uuid": "431106bc-8535-4448-903e-854af460b276",
+            "status": "in review by lab",
+            "@type": [
+              "Modification",
+              "Item"
+            ],
+            "modification_type": "Other",
+            "modification_name": "Other",
+            "@id": "/modifications/431106bc-8535-4448-903e-854af460b276/",
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          }
+        ],
+        "cell_culture_details": [
+          {
+            "uuid": "131106bc-8535-4448-903e-854af460b212",
+            "@id": "/biosample-cell-cultures/131106bc-8535-4448-903e-854af460b212/",
+            "status": "in review by lab",
+            "@type": [
+              "BiosampleCellCulture",
+              "Item"
+            ],
+            "display_title": "BiosampleCellCulture from 2022-04-19",
+            "in_vitro_differentiated": "No",
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          }
+        ],
+        "treatments": [
+          {
+            "description": "RNAi treatment for rS3",
+            "status": "in review by lab",
+            "@type": [
+              "TreatmentRnai",
+              "Treatment",
+              "Item"
+            ],
+            "treatment_type": "RNAi",
+            "uuid": "686b362f-4eb6-4a9c-8173-3ab267307e3b",
+            "@id": "/treatments-rnai/686b362f-4eb6-4a9c-8173-3ab267307e3b/",
+            "display_title": "siRNA of MFG",
+            "constructs": [
+              {
+                "status": "in review by lab",
+                "name": "GFP_Construct",
+                "display_title": "GFP_Construct",
+                "@type": [
+                  "Construct",
+                  "Item"
+                ],
+                "@id": "/constructs/131106bc-8535-4448-903e-854af460b211/",
+                "uuid": "131106bc-8535-4448-903e-854af460b211",
+                "principals_allowed": {
+                  "view": [
+                    "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                    "group.admin",
+                    "group.read-only-admin",
+                    "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                    "remoteuser.EMBED",
+                    "remoteuser.INDEXER"
+                  ],
+                  "edit": [
+                    "group.admin",
+                    "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                  ]
+                }
+              }
+            ],
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          {
+            "description": "RNAi treatment for rS5",
+            "status": "in review by lab",
+            "@type": [
+              "TreatmentRnai",
+              "Treatment",
+              "Item"
+            ],
+            "treatment_type": "RNAi",
+            "uuid": "686b362f-4eb6-4a9c-8173-3ab267307a8d",
+            "@id": "/treatments-rnai/686b362f-4eb6-4a9c-8173-3ab267307a8d/",
+            "display_title": "shRNA of MFG",
+            "constructs": [
+              {
+                "status": "in review by lab",
+                "name": "GFP_Construct",
+                "display_title": "GFP_Construct",
+                "@type": [
+                  "Construct",
+                  "Item"
+                ],
+                "@id": "/constructs/131106bc-8535-4448-903e-854af460b211/",
+                "uuid": "131106bc-8535-4448-903e-854af460b211",
+                "principals_allowed": {
+                  "view": [
+                    "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                    "group.admin",
+                    "group.read-only-admin",
+                    "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                    "remoteuser.EMBED",
+                    "remoteuser.INDEXER"
+                  ],
+                  "edit": [
+                    "group.admin",
+                    "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                  ]
+                }
+              }
+            ],
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          }
+        ],
+        "principals_allowed": {
+          "view": [
+            "award.b0b9c607-f8b4-4f02-93f4-9895b461224b",
+            "group.admin",
+            "group.read-only-admin",
+            "lab.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988",
+            "remoteuser.EMBED",
+            "remoteuser.INDEXER"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988"
+          ]
+        }
+      },
+      "processed_files": [
+        {
+          "file_type_detailed": "other (pairs)",
+          "@id": "/files-processed/4DNFIAAAAAA2/",
+          "href": "/files-processed/4DNFIAAAAAA2/@@download/4DNFIAAAAAA2.pairs.gz",
+          "file_format": {
+            "@id": "/file-formats/pairs/",
+            "status": "released",
+            "@type": [
+              "FileFormat",
+              "Item"
+            ],
+            "display_title": "pairs",
+            "uuid": "d13d06cf-218e-4f61-aaf0-91f226248b2c",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin"
+              ]
+            }
+          },
+          "file_classification": "processed file",
+          "accession": "4DNFIAAAAAA2",
+          "upload_key": "7f9eb396-5c1a-1111-aebf-28ea39d6a50f/4DNFIAAAAAA2.pairs.gz",
+          "@type": [
+            "FileProcessed",
+            "File",
+            "Item"
+          ],
+          "status": "uploaded",
+          "uuid": "7f9eb396-5c1a-1111-aebf-28ea39d6a50f",
+          "display_title": "4DNFIAAAAAA2.pairs.gz",
+          "lab": {
+            "display_title": "4DN DCIC, HMS",
+            "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "@id": "/labs/4dn-dcic-lab/",
+            "@type": [
+              "Lab",
+              "Item"
+            ],
+            "name": "4dn-dcic-lab",
+            "status": "current",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          "last_modified": {
+            "date_modified": "2022-04-19T21:51:19.637949+00:00"
+          },
+          "external_references": [],
+          "track_and_facet_info": {
+            "experimental_lab": "4DN Testing Lab",
+            "experiment_type": "Dilution Hi-C",
+            "experiment_bucket": "processed file",
+            "assay_info": "DNaseI",
+            "dataset": "X et al. HiC - ligation volumes",
+            "condition": "Control",
+            "replicate_info": "Biorep 1, Techrep 2",
+            "biosource_name": "GM12878",
+            "lab_name": "4DN DCIC, HMS"
+          },
+          "principals_allowed": {
+            "view": [
+              "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+              "group.admin",
+              "group.read-only-admin",
+              "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+              "remoteuser.EMBED",
+              "remoteuser.INDEXER"
+            ],
+            "edit": [
+              "group.admin",
+              "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+            ]
+          }
+        }
+      ],
+      "digestion_enzyme": {
+        "name": "DNaseI",
+        "@id": "/enzymes/DNaseI/",
+        "uuid": "e646edb2-d4d5-405b-aab1-03e4754b0705",
+        "@type": [
+          "Enzyme",
+          "Item"
+        ],
+        "display_title": "DNaseI",
+        "status": "in review by lab",
+        "principals_allowed": {
+          "view": [
+            "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+            "group.admin",
+            "group.read-only-admin",
+            "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "remoteuser.EMBED",
+            "remoteuser.INDEXER"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+          ]
+        }
+      },
+      "experiment_type": {
+        "title": "Dilution Hi-C",
+        "display_title": "Dilution Hi-C",
+        "uuid": "b17b17cd-544a-3a3b-abc3-17a544544b3c",
+        "status": "in review by lab",
+        "@type": [
+          "ExperimentType",
+          "Item"
+        ],
+        "assay_subclass_short": "Hi-C",
+        "assay_subclassification": "DNA-DNA Pairwise Interactions",
+        "@id": "/experiment-types/dilution-hi-c/",
+        "other_tags": [
+          "DNA-DNA"
+        ],
+        "assay_classification": "3C via Ligation",
+        "experiment_category": "Sequencing",
+        "principals_allowed": {
+          "view": [
+            "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+            "group.admin",
+            "group.read-only-admin",
+            "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "remoteuser.EMBED",
+            "remoteuser.INDEXER"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+          ]
+        }
+      },
+      "experiment_categorizer": {
+        "field": "Enzyme",
+        "value": "DNaseI",
+        "combined": "Enzyme: DNaseI"
+      },
+      "external_references": [
+        {
+          "ref": "SRA:SRX764989",
+          "uri": "https://www.ncbi.nlm.nih.gov/sra/?term=SRX764989"
+        },
+        {
+          "ref": "GEO:GSM1551603",
+          "uri": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM1551603"
+        }
+      ],
+      "principals_allowed": {
+        "view": [
+          "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+          "group.admin",
+          "group.read-only-admin",
+          "lab.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988",
+          "remoteuser.EMBED",
+          "remoteuser.INDEXER"
+        ],
+        "edit": [
+          "group.admin",
+          "submits_for.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988"
+        ]
+      },
+      "last_modified": {
+        "date_modified": "2022-04-19T21:51:23.554758+00:00"
+      }
+    },
+    {
+      "display_title": "Dilution Hi-C on GM12878 with DNaseI - 4DNEXO67APV1",
+      "@type": [
+        "ExperimentHiC",
+        "Experiment",
+        "Item"
+      ],
+      "accession": "4DNEXO67APV1",
+      "status": "released",
+      "uuid": "75041e2f-3e43-4388-8bbb-e861f209b3fb",
+      "@id": "/experiments-hi-c/4DNEXO67APV1/",
+      "files": [
+        {
+          "paired_end": "1",
+          "status": "released",
+          "file_type_detailed": "reads (fastq)",
+          "accession": "4DNFIO67APZ1",
+          "@type": [
+            "FileFastq",
+            "File",
+            "Item"
+          ],
+          "file_type": "reads",
+          "upload_key": "46e82a90-49e5-4c33-afab-9ec90d65faa4/4DNFIO67APZ1.fastq.gz",
+          "file_classification": "raw file",
+          "@id": "/files-fastq/4DNFIO67APZ1/",
+          "href": "/files-fastq/4DNFIO67APZ1/@@download/4DNFIO67APZ1.fastq.gz",
+          "uuid": "46e82a90-49e5-4c33-afab-9ec90d65faa4",
+          "display_title": "4DNFIO67APZ1.fastq.gz",
+          "file_size": 34563456456,
+          "related_files": [
+            {
+              "relationship_type": "paired with",
+              "file": {
+                "display_title": "4DNFIO67AZZ1.fastq.gz",
+                "@type": [
+                  "FileFastq",
+                  "File",
+                  "Item"
+                ],
+                "accession": "4DNFIO67AZZ1",
+                "paired_end": "2",
+                "uuid": "46e82a90-49e5-4c33-afab-9ec90d65fbb4",
+                "@id": "/files-fastq/4DNFIO67AZZ1/",
+                "status": "released",
+                "file_type": "reads",
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin"
+                  ]
+                }
+              }
+            }
+          ],
+          "file_format": {
+            "@type": [
+              "FileFormat",
+              "Item"
+            ],
+            "@id": "/file-formats/fastq/",
+            "display_title": "fastq",
+            "status": "released",
+            "uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+            "file_format": "fastq",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin"
+              ]
+            }
+          },
+          "lab": {
+            "@type": [
+              "Lab",
+              "Item"
+            ],
+            "@id": "/labs/4dn-dcic-lab/",
+            "display_title": "4DN DCIC, HMS",
+            "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "name": "4dn-dcic-lab",
+            "status": "current",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          "external_references": [],
+          "principals_allowed": {
+            "view": [
+              "system.Everyone"
+            ],
+            "edit": [
+              "group.admin"
+            ]
+          },
+          "track_and_facet_info": {
+            "experimental_lab": "4DN Testing Lab",
+            "experiment_type": "Dilution Hi-C",
+            "experiment_bucket": "raw file",
+            "assay_info": "DNaseI",
+            "dataset": "X et al. HiC - ligation volumes",
+            "condition": "Control",
+            "replicate_info": "Biorep 2, Techrep 1",
+            "biosource_name": "GM12878",
+            "lab_name": "4DN DCIC, HMS"
+          }
+        },
+        {
+          "paired_end": "2",
+          "status": "released",
+          "file_type_detailed": "reads (fastq)",
+          "accession": "4DNFIO67AZZ1",
+          "@type": [
+            "FileFastq",
+            "File",
+            "Item"
+          ],
+          "file_type": "reads",
+          "upload_key": "46e82a90-49e5-4c33-afab-9ec90d65fbb4/4DNFIO67AZZ1.fastq.gz",
+          "file_classification": "raw file",
+          "@id": "/files-fastq/4DNFIO67AZZ1/",
+          "href": "/files-fastq/4DNFIO67AZZ1/@@download/4DNFIO67AZZ1.fastq.gz",
+          "uuid": "46e82a90-49e5-4c33-afab-9ec90d65fbb4",
+          "display_title": "4DNFIO67AZZ1.fastq.gz",
+          "file_size": 346456453,
+          "related_files": [
+            {
+              "relationship_type": "paired with",
+              "file": {
+                "display_title": "4DNFIO67APZ1.fastq.gz",
+                "@type": [
+                  "FileFastq",
+                  "File",
+                  "Item"
+                ],
+                "accession": "4DNFIO67APZ1",
+                "paired_end": "1",
+                "uuid": "46e82a90-49e5-4c33-afab-9ec90d65faa4",
+                "@id": "/files-fastq/4DNFIO67APZ1/",
+                "status": "released",
+                "file_type": "reads",
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin"
+                  ]
+                }
+              }
+            }
+          ],
+          "file_format": {
+            "@type": [
+              "FileFormat",
+              "Item"
+            ],
+            "@id": "/file-formats/fastq/",
+            "display_title": "fastq",
+            "status": "released",
+            "uuid": "c13d06cf-218e-4f61-aaf0-91f226248b2c",
+            "file_format": "fastq",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin"
+              ]
+            }
+          },
+          "lab": {
+            "@type": [
+              "Lab",
+              "Item"
+            ],
+            "@id": "/labs/4dn-dcic-lab/",
+            "display_title": "4DN DCIC, HMS",
+            "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "name": "4dn-dcic-lab",
+            "status": "current",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          "external_references": [],
+          "principals_allowed": {
+            "view": [
+              "system.Everyone"
+            ],
+            "edit": [
+              "group.admin"
+            ]
+          },
+          "track_and_facet_info": {
+            "experimental_lab": "4DN Testing Lab",
+            "experiment_type": "Dilution Hi-C",
+            "experiment_bucket": "raw file",
+            "assay_info": "DNaseI",
+            "dataset": "X et al. HiC - ligation volumes",
+            "condition": "Control",
+            "replicate_info": "Biorep 2, Techrep 1",
+            "biosource_name": "GM12878",
+            "lab_name": "4DN DCIC, HMS"
+          }
+        }
+      ],
+      "biosample": {
+        "uuid": "231111bc-8535-4448-903e-854af460b242",
+        "@type": [
+          "Biosample",
+          "Item"
+        ],
+        "modifications_summary": "Stable Transfection for MFG and Other",
+        "@id": "/biosamples/4DNBS2548734/",
+        "biosample_type": "immortalized cells",
+        "biosource_summary": "GM12878",
+        "status": "in review by lab",
+        "accession": "4DNBS2548734",
+        "biosample_category": [
+          "GM12878"
+        ],
+        "display_title": "4DNBS2548734",
+        "treatments_summary": "siRNA of MFG and shRNA of MFG",
+        "biosource": [
+          {
+            "accession": "4DNSR35OABJB",
+            "biosource_type": "immortalized cell line",
+            "display_title": "GM12878 - 4DNSR35OABJB",
+            "cell_line_tier": "Unclassified",
+            "uuid": "331111bc-8535-4448-903e-854af460b254",
+            "@id": "/biosources/4DNSR35OABJB/",
+            "status": "in review by lab",
+            "@type": [
+              "Biosource",
+              "Item"
+            ],
+            "cell_line": {
+              "status": "released",
+              "@id": "/ontology-terms/EFO:0002784/",
+              "preferred_name": "GM12878",
+              "term_name": "GM12878",
+              "uuid": "530036bc-8535-4448-903e-854af460b24c",
+              "display_title": "GM12878",
+              "term_id": "EFO:0002784",
+              "slim_terms": [
+                {
+                  "status": "released",
+                  "display_title": "cell line",
+                  "@type": [
+                    "OntologyTerm",
+                    "Item"
+                  ],
+                  "uuid": "111189bc-8535-4448-903e-854af460a233",
+                  "@id": "/ontology-terms/EFO:0000322/",
+                  "principals_allowed": {
+                    "view": [
+                      "system.Everyone"
+                    ],
+                    "edit": [
+                      "group.admin"
+                    ]
+                  }
+                }
+              ],
+              "@type": [
+                "OntologyTerm",
+                "Item"
+              ],
+              "principals_allowed": {
+                "view": [
+                  "system.Everyone"
+                ],
+                "edit": [
+                  "group.admin"
+                ]
+              }
+            },
+            "organism": {
+              "@id": "/organisms/9606/",
+              "display_title": "H. sapiens",
+              "@type": [
+                "Organism",
+                "Item"
+              ],
+              "scientific_name": "Homo sapiens",
+              "name": "human",
+              "uuid": "7745b647-ff15-4ff3-9ced-b897d4e2983c",
+              "status": "released",
+              "principals_allowed": {
+                "view": [
+                  "system.Everyone"
+                ],
+                "edit": [
+                  "group.admin"
+                ]
+              }
+            },
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          }
+        ],
+        "modifications": [
+          {
+            "display_title": "Stable Transfection for MFG",
+            "uuid": "431106bc-8535-4448-903e-854af460b265",
+            "status": "in review by lab",
+            "@type": [
+              "Modification",
+              "Item"
+            ],
+            "modification_type": "Stable Transfection",
+            "modification_name": "Stable Transfection for MFG",
+            "@id": "/modifications/431106bc-8535-4448-903e-854af460b265/",
+            "target_of_mod": [
+              {
+                "preferred_label": "MFG",
+                "@id": "/bio-features/a8ab8bca-4840-41b7-88d7-04cc19a54657/",
+                "feature_type": {
+                  "@id": "/ontology-terms/SO:0000704/",
+                  "uuid": "0231da78-1adc-4b8a-89b9-4f91908412a3",
+                  "display_title": "gene",
+                  "@type": [
+                    "OntologyTerm",
+                    "Item"
+                  ],
+                  "status": "released",
+                  "principals_allowed": {
+                    "view": [
+                      "system.Everyone"
+                    ],
+                    "edit": [
+                      "group.admin"
+                    ]
+                  }
+                },
+                "genome_location": [
+                  {
+                    "@type": [
+                      "GenomicRegion",
+                      "Item"
+                    ],
+                    "display_title": "GRCh38:1:1-1000000",
+                    "@id": "/genomic-regions/d1115d5e-40aa-43bc-b81c-32c70c9afb01/",
+                    "status": "in review by lab",
+                    "uuid": "d1115d5e-40aa-43bc-b81c-32c70c9afb01",
+                    "principals_allowed": {
+                      "view": [
+                        "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                        "group.admin",
+                        "group.read-only-admin",
+                        "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                        "remoteuser.EMBED",
+                        "remoteuser.INDEXER"
+                      ],
+                      "edit": [
+                        "group.admin",
+                        "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                      ]
+                    }
+                  }
+                ],
+                "@type": [
+                  "BioFeature",
+                  "Item"
+                ],
+                "display_title": "MFG",
+                "relevant_genes": [
+                  {
+                    "display_title": "CTCF",
+                    "status": "in review by lab",
+                    "@id": "/genes/10664/",
+                    "@type": [
+                      "Gene",
+                      "Item"
+                    ],
+                    "uuid": "3f3496f7-31bf-429f-8da7-7f1fdf840dcc",
+                    "principals_allowed": {
+                      "view": [
+                        "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                        "group.admin",
+                        "group.read-only-admin",
+                        "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                        "remoteuser.EMBED",
+                        "remoteuser.INDEXER"
+                      ],
+                      "edit": [
+                        "group.admin",
+                        "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                      ]
+                    }
+                  }
+                ],
+                "uuid": "a8ab8bca-4840-41b7-88d7-04cc19a54657",
+                "status": "in review by lab",
+                "organism_name": "human",
+                "principals_allowed": {
+                  "view": [
+                    "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                    "group.admin",
+                    "group.read-only-admin",
+                    "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                    "remoteuser.EMBED",
+                    "remoteuser.INDEXER"
+                  ],
+                  "edit": [
+                    "group.admin",
+                    "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                  ]
+                }
+              }
+            ],
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          {
+            "display_title": "Other",
+            "uuid": "431106bc-8535-4448-903e-854af460b276",
+            "status": "in review by lab",
+            "@type": [
+              "Modification",
+              "Item"
+            ],
+            "modification_type": "Other",
+            "modification_name": "Other",
+            "@id": "/modifications/431106bc-8535-4448-903e-854af460b276/",
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          }
+        ],
+        "cell_culture_details": [
+          {
+            "uuid": "131112bc-8535-4448-903e-854af460b212",
+            "@id": "/biosample-cell-cultures/131112bc-8535-4448-903e-854af460b212/",
+            "status": "in review by lab",
+            "@type": [
+              "BiosampleCellCulture",
+              "Item"
+            ],
+            "display_title": "BiosampleCellCulture from 2022-04-19",
+            "in_vitro_differentiated": "No",
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          }
+        ],
+        "treatments": [
+          {
+            "description": "RNAi treatment for rS3",
+            "status": "in review by lab",
+            "@type": [
+              "TreatmentRnai",
+              "Treatment",
+              "Item"
+            ],
+            "treatment_type": "RNAi",
+            "uuid": "686b362f-4eb6-4a9c-8173-3ab267307e3b",
+            "@id": "/treatments-rnai/686b362f-4eb6-4a9c-8173-3ab267307e3b/",
+            "display_title": "siRNA of MFG",
+            "constructs": [
+              {
+                "status": "in review by lab",
+                "name": "GFP_Construct",
+                "display_title": "GFP_Construct",
+                "@type": [
+                  "Construct",
+                  "Item"
+                ],
+                "@id": "/constructs/131106bc-8535-4448-903e-854af460b211/",
+                "uuid": "131106bc-8535-4448-903e-854af460b211",
+                "principals_allowed": {
+                  "view": [
+                    "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                    "group.admin",
+                    "group.read-only-admin",
+                    "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                    "remoteuser.EMBED",
+                    "remoteuser.INDEXER"
+                  ],
+                  "edit": [
+                    "group.admin",
+                    "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                  ]
+                }
+              }
+            ],
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          {
+            "description": "RNAi treatment for rS5",
+            "status": "in review by lab",
+            "@type": [
+              "TreatmentRnai",
+              "Treatment",
+              "Item"
+            ],
+            "treatment_type": "RNAi",
+            "uuid": "686b362f-4eb6-4a9c-8173-3ab267307a8d",
+            "@id": "/treatments-rnai/686b362f-4eb6-4a9c-8173-3ab267307a8d/",
+            "display_title": "shRNA of MFG",
+            "constructs": [
+              {
+                "status": "in review by lab",
+                "name": "GFP_Construct",
+                "display_title": "GFP_Construct",
+                "@type": [
+                  "Construct",
+                  "Item"
+                ],
+                "@id": "/constructs/131106bc-8535-4448-903e-854af460b211/",
+                "uuid": "131106bc-8535-4448-903e-854af460b211",
+                "principals_allowed": {
+                  "view": [
+                    "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                    "group.admin",
+                    "group.read-only-admin",
+                    "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                    "remoteuser.EMBED",
+                    "remoteuser.INDEXER"
+                  ],
+                  "edit": [
+                    "group.admin",
+                    "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+                  ]
+                }
+              }
+            ],
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          }
+        ],
+        "principals_allowed": {
+          "view": [
+            "award.b0b9c607-f8b4-4f02-93f4-9895b461224b",
+            "group.admin",
+            "group.read-only-admin",
+            "lab.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988",
+            "remoteuser.EMBED",
+            "remoteuser.INDEXER"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b22-a94a-d2e3a36cc988"
+          ]
+        }
+      },
+      "processed_files": [
+        {
+          "file_type_detailed": "File (pairs)",
+          "@id": "/files-processed/4DNFIAAAAAA3/",
+          "href": "/files-processed/4DNFIAAAAAA3/@@download/4DNFIAAAAAA3.pairs.gz",
+          "file_format": {
+            "@id": "/file-formats/pairs/",
+            "status": "released",
+            "@type": [
+              "FileFormat",
+              "Item"
+            ],
+            "display_title": "pairs",
+            "uuid": "d13d06cf-218e-4f61-aaf0-91f226248b2c",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin"
+              ]
+            }
+          },
+          "file_classification": "processed file",
+          "accession": "4DNFIAAAAAA3",
+          "upload_key": "7f9eb396-5c1a-1112-aebf-28ea39d6a50f/4DNFIAAAAAA3.pairs.gz",
+          "@type": [
+            "FileProcessed",
+            "File",
+            "Item"
+          ],
+          "file_type": "File",
+          "status": "uploading",
+          "uuid": "7f9eb396-5c1a-1112-aebf-28ea39d6a50f",
+          "display_title": "4DNFIAAAAAA3.pairs.gz",
+          "extra_files": [
+            {
+              "file_size": 12345678,
+              "href": "/files-processed/4DNFIAAAAAA3/@@download/4DNFIAAAAAA3.pairs.gz.px2",
+              "md5sum": "6c2b2059745304918502d4ed2a863f59",
+              "file_format": {
+                "uuid": "d13d06cf-218e-4f61-aaf0-91f226348b2c",
+                "status": "released",
+                "@id": "/file-formats/pairs_px2/",
+                "display_title": "pairs_px2",
+                "@type": [
+                  "FileFormat",
+                  "Item"
+                ],
+                "file_format": "pairs_px2",
+                "principals_allowed": {
+                  "view": [
+                    "system.Everyone"
+                  ],
+                  "edit": [
+                    "group.admin"
+                  ]
+                }
+              }
+            }
+          ],
+          "lab": {
+            "display_title": "4DN DCIC, HMS",
+            "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "@id": "/labs/4dn-dcic-lab/",
+            "@type": [
+              "Lab",
+              "Item"
+            ],
+            "name": "4dn-dcic-lab",
+            "status": "current",
+            "principals_allowed": {
+              "view": [
+                "system.Everyone"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            }
+          },
+          "quality_metric": {
+            "uuid": "131106bc-8535-4448-903e-854abbbbbbbb",
+            "Total reads": 651962,
+            "status": "in review by lab",
+            "overall_quality_status": "PASS",
+            "url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIX4AIQHN/pairsqc_report.html",
+            "display_title": "QualityMetricPairsqc from 2022-04-19",
+            "@id": "/quality-metrics-pairsqc/131106bc-8535-4448-903e-854abbbbbbbb/",
+            "@type": [
+              "QualityMetricPairsqc",
+              "QualityMetric",
+              "Item"
+            ],
+            "principals_allowed": {
+              "view": [
+                "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+                "group.admin",
+                "group.read-only-admin",
+                "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+                "remoteuser.EMBED",
+                "remoteuser.INDEXER"
+              ],
+              "edit": [
+                "group.admin",
+                "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+              ]
+            },
+            "quality_metric_summary": [
+              {
+                "title": "Filtered Reads",
+                "value": "651962",
+                "numberType": "integer"
+              },
+              {
+                "title": "Cis reads (>20kb)",
+                "value": "42.397",
+                "tooltip": "Percent of filtered reads (=0.28m)",
+                "numberType": "percent"
+              },
+              {
+                "title": "Short cis reads",
+                "value": "33.9",
+                "tooltip": "Percent of filtered reads (=0.22m)",
+                "numberType": "percent"
+              },
+              {
+                "title": "Trans Reads",
+                "value": "23.703",
+                "tooltip": "Percent of filtered reads (=0.15m)",
+                "numberType": "percent"
+              }
+            ]
+          },
+          "last_modified": {
+            "date_modified": "2022-04-19T21:51:19.684529+00:00"
+          },
+          "external_references": [],
+          "track_and_facet_info": {
+            "experiment_type": "Dataset",
+            "assay_info": "Assay",
+            "biosource_name": "Biosource",
+            "experimental_lab": "4DN Testing Lab",
+            "experiment_bucket": "processed file",
+            "dataset": "X et al. HiC - ligation volumes",
+            "condition": "Control",
+            "replicate_info": "Biorep 2, Techrep 1",
+            "lab_name": "4DN DCIC, HMS"
+          },
+          "principals_allowed": {
+            "view": [
+              "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+              "group.admin",
+              "group.read-only-admin",
+              "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+              "remoteuser.EMBED",
+              "remoteuser.INDEXER"
+            ],
+            "edit": [
+              "group.admin",
+              "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+            ]
+          }
+        }
+      ],
+      "digestion_enzyme": {
+        "name": "DNaseI",
+        "@id": "/enzymes/DNaseI/",
+        "uuid": "e646edb2-d4d5-405b-aab1-03e4754b0705",
+        "@type": [
+          "Enzyme",
+          "Item"
+        ],
+        "display_title": "DNaseI",
+        "status": "in review by lab",
+        "principals_allowed": {
+          "view": [
+            "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+            "group.admin",
+            "group.read-only-admin",
+            "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "remoteuser.EMBED",
+            "remoteuser.INDEXER"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+          ]
+        }
+      },
+      "experiment_type": {
+        "title": "Dilution Hi-C",
+        "display_title": "Dilution Hi-C",
+        "uuid": "b17b17cd-544a-3a3b-abc3-17a544544b3c",
+        "status": "in review by lab",
+        "@type": [
+          "ExperimentType",
+          "Item"
+        ],
+        "assay_subclass_short": "Hi-C",
+        "assay_subclassification": "DNA-DNA Pairwise Interactions",
+        "@id": "/experiment-types/dilution-hi-c/",
+        "other_tags": [
+          "DNA-DNA"
+        ],
+        "assay_classification": "3C via Ligation",
+        "experiment_category": "Sequencing",
+        "principals_allowed": {
+          "view": [
+            "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+            "group.admin",
+            "group.read-only-admin",
+            "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "remoteuser.EMBED",
+            "remoteuser.INDEXER"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+          ]
+        }
+      },
+      "experiment_categorizer": {
+        "field": "Enzyme",
+        "value": "DNaseI",
+        "combined": "Enzyme: DNaseI"
+      },
+      "external_references": [],
+      "principals_allowed": {
+        "view": [
+          "system.Everyone"
+        ],
+        "edit": [
+          "group.admin"
+        ]
+      },
+      "last_modified": {
+        "date_modified": "2022-04-19T21:51:23.926613+00:00"
+      }
+    }
+  ],
+  "experimentset_type": "replicate",
+  "@id": "/experiment-set-replicates/4DNESAAAAAA1/",
+  "@type": [
+    "ExperimentSetReplicate",
+    "ExperimentSet",
+    "Item"
+  ],
+  "uuid": "431106bc-8535-4448-903e-854af460b260",
+  "principals_allowed": {
+    "view": [
+      "system.Everyone"
+    ],
+    "edit": [
+      "group.admin"
+    ]
+  },
+  "display_title": "4DNESAAAAAA1",
+  "external_references": [],
+  "produced_in_pub": {
+    "authors": [
+      "ENCODE Project Consortium"
+    ],
+    "ID": "PMID:22955616",
+    "@id": "/publications/52e85c70-fe2d-11e3-9191-0800200c9a66/",
+    "date_published": "2012-09-06",
+    "@type": [
+      "Publication",
+      "Item"
+    ],
+    "status": "current",
+    "url": "https://www.ncbi.nlm.nih.gov/pubmed/22955616",
+    "abstract": "The human genome encodes the blueprint of life, but the function of the vast majority of its nearly three billion bases is unknown. The Encyclopedia of DNA Elements (ENCODE) project has systematically mapped regions of transcription, transcription factor association, chromatin structure and histone modification. These data enabled us to assign biochemical functions for 80% of the genome, in particular outside of the well-studied protein-coding regions. Many discovered candidate regulatory elements are physically associated with one another and with expressed genes, providing new insights into the mechanisms of gene regulation. The newly identified elements also show a statistical correspondence to sequence  variants linked to human disease, and can thereby guide interpretation of this variation. Overall, the project provides new insights into the organization and regulation of our genes and genome, and is an expansive resource of functional annotations for biomedical research.",
+    "display_title": "ENCODE Project Consortium (2012) PMID:22955616",
+    "short_attribution": "ENCODE Project Consortium (2012)",
+    "journal": "Nature",
+    "title": "An integrated encyclopedia of DNA elements in the human genome.",
+    "uuid": "52e85c70-fe2d-11e3-9191-0800200c9a66",
+    "principals_allowed": {
+      "view": [
+        "system.Everyone"
+      ],
+      "edit": [
+        "group.admin"
+      ]
+    }
+  },
+  "pubs_using": [],
+  "publications_of_set": [
+    {
+      "@id": "/publications/52e85c70-fe2d-11e3-9191-0800200c9a66/",
+      "title": "An integrated encyclopedia of DNA elements in the human genome.",
+      "status": "current",
+      "abstract": "The human genome encodes the blueprint of life, but the function of the vast majority of its nearly three billion bases is unknown. The Encyclopedia of DNA Elements (ENCODE) project has systematically mapped regions of transcription, transcription factor association, chromatin structure and histone modification. These data enabled us to assign biochemical functions for 80% of the genome, in particular outside of the well-studied protein-coding regions. Many discovered candidate regulatory elements are physically associated with one another and with expressed genes, providing new insights into the mechanisms of gene regulation. The newly identified elements also show a statistical correspondence to sequence  variants linked to human disease, and can thereby guide interpretation of this variation. Overall, the project provides new insights into the organization and regulation of our genes and genome, and is an expansive resource of functional annotations for biomedical research.",
+      "ID": "PMID:22955616",
+      "authors": [
+        "ENCODE Project Consortium"
+      ],
+      "journal": "Nature",
+      "uuid": "52e85c70-fe2d-11e3-9191-0800200c9a66",
+      "display_title": "ENCODE Project Consortium (2012) PMID:22955616",
+      "@type": [
+        "Publication",
+        "Item"
+      ],
+      "date_published": "2012-09-06",
+      "principals_allowed": {
+        "view": [
+          "system.Everyone"
+        ],
+        "edit": [
+          "group.admin"
+        ]
+      }
+    }
+  ],
+  "number_of_experiments": 3,
+  "@context": "/terms/",
+  "actions": [
+    {
+      "name": "create",
+      "title": "Create",
+      "profile": "/profiles/ExperimentSetReplicate.json",
+      "href": "/experiment-set-replicates/4DNESAAAAAA1/?currentAction=create"
+    },
+    {
+      "name": "edit",
+      "title": "Edit",
+      "profile": "/profiles/ExperimentSetReplicate.json",
+      "href": "/experiment-set-replicates/4DNESAAAAAA1/?currentAction=edit"
+    }
+  ],
+  "aggregated-items": {
+    "badges": [
+      {
+        "parent": "/biosamples/4DNBS1234567/",
+        "embedded_path": "experiments_in_set.biosample.badges",
+        "item": {
+          "messages": [
+            "Biosample is missing a morphology image",
+            "Biosample is missing culture duration",
+            "Biosample is missing passage number"
+          ],
+          "badge": {
+            "commendation": null,
+            "warning": "Tier1 Metadata Missing",
+            "uuid": "e39777c6-8fe4-4424-bac1-40406342e026",
+            "@id": "/badges/tier1-metadata-missing/",
+            "badge_icon": "/static/img/badges/biosample-orange-circle.svg",
+            "description": "Tier 1 biosample missing required metadata"
+          }
+        }
+      }
+    ]
+  },
+  "validation-errors": []
+}
