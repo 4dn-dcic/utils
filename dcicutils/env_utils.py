@@ -109,16 +109,19 @@ FF_PUBLIC_URLS = {
     'data': FF_PUBLIC_URL_PRD,
 }
 
-CGAP_PUBLIC_URL_STG = 'https://staging.cgap.hms.harvard.edu'  # This is a stopgap for testing and may have to change
-CGAP_PUBLIC_URL_PRD = 'https://cgap.hms.harvard.edu'
-CGAP_PUBLIC_DOMAIN_PRD = 'cgap.hms.harvard.edu'
-CGAP_PRODUCTION_IDENTIFIER = 'cgap'
+# These names are recently changed but are only used internally to this repo. I did a github-wide search.
+_CGAP_MGB_PUBLIC_URL_STG = 'https://staging.cgap-mgb.hms.harvard.edu'  # This is a stopgap for testing and may have to change
+_CGAP_MGB_PUBLIC_URL_PRD = 'https://cgap-mgb.hms.harvard.edu'
+_CGAP_MGB_PUBLIC_DOMAIN_PRD = 'cgap.hms.harvard.edu'
+_CGAP_MGB_PRODUCTION_IDENTIFIER = 'cgap'
 
+# This table exists to keep legacy use of names that help through blue/green deployments on Fourfront, and that
+# left us room (that might one day be needed) for the option of such deployments on CGAP, too. -kmp 26-Apr-2022
 CGAP_PUBLIC_URLS = {
-    'cgap': CGAP_PUBLIC_URL_PRD,
-    'fourfront-cgap': CGAP_PUBLIC_URL_PRD,
-    'data': CGAP_PUBLIC_URL_PRD,
-    'staging': CGAP_PUBLIC_URL_STG,
+    'cgap': _CGAP_MGB_PUBLIC_URL_PRD,
+    'fourfront-cgap': _CGAP_MGB_PUBLIC_URL_PRD,
+    'data': _CGAP_MGB_PUBLIC_URL_PRD,
+    'staging': _CGAP_MGB_PUBLIC_URL_STG,
 }
 
 BEANSTALK_PROD_BUCKET_ENVS = {
@@ -307,7 +310,7 @@ def public_url_for_app(appname: Optional[OrchestratedApp] = None):
     if appname is None:
         appname = 'fourfront'
     return _orchestrated_app_case(orchestrated_app=appname,
-                                  if_cgap=CGAP_PUBLIC_URL_PRD,
+                                  if_cgap=_CGAP_MGB_PUBLIC_URL_PRD,
                                   if_fourfront=FF_PUBLIC_URL_PRD)
 
 

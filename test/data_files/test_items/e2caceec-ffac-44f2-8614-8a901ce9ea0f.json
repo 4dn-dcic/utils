@@ -1,0 +1,290 @@
+{
+  "lab": {
+    "display_title": "4DN DCIC, HMS",
+    "title": "4DN DCIC, HMS",
+    "@id": "/labs/4dn-dcic-lab/",
+    "status": "current",
+    "uuid": "828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+    "@type": [
+      "Lab",
+      "Item"
+    ],
+    "correspondence": [
+      {
+        "contact_email": "YW5kcmV3X3NjaHJvZWRlckBobXMuaGFydmFyZC5lZHU=",
+        "@id": "/users/986b362f-4eb6-4a9c-8173-3ab267227777/",
+        "display_title": "Andy Schroeder"
+      },
+      {
+        "contact_email": "YW5kcmVhX2Nvc29sb0BobXMuaGFydmFyZC5lZHU=",
+        "@id": "/users/e4a22298-1da4-4e59-8a65-9e661f47fb48/",
+        "display_title": "Andrea Cosolo"
+      },
+      {
+        "contact_email": "c2FyYWhfcmVpZmZAaG1zLmhhcnZhcmQuZWR1",
+        "@id": "/users/e2324f87-0625-4bbc-803b-d47677aebe08/",
+        "display_title": "Sarah Reiff"
+      }
+    ],
+    "pi": {
+      "uuid": "986b362f-4eb6-4a9c-8173-3ab267307e3a",
+      "status": "current",
+      "@type": [
+        "User",
+        "Item"
+      ],
+      "email": "4dndcic@gmail.com",
+      "@id": "/users/986b362f-4eb6-4a9c-8173-3ab267307e3a/",
+      "contact_email": "4dndcic@gmail.com",
+      "display_title": "4dn DCIC",
+      "last_name": "DCIC",
+      "first_name": "4dn",
+      "principals_allowed": {
+        "view": [
+          "group.admin",
+          "group.read-only-admin",
+          "remoteuser.EMBED",
+          "remoteuser.INDEXER",
+          "userid.986b362f-4eb6-4a9c-8173-3ab267307e3a"
+        ],
+        "edit": [
+          "group.admin",
+          "userid.986b362f-4eb6-4a9c-8173-3ab267307e3a"
+        ]
+      }
+    },
+    "principals_allowed": {
+      "view": [
+        "system.Everyone"
+      ],
+      "edit": [
+        "group.admin",
+        "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+      ]
+    }
+  },
+  "award": {
+    "description": "DCIC: The goals of the 4D Nucleome (4DN) Data Coordination and Integration Center (DCIC) are to collect, store, curate, display, and analyze data generated in the 4DN Network. We have assembled a team of investigators with a strong track record in analysis of chromatin interaction data, image processing and three-dimensional data visualization, integrative analysis of genomic and epigenomic data, data portal development, large-scale computing, and development of secure and flexible cloud technologies. In Aim 1, we will develop efficient submission pipelines for data and metadata from 4DN data production groups. We will define data/metadata requirements and quality metrics in conjunction with the production groups and ensure that high-quality, well- annotated data become available to the wider scientific community in a timely manner. In Aim 2, we will develop a user-friendly data portal for the broad scientific community. This portal will provide an easy-to-navigate interface for accessing raw and intermediate data files, allow for programmatic access via APIs, and will incorporate novel analysis and visualization tools developed by DCIC as well as other Network members. For computing and storage scalability and cost-effectiveness, significant efforts will be devoted to development and deployment of cloud-based technology. We will conduct tutorials and workshops to facilitate the use of 4DN data and tools by external investigators. In Aim 3, we will coordinate and assist in conducting integrative analysis of the multiple data types. These efforts will examine key questions in higher-order chromatin organization using both sequence and image data, and the tools and algorithms developed here will be incorporated into the data portal for use by other investigators. These three aims will ensure that the data generated in 4DN will have maximal impact for the scientific community.",
+    "@type": [
+      "Award",
+      "Item"
+    ],
+    "status": "current",
+    "display_title": "4D NUCLEOME NETWORK DATA COORDINATION AND INTEGRATION CENTER",
+    "@id": "/awards/1U01CA200059-01/",
+    "center_title": "DCIC - DCIC",
+    "uuid": "b0b9c607-f8b4-4f02-93f4-9895b461334b",
+    "project": "4DN",
+    "name": "1U01CA200059-01",
+    "pi": {
+      "status": "current",
+      "last_name": "DCIC",
+      "@id": "/users/986b362f-4eb6-4a9c-8173-3ab267307e3a/",
+      "@type": [
+        "User",
+        "Item"
+      ],
+      "display_title": "4dn DCIC",
+      "uuid": "986b362f-4eb6-4a9c-8173-3ab267307e3a",
+      "principals_allowed": {
+        "view": [
+          "group.admin",
+          "group.read-only-admin",
+          "remoteuser.EMBED",
+          "remoteuser.INDEXER",
+          "userid.986b362f-4eb6-4a9c-8173-3ab267307e3a"
+        ],
+        "edit": [
+          "group.admin",
+          "userid.986b362f-4eb6-4a9c-8173-3ab267307e3a"
+        ]
+      }
+    },
+    "principals_allowed": {
+      "view": [
+        "system.Everyone"
+      ],
+      "edit": [
+        "group.admin"
+      ]
+    }
+  },
+  "status": "in review by lab",
+  "qc_list": [
+    {
+      "value": {
+        "@id": "/quality-metrics-fastqc/131106bc-8535-4448-903e-854af460b000/",
+        "display_title": "QualityMetricFastqc from 2022-04-19",
+        "status": "in review by lab",
+        "@type": [
+          "QualityMetricFastqc",
+          "QualityMetric",
+          "Item"
+        ],
+        "uuid": "131106bc-8535-4448-903e-854af460b000",
+        "principals_allowed": {
+          "view": [
+            "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+            "group.admin",
+            "group.read-only-admin",
+            "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "remoteuser.EMBED",
+            "remoteuser.INDEXER"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+          ]
+        }
+      },
+      "qc_type": "quality_metric_fastqc"
+    },
+    {
+      "value": {
+        "@id": "/quality-metrics-pairsqc/131106bc-8535-4448-903e-854abbbbbbbb/",
+        "display_title": "QualityMetricPairsqc from 2022-04-19",
+        "status": "in review by lab",
+        "@type": [
+          "QualityMetricPairsqc",
+          "QualityMetric",
+          "Item"
+        ],
+        "uuid": "131106bc-8535-4448-903e-854abbbbbbbb",
+        "principals_allowed": {
+          "view": [
+            "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+            "group.admin",
+            "group.read-only-admin",
+            "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+            "remoteuser.EMBED",
+            "remoteuser.INDEXER"
+          ],
+          "edit": [
+            "group.admin",
+            "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+          ]
+        },
+        "quality_metric_summary": [
+          {
+            "title": "Filtered Reads",
+            "value": "651962",
+            "numberType": "integer"
+          },
+          {
+            "title": "Cis reads (>20kb)",
+            "value": "42.397",
+            "tooltip": "Percent of filtered reads (=0.28m)",
+            "numberType": "percent"
+          },
+          {
+            "title": "Short cis reads",
+            "value": "33.9",
+            "tooltip": "Percent of filtered reads (=0.22m)",
+            "numberType": "percent"
+          },
+          {
+            "title": "Trans Reads",
+            "value": "23.703",
+            "tooltip": "Percent of filtered reads (=0.15m)",
+            "numberType": "percent"
+          }
+        ]
+      },
+      "qc_type": "quality_metric_pairsqc"
+    }
+  ],
+  "date_created": "2022-04-19T21:49:27.650253+00:00",
+  "last_modified": {
+    "modified_by": {
+      "uuid": "3202fd57-44d2-44fb-a131-afb1e43d8ae5",
+      "display_title": "loadxl loadxl",
+      "@id": "/users/3202fd57-44d2-44fb-a131-afb1e43d8ae5/",
+      "@type": [
+        "User",
+        "Item"
+      ],
+      "status": "current",
+      "principals_allowed": {
+        "view": [
+          "group.admin",
+          "group.read-only-admin",
+          "remoteuser.EMBED",
+          "remoteuser.INDEXER",
+          "userid.3202fd57-44d2-44fb-a131-afb1e43d8ae5"
+        ],
+        "edit": [
+          "group.admin",
+          "userid.3202fd57-44d2-44fb-a131-afb1e43d8ae5"
+        ]
+      }
+    },
+    "date_modified": "2022-04-19T21:51:03.223598+00:00"
+  },
+  "schema_version": "1",
+  "overall_quality_status": "PASS",
+  "@id": "/quality-metrics-qclist/e2caceec-ffac-44f2-8614-8a901ce9ea0f/",
+  "@type": [
+    "QualityMetricQclist",
+    "QualityMetric",
+    "Item"
+  ],
+  "uuid": "e2caceec-ffac-44f2-8614-8a901ce9ea0f",
+  "principals_allowed": {
+    "view": [
+      "award.b0b9c607-f8b4-4f02-93f4-9895b461334b",
+      "group.admin",
+      "group.read-only-admin",
+      "lab.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989",
+      "remoteuser.EMBED",
+      "remoteuser.INDEXER"
+    ],
+    "edit": [
+      "group.admin",
+      "submits_for.828cd4fe-ebb0-4b36-a94a-d2e3a36cc989"
+    ]
+  },
+  "display_title": "QualityMetricQclist from 2022-04-19",
+  "external_references": [],
+  "quality_metric_summary": [
+    {
+      "title": "Filtered Reads",
+      "value": "651962",
+      "numberType": "integer"
+    },
+    {
+      "title": "Cis reads (>20kb)",
+      "value": "42.397",
+      "tooltip": "Percent of filtered reads (=0.28m)",
+      "numberType": "percent"
+    },
+    {
+      "title": "Short cis reads",
+      "value": "33.9",
+      "tooltip": "Percent of filtered reads (=0.22m)",
+      "numberType": "percent"
+    },
+    {
+      "title": "Trans Reads",
+      "value": "23.703",
+      "tooltip": "Percent of filtered reads (=0.15m)",
+      "numberType": "percent"
+    }
+  ],
+  "@context": "/terms/",
+  "actions": [
+    {
+      "name": "create",
+      "title": "Create",
+      "profile": "/profiles/QualityMetricQclist.json",
+      "href": "/quality-metrics-qclist/e2caceec-ffac-44f2-8614-8a901ce9ea0f/?currentAction=create"
+    },
+    {
+      "name": "edit",
+      "title": "Edit",
+      "profile": "/profiles/QualityMetricQclist.json",
+      "href": "/quality-metrics-qclist/e2caceec-ffac-44f2-8614-8a901ce9ea0f/?currentAction=edit"
+    }
+  ],
+  "aggregated-items": {},
+  "validation-errors": []
+}

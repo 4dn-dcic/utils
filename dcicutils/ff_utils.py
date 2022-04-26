@@ -518,7 +518,7 @@ def fetch_files_qc_metrics(data, associated_files=None,
                            ignore_typical_fields=True,
                            key=None, ff_env=None):
     """
-    Utility function to grap all the qc metrics from associated types of file such as:
+    Utility function to grab all the qc metrics from associated types of file such as:
     'proccessed_files', 'other_processed_files', 'files'
     Args:
         data: the metadata of a ExperimentSet or Experiment
@@ -559,7 +559,8 @@ def fetch_files_qc_metrics(data, associated_files=None,
                 if entry.get('quality_metric'):
                     # check if it is a list of qc metrics
                     if entry['quality_metric']['display_title'].startswith('QualityMetricQclist'):
-                        qc_metric_list = get_metadata(entry['quality_metric']['uuid'], key=key, ff_env=ff_env)
+                        qc_metric_list_uuid = entry['quality_metric']['uuid']
+                        qc_metric_list = get_metadata(qc_metric_list_uuid, key=key, ff_env=ff_env)
                         if not qc_metric_list.get('qc_list'):
                             continue
                         for qc in qc_metric_list['qc_list']:
@@ -658,7 +659,8 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
 
     # If it is an experimentset, get qc_metrics for the experiments in the experiment set
     if resp.get('experiments_in_set'):
-        organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['individual']['organism']['name']
+        organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['organism']['name']
+        # organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['individual']['organism']['name']
         experiment_type = resp['experiments_in_set'][0]['experiment_type']['display_title']
         experiment_subclass = resp['experiments_in_set'][0]['experiment_type']['assay_subclass_short']
         biosource_summary = resp['experiments_in_set'][0]['biosample']['biosource_summary']
