@@ -110,7 +110,7 @@ FF_PUBLIC_URLS = {
 }
 
 # These names are recently changed but are only used internally to this repo. I did a github-wide search.
-_CGAP_MGB_PUBLIC_URL_STG = 'https://staging.cgap-mgb.hms.harvard.edu'  # This is a stopgap for testing and may have to change
+_CGAP_MGB_PUBLIC_URL_STG = 'https://staging.cgap-mgb.hms.harvard.edu'  # A stopgap for testing that may have to change
 _CGAP_MGB_PUBLIC_URL_PRD = 'https://cgap-mgb.hms.harvard.edu'
 _CGAP_MGB_PUBLIC_DOMAIN_PRD = 'cgap.hms.harvard.edu'
 _CGAP_MGB_PRODUCTION_IDENTIFIER = 'cgap'

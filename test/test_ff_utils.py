@@ -98,6 +98,7 @@ def profiles():
 
 _DATA_DIR = os.path.join(os.path.dirname(__file__), 'data_files')
 
+
 @pytest.fixture
 def mocked_replicate_experiment():
     with open(os.path.join(_DATA_DIR, 'test_items/431106bc-8535-4448-903e-854af460b260.json')) as opf:
@@ -414,7 +415,8 @@ def test_stuff_in_queues_unit():
     class MockBotoSQSClientErring(MockBotoSQSClient):
         def compute_mock_queue_attribute(self, QueueUrl, Attribute):  # noQA - Amazon AWS chose the argument names
             print("Simulating a boto3 error.")
-            raise ClientError(500, "get_queue_attributes")
+            raise ClientError({"Error": {"Code": 500, "Message": "Simulated Boto3 Error"}},  # noQA
+                              "get_queue_attributes")
 
     # If there is difficulty getting to the queue, it behaves as if there's stuff in the queue.
     with mock.patch.object(ff_utils, "boto3", MockBoto3(sqs=MockBotoSQSClientErring)):
@@ -1388,7 +1390,7 @@ def test_fetch_qc_metrics_logic(mocked_replicate_experiment):
         #    "uuid": "7a2d8f3d-2108-4b81-a09e-fdcf622a0392",
         #    "display_title": "QualityMetricPairsqc from 2018-04-27"
         # }
-        result = ff_utils.fetch_files_qc_metrics(get_mocked_result(kind="metadata", dir="test_items",
+        result = ff_utils.fetch_files_qc_metrics(get_mocked_result(kind="metadata", dirname="test_items",
                                                                    uuid="331106bc-8535-3338-903e-854af460b544",
                                                                    ignored_kwargs={}),
                                                  associated_files=['other_processed_files'],
@@ -1398,11 +1400,11 @@ def test_fetch_qc_metrics_logic(mocked_replicate_experiment):
 
 
 def mocked_get_metadata_from_data_files(uuid, **kwargs):
-    return get_mocked_result(kind='mocked metadata', dir='test_items', uuid=uuid, ignored_kwargs=kwargs)
+    return get_mocked_result(kind='mocked metadata', dirname='test_items', uuid=uuid, ignored_kwargs=kwargs)
 
 
-def get_mocked_result(*, kind, dir, uuid, ignored_kwargs):
-    data_file = os.path.join(_DATA_DIR, dir, uuid + '.json')
+def get_mocked_result(*, kind, dirname, uuid, ignored_kwargs=None):
+    data_file = os.path.join(_DATA_DIR, dirname, uuid + '.json')
     print(f"Getting {kind} for {uuid} ignoring kwargs={ignored_kwargs} from {data_file}")
     with open(data_file, 'r') as fp:
         return json.load(fp)
@@ -1419,7 +1421,9 @@ def test_get_qc_metrics_logic():  # mocked_replicate_experiment
         input_uuid = "431106bc-8535-4448-903e-854af460b260"
         result = ff_utils.get_associated_qc_metrics(input_uuid)
         assert "131106bc-8535-4448-903e-854abbbbbbbb" in result  # quick pre-test
-        assert result == get_mocked_result(kind='QC metrics', dir='test_qc_metrics', uuid=input_uuid, ignored_kwargs={})
+        assert result == get_mocked_result(kind='QC metrics',
+                                           dirname='test_qc_metrics',
+                                           uuid=input_uuid)
 
 
 @pytest.mark.integrated
