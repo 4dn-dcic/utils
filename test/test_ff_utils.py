@@ -1388,8 +1388,10 @@ def test_fetch_qc_metrics_logic(mocked_replicate_experiment):
         #    "uuid": "7a2d8f3d-2108-4b81-a09e-fdcf622a0392",
         #    "display_title": "QualityMetricPairsqc from 2018-04-27"
         # }
-        result = ff_utils.fetch_files_qc_metrics(get_mocked_result(kind="metadata", dir="test_items", uuid="331106bc-8535-3338-903e-854af460b544",
-                                                                   ignored_kwargs={}), associated_files=['other_processed_files'],
+        result = ff_utils.fetch_files_qc_metrics(get_mocked_result(kind="metadata", dir="test_items",
+                                                                   uuid="331106bc-8535-3338-903e-854af460b544",
+                                                                   ignored_kwargs={}),
+                                                 associated_files=['other_processed_files'],
                                                  ignore_typical_fields=False)
         assert '131106bc-8535-4448-903e-854af460b000' in result
         assert '131106bc-8535-4448-903e-854abbbbbbbb' in result

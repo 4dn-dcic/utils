@@ -8,7 +8,7 @@ from dcicutils import base, env_utils, compute_prd_env_for_env
 from dcicutils.env_utils import (
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env,
     FF_ENV_PRODUCTION_GREEN, FF_ENV_PRODUCTION_BLUE,
-    CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_WEBPROD,
+    CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_WEBPROD, _CGAP_MGB_PUBLIC_URL_PRD,
 )
 from dcicutils.exceptions import NotBeanstalkEnvironment
 from dcicutils.qa_utils import mock_not_called
@@ -74,7 +74,7 @@ def test_get_beanstalk_real_url_cgap():
             mock_compute_prd_env_for_project.return_value = 'fourfront-cgap'
             mock_beanstalk_info.side_effect = _mocked_beanstalk_info
             url = base.get_beanstalk_real_url('fourfront-cgap')
-            assert url == 'https://cgap.hms.harvard.edu'
+            assert url == 'https://cgap-mgb.hms.harvard.edu' == _CGAP_MGB_PUBLIC_URL_PRD
 
 
 def _ip_addresses(hostname):
