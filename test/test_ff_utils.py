@@ -1386,10 +1386,6 @@ def test_fetch_qc_metrics_logic(mocked_replicate_experiment):
     """
     with mock.patch("dcicutils.ff_utils.get_metadata") as mock_get_metadata:
         mock_get_metadata.side_effect = mocked_get_metadata_from_data_files
-        # mock_get_metadata.return_value = {
-        #    "uuid": "7a2d8f3d-2108-4b81-a09e-fdcf622a0392",
-        #    "display_title": "QualityMetricPairsqc from 2018-04-27"
-        # }
         result = ff_utils.fetch_files_qc_metrics(get_mocked_result(kind="metadata", dirname="test_items",
                                                                    uuid="331106bc-8535-3338-903e-854af460b544",
                                                                    ignored_kwargs={}),
@@ -1400,7 +1396,11 @@ def test_fetch_qc_metrics_logic(mocked_replicate_experiment):
 
 
 def mocked_get_metadata_from_data_files(uuid, **kwargs):
-    return get_mocked_result(kind='mocked metadata', dirname='test_items', uuid=uuid, ignored_kwargs=kwargs)
+    result = get_mocked_result(kind='mocked metadata', dirname='test_items', uuid=uuid, ignored_kwargs=kwargs)
+    # Guard against bad mocks.
+    assert 'uuid' in result, f"The result of a mocked get_metadata call for {uuid} has no 'uuid' key."
+    assert result['uuid'] == uuid, f"Result of a mocked get_metadata({uuid!r}) call has wrong uuid {result['uuid']!r}."
+    return result
 
 
 def get_mocked_result(*, kind, dirname, uuid, ignored_kwargs=None):
@@ -1410,7 +1410,7 @@ def get_mocked_result(*, kind, dirname, uuid, ignored_kwargs=None):
         return json.load(fp)
 
 
-def test_get_qc_metrics_logic():  # mocked_replicate_experiment
+def test_get_qc_metrics_logic():
     """
     End to end test on 'get_associated_qc_metrics' to check the logic of the fuction to make sure
     it is getting the qc metrics.
