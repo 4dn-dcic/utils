@@ -1380,19 +1380,33 @@ def test_faceted_search_users(integrated_ff):
     assert len(resp) == 10
 
 
-def test_fetch_qc_metrics_logic(mocked_replicate_experiment):
+@pytest.mark.unit
+def test_fetch_qc_metrics_logic_unit(mocked_replicate_experiment):
     """
     Tests that the fetch_qc_metrics function is being used correctly inside the get_associated_qc_metrics function
     """
     with mock.patch("dcicutils.ff_utils.get_metadata") as mock_get_metadata:
         mock_get_metadata.side_effect = mocked_get_metadata_from_data_files
-        result = ff_utils.fetch_files_qc_metrics(get_mocked_result(kind="metadata", dirname="test_items",
-                                                                   uuid="331106bc-8535-3338-903e-854af460b544",
-                                                                   ignored_kwargs={}),
-                                                 associated_files=['other_processed_files'],
-                                                 ignore_typical_fields=False)
+        result = ff_utils.fetch_files_qc_metrics(
+            mocked_get_metadata_from_data_files("331106bc-8535-3338-903e-854af460b544"),
+            associated_files=['other_processed_files'],
+            ignore_typical_fields=False)
         assert '131106bc-8535-4448-903e-854af460b000' in result
         assert '131106bc-8535-4448-903e-854abbbbbbbb' in result
+
+
+@pytest.mark.integratedx
+def test_fetch_qc_metrics_logic_integrated(mocked_replicate_experiment):
+    """
+    Tests that the fetch_qc_metrics function is being used correctly inside the get_associated_qc_metrics function
+    """
+    result = ff_utils.fetch_files_qc_metrics(
+        ff_utils.get_metadata("331106bc-8535-3338-903e-854af460b544", ff_env='fourfront-mastertest'),
+        ff_env='fourfront-mastertest',
+        associated_files=['other_processed_files'],
+        ignore_typical_fields=False)
+    assert '131106bc-8535-4448-903e-854af460b000' in result
+    assert '131106bc-8535-4448-903e-854abbbbbbbb' in result
 
 
 def mocked_get_metadata_from_data_files(uuid, **kwargs):
@@ -1410,7 +1424,8 @@ def get_mocked_result(*, kind, dirname, uuid, ignored_kwargs=None):
         return json.load(fp)
 
 
-def test_get_qc_metrics_logic():
+@pytest.mark.unit
+def test_get_qc_metrics_logic_unit():
     """
     End to end test on 'get_associated_qc_metrics' to check the logic of the fuction to make sure
     it is getting the qc metrics.
