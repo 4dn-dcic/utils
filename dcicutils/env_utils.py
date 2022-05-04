@@ -487,16 +487,31 @@ def has_declared_stg_env(project: OrchestratedApp) -> bool:
     return True if EnvUtils.STG_ENV_NAME else False
 
 
+# We could inherit the beanstalk definition, but that would mean we can't recycle the envnames in a container account,
+# and there's really no reason not to allow that. -kmp 4-May-2022
+# @if_orchestrated(use_legacy=True)
+
+@if_orchestrated
+def is_beanstalk_env(envname):
+    """
+    Returns True if envname is one of the traditional/legacy beanstalk names, and False otherwise.
+
+    NOTE: The list of names is heled in _ALL_BEANSTALK_NAMES, but you MUST NOT reference that variable directly.
+          Always use this function.
+    """
+    ignored(envname)
+    return False
+
+
 @if_orchestrated
 def is_stg_or_prd_env(envname: Optional[EnvName]) -> bool:
-    # The legacy version does something much more elaborate that involves heuristics on names.
-    # Note, too, that in the legacy version, this would return true both of CGAP or Fourfront names,
-    # but really you're only supposed to call it on one or the other's environments. It's rarely the
-    # case that the same code would ever be implicating both.  So here we assume every orchestrated
-    # ecosystem is one or the other, and hence there is a canonical PRD_ENV_NAME and STG_ENV_NAME.
-    # -kmp 24-Jul-2021
-
-    if not isinstance(envname, str):
+    """
+    Returns True if the given envname is the name of something that might be either live data or something
+    that is ready to be swapped in as live.  So things like 'staging' and either of 'blue/green' will return
+    True whether or not they are actually the currently live instance. (This function doesn't change its
+    state as blue or green is deployed, in other words.)
+    """
+    if not envname:
         return False
     elif _is_raw_stg_or_prd_env(envname):
         return True

@@ -96,15 +96,18 @@ def profiles():
     }
 
 
+_DATA_DIR = os.path.join(os.path.dirname(__file__), 'data_files')
+
+
 @pytest.fixture
 def mocked_replicate_experiment():
-    with open('./test/data_files/test_experiment_set.json') as opf:
+    with open(os.path.join(_DATA_DIR, 'test_items/431106bc-8535-4448-903e-854af460b260.json')) as opf:
         return json.load(opf)
 
 
 @pytest.fixture
 def qc_metrics():
-    with open('./test/data_files/qc_metrics.json') as opf:
+    with open(os.path.join(_DATA_DIR, 'test_qc_metrics/431106bc-8535-4448-903e-854af460b260.json')) as opf:
         return json.load(opf)
 
 
@@ -316,13 +319,14 @@ def test_unified_authentication_prod_envs_integrated_only():
     blue_auth = ff_utils.unified_authentication(ff_env="fourfront-blue")
     assert blue_auth == ff_prod_auth
 
-    # CGAP prod
-    cgap_prod_auth = ff_utils.unified_authentication(ff_env="fourfront-cgap")
-    assert len(cgap_prod_auth) == 2
-
-    # Assure CGAP and Fourfront don't share auth
-    auth_is_shared = cgap_prod_auth == ff_prod_auth
-    assert not auth_is_shared
+    # Decommissioned
+    # # CGAP prod
+    # cgap_prod_auth = ff_utils.unified_authentication(ff_env="fourfront-cgap")
+    # assert len(cgap_prod_auth) == 2
+    #
+    # # Assure CGAP and Fourfront don't share auth
+    # auth_is_shared = cgap_prod_auth == ff_prod_auth
+    # assert not auth_is_shared
 
     with raises_regexp(ClientError, "does not exist"):
         # There is no such environment as 'fourfront-data'
@@ -411,7 +415,8 @@ def test_stuff_in_queues_unit():
     class MockBotoSQSClientErring(MockBotoSQSClient):
         def compute_mock_queue_attribute(self, QueueUrl, Attribute):  # noQA - Amazon AWS chose the argument names
             print("Simulating a boto3 error.")
-            raise ClientError(500, "get_queue_attributes")
+            raise ClientError({"Error": {"Code": 500, "Message": "Simulated Boto3 Error"}},  # noQA
+                              "get_queue_attributes")
 
     # If there is difficulty getting to the queue, it behaves as if there's stuff in the queue.
     with mock.patch.object(ff_utils, "boto3", MockBoto3(sqs=MockBotoSQSClientErring)):
@@ -592,6 +597,18 @@ def test_get_metadata_unit():
         error_message_json = {'message': 'foo'}
         mock_authorized_request.side_effect = make_mocked_authorized_request_erring(500, json=error_message_json)
         assert ff_utils.get_metadata(test_item, key=ts.bar_env_auth_dict, check_queue=False) == error_message_json
+
+
+def test_sls():
+    in_and_out = {
+        'my_id/': 'my_id/',
+        '/my_id/': 'my_id/',
+        '//my_id': 'my_id',
+        'my/id': 'my/id',
+        '/my/id': 'my/id',
+    }
+    for i, o in in_and_out.items():
+        assert ff_utils._sls(i) == o
 
 
 @pytest.mark.integratedx
@@ -1250,7 +1267,7 @@ def test_faceted_search_exp_set(integrated_ff):
     sample_type = {'Sample Type': 'immortalized cells'}
     sample_type.update(for_all)
     resp = ff_utils.faceted_search(**sample_type)
-    assert len(resp) == 13
+    assert len(resp) == 12
     sample_cat = {'Sample Category': 'In vitro Differentiation'}
     sample_cat.update(for_all)
     resp = ff_utils.faceted_search(**sample_cat)
@@ -1258,7 +1275,7 @@ def test_faceted_search_exp_set(integrated_ff):
     sample = {'Sample': 'GM12878'}
     sample.update(for_all)
     resp = ff_utils.faceted_search(**sample)
-    assert len(resp) == 13
+    assert len(resp) == 12
     tissue_src = {'Tissue Source': 'endoderm'}
     tissue_src.update(for_all)
     resp = ff_utils.faceted_search(**tissue_src)
@@ -1270,11 +1287,11 @@ def test_faceted_search_exp_set(integrated_ff):
     mods = {'Modifications': 'Stable Transfection'}
     mods.update(for_all)
     resp = ff_utils.faceted_search(**mods)
-    assert len(resp) == 7
+    assert len(resp) == 6
     treats = {'Treatments': 'RNAi'}
     treats.update(for_all)
     resp = ff_utils.faceted_search(**treats)
-    assert len(resp) == 7
+    assert len(resp) == 6
     assay_details = {'Assay Details': 'No value'}
     assay_details.update(for_all)
     resp = ff_utils.faceted_search(**assay_details)
@@ -1286,7 +1303,7 @@ def test_faceted_search_exp_set(integrated_ff):
     warnings = {'Warnings': 'No value'}
     warnings.update(for_all)
     resp = ff_utils.faceted_search(**warnings)
-    assert len(resp) == 4
+    assert len(resp) == 5
     both_projects = {'Project': '4DN|External'}
     both_projects.update(for_all)
     resp = ff_utils.faceted_search(**both_projects)
@@ -1309,7 +1326,7 @@ def test_faceted_search_exp_set(integrated_ff):
     proj_exp_sam.update(for_all)
     resp = ff_utils.faceted_search(**proj_exp_sam)
     assert len(resp) == 1
-    exp_sam = {'Experiment Type': 'ATAC-seq', 'Sample': 'GM12878'}
+    exp_sam = {'Experiment Type': 'ATAC-seq', 'Sample': 'primary cell'}
     exp_sam.update(for_all)
     resp = ff_utils.faceted_search(**exp_sam)
     assert len(resp) == 1
@@ -1363,31 +1380,65 @@ def test_faceted_search_users(integrated_ff):
     assert len(resp) == 10
 
 
-def test_fetch_qc_metrics_logic(mocked_replicate_experiment):
+@pytest.mark.unit
+def test_fetch_qc_metrics_logic_unit(mocked_replicate_experiment):
     """
     Tests that the fetch_qc_metrics function is being used correctly inside the get_associated_qc_metrics function
     """
     with mock.patch("dcicutils.ff_utils.get_metadata") as mock_get_metadata:
-        mock_get_metadata.return_value = {
-            "uuid": "7a2d8f3d-2108-4b81-a09e-fdcf622a0392",
-            "display_title": "QualityMetricPairsqc from 2018-04-27"
-        }
-        result = ff_utils.fetch_files_qc_metrics(mocked_replicate_experiment, ['processed_files'])
-        assert "7a2d8f3d-2108-4b81-a09e-fdcf622a0392" in result
+        mock_get_metadata.side_effect = mocked_get_metadata_from_data_files
+        result = ff_utils.fetch_files_qc_metrics(
+            mocked_get_metadata_from_data_files("331106bc-8535-3338-903e-854af460b544"),
+            associated_files=['other_processed_files'],
+            ignore_typical_fields=False)
+        assert '131106bc-8535-4448-903e-854af460b000' in result
+        assert '131106bc-8535-4448-903e-854abbbbbbbb' in result
 
 
-def test_get_qc_metrics_logic(mocked_replicate_experiment, qc_metrics):
+@pytest.mark.integratedx
+def test_fetch_qc_metrics_logic_integrated(mocked_replicate_experiment):
+    """
+    Tests that the fetch_qc_metrics function is being used correctly inside the get_associated_qc_metrics function
+    """
+    result = ff_utils.fetch_files_qc_metrics(
+        ff_utils.get_metadata("331106bc-8535-3338-903e-854af460b544", ff_env='fourfront-mastertest'),
+        ff_env='fourfront-mastertest',
+        associated_files=['other_processed_files'],
+        ignore_typical_fields=False)
+    assert '131106bc-8535-4448-903e-854af460b000' in result
+    assert '131106bc-8535-4448-903e-854abbbbbbbb' in result
+
+
+def mocked_get_metadata_from_data_files(uuid, **kwargs):
+    result = get_mocked_result(kind='mocked metadata', dirname='test_items', uuid=uuid, ignored_kwargs=kwargs)
+    # Guard against bad mocks.
+    assert 'uuid' in result, f"The result of a mocked get_metadata call for {uuid} has no 'uuid' key."
+    assert result['uuid'] == uuid, f"Result of a mocked get_metadata({uuid!r}) call has wrong uuid {result['uuid']!r}."
+    return result
+
+
+def get_mocked_result(*, kind, dirname, uuid, ignored_kwargs=None):
+    data_file = os.path.join(_DATA_DIR, dirname, uuid + '.json')
+    print(f"Getting {kind} for {uuid} ignoring kwargs={ignored_kwargs} from {data_file}")
+    with open(data_file, 'r') as fp:
+        return json.load(fp)
+
+
+@pytest.mark.unit
+def test_get_qc_metrics_logic_unit():
     """
     End to end test on 'get_associated_qc_metrics' to check the logic of the fuction to make sure
     it is getting the qc metrics.
     """
     with mock.patch("dcicutils.ff_utils.get_metadata") as mock_get_metadata:
-        mock_get_metadata.return_value = mocked_replicate_experiment
-        with mock.patch("dcicutils.ff_utils.fetch_files_qc_metrics") as mock_fetch_qc:
-            mock_fetch_qc.return_value = qc_metrics
-            result = ff_utils.get_associated_qc_metrics("6ba6a5df-dac5-4111-b5f0-299b6bee0f38")
-            assert "762d3cc0-fcd4-4c1a-a99f-124b0f371690" in result
-            assert "9b0b1733-0f17-420e-9e38-1f58ba993c54" in result
+        mock_get_metadata.side_effect = mocked_get_metadata_from_data_files
+        print()  # start output on a fresh line
+        input_uuid = "431106bc-8535-4448-903e-854af460b260"
+        result = ff_utils.get_associated_qc_metrics(input_uuid)
+        assert "131106bc-8535-4448-903e-854abbbbbbbb" in result  # quick pre-test
+        assert result == get_mocked_result(kind='QC metrics',
+                                           dirname='test_qc_metrics',
+                                           uuid=input_uuid)
 
 
 @pytest.mark.integrated

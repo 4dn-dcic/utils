@@ -2,12 +2,13 @@ import boto3
 import time
 
 from botocore.exceptions import ClientError
-from dcicutils.common import REGION, OrchestratedApp, EnvName
-from dcicutils.misc_utils import PRINT
-from dcicutils.env_utils import (
+from .common import REGION, OrchestratedApp, EnvName
+from .misc_utils import PRINT
+from .env_utils import (
     is_cgap_env, is_fourfront_env, is_stg_or_prd_env, public_url_mappings, is_orchestrated,
     blue_green_mirror_env, get_standard_mirror_env, has_declared_stg_env, maybe_get_declared_prd_env_name,
 )
+from .exceptions import NotBeanstalkEnvironment
 from typing import Optional
 
 
@@ -170,7 +171,9 @@ def compute_cgap_stg_env():
 
 def compute_prd_env_for_env(envname):
     """Given an environment, returns the name of the prod environment for its owning project."""
-    if is_cgap_env(envname):
+    if not is_beanstalk_env(envname):  # Doing this might catch some errors
+        raise NotBeanstalkEnvironment(envname=envname)
+    elif is_cgap_env(envname):
         return compute_cgap_prd_env()
     elif is_fourfront_env(envname):
         return compute_ff_prd_env()

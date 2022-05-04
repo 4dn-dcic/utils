@@ -8,15 +8,15 @@ from dcicutils.env_utils import (
     indexer_env_for_env, infer_foursight_from_env, infer_foursight_url_from_env, infer_repo_from_env,
     is_cgap_env, is_cgap_server, is_fourfront_env, is_fourfront_server, is_hotseat_env, is_indexer_env,
     is_stg_or_prd_env, is_test_env, make_env_name_cfn_compatible, permit_load_data,
-    prod_bucket_env, prod_bucket_env_for_app, public_url_for_app, public_url_mappings, short_env_name,
+    prod_bucket_env, prod_bucket_env_for_app, public_url_for_app, public_url_mappings, short_env_name, is_beanstalk_env,
 )
 from dcicutils.env_utils_legacy import (
     BEANSTALK_PROD_MIRRORS, CGAP_ENV_DEV, CGAP_ENV_HOTSEAT, CGAP_ENV_HOTSEAT_NEW, CGAP_ENV_INDEXER,
     CGAP_ENV_MASTERTEST, CGAP_ENV_MASTERTEST_NEW, CGAP_ENV_PRODUCTION_BLUE, CGAP_ENV_PRODUCTION_BLUE_NEW,
     CGAP_ENV_PRODUCTION_GREEN, CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_STAGING, CGAP_ENV_STAGING_NEW,
     CGAP_ENV_WEBDEV, CGAP_ENV_WEBDEV_NEW, CGAP_ENV_WEBPROD, CGAP_ENV_WEBPROD_NEW, CGAP_ENV_WOLF, CGAP_ENV_WOLF_NEW,
-    CGAP_PRODUCTION_IDENTIFIER, CGAP_PROD_BUCKET_ENV,
-    CGAP_PUBLIC_DOMAIN_PRD, CGAP_PUBLIC_URLS, CGAP_PUBLIC_URL_PRD,
+    CGAP_PROD_BUCKET_ENV,
+    _CGAP_MGB_PRODUCTION_IDENTIFIER, _CGAP_MGB_PUBLIC_DOMAIN_PRD, CGAP_PUBLIC_URLS, _CGAP_MGB_PUBLIC_URL_PRD,  # noQA
     FF_ENV_HOTSEAT, FF_ENV_INDEXER, FF_ENV_MASTERTEST, FF_ENV_PRODUCTION_BLUE, FF_ENV_PRODUCTION_GREEN,
     FF_ENV_WEBDEV, FF_ENV_WEBPROD, FF_ENV_WEBPROD2, FF_ENV_WOLF,
     FF_PRODUCTION_IDENTIFIER, FF_PROD_BUCKET_ENV, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG,
@@ -217,7 +217,7 @@ def test_public_url_mappings():
 
 def test_public_url_for_app():
 
-    assert public_url_for_app('cgap') == CGAP_PUBLIC_URL_PRD
+    assert public_url_for_app('cgap') == _CGAP_MGB_PUBLIC_URL_PRD
     assert public_url_for_app('fourfront') == FF_PUBLIC_URL_PRD
 
     with pytest.raises(InvalidParameterError):
@@ -334,6 +334,46 @@ def test_is_fourfront_env():
     assert is_fourfront_env('fourfront-blue') is True
 
     assert is_fourfront_env(None) is False
+
+
+def test_is_beanstalk_env():
+
+    assert is_beanstalk_env('fourfront-webprod') is True
+    assert is_beanstalk_env('fourfront-webprod2') is True
+    assert is_beanstalk_env('fourfront-blue') is True
+    assert is_beanstalk_env('fourfront-green') is True
+    assert is_beanstalk_env('fourfront-hotseat') is True
+    assert is_beanstalk_env('fourfront-webdev') is True
+    assert is_beanstalk_env('fourfront-mastertest') is True
+
+    assert is_beanstalk_env('fourfront-cgap') is True
+    assert is_beanstalk_env('fourfront-cgaptest') is True
+    assert is_beanstalk_env('fourfront-cgapdev') is True
+    assert is_beanstalk_env('fourfront-cgapwolf') is True
+
+    # The magic non-beanstalk names return False
+    assert is_beanstalk_env('data') is False
+    assert is_beanstalk_env('staging') is False
+    assert is_beanstalk_env('cgap') is False
+
+    # Other potential FF and CGAP environment names return False
+    assert is_beanstalk_env('fourfront-devtest') is False
+    assert is_beanstalk_env('fourfront-supertest') is False
+    assert is_beanstalk_env('fourfront-megatest') is False
+    assert is_beanstalk_env('fourfront-anything') is False
+
+    assert is_beanstalk_env('fourfront-cgapanything') is False
+
+    assert is_beanstalk_env('cgap-wolf') is False
+    assert is_beanstalk_env('cgap-mgb') is False
+    assert is_beanstalk_env('cgap-msa') is False
+    assert is_beanstalk_env('cgap-dfci') is False
+    assert is_beanstalk_env('cgap-core') is False
+    assert is_beanstalk_env('cgap-training') is False
+    assert is_beanstalk_env('cgap-clalit') is False
+    assert is_beanstalk_env('cgap-anything') is False
+
+    assert is_beanstalk_env('anything-at-all') is False
 
 
 def test_is_stg_or_prd_env():
@@ -693,7 +733,7 @@ def test_infer_foursight_env():
     check(CGAP_ENV_WEBPROD, 'cgap')
 
     # Traditionally this didn't work as inputs, but that seems silly, so I made it work, too. -kmp 4-Oct-2021
-    check('cgap', CGAP_PRODUCTION_IDENTIFIER, request=mock_request(CGAP_PUBLIC_DOMAIN_PRD))
+    check('cgap', _CGAP_MGB_PRODUCTION_IDENTIFIER, request=mock_request(_CGAP_MGB_PUBLIC_DOMAIN_PRD))
 
     check('', None)
     check(None, None)
@@ -754,7 +794,7 @@ def test_infer_foursight_url_from_env():
     check(CGAP_ENV_WEBPROD, 'cgap', cgap=True)
 
     # Traditionally this didn't work as inputs, but that seems silly, so I made it work, too. -kmp 4-Oct-2021
-    check('cgap', CGAP_PRODUCTION_IDENTIFIER, request=mock_request(CGAP_PUBLIC_DOMAIN_PRD), cgap=True)
+    check('cgap', _CGAP_MGB_PRODUCTION_IDENTIFIER, request=mock_request(_CGAP_MGB_PUBLIC_DOMAIN_PRD), cgap=True)
 
     check('', None, cgap=True)
     check(None, None, cgap=True)

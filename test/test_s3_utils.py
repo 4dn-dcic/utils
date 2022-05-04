@@ -13,7 +13,7 @@ from dcicutils.env_utils import (
     get_standard_mirror_env,
 )
 from dcicutils.env_utils_legacy import (
-    FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, CGAP_PUBLIC_URL_PRD
+    FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, _CGAP_MGB_PUBLIC_URL_PRD  # noQA
 )
 from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs
 from dcicutils.misc_utils import ignored, ignorable
@@ -200,7 +200,7 @@ def test_s3utils_creation_cgap_prd():
             'sys_bucket': 'elasticbeanstalk-fourfront-cgap-system',
             'outfile_bucket': 'elasticbeanstalk-fourfront-cgap-wfoutput',
             'raw_file_bucket': 'elasticbeanstalk-fourfront-cgap-files',
-            'url': CGAP_PUBLIC_URL_PRD,
+            'url': _CGAP_MGB_PUBLIC_URL_PRD,
         }
 
     test_prd('cgap')

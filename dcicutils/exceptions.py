@@ -189,3 +189,34 @@ class EnvUtilsLoadError(ValueError):
         self.env = env
         self.encapsulated_error = encapsulated_error
         super().__init__(f"{msg} (bucket_name={bucket_name}, env={env})")
+
+
+class AppKeyMissing(RuntimeError):
+
+    def __init__(self, context, key_manager):
+        self.context = context
+        self.key_manager = key_manager
+        super().__init__(f"Missing credential in file {key_manager.keys_file} for {context}.")
+
+
+class AppEnvKeyMissing(AppKeyMissing):
+
+    def __init__(self, env, key_manager):
+        self.env = env
+        super().__init__(context=f"{key_manager.APP_NAME} environment {env}",
+                         key_manager=key_manager)
+
+
+class AppServerKeyMissing(AppKeyMissing):
+
+    def __init__(self, server, key_manager):
+        self.server = server
+        super().__init__(context=f"{key_manager.APP_NAME} server {server}",
+                         key_manager=key_manager)
+
+
+class NotBeanstalkEnvironment(Exception):
+
+    def __init__(self, message=None, *, envname):
+        self.envname = envname
+        super().__init__(message or f"Not a beanstalk environment: {envname}")

@@ -235,6 +235,12 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     return result
 
 
+def _sls(val):
+    """general helper to check for and strip leading slashes on ids in API fxns
+    """
+    return val.lstrip('/')
+
+
 def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
     """
     Function to get metadata for a given obj_id (uuid or @id, most likely).
@@ -251,7 +257,7 @@ def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
     auth = get_authentication_with_server(key, ff_env)
     if check_queue and stuff_in_queues(ff_env, check_secondary=False):
         add_on += '&datastore=database'
-    get_url = '/'.join([auth['server'], obj_id]) + process_add_on(add_on)
+    get_url = '/'.join([auth['server'], _sls(obj_id)]) + process_add_on(add_on)
     # check the queues if check_queue is True
     response = authorized_request(get_url, auth=auth, verb='GET')
     return get_response_json(response)
@@ -269,7 +275,7 @@ def patch_metadata(patch_item, obj_id='', key=None, ff_env=None, add_on=''):
     if not obj_id:
         raise Exception("ERROR getting id from given object %s for the request to"
                         " patch item. Supply a uuid or accession." % obj_id)
-    patch_url = '/'.join([auth['server'], obj_id]) + process_add_on(add_on)
+    patch_url = '/'.join([auth['server'], _sls(obj_id)]) + process_add_on(add_on)
     # format item to json
     patch_item = json.dumps(patch_item)
     response = authorized_request(patch_url, auth=auth, verb='PATCH', data=patch_item)
@@ -442,7 +448,7 @@ def get_item_facets(item_type, key=None, ff_env=None):
     """
     Gets facet query string information ie: mapping from facet to query string
     """
-    resp = get_metadata('/profiles/' + item_type + '.json', key=key, ff_env=ff_env)
+    resp = get_metadata('profiles/' + item_type + '.json', key=key, ff_env=ff_env)
     facets = {}
     for query_url, info in resp.get('facets', {}).items():
         facets[info['title']] = query_url
@@ -460,7 +466,7 @@ def get_item_facet_values(item_type, key=None, ff_env=None):
     for that facet mapping to the count for that value
     format: {'Project': {'4DN': 2, 'Other': 6}, 'Lab': {...}}
     """
-    resp = get_metadata('/search/?type=' + item_type, key=key, ff_env=ff_env)['facets']
+    resp = get_metadata('search/?type=' + item_type, key=key, ff_env=ff_env)['facets']
     facets = {}
     for facet in resp:
         name = facet['title']
@@ -493,7 +499,7 @@ def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
     """
     item_facets = kwargs.get('item_facets', None)
     item_type = 'ExperimentSetReplicate' if item_type is None else item_type
-    search = '/search/?type=' + item_type
+    search = 'search/?type=' + item_type
     if item_facets is None:
         item_facets = get_item_facets(item_type, key=key, ff_env=ff_env)
     for facet, values in kwargs.items():
@@ -512,7 +518,7 @@ def fetch_files_qc_metrics(data, associated_files=None,
                            ignore_typical_fields=True,
                            key=None, ff_env=None):
     """
-    Utility function to grap all the qc metrics from associated types of file such as:
+    Utility function to grab all the qc metrics from associated types of file such as:
     'proccessed_files', 'other_processed_files', 'files'
     Args:
         data: the metadata of a ExperimentSet or Experiment
@@ -553,7 +559,8 @@ def fetch_files_qc_metrics(data, associated_files=None,
                 if entry.get('quality_metric'):
                     # check if it is a list of qc metrics
                     if entry['quality_metric']['display_title'].startswith('QualityMetricQclist'):
-                        qc_metric_list = get_metadata(entry['quality_metric']['uuid'], key=key, ff_env=ff_env)
+                        qc_metric_list_uuid = entry['quality_metric']['uuid']
+                        qc_metric_list = get_metadata(qc_metric_list_uuid, key=key, ff_env=ff_env)
                         if not qc_metric_list.get('qc_list'):
                             continue
                         for qc in qc_metric_list['qc_list']:
@@ -569,7 +576,7 @@ def fetch_files_qc_metrics(data, associated_files=None,
                                           'source_file': source_file,
                                           'source_file_type': source_file_type
                                           }
-                                        }
+                            }
                             qc_metrics.update(qc_info)
 
                     else:
@@ -585,7 +592,7 @@ def fetch_files_qc_metrics(data, associated_files=None,
                                       'source_file': source_file,
                                       'source_file_type': source_file_type
                                       }
-                                    }
+                        }
                         qc_metrics.update(qc_info)
     return qc_metrics
 
@@ -652,7 +659,8 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
 
     # If it is an experimentset, get qc_metrics for the experiments in the experiment set
     if resp.get('experiments_in_set'):
-        organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['individual']['organism']['name']
+        organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['organism']['name']
+        # organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['individual']['organism']['name']
         experiment_type = resp['experiments_in_set'][0]['experiment_type']['display_title']
         experiment_subclass = resp['experiments_in_set'][0]['experiment_type']['assay_subclass_short']
         biosource_summary = resp['experiments_in_set'][0]['biosample']['biosource_summary']
@@ -902,7 +910,7 @@ def get_schema_names(key=None, ff_env=None):
     """
     auth = get_authentication_with_server(key, ff_env)
     schema_name = {}
-    profiles = get_metadata('/profiles/', key=auth, add_on='frame=raw')
+    profiles = get_metadata('profiles/', key=auth, add_on='frame=raw')
     for key, value in profiles.items():
         # skip abstract types
         if value.get('isAbstract') is True:

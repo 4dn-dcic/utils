@@ -2,8 +2,9 @@ from dcicutils.exceptions import (
     ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix,
     ConfigurationError, SynonymousEnvironmentVariablesMismatched, InferredBucketConflict,
     CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv, GlobalBucketAccessError,
-    InvalidParameterError,
+    InvalidParameterError, AppKeyMissing, AppServerKeyMissing, AppEnvKeyMissing
 )
+from dcicutils.creds_utils import CGAPKeyManager
 
 
 def test_expected_error_not_seen():
@@ -253,3 +254,38 @@ def test_invalid_parameter_error_with_dynamic_options():
     n += 1  # n == 3. Valid values for newly created errors = ['val0', 'val1', 'val2']
     assert str(e2a) == "The value was not valid. Valid values are 'val0' and 'val1'."  # created when n == 2
     assert str(e2b) == "The value was not valid. Valid values are 'val0' and 'val1'."  # ditto
+
+
+def test_app_key_missing():
+
+    error = AppKeyMissing(context="testing", key_manager=CGAPKeyManager())
+
+    assert isinstance(error, RuntimeError)
+    assert isinstance(error, AppKeyMissing)
+
+    assert str(error) == "Missing credential in file %s for testing." % CGAPKeyManager._default_keys_file()
+
+
+def test_app_env_key_missing():
+    some_env = 'fourfront-cgapsomething'
+
+    error = AppEnvKeyMissing(env=some_env, key_manager=CGAPKeyManager())
+
+    assert isinstance(error, RuntimeError)
+    assert isinstance(error, AppKeyMissing)
+
+    assert str(error) == ("Missing credential in file %s for CGAP environment %s."
+                          % (CGAPKeyManager._default_keys_file(), some_env))
+
+
+def test_app_server_key_missing():
+
+    some_server = "http://127.0.0.1:5000"
+
+    error = AppServerKeyMissing(server=some_server, key_manager=CGAPKeyManager())
+
+    assert isinstance(error, RuntimeError)
+    assert isinstance(error, AppKeyMissing)
+
+    assert str(error) == ("Missing credential in file %s for CGAP server %s."
+                          % (CGAPKeyManager._default_keys_file(), some_server))

@@ -37,6 +37,13 @@ command_utils
    :members:
 
 
+creds_utils
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.creds_utils
+   :members:
+
+
 common
 ^^^^^^
 

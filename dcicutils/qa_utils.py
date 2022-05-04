@@ -1436,3 +1436,15 @@ def make_mock_beanstalk_environment_variables(var_str):
     spec2 = [{"Namespace": _NAMESPACE_ENVIRONMENT_VARIABLE, "OptionName": name, "Value": value}
              for name, value in [spec.split("=") for spec in var_str.split(",")]]
     return spec0 + spec1 + spec2
+
+
+class MockedCommandArgs:
+
+    VALID_ARGS = []
+
+    def __init__(self, **args):
+        for arg in self.VALID_ARGS:
+            setattr(self, arg, None)
+        for arg, v in args.items():
+            assert arg in self.VALID_ARGS
+            setattr(self, arg, v)

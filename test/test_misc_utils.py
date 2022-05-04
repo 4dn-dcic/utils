@@ -24,7 +24,7 @@ from dcicutils.misc_utils import (
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
     capitalize1, local_attrs, dict_zip, json_leaf_subst, _is_function_of_exactly_one_required_arg, string_list,
-    string_md5,
+    string_md5, SingletonManager,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -2566,3 +2566,37 @@ def test_json_leaf_subst():
     assert json_leaf_subst("x", subs) == "ex"
     assert json_leaf_subst(["x", "y"], subs) == ["ex", "why"]
     assert json_leaf_subst({"x": "y", "y": "x"}, subs) == {"ex": "why", "why": "ex"}
+
+
+def test_singleton_manager():
+
+    class Foo:
+        def __init__(self, token2=None):
+            self.secret_token = uuid.uuid4()
+            self.secret_token2 = token2
+
+    foo1_manager = SingletonManager(Foo)
+
+    assert foo1_manager.singleton_class is Foo
+    assert isinstance(foo1_manager.singleton, Foo)
+    assert foo1_manager.singleton is foo1_manager.singleton
+    assert foo1_manager.singleton.secret_token == foo1_manager.singleton.secret_token
+    assert foo1_manager.singleton.secret_token2 is None
+
+    foo2_manager = SingletonManager(Foo, str(uuid.uuid4()))
+
+    assert foo2_manager.singleton_class is Foo
+    assert isinstance(foo2_manager.singleton, Foo)
+    assert foo2_manager.singleton is foo2_manager.singleton
+    assert foo2_manager.singleton.secret_token == foo2_manager.singleton.secret_token
+    assert foo2_manager.singleton.secret_token2 == foo2_manager.singleton.secret_token2
+
+    foo3_manager = SingletonManager(Foo, token2=str(uuid.uuid4()))
+
+    assert foo3_manager.singleton_class is Foo
+    assert isinstance(foo3_manager.singleton, Foo)
+    assert foo3_manager.singleton is foo3_manager.singleton
+    assert foo3_manager.singleton.secret_token == foo3_manager.singleton.secret_token
+    assert foo3_manager.singleton.secret_token2 is not None
+    assert foo3_manager.singleton.secret_token2 == foo3_manager.singleton.secret_token2
+
