@@ -220,3 +220,10 @@ class NotBeanstalkEnvironment(Exception):
     def __init__(self, message=None, *, envname):
         self.envname = envname
         super().__init__(message or f"Not a beanstalk environment: {envname}")
+
+
+class BeanstalkOperationNotImplemented(NotImplementedError):
+    def __init__(self, operation, message=None):
+        self.operation = operation
+        super().__init__(f"Attempt to use an obsolete beanstalk operation {operation} in a container environment."
+                         or message)

@@ -10,9 +10,11 @@ import time
 from botocore.exceptions import ClientError
 from dcicutils import es_utils, ff_utils, s3_utils
 from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true
+from dcicutils.exceptions import MissingGlobalEnv
 from dcicutils.ff_mocks import mocked_s3utils, TestScenarios
 from dcicutils.qa_utils import (
     check_duplicated_items_by_key, ignored, raises_regexp, MockResponse, MockBoto3, MockBotoSQSClient,
+    MockBotoS3Client,
 )
 from types import GeneratorType
 from unittest import mock
@@ -239,9 +241,14 @@ def test_unified_authentication_decoding(integrated_ff):
 
 
 @contextlib.contextmanager
-def mocked_s3utils_with_sse():
-    with mocked_s3utils(beanstalks=['fourfront-foo', 'fourfront-bar'], require_sse=True):
-        yield
+def mocked_s3utils_with_sse(beanstalks=None, require_sse=True, files=None):
+    with mocked_s3utils(beanstalks=beanstalks or ['fourfront-foo', 'fourfront-bar'],
+                        require_sse=require_sse) as mock_boto3:
+        s3 = mock_boto3.client('s3')
+        assert isinstance(s3, MockBotoS3Client)
+        for filename, string in (files or {}).items():
+            s3.s3_files.files[filename] = string.encode('utf-8')
+        yield mock_boto3
 
 
 def test_unified_authentication_unit():
@@ -314,10 +321,10 @@ def test_unified_authentication_prod_envs_integrated_only():
     assert len(ff_prod_auth) == 2
     staging_auth = ff_utils.unified_authentication(ff_env="staging")
     assert staging_auth == ff_prod_auth
-    green_auth = ff_utils.unified_authentication(ff_env="fourfront-green")
-    assert green_auth == ff_prod_auth
-    blue_auth = ff_utils.unified_authentication(ff_env="fourfront-blue")
-    assert blue_auth == ff_prod_auth
+#     green_auth = ff_utils.unified_authentication(ff_env="fourfront-production-green")
+#     assert green_auth == ff_prod_auth
+#     blue_auth = ff_utils.unified_authentication(ff_env="fourfront-production-blue")
+#     assert blue_auth == ff_prod_auth
 
     # Decommissioned
     # # CGAP prod
@@ -328,7 +335,7 @@ def test_unified_authentication_prod_envs_integrated_only():
     # auth_is_shared = cgap_prod_auth == ff_prod_auth
     # assert not auth_is_shared
 
-    with raises_regexp(ClientError, "does not exist"):
+    with pytest.raises(MissingGlobalEnv):
         # There is no such environment as 'fourfront-data'
         ff_utils.unified_authentication(ff_env="fourfront-data")
 
@@ -435,7 +442,7 @@ def test_stuff_in_queues_integrated(integrated_ff):
     for item in search_res[:8]:
         ff_utils.patch_metadata({}, obj_id=item['uuid'], key=integrated_ff['ff_key'])
     time.sleep(3)  # let queues catch up
-    stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env'], check_secondary=True)
+    stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env_index'], check_secondary=True)
     assert stuff_in_queue
     with pytest.raises(Exception) as exec_info:
         ff_utils.stuff_in_queues(None, check_secondary=True)  # fail if no env specified
@@ -977,6 +984,7 @@ def test_search_metadata_with_generator(integrated_ff):
     validate_gen(search_gen, 3)
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 def test_get_es_metadata_with_generator(integrated_ff):
     """ Tests using get_es_metadata with the generator option """
@@ -992,6 +1000,7 @@ def test_get_es_metadata_with_generator(integrated_ff):
     assert found == 15
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_get_search_generator(integrated_ff):
@@ -1022,6 +1031,7 @@ def test_get_search_generator(integrated_ff):
     assert len(all_gen3_uuids) == len(all_gen3)
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_get_es_metadata(integrated_ff):
@@ -1130,6 +1140,7 @@ def test_get_es_metadata(integrated_ff):
     assert 'Invalid sources for get_es_metadata' in str(exec_info2.value)
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_get_es_search_generator(integrated_ff):
@@ -1164,7 +1175,7 @@ def test_get_health_page(integrated_ff):
     assert health_res and 'error' not in health_res
     assert 'elasticsearch' in health_res
     assert 'database' in health_res
-    assert health_res['beanstalk_env'] == integrated_ff['ff_env']
+    assert health_res['beanstalk_env'] == integrated_ff['ff_env_index']
     # try with ff_env instead of key
     health_res2 = ff_utils.get_health_page(ff_env=integrated_ff['ff_env'])
     assert health_res2 and 'error' not in health_res2
@@ -1185,6 +1196,7 @@ def test_get_schema_names(integrated_ff):
     assert schema_names['ExperimentSetReplicate'] == 'experiment_set_replicate'
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_expand_es_metadata(integrated_ff):
@@ -1267,7 +1279,7 @@ def test_faceted_search_exp_set(integrated_ff):
     sample_type = {'Sample Type': 'immortalized cells'}
     sample_type.update(for_all)
     resp = ff_utils.faceted_search(**sample_type)
-    assert len(resp) == 12
+    assert len(resp) == 13
     sample_cat = {'Sample Category': 'In vitro Differentiation'}
     sample_cat.update(for_all)
     resp = ff_utils.faceted_search(**sample_cat)
@@ -1275,7 +1287,7 @@ def test_faceted_search_exp_set(integrated_ff):
     sample = {'Sample': 'GM12878'}
     sample.update(for_all)
     resp = ff_utils.faceted_search(**sample)
-    assert len(resp) == 12
+    assert len(resp) == 13
     tissue_src = {'Tissue Source': 'endoderm'}
     tissue_src.update(for_all)
     resp = ff_utils.faceted_search(**tissue_src)
@@ -1287,11 +1299,11 @@ def test_faceted_search_exp_set(integrated_ff):
     mods = {'Modifications': 'Stable Transfection'}
     mods.update(for_all)
     resp = ff_utils.faceted_search(**mods)
-    assert len(resp) == 6
+    assert len(resp) == 7
     treats = {'Treatments': 'RNAi'}
     treats.update(for_all)
     resp = ff_utils.faceted_search(**treats)
-    assert len(resp) == 6
+    assert len(resp) == 7
     assay_details = {'Assay Details': 'No value'}
     assay_details.update(for_all)
     resp = ff_utils.faceted_search(**assay_details)
@@ -1303,7 +1315,7 @@ def test_faceted_search_exp_set(integrated_ff):
     warnings = {'Warnings': 'No value'}
     warnings.update(for_all)
     resp = ff_utils.faceted_search(**warnings)
-    assert len(resp) == 5
+    assert len(resp) == 4
     both_projects = {'Project': '4DN|External'}
     both_projects.update(for_all)
     resp = ff_utils.faceted_search(**both_projects)
@@ -1326,7 +1338,15 @@ def test_faceted_search_exp_set(integrated_ff):
     proj_exp_sam.update(for_all)
     resp = ff_utils.faceted_search(**proj_exp_sam)
     assert len(resp) == 1
+    exp_sam = {'Experiment Type': 'ATAC-seq'}
+    exp_sam.update(for_all)
+    resp = ff_utils.faceted_search(**exp_sam)
+    assert len(resp) == 1
     exp_sam = {'Experiment Type': 'ATAC-seq', 'Sample': 'primary cell'}
+    exp_sam.update(for_all)
+    resp = ff_utils.faceted_search(**exp_sam)
+    assert len(resp) == 0
+    exp_sam = {'Experiment Type': 'ATAC-seq', 'Sample': 'GM12878'}
     exp_sam.update(for_all)
     resp = ff_utils.faceted_search(**exp_sam)
     assert len(resp) == 1
@@ -1475,6 +1495,7 @@ def test_get_qc_metrics(integrated_ff):
     assert 'QualityMetric' in qc_metrics['4c9dabc6-61d6-4054-a951-c4fdd0023800']['values']['@type']
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_expand_es_metadata_frame_object_embedded(integrated_ff):
@@ -1494,6 +1515,7 @@ def test_expand_es_metadata_frame_object_embedded(integrated_ff):
     assert set(uuids_obj) == set(uuids_emb)
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_expand_es_metadata_add_wfrs(integrated_ff):
@@ -1516,6 +1538,7 @@ def test_expand_es_metadata_complain_wrong_frame(integrated_ff):
     assert str(exec_info.value) == """Invalid frame name "embroiled", please use one of ['raw', 'object', 'embedded']"""
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_expand_es_metadata_ignore_fields(integrated_ff):
@@ -1544,6 +1567,8 @@ def test_delete_field(integrated_ff):
     assert "Bad status code" in str(exec_info.value)
 
 
+@pytest.mark.direct_es_query
+@pytest.mark.integrated
 @pytest.mark.file_operation
 @pytest.mark.flaky
 def test_dump_results_to_json(integrated_ff):
@@ -1567,6 +1592,7 @@ def test_dump_results_to_json(integrated_ff):
     clear_folder(test_folder)
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 def test_search_es_metadata(integrated_ff):
     """ Tests search_es_metadata on mastertest """
@@ -1598,6 +1624,7 @@ def test_search_es_metadata(integrated_ff):
     assert res[0]["_source"]["embedded"]["groups"] == ["admin"]
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 def test_search_es_metadata_generator(integrated_ff):
     """ Tests SearchESMetadataHandler both normally and with a generator, verifies consistent results """
@@ -1625,8 +1652,9 @@ def test_convert_param():
 @pytest.mark.integrated
 def test_get_page(integrated_ff):
     ff_env = integrated_ff['ff_env']
+    ff_env_index = integrated_ff['ff_env_index']
     health_res = ff_utils.get_health_page(ff_env=ff_env)
-    assert health_res['namespace'] == ff_env
+    assert health_res['namespace'] == ff_env_index
     counts_res = ff_utils.get_counts_page(ff_env=ff_env)['db_es_total']
     assert 'DB' in counts_res
     assert 'ES' in counts_res

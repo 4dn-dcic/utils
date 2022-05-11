@@ -375,6 +375,10 @@ def public_url_mappings(envname: EnvName):
     return CGAP_PUBLIC_URLS if is_cgap_env(envname) else FF_PUBLIC_URLS
 
 
+def compute_orchestrated_prd_env_for_project(project: OrchestratedApp) -> Optional[EnvName]:
+    return None
+
+
 def is_cgap_server(server, allow_localhost=False):
     """
     Returns True if the given string looks like a CGAP server name. Otherwise returns False.

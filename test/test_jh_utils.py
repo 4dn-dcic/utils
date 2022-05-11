@@ -4,6 +4,7 @@ import os
 import datetime
 import pytest
 import re
+import urllib.parse
 
 from dcicutils import s3_utils, ff_utils
 from dcicutils.qa_utils import override_environ, MockFileSystem
@@ -43,7 +44,9 @@ def test_proper_initialization(integrated_ff):
     assert os.environ['FF_ACCESS_KEY'] == integrated_ff['ff_key']['key']
     assert os.environ['FF_ACCESS_SECRET'] == integrated_ff['ff_key']['secret']
     # eliminate 'http://' from server name. This is just how urllib store passwords...
-    auth_key = ((test_server[7:], '/'),)
+    # auth_host = test_server[7:]
+    auth_host = urllib.parse.urlparse(test_server).hostname
+    auth_key = ((auth_host, '/'),)
     basic_auth = jh_utils.AUTH_HANDLER.passwd.passwd[None][auth_key]
     assert basic_auth == (os.environ['FF_ACCESS_KEY'], os.environ['FF_ACCESS_SECRET'])
 

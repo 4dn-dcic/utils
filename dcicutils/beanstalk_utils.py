@@ -15,10 +15,11 @@ from datetime import datetime
 from . import ff_utils
 from botocore.exceptions import ClientError
 from .base import (
-    REGION, FOURSIGHT_URL,  # _FF_MAGIC_CNAME, _CGAP_MAGIC_CNAME, _FF_GOLDEN_DB, _CGAP_GOLDEN_DB,
+    FOURSIGHT_URL,  # _FF_MAGIC_CNAME, _CGAP_MAGIC_CNAME, _FF_GOLDEN_DB, _CGAP_GOLDEN_DB,
     beanstalk_info, describe_beanstalk_environments, get_beanstalk_real_url,
     compute_ff_prd_env, compute_ff_stg_env, compute_cgap_prd_env, compute_cgap_stg_env, compute_prd_env_for_env,
 )
+from .common import REGION
 from .env_utils import is_stg_or_prd_env, is_orchestrated
 from .misc_utils import PRINT, exported, obsolete, remove_suffix, prompt_for_input
 

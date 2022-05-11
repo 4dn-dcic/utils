@@ -4,13 +4,14 @@ import os
 import re
 
 
+from dcicutils.base import get_beanstalk_real_url
 from dcicutils.misc_utils import ignored, override_environ, remove_prefix
 from dcicutils.qa_utils import (
     MockBoto3, MockBotoElasticBeanstalkClient, MockBotoS3Client,
     make_mock_beanstalk, make_mock_beanstalk_cname, make_mock_beanstalk_environment_variables,
 )
 from unittest import mock
-from . import beanstalk_utils, base, ff_utils, s3_utils
+from . import beanstalk_utils, ff_utils, s3_utils, env_utils  # , base
 
 
 _MOCK_APPLICATION_NAME = "4dn-web"
@@ -74,10 +75,25 @@ def make_mock_boto_eb_client_class(beanstalks):
     return MockBotoBeanstalkClient
 
 
+def make_mock_es_url(env_name):
+    return f"http://{env_name}.es.mocked-fourfront.org"
+
+
+def make_mock_portal_url(env_name):
+    return f"http://{make_mock_beanstalk_cname(env_name)}"
+
+
 def make_mock_health_page(env_name):
     return {
         s3_utils.HealthPageKey.BEANSTALK_ENV: env_name,
-        s3_utils.HealthPageKey.ELASTICSEARCH: f"http://{env_name}.elasticsearch.whatever",
+        s3_utils.HealthPageKey.ELASTICSEARCH: make_mock_es_url(env_name),
+        s3_utils.HealthPageKey.SYSTEM_BUCKET: s3_utils.s3Utils.SYS_BUCKET_TEMPLATE % env_name,
+        s3_utils.HealthPageKey.PROCESSED_FILE_BUCKET: s3_utils.s3Utils.OUTFILE_BUCKET_TEMPLATE % env_name,
+        s3_utils.HealthPageKey.FILE_UPLOAD_BUCKET: s3_utils.s3Utils.RAW_BUCKET_TEMPLATE % env_name,
+        s3_utils.HealthPageKey.BLOB_BUCKET: s3_utils.s3Utils.BLOB_BUCKET_TEMPLATE % env_name,
+        s3_utils.HealthPageKey.METADATA_BUNDLES_BUCKET: s3_utils.s3Utils.METADATA_BUCKET_TEMPLATE % env_name,
+        s3_utils.HealthPageKey.TIBANNA_CWLS_BUCKET: s3_utils.s3Utils.TIBANNA_CWLS_BUCKET_TEMPLATE,      # no env_name
+        s3_utils.HealthPageKey.TIBANNA_OUTPUT_BUCKET: s3_utils.s3Utils.TIBANNA_OUTPUT_BUCKET_TEMPLATE,  # no env_name
     }
 
 
@@ -97,11 +113,30 @@ def mocked_s3utils(beanstalks=None, require_sse=False, other_access_key_names=No
                 else MockBotoS3Client)
     mock_boto3 = MockBoto3(s3=s3_class,
                            elasticbeanstalk=make_mock_boto_eb_client_class(beanstalks=beanstalks))
-    # Now we arrange that both s3_utils and ff_utils modules share the illusion that our mock IS the boto3 library
+    s3_client = mock_boto3.client('s3')  # This creates the s3 file system
+    assert isinstance(s3_client, s3_class)
+    for beanstalk in beanstalks:
+        record = {
+            "fourfront": make_mock_portal_url(beanstalk),
+            "es_url": make_mock_es_url(beanstalk),
+            "ff_env": beanstalk
+        }
+        record_string = json.dumps(record)
+        s3_client.s3_files.files[f"foursight-envs/{beanstalk}"] = bytes(record_string.encode('utf-8'))
+    # Now we arrange that s3_utils, ff_utils, etc. modules share the illusion that our mock IS the boto3 library
     with mock.patch.object(s3_utils, "boto3", mock_boto3):
         with mock.patch.object(ff_utils, "boto3", mock_boto3):
             with mock.patch.object(beanstalk_utils, "boto3", mock_boto3):
-                with mock.patch.object(base, "boto3", mock_boto3):
+                with mock.patch.object(env_utils, "boto3", mock_boto3):
+                  # def mocked_get_authentication_with_server(key, ff_env):
+                  #   if ff_env == TestScenarios.foo_env:
+                  #        return TestScenarios.foo_env_auth_dict
+                  #    elif ff_env == TestScenarios.bar_env:
+                  #        return TestScenarios.bar_env_auth_dict
+                  #    else:
+                  #        raise ValueError(f"Bad env: {ff_env}")
+                  # with mock.patch.object(ff_utils, "get_authentication_with_server") as mock_get_auth:
+                  #  mock_get_auth.side_effect = mocked_get_authentication_with_server
                     with mock.patch.object(s3_utils.EnvManager, "fetch_health_page_json") as mock_fetcher:
 
                         # This is all that's needed for s3Utils to initialize an EnvManager.
@@ -120,9 +155,9 @@ def mocked_s3utils(beanstalks=None, require_sse=False, other_access_key_names=No
                         # as an environment variable (i.e., in os.environ), so this sets up that environment variable.
                         if require_sse:
                             with override_environ(S3_ENCRYPT_KEY=s3_class.SSE_ENCRYPT_KEY):
-                                yield
+                                yield mock_boto3
                         else:
-                            yield
+                            yield mock_boto3
 
 
 # Here we set up some variables, auxiliary functions, and mocks containing common values needed for testing
@@ -257,6 +292,12 @@ def make_mock_boto_s3_with_sse(beanstalks=None, other_access_key_names=None):
             for env in beanstalks
             for access_key_name in access_key_names
         }
+
+        def check_for_kwargs_required_by_mock(self, operation, Bucket, Key, **kwargs):
+            if Bucket == 'foursight-envs':
+                return  # This bucket does not care about SSE arguments
+            super().check_for_kwargs_required_by_mock(operation=operation, Bucket=Bucket, Key=Key, **kwargs)
+
 
     return MockBotoS3WithSSE
 

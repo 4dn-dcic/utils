@@ -19,18 +19,40 @@ test:  # runs default tests, which are the unit tests
 retest:  # runs only failed tests from the last test run. (if no failures, it seems to run all?? -kmp 17-Dec-2020)
 	poetry run pytest -vv -r w --last-failed
 
-test-all:
+test-all:  # you have to be really brave to want this. a lot of things will err
+	@git log -1 --decorate | head -1
+	@date
 	poetry run pytest -vv -r w
+	@git log -1 --decorate | head -1
+	@date
+
+test-most:  # leaves out things that will probably err but runs unit tests and both kinds of integrations
+	@git log -1 --decorate | head -1
+	@date
+	poetry run pytest -vv -r w -m "not beanstalk_failure and not direct_es_query"
+	@git log -1 --decorate | head -1
+	@date
 
 test-units:  # runs unit tests (and integration tests not backed by a unit test)
 	@git log -1 --decorate | head -1
 	@date
-	poetry run pytest -vv -r w -m "not integratedx"
+	poetry run pytest -vv -r w -m "not integratedx and not beanstalk_failure and not direct_es_query"
 	@git log -1 --decorate | head -1
 	@date
 
 test-integrations:  # runs integration tests
-	poetry run pytest -vv -r w -m "integrated or integratedx"
+	@git log -1 --decorate | head -1
+	@date
+	poetry run pytest -vv -r w -m "(integrated or integratedx) and not beanstalk_failure and not direct_es_query"
+	@git log -1 --decorate | head -1
+	@date
+
+test-direct-es-query:  # must be called inside VPC (e.g., from foursight after cloning repo, setting up venv, etc)
+	@git log -1 --decorate | head -1
+	@date
+	poetry run pytest -vv -r w -m "direct_es_query"
+	@git log -1 --decorate | head -1
+	@date
 
 update:  # updates dependencies
 	poetry update

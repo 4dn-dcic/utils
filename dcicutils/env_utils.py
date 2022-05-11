@@ -1,4 +1,6 @@
 import boto3
+import contextlib
+import copy
 import functools
 import json
 import os
@@ -8,10 +10,10 @@ from botocore.exceptions import HTTPClientError, ClientError
 from typing import Optional
 from urllib.parse import urlparse
 from . import env_utils_legacy as legacy
-from .common import EnvName, OrchestratedApp
+from .common import EnvName, OrchestratedApp, APP_FOURFRONT  # , APP_CGAP
 from .env_base import EnvManager
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
-from .exceptions import EnvUtilsLoadError
+from .exceptions import EnvUtilsLoadError, BeanstalkOperationNotImplemented
 from .misc_utils import decorator, full_object_name, ignored, remove_prefix, check_true, find_association
 
 
@@ -28,7 +30,7 @@ class UseLegacy(BaseException):
 
 
 @decorator()
-def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, assumes_no_mirror=False):
+def                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, assumes_no_mirror=False):
     """
     This is a decorator intended to manage new versions of these functions as they apply to orchestrated CGAP
     without disturbing legacy behavior (now found in env_utils_legacy.py and still supported for the original
@@ -77,6 +79,7 @@ def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, a
 class EnvNames:
     DEV_DATA_SET_TABLE = 'dev_data_set_table'  # dictionary mapping envnames to their preferred data set
     DEV_ENV_DOMAIN_SUFFIX = 'dev_env_domain_suffix'  # e.g., .abc123def456ghi789.us-east-1.rds.amazonaws.com
+    ECOSYSTEM = 'ecosystem'  # name of an ecosystem file, such as "main.ecosystem"
     FOURSIGHT_URL_PREFIX = 'foursight_url_prefix'
     FULL_ENV_PREFIX = 'full_env_prefix'  # a string like "cgap-" that precedes all env names
     HOTSEAT_ENVS = 'hotseat_envs'  # a list of environments that are for testing with hot data
@@ -247,9 +250,9 @@ class EnvUtils:
     }
 
     @classmethod
-    def init(cls):
+    def init(cls, env_name=None):
         if cls._DECLARED_DATA is None:
-            cls.load_declared_data()
+            cls.load_declared_data(env_name=env_name)
 
     @classmethod
     def declared_data(cls):
@@ -266,6 +269,22 @@ class EnvUtils:
                 else:
                     setattr(EnvUtils, var, None)
 
+    @classmethod
+    @contextlib.contextmanager
+    def locally_declared_data(cls, data={}, **kwargs):
+        old_data = {attr: copy.deepcopy(val)
+                    for attr, val in cls.__dict__.items() if attr.isupper()}
+        try:
+            if data is not None:
+                cls.set_declared_data(data)  # First set the given data, if any
+            # Now override individual specified attributes
+            for attr, val in kwargs.items():
+                 setattr(cls, attr, val)
+            yield
+        finally:
+            for attr, old_val in old_data.items():
+                setattr(cls, attr, old_val)
+
     # Vaguely, the thing we're trying to recognize is this (sanitized slightly here),
     # which we first call str() on and then check with a regular expression:
     #
@@ -276,30 +295,42 @@ class EnvUtils:
     _CREDENTIALS_ERROR_PATTERN = re.compile(".*Invalid header value.*(Credentials|SignedHeaders)")
 
     @classmethod
+    def _get_s3_object(cls, bucket: str, key: str) -> dict:
+        try:
+            s3 = boto3.client('s3')
+            metadata = s3.get_object(Bucket=bucket, Key=key)
+            data = json.load(metadata['Body'])
+            return data
+        except HTTPClientError as err_obj:
+            if cls._CREDENTIALS_ERROR_PATTERN.match(str(err_obj)):  # Some sort of plausibility test
+                raise EnvUtilsLoadError("Credentials problem, perhaps expired or wrong account.",
+                                        bucket_name=bucket, env=key, encapsulated_error=err_obj)
+            raise
+        except ClientError as err_obj:
+            response_data = getattr(err_obj, 'response', {})
+            response_error = response_data.get('Error', {})
+            if response_error:
+                response_error_code = response_error.get('Code', None)
+                msg = response_error.get('Message') or response_error_code or "Load Error"
+                raise EnvUtilsLoadError(msg, bucket_name=bucket, env=key, encapsulated_error=err_obj)
+            raise
+
+    @classmethod
     def load_declared_data(cls, env_name=None):
         bucket = EnvManager.global_env_bucket_name()
         if bucket:
             env_name = env_name or os.environ.get('ENV_NAME')
             if env_name:
                 try:
-                    s3 = boto3.client('s3')
-                    metadata = s3.get_object(Bucket=bucket, Key=env_name)
-                    data = json.load(metadata['Body'])
+                    data = cls._get_s3_object(bucket=bucket, key=env_name)
+                    ecosystem = data.get(e.ECOSYSTEM)
+                    if ecosystem:
+                        ecosystem_data = cls._get_s3_object(bucket=bucket, key=ecosystem)
+                        # TODO: Maybe error-check that the data doesn't contain conflicting or ignored data,
+                        #       since we won't be using it.
+                        data = ecosystem_data
                     cls.set_declared_data(data)
                     return
-                except HTTPClientError as err_obj:
-                    if cls._CREDENTIALS_ERROR_PATTERN.match(str(err_obj)):  # Some sort of plausibility test
-                        raise EnvUtilsLoadError("Credentials problem, perhaps expired or wrong account.",
-                                                bucket_name=bucket, env=env_name, encapsulated_error=err_obj)
-                    raise
-                except ClientError as err_obj:
-                    response_data = getattr(err_obj, 'response', {})
-                    response_error = response_data.get('Error', {})
-                    if response_error:
-                        response_error_code = response_error.get('Code', None)
-                        msg = response_error.get('Message') or response_error_code or "Load Error"
-                        raise EnvUtilsLoadError(msg, bucket_name=bucket, env=env_name, encapsulated_error=err_obj)
-                    raise
                 except Exception as err_obj:
                     raise EnvUtilsLoadError(str(err_obj), bucket_name=bucket, env=env_name, encapsulated_error=err_obj)
 
@@ -318,6 +349,7 @@ def is_indexer_env(envname: EnvName) -> bool:
     """
     Returns true if the given envname is the indexer env name.
     """
+    raise BeanstalkOperationNotImplemented(operation="indexer_env")
     return envname == EnvUtils.INDEXER_ENV_NAME
 
 
@@ -327,6 +359,7 @@ def indexer_env_for_env(envname: EnvName) -> Optional[EnvName]:
     Given any environment, returns the associated indexer env.
     (If the environment is the indexer env itself, returns None.)
     """
+    raise BeanstalkOperationNotImplemented(operation="indexer_env_for_env")
     if envname == EnvUtils.INDEXER_ENV_NAME:
         return None
     else:
@@ -361,6 +394,7 @@ def blue_green_mirror_env(envname):
 
 @if_orchestrated()
 def prod_bucket_env_for_app(appname: Optional[OrchestratedApp] = None):
+    # raise BeanstalkOperationNotImplemented(operation="prod_bucket_env_for_app")
     _check_appname(appname)
     return prod_bucket_env(EnvUtils.PRD_ENV_NAME)
 
@@ -368,8 +402,12 @@ def prod_bucket_env_for_app(appname: Optional[OrchestratedApp] = None):
 @if_orchestrated
 def prod_bucket_env(envname: EnvName) -> Optional[EnvName]:
     if is_stg_or_prd_env(envname):
-        return EnvUtils.WEBPROD_PSEUDO_ENV
-    else:
+        if EnvUtils.WEBPROD_PSEUDO_ENV:
+            return EnvUtils.WEBPROD_PSEUDO_ENV
+        elif EnvUtils.STAGE_MIRRORING_ENABLED and envname == EnvUtils.STG_ENV_NAME:
+            return EnvUtils.PRD_ENV_NAME
+        return envname
+    else:  # For a non-prod env, we just return None
         return None
 
 
@@ -395,7 +433,8 @@ def public_url_mappings(envname):
 
 def _check_appname(appname: Optional[OrchestratedApp], required=False):
     if appname or required:  # VERY IMPORTANT: Only do this check if we are given a specific app name (or it's required)
-        if appname != EnvUtils.ORCHESTRATED_APP:
+        # ALSO: Only check if the orchestrated app is declared. Otherwise, trust.
+        if EnvUtils.ORCHESTRATED_APP and appname != EnvUtils.ORCHESTRATED_APP:
             raise RuntimeError(f"The orchestrated app is {EnvUtils.ORCHESTRATED_APP}, not {appname}.")
 
 
@@ -405,6 +444,17 @@ def public_url_for_app(appname: Optional[OrchestratedApp] = None) -> Optional[st
     entry = find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.ENVIRONMENT: EnvUtils.PRD_ENV_NAME})
     if entry:
         return entry.get('url')
+
+
+def compute_orchestrated_real_url(envname):
+    entry = find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.ENVIRONMENT: envname})
+    if entry:
+        return entry.get('url')
+    elif EnvUtils.ORCHESTRATED_APP == APP_FOURFRONT: # Only fourfront shortens
+        protocol = 'https' if envname == 'data' else 'http'
+        return f"{protocol}://{short_env_name(envname)}{EnvUtils.DEV_ENV_DOMAIN_SUFFIX}"
+    else:
+        return f"https://{envname}{EnvUtils.DEV_ENV_DOMAIN_SUFFIX}"
 
 
 @if_orchestrated
@@ -463,6 +513,12 @@ def is_fourfront_env(envname: Optional[EnvName]) -> bool:
         return True
     else:
         return False
+
+
+@if_orchestrated
+def compute_orchestrated_prd_env_for_project(project: OrchestratedApp):
+    _check_appname(appname=project)
+    return EnvUtils.PRD_ENV_NAME
 
 
 def _is_raw_stg_or_prd_env(envname: EnvName) -> bool:

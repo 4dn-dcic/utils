@@ -15,6 +15,7 @@ from dcicutils.env_utils import (
     # New support
     EnvUtils, p, c,
 )
+from dcicutils.exceptions import BeanstalkOperationNotImplemented
 from dcicutils.misc_utils import decorator, local_attrs
 from dcicutils.qa_utils import raises_regexp
 from unittest import mock
@@ -1594,6 +1595,7 @@ def test_orchestrated_infer_foursight_env():
             assert infer_foursight_from_env(mock_request('cgap.hms.harvard.edu'), 'cgap') == 'cgap'
 
 
+@pytest.mark.skip
 @using_orchestrated_behavior()
 def test_orchestrated_indexer_env_for_env():
 
@@ -1610,6 +1612,20 @@ def test_orchestrated_indexer_env_for_env():
 
 
 @using_orchestrated_behavior()
+def test_orchestrated_indexer_env_for_env_disabled():
+
+    assert EnvUtils.INDEXER_ENV_NAME == 'acme-indexer'
+
+    # We've disabled calls to this. The indexer isn't done this way in containers.
+    for env in ['acme-indexer', 'acme-prd', 'acme-test', 'acme-anything', 'blah-blah']:
+        with pytest.raises(BeanstalkOperationNotImplemented):
+            indexer_env_for_env(env)
+
+
+
+
+@pytest.mark.skip
+@using_orchestrated_behavior()
 def test_orchestrated_is_indexer_env():
 
     assert EnvUtils.INDEXER_ENV_NAME == 'acme-indexer'
@@ -1621,6 +1637,18 @@ def test_orchestrated_is_indexer_env():
     assert is_indexer_env('acme-test') is False
     assert is_indexer_env('acme-foo') is False
     assert is_indexer_env('pretty-much-anything') is False
+
+
+@using_orchestrated_behavior()
+def test_orchestrated_is_indexer_env_disabled():
+
+    assert EnvUtils.INDEXER_ENV_NAME == 'acme-indexer'
+
+    # We've disabled calls to this. The indexer isn't done this way in containers.
+    for env in ['acme-indexer', 'acme-prd', 'acme-test', 'acme-anything', 'blah-blah']:
+        with pytest.raises(BeanstalkOperationNotImplemented):
+            is_indexer_env(env)
+
 
 
 @using_orchestrated_behavior()

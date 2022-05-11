@@ -101,6 +101,8 @@ class EnvManager:
         if not self._portal_url:
             raise ValueError(f"Missing {self.LEGACY_PORTAL_URL_KEY!r} or {self.PORTAL_URL_KEY!r}"
                              f" key in global_env {env_description}.")
+        else:
+            self._portal_url = self._portal_url.rstrip('/')
 
         self._es_url = (env_description.get(self.LEGACY_ES_URL_KEY) or
                         env_description.get(self.ES_URL_KEY))

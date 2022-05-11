@@ -827,10 +827,13 @@ class MockBotoS3Client:
         self.other_required_arguments = other_required_arguments
         self.storage_class = storage_class or self.DEFAULT_STORAGE_CLASS
 
-    def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+    def check_for_kwargs_required_by_mock(self, operation, Bucket, Key, **kwargs):
+        ignored(Bucket, Key)
         if kwargs != self.other_required_arguments:
-            raise MockKeysNotImplemented("upload_file_obj", kwargs.keys())
+            raise MockKeysNotImplemented(operation, self.other_required_arguments.keys())
 
+    def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+        self.check_for_kwargs_required_by_mock("upload_fileobj", Bucket=Bucket, Key=Key, **kwargs)
         data = Fileobj.read()
         print("Uploading %s (%s bytes) to bucket %s key %s"
               % (Fileobj, len(data), Bucket, Key))
@@ -838,16 +841,12 @@ class MockBotoS3Client:
             fp.write(data)
 
     def upload_file(self, Filename, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
-        if kwargs != self.other_required_arguments:
-            raise MockKeysNotImplemented("upload_file", kwargs.keys())
-
+        self.check_for_kwargs_required_by_mock("upload_file", Bucket=Bucket, Key=Key, **kwargs)
         with io.open(Filename, 'rb') as fp:
             self.upload_fileobj(Fileobj=fp, Bucket=Bucket, Key=Key)
 
     def download_fileobj(self, Bucket, Key, Fileobj, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
-        if kwargs != self.other_required_arguments:
-            raise MockKeysNotImplemented("download_fileobj", kwargs.keys())
-
+        self.check_for_kwargs_required_by_mock("download_fileobj", Bucket=Bucket, Key=Key, **kwargs)
         with self.s3_files.open(os.path.join(Bucket, Key), 'rb') as fp:
             data = fp.read()
         print("Downloading bucket %s key %s (%s bytes) to %s"
@@ -855,15 +854,12 @@ class MockBotoS3Client:
         Fileobj.write(data)
 
     def download_file(self, Bucket, Key, Filename, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
-        if kwargs != self.other_required_arguments:
-            raise MockKeysNotImplemented("download_file", kwargs.keys())
-
+        self.check_for_kwargs_required_by_mock("download_file", Bucket=Bucket, Key=Key, **kwargs)
         with io.open(Filename, 'wb') as fp:
             self.download_fileobj(Bucket=Bucket, Key=Key, Fileobj=fp)
 
     def get_object(self, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
-        if kwargs != self.other_required_arguments:
-            raise MockKeysNotImplemented("get_object", kwargs.keys())
+        self.check_for_kwargs_required_by_mock("get_object", Bucket=Bucket, Key=Key, **kwargs)
 
         head_metadata = self.head_object(Bucket=Bucket, Key=Key, **kwargs)
 
@@ -881,6 +877,7 @@ class MockBotoS3Client:
     }
 
     def put_object(self, *, Bucket, Key, Body, ContentType=None, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+        # TODO: Shouldn't this be checking for required arguments (e.g., for SSE)? -kmp 9-May-2022
         if ContentType is not None:
             exts = self.PUT_OBJECT_CONTENT_TYPES.get(ContentType)
             assert exts, "Unimplemented mock .put_object content type %s for Key=%s" % (ContentType, Key)
@@ -900,8 +897,7 @@ class MockBotoS3Client:
         return MockBotoS3Bucket(s3=self, name=name)
 
     def head_object(self, Bucket, Key, **kwargs):  # noQA - AWS argument naming style
-        if kwargs != self.other_required_arguments:
-            raise MockKeysNotImplemented("get_object", kwargs.keys())
+        self.check_for_kwargs_required_by_mock("head_object", Bucket=Bucket, Key=Key, **kwargs)
 
         pseudo_filename = os.path.join(Bucket, Key)
 
@@ -919,7 +915,7 @@ class MockBotoS3Client:
             # I would need to research what specific error is needed here and hwen,
             # since it might be a 404 (not found) or a 403 (permissions), depending on various details.
             # For now, just fail in any way since maybe our code doesn't care.
-            raise Exception("Mock File Not Found")
+            raise Exception(f"Mock File Not Found: {pseudo_filename}")
 
     def head_bucket(self, Bucket):  # noQA - AWS argument naming style
         bucket_prefix = Bucket + "/"

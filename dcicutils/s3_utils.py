@@ -125,8 +125,9 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 # env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket, env=env)
                 # ff_url = env_config['fourfront']
                 self.env_manager = global_manager = EnvManager(env_name=env, s3=self.s3)
-                self.url = global_manager.portal_url
-                health_json_url = f'{global_manager.portal_url}/health?format=json'
+                portal_url = global_manager.portal_url.rstrip('/')
+                self.url = portal_url
+                health_json_url = f"{portal_url}/health?format=json"
                 logger.warning('health json url: {}'.format(health_json_url))
                 health_json = EnvManager.fetch_health_page_json(url=health_json_url)
                 self.s3_encrypt_key_id = health_json.get(HealthPageKey.S3_ENCRYPT_KEY_ID, None)

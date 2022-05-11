@@ -9,12 +9,43 @@ import time
 
 from dcicutils.beanstalk_utils import describe_beanstalk_environments, REGION
 from dcicutils.ff_utils import authorized_request, get_health_page
-from dcicutils.misc_utils import check_true, PRINT
+from dcicutils.base import get_beanstalk_real_url
+from dcicutils.misc_utils import check_true, PRINT, remove_prefix
 from dcicutils.s3_utils import s3Utils
-from .conftest_settings import TEST_DIR
+from .conftest_settings import TEST_DIR, INTEGRATED_ENV, INTEGRATED_ENV_INDEX
 
+
+def _get_portal_url_for_testing(envname):
+    # This doesn't quite work, probably because fourfront_mastertest is not properly declared yet.
+    # portal_url = get_beanstalk_real_url(envname)
+    short_envname = remove_prefix('fourfront_', remove_prefix('fourfront-', envname))
+    print(f"short_envname={short_envname}")
+    portal_url = f"https://{short_envname}.4dnucleome.org"
+    return portal_url
 
 def _discover_es_health_from_boto3_eb_metadata(envname):
+    portal_url = _get_portal_url_for_testing(envname)
+    # From here we should be good...
+    print(f"portal_url={portal_url}")
+    healh_json_url = f"{portal_url}/health?format=json"
+    print(f"health_json_url={healh_json_url}")
+    response = requests.get(healh_json_url)
+    print(f"response={response}")
+    result = response.json()
+    print(f"result={result}")
+    return result
+
+    # This doesn't quite work, probably because fourfront_mastertest is not properly declared yet.
+    # portal_url = get_beanstalk_real_url(envname)
+    # print(f"portal_url={portal_url}")
+    # healh_json_url = f"{portal_url}/health?format=json"
+    # print(f"health_json_url={healh_json_url}")
+    # response = requests.get(healh_json_url)
+    # print(f"response={response}")
+    # result = response.json()
+    # print(f"result={result}")
+    # return result
+
     try:
         eb_client = boto3.client('elasticbeanstalk', region_name=REGION)
         # Calling describe_beanstalk_environments is pretty much the same as doing eb_client.describe_environments(...)
@@ -34,6 +65,13 @@ def _discover_es_health_from_boto3_eb_metadata(envname):
 
 
 def _discover_es_url_from_boto3_eb_metadata(integrated_envname):
+
+    health = _discover_es_health_from_boto3_eb_metadata(integrated_envname)
+    namespace = health['namespace']
+    assert isinstance(namespace, str)
+    assert namespace.replace('_', '-') == integrated_envname.replace('_', '-')
+    return health['elasticsearch']
+
     try:
 
         discovered_health_json_from_eb = _discover_es_health_from_boto3_eb_metadata(integrated_envname)
@@ -68,14 +106,14 @@ def _discover_es_url_from_boto3_eb_metadata(integrated_envname):
         PRINT(f"{e.__class__.__name__}: {e}")
         raise RuntimeError(f"Failed to discover ES URL for {integrated_envname}.")
 
-# XXX: Refactor to config
-INTEGRATED_ENV = 'fourfront-mastertest'
 
 
 # We used to wire in this URL, but it's better to discover it dynamically
 # so that it can change.
 INTEGRATED_ES = _discover_es_url_from_boto3_eb_metadata(INTEGRATED_ENV)
 
+os.environ['GLOBAL_ENV_BUCKET'] = 'foursight-envs'
+os.environ['ENV_NAME'] = INTEGRATED_ENV
 
 @pytest.fixture(scope='session')
 def integrated_ff():
@@ -87,6 +125,7 @@ def integrated_ff():
     integrated['ff_key'] = s3.get_access_keys()
     integrated['higlass_key'] = s3.get_higlass_key()
     integrated['ff_env'] = INTEGRATED_ENV
+    integrated['ff_env_index'] = INTEGRATED_ENV_INDEX
     integrated['es_url'] = INTEGRATED_ES
     # do this to make sure env is up (will error if not)
     res = authorized_request(integrated['ff_key']['server'],  # noQA - PyCharm fears the ['server'] part won't be there.

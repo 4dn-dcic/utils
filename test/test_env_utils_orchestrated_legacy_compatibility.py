@@ -19,8 +19,11 @@ from dcicutils.env_utils_legacy import (
     CGAP_ENV_MASTERTEST, CGAP_ENV_MASTERTEST_NEW, CGAP_ENV_PRODUCTION_BLUE, CGAP_ENV_PRODUCTION_BLUE_NEW,
     CGAP_ENV_PRODUCTION_GREEN, CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_STAGING, CGAP_ENV_STAGING_NEW,
     CGAP_ENV_WEBDEV, CGAP_ENV_WEBDEV_NEW, CGAP_ENV_WEBPROD, CGAP_ENV_WEBPROD_NEW, CGAP_ENV_WOLF, CGAP_ENV_WOLF_NEW,
-    CGAP_PRODUCTION_IDENTIFIER, CGAP_PROD_BUCKET_ENV,
-    CGAP_PUBLIC_DOMAIN_PRD, CGAP_PUBLIC_URLS, CGAP_PUBLIC_URL_PRD,
+    _CGAP_MGB_PRODUCTION_IDENTIFIER,  # noQA
+    CGAP_PROD_BUCKET_ENV,
+    _CGAP_MGB_PUBLIC_DOMAIN_PRD,  # noQA
+    CGAP_PUBLIC_URLS,
+    _CGAP_MGB_PUBLIC_URL_PRD,  # noQA
     FF_ENV_HOTSEAT, FF_ENV_INDEXER, FF_ENV_MASTERTEST, FF_ENV_PRODUCTION_BLUE, FF_ENV_PRODUCTION_GREEN,
     FF_ENV_WEBDEV, FF_ENV_WEBPROD, FF_ENV_WEBPROD2, FF_ENV_WOLF,
     FF_PRODUCTION_IDENTIFIER, FF_PROD_BUCKET_ENV, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG,
@@ -254,7 +257,7 @@ def test_legacy_public_url_mappings():
 @using_legacy_behavior()
 def test_legacy_public_url_for_app():
 
-    assert public_url_for_app('cgap') == CGAP_PUBLIC_URL_PRD
+    assert public_url_for_app('cgap') == _CGAP_MGB_PUBLIC_URL_PRD
     assert public_url_for_app('fourfront') == FF_PUBLIC_URL_PRD
 
     with pytest.raises(InvalidParameterError):
@@ -745,7 +748,7 @@ def test_legacy_infer_foursight_env():
     check(CGAP_ENV_WEBPROD, 'cgap')
 
     # Traditionally this didn't work as inputs, but that seems silly, so I made it work, too. -kmp 4-Oct-2021
-    check('cgap', CGAP_PRODUCTION_IDENTIFIER, request=mock_request(CGAP_PUBLIC_DOMAIN_PRD))
+    check('cgap', _CGAP_MGB_PRODUCTION_IDENTIFIER, request=mock_request(_CGAP_MGB_PUBLIC_DOMAIN_PRD))
 
     check('', None)
     check(None, None)
@@ -807,7 +810,7 @@ def test_legacy_infer_foursight_url_from_env():
     check(CGAP_ENV_WEBPROD, 'cgap', cgap=True)
 
     # Traditionally this didn't work as inputs, but that seems silly, so I made it work, too. -kmp 4-Oct-2021
-    check('cgap', CGAP_PRODUCTION_IDENTIFIER, request=mock_request(CGAP_PUBLIC_DOMAIN_PRD), cgap=True)
+    check('cgap', _CGAP_MGB_PRODUCTION_IDENTIFIER, request=mock_request(_CGAP_MGB_PUBLIC_DOMAIN_PRD), cgap=True)
 
     check('', None, cgap=True)
     check(None, None, cgap=True)
