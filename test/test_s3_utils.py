@@ -4,10 +4,9 @@ import io
 import json
 import os
 import pytest
-import requests
 
 from botocore.exceptions import ClientError
-from dcicutils import s3_utils as s3_utils_module, beanstalk_utils
+from dcicutils import s3_utils as s3_utils_module  # , beanstalk_utils
 from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
 from dcicutils.env_utils import (
     get_standard_mirror_env, EnvUtils,
@@ -16,13 +15,13 @@ from dcicutils.env_utils_legacy import (
     FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, _CGAP_MGB_PUBLIC_URL_PRD  # noQA
 )
 from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs
-from dcicutils.ff_mocks import make_mock_portal_url, make_mock_es_url
+from dcicutils.ff_mocks import make_mock_es_url
 from dcicutils.misc_utils import ignored, ignorable
 from dcicutils.qa_utils import override_environ, MockBoto3, MockBotoS3Client, MockResponse, known_bug_expected
 from dcicutils.s3_utils import s3Utils, EnvManager, HealthPageKey
 from unittest import mock
 from .test_ff_utils import mocked_s3utils_with_sse
-from .conftest_settings import INTEGRATED_ENV
+
 
 @contextlib.contextmanager
 def mocked_s3_integration(integrated_names=None, zip_suffix="", ffenv=None):
@@ -100,11 +99,12 @@ def test_regression_s3_utils_short_name_c4_706():
 
 
 def _env_is_probably_up_and_healthy(env):
+    ignored(env)
     return True  # not quite right, but
     # This code won't work in container systems...
-    env_url = beanstalk_utils.get_beanstalk_real_url(env)
-    health_page_url = f"{env_url.rstrip('/')}/health?format=json"
-    return requests.get(health_page_url).status_code == 200
+    # env_url = beanstalk_utils.get_beanstalk_real_url(env)
+    # health_page_url = f"{env_url.rstrip('/')}/health?format=json"
+    # return requests.get(health_page_url).status_code == 200
 
 
 @pytest.mark.integrated
@@ -147,6 +147,7 @@ def test_s3utils_creation_ff_stg():
     prd_beanstalk_env = compute_ff_prd_env()
     stg_beanstalk_env = get_standard_mirror_env(prd_beanstalk_env)
     test_stg(stg_beanstalk_env)
+
 
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
@@ -550,7 +551,7 @@ def test_get_file_size_in_gb_integrated(integrated_s3_info):
 @pytest.mark.unit
 def test_get_file_size_in_gb_unit(integrated_names):
 
-        # This unit test needs work, but its corresponding integration test works.
+    # This unit test needs work, but its corresponding integration test works.
     # with mocked_s3_integration(integrated_names=integrated_names) as s3_connection:
     ffenv = integrated_names['ffenv'] if integrated_names else None
     filename = integrated_names['filename']

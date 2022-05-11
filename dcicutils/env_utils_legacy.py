@@ -5,7 +5,7 @@ from typing import Optional
 from urllib.parse import urlparse
 from .common import EnvName, OrchestratedApp, APP_CGAP, APP_FOURFRONT, ORCHESTRATED_APPS
 from .exceptions import InvalidParameterError
-from .misc_utils import get_setting_from_context, check_true, remove_prefix
+from .misc_utils import get_setting_from_context, check_true, remove_prefix, ignored
 
 
 logger = structlog.getLogger(__name__)
@@ -376,6 +376,7 @@ def public_url_mappings(envname: EnvName):
 
 
 def compute_orchestrated_prd_env_for_project(project: OrchestratedApp) -> Optional[EnvName]:
+    ignored(project)
     return None
 
 

@@ -23,7 +23,9 @@ from dcicutils.misc_utils import (
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ,
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
-    capitalize1, local_attrs, dict_zip, json_leaf_subst, _is_function_of_exactly_one_required_arg, string_list,
+    capitalize1, local_attrs, dict_zip, json_leaf_subst,
+    _is_function_of_exactly_one_required_arg,  # noQA
+    string_list,
     string_md5, SingletonManager,
 )
 from dcicutils.qa_utils import (
@@ -1464,27 +1466,35 @@ def test_is_function_of_exactly_one_required_arg():
         return ['n_args', 0]
 
     def f1(x):
+        ignored(x)
         return ['n_args', 1]
 
     def f2(x, y):
+        ignored(x, y)
         return ['n_args', 2]
 
     def f0_k1(*, k):
+        ignored(k)
         return ['n_args', 0, 'n_kwargs', 1]
 
     def f1_k1(*, k):
+        ignored(k)
         return ['n_args', 1, 'n_kwargs', 1]
 
     def f2_k1(*, k):
+        ignored(k)
         return ['n_args', 2, 'n_kwargs', 1]
 
     def f0_1(x=0):
+        ignored(x)
         return ['n_args_min', 0, 'n_args_max', 1]
 
     def f0_2(x=0, y=0):
+        ignored(x, y)
         return ['n_args_min', 0, 'n_args_max', 1]
 
     def f0_k0_1(*, k=0):
+        ignored(k)
         return ['n_args', 0, 'n_kwargs_min', 0, 'n_kwargs_max', 1]
 
     assert _is_function_of_exactly_one_required_arg(f0) is False
@@ -2599,4 +2609,3 @@ def test_singleton_manager():
     assert foo3_manager.singleton.secret_token == foo3_manager.singleton.secret_token
     assert foo3_manager.singleton.secret_token2 is not None
     assert foo3_manager.singleton.secret_token2 == foo3_manager.singleton.secret_token2
-

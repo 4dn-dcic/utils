@@ -4,7 +4,6 @@ import os
 import re
 
 
-from dcicutils.base import get_beanstalk_real_url
 from dcicutils.misc_utils import ignored, override_environ, remove_prefix
 from dcicutils.qa_utils import (
     MockBoto3, MockBotoElasticBeanstalkClient, MockBotoS3Client,
@@ -22,7 +21,7 @@ _MOCK_APPLICATION_OPTIONS_PARTIAL = (
 )
 
 
-class MockBoto4DNLegacyElasticBeanstalkClient(MockBotoElasticBeanstalkClient):
+class MockBoto4DNLegacyElasticBeanstalkClient(MockBotoElasticBeanstalkClient):  # noQA - missing some abstract methods
 
     DEFAULT_MOCKED_BEANSTALKS = [
         make_mock_beanstalk("fourfront-cgapdev"),
@@ -57,7 +56,7 @@ class MockBoto4DNLegacyElasticBeanstalkClient(MockBotoElasticBeanstalkClient):
 
 def make_mock_boto_eb_client_class(beanstalks):
 
-    class MockBotoBeanstalkClient(MockBotoElasticBeanstalkClient):
+    class MockBotoBeanstalkClient(MockBotoElasticBeanstalkClient):  # noQA - missing some abstract methods
 
         DEFAULT_MOCKED_BEANSTALKS = list(map(make_mock_beanstalk, beanstalks))
 
@@ -128,15 +127,15 @@ def mocked_s3utils(beanstalks=None, require_sse=False, other_access_key_names=No
         with mock.patch.object(ff_utils, "boto3", mock_boto3):
             with mock.patch.object(beanstalk_utils, "boto3", mock_boto3):
                 with mock.patch.object(env_utils, "boto3", mock_boto3):
-                  # def mocked_get_authentication_with_server(key, ff_env):
-                  #   if ff_env == TestScenarios.foo_env:
-                  #        return TestScenarios.foo_env_auth_dict
-                  #    elif ff_env == TestScenarios.bar_env:
-                  #        return TestScenarios.bar_env_auth_dict
-                  #    else:
-                  #        raise ValueError(f"Bad env: {ff_env}")
-                  # with mock.patch.object(ff_utils, "get_authentication_with_server") as mock_get_auth:
-                  #  mock_get_auth.side_effect = mocked_get_authentication_with_server
+                    # def mocked_get_authentication_with_server(key, ff_env):
+                    #   if ff_env == TestScenarios.foo_env:
+                    #        return TestScenarios.foo_env_auth_dict
+                    #    elif ff_env == TestScenarios.bar_env:
+                    #        return TestScenarios.bar_env_auth_dict
+                    #    else:
+                    #        raise ValueError(f"Bad env: {ff_env}")
+                    # with mock.patch.object(ff_utils, "get_authentication_with_server") as mock_get_auth:
+                    #  mock_get_auth.side_effect = mocked_get_authentication_with_server
                     with mock.patch.object(s3_utils.EnvManager, "fetch_health_page_json") as mock_fetcher:
 
                         # This is all that's needed for s3Utils to initialize an EnvManager.
@@ -297,7 +296,6 @@ def make_mock_boto_s3_with_sse(beanstalks=None, other_access_key_names=None):
             if Bucket == 'foursight-envs':
                 return  # This bucket does not care about SSE arguments
             super().check_for_kwargs_required_by_mock(operation=operation, Bucket=Bucket, Key=Key, **kwargs)
-
 
     return MockBotoS3WithSSE
 

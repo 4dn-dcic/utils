@@ -14,7 +14,7 @@ def test_set_logging_not_prod(caplog):
     assert len(caplog.records) == 1
     log_record = caplog.records[0]
     # make sure there are no handlers and the message is non-dictionary
-    assert len(log_record._logger.handlers) == 0
+    assert len(log_record._logger.handlers) == 0  # noQA - PyCharm doesn't like the reference to ._logger
     assert 'baz' in log_record.__dict__['msg']
     assert 'error' in log_record.__dict__['msg']
     assert 'log_uuid' in log_record.__dict__['msg']
@@ -31,7 +31,7 @@ def test_set_logging_prod_but_no_es(caplog):
     log_record = caplog.records[0]
     assert isinstance(log_record.__dict__['msg'], dict)
     assert 'log_uuid' in log_record.__dict__['msg']
-    assert len(log_record._logger.handlers) == 0
+    assert len(log_record._logger.handlers) == 0  # noQA - PyCharm doesn't like the reference to ._logger
 
 
 @pytest.mark.integrated
@@ -42,6 +42,7 @@ def test_set_logging_level(caplog, integrated_ff):
     log = structlog.getLogger('Errors')
     log.error('oh no an error!', foo='faux')
     assert len(caplog.records) == 1
+
 
 @pytest.mark.direct_es_query
 @pytest.mark.integrated
@@ -96,7 +97,7 @@ def test_set_logging_in_prod(caplog, integrated_ff):
     assert len(caplog.records) == 2  # two logs now
     log_record2 = caplog.records[1]
     # make sure the ES handler is present
-    assert len(log_record2._logger.handlers) == 1
+    assert len(log_record2._logger.handlers) == 1  # noQA - PyCharm doesn't like the reference to ._logger
     assert 'log_uuid' in log_record2.__dict__['msg']
     assert log_record2.__dict__['msg']['event'] == 'test_skip'
     log_uuid = log_record2.__dict__['msg']['log_uuid']
@@ -130,7 +131,7 @@ def test_logging_retry(caplog, integrated_ff):
     for log_record in caplog.records:
         msg = log_record.__dict__['msg']  # gets around a method for .msg that does something we don't want.
         if not isinstance(msg, str) and msg['event'] == 'test_retry':
-            assert msg['_test_log_utils'] == True
+            assert msg['_test_log_utils'] is True
             log_uuid = msg['log_uuid']
             break
     else:

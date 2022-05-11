@@ -1622,8 +1622,6 @@ def test_orchestrated_indexer_env_for_env_disabled():
             indexer_env_for_env(env)
 
 
-
-
 @pytest.mark.skip
 @using_orchestrated_behavior()
 def test_orchestrated_is_indexer_env():
@@ -1648,7 +1646,6 @@ def test_orchestrated_is_indexer_env_disabled():
     for env in ['acme-indexer', 'acme-prd', 'acme-test', 'acme-anything', 'blah-blah']:
         with pytest.raises(BeanstalkOperationNotImplemented):
             is_indexer_env(env)
-
 
 
 @using_orchestrated_behavior()

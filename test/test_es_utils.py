@@ -7,7 +7,7 @@ from dcicutils.ff_utils import get_es_metadata
 from dcicutils.misc_utils import ignored
 from dcicutils.qa_utils import timed
 from unittest import mock
-from .conftest_settings import INTEGRATED_ENV, INTEGRATED_ENV_INDEX
+from .conftest_settings import INTEGRATED_ENV_INDEX  # , INTEGRATED_ENV
 
 
 class TestElasticSearchServiceClient:
@@ -123,7 +123,9 @@ def test_lucene_query_basic(es_client_fixture):
         },
         'sort': [{'_uid': {'order': 'desc'}}]
     }
-    results = execute_lucene_query_on_es(client=es_client_fixture, index=f'{INTEGRATED_ENV_INDEX}user', query=test_query)
+    results = execute_lucene_query_on_es(client=es_client_fixture,
+                                         index=f'{INTEGRATED_ENV_INDEX}user',
+                                         query=test_query)
     assert len(results) == 1
 
 

@@ -30,7 +30,7 @@ class UseLegacy(BaseException):
 
 
 @decorator()
-def                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, assumes_no_mirror=False):
+def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, assumes_no_mirror=False):
     """
     This is a decorator intended to manage new versions of these functions as they apply to orchestrated CGAP
     without disturbing legacy behavior (now found in env_utils_legacy.py and still supported for the original
@@ -271,7 +271,9 @@ class EnvUtils:
 
     @classmethod
     @contextlib.contextmanager
-    def locally_declared_data(cls, data={}, **kwargs):
+    def locally_declared_data(cls, data=None, **kwargs):
+        if data is None:
+            data = {}
         old_data = {attr: copy.deepcopy(val)
                     for attr, val in cls.__dict__.items() if attr.isupper()}
         try:
@@ -279,7 +281,7 @@ class EnvUtils:
                 cls.set_declared_data(data)  # First set the given data, if any
             # Now override individual specified attributes
             for attr, val in kwargs.items():
-                 setattr(cls, attr, val)
+                setattr(cls, attr, val)
             yield
         finally:
             for attr, old_val in old_data.items():
@@ -345,25 +347,27 @@ class EnvUtils:
 
 
 @if_orchestrated
-def is_indexer_env(envname: EnvName) -> bool:
+def is_indexer_env(envname: EnvName):
     """
     Returns true if the given envname is the indexer env name.
     """
+    ignored(envname)
     raise BeanstalkOperationNotImplemented(operation="indexer_env")
-    return envname == EnvUtils.INDEXER_ENV_NAME
+    # return envname == EnvUtils.INDEXER_ENV_NAME
 
 
 @if_orchestrated
-def indexer_env_for_env(envname: EnvName) -> Optional[EnvName]:
+def indexer_env_for_env(envname: EnvName):
     """
     Given any environment, returns the associated indexer env.
     (If the environment is the indexer env itself, returns None.)
     """
+    ignored(envname)
     raise BeanstalkOperationNotImplemented(operation="indexer_env_for_env")
-    if envname == EnvUtils.INDEXER_ENV_NAME:
-        return None
-    else:
-        return EnvUtils.INDEXER_ENV_NAME
+    # if envname == EnvUtils.INDEXER_ENV_NAME:
+    #     return None
+    # else:
+    #     return EnvUtils.INDEXER_ENV_NAME
 
 
 @if_orchestrated
@@ -450,7 +454,7 @@ def compute_orchestrated_real_url(envname):
     entry = find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.ENVIRONMENT: envname})
     if entry:
         return entry.get('url')
-    elif EnvUtils.ORCHESTRATED_APP == APP_FOURFRONT: # Only fourfront shortens
+    elif EnvUtils.ORCHESTRATED_APP == APP_FOURFRONT:  # Only fourfront shortens
         protocol = 'https' if envname == 'data' else 'http'
         return f"{protocol}://{short_env_name(envname)}{EnvUtils.DEV_ENV_DOMAIN_SUFFIX}"
     else:
