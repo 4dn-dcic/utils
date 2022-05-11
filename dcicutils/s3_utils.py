@@ -293,6 +293,61 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             return False
         return file_metadata
 
+    def get_object_tags(self, key, bucket):
+        """
+        Get all tags of an object.
+
+        Args:
+            key (string): object key
+            bucket (string): S3 bucket
+            
+        Returns:
+            Returns list of object tags. 
+            The format is [{'Key': 'KEY1','Value': 'VALUE1'},{...}]
+        """
+
+        try:
+            response = self.s3.get_object_tagging(
+                Bucket=bucket,
+                Key=key,
+            )
+            return response["TagSet"]
+        except Exception as e:
+            logger.warning(f'Could not get tags for object {bucket}/{key}: {str(e)}')
+            raise e
+
+    def set_object_tags(self, key, bucket, tags, replace_tags=True):
+        """
+        Adds or replaces tags of an object with the ones specified in `tags`.
+
+        Args:
+            key (string): object key
+            bucket (string): S3 bucket
+            tags (list): List of tags of the form [{'Key': 'KEY1','Value': 'VALUE1'}, {...}]
+            replace_tags (bool): If True, existing tags are replaced with the provided ones. 
+                Otherwise, the provided tags are added to the existing ones
+
+        Returns:
+            Dict with the versionId of the object the tag-set was added to
+        """
+
+        try:
+            new_tags = tags
+            if not replace_tags:
+                existing_tags = self.get_object_tags(key, bucket)
+                if existing_tags:
+                    new_tags = existing_tags + new_tags
+            return self.s3.put_object_tagging(
+                Bucket=bucket,
+                Key=key,
+                Tagging={
+                    'TagSet': new_tags,
+                },
+            )
+        except Exception as e:
+            logger.warning(f'{bucket}/{key} could not be tagged: {str(e)}')
+            raise e
+
     def get_file_size(self, key, bucket=None, add_bytes=0, add_gb=0,
                       size_in_gb=False):
         """
