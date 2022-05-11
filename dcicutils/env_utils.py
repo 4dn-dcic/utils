@@ -274,7 +274,7 @@ class EnvUtils:
     def locally_declared_data(cls, data=None, **kwargs):
         if data is None:
             data = {}
-        old_data = {attr: copy.deepcopy(val)
+        old_data = {attr: copy.copy(val) if isinstance(val, (dict, list)) else val
                     for attr, val in cls.__dict__.items() if attr.isupper()}
         try:
             if data is not None:
