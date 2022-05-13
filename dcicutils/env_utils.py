@@ -392,6 +392,9 @@ def is_indexer_env(envname: EnvName):
     """
     ignored(envname)
     raise BeanstalkOperationNotImplemented(operation="indexer_env")
+    #
+    # Formerly:
+    #
     # return envname == EnvUtils.INDEXER_ENV_NAME
 
 
@@ -403,6 +406,9 @@ def indexer_env_for_env(envname: EnvName):
     """
     ignored(envname)
     raise BeanstalkOperationNotImplemented(operation="indexer_env_for_env")
+    #
+    # Formerly:
+    #
     # if envname == EnvUtils.INDEXER_ENV_NAME:
     #     return None
     # else:
@@ -437,7 +443,6 @@ def blue_green_mirror_env(envname):
 
 @if_orchestrated()
 def prod_bucket_env_for_app(appname: Optional[OrchestratedApp] = None):
-    # raise BeanstalkOperationNotImplemented(operation="prod_bucket_env_for_app")
     _check_appname(appname)
     return prod_bucket_env(EnvUtils.PRD_ENV_NAME)
 
@@ -572,7 +577,7 @@ def is_fourfront_env(envname: Optional[EnvName]) -> bool:
 
 
 @if_orchestrated
-def compute_orchestrated_prd_env_for_project(project: OrchestratedApp):
+def compute_prd_env_for_project(project: OrchestratedApp):
     _check_appname(appname=project)
     return EnvUtils.PRD_ENV_NAME
 

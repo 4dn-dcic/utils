@@ -5,7 +5,7 @@ from botocore.exceptions import ClientError
 from .common import APP_CGAP, APP_FOURFRONT
 from .env_utils import (
     is_cgap_env, is_fourfront_env, get_standard_mirror_env,
-    compute_orchestrated_prd_env_for_project, get_env_real_url,
+    compute_prd_env_for_project, get_env_real_url,
 )
 from .misc_utils import PRINT
 
@@ -55,7 +55,11 @@ def describe_beanstalk_environments(client, **kwargs):
 
 def beanstalk_info(env):
     """
-    Describe a ElasticBeanstalk environment given an environment name
+    This doesn't actually talk to a beanstalk any more, but now returns a subset of the information
+    that a beanstalk info query would have returned, specifically:
+
+      {"EnvironmentName": <env>, "CNAME": <portal-url-hostname>}
+
 
     Args:
         env (str): ElasticBeanstalk environment name
@@ -63,7 +67,22 @@ def beanstalk_info(env):
     Returns:
         dict: Environments result from describe_beanstalk_environments
     """
-    url = get_beanstalk_real_url(env)
+    return get_env_info(env)
+
+
+def get_env_info(env):
+    """
+    This returns some information about the given environment in a format similar to what beanstalk_info used to
+    return. (If there are other elements of that function's return value that are needed, this is the function to
+    extend.) The return value for now is:
+
+    Args:
+        env (str): ElasticBeanstalk environment name
+
+    Returns:
+        a dictionary of the form {"EnvironmentName": <env>, "CNAME": <portal-url-hostname>}
+    """
+    url = get_env_real_url(env)
     parsed_url = urllib.parse.urlparse(url)
 
     return {
@@ -74,9 +93,13 @@ def beanstalk_info(env):
 
 def get_beanstalk_real_url(env):
     """
-    Return the real url for the elasticbeanstalk with given environment name.
+    Return the real url for the portal with given environment name.
     Name can be a special name (like 'cgap', 'data', 'staging'),
     or an actual environment.
+
+    Note that because we are all-containerized now, this is now table-driven and does not actually do a beanstalk
+    call. We left the name for now, to not break things, but you should consider it deprecated and
+    use get_env_real_url instead.
 
     Args:
         env (str): ElasticBeanstalk environment name
@@ -90,7 +113,7 @@ def get_beanstalk_real_url(env):
 
 def compute_ff_prd_env():  # a.k.a. "whodaman" (its historical name, which has gone away)
     """Returns the name of the current Fourfront production environment."""
-    return compute_orchestrated_prd_env_for_project(APP_FOURFRONT)
+    return compute_prd_env_for_project(APP_FOURFRONT)
 
 
 def compute_ff_stg_env():
@@ -100,7 +123,7 @@ def compute_ff_stg_env():
 
 def compute_cgap_prd_env():
     """Returns the name of the current CGAP production environment."""
-    return compute_orchestrated_prd_env_for_project(APP_CGAP)
+    return compute_prd_env_for_project(APP_CGAP)
 
 
 def compute_cgap_stg_env():

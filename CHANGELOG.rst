@@ -10,6 +10,15 @@ Change Log
 4.0.0
 =====
 
+* New ``make`` targets:
+
+  * ``make test-all`` runs all tests
+  * ``make test-most`` runs all unit and integration tests (marked ``unit``, ``integration`` or ``integrationx``),
+    but not things likely to fail (marked ``beanstalk failure`` or ``direct_es_query``).
+  * ``make test-integrations`` runs all integration tests (marked ``integration`` or ``integrationx``),
+    but not things likely to fail (marked ``beanstalk failure`` or ``direct_es_query``).
+  * ``make test-direct-es-query`` runs any test marked ``direct_es_query```.
+
 * Configurable environmental support for orchestrated C4 applications (Fourfront and CGAP) in ``env_utils`` (C4-689).
 
 * Extend that support to allow mirroring to be enabled (C4-734).
@@ -40,15 +49,46 @@ these new items:
                                  It may or may not need to be different if we orchestrate the legacy system.)
 ===============================  ===============================================================================
 
-* These functions have been removed because they were never invoked by automatic programs anyway.
+* In ``beanstalk_utils``:
 
-  * ``beanstalk_utils.swap_cname``
+  * Removed:
 
-* These functions unconditionally raise an error indicating that the functionality is no longer available.
-  Their callers must be rewritten.
+    * ``swap_cname``
 
-  * ``env_utils.is_indexer_env``
-  * ``indexer_env_for_env``
+    NOTE: This was never invoked by automatic programs, so we didn't do a deprecation stage.
+
+* Deprecated:
+
+  * ``get_beanstalk_real_url`` is deprecated. Use ``env_utils.get_env_real_url``.
+  * ``get_beanstalk_info`` is deprecated. Use ``beanstalk_utils.get_env_info``.
+
+  NOTE: These continue to work for now, but will be removed in the future.
+  Please update code to use recommended replacement.
+
+* In ``env_utils``:
+
+  * New functionality:
+
+    * ``compute_prd_env_for_project``
+    * ``get_env_real_url``
+    * ``get_foursight_bucket``
+
+  * Always erring:
+
+    * ``is_indexer_env``
+    * ``indexer_env_for_env``
+
+    NOTE: These functions unconditionally raise an error indicating that the functionality is no longer available.
+          Their callers must be rewritten, probably in a way that is not a simple substitution.
+
+* Added tech debt by disabling certain tests or marking them for later scrutiny.
+  Three new pytest markers were added in ``pytest.ini``:
+
+  * ``beanstalk_failure`` - An obsolete beanstalk-related test that needs fixing
+  * ``direct_es_query`` - A test of direct ES _search that is disabled for now
+    and needs to move inside the firewall
+  * ``stg_or_prd_testing_needs_repair`` - Some or all of a test that was failing on stg/prd
+    has been temporarily disabled
 
 
 3.13.0

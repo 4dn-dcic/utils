@@ -127,17 +127,7 @@ def mocked_s3utils(beanstalks=None, require_sse=False, other_access_key_names=No
         with mock.patch.object(ff_utils, "boto3", mock_boto3):
             with mock.patch.object(beanstalk_utils, "boto3", mock_boto3):
                 with mock.patch.object(env_utils, "boto3", mock_boto3):
-                    # def mocked_get_authentication_with_server(key, ff_env):
-                    #   if ff_env == TestScenarios.foo_env:
-                    #        return TestScenarios.foo_env_auth_dict
-                    #    elif ff_env == TestScenarios.bar_env:
-                    #        return TestScenarios.bar_env_auth_dict
-                    #    else:
-                    #        raise ValueError(f"Bad env: {ff_env}")
-                    # with mock.patch.object(ff_utils, "get_authentication_with_server") as mock_get_auth:
-                    #  mock_get_auth.side_effect = mocked_get_authentication_with_server
                     with mock.patch.object(s3_utils.EnvManager, "fetch_health_page_json") as mock_fetcher:
-
                         # This is all that's needed for s3Utils to initialize an EnvManager.
                         # We might have to add more later.
                         def mocked_fetch_health_page_json(url, use_urllib=True):

@@ -5,7 +5,7 @@ from typing import Optional
 from urllib.parse import urlparse
 from .common import EnvName, OrchestratedApp, APP_CGAP, APP_FOURFRONT, ORCHESTRATED_APPS
 from .exceptions import InvalidParameterError
-from .misc_utils import get_setting_from_context, check_true, remove_prefix, ignored
+from .misc_utils import get_setting_from_context, check_true, remove_prefix
 
 
 logger = structlog.getLogger(__name__)
@@ -373,11 +373,6 @@ def public_url_mappings(envname: EnvName):
     The envname may be 'cgap', 'data', 'staging', or an environment name.
     """
     return CGAP_PUBLIC_URLS if is_cgap_env(envname) else FF_PUBLIC_URLS
-
-
-def compute_orchestrated_prd_env_for_project(project: OrchestratedApp) -> Optional[EnvName]:
-    ignored(project)
-    return None
 
 
 def is_cgap_server(server, allow_localhost=False):
