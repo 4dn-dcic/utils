@@ -262,17 +262,20 @@ def _create_foursight_new(dest_env):
     return fs
 
 
-def swap_cname(src, dest):
-    """ Does a CNAME swap and foursight configuration (pulled in from Torb)
-        NOTE: this is the mechanism by which CNAME swaps must occur as of 9/15/2020
-    """
-    _swap_cname(src, dest)
-    res_data = _create_foursight_new(src)
-    print('Updated foursight %s environment to use %s. Foursight response: %s'
-          % (res_data['fs_url'], res_data['dest_env'], res_data['foursight']))
-    res_stag = _create_foursight_new(dest)
-    print('Updated foursight %s environment to use %s. Foursight response: %s'
-          % (res_stag['fs_url'], res_stag['dest_env'], res_stag['foursight']))
+# This function has been removed on a major version boundary. This is no longer the way to swap staging
+# and data identies.
+#
+# def swap_cname(src, dest):
+#     """ Does a CNAME swap and foursight configuration (pulled in from Torb)
+#         NOTE: this is the mechanism by which CNAME swaps must occur as of 9/15/2020
+#     """
+#     _swap_cname(src, dest)
+#     res_data = _create_foursight_new(src)
+#     print('Updated foursight %s environment to use %s. Foursight response: %s'
+#           % (res_data['fs_url'], res_data['dest_env'], res_data['foursight']))
+#     res_stag = _create_foursight_new(dest)
+#     print('Updated foursight %s environment to use %s. Foursight response: %s'
+#           % (res_stag['fs_url'], res_stag['dest_env'], res_stag['foursight']))
 
 
 def _get_beanstalk_configuration_settings(env):

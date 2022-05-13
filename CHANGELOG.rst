@@ -10,7 +10,7 @@ Change Log
 4.0.0
 =====
 
-* Configurable support for orchestrated CGAP in ``env_utils`` (C4-689).
+* Configurable environmental support for orchestrated C4 applications (Fourfront and CGAP) in ``env_utils`` (C4-689).
 
 * Extend that support to allow mirroring to be enabled (C4-734).
 
@@ -22,10 +22,11 @@ these new items:
 ===============================  ===============================================================================
 ``"dev_data_set_table"``         Dictionary mapping envnames to their preferred data set
 ``"dev_env_domain_suffix"``      e.g., .abc123def456ghi789.us-east-1.rds.amazonaws.com
+``"foursight_bucket_table"``     A table mapping environments to another table mapping chalice stages to buckets
 ``"foursight_url_prefix"``       A prefix string for use by foursight.
 ``"full_env_prefix"``            A string like "cgap-" that precedes all env names
 ``"hotseat_envs"``               A list of environments that are for testing with hot data
-``"indexer_env_name"``           The environment name used for indexing
+``"indexer_env_name"``           The environment name used for indexing (being phased out)
 ``"is_legacy"``                  Should be ``"true"`` if legacy effect is desired, otherwise omitted.
 ``"stage_mirroring_enabled"``    Should be ``"true"`` if mirroring is desired, otherwise omitted.
 ``"orchestrated_app"``           This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
@@ -38,6 +39,16 @@ these new items:
                                  (In orchestrations, this should usually be the same as the ``prd_env_name``.
                                  It may or may not need to be different if we orchestrate the legacy system.)
 ===============================  ===============================================================================
+
+* These functions have been removed because they were never invoked by automatic programs anyway.
+
+  * ``beanstalk_utils.swap_cname``
+
+* These functions unconditionally raise an error indicating that the functionality is no longer available.
+  Their callers must be rewritten.
+
+  * ``env_utils.is_indexer_env``
+  * ``indexer_env_for_env``
 
 
 3.13.0

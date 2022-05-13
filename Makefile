@@ -8,6 +8,7 @@ configure:  # does any pre-requisite installs
 
 lint:
 	flake8 dcicutils
+	flake8 test
 
 build:  # builds
 	make configure

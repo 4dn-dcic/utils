@@ -1,5 +1,6 @@
 import contextlib
 import functools
+import json
 import os
 import pytest
 
@@ -11,12 +12,14 @@ from dcicutils.env_utils import (
     infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env,
     is_indexer_env, indexer_env_for_env, classify_server_url,
     short_env_name, full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
-    make_env_name_cfn_compatible,
+    make_env_name_cfn_compatible, get_foursight_bucket,
     # New support
-    EnvUtils, p, c,
+    EnvUtils, p, c, get_env_real_url
 )
-from dcicutils.exceptions import BeanstalkOperationNotImplemented
-from dcicutils.misc_utils import decorator, local_attrs
+from dcicutils.exceptions import (
+    BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
+)
+from dcicutils.misc_utils import decorator, local_attrs, ignorable
 from dcicutils.qa_utils import raises_regexp
 from unittest import mock
 from urllib.parse import urlparse
@@ -294,7 +297,7 @@ def test_orchestrated_public_url_mappings():
     # For that matter, the key name doesn't have to be cgap either. But it should be PRD_ENV_NAME
     # or something in PUBLIC_URL_TABLE.
     public_name_1 = 'cgap'
-    public_url_1 = 'https://genetics.example.com'
+    public_url_1 = 'https://cgap.genetics.example.com'
     public_env_1 = 'acme-prd'
     public_name_2 = 'stg'
     public_url_2 = 'https://staging.genetics.example.com'
@@ -384,8 +387,8 @@ def test_orchestrated_blue_green_mirror_env():
 @using_orchestrated_behavior()
 def test_orchestrated_public_url_for_app():
 
-    assert public_url_for_app() == "https://genetics.example.com"
-    assert public_url_for_app('cgap') == "https://genetics.example.com"
+    assert public_url_for_app() == "https://cgap.genetics.example.com"
+    assert public_url_for_app('cgap') == "https://cgap.genetics.example.com"
     with pytest.raises(Exception):
         public_url_for_app('fourfront')  # The example app is not a fourfront app
 
@@ -423,17 +426,15 @@ def test_orchestrated_is_cgap_server_for_cgap():
     assert is_cgap_server("https://127.0.0.1") is False
     assert is_cgap_server("https://127.0.0.1", allow_localhost=True) is True
 
-    assert is_cgap_server("genetics.example.com") is True
+    assert is_cgap_server("cgap.genetics.example.com") is True
 
-    assert is_cgap_server("https://genetics.example.com") is True
+    assert is_cgap_server("http://cgap.genetics.example.com") is True
+    assert is_cgap_server("http://cgap.genetics.example.com/") is True
+    assert is_cgap_server("http://cgap.genetics.example.com/me") is True
 
-    assert is_cgap_server("http://genetics.example.com") is True
-    assert is_cgap_server("http://genetics.example.com/") is True
-    assert is_cgap_server("http://genetics.example.com/me") is True
-
-    assert is_cgap_server("https://genetics.example.com") is True
-    assert is_cgap_server("https://genetics.example.com/") is True
-    assert is_cgap_server("https://genetics.example.com/me") is True
+    assert is_cgap_server("https://cgap.genetics.example.com") is True
+    assert is_cgap_server("https://cgap.genetics.example.com/") is True
+    assert is_cgap_server("https://cgap.genetics.example.com/me") is True
 
     assert is_cgap_server("example.com") is False
     assert is_cgap_server("https://example.com") is False
@@ -1957,3 +1958,108 @@ def test_orchestrated_classify_server_url_other():
 ])
 def test_orchestrated_make_env_name_cfn_compatible(env_name, cfn_id):
     assert make_env_name_cfn_compatible(env_name) == cfn_id
+
+
+@using_orchestrated_behavior()
+def test_get_foursight_bucket():
+
+    bucket_table = EnvUtils.FOURSIGHT_BUCKET_TABLE
+    # Uncomment the following line to see the table we're working with.
+    print(f"Testing get_foursight_bucket relative to: {json.dumps(bucket_table, indent=2)}")
+    ignorable(json, bucket_table)  # Keeps lint tools from complaining when the above line is commented out.
+
+    bucket = get_foursight_bucket(envname='acme-prd', stage='dev')
+    assert bucket == 'acme-foursight-dev-prd'
+
+    bucket = get_foursight_bucket(envname='acme-prd', stage='prod')
+    assert bucket == 'acme-foursight-prod-prd'
+
+    bucket = get_foursight_bucket(envname='acme-stg', stage='dev')
+    assert bucket == 'acme-foursight-dev-stg'
+
+    bucket = get_foursight_bucket(envname='acme-stg', stage='prod')
+    assert bucket == 'acme-foursight-prod-stg'
+
+    bucket = get_foursight_bucket(envname='acme-foo', stage='dev')
+    assert bucket == 'acme-foursight-dev-other'
+
+    bucket = get_foursight_bucket(envname='acme-foo', stage='prod')
+    assert bucket == 'acme-foursight-prod-other'
+
+    with local_attrs(EnvUtils, FOURSIGHT_BUCKET_TABLE="not-a-dict"):
+
+        with pytest.raises(MissingFoursightBucketTable):
+            get_foursight_bucket(envname='acme-foo', stage='prod')
+
+        EnvUtils.FOURSIGHT_BUCKET_TABLE = None
+        with pytest.raises(MissingFoursightBucketTable):
+            get_foursight_bucket(envname='acme-foo', stage='prod')
+
+        EnvUtils.FOURSIGHT_BUCKET_TABLE = {}
+        with pytest.raises(IncompleteFoursightBucketTable):
+            get_foursight_bucket(envname='acme-foo', stage='prod')
+
+
+@using_orchestrated_behavior(data=EnvUtils.SAMPLE_TEMPLATE_FOR_FOURFRONT_TESTING)
+def test_ff_get_env_real_url():
+
+    # ===== Explicitly Defined URLs =====
+
+    # By special name
+    assert get_env_real_url('data') == 'https://genetics.example.com'
+    assert get_env_real_url('staging') == 'https://stg.genetics.example.com'
+    assert get_env_real_url('test') == 'https://testing.genetics.example.com'
+
+    # By environment long name
+    assert get_env_real_url('acme-prd') == 'https://genetics.example.com'
+    assert get_env_real_url('acme-stg') == 'https://stg.genetics.example.com'
+    assert get_env_real_url('acme-pubtest') == 'https://testing.genetics.example.com'
+
+    # By environment short name
+    assert get_env_real_url('prd') == 'https://genetics.example.com'
+    assert get_env_real_url('stg') == 'https://stg.genetics.example.com'
+    assert get_env_real_url('pubtest') == 'https://testing.genetics.example.com'
+
+    # ==== Other URLs are built from DEV_SUFFIX =====
+
+    dev_suffix = EnvUtils.DEV_ENV_DOMAIN_SUFFIX
+    for env in ['acme-mastertest', 'acme-foo', "testing",
+                # It doesn't work to add 'acme-' to the front of the special names
+                'acme-data', 'acme-staging', 'acme-test']:
+        # Note use of 'http' because Forfront prefers that.
+        assert get_env_real_url(env) == f'http://{short_env_name(env)}{dev_suffix}'
+
+
+@using_orchestrated_behavior(data=EnvUtils.SAMPLE_TEMPLATE_FOR_CGAP_TESTING)
+def test_cgap_get_env_real_url():
+
+    # ===== Explicitly Defined URLs =====
+
+    # By special name
+    assert get_env_real_url('cgap') == 'https://cgap.genetics.example.com'
+    assert get_env_real_url('stg') == 'https://staging.genetics.example.com'
+    assert get_env_real_url('testing') == 'https://testing.genetics.example.com'
+
+    # By environment long name
+    assert get_env_real_url('acme-prd') == 'https://cgap.genetics.example.com'
+    assert get_env_real_url('acme-stg') == 'https://staging.genetics.example.com'
+    assert get_env_real_url('acme-pubtest') == 'https://testing.genetics.example.com'
+
+    # By environment short name
+    assert get_env_real_url('prd') == 'https://cgap.genetics.example.com'
+    assert get_env_real_url('stg') == 'https://staging.genetics.example.com'
+    assert get_env_real_url('pubtest') == 'https://testing.genetics.example.com'
+
+    # ==== Other URLs are built from DEV_SUFFIX =====
+
+    # These are not wired in, and end up defaulting Fourfront-style
+    dev_suffix = EnvUtils.DEV_ENV_DOMAIN_SUFFIX
+    for env in ['acme-mastertest', 'acme-foo', 'staging', 'test',
+                # It doesn't work to add 'acme-' to the front of the special names, except 'stg' is actually also
+                # a short name of an environment in this example, and so it does work to do that.
+                # (We tested that above.)
+                'acme-cgap', 'acme-testing']:
+        # Note:
+        #  * Uses 'https' uniformly for security reasons.
+        #  * Uses full env name.
+        assert get_env_real_url(env) == f'https://{env}{dev_suffix}'

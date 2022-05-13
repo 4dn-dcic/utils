@@ -142,6 +142,14 @@ class GlobalBucketAccessError(ConfigurationError):
                          .format(global_bucket=global_bucket, status=status))
 
 
+class MissingFoursightBucketTable(ConfigurationError):
+    pass
+
+
+class IncompleteFoursightBucketTable(ConfigurationError):
+    pass
+
+
 class InvalidParameterError(ValueError):
 
     SUPPRESSED = NamedObject('suppressed')

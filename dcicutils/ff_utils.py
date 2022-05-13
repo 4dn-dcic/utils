@@ -1229,16 +1229,15 @@ def get_authentication_with_server(auth=None, ff_env=None):
     return auth
 
 
-def stuff_in_queues(ff_env, check_secondary=False):
+def stuff_in_queues(ff_env_index_namespace, check_secondary=False):
     """
     Used to guarantee up-to-date metadata by checking the contents of the indexer queues.
     If items are currently waiting in the primary queue, return False.
     If check_secondary is True, will also check the secondary queue.
     """
-    if not ff_env:
-        raise ValueError("Must provide a full fourfront environment name to "
-                         "this function (such as 'fourfront-webdev'). You gave: "
-                         "%s" % ff_env)
+    if not ff_env_index_namespace:
+        raise ValueError(f"Must provide a full fourfront environment name to this function"
+                         f" (such as 'fourfront-webdev'). You gave: {ff_env_index_namespace!r}")
     stuff_in_queue = False
     client = boto3.client('sqs', region_name='us-east-1')
     queue_names = ['-indexer-queue']
@@ -1247,14 +1246,14 @@ def stuff_in_queues(ff_env, check_secondary=False):
     for queue_name in queue_names:
         try:
             queue_url = client.get_queue_url(
-                QueueName=ff_env + queue_name
+                QueueName=ff_env_index_namespace + queue_name
             ).get('QueueUrl')
             queue_attrs = client.get_queue_attributes(
                 QueueUrl=queue_url,
                 AttributeNames=['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible']
             ).get('Attributes', {})
         except Exception:
-            PRINT('Error finding queue or its attributes: %s' % ff_env + queue_name)
+            PRINT('Error finding queue or its attributes: %s' % ff_env_index_namespace + queue_name)
             stuff_in_queue = True  # queue not found. use datastore=database
             break
         else:

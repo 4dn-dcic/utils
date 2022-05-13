@@ -10,11 +10,17 @@ from botocore.exceptions import HTTPClientError, ClientError
 from typing import Optional
 from urllib.parse import urlparse
 from . import env_utils_legacy as legacy
-from .common import EnvName, OrchestratedApp, APP_FOURFRONT  # , APP_CGAP
+from .common import (
+    EnvName, OrchestratedApp, APP_FOURFRONT, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD
+)
 from .env_base import EnvManager
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
-from .exceptions import EnvUtilsLoadError, BeanstalkOperationNotImplemented
-from .misc_utils import decorator, full_object_name, ignored, remove_prefix, check_true, find_association
+from .exceptions import (
+    EnvUtilsLoadError, BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
+)
+from .misc_utils import (
+    decorator, full_object_name, ignored, remove_prefix, check_true, find_association, override_environ,
+)
 
 
 class UseLegacy(BaseException):
@@ -29,8 +35,16 @@ class UseLegacy(BaseException):
     pass
 
 
+def _make_no_legacy(fn, function_name):
+    @functools.wraps(fn)
+    def _missing_legacy_function(*args, **kwargs):
+        ignored(*args, **kwargs)
+        raise NotImplementedError(f"There is only an orchestrated version of {function_name}, not a legacy version.")
+    return _missing_legacy_function
+
+
 @decorator()
-def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, assumes_no_mirror=False):
+def if_orchestrated(*, unimplemented=False, use_legacy=False, assumes_cgap=False, assumes_no_mirror=False):
     """
     This is a decorator intended to manage new versions of these functions as they apply to orchestrated CGAP
     without disturbing legacy behavior (now found in env_utils_legacy.py and still supported for the original
@@ -39,7 +53,7 @@ def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, a
     The arguments to this decorator are as follows:
 
     :param unimplemented: a boolean saying if orchestrated functionality is unimplemented (so gets an automatic error).
-    :param use_legacy: a boolean saying if the legacy definition is suitably general to be used directly
+    :param use_legacy: a boolean saying if the legacy definition is suitably general to be used directly instead
     :param assumes_cgap: a boolean saying whether the orchestrated definition is CGAP-specific
     :param assumes_no_mirror: a boolean saying whether the orchestrated definition is expected to fail if mirroring on
     """
@@ -48,7 +62,11 @@ def if_orchestrated(unimplemented=False, use_legacy=False, assumes_cgap=False, a
 
         EnvUtils.init()
 
-        legacy_fn = getattr(legacy, fn.__name__)
+        try:
+            legacy_fn = getattr(legacy, fn.__name__)
+        except AttributeError:
+            # If is no legacy function (e.g., for new functionality), conjure a function with nicer error message
+            legacy_fn = _make_no_legacy(fn, fn.__name__)
 
         if use_legacy:
             return legacy_fn
@@ -81,6 +99,7 @@ class EnvNames:
     DEV_ENV_DOMAIN_SUFFIX = 'dev_env_domain_suffix'  # e.g., .abc123def456ghi789.us-east-1.rds.amazonaws.com
     ECOSYSTEM = 'ecosystem'  # name of an ecosystem file, such as "main.ecosystem"
     FOURSIGHT_URL_PREFIX = 'foursight_url_prefix'
+    FOURSIGHT_BUCKET_TABLE = 'foursight_bucket_table'
     FULL_ENV_PREFIX = 'full_env_prefix'  # a string like "cgap-" that precedes all env names
     HOTSEAT_ENVS = 'hotseat_envs'  # a list of environments that are for testing with hot data
     INDEXER_ENV_NAME = 'indexer_env_name'  # the environment name used for indexing
@@ -135,6 +154,7 @@ class EnvUtils:
 
     DEV_DATA_SET_TABLE = None  # dictionary mapping envnames to their preferred data set
     DEV_ENV_DOMAIN_SUFFIX = None
+    FOURSIGHT_BUCKET_TABLE = None
     FOURSIGHT_URL_PREFIX = None
     FULL_ENV_PREFIX = None  # a string like "cgap-" that precedes all env names (does NOT have to include 'cgap')
     HOTSEAT_ENVS = None
@@ -157,6 +177,11 @@ class EnvUtils:
     SAMPLE_TEMPLATE_FOR_CGAP_TESTING = {
         e.DEV_DATA_SET_TABLE: {'acme-hotseat': 'prod', 'acme-test': 'test'},
         e.DEV_ENV_DOMAIN_SUFFIX: DEV_SUFFIX_FOR_TESTING,
+        e.FOURSIGHT_BUCKET_TABLE: {
+            "acme-prd": {CHALICE_STAGE_DEV: "acme-foursight-dev-prd", CHALICE_STAGE_PROD: "acme-foursight-prod-prd"},
+            "acme-stg": {CHALICE_STAGE_DEV: "acme-foursight-dev-stg", CHALICE_STAGE_PROD: "acme-foursight-prod-stg"},
+            "default": {CHALICE_STAGE_DEV: "acme-foursight-dev-other", CHALICE_STAGE_PROD: "acme-foursight-prod-other"},
+        },
         e.FOURSIGHT_URL_PREFIX: 'https://foursight.genetics.example.com/api/view/',
         e.FULL_ENV_PREFIX: 'acme-',
         e.HOTSEAT_ENVS: ['acme-hotseat', 'acme-pubdemo'],
@@ -167,8 +192,8 @@ class EnvUtils:
         e.PUBLIC_URL_TABLE: [
             {
                 p.NAME: 'cgap',
-                p.URL: 'https://genetics.example.com',
-                p.HOST: 'genetics.example.com',
+                p.URL: 'https://cgap.genetics.example.com',
+                p.HOST: 'cgap.genetics.example.com',
                 p.ENVIRONMENT: 'acme-prd',
             },
             {
@@ -193,6 +218,7 @@ class EnvUtils:
         # We don't do stage mirroring in the orchestrated world, and probably should not confuse users by inviting
         # these to be set. For extra security, even if you did set them they wouldn't work without enabling mirroring.
         # -kmp 24-Jul-2021
+        # e.STAGE_MIRRORING_ENABLED: False,
         # e.STG_ENV_NAME: None,
         e.TEST_ENVS: ['acme-test', 'acme-mastertest', 'acme-pubtest'],
         e.WEBPROD_PSEUDO_ENV: 'production-data',
@@ -201,6 +227,11 @@ class EnvUtils:
     SAMPLE_TEMPLATE_FOR_FOURFRONT_TESTING = {
         e.DEV_DATA_SET_TABLE: {'acme-hotseat': 'prod', 'acme-test': 'test'},
         e.DEV_ENV_DOMAIN_SUFFIX: DEV_SUFFIX_FOR_TESTING,
+        e.FOURSIGHT_BUCKET_TABLE: {
+            "acme-prd": {CHALICE_STAGE_DEV: "acme-foursight-dev-prd", CHALICE_STAGE_PROD: "acme-foursight-prod-prd"},
+            "acme-stg": {CHALICE_STAGE_DEV: "acme-foursight-dev-stg", CHALICE_STAGE_PROD: "acme-foursight-prod-stg"},
+            "default": {CHALICE_STAGE_DEV: "acme-foursight-dev-other", CHALICE_STAGE_PROD: "acme-foursight-prod-other"},
+        },
         e.FOURSIGHT_URL_PREFIX: 'https://foursight.genetics.example.com/api/view/',
         e.FULL_ENV_PREFIX: 'acme-',
         e.HOTSEAT_ENVS: ['acme-hotseat'],
@@ -239,19 +270,19 @@ class EnvUtils:
                 p.HOST: 'hot.genetics.example.com',
                 p.ENVIRONMENT: 'acme-hotseat',
             },
-
         ],
         # We don't do stage mirroring in the orchestrated world, and probably should not confuse users by inviting
         # these to be set. For extra security, even if you did set them they wouldn't work without enabling mirroring.
         # -kmp 24-Jul-2021
+        # e.STAGE_MIRRORING_ENABLED: False,
         # e.STG_ENV_NAME: None,
         e.TEST_ENVS: ['acme-test', 'acme-mastertest', 'acme-pubtest'],
         e.WEBPROD_PSEUDO_ENV: 'production-data',
     }
 
     @classmethod
-    def init(cls, env_name=None):
-        if cls._DECLARED_DATA is None:
+    def init(cls, env_name=None, force=False):
+        if force or cls._DECLARED_DATA is None:
             cls.load_declared_data(env_name=env_name)
 
     @classmethod
@@ -268,6 +299,14 @@ class EnvUtils:
                     setattr(EnvUtils, var, data[key])
                 else:
                     setattr(EnvUtils, var, None)
+
+    @classmethod
+    @contextlib.contextmanager
+    def local_env_utils(cls, global_env_bucket, env_name):
+        with EnvUtils.locally_declared_data():
+            with override_environ(GLOBAL_ENV_BUCKET=global_env_bucket, ENV_NAME=env_name):
+                EnvUtils.init(force=True)
+                yield
 
     @classmethod
     @contextlib.contextmanager
@@ -450,14 +489,27 @@ def public_url_for_app(appname: Optional[OrchestratedApp] = None) -> Optional[st
         return entry.get('url')
 
 
-def compute_orchestrated_real_url(envname):
-    entry = find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.ENVIRONMENT: envname})
+def _find_public_url_entry(envname):
+    entry = (find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.NAME: envname}) or
+             find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.ENVIRONMENT: full_env_name(envname)}) or
+             find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.ENVIRONMENT: short_env_name(envname)}))
+    if entry:
+        return entry
+
+
+@if_orchestrated
+def get_env_real_url(envname):
+    entry = _find_public_url_entry(envname)
     if entry:
         return entry.get('url')
     elif EnvUtils.ORCHESTRATED_APP == APP_FOURFRONT:  # Only fourfront shortens
+        # Fourfront is a low-security application, so only 'data' is 'https' and the rest are 'http'.
+        # TODO: This should be table-driven, too, but we're not planning to distribute Fourfront,
+        #       so it's not high priority. -kmp 13-May-2022
         protocol = 'https' if envname == 'data' else 'http'
         return f"{protocol}://{short_env_name(envname)}{EnvUtils.DEV_ENV_DOMAIN_SUFFIX}"
     else:
+        # For CGAP, everything has to be 'https'. Part of our security model.
         return f"https://{envname}{EnvUtils.DEV_ENV_DOMAIN_SUFFIX}"
 
 
@@ -637,6 +689,24 @@ def get_mirror_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT
         return get_standard_mirror_env(who_i_am)
     else:
         return None
+
+
+@if_orchestrated
+def get_foursight_bucket(envname: EnvName, stage: ChaliceStage) -> str:
+    bucket = None
+    bucket_table = EnvUtils.FOURSIGHT_BUCKET_TABLE
+    if isinstance(bucket_table, dict):
+        env_entry = bucket_table.get(envname)
+        if not env_entry:
+            env_entry = bucket_table.get("default")
+        if isinstance(env_entry, dict):
+            bucket = env_entry.get(stage)
+        if bucket:
+            return bucket
+        raise IncompleteFoursightBucketTable(f"No foursight bucket is defined for envname={envname} stage={stage}"
+                                             f" in bucket_table={bucket_table}.")
+    else:
+        raise MissingFoursightBucketTable("No foursight bucket table is declared.")
 
 
 @if_orchestrated

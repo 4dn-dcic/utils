@@ -4,10 +4,13 @@ import io
 import json
 import os
 import pytest
+import requests
 
 from botocore.exceptions import ClientError
 from dcicutils import s3_utils as s3_utils_module  # , beanstalk_utils
+from dcicutils.beanstalk_utils import get_beanstalk_real_url
 from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
+from dcicutils.common import LEGACY_GLOBAL_ENV_BUCKET
 from dcicutils.env_utils import (
     get_standard_mirror_env, EnvUtils,
 )
@@ -19,6 +22,7 @@ from dcicutils.ff_mocks import make_mock_es_url
 from dcicutils.misc_utils import ignored, ignorable
 from dcicutils.qa_utils import override_environ, MockBoto3, MockBotoS3Client, MockResponse, known_bug_expected
 from dcicutils.s3_utils import s3Utils, EnvManager, HealthPageKey
+from requests.exceptions import ConnectionError
 from unittest import mock
 from .test_ff_utils import mocked_s3utils_with_sse
 
@@ -98,23 +102,29 @@ def test_regression_s3_utils_short_name_c4_706():
         s3Utils(env="mastertest")
 
 
-def _env_is_probably_up_and_healthy(env):
-    ignored(env)
-    return True  # not quite right, but
-    # This code won't work in container systems...
-    # env_url = beanstalk_utils.get_beanstalk_real_url(env)
-    # health_page_url = f"{env_url.rstrip('/')}/health?format=json"
-    # return requests.get(health_page_url).status_code == 200
+def _notice_health_page_connection_problem_for_test(env):
+    env_url = get_beanstalk_real_url(env)
+    health_page_url = f"{env_url.rstrip('/')}/health?format=json"
+    failure_message = f"Health page for {env} is unavailable at {health_page_url}, so test is being skipped."
+    try:
+        if requests.get(health_page_url, timeout=2).status_code == 200:
+            return None
+        else:
+            return failure_message
+    except ConnectionError:  # e.g., connection failure or timeout, probably host unavailable
+        return failure_message
 
 
 @pytest.mark.integrated
 @pytest.mark.parametrize('ff_ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat'])
 def test_s3utils_creation_ff_ordinary(ff_ordinary_envname):
-    if _env_is_probably_up_and_healthy(ff_ordinary_envname):
-        util = s3Utils(env=ff_ordinary_envname)
-        assert util.sys_bucket == 'elasticbeanstalk-%s-system' % ff_ordinary_envname
-    else:
-        pytest.skip(f"Health page for {ff_ordinary_envname} is unavailable, so test is being skipped.")
+    with EnvUtils.local_env_utils(global_env_bucket=LEGACY_GLOBAL_ENV_BUCKET, env_name=ff_ordinary_envname):
+        problem = _notice_health_page_connection_problem_for_test(ff_ordinary_envname)
+        if not problem:
+            util = s3Utils(env=ff_ordinary_envname)
+            assert util.sys_bucket == 'elasticbeanstalk-%s-system' % ff_ordinary_envname
+        else:
+            pytest.skip(problem)
 
 
 @pytest.mark.beanstalk_failure
@@ -582,7 +592,12 @@ def test_read_s3_zip_unit(integrated_names):
     # with mocked_s3_integration(integrated_names=integrated_names) as s3_connection:
     ffenv = integrated_names['ffenv'] if integrated_names else None
 
-    with mocked_s3utils_with_sse(beanstalks=[ffenv], require_sse=False):
+    with mocked_s3utils_with_sse(beanstalks=[ffenv],
+                                 # TODO (C4-819): This and other tests that are uploading files to S3
+                                 #                are not passing KMS arguments. Test needs to be upgraded.
+                                 #                But also need to figure out if that's a bug in test or
+                                 #                underlying API.  -kmp 13-May-2022
+                                 require_sse=False):
         s3_connection = s3Utils(env=ffenv)
 
         # In our mock, this won't exist already on S3 like in the integrated version of this test,
@@ -1015,7 +1030,7 @@ def test_env_manager_global_env_bucket_name():
     # This is the rewrite:
 
     global_env_bucket_for_testing = os.environ.get('GLOBAL_ENV_BUCKET')
-    assert global_env_bucket_for_testing  # probably it's 'foursight-envs', but let's be generic
+    assert global_env_bucket_for_testing == LEGACY_GLOBAL_ENV_BUCKET
     global_bucket_env_for_testing = os.environ.get('GLOBAL_BUCKET_ENV')
     assert global_bucket_env_for_testing is None or global_bucket_env_for_testing == global_env_bucket_for_testing
 

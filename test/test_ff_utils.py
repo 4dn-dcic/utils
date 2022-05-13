@@ -311,6 +311,7 @@ def test_unified_authentication_integrated(integrated_ff):
     assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
 
+@pytest.mark.stg_or_prd_testing_needs_repair
 @pytest.mark.integrated
 def test_unified_authentication_prod_envs_integrated_only():
     # This is ONLY an integration test. There is no unit test functionality tested here.
@@ -442,7 +443,7 @@ def test_stuff_in_queues_integrated(integrated_ff):
     for item in search_res[:8]:
         ff_utils.patch_metadata({}, obj_id=item['uuid'], key=integrated_ff['ff_key'])
     time.sleep(3)  # let queues catch up
-    stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env_index'], check_secondary=True)
+    stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env_index_namespace'], check_secondary=True)
     assert stuff_in_queue
     with pytest.raises(Exception) as exec_info:
         ff_utils.stuff_in_queues(None, check_secondary=True)  # fail if no env specified
@@ -1175,7 +1176,7 @@ def test_get_health_page(integrated_ff):
     assert health_res and 'error' not in health_res
     assert 'elasticsearch' in health_res
     assert 'database' in health_res
-    assert health_res['beanstalk_env'] == integrated_ff['ff_env_index']
+    assert health_res['beanstalk_env'] == integrated_ff['ff_env_index_namespace']
     # try with ff_env instead of key
     health_res2 = ff_utils.get_health_page(ff_env=integrated_ff['ff_env'])
     assert health_res2 and 'error' not in health_res2
@@ -1652,9 +1653,9 @@ def test_convert_param():
 @pytest.mark.integrated
 def test_get_page(integrated_ff):
     ff_env = integrated_ff['ff_env']
-    ff_env_index = integrated_ff['ff_env_index']
+    ff_env_index_namespace = integrated_ff['ff_env_index_namespace']
     health_res = ff_utils.get_health_page(ff_env=ff_env)
-    assert health_res['namespace'] == ff_env_index
+    assert health_res['namespace'] == ff_env_index_namespace
     counts_res = ff_utils.get_counts_page(ff_env=ff_env)['db_es_total']
     assert 'DB' in counts_res
     assert 'ES' in counts_res

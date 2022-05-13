@@ -5,7 +5,7 @@ from botocore.exceptions import ClientError
 from .common import APP_CGAP, APP_FOURFRONT
 from .env_utils import (
     is_cgap_env, is_fourfront_env, get_standard_mirror_env,
-    compute_orchestrated_prd_env_for_project, compute_orchestrated_real_url,
+    compute_orchestrated_prd_env_for_project, get_env_real_url,
 )
 from .misc_utils import PRINT
 
@@ -75,7 +75,8 @@ def beanstalk_info(env):
 def get_beanstalk_real_url(env):
     """
     Return the real url for the elasticbeanstalk with given environment name.
-    Name can be 'cgap', 'data', 'staging', or an actual environment.
+    Name can be a special name (like 'cgap', 'data', 'staging'),
+    or an actual environment.
 
     Args:
         env (str): ElasticBeanstalk environment name
@@ -84,7 +85,7 @@ def get_beanstalk_real_url(env):
         str: url of the ElasticBeanstalk environment
     """
 
-    return compute_orchestrated_real_url(env)
+    return get_env_real_url(env)
 
 
 def compute_ff_prd_env():  # a.k.a. "whodaman" (its historical name, which has gone away)
