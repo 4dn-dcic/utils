@@ -311,6 +311,7 @@ def test_unified_authentication_integrated(integrated_ff):
     assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
 
+@pytest.mark.recordable
 @pytest.mark.stg_or_prd_testing_needs_repair
 @pytest.mark.integratedx
 @pytest.mark.flaky
@@ -696,6 +697,7 @@ SAMPLE_RECORD = {
 }
 
 
+@pytest.mark.recordable
 @pytest.mark.integratedx
 @pytest.mark.flaky
 def test_post_delete_purge_links_metadata_integrated(integrated_ff):
@@ -777,6 +779,7 @@ def check_post_delete_purge_links_metadata(integrated_ff):
     assert 'The resource could not be found' in str(exec_info.value)
 
 
+@pytest.mark.recordable
 @pytest.mark.integratedx
 @pytest.mark.flaky
 def test_upsert_metadata_integrated(integrated_ff):
