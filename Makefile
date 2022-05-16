@@ -17,6 +17,9 @@ build:  # builds
 test:  # runs default tests, which are the unit tests
 	make test-units
 
+test-for-ga:
+	make test-units-with-coverage
+
 retest:  # runs only failed tests from the last test run. (if no failures, it seems to run all?? -kmp 17-Dec-2020)
 	poetry run pytest -vv -r w --last-failed
 
@@ -31,6 +34,13 @@ test-most:  # leaves out things that will probably err but runs unit tests and b
 	@git log -1 --decorate | head -1
 	@date
 	poetry run pytest -vv -r w -m "not beanstalk_failure and not direct_es_query"
+	@git log -1 --decorate | head -1
+	@date
+
+test-units-with-coverage:
+	@git log -1 --decorate | head -1
+	@date
+	poetry run coverage run --source dcicutils -m pytest -vv -r w -m "not integratedx and not beanstalk_failure and not direct_es_query"
 	@git log -1 --decorate | head -1
 	@date
 
