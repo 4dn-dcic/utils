@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "3.13.0.2b24"  # originally based on 3.6.0, but merges 3.13.0, eventually to be "4.0.0"
+version = "3.13.0.2b25"  # originally based on 3.6.0, but merges 3.13.0, eventually to be "4.0.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -59,6 +59,7 @@ webtest = "^2.0.34"
 botocore-stubs = "1.21.22"
 boto3-stubs = "1.18.23"
 coverage = ">=5.3.1"
+coveralls = ">=2.1.2"
 flake8 = ">=3.9.2"
 flaky = ">=3.7.0"
 pytest = ">=4.5.0"
