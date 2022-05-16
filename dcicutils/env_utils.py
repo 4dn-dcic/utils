@@ -757,14 +757,36 @@ def infer_repo_from_env(envname):
 
 
 @if_orchestrated()
-def infer_foursight_url_from_env(request, envname: Optional[EnvName]):
+def infer_foursight_url_from_env(request=None, envname: Optional[EnvName] = None):
+    """
+    Infers the Foursight URL for the given envname and request context.
+
+    :param request: This argument is
+    :param envname: name of the environment we are on
+    :return: Foursight env at the end of the url ie: for fourfront-green, could be either 'data' or 'staging'
+    """
     ignored(request)
+    if envname is None:
+        # Although short_env_name allows None, it will return None in that case and a more confusing error will result.
+        # (We allow None only so we can gracefully phase out the 'request' argument.) -kmp 15-May-2022
+        raise ValueError("A non-null envname is required by infer_foursight_url_from_env.")
+    # TODO: Shouldn't this call infer_foursight_from_env instead of short_env_name?
+    #       However: Note that infer_foursight_from_env will try to do something useful with None that we don't want.
     return EnvUtils.FOURSIGHT_URL_PREFIX + short_env_name(envname)
 
 
 @if_orchestrated
-def infer_foursight_from_env(request, envname):
-    ignored(request)
+def infer_foursight_from_env(request=None, envname: Optional[EnvName] = None):
+    """
+    Infers the Foursight environment to view based on the given envname and request context
+
+    :param request: the current request (or an object that has a 'domain' attribute)
+    :param envname: name of the environment we are on
+    :return: Foursight env at the end of the url ie: for fourfront-green, could be either 'data' or 'staging'
+    """
+    if envname is None:
+        # We allow None only so we can gracefully phase out the 'request' argument. -kmp 15-May-2022
+        raise ValueError("A non-null envname is required by infer_foursight_from_env.")
     if EnvUtils.STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME:
         classification = classify_server_url(request.domain)
         if classification[c.IS_STG_OR_PRD]:
@@ -859,6 +881,8 @@ def classify_server_url(url, raise_error=True):
     }
 
 
-@if_orchestrated(use_legacy=True)
-def make_env_name_cfn_compatible(env_name):
-    ignored(env_name)
+# I don't think this function is ever called in any repo. -kmp 15-May-2022
+#
+# @if_orchestrated(use_legacy=True)
+# def make_env_name_cfn_compatible(env_name):
+#     ignored(env_name)

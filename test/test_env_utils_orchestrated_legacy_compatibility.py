@@ -9,7 +9,9 @@ from dcicutils.env_utils import (
     full_env_name, full_fourfront_env_name, get_bucket_env, get_mirror_env_from_context, get_standard_mirror_env,
     indexer_env_for_env, infer_foursight_from_env, infer_foursight_url_from_env, infer_repo_from_env,
     is_cgap_env, is_cgap_server, is_fourfront_env, is_fourfront_server, is_hotseat_env, is_indexer_env,
-    is_stg_or_prd_env, is_test_env, make_env_name_cfn_compatible, permit_load_data,
+    is_stg_or_prd_env, is_test_env,
+    # make_env_name_cfn_compatible,
+    permit_load_data,
     prod_bucket_env, prod_bucket_env_for_app, public_url_for_app, public_url_mappings, short_env_name,
     # Support for implementation
     ClassificationParts, EnvNames, EnvUtils, PublicUrlParts
@@ -698,7 +700,7 @@ def test_legacy_infer_repo_from_env():
 
 
 @using_legacy_behavior()
-def test_legacy_infer_foursight_env():
+def test_legacy_infer_foursight_from_env():
 
     class MockedRequest:
         def __init__(self, domain):
@@ -1067,12 +1069,14 @@ def test_legacy_classify_server_url_other():
     }
 
 
-@using_legacy_behavior()
-@pytest.mark.parametrize('env_name, cfn_id', [
-    ('cgap-mastertest', 'cgapmastertest'),
-    ('fourfront-cgap', 'fourfrontcgap'),
-    ('cgap-msa', 'cgapmsa'),
-    ('fourfrontmastertest', 'fourfrontmastertest')
-])
-def test_legacy_make_env_name_cfn_compatible(env_name, cfn_id):
-    assert make_env_name_cfn_compatible(env_name) == cfn_id
+# The function make_env_name_cfn_compatible has been removed because I think no one uses it. -kmp 15-May-2022
+#
+# @using_legacy_behavior()
+# @pytest.mark.parametrize('env_name, cfn_id', [
+#     ('cgap-mastertest', 'cgapmastertest'),
+#     ('fourfront-cgap', 'fourfrontcgap'),
+#     ('cgap-msa', 'cgapmsa'),
+#     ('fourfrontmastertest', 'fourfrontmastertest')
+# ])
+# def test_legacy_make_env_name_cfn_compatible(env_name, cfn_id):
+#     assert make_env_name_cfn_compatible(env_name) == cfn_id

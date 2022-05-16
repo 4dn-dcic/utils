@@ -999,7 +999,7 @@ def remove_element(elem, lst, raise_error=True):
     return result
 
 
-def remove_prefix(prefix, text, required=False):
+def remove_prefix(prefix: str, text: str, required: bool = False):
     if not text.startswith(prefix):
         if required:
             raise ValueError('Prefix %s is not the initial substring of %s' % (prefix, text))
@@ -1008,7 +1008,7 @@ def remove_prefix(prefix, text, required=False):
     return text[len(prefix):]
 
 
-def remove_suffix(suffix, text, required=False):
+def remove_suffix(suffix: str, text: str, required: bool = False):
     if not text.endswith(suffix):
         if required:
             raise ValueError('Suffix %s is not the final substring of %s' % (suffix, text))

@@ -12,7 +12,8 @@ from dcicutils.env_utils import (
     infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env,
     is_indexer_env, indexer_env_for_env, classify_server_url,
     short_env_name, full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
-    make_env_name_cfn_compatible, get_foursight_bucket,
+    # make_env_name_cfn_compatible,
+    get_foursight_bucket,
     # New support
     EnvUtils, p, c, get_env_real_url
 )
@@ -1530,7 +1531,7 @@ FOURFRONT_SETTINGS_FOR_TESTING = dict(
 
 
 @using_orchestrated_behavior()
-def test_orchestrated_infer_foursight_env():
+def test_orchestrated_infer_foursight_from_env():
 
     dev_suffix = EnvUtils.DEV_SUFFIX_FOR_TESTING
 
@@ -1947,17 +1948,19 @@ def test_orchestrated_classify_server_url_other():
     }
 
 
-@using_orchestrated_behavior()
-@pytest.mark.parametrize('env_name, cfn_id', [
-    ('acme-foo', 'acmefoo'),
-    ('foo-bar-baz', 'foobarbaz'),
-    ('cgap-mastertest', 'cgapmastertest'),
-    ('fourfront-cgap', 'fourfrontcgap'),
-    ('cgap-msa', 'cgapmsa'),
-    ('fourfrontmastertest', 'fourfrontmastertest')
-])
-def test_orchestrated_make_env_name_cfn_compatible(env_name, cfn_id):
-    assert make_env_name_cfn_compatible(env_name) == cfn_id
+# The function make_env_name_cfn_compatible has been removed because I think no one uses it. -kmp 15-May-2022
+#
+# @using_orchestrated_behavior()
+# @pytest.mark.parametrize('env_name, cfn_id', [
+#     ('acme-foo', 'acmefoo'),
+#     ('foo-bar-baz', 'foobarbaz'),
+#     ('cgap-mastertest', 'cgapmastertest'),
+#     ('fourfront-cgap', 'fourfrontcgap'),
+#     ('cgap-msa', 'cgapmsa'),
+#     ('fourfrontmastertest', 'fourfrontmastertest')
+# ])
+# def test_orchestrated_make_env_name_cfn_compatible(env_name, cfn_id):
+#     assert make_env_name_cfn_compatible(env_name) == cfn_id
 
 
 @using_orchestrated_behavior()
