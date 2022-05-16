@@ -67,6 +67,13 @@ these new items:
 
 * In ``env_utils``:
 
+  * Removed:
+
+    * ``make_env_name_cfn_compatible``
+
+    NOTE: This was not believed to be used anywhere so is presumably no great hardship.
+    (Kent also didn't like the naming, which used a confusing abbreviation.)
+
   * New functionality:
 
     * ``compute_prd_env_for_project``
