@@ -352,6 +352,42 @@ _TEST_DIR = os.path.join(os.path.dirname(_MYDIR), "test")
 
 
 class TestRecorder:
+    """
+    This allows the web request part of an integration test to be run in a mode where it makes a recording
+    that can be played back as an integration test. (Note that this does not mock other elements like s3
+    because it's assumed the web request hides all of that.)
+
+    This would replace something that might be written as:
+
+        @pytest.mark.integrated
+        def test_something(integrated_ff):
+            ...the meat of the test...
+
+    with:
+
+        @pytest.mark.recordable
+        @pytest.mark.integratedx
+        def test_something(integrated_ff):
+            with TestRecorder().recorded_requests('test_something', integrated_ff):
+                # Call common subroutine shared by integrated and unit test
+                check_something(integrated_ff)
+
+        @pytest.mark.unit
+        def test_post_delete_purge_links_metadata_unit():
+            with TestRecorder().replayed_requests('test_post_delete_purge_links_metadata') as mocked_integrated_ff:
+                # Call common subroutine shared by integrated and unit test
+                check_post_delete_purge_links_metadata(mocked_integrated_ff)
+
+        def check_something(integrated_ff):  # Not a test but a common subroutine
+            ... the meat of the test ...
+
+    The integration test must be run once by doing something like:
+
+        $ RECORDING_ENABLED=TRUE pytest -vv -m recordable
+
+    This will create the recordings. After that, one can invoke tests in the normal way, but the recorded test
+    will be used. Be sure to check in the recording.
+    """
 
     __test__ = False  # This declaration asserts to PyTest that this is not a test case.
 
