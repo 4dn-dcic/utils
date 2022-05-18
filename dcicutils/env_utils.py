@@ -17,10 +17,9 @@ from .env_base import EnvManager
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
 from .exceptions import (
     EnvUtilsLoadError, BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
-    NotUsingBeanstalksAnyMore
 )
 from .misc_utils import (
-    decorator, full_object_name, ignored, remove_prefix, remove_suffix, check_true, find_association, override_environ,
+    decorator, full_object_name, ignored, remove_prefix, check_true, find_association, override_environ,
 )
 
 

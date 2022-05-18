@@ -1065,6 +1065,7 @@ class MockBotoS3ObjectSummary:
     def key(self):
         return self._attributes['Key']
 
+
 class MockBotoS3BucketObjects:
 
     def __init__(self, bucket):

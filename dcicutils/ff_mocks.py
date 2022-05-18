@@ -8,7 +8,7 @@ import re
 import requests
 import time
 
-
+from dcicutils.env_utils import EnvUtils
 from dcicutils.lang_utils import disjoined_list
 from dcicutils.misc_utils import ignored, override_environ, remove_prefix, full_class_name, PRINT, environ_bool
 from dcicutils.qa_utils import (
@@ -102,7 +102,6 @@ def make_mock_health_page(env_name):
         s3_utils.HealthPageKey.TIBANNA_OUTPUT_BUCKET: s3_utils.s3Utils.TIBANNA_OUTPUT_BUCKET_TEMPLATE,  # no env_name
     }
 
-from dcicutils.env_utils import EnvUtils
 
 @contextlib.contextmanager
 def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=None):
@@ -135,33 +134,34 @@ def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=
         with mock.patch.object(ff_utils, "boto3", mock_boto3):
             with mock.patch.object(beanstalk_utils, "boto3", mock_boto3):
                 with mock.patch.object(env_utils, "boto3", mock_boto3):
-                  with mock.patch.object(env_base, "boto3", mock_boto3):
-                    with mock.patch.object(s3_utils.EnvManager, "fetch_health_page_json") as mock_fetcher:
-                        # This is all that's needed for s3Utils to initialize an EnvManager.
-                        # We might have to add more later.
-                        def mocked_fetch_health_page_json(url, use_urllib=True):
-                            ignored(use_urllib)  # we don't test this
-                            m = re.match(r'.*(fourfront-[a-z0-9-]+)(?:[.]|$)', url)
-                            if m:
-                                env_name = m.group(1)
-                                return make_mock_health_page(env_name)
-                            else:
-                                raise NotImplementedError(f"Mock can't handle URL: {url}")
+                    with mock.patch.object(env_base, "boto3", mock_boto3):
+                        with mock.patch.object(s3_utils.EnvManager, "fetch_health_page_json") as mock_fetcher:
+                            # This is all that's needed for s3Utils to initialize an EnvManager.
+                            # We might have to add more later.
+                            def mocked_fetch_health_page_json(url, use_urllib=True):
+                                ignored(use_urllib)  # we don't test this
+                                m = re.match(r'.*(fourfront-[a-z0-9-]+)(?:[.]|$)', url)
+                                if m:
+                                    env_name = m.group(1)
+                                    return make_mock_health_page(env_name)
+                                else:
+                                    raise NotImplementedError(f"Mock can't handle URL: {url}")
 
-                        mock_fetcher.side_effect = mocked_fetch_health_page_json
-                        # The mocked encrypt key is expected by various tools in the s3_utils module to be supplied
-                        # as an environment variable (i.e., in os.environ), so this sets up that environment variable.
-                        if require_sse:
-                            with override_environ(S3_ENCRYPT_KEY=s3_class.SSE_ENCRYPT_KEY):
+                            mock_fetcher.side_effect = mocked_fetch_health_page_json
+                            # The mocked encrypt key is expected by various tools in the s3_utils module to be
+                            # supplied as an environment variable (i.e., in os.environ), so this sets up that
+                            # environment variable.
+                            if require_sse:
+                                with override_environ(S3_ENCRYPT_KEY=s3_class.SSE_ENCRYPT_KEY):
+                                    with EnvUtils.local_env_utils(global_env_bucket=os.environ.get('GLOBAL_ENV_BUCKET'),
+                                                                  env_name=environments[0]
+                                                                  if environments else
+                                                                  os.environ.get('ENV_NAME')):
+                                        yield mock_boto3
+                            else:
                                 with EnvUtils.local_env_utils(global_env_bucket=os.environ.get('GLOBAL_ENV_BUCKET'),
-                                                              env_name=environments[0]
-                                                              if environments else
-                                                              os.environ.get('ENV_NAME')):
+                                                              env_name=os.environ.get('ENV_NAME')):
                                     yield mock_boto3
-                        else:
-                            with EnvUtils.local_env_utils(global_env_bucket=os.environ.get('GLOBAL_ENV_BUCKET'),
-                                                          env_name=os.environ.get('ENV_NAME')):
-                                yield mock_boto3
 
 
 # Here we set up some variables, auxiliary functions, and mocks containing common values needed for testing
