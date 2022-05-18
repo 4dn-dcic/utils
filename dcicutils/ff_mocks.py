@@ -148,9 +148,9 @@ def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=
                                     raise NotImplementedError(f"Mock can't handle URL: {url}")
 
                             mock_fetcher.side_effect = mocked_fetch_health_page_json
-                            # The mocked encrypt key is expected by various tools in the s3_utils module to be
-                            # supplied as an environment variable (i.e., in os.environ), so this sets up that
-                            # environment variable.
+                            # The mocked encrypt key is expected by various tools in the s3_utils module
+                            # to be supplied as an environment variable (i.e., in os.environ), so this
+                            # sets up that environment variable.
                             if require_sse:
                                 with override_environ(S3_ENCRYPT_KEY=s3_class.SSE_ENCRYPT_KEY):
                                     with EnvUtils.local_env_utils(global_env_bucket=os.environ.get('GLOBAL_ENV_BUCKET'),
