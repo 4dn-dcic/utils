@@ -18,7 +18,7 @@ from dcicutils.env_utils_legacy import (
     FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, _CGAP_MGB_PUBLIC_URL_PRD  # noQA
 )
 from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs
-from dcicutils.ff_mocks import make_mock_es_url
+from dcicutils.ff_mocks import make_mock_es_url, make_mock_portal_url
 from dcicutils.misc_utils import ignored, ignorable
 from dcicutils.qa_utils import override_environ, MockBoto3, MockBotoS3Client, MockResponse, known_bug_expected
 from dcicutils.s3_utils import s3Utils, EnvManager, HealthPageKey
@@ -926,97 +926,112 @@ def test_env_manager_fetch_health_page_json():
             assert helper.used_mocked_urlopen is True
 
 
+from .test_ff_utils import mocked_s3utils_with_sse
+
 def test_env_manager():
 
-    class MyS3(MockBotoS3Client):
-        MOCK_STATIC_FILES = {
-            # Bucket 'global-env-1'
-            'global-env-1/cgap-footest':
-                '{"fourfront": "http://portal", "es": "http://es", "ff_env": "cgap-footest"}',
-            # Bucket 'global-env-2'
-            'global-env-2/cgap-footest':
-                '{"fourfront": "http://portal-foo", "es": "http://es-foo", "ff_env": "cgap-footest"}',
-            'global-env-2/cgap-bartest':
-                '{"fourfront": "http://portal-bar", "es": "http://es-bar", "ff_env": "cgap-bartest"}',
-        }
+    test_env = 'fourfront-foo'
+    test_env2 = 'another-plausible-env'
 
-    with mock.patch.object(s3_utils_module, "boto3", MockBoto3(s3=MyS3)):
-
-        my_s3 = s3_utils_module.boto3.client('s3')
-
+    # This tests that with no env_name argument, we can figure out there's only one environment
+    with mocked_s3utils_with_sse(beanstalks=[test_env]):
         with EnvManager.global_env_bucket_named(name='global-env-1'):
+            with pytest.raises(Exception):
+              EnvManager()
 
-            e = EnvManager(s3=my_s3)
-            assert e.portal_url == "http://portal"
-            assert e.es_url == "http://es"
-            assert e.env_name == "cgap-footest"
+        env_mgr = EnvManager()
+
+        assert env_mgr.portal_url == make_mock_portal_url(test_env)
+        assert env_mgr.es_url == make_mock_es_url(test_env)
+        assert env_mgr.env_name == test_env
+
+    # This tests that additional ecosystems do not confuse env defaulting
+    with mocked_s3utils_with_sse(beanstalks=[test_env, 'foo.ecosystem']):
+        with EnvManager.global_env_bucket_named(name='global-env-1'):
+            with pytest.raises(Exception):
+              EnvManager()
+
+        env_mgr = EnvManager()
+
+        assert env_mgr.portal_url == make_mock_portal_url(test_env)
+        assert env_mgr.es_url == make_mock_es_url(test_env)
+        assert env_mgr.env_name == test_env
+
+    # This tests that we notice a legit ambiguity in environment names
+    with mocked_s3utils_with_sse(beanstalks=[test_env, 'another-possible-env']):
+        with pytest.raises(Exception):
+            EnvManager()  # can't tell which environment
+
+    # This tests that we can overcome a legit ambiguity
+    with mocked_s3utils_with_sse(beanstalks=[test_env, test_env2]):
+        with EnvManager.global_env_bucket_named(name='global-env-1'):
+            with pytest.raises(Exception):
+              EnvManager()
+
+        env_mgr = EnvManager(env_name=test_env)
+
+        assert env_mgr.portal_url == make_mock_portal_url(test_env)
+        assert env_mgr.es_url == make_mock_es_url(test_env)
+        assert env_mgr.env_name == test_env
+
+        env_mgr = EnvManager(env_name=test_env2)
+
+        assert env_mgr.portal_url == make_mock_portal_url(test_env2)
+        assert env_mgr.es_url == make_mock_es_url(test_env2)
+        assert env_mgr.env_name == test_env2
 
 
 def test_env_manager_verify_and_get_env_config():
 
-    class MyS3(MockBotoS3Client):
-        MOCK_STATIC_FILES = {
-            # Bucket 'global-env-1'
-            'global-env-1/cgap-footest':
-                '{"fourfront": "http://portal", "es": "http://es", "ff_env": "cgap-footest"}',
-            # Bucket 'global-env-2'
-            'global-env-2/cgap-footest':
-                '{"fourfront": "http://portal-foo", "es": "http://es-foo", "ff_env": "cgap-footest"}',
-            'global-env-2/cgap-bartest':
-                '{"fourfront": "http://portal-bar", "es": "http://es-bar", "ff_env": "cgap-bartest"}',
-        }
+    test_env = 'fourfront-foo'
 
-    with mock.patch.object(s3_utils_module, "boto3", MockBoto3(s3=MyS3)):
+    with mocked_s3utils_with_sse(beanstalks=[test_env]) as boto3:
 
-        my_s3 = s3_utils_module.boto3.client('s3')
+        config = EnvManager.verify_and_get_env_config(s3_client=boto3.client('s3'),
+                                                      global_bucket='foursight-envs',
+                                                      env=test_env)
 
-        # Note here we specified the env explicitly.
-        config = EnvManager.verify_and_get_env_config(s3_client=my_s3, global_bucket='global-env-1', env='cgap-footest')
+        assert config['fourfront'] == make_mock_portal_url(test_env)
+        assert config['es'] == make_mock_es_url(test_env)
+        assert config['ff_env'] == test_env
 
-        assert config['fourfront'] == 'http://portal'
-        assert config['es'] == 'http://es'
-        assert config['ff_env'] == 'cgap-footest'
+        config = EnvManager.verify_and_get_env_config(s3_client=boto3.client('s3'),
+                                                      global_bucket='foursight-envs',
+                                                      # env will default because we have only one
+                                                      env=None
+                                                      )
 
-        env_manager_from_desc = EnvManager.compose(portal_url='http://portal',
-                                                   es_url="http://es",
-                                                   env_name='cgap-footest',
-                                                   s3=my_s3)
+        assert config['fourfront'] == make_mock_portal_url(test_env)
+        assert config['es'] == make_mock_es_url(test_env)
+        assert config['ff_env'] == test_env
 
-        assert env_manager_from_desc.env_description == config
-        assert env_manager_from_desc.env_description['fourfront'] == 'http://portal'
-        assert env_manager_from_desc.env_description['es'] == 'http://es'
-        assert env_manager_from_desc.env_description['ff_env'] == 'cgap-footest'
-        assert env_manager_from_desc.portal_url == 'http://portal'
-        assert env_manager_from_desc.es_url == 'http://es'
-        assert env_manager_from_desc.env_name == 'cgap-footest'
 
-        config = EnvManager.verify_and_get_env_config(s3_client=my_s3, global_bucket='global-env-1',
-                                                      # Env unspecified, but there's only one, so it'll be inferred.
-                                                      env=None)
+def test_env_manager_compose():
 
-        assert config['fourfront'] == 'http://portal'
-        assert config['es'] == 'http://es'
-        assert config['ff_env'] == 'cgap-footest'
+    test_env = 'fourfront-foo'
 
-        # The next tests are similar to the above, but in an S3 global bucket env (global-env-2) that has more than
-        # one environment, so the env cannot default.
+    test_portal = make_mock_portal_url(test_env)
+    test_es = make_mock_es_url(test_env)
 
-        config = EnvManager.verify_and_get_env_config(s3_client=my_s3, global_bucket='global-env-2', env='cgap-footest')
+    with mocked_s3utils_with_sse(beanstalks=[test_env]) as boto3:
 
-        assert config['fourfront'] == 'http://portal-foo'
-        assert config['es'] == 'http://es-foo'
-        assert config['ff_env'] == 'cgap-footest'
+        config = EnvManager.verify_and_get_env_config(s3_client=boto3.client('s3'),
+                                                      global_bucket='foursight-envs',
+                                                      env=test_env)
 
-        config = EnvManager.verify_and_get_env_config(s3_client=my_s3, global_bucket='global-env-2', env='cgap-bartest')
+        assert config['fourfront'] == test_portal
+        assert config['es'] == test_es
+        assert config['ff_env'] == test_env
 
-        assert config['fourfront'] == 'http://portal-bar'
-        assert config['es'] == 'http://es-bar'
-        assert config['ff_env'] == 'cgap-bartest'
+        env_manager_from_desc = EnvManager.compose(s3=boto3.client('s3'),
+                                                   portal_url=test_portal,
+                                                   es_url=test_es,
+                                                   env_name=test_env)
 
-        with pytest.raises(CannotInferEnvFromManyGlobalEnvs):
-            EnvManager.verify_and_get_env_config(s3_client=my_s3, global_bucket='global-env-2',
-                                                 # Env unspecified, but alas ambiguous, so no defaulting can occur.
-                                                 env=None)
+        assert env_manager_from_desc.env_description['ff_env'] == test_env
+        assert env_manager_from_desc.env_description['fourfront'] == test_portal
+        assert env_manager_from_desc.env_description['es'] == test_es
+
 
 
 def test_env_manager_global_env_bucket_name():

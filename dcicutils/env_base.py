@@ -11,7 +11,7 @@ from .exceptions import (
     CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv,
     GlobalBucketAccessError, SynonymousEnvironmentVariablesMismatched,
 )
-from .misc_utils import override_environ, ignored
+from .misc_utils import override_environ, ignored, remove_suffix
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,8 @@ class EnvManager:
 
     LEGACY_ENV_NAME_KEY = 'ff_env'
     ENV_NAME_KEY = 'env_name'  # In the future we may want to convert to these keys, but not yet. See note above.
+
+    LEGACY_ACCOUNT_GLOBAL_ENV_BUCKET = 'foursight-envs'
 
     @classmethod
     def compose(cls, *, portal_url, es_url, env_name, s3: Optional[botocore.client.BaseClient] = None):
@@ -87,9 +89,10 @@ class EnvManager:
         if described_env_name:
             if not env_name:
                 env_name = described_env_name
-            elif env_name != described_env_name:
-                raise ValueError(f"The given env name, {env_name},"
-                                 f" does not match the name given in the description, {env_description}.")
+            # TODO: Enable this test when entries for mastertest don't expand to "fourfront-mastertest", etc.
+            # elif env_name != described_env_name:
+            #     raise ValueError(f"The given env name, {env_name},"
+            #                      f" does not match the name given in the description, {env_description}.")
 
         self._env_name = env_name
         if not self._env_name:
@@ -146,24 +149,27 @@ class EnvManager:
         """
         return self._env_name
 
-    @staticmethod
-    def verify_and_get_env_config(s3_client, global_bucket: str, env):
+    @classmethod
+    def verify_and_get_env_config(cls, s3_client, global_bucket: str, env):
         """
         Verifies the S3 environment from which the env config is coming from, and returns the S3-based env config
         Throws exceptions if the S3 bucket is unreachable, or an env based on the name of the global S3 bucket
         is not present.
         """
         logger.warning(f'Fetching bucket data via global env bucket: {global_bucket}')
-        head_response = s3_client.head_bucket(Bucket=global_bucket)
-        status = head_response['ResponseMetadata']['HTTPStatusCode']  # should be 200; raise error for 404 or 403
-        if status != 200:
-            raise GlobalBucketAccessError(global_bucket=global_bucket, status=status)
-        # list contents of global env bucket, look for a match with the global env bucket name
-        list_response = s3_client.list_objects_v2(Bucket=global_bucket)
-        # no match, raise exception
-        if list_response['KeyCount'] < 1:
-            raise CannotInferEnvFromNoGlobalEnvs(global_bucket=global_bucket)
-        keys = [content['Key'] for content in list_response['Contents']]
+
+        # head_response = s3_client.head_bucket(Bucket=global_bucket)
+        # status = head_response['ResponseMetadata']['HTTPStatusCode']  # should be 200; raise error for 404 or 403
+        # if status != 200:
+        #     raise GlobalBucketAccessError(global_bucket=global_bucket, status=status)
+        # # list contents of global env bucket, look for a match with the global env bucket name
+        # list_response = s3_client.list_objects_v2(Bucket=global_bucket)
+        # # no match, raise exception
+        # if list_response['KeyCount'] < 1:
+        #     raise CannotInferEnvFromNoGlobalEnvs(global_bucket=global_bucket)
+        # keys = [content['Key'] for content in list_response['Contents']]
+        keys = cls.get_all_environments(env_bucket=global_bucket)
+
         if env is None:
             if len(keys) == 1:
                 # If there is only one env, which is the likely case, let's infer that this is the one we want.
@@ -215,3 +221,32 @@ class EnvManager:
 
         with override_environ(GLOBAL_BUCKET_ENV=name, GLOBAL_ENV_BUCKET=name):
             yield
+
+    @classmethod
+    def _get_configs(cls, env_bucket, kind):
+        env_bucket_name = (
+            # prefer a given bucket
+            env_bucket
+            # or GLOBAL_ENV_BUCKET
+            or cls.global_env_bucket_name()
+            # but failing that, for legacy system, just use legacy name
+            or cls.LEGACY_ACCOUNT_GLOBAL_ENV_BUCKET)
+        s3_resource = boto3.resource('s3')
+        env_bucket_model= s3_resource.Bucket(env_bucket_name)
+        configs = []
+        key_objs = env_bucket_model.objects.all()
+        for key_obj in key_objs:
+             key_name = key_obj.key
+             if kind == 'env' and '.' not in key_name:
+                 configs.append(key_name)
+             elif kind == 'ecosystem' and key_name.endswith('.ecosystem'):
+                 configs.append(remove_suffix('.ecosystem', key_name))
+        return sorted(configs)
+
+    @classmethod
+    def get_all_environments(cls, env_bucket=None):
+        return cls._get_configs(env_bucket=env_bucket, kind='env')
+
+    @classmethod
+    def get_all_ecosystems(cls, env_bucket=None):
+        return cls._get_configs(env_bucket=env_bucket, kind='ecosystem')

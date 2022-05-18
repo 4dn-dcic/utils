@@ -17,9 +17,10 @@ from .env_base import EnvManager
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
 from .exceptions import (
     EnvUtilsLoadError, BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
+    NotUsingBeanstalksAnyMore
 )
 from .misc_utils import (
-    decorator, full_object_name, ignored, remove_prefix, check_true, find_association, override_environ,
+    decorator, full_object_name, ignored, remove_prefix, remove_suffix, check_true, find_association, override_environ,
 )
 
 
@@ -281,9 +282,9 @@ class EnvUtils:
     }
 
     @classmethod
-    def init(cls, env_name=None, force=False):
+    def init(cls, env_name=None, ecosystem=None, force=False):
         if force or cls._DECLARED_DATA is None:
-            cls.load_declared_data(env_name=env_name)
+            cls.load_declared_data(env_name=env_name, ecosystem=ecosystem)
 
     @classmethod
     def declared_data(cls):
@@ -302,9 +303,14 @@ class EnvUtils:
 
     @classmethod
     @contextlib.contextmanager
-    def local_env_utils(cls, global_env_bucket, env_name):
+    def local_env_utils(cls, global_env_bucket=None, env_name=None):
+        attrs = {}
+        if global_env_bucket:
+            attrs['GLOBAL_ENV_BUCKET'] = global_env_bucket
+        if env_name:
+            attrs['ENV_NAME'] = env_name
         with EnvUtils.locally_declared_data():
-            with override_environ(GLOBAL_ENV_BUCKET=global_env_bucket, ENV_NAME=env_name):
+            with override_environ(**attrs):
                 EnvUtils.init(force=True)
                 yield
 
@@ -336,16 +342,22 @@ class EnvUtils:
     _CREDENTIALS_ERROR_PATTERN = re.compile(".*Invalid header value.*(Credentials|SignedHeaders)")
 
     @classmethod
-    def _get_s3_object(cls, bucket: str, key: str) -> dict:
+    def _get_config_object_from_s3(cls, env_bucket: str, config_key: str) -> dict:
+        """
+         Returns the contents of an environmental configuration file.
+
+        :param env_bucket: the name of a bucket (the global_env_bucket)
+        :param config_key: the name of a key (the name of a configuration - an ff_env or ecosystem)
+        """
         try:
             s3 = boto3.client('s3')
-            metadata = s3.get_object(Bucket=bucket, Key=key)
+            metadata = s3.get_object(Bucket=env_bucket, Key=config_key)
             data = json.load(metadata['Body'])
             return data
         except HTTPClientError as err_obj:
             if cls._CREDENTIALS_ERROR_PATTERN.match(str(err_obj)):  # Some sort of plausibility test
                 raise EnvUtilsLoadError("Credentials problem, perhaps expired or wrong account.",
-                                        bucket_name=bucket, env=key, encapsulated_error=err_obj)
+                                        env_bucket=env_bucket, config_key=config_key, encapsulated_error=err_obj)
             raise
         except ClientError as err_obj:
             response_data = getattr(err_obj, 'response', {})
@@ -353,27 +365,37 @@ class EnvUtils:
             if response_error:
                 response_error_code = response_error.get('Code', None)
                 msg = response_error.get('Message') or response_error_code or "Load Error"
-                raise EnvUtilsLoadError(msg, bucket_name=bucket, env=key, encapsulated_error=err_obj)
+                raise EnvUtilsLoadError(msg, env_bucket=env_bucket, config_key=config_key, encapsulated_error=err_obj)
             raise
 
     @classmethod
-    def load_declared_data(cls, env_name=None):
-        bucket = EnvManager.global_env_bucket_name()
-        if bucket:
-            env_name = env_name or os.environ.get('ENV_NAME')
-            if env_name:
-                try:
-                    data = cls._get_s3_object(bucket=bucket, key=env_name)
-                    ecosystem = data.get(e.ECOSYSTEM)
-                    if ecosystem:
-                        ecosystem_data = cls._get_s3_object(bucket=bucket, key=ecosystem)
-                        # TODO: Maybe error-check that the data doesn't contain conflicting or ignored data,
-                        #       since we won't be using it.
-                        data = ecosystem_data
-                    cls.set_declared_data(data)
-                    return
-                except Exception as err_obj:
-                    raise EnvUtilsLoadError(str(err_obj), bucket_name=bucket, env=env_name, encapsulated_error=err_obj)
+    def load_declared_data(cls, env_name=None, ecosystem=None):
+        """
+        Tries to load environmental data from any of various keys in the global env bucket.
+        1. If an ecosystem was specified, load from <ecosystem>.ecosystem.
+        2. If an env_name was specified, load from that name.
+        3. If the environment variable ENV_NAME is set, load from that name.
+        4. Using the environment variable ECOSYSTEM (default 'main'), load from <ecosystem>.ecosystem
+        """
+        config_key = f"{ecosystem}.ecosystem" if ecosystem else (env_name or os.environ.get('ENV_NAME'))
+        if not config_key:
+            config_key = f"{os.environ.get('ECOSYSTEM', 'main')}.ecosystem"
+        env_bucket = EnvManager.global_env_bucket_name()
+        if env_bucket and config_key:
+            try:
+                config_data = cls._get_config_object_from_s3(env_bucket=env_bucket,
+                                                             config_key=config_key)
+                ecosystem_key_from_config_data = config_data.get(e.ECOSYSTEM)
+                if ecosystem_key_from_config_data:
+                    config_data = cls._get_config_object_from_s3(env_bucket=env_bucket,
+                                                                 config_key=ecosystem_key_from_config_data)
+                cls.set_declared_data(config_data)
+                return
+            except Exception as err_obj:
+                raise EnvUtilsLoadError(str(err_obj),
+                                        env_bucket=env_bucket,
+                                        config_key=config_key,
+                                        encapsulated_error=err_obj)
 
         cls.set_declared_data({e.IS_LEGACY: True})
 

@@ -192,11 +192,11 @@ class InvalidParameterError(ValueError):
 
 class EnvUtilsLoadError(ValueError):
 
-    def __init__(self, msg, *, bucket_name, env, encapsulated_error):
-        self.bucket_name = bucket_name
-        self.env = env
+    def __init__(self, msg, *, env_bucket, config_key, encapsulated_error):
+        self.env_bucket = env_bucket
+        self.config_key = config_key
         self.encapsulated_error = encapsulated_error
-        super().__init__(f"{msg} (bucket_name={bucket_name}, env={env})")
+        super().__init__(f"{msg} (env_bucket={env_bucket}, config={config_key})")
 
 
 class AppKeyMissing(RuntimeError):
@@ -221,6 +221,11 @@ class AppServerKeyMissing(AppKeyMissing):
         self.server = server
         super().__init__(context=f"{key_manager.APP_NAME} server {server}",
                          key_manager=key_manager)
+
+
+class NotUsingBeanstalksAnyMore(Exception):
+    pass
+
 
 
 class NotBeanstalkEnvironment(Exception):

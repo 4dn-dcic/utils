@@ -15,8 +15,9 @@ from dcicutils.qa_utils import (
     MockBoto3, MockBotoElasticBeanstalkClient, MockBotoS3Client, ControlledTime, MockResponse,
     make_mock_beanstalk, make_mock_beanstalk_cname, make_mock_beanstalk_environment_variables,
 )
+from dcicutils.s3_utils import EnvManager
 from unittest import mock
-from . import beanstalk_utils, ff_utils, s3_utils, env_utils  # , base
+from . import beanstalk_utils, ff_utils, s3_utils, env_utils, env_base  # , base
 
 
 _MOCK_APPLICATION_NAME = "4dn-web"
@@ -101,38 +102,40 @@ def make_mock_health_page(env_name):
         s3_utils.HealthPageKey.TIBANNA_OUTPUT_BUCKET: s3_utils.s3Utils.TIBANNA_OUTPUT_BUCKET_TEMPLATE,  # no env_name
     }
 
+from dcicutils.env_utils import EnvUtils
 
 @contextlib.contextmanager
-def mocked_s3utils(beanstalks=None, require_sse=False, other_access_key_names=None):
+def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=None):
     """
     This context manager sets up a mock version of boto3 for use by s3_utils and ff_utils during the context
     of its test. It also sets up the S3_ENCRYPT_KEY environment variable with a sample value for testing,
     and it sets up a set of mocked beanstalks for fourfront-foo and fourfront-bar, so that s3_utils will not
     get confused when it does discovery operations to find them.
     """
-    if beanstalks is None:
-        beanstalks = TestScenarios.DEFAULT_BEANSTALKS
+    if environments is None:
+        environments = TestScenarios.DEFAULT_BEANSTALKS
     # First we make a mocked boto3 that will use an S3 mock with mock server side encryption.
-    s3_class = (make_mock_boto_s3_with_sse(beanstalks=beanstalks, other_access_key_names=other_access_key_names)
+    s3_class = (make_mock_boto_s3_with_sse(beanstalks=environments, other_access_key_names=other_access_key_names)
                 if require_sse
                 else MockBotoS3Client)
     mock_boto3 = MockBoto3(s3=s3_class,
-                           elasticbeanstalk=make_mock_boto_eb_client_class(beanstalks=beanstalks))
+                           elasticbeanstalk=make_mock_boto_eb_client_class(beanstalks=environments))
     s3_client = mock_boto3.client('s3')  # This creates the s3 file system
     assert isinstance(s3_client, s3_class)
-    for beanstalk in beanstalks:
+    for environment in environments:
         record = {
-            "fourfront": make_mock_portal_url(beanstalk),
-            "es_url": make_mock_es_url(beanstalk),
-            "ff_env": beanstalk
+            EnvManager.LEGACY_PORTAL_URL_KEY: make_mock_portal_url(environment),
+            EnvManager.LEGACY_ES_URL_KEY: make_mock_es_url(environment),
+            EnvManager.LEGACY_ENV_NAME_KEY: environment
         }
         record_string = json.dumps(record)
-        s3_client.s3_files.files[f"foursight-envs/{beanstalk}"] = bytes(record_string.encode('utf-8'))
+        s3_client.s3_files.files[f"foursight-envs/{environment}"] = bytes(record_string.encode('utf-8'))
     # Now we arrange that s3_utils, ff_utils, etc. modules share the illusion that our mock IS the boto3 library
     with mock.patch.object(s3_utils, "boto3", mock_boto3):
         with mock.patch.object(ff_utils, "boto3", mock_boto3):
             with mock.patch.object(beanstalk_utils, "boto3", mock_boto3):
                 with mock.patch.object(env_utils, "boto3", mock_boto3):
+                  with mock.patch.object(env_base, "boto3", mock_boto3):
                     with mock.patch.object(s3_utils.EnvManager, "fetch_health_page_json") as mock_fetcher:
                         # This is all that's needed for s3Utils to initialize an EnvManager.
                         # We might have to add more later.
@@ -150,9 +153,15 @@ def mocked_s3utils(beanstalks=None, require_sse=False, other_access_key_names=No
                         # as an environment variable (i.e., in os.environ), so this sets up that environment variable.
                         if require_sse:
                             with override_environ(S3_ENCRYPT_KEY=s3_class.SSE_ENCRYPT_KEY):
-                                yield mock_boto3
+                                with EnvUtils.local_env_utils(global_env_bucket=os.environ.get('GLOBAL_ENV_BUCKET'),
+                                                              env_name=environments[0]
+                                                              if environments else
+                                                              os.environ.get('ENV_NAME')):
+                                    yield mock_boto3
                         else:
-                            yield mock_boto3
+                            with EnvUtils.local_env_utils(global_env_bucket=os.environ.get('GLOBAL_ENV_BUCKET'),
+                                                          env_name=os.environ.get('ENV_NAME')):
+                                yield mock_boto3
 
 
 # Here we set up some variables, auxiliary functions, and mocks containing common values needed for testing
