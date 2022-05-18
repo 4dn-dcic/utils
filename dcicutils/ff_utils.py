@@ -223,7 +223,7 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     try:
         the_verb = REQUESTS_VERBS[verb.upper()]
     except KeyError:
-        raise ValueError("Provided verb %s is not valid. Must one of: %s"
+        raise ValueError("Provided verb %s is not valid. Must be one of: %s"
                          % (verb.upper(), ', '.join(REQUESTS_VERBS.keys())))
     # automatically detect a search and overwrite the retry if it is standard
     if '/search/' in url and retry_fxn == standard_request_with_retries:
@@ -704,8 +704,8 @@ def get_metadata_links(obj_id, key=None, ff_env=None):
     Given standard key/ff_env authentication, return result for @@links view
     """
     auth = get_authentication_with_server(key, ff_env)
-    purge_url = '/'.join([auth['server'], obj_id, '@@links'])
-    response = authorized_request(purge_url, auth=auth, verb='GET')
+    links_url = '/'.join([auth['server'], obj_id, '@@links'])
+    response = authorized_request(links_url, auth=auth, verb='GET')
     return get_response_json(response)
 
 

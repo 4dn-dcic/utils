@@ -204,6 +204,14 @@ class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
         self._just_now += self._tick_timedelta
         return self._just_now
 
+    EPOCH_START_TIME = datetime.datetime(1970, 1, 1, 0, 0, 0)
+
+    def time(self) -> float:
+        """
+        Returns like what time.time would return.
+        """
+        return (self.utcnow() - self.EPOCH_START_TIME).total_seconds()
+
     def utcnow(self) -> datetime.datetime:
         """
         This tells you what the virtual clock time would be in UTC.

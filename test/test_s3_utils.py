@@ -957,7 +957,7 @@ def test_env_manager():
 
     # This tests that we notice a legit ambiguity in environment names
     with mocked_s3utils_with_sse(beanstalks=[test_env, 'another-possible-env']):
-        with pytest.raises(Exception):
+        with pytest.raises(CannotInferEnvFromManyGlobalEnvs):
             EnvManager()  # can't tell which environment
 
     # This tests that we can overcome a legit ambiguity

@@ -1,12 +1,18 @@
 import contextlib
+import datetime
+import io
 import json
+import math
 import os
 import re
+import requests
+import time
 
 from dcicutils.env_utils import EnvUtils
-from dcicutils.misc_utils import ignored, override_environ, remove_prefix
+from dcicutils.lang_utils import disjoined_list
+from dcicutils.misc_utils import ignored, override_environ, remove_prefix, full_class_name, PRINT, environ_bool
 from dcicutils.qa_utils import (
-    MockBoto3, MockBotoElasticBeanstalkClient, MockBotoS3Client,
+    MockBoto3, MockBotoElasticBeanstalkClient, MockBotoS3Client, ControlledTime, MockResponse,
     make_mock_beanstalk, make_mock_beanstalk_cname, make_mock_beanstalk_environment_variables,
 )
 from dcicutils.s3_utils import EnvManager
@@ -300,3 +306,202 @@ def make_mock_boto_s3_with_sse(beanstalks=None, other_access_key_names=None):
 
 
 # MockBotoS3WithSSE = make_mock_boto_s3_with_sse()
+
+
+REQUESTS_KEYS = list(ff_utils.REQUESTS_VERBS.keys())
+
+
+@contextlib.contextmanager
+def mocked_authorized_requests(**mocks):
+    for key in mocks:
+        assert key in REQUESTS_KEYS, (f"The string {key} does not name a requests verb."
+                                      f" Each key must be {disjoined_list(REQUESTS_KEYS)}.")
+    mocked = ff_utils.REQUESTS_VERBS.copy()
+
+    def make_disabled(verb):
+        def _disabled(url, *args, **kwargs):
+            ignored(args, kwargs)
+            raise AssertionError(f"Attempt to {verb} {url}, which is disabled in the mock.")
+        return _disabled
+
+    with mock.patch.object(ff_utils, 'REQUESTS_VERBS', mocked):
+        for key, val in mocked.items():
+            mocked[key] = make_disabled(key)
+        for key, val in mocks.items():
+            mocked[key] = mocks.get(key) or val
+        yield
+
+
+@contextlib.contextmanager
+def controlled_time_mocking(enabled=True):
+    dt = ControlledTime()
+    if enabled:
+        with mock.patch.object(datetime, "datetime", dt):
+            with mock.patch.object(requests.sessions, "preferred_clock", dt.time):
+                with mock.patch.object(time, "sleep", dt.sleep):
+                    with mock.patch.object(time, "time", dt.time):
+                        yield dt
+    else:
+        # This returns the datetime object, but doesn't set it up as a mock, so it's harmless.
+        # But it means the caller can still do dt.sleep() operations.
+        yield dt
+
+
+_MYDIR = os.path.dirname(__file__)
+_TEST_DIR = os.path.join(os.path.dirname(_MYDIR), "test")
+
+
+class TestRecorder:
+    """
+    This allows the web request part of an integration test to be run in a mode where it makes a recording
+    that can be played back as an integration test. (Note that this does not mock other elements like s3
+    because it's assumed the web request hides all of that.)
+
+    This would replace something that might be written as:
+
+        @pytest.mark.integrated
+        def test_something(integrated_ff):
+            ...the meat of the test...
+
+    with:
+
+        @pytest.mark.recordable
+        @pytest.mark.integratedx
+        def test_something(integrated_ff):
+            with TestRecorder().recorded_requests('test_something', integrated_ff):
+                # Call common subroutine shared by integrated and unit test
+                check_something(integrated_ff)
+
+        @pytest.mark.unit
+        def test_post_delete_purge_links_metadata_unit():
+            with TestRecorder().replayed_requests('test_post_delete_purge_links_metadata') as mocked_integrated_ff:
+                # Call common subroutine shared by integrated and unit test
+                check_post_delete_purge_links_metadata(mocked_integrated_ff)
+
+        def check_something(integrated_ff):  # Not a test but a common subroutine
+            ... the meat of the test ...
+
+    The integration test must be run once by doing something like:
+
+        $ RECORDING_ENABLED=TRUE pytest -vv -m recordable
+
+    This will create the recordings. After that, one can invoke tests in the normal way, but the recorded test
+    will be used. Be sure to check in the recording.
+    """
+
+    __test__ = False  # This declaration asserts to PyTest that this is not a test case.
+
+    RECORDING_ENABLED = environ_bool("RECORDING_ENABLED")
+
+    DEFAULT_RECORDINGS_DIR = os.path.abspath(os.path.join(_TEST_DIR, "recordings"))
+
+    REAL_REQUEST_VERBS = ff_utils.REQUESTS_VERBS.copy()
+
+    def __init__(self, recordings_dir=None):
+        self.recordings_dir = recordings_dir or self.DEFAULT_RECORDINGS_DIR
+        self.recording_enabled = self.RECORDING_ENABLED
+
+    @contextlib.contextmanager
+    def disable_recording(self):
+        old_enabled = self.recording_enabled
+        try:
+            self.recording_enabled = False
+            yield
+        finally:
+            self.recording_enabled = old_enabled
+
+    @contextlib.contextmanager
+    def recorded_requests(self, test_name, integrated_ff):
+        with io.open(os.path.join(self.recordings_dir, test_name), 'w') as recording_fp:
+
+            # Write an initial record with sufficient integratoin context information for replaying
+            PRINT(json.dumps({
+                "ff_key": {"key": "some-key", "secret": "some-secret", "server": integrated_ff["ff_key"]["server"]},
+                "ff_env": integrated_ff["ff_env"],
+                "ff_env_index_namespace": integrated_ff["ff_env_index_namespace"]
+            }), file=recording_fp)
+
+            def mock_recorded(verb):
+                def _mocked(url, **kwargs):
+                    start = datetime.datetime.now()
+                    data = kwargs.get('data')
+                    try:
+                        response = self.REAL_REQUEST_VERBS[verb](url, **kwargs)
+                        status = response.status_code
+                        result = response.json()
+                        PRINT(f"Recording {verb} {url}")
+                        duration = (datetime.datetime.now() - start).total_seconds()
+                        duration = math.floor(duration * 10) / 10.0  # round to tenths of a second
+                        event = {"verb": verb, "url": url, "data": data,
+                                 "duration": duration, "status": status, "result": result}
+                        if self.recording_enabled:
+                            PRINT(json.dumps(event), file=recording_fp)
+                        return response
+                    except Exception as e:
+                        error_type = full_class_name(e)
+                        error_message = str(e)
+                        duration = (datetime.datetime.now() - start).total_seconds()
+                        event = {"verb": verb, "url": url, "data": data,
+                                 "duration": duration, "error_type": error_type, "error_message": error_message}
+                        if self.recording_enabled:
+                            PRINT(json.dumps(event), file=recording_fp)
+                        raise
+                _mocked.__name__ = f"_mocked_{verb}_after_recording"
+                return _mocked
+            with mocked_authorized_requests(GET=mock_recorded('GET'),
+                                            PATCH=mock_recorded('PATCH'),
+                                            POST=mock_recorded('POST'),
+                                            PUT=mock_recorded('PUT'),
+                                            DELETE=mock_recorded('DELETE')):
+                yield
+
+    @contextlib.contextmanager
+    def replayed_requests(self, test_name, mock_time=False):
+        with controlled_time_mocking(enabled=mock_time) as dt:
+            with io.open(os.path.join(self.recordings_dir, test_name)) as recording_fp:
+
+                PRINT()  # Start output on a fresh line
+
+                def get_next_json():
+                    line = recording_fp.readline()
+                    if not line:
+                        raise AssertionError("Out of replayable records.")
+                    parsed_json = json.loads(line)
+                    if parsed_json.get('verb') is None:
+                        PRINT(f"Consuming special non-request replay record.")
+                    else:
+                        PRINT(f"Consuming replay record {parsed_json.get('verb')} {parsed_json.get('url')}")
+                    return parsed_json
+
+                # Read back initial record with sufficient integratoin context information for replaying
+                mocked_integrated_ff = get_next_json()
+
+                def mock_replayed(verb):
+
+                    def _mocked(url, **kwargs):
+                        ignored(kwargs)
+                        PRINT(f"Replaying {verb} {url}")
+                        expected_event = get_next_json()
+                        expected_verb = expected_event['verb']
+                        expected_url = expected_event['url']
+                        if verb != expected_verb or url != expected_url:
+                            raise AssertionError(f"Actual call {verb} {url} does not match"
+                                                 f" expected call {expected_verb} {expected_url}")
+                        if expected_event.get('data') != kwargs.get('data'):  # might or might not have data
+                            raise AssertionError(f"Data mismatch on call {verb} {url}.")
+                        dt.sleep(expected_event['duration'])
+                        error_message = expected_event.get('error_message')
+                        if error_message:
+                            raise Exception(error_message)
+                        else:
+                            return MockResponse(status_code=expected_event['status'], json=expected_event['result'])
+
+                    _mocked.__name__ = f"_mocked_{verb}_by_replay"
+                    return _mocked
+
+                with mocked_authorized_requests(GET=mock_replayed('GET'),
+                                                PATCH=mock_replayed('PATCH'),
+                                                POST=mock_replayed('POST'),
+                                                PUT=mock_replayed('PUT'),
+                                                DELETE=mock_replayed('DELETE')):
+                    yield mocked_integrated_ff

@@ -1,20 +1,20 @@
 import contextlib
 import copy
-import pytest
 import json
 import os
+import pytest
 import requests
 import shutil
 import time
 
 from botocore.exceptions import ClientError
 from dcicutils import es_utils, ff_utils, s3_utils
-from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true
 from dcicutils.exceptions import MissingGlobalEnv
-from dcicutils.ff_mocks import mocked_s3utils, TestScenarios
+from dcicutils.ff_mocks import mocked_s3utils, TestScenarios, TestRecorder
+from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true
 from dcicutils.qa_utils import (
     check_duplicated_items_by_key, ignored, raises_regexp, MockResponse, MockBoto3, MockBotoSQSClient,
-    MockBotoS3Client,
+    MockBotoS3Client
 )
 from types import GeneratorType
 from unittest import mock
@@ -311,9 +311,24 @@ def test_unified_authentication_integrated(integrated_ff):
     assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
 
+@pytest.mark.recordable
 @pytest.mark.stg_or_prd_testing_needs_repair
-@pytest.mark.integrated
-def test_unified_authentication_prod_envs_integrated_only():
+@pytest.mark.integratedx
+@pytest.mark.flaky
+def test_unified_authentication_prod_envs_integrated_only_integrated(integrated_ff):
+    with TestRecorder().recorded_requests('unified_authentication_prod_envs_integrated_only', integrated_ff):
+        check_post_delete_purge_links_metadata(integrated_ff)
+
+
+@pytest.mark.unit
+def test_unified_authentication_prod_envs_integrated_only_unit():
+    # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
+    # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
+    with TestRecorder().replayed_requests('unified_authentication_prod_envs_integrated_only') as mocked_integrated_ff:
+        check_post_delete_purge_links_metadata(mocked_integrated_ff)
+
+
+def check_unified_authentication_prod_envs_integrated_only():
     # This is ONLY an integration test. There is no unit test functionality tested here.
     # All of the functionality used here is already tested elsewhere.
 
@@ -659,7 +674,7 @@ def test_get_metadata_integrated(integrated_ff):
 
 @pytest.mark.integrated
 @pytest.mark.flaky
-def test_patch_metadata(integrated_ff):
+def test_patch_metadata_integrated(integrated_ff):
     test_item = '331111bc-8535-4448-903e-854af460a254'
     original_res = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'])
     res = ff_utils.patch_metadata({'description': 'patch test'},
@@ -674,14 +689,39 @@ def test_patch_metadata(integrated_ff):
     assert 'ERROR getting id' in str(exec_info.value)
 
 
-@pytest.mark.integrated
+SAMPLE_RECORD = {
+    'description': 'patch test original value',
+    '@id': '/biosources/4DNSRJFD3WGN/',
+    '@type': ['Biosource', 'Item'],
+    'uuid': '331111bc-8535-4448-903e-854af460a254'
+}
+
+
+@pytest.mark.recordable
+@pytest.mark.integratedx
 @pytest.mark.flaky
-def test_post_delete_purge_links_metadata(integrated_ff):
+def test_post_delete_purge_links_metadata_integrated(integrated_ff):
+    with TestRecorder().recorded_requests('test_post_delete_purge_links_metadata', integrated_ff):
+        check_post_delete_purge_links_metadata(integrated_ff)
+
+
+@pytest.mark.unit
+def test_post_delete_purge_links_metadata_unit():
+    # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
+    # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
+    with TestRecorder().replayed_requests('test_post_delete_purge_links_metadata') as mocked_integrated_ff:
+        check_post_delete_purge_links_metadata(mocked_integrated_ff)
+
+
+def check_post_delete_purge_links_metadata(integrated_ff):
     """
     Combine all of these tests because they logically fit
     """
-    post_data = {'biosource_type': 'immortalized cell line', 'award': '1U01CA200059-01',
-                 'lab': '4dn-dcic-lab'}
+    post_data = {
+        'biosource_type': 'immortalized cell line',
+        'award': '1U01CA200059-01',
+        'lab': '4dn-dcic-lab'
+    }
     post_res = ff_utils.post_metadata(post_data, 'biosource', key=integrated_ff['ff_key'])
     post_item = post_res['@graph'][0]
     assert 'uuid' in post_item
@@ -739,9 +779,23 @@ def test_post_delete_purge_links_metadata(integrated_ff):
     assert 'The resource could not be found' in str(exec_info.value)
 
 
-@pytest.mark.integrated
+@pytest.mark.recordable
+@pytest.mark.integratedx
 @pytest.mark.flaky
-def test_upsert_metadata(integrated_ff):
+def test_upsert_metadata_integrated(integrated_ff):
+    with TestRecorder().recorded_requests('test_upsert_metadata', integrated_ff):
+        check_post_delete_purge_links_metadata(integrated_ff)
+
+
+@pytest.mark.unit
+def test_upsert_metadata_unit():
+    # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
+    # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
+    with TestRecorder().replayed_requests('test_upsert_metadata') as mocked_integrated_ff:
+        check_post_delete_purge_links_metadata(mocked_integrated_ff)
+
+
+def check_upsert_metadata(integrated_ff):
     test_data = {'biosource_type': 'immortalized cell line',
                  'award': '1U01CA200059-01', 'lab': '4dn-dcic-lab'}
     upsert_res = ff_utils.upsert_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
