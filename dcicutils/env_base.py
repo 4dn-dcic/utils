@@ -7,10 +7,7 @@ import os
 import urllib.request
 
 from typing import Optional
-from .exceptions import (
-    CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv,
-    GlobalBucketAccessError, SynonymousEnvironmentVariablesMismatched,
-)
+from .exceptions import CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv, SynonymousEnvironmentVariablesMismatched
 from .misc_utils import override_environ, ignored, remove_suffix
 
 
@@ -232,15 +229,15 @@ class EnvManager:
             # but failing that, for legacy system, just use legacy name
             or cls.LEGACY_ACCOUNT_GLOBAL_ENV_BUCKET)
         s3_resource = boto3.resource('s3')
-        env_bucket_model= s3_resource.Bucket(env_bucket_name)
+        env_bucket_model = s3_resource.Bucket(env_bucket_name)
         configs = []
         key_objs = env_bucket_model.objects.all()
         for key_obj in key_objs:
-             key_name = key_obj.key
-             if kind == 'env' and '.' not in key_name:
-                 configs.append(key_name)
-             elif kind == 'ecosystem' and key_name.endswith('.ecosystem'):
-                 configs.append(remove_suffix('.ecosystem', key_name))
+            key_name = key_obj.key
+            if kind == 'env' and '.' not in key_name:
+                configs.append(key_name)
+            elif kind == 'ecosystem' and key_name.endswith('.ecosystem'):
+                configs.append(remove_suffix('.ecosystem', key_name))
         return sorted(configs)
 
     @classmethod

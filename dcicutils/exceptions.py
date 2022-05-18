@@ -227,7 +227,6 @@ class NotUsingBeanstalksAnyMore(Exception):
     pass
 
 
-
 class NotBeanstalkEnvironment(Exception):
 
     def __init__(self, message=None, *, envname):

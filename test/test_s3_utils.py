@@ -17,10 +17,10 @@ from dcicutils.env_utils import (
 from dcicutils.env_utils_legacy import (
     FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, _CGAP_MGB_PUBLIC_URL_PRD  # noQA
 )
-from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs
+from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched
 from dcicutils.ff_mocks import make_mock_es_url, make_mock_portal_url
 from dcicutils.misc_utils import ignored, ignorable
-from dcicutils.qa_utils import override_environ, MockBoto3, MockBotoS3Client, MockResponse, known_bug_expected
+from dcicutils.qa_utils import override_environ, MockBoto3, MockResponse, known_bug_expected
 from dcicutils.s3_utils import s3Utils, EnvManager, HealthPageKey
 from requests.exceptions import ConnectionError
 from unittest import mock
@@ -926,8 +926,6 @@ def test_env_manager_fetch_health_page_json():
             assert helper.used_mocked_urlopen is True
 
 
-from .test_ff_utils import mocked_s3utils_with_sse
-
 def test_env_manager():
 
     test_env = 'fourfront-foo'
@@ -937,7 +935,7 @@ def test_env_manager():
     with mocked_s3utils_with_sse(beanstalks=[test_env]):
         with EnvManager.global_env_bucket_named(name='global-env-1'):
             with pytest.raises(Exception):
-              EnvManager()
+                EnvManager()
 
         env_mgr = EnvManager()
 
@@ -949,7 +947,7 @@ def test_env_manager():
     with mocked_s3utils_with_sse(beanstalks=[test_env, 'foo.ecosystem']):
         with EnvManager.global_env_bucket_named(name='global-env-1'):
             with pytest.raises(Exception):
-              EnvManager()
+                EnvManager()
 
         env_mgr = EnvManager()
 
@@ -966,7 +964,7 @@ def test_env_manager():
     with mocked_s3utils_with_sse(beanstalks=[test_env, test_env2]):
         with EnvManager.global_env_bucket_named(name='global-env-1'):
             with pytest.raises(Exception):
-              EnvManager()
+                EnvManager()
 
         env_mgr = EnvManager(env_name=test_env)
 
@@ -1031,7 +1029,6 @@ def test_env_manager_compose():
         assert env_manager_from_desc.env_description['ff_env'] == test_env
         assert env_manager_from_desc.env_description['fourfront'] == test_portal
         assert env_manager_from_desc.env_description['es'] == test_es
-
 
 
 def test_env_manager_global_env_bucket_name():
