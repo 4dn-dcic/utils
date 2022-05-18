@@ -1044,15 +1044,18 @@ class MockBotoS3Bucket:
 
     def _all(self):
         """A callback for <bucket>.objects.all()"""
-        return [self.s3.head_object(Bucket=self.name, Key=key)
+        return [MockBotoS3ObjectSummary(attributes=self.s3.head_object(Bucket=self.name, Key=key))
                 for key in self._keys()]
 
 
 class MockBotoS3ObjectSummary:
     # Not sure if we need to expose the strucutre of this yet. -kmp 13-Jan-2021
-    def __init__(self, **attributes):
+    def __init__(self, attributes):
         self._attributes = attributes
 
+    @property
+    def key(self):
+        return self._attributes['Key']
 
 class MockBotoS3BucketObjects:
 

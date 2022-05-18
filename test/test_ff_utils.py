@@ -242,7 +242,7 @@ def test_unified_authentication_decoding(integrated_ff):
 
 @contextlib.contextmanager
 def mocked_s3utils_with_sse(beanstalks=None, require_sse=True, files=None):
-    with mocked_s3utils(beanstalks=beanstalks or ['fourfront-foo', 'fourfront-bar'],
+    with mocked_s3utils(environments=beanstalks or ['fourfront-foo', 'fourfront-bar'],
                         require_sse=require_sse) as mock_boto3:
         s3 = mock_boto3.client('s3')
         assert isinstance(s3, MockBotoS3Client)
@@ -255,7 +255,7 @@ def test_unified_authentication_unit():
 
     ts = TestScenarios
 
-    with mocked_s3utils_with_sse():
+    with mocked_s3utils_with_sse(beanstalks=['fourfront-mastertest', ts.foo_env, ts.bar_env]):
 
         # When supplied a basic auth tuple, (key, secret), and a fourfront environment, the tuple is returned.
         auth1 = ff_utils.unified_authentication(ts.some_auth_tuple, ts.foo_env)
