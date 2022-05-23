@@ -5,7 +5,6 @@ import functools
 import json
 import os
 import re
-import urllib.parse
 
 from botocore.exceptions import HTTPClientError, ClientError
 from typing import Optional
