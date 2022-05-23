@@ -26,6 +26,9 @@ from unittest import mock
 from urllib.parse import urlparse
 
 
+ignorable(BeanstalkOperationNotImplemented)  # Stuff that does or doesn't use this might come and go
+
+
 @contextlib.contextmanager
 def stage_mirroring(*, enabled=True):
     with local_attrs(EnvUtils, STAGE_MIRRORING_ENABLED=enabled):
