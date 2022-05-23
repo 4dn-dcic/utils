@@ -34,7 +34,7 @@ import boto3
 from git import Repo
 
 from .beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env
-from .common import LEGACY_GLOBAL_ENV_BUCKET, DEFAULT_ECOSYSTEM
+from .common import LEGACY_GLOBAL_ENV_BUCKET, LEGACY_CGAP_GLOBAL_ENV_BUCKET, DEFAULT_ECOSYSTEM
 from .env_utils import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env,
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, is_test_env, is_hotseat_env,
@@ -597,8 +597,16 @@ class IniFileManager:
             raise ValueError("If both ENCODED_BS_ENV and ENCODED_ENV_NAME are supplied, they must agree.")
 
         es_server = es_server or os.environ.get('ENCODED_ES_SERVER', "MISSING_ENCODED_ES_SERVER")
-        env_bucket = env_bucket or EnvManager.global_env_bucket_name() or LEGACY_GLOBAL_ENV_BUCKET
-        env_ecosystem = env_ecosystem or os.environ.get("ENCODED_ECOSYSTEM") or DEFAULT_ECOSYSTEM
+        env_bucket = (env_bucket
+                      or EnvManager.global_env_bucket_name()
+                      or ("MISSING_GLOBAL_ENV_BUCKET"
+                          if cls.APP_ORCHESTRATED
+                          else (LEGACY_CGAP_GLOBAL_ENV_BUCKET if cls.APP_KIND == 'cgap' else LEGACY_GLOBAL_ENV_BUCKET)))
+        env_ecosystem = (env_ecosystem
+                         or os.environ.get("ENCODED_ECOSYSTEM")
+                         or ("MISSING_ENCODED_ECOSYSTEM"
+                             if cls.APP_ORCHESTRATED
+                             else DEFAULT_ECOSYSTEM))
         env_name = (env_name or bs_env
                     or os.environ.get("ENCODED_BS_ENV")
                     or os.environ.get("ENCODED_ENV_NAME")
