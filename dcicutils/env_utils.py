@@ -412,11 +412,15 @@ def is_indexer_env(envname: EnvName):
     Returns true if the given envname is the indexer env name.
     """
     ignored(envname)
-    raise BeanstalkOperationNotImplemented(operation="indexer_env")
+    return False
     #
     # Formerly:
     #
-    # return envname == EnvUtils.INDEXER_ENV_NAME
+    #     return envname == EnvUtils.INDEXER_ENV_NAME
+    #
+    # and we also tried:
+    #
+    #     raise BeanstalkOperationNotImplemented(operation="indexer_env")
 
 
 @if_orchestrated
@@ -426,15 +430,18 @@ def indexer_env_for_env(envname: EnvName):
     (If the environment is the indexer env itself, returns None.)
     """
     ignored(envname)
-    raise BeanstalkOperationNotImplemented(operation="indexer_env_for_env")
-    #
+    return None
+
     # Formerly:
     #
-    # if envname == EnvUtils.INDEXER_ENV_NAME:
-    #     return None
-    # else:
-    #     return EnvUtils.INDEXER_ENV_NAME
-
+    #     if envname == EnvUtils.INDEXER_ENV_NAME:
+    #         return None
+    #     else:
+    #         return EnvUtils.INDEXER_ENV_NAME
+    #
+    # and we also tried:
+    #
+    #     raise BeanstalkOperationNotImplemented(operation="indexer_env_for_env")
 
 @if_orchestrated
 def data_set_for_env(envname: EnvName, default=None):
