@@ -7,6 +7,7 @@ import os
 import urllib.request
 
 from typing import Optional
+from .common import LEGACY_GLOBAL_ENV_BUCKET
 from .exceptions import CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv, SynonymousEnvironmentVariablesMismatched
 from .misc_utils import override_environ, ignored, remove_suffix
 
@@ -32,8 +33,6 @@ class EnvManager:
 
     LEGACY_ENV_NAME_KEY = 'ff_env'
     ENV_NAME_KEY = 'env_name'  # In the future we may want to convert to these keys, but not yet. See note above.
-
-    LEGACY_ACCOUNT_GLOBAL_ENV_BUCKET = 'foursight-envs'
 
     @classmethod
     def compose(cls, *, portal_url, es_url, env_name, s3: Optional[botocore.client.BaseClient] = None):
@@ -227,7 +226,7 @@ class EnvManager:
             # or GLOBAL_ENV_BUCKET
             or cls.global_env_bucket_name()
             # but failing that, for legacy system, just use legacy name
-            or cls.LEGACY_ACCOUNT_GLOBAL_ENV_BUCKET)
+            or LEGACY_GLOBAL_ENV_BUCKET)
         s3_resource = boto3.resource('s3')
         env_bucket_model = s3_resource.Bucket(env_bucket_name)
         configs = []
