@@ -1584,6 +1584,21 @@ def test_orchestrated_infer_foursight_from_env():
             assert (infer_foursight_from_env(mock_request(domain='staging.4dnucleome.org'), 'staging')
                     == 'staging')
 
+            assert (infer_foursight_from_env('data.4dnucleome.org', 'data') == 'data')
+            assert (infer_foursight_from_env('data.4dnucleome.org', 'staging') == 'data')
+
+            assert (infer_foursight_from_env('https://data.4dnucleome.org', 'data') == 'data')
+            assert (infer_foursight_from_env('https://data.4dnucleome.org', 'staging') == 'data')
+
+            assert (infer_foursight_from_env('staging.4dnucleome.org', 'data') == 'staging')
+            assert (infer_foursight_from_env('staging.4dnucleome.org', 'staging') == 'staging')
+
+            assert (infer_foursight_from_env('http://staging.4dnucleome.org', 'data') == 'staging')
+            assert (infer_foursight_from_env('http://staging.4dnucleome.org', 'staging') == 'staging')
+
+            assert (infer_foursight_from_env(None, 'data') == 'data')
+            assert (infer_foursight_from_env(None, 'staging') == 'staging')
+
         # (active) cgap environments
         with local_attrs(EnvUtils, **CGAP_SETTINGS_FOR_TESTING):
 

@@ -802,15 +802,13 @@ def infer_foursight_url_from_env(request=None, envname: Optional[EnvName] = None
         # Although short_env_name allows None, it will return None in that case and a more confusing error will result.
         # (We allow None only so we can gracefully phase out the 'request' argument.) -kmp 15-May-2022
         raise ValueError("A non-null envname is required by infer_foursight_url_from_env.")
-    # TODO: Shouldn't this call infer_foursight_from_env instead of short_env_name?
-    #       However: Note that infer_foursight_from_env will try to do something useful with None that we don't want.
-    return EnvUtils.FOURSIGHT_URL_PREFIX + short_env_name(envname)
+    return EnvUtils.FOURSIGHT_URL_PREFIX + infer_foursight_from_env(request=request, envname=envname)
 
 
 @if_orchestrated
 def infer_foursight_from_env(request=None, envname: Optional[EnvName] = None):
     """
-    Infers the Foursight environment to view based on the given envname and request context
+    Infers the Foursight environment token to view based on the given envname and request context
 
     :param request: the current request (or an object that has a 'domain' attribute)
     :param envname: name of the environment we are on
@@ -819,16 +817,21 @@ def infer_foursight_from_env(request=None, envname: Optional[EnvName] = None):
     if envname is None:
         # We allow None only so we can gracefully phase out the 'request' argument. -kmp 15-May-2022
         raise ValueError("A non-null envname is required by infer_foursight_from_env.")
-    if EnvUtils.STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME:
-        classification = classify_server_url(request.domain)
+
+    # If a request is passed and stage-mirroring is enabled, we can tell from the URL if we're staging
+    # then for anything that is a stg or prd, return its 'public name' token.
+    # TODO: Find a simpler way to write this block of code? It's not very abstract. -kmp 23-May-2022
+    if request and EnvUtils.STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME:
+        classification = classify_server_url(request if isinstance(request, str) else request.domain)
         if classification[c.IS_STG_OR_PRD]:
             public_name = classification[c.PUBLIC_NAME]
             if public_name:
                 return public_name
+
     entry = find_association(EnvUtils.PUBLIC_URL_TABLE, environment=envname)
     if entry:
         envname = entry[p.NAME]
-    return remove_prefix(EnvUtils.FULL_ENV_PREFIX, envname, required=False)
+    return short_env_name(envname)  # remove_prefix(EnvUtils.FULL_ENV_PREFIX, envname, required=False)
 
 
 @if_orchestrated()
