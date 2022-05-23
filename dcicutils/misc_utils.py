@@ -1506,7 +1506,7 @@ def json_leaf_subst(exp, substitutions):
     return exp
 
 
-class SingletonManager():  # TODO: Move to dcicutils
+class SingletonManager():
 
     def __init__(self, singleton_class, *singleton_args, **singleton_kwargs):
         self._singleton = None
