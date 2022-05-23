@@ -19,8 +19,11 @@ from .exceptions import (
     EnvUtilsLoadError, BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
 )
 from .misc_utils import (
-    decorator, full_object_name, ignored, remove_prefix, check_true, find_association, override_environ,
+    decorator, full_object_name, ignored, ignorable, remove_prefix, check_true, find_association, override_environ,
 )
+
+
+ignorable(BeanstalkOperationNotImplemented)  # Stuff that does or doesn't use this might come and go
 
 
 class UseLegacy(BaseException):
@@ -442,6 +445,7 @@ def indexer_env_for_env(envname: EnvName):
     # and we also tried:
     #
     #     raise BeanstalkOperationNotImplemented(operation="indexer_env_for_env")
+
 
 @if_orchestrated
 def data_set_for_env(envname: EnvName, default=None):
