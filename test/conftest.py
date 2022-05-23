@@ -2,6 +2,7 @@ import os
 import pytest
 import requests
 
+from dcicutils.common import LEGACY_GLOBAL_ENV_BUCKET
 from dcicutils.ff_utils import authorized_request  # , get_health_page
 from dcicutils.s3_utils import s3Utils
 from .conftest_settings import TEST_DIR, INTEGRATED_ENV, INTEGRATED_ENV_INDEX_NAMESPACE, INTEGRATED_ENV_PORTAL_URL
@@ -23,7 +24,7 @@ INTEGRATED_ES = _portal_health_get(portal_url=INTEGRATED_ENV_PORTAL_URL,
                                    namespace=INTEGRATED_ENV_INDEX_NAMESPACE,
                                    key="elasticsearch")
 
-os.environ['GLOBAL_ENV_BUCKET'] = 'foursight-envs'
+os.environ['GLOBAL_ENV_BUCKET'] = LEGACY_GLOBAL_ENV_BUCKET
 os.environ['ENV_NAME'] = INTEGRATED_ENV
 
 
