@@ -551,6 +551,7 @@ def test_deployment_utils_any_environment_template_filename():
             TestDeployer.any_environment_template_filename()
 
 
+@pytest.mark.skip(reason="We are beyond the need to test this, and this test is hard to maintain")
 def test_deployment_utils_transitional_equivalence():
     """
     We used to use separate files for each environment. This tests that the new any.ini technology,
