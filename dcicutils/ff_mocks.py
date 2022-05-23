@@ -18,6 +18,7 @@ from dcicutils.qa_utils import (
 from dcicutils.s3_utils import EnvManager
 from unittest import mock
 from . import beanstalk_utils, ff_utils, s3_utils, env_utils, env_base  # , base
+from .common import LEGACY_GLOBAL_ENV_BUCKET
 
 
 _MOCK_APPLICATION_NAME = "4dn-web"
@@ -128,7 +129,7 @@ def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=
             EnvManager.LEGACY_ENV_NAME_KEY: environment
         }
         record_string = json.dumps(record)
-        s3_client.s3_files.files[f"foursight-envs/{environment}"] = bytes(record_string.encode('utf-8'))
+        s3_client.s3_files.files[f"{LEGACY_GLOBAL_ENV_BUCKET}/{environment}"] = bytes(record_string.encode('utf-8'))
     # Now we arrange that s3_utils, ff_utils, etc. modules share the illusion that our mock IS the boto3 library
     with mock.patch.object(s3_utils, "boto3", mock_boto3):
         with mock.patch.object(ff_utils, "boto3", mock_boto3):
@@ -298,7 +299,7 @@ def make_mock_boto_s3_with_sse(beanstalks=None, other_access_key_names=None):
         }
 
         def check_for_kwargs_required_by_mock(self, operation, Bucket, Key, **kwargs):
-            if Bucket == 'foursight-envs':
+            if Bucket == LEGACY_GLOBAL_ENV_BUCKET:
                 return  # This bucket does not care about SSE arguments
             super().check_for_kwargs_required_by_mock(operation=operation, Bucket=Bucket, Key=Key, **kwargs)
 
