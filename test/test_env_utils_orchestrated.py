@@ -1620,8 +1620,9 @@ def test_orchestrated_indexer_env_for_env_disabled():
 
     # We've disabled calls to this. The indexer isn't done this way in containers.
     for env in ['acme-indexer', 'acme-prd', 'acme-test', 'acme-anything', 'blah-blah']:
-        with pytest.raises(BeanstalkOperationNotImplemented):
-            indexer_env_for_env(env)
+        # We tried raising an error and opted to just return None
+        # with pytest.raises(BeanstalkOperationNotImplemented):
+        assert indexer_env_for_env(env) is None
 
 
 @pytest.mark.skip
@@ -1646,8 +1647,9 @@ def test_orchestrated_is_indexer_env_disabled():
 
     # We've disabled calls to this. The indexer isn't done this way in containers.
     for env in ['acme-indexer', 'acme-prd', 'acme-test', 'acme-anything', 'blah-blah']:
-        with pytest.raises(BeanstalkOperationNotImplemented):
-            is_indexer_env(env)
+        # We tried raising an error and opted to just return False
+        # with pytest.raises(BeanstalkOperationNotImplemented):
+        assert is_indexer_env(env) is False
 
 
 @using_orchestrated_behavior()

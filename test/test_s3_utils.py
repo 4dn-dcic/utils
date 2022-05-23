@@ -144,6 +144,7 @@ def test_s3utils_creation_ff_stg():
             'url': util.url,
         }
         assert actual_props == {
+            # Change to containers meant using new fourfront-webprod2 pseudoenv.
             'sys_bucket': 'elasticbeanstalk-fourfront-webprod2-system',
             'outfile_bucket': 'elasticbeanstalk-fourfront-webprod-wfoutput',
             'raw_file_bucket': 'elasticbeanstalk-fourfront-webprod-files',
@@ -179,6 +180,7 @@ def test_s3utils_creation_ff_prd():
                 'url': util.url,
             }
             assert actual_props == {
+                # Change to containers meant using new fourfront-webprod2 pseudoenv.
                 'sys_bucket': 'elasticbeanstalk-fourfront-webprod2-system',
                 'outfile_bucket': 'elasticbeanstalk-fourfront-webprod-wfoutput',
                 'raw_file_bucket': 'elasticbeanstalk-fourfront-webprod-files',
@@ -986,7 +988,7 @@ def test_env_manager_verify_and_get_env_config():
     with mocked_s3utils_with_sse(beanstalks=[test_env]) as boto3:
 
         config = EnvManager.verify_and_get_env_config(s3_client=boto3.client('s3'),
-                                                      global_bucket='foursight-envs',
+                                                      global_bucket=LEGACY_GLOBAL_ENV_BUCKET,
                                                       env=test_env)
 
         assert config['fourfront'] == make_mock_portal_url(test_env)
@@ -994,7 +996,7 @@ def test_env_manager_verify_and_get_env_config():
         assert config['ff_env'] == test_env
 
         config = EnvManager.verify_and_get_env_config(s3_client=boto3.client('s3'),
-                                                      global_bucket='foursight-envs',
+                                                      global_bucket=LEGACY_GLOBAL_ENV_BUCKET,
                                                       # env will default because we have only one
                                                       env=None
                                                       )
@@ -1014,7 +1016,7 @@ def test_env_manager_compose():
     with mocked_s3utils_with_sse(beanstalks=[test_env]) as boto3:
 
         config = EnvManager.verify_and_get_env_config(s3_client=boto3.client('s3'),
-                                                      global_bucket='foursight-envs',
+                                                      global_bucket=LEGACY_GLOBAL_ENV_BUCKET,
                                                       env=test_env)
 
         assert config['fourfront'] == test_portal
