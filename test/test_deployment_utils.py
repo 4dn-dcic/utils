@@ -442,25 +442,27 @@ def test_deployment_utils_build_ini_file_from_template():
                             TestDeployer.build_ini_file_from_template(some_template_file_name,
                                                                       some_ini_file_name, indexer=True)
 
-            MockFileStream.reset()
-
-            with pytest.raises(RuntimeError):
-                with mock.patch("os.path.exists") as mock_exists:
-                    mock_exists.return_value = True
-                    with mock.patch("io.open", side_effect=mocked_open):
-                        TestDeployer.build_ini_file_from_template(some_template_file_name,
-                                                                  some_ini_file_name,
-                                                                  bs_env='fourfront-indexer', indexer=True)
-
-            MockFileStream.reset()
-
-            with pytest.raises(RuntimeError):
-                with mock.patch("os.path.exists") as mock_exists:
-                    mock_exists.return_value = True
-                    with mock.patch("io.open", side_effect=mocked_open):
-                        TestDeployer.build_ini_file_from_template(some_template_file_name,
-                                                                  some_ini_file_name,
-                                                                  bs_env='fourfront-indexer')
+            # We're no longer caring about or testing for indexer_environment
+            #
+            # MockFileStream.reset()
+            #
+            # with pytest.raises(RuntimeError):
+            #     with mock.patch("os.path.exists") as mock_exists:
+            #         mock_exists.return_value = True
+            #         with mock.patch("io.open", side_effect=mocked_open):
+            #             TestDeployer.build_ini_file_from_template(some_template_file_name,
+            #                                                       some_ini_file_name,
+            #                                                       bs_env='fourfront-indexer', indexer=True)
+            #
+            # MockFileStream.reset()
+            #
+            # with pytest.raises(RuntimeError):
+            #     with mock.patch("os.path.exists") as mock_exists:
+            #         mock_exists.return_value = True
+            #         with mock.patch("io.open", side_effect=mocked_open):
+            #             TestDeployer.build_ini_file_from_template(some_template_file_name,
+            #                                                       some_ini_file_name,
+            #                                                       bs_env='fourfront-indexer')
 
             # Uncomment this for debugging...
             # assert False, "PASSED"
@@ -559,277 +561,276 @@ def test_deployment_utils_transitional_equivalence():
     production.ini.
     """
 
-    # TODO: Once this mechanism is in place, the files cgap.ini, cgapdev.ini, cgaptest.ini, and cgapwolf.ini
-    #       can either be removed (and these transitional tests removed) or transitioned to be test data.
+    with override_environ(ENV_NAME=None, GLOBAL_ENV_BUCKET=None, GLOBAL_BUCKET_ENV=None):
 
-    def tester(ref_ini, bs_env, data_set, es_server, *, any_ini=None, es_namespace=None, line_checker=None,
-               use_ini_file_manager_kind=None, **others):
-        """
-        This common tester program checks that the any.ini does the same thing as a given ref ini,
-        given a particular set of environment variables.  It does the output to a string in both cases
-        and then compares the result.
-        """
+        assert os.environ.get('ENV_NAME') is None
 
-        if use_ini_file_manager_kind == 'legacy-cgap':
-            class SelectedTestDeployer (TestLegacyCgapDeployer):
-                pass
-        elif use_ini_file_manager_kind == 'orchestrated-cgap':
-            class SelectedTestDeployer (TestOrchestratedCgapDeployer):
-                pass
-        elif use_ini_file_manager_kind is None:
-            class SelectedTestDeployer (TestDeployer):
-                pass
-        else:
-            raise InvalidParameterError('use_ini_file_manager_kind', use_ini_file_manager_kind,
-                                        ['legacy-cgap', 'orchestrated-cgap'])
+        # TODO: Once this mechanism is in place, the files cgap.ini, cgapdev.ini, cgaptest.ini, and cgapwolf.ini
+        #       can either be removed (and these transitional tests removed) or transitioned to be test data.
 
-        def fix_(x):
-            return x.replace('_', '-')
+        def tester(ref_ini, env_name, data_set, es_server, *, any_ini=None, es_namespace=None, line_checker=None,
+                   use_ini_file_manager_kind=None, **others):
+            """
+            This common tester program checks that the any.ini does the same thing as a given ref ini,
+            given a particular set of environment variables.  It does the output to a string in both cases
+            and then compares the result.
+            """
 
-        if bs_env.startswith("fourfront"):
-            assert fix_(ref_ini[:-4]) == fix_(bs_env[10:])  # "xyz.ini" needs to match "fourfront-xyz"
-        else:
-            assert fix_(ref_ini[:-4]) == fix_(bs_env)  # In a post-fourfront world, "xyz.ini" needs to match "xyz"
+            if use_ini_file_manager_kind == 'legacy-cgap':
+                class SelectedTestDeployer (TestLegacyCgapDeployer):
+                    pass
+            elif use_ini_file_manager_kind == 'orchestrated-cgap':
+                class SelectedTestDeployer (TestOrchestratedCgapDeployer):
+                    pass
+            elif use_ini_file_manager_kind is None:
+                class SelectedTestDeployer (TestDeployer):
+                    pass
+            else:
+                raise InvalidParameterError('use_ini_file_manager_kind', use_ini_file_manager_kind,
+                                            ['legacy-cgap', 'orchestrated-cgap'])
 
-        es_namespace = es_namespace or bs_env
+            def fix_(x):
+                return x.replace('_', '-')
 
-        # Test of build_ini_from_template with just 2 keyword arguments explicitly supplied (bs_env, es_server),
-        # and others defaulted.
+            if env_name.startswith("fourfront"):
+                assert fix_(ref_ini[:-4]) == fix_(env_name[10:])  # "xyz.ini" needs to match "fourfront-xyz"
+            else:
+                assert fix_(ref_ini[:-4]) == fix_(env_name)  # In a post-fourfront world, "xyz.ini" needs to match "xyz"
 
-        ref_output = StringIO()
-        any_output = StringIO()
+            es_namespace = es_namespace or env_name
 
-        any_ini_path = os.path.join(SelectedTestDeployer.TEMPLATE_DIR,
-                                    any_ini or ("cg_any.ini" if is_cgap_env(bs_env) else "ff_any.ini"))
-        ref_ini_path = os.path.join(SelectedTestDeployer.TEMPLATE_DIR, ref_ini)
+            # Test of build_ini_from_template with just 2 keyword arguments explicitly supplied (bs_env, es_server),
+            # and others defaulted.
 
-        with override_environ(APP_VERSION='externally_defined'):
-            # We don't expect variables like APP_VERSION to be globally available because
-            # we'd end up shadowing them and confusion could result about which variable
-            # the template wanted to reference, ours or theirs. -kmp 9-May-2020
-            with pytest.raises(RuntimeError):
-                SelectedTestDeployer.build_ini_stream_from_template(ref_ini_path, "this shouldn't get used")
+            ref_output = StringIO()
+            any_output = StringIO()
 
-        SelectedTestDeployer.build_ini_stream_from_template(ref_ini_path, ref_output,
-                                                            bs_env=bs_env, es_server=es_server, **others)
-        SelectedTestDeployer.build_ini_stream_from_template(any_ini_path, any_output,
-                                                            # we should be able to default data_env & es_namespace
-                                                            bs_env=bs_env, es_server=es_server, **others)
+            any_ini_path = os.path.join(SelectedTestDeployer.TEMPLATE_DIR,
+                                        any_ini or ("cg_any.ini" if is_cgap_env(env_name) else "ff_any.ini"))
+            ref_ini_path = os.path.join(SelectedTestDeployer.TEMPLATE_DIR, ref_ini)
 
-        ref_content = ref_output.getvalue()
-        any_content = any_output.getvalue()
-        assert ref_content == any_content
+            assert os.environ.get('APP_VERSION') is None
 
-        # Test of build_ini_from_template with all 4 keyword arguments explicitly supplied (bs_env, data_set,
-        # es_server, es_namespace), none defaulted.
+            with override_environ(APP_VERSION='externally_defined'):
+                # We don't expect variables like APP_VERSION to be globally available because
+                # we'd end up shadowing them and confusion could result about which variable
+                # the template wanted to reference, ours or theirs. -kmp 9-May-2020
+                # with pytest.raises(RuntimeError) as e:
+                with pytest.raises(RuntimeError):
+                    SelectedTestDeployer.build_ini_stream_from_template(ref_ini_path, "this shouldn't get used")
 
-        ref_output = StringIO()
-        any_output = StringIO()
+            assert os.environ.get('APP_VERSION') is None
 
-        SelectedTestDeployer.build_ini_stream_from_template(ref_ini_path, ref_output,
-                                                            bs_env=bs_env, data_set=data_set,
-                                                            es_server=es_server, es_namespace=es_namespace, **others)
-        SelectedTestDeployer.build_ini_stream_from_template(any_ini_path, any_output,
-                                                            bs_env=bs_env, data_set=data_set,
-                                                            es_server=es_server, es_namespace=es_namespace, **others)
+            # Testing to be removed later with bs=. Same as next block of tests with env_name= .
+            SelectedTestDeployer.build_ini_stream_from_template(ref_ini_path, ref_output,
+                                                                bs_env=env_name, es_server=es_server, **others)
+            SelectedTestDeployer.build_ini_stream_from_template(any_ini_path, any_output,
+                                                                # we should be able to default data_env & es_namespace
+                                                                bs_env=env_name, es_server=es_server, **others)
 
-        ref_content = ref_output.getvalue()
-        any_content = any_output.getvalue()
-        assert ref_content == any_content
+            ref_content = ref_output.getvalue()
+            any_content = any_output.getvalue()
+            assert ref_content == any_content
 
-        problems = []
+            # Testing with env_name= to replace previous block with bs_env=.
+            SelectedTestDeployer.build_ini_stream_from_template(ref_ini_path, ref_output,
+                                                                env_name=env_name, es_server=es_server, **others)
+            SelectedTestDeployer.build_ini_stream_from_template(any_ini_path, any_output,
+                                                                # we should be able to default data_env & es_namespace
+                                                                env_name=env_name, es_server=es_server, **others)
 
-        if line_checker:
+            ref_content = ref_output.getvalue()
+            any_content = any_output.getvalue()
+            assert ref_content == any_content
 
-            for raw_line in io.StringIO(any_content):
-                line = raw_line.rstrip()
-                problem = line_checker.check(line)
-                if problem:
-                    problems.append(problem)
+            # Test of build_ini_from_template with all 4 keyword arguments explicitly supplied (bs_env, data_set,
+            # es_server, es_namespace), none defaulted.
 
-            line_checker.check_finally()
+            ref_output = StringIO()
+            any_output = StringIO()
 
-            assert problems == [], "Problems found:\n%s" % "\n".join(problems)
+            # Testing to be removed later with bs=. Same as next block of tests with env_name= .
+            SelectedTestDeployer.build_ini_stream_from_template(ref_ini_path, ref_output,
+                                                                bs_env=env_name, data_set=data_set,
+                                                                es_server=es_server, es_namespace=es_namespace,
+                                                                **others)
+            SelectedTestDeployer.build_ini_stream_from_template(any_ini_path, any_output,
+                                                                bs_env=env_name, data_set=data_set,
+                                                                es_server=es_server, es_namespace=es_namespace,
+                                                                **others)
 
-    with mock.patch("pkg_resources.get_distribution", return_value=FakeDistribution()):
-        with mock.patch.object(IniFileManager, "get_app_version",
-                               return_value=MOCKED_PROJECT_VERSION) as mock_get_app_version:
-            with mock.patch("toml.load", return_value={"tool": {"poetry": {"version": MOCKED_LOCAL_GIT_VERSION}}}):
-                with override_environ(ENCODED_INDEXER=None, ENCODED_INDEX_SERVER=None):
+            ref_content = ref_output.getvalue()
+            any_content = any_output.getvalue()
+            assert ref_content == any_content
 
-                    class Checker:
+            # Testing with env_name= to replace previous block with bs_env=.
+            SelectedTestDeployer.build_ini_stream_from_template(ref_ini_path, ref_output,
+                                                                env_name=env_name, data_set=data_set,
+                                                                es_server=es_server, es_namespace=es_namespace,
+                                                                **others)
+            SelectedTestDeployer.build_ini_stream_from_template(any_ini_path, any_output,
+                                                                env_name=env_name, data_set=data_set,
+                                                                es_server=es_server, es_namespace=es_namespace,
+                                                                **others)
 
-                        def __init__(self, expect_indexer, expect_index_server, expected_values=None):
-                            self.indexer = None
-                            self.expect_indexer = expect_indexer
-                            self.expect_index_server = expect_index_server
-                            self.indexer = None
-                            self.index_server = None
-                            self.expected_values = expected_values or {}
-                            self.actual_values = {}
+            ref_content = ref_output.getvalue()
+            any_content = any_output.getvalue()
+            assert ref_content == any_content
 
-                        def check_any(self, line):
-                            if line.startswith('indexer ='):
-                                print("saw indexer line:", repr(line))
-                                self.indexer = line.split('=')[1].strip()
-                            if line.startswith('index_server ='):
-                                print("saw index server line:", repr(line))
-                                self.index_server = line.split('=')[1].strip()
-                            for key in self.expected_values.keys():
-                                if line.startswith(f"{key} ="):
-                                    print("saw expected line:", repr(line))
-                                    self.actual_values[key] = line.split('=')[1].strip()
-                                    break  # very minor optimization, but not strictly needed
+            problems = []
 
-                        def check(self, line):
-                            self.check_any(line)
+            if line_checker:
 
-                        def check_finally(self):
-                            assert self.indexer == self.expect_indexer
-                            assert self.index_server == self.expect_index_server
-                            assert self.expected_values == self.actual_values
+                for raw_line in io.StringIO(any_content):
+                    line = raw_line.rstrip()
+                    problem = line_checker.check(line)
+                    if problem:
+                        problems.append(problem)
 
-                    class CGAPProdChecker(Checker):
-                        pass
+                line_checker.check_finally()
 
-                    class FFProdChecker(Checker):
+                assert problems == [], "Problems found:\n%s" % "\n".join(problems)
 
-                        def check(self, line):
-                            if 'bucket =' in line:
-                                fragment = 'fourfront-webprod'
-                                if fragment not in line:
-                                    return "'%s' missing in '%s'" % (fragment, line)
-                            self.check_any(line)
+        with mock.patch("pkg_resources.get_distribution", return_value=FakeDistribution()):
+            with mock.patch.object(IniFileManager, "get_app_version",
+                                   return_value=MOCKED_PROJECT_VERSION) as mock_get_app_version:
+                with mock.patch("toml.load", return_value={"tool": {"poetry": {"version": MOCKED_LOCAL_GIT_VERSION}}}):
+                    with override_environ(ENCODED_INDEXER=None, ENCODED_INDEX_SERVER=None):
 
-                    # CGAP uses data_set='prod' for everything but 'fourfront-cgapdev', which uses 'test'.
-                    # But that logic is hidden in data_set_for_env, in case it changes.
+                        class Checker:
 
-                    us_east = "us-east-1.es.amazonaws.com:80"
-                    index_default = "true"
-                    index_server_default = None
+                            def __init__(self, expect_indexer, expect_index_server, expected_values=None):
+                                self.indexer = None
+                                self.expect_indexer = expect_indexer
+                                self.expect_index_server = expect_index_server
+                                self.indexer = None
+                                self.index_server = None
+                                self.expected_values = expected_values or {}
+                                self.actual_values = {}
 
-                    bs_env = "fourfront-cgap"
-                    data_set = data_set_for_env(bs_env)
-                    tester(ref_ini="cgap.ini", bs_env=bs_env, data_set=data_set,
-                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
-                           line_checker=CGAPProdChecker(expect_indexer=index_default,
-                                                        expect_index_server=index_server_default))
+                            def check_any(self, line):
+                                if line.startswith('indexer ='):
+                                    print("saw indexer line:", repr(line))
+                                    self.indexer = line.split('=')[1].strip()
+                                if line.startswith('index_server ='):
+                                    print("saw index server line:", repr(line))
+                                    self.index_server = line.split('=')[1].strip()
+                                for key in self.expected_values.keys():
+                                    if line.startswith(f"{key} ="):
+                                        print("saw expected line:", repr(line))
+                                        self.actual_values[key] = line.split('=')[1].strip()
+                                        break  # very minor optimization, but not strictly needed
 
-                    test_alpha_org = "alphatest"
-                    test_encrypt_key_id = 'sample-encrypt-key-id-for-testing'
-                    bs_env = "cgap-alpha"
-                    data_set = data_set_for_env(bs_env) or "prod"
+                            def check(self, line):
+                                self.check_any(line)
 
-                    tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
-                           use_ini_file_manager_kind="orchestrated-cgap",
-                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
-                           line_checker=CGAPProdChecker(expect_indexer=index_default,
-                                                        expect_index_server=index_server_default,
-                                                        expected_values={
-                                                            "file_upload_bucket": f"acme-hospital-{bs_env}-files",
-                                                            "app_kind": "cgap",
-                                                            "app_deployment": "orchestrated",
-                                                        }),
-                           application_bucket_prefix="acme-hospital-",
-                           s3_bucket_env=bs_env)
+                            def check_finally(self):
+                                assert self.indexer == self.expect_indexer
+                                assert self.index_server == self.expect_index_server
+                                assert self.expected_values == self.actual_values
 
-                    tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
-                           use_ini_file_manager_kind="legacy-cgap",
-                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
-                           line_checker=CGAPProdChecker(expect_indexer=index_default,
-                                                        expect_index_server=index_server_default,
-                                                        expected_values={
-                                                            "file_upload_bucket": f"elasticbeanstalk-{bs_env}-files",
-                                                            "app_kind": "cgap",
-                                                            "app_deployment": "beanstalk",
-                                                        }),
-                           s3_bucket_env=bs_env)
+                        class CGAPProdChecker(Checker):
+                            pass
 
-                    tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
-                           use_ini_file_manager_kind='orchestrated-cgap',
-                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
-                           line_checker=CGAPProdChecker(expect_indexer=index_default,
-                                                        expect_index_server=index_server_default,
-                                                        expected_values={
-                                                            "file_upload_bucket": f"some-prefix-{bs_env}-files",
-                                                        }),
-                           application_bucket_prefix="some-prefix-",
-                           s3_bucket_env=bs_env)
+                        class FFProdChecker(Checker):
 
-                    tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
-                           use_ini_file_manager_kind="orchestrated-cgap",
-                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
-                           line_checker=CGAPProdChecker(expect_indexer=index_default,
-                                                        expect_index_server=index_server_default,
-                                                        expected_values={
-                                                            "file_upload_bucket": f"{test_alpha_org}-{bs_env}-files",
-                                                        }),
-                           s3_bucket_env=bs_env,
-                           s3_bucket_org=test_alpha_org,
-                           s3_encrypt_key_id=test_encrypt_key_id,
-                           application_bucket_prefix=f"{test_alpha_org}-")
+                            def check(self, line):
+                                if 'bucket =' in line and not line.startswith('env.bucket ='):
+                                    fragment = 'fourfront-webprod'
+                                    if fragment not in line:
+                                        return "'%s' missing in '%s'" % (fragment, line)
+                                self.check_any(line)
 
-                    tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
-                           use_ini_file_manager_kind='orchestrated-cgap',
-                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
-                           line_checker=CGAPProdChecker(expect_indexer=index_default,
-                                                        expect_index_server=index_server_default,
-                                                        expected_values={
-                                                            "file_upload_bucket": f"{test_alpha_org}-{bs_env}-files",
-                                                        }),
-                           s3_bucket_env=bs_env,
-                           s3_bucket_org=test_alpha_org,
-                           s3_encrypt_key_id=test_encrypt_key_id,
-                           application_bucket_prefix=f"{test_alpha_org}-")
+                        # CGAP uses data_set='prod' for everything but 'fourfront-cgapdev', which uses 'test'.
+                        # But that logic is hidden in data_set_for_env, in case it changes.
 
-                    bs_env = "cgap-alfa"
-                    tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
-                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
-                           use_ini_file_manager_kind='orchestrated-cgap',
-                           line_checker=CGAPProdChecker(expect_indexer=index_default,
-                                                        expect_index_server=index_server_default,
-                                                        expected_values={
-                                                            "file_upload_bucket": 'fu-bucket',
-                                                            "file_wfout_bucket": 'fw-bucket',
-                                                            "blob_bucket": "b-bucket",
-                                                            "system_bucket": "s-bucket",
-                                                            "metadata_bundles_bucket": "md-bucket",
-                                                            "identity": "ThisIsMyIdentity",
-                                                            "tibanna_cwls_bucket": "cwls-bucket",
-                                                            "tibanna_output_bucket": "tb-bucket",
-                                                            "s3_encrypt_key_id": "MyKey",
-                                                        }),
-                           s3_bucket_env=bs_env,
-                           s3_bucket_org=test_alpha_org,
-                           file_upload_bucket='fu-bucket',
-                           file_wfout_bucket='fw-bucket',
-                           blob_bucket='b-bucket',
-                           system_bucket='s-bucket',
-                           metadata_bundles_bucket='md-bucket',
-                           sentry_dsn="https://123sample123sample123@o1111111.ingest.sentry.io/1234567",
-                           identity='ThisIsMyIdentity',
-                           auth0_client="31415926535",
-                           auth0_secret="piepipiepipiepi",
-                           tibanna_cwls_bucket="cwls-bucket",
-                           tibanna_output_bucket="tb-bucket",
-                           s3_encrypt_key_id="MyKey",
-                           )
+                        us_east = "us-east-1.es.amazonaws.com:80"
+                        index_default = "true"
+                        index_server_default = None
 
-                    with override_environ(ENCODED_FILE_UPLOAD_BUCKET='decoy1',
-                                          ENCODED_FILE_WFOUT_BUCKET='decoy2',
-                                          ENCODED_BLOB_BUCKET='decoy3',
-                                          ENCODED_SYSTEM_BUCKET='decoy4',
-                                          ENCODED_METADATA_BUNDLES_BUCKET='decoy5',
-                                          ENCODED_S3_BUCKET_ORG='decoy6',
-                                          ENCODED_TIBANNA_OUTPUT_BUCKET='decoy7',
-                                          ENCODED_TIBANNA_CWLS_BUCKET='decoy8',
-                                          ENCODED_S3_ENCRYPT_KEY_ID='decoy9',
-                                          ):
-                        # The decoy values in the environment variables don't matter because we'll be passing
-                        # explicit values for these to the builder that will take precedence.
-                        tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
+                        assert os.environ.get('ENV_NAME') is None
+
+                        bs_env = "fourfront-cgap"
+                        data_set = data_set_for_env(bs_env)
+                        tester(ref_ini="cgap.ini", env_name=bs_env, data_set=data_set,
+                               es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                            expect_index_server=index_server_default))
+
+                        test_alpha_org = "alphatest"
+                        test_encrypt_key_id = 'sample-encrypt-key-id-for-testing'
+                        bs_env = "cgap-alpha"
+                        data_set = data_set_for_env(bs_env) or "prod"
+
+                        tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
                                use_ini_file_manager_kind="orchestrated-cgap",
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                            expect_index_server=index_server_default,
+                                                            expected_values={
+                                                                "file_upload_bucket": f"acme-hospital-{bs_env}-files",
+                                                                "app_kind": "cgap",
+                                                                "app_deployment": "orchestrated",
+                                                            }),
+                               application_bucket_prefix="acme-hospital-",
+                               s3_bucket_env=bs_env)
+
+                        tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
+                               use_ini_file_manager_kind="legacy-cgap",
+                               es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                            expect_index_server=index_server_default,
+                                                            expected_values={
+                                                                "file_upload_bucket":
+                                                                    f"elasticbeanstalk-{bs_env}-files",
+                                                                "app_kind": "cgap",
+                                                                "app_deployment": "beanstalk",
+                                                            }),
+                               s3_bucket_env=bs_env)
+
+                        tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
+                               use_ini_file_manager_kind='orchestrated-cgap',
+                               es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                            expect_index_server=index_server_default,
+                                                            expected_values={
+                                                                "file_upload_bucket": f"some-prefix-{bs_env}-files",
+                                                            }),
+                               application_bucket_prefix="some-prefix-",
+                               s3_bucket_env=bs_env)
+
+                        tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
+                               use_ini_file_manager_kind="orchestrated-cgap",
+                               es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                            expect_index_server=index_server_default,
+                                                            expected_values={
+                                                                "file_upload_bucket":
+                                                                    f"{test_alpha_org}-{bs_env}-files",
+                                                            }),
+                               s3_bucket_env=bs_env,
+                               s3_bucket_org=test_alpha_org,
+                               s3_encrypt_key_id=test_encrypt_key_id,
+                               application_bucket_prefix=f"{test_alpha_org}-")
+
+                        tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
+                               use_ini_file_manager_kind='orchestrated-cgap',
+                               es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                            expect_index_server=index_server_default,
+                                                            expected_values={
+                                                                "file_upload_bucket":
+                                                                    f"{test_alpha_org}-{bs_env}-files",
+                                                            }),
+                               s3_bucket_env=bs_env,
+                               s3_bucket_org=test_alpha_org,
+                               s3_encrypt_key_id=test_encrypt_key_id,
+                               application_bucket_prefix=f"{test_alpha_org}-")
+
+                        bs_env = "cgap-alfa"
+                        tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
+                               es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               use_ini_file_manager_kind='orchestrated-cgap',
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
                                                             expected_values={
@@ -838,10 +839,10 @@ def test_deployment_utils_transitional_equivalence():
                                                                 "blob_bucket": "b-bucket",
                                                                 "system_bucket": "s-bucket",
                                                                 "metadata_bundles_bucket": "md-bucket",
+                                                                "identity": "ThisIsMyIdentity",
                                                                 "tibanna_cwls_bucket": "cwls-bucket",
                                                                 "tibanna_output_bucket": "tb-bucket",
-                                                                "identity": "ThisIsMyIdentity",
-                                                                "s3_encrypt_key_id": "MyKeyId",
+                                                                "s3_encrypt_key_id": "MyKey",
                                                             }),
                                s3_bucket_env=bs_env,
                                s3_bucket_org=test_alpha_org,
@@ -850,200 +851,244 @@ def test_deployment_utils_transitional_equivalence():
                                blob_bucket='b-bucket',
                                system_bucket='s-bucket',
                                metadata_bundles_bucket='md-bucket',
+                               sentry_dsn="https://123sample123sample123@o1111111.ingest.sentry.io/1234567",
+                               identity='ThisIsMyIdentity',
+                               auth0_client="31415926535",
+                               auth0_secret="piepipiepipiepi",
                                tibanna_cwls_bucket="cwls-bucket",
                                tibanna_output_bucket="tb-bucket",
-                               identity='ThisIsMyIdentity',
-                               s3_encrypt_key_id='MyKeyId',
+                               s3_encrypt_key_id="MyKey",
                                )
 
-                    with override_environ(ENCODED_FILE_UPLOAD_BUCKET='fu-bucket',
-                                          ENCODED_FILE_WFOUT_BUCKET='fw-bucket',
-                                          ENCODED_BLOB_BUCKET='b-bucket',
-                                          ENCODED_SYSTEM_BUCKET='s-bucket',
-                                          ENCODED_METADATA_BUNDLES_BUCKET='md-bucket',
-                                          ENCODED_S3_BUCKET_ORG=test_alpha_org,
-                                          ENCODED_TIBANNA_OUTPUT_BUCKET='tb-bucket',
-                                          ENCODED_TIBANNA_CWLS_BUCKET='cwls-bucket',
-                                          ENCODED_IDENTITY='ThisIsMyIdentity',
-                                          ENCODED_S3_ENCRYPT_KEY_ID='MyKeyId'):
-                        # If no explicit args are passed to the builder, the ENCODED_xxx arguments DO matter.
-                        tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", bs_env=bs_env, data_set=data_set,
-                               use_ini_file_manager_kind="orchestrated-cgap",
-                               es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
-                               line_checker=CGAPProdChecker(expect_indexer=index_default,
-                                                            expect_index_server=index_server_default,
-                                                            expected_values={
-                                                                "file_upload_bucket": 'fu-bucket',
-                                                                "file_wfout_bucket": 'fw-bucket',
-                                                                "blob_bucket": "b-bucket",
-                                                                "system_bucket": "s-bucket",
-                                                                "metadata_bundles_bucket": "md-bucket",
-                                                                "tibanna_cwls_bucket": "cwls-bucket",
-                                                                "tibanna_output_bucket": "tb-bucket",
-                                                                "identity": "ThisIsMyIdentity",
-                                                                "s3_encrypt_key_id": "MyKeyId",
-                                                            }),
-                               s3_bucket_env=bs_env)
+                        with override_environ(ENCODED_FILE_UPLOAD_BUCKET='decoy1',
+                                              ENCODED_FILE_WFOUT_BUCKET='decoy2',
+                                              ENCODED_BLOB_BUCKET='decoy3',
+                                              ENCODED_SYSTEM_BUCKET='decoy4',
+                                              ENCODED_METADATA_BUNDLES_BUCKET='decoy5',
+                                              ENCODED_S3_BUCKET_ORG='decoy6',
+                                              ENCODED_TIBANNA_OUTPUT_BUCKET='decoy7',
+                                              ENCODED_TIBANNA_CWLS_BUCKET='decoy8',
+                                              ENCODED_S3_ENCRYPT_KEY_ID='decoy9',
+                                              ):
+                            # The decoy values in the environment variables don't matter because we'll be passing
+                            # explicit values for these to the builder that will take precedence.
+                            tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", env_name=bs_env,
+                                   data_set=data_set, use_ini_file_manager_kind="orchestrated-cgap",
+                                   es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                                expect_index_server=index_server_default,
+                                                                expected_values={
+                                                                    "file_upload_bucket": 'fu-bucket',
+                                                                    "file_wfout_bucket": 'fw-bucket',
+                                                                    "blob_bucket": "b-bucket",
+                                                                    "system_bucket": "s-bucket",
+                                                                    "metadata_bundles_bucket": "md-bucket",
+                                                                    "tibanna_cwls_bucket": "cwls-bucket",
+                                                                    "tibanna_output_bucket": "tb-bucket",
+                                                                    "identity": "ThisIsMyIdentity",
+                                                                    "s3_encrypt_key_id": "MyKeyId",
+                                                                }),
+                                   s3_bucket_env=bs_env,
+                                   s3_bucket_org=test_alpha_org,
+                                   file_upload_bucket='fu-bucket',
+                                   file_wfout_bucket='fw-bucket',
+                                   blob_bucket='b-bucket',
+                                   system_bucket='s-bucket',
+                                   metadata_bundles_bucket='md-bucket',
+                                   tibanna_cwls_bucket="cwls-bucket",
+                                   tibanna_output_bucket="tb-bucket",
+                                   identity='ThisIsMyIdentity',
+                                   s3_encrypt_key_id='MyKeyId',
+                                   )
 
-                    bs_env = "fourfront-cgapdev"
-                    data_set = data_set_for_env(bs_env)
-                    tester(ref_ini="cgapdev.ini", bs_env=bs_env, data_set=data_set,
-                           es_server="search-fourfront-cgapdev-gnv2sgdngkjbcemdadmaoxcsae.%s" % us_east,
-                           line_checker=Checker(expect_indexer=index_default,
-                                                expect_index_server=index_server_default))
+                        with override_environ(ENCODED_FILE_UPLOAD_BUCKET='fu-bucket',
+                                              ENCODED_FILE_WFOUT_BUCKET='fw-bucket',
+                                              ENCODED_BLOB_BUCKET='b-bucket',
+                                              ENCODED_SYSTEM_BUCKET='s-bucket',
+                                              ENCODED_METADATA_BUNDLES_BUCKET='md-bucket',
+                                              ENCODED_S3_BUCKET_ORG=test_alpha_org,
+                                              ENCODED_TIBANNA_OUTPUT_BUCKET='tb-bucket',
+                                              ENCODED_TIBANNA_CWLS_BUCKET='cwls-bucket',
+                                              ENCODED_IDENTITY='ThisIsMyIdentity',
+                                              ENCODED_S3_ENCRYPT_KEY_ID='MyKeyId'):
+                            # If no explicit args are passed to the builder, the ENCODED_xxx arguments DO matter.
+                            tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", env_name=bs_env,
+                                   data_set=data_set, use_ini_file_manager_kind="orchestrated-cgap",
+                                   es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                                expect_index_server=index_server_default,
+                                                                expected_values={
+                                                                    "file_upload_bucket": 'fu-bucket',
+                                                                    "file_wfout_bucket": 'fw-bucket',
+                                                                    "blob_bucket": "b-bucket",
+                                                                    "system_bucket": "s-bucket",
+                                                                    "metadata_bundles_bucket": "md-bucket",
+                                                                    "tibanna_cwls_bucket": "cwls-bucket",
+                                                                    "tibanna_output_bucket": "tb-bucket",
+                                                                    "identity": "ThisIsMyIdentity",
+                                                                    "s3_encrypt_key_id": "MyKeyId",
+                                                                }),
+                                   s3_bucket_env=bs_env)
 
-                    bs_env = "fourfront-cgaptest"
-                    data_set = data_set_for_env(bs_env)
-                    tester(ref_ini="cgaptest.ini", bs_env=bs_env, data_set=data_set,
-                           es_server="search-fourfront-cgaptest-dxiczz2zv7f3nshshvevcvmpmy.%s" % us_east,
-                           line_checker=Checker(expect_indexer=index_default,
-                                                expect_index_server=index_server_default))
+                        bs_env = "fourfront-cgapdev"
+                        data_set = data_set_for_env(bs_env)
+                        tester(ref_ini="cgapdev.ini", env_name=bs_env, data_set=data_set,
+                               es_server="search-fourfront-cgapdev-gnv2sgdngkjbcemdadmaoxcsae.%s" % us_east,
+                               line_checker=Checker(expect_indexer=index_default,
+                                                    expect_index_server=index_server_default))
 
-                    bs_env = "fourfront-cgapwolf"
-                    data_set = data_set_for_env(bs_env)
-                    tester(ref_ini="cgapwolf.ini", bs_env=bs_env, data_set=data_set,
-                           # This ini file will have 'app_kind = ccgap' rather than 'app_kind = unknown'.
-                           use_ini_file_manager_kind='legacy-cgap',
-                           es_server="search-fourfront-cgapwolf-r5kkbokabymtguuwjzspt2kiqa.%s" % us_east,
-                           line_checker=Checker(expect_indexer=index_default,
-                                                expect_index_server=index_server_default))
+                        bs_env = "fourfront-cgaptest"
+                        data_set = data_set_for_env(bs_env)
+                        tester(ref_ini="cgaptest.ini", env_name=bs_env, data_set=data_set,
+                               es_server="search-fourfront-cgaptest-dxiczz2zv7f3nshshvevcvmpmy.%s" % us_east,
+                               line_checker=Checker(expect_indexer=index_default,
+                                                    expect_index_server=index_server_default))
 
-                    # Fourfront uses data_set='prod' for everything but 'fourfront-mastertest',
-                    # which uses data_set='test'
+                        bs_env = "fourfront-cgapwolf"
+                        data_set = data_set_for_env(bs_env)
+                        tester(ref_ini="cgapwolf.ini", env_name=bs_env, data_set=data_set,
+                               # This ini file will have 'app_kind = ccgap' rather than 'app_kind = unknown'.
+                               use_ini_file_manager_kind='legacy-cgap',
+                               es_server="search-fourfront-cgapwolf-r5kkbokabymtguuwjzspt2kiqa.%s" % us_east,
+                               line_checker=Checker(expect_indexer=index_default,
+                                                    expect_index_server=index_server_default))
 
-                    bs_env = "fourfront-blue"
-                    data_set = data_set_for_env(bs_env)
-                    tester(ref_ini="blue.ini", bs_env=bs_env, data_set=data_set,
-                           es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
-                           line_checker=FFProdChecker(expect_indexer=index_default,
-                                                      expect_index_server=index_server_default))
+                        # Fourfront uses data_set='prod' for everything but 'fourfront-mastertest',
+                        # which uses data_set='test'
 
-                    bs_env = "fourfront-green"
-                    data_set = data_set_for_env(bs_env)
-                    tester(ref_ini="green.ini", bs_env=bs_env, data_set=data_set,
-                           es_server="search-fourfront-green-cghpezl64x4uma3etijfknh7ja.%s" % us_east,
-                           line_checker=FFProdChecker(expect_indexer=index_default,
-                                                      expect_index_server=index_server_default))
-
-                    bs_env = "fourfront-hotseat"
-                    data_set = data_set_for_env(bs_env)
-                    tester(ref_ini="hotseat.ini", bs_env=bs_env, data_set=data_set,
-                           es_server="search-fourfront-hotseat-f3oxd2wjxw3h2wsxxbcmzhhd4i.%s" % us_east,
-                           line_checker=Checker(expect_indexer=index_default,
-                                                expect_index_server=index_server_default))
-
-                    bs_env = "fourfront-mastertest"
-                    data_set = data_set_for_env(bs_env)
-                    tester(ref_ini="mastertest.ini", bs_env=bs_env, data_set=data_set,
-                           es_server="search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.%s" % us_east,
-                           line_checker=Checker(expect_indexer=index_default,
-                                                expect_index_server=index_server_default))
-
-                    bs_env = "fourfront-webdev"
-                    data_set = data_set_for_env(bs_env)
-                    tester(ref_ini="webdev.ini", bs_env=bs_env, data_set=data_set,
-                           es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
-                           line_checker=Checker(expect_indexer=index_default,
-                                                expect_index_server=index_server_default))
-
-                    bs_env = "fourfront-webprod"
-                    data_set = data_set_for_env(bs_env)
-                    tester(ref_ini="webprod.ini", bs_env=bs_env, data_set=data_set,
-                           es_server="search-fourfront-webprod-hmrrlalm4ifyhl4bzbvl73hwv4.%s" % us_east,
-                           line_checker=FFProdChecker(expect_indexer=index_default,
-                                                      expect_index_server=index_server_default))
-
-                    bs_env = "fourfront-webprod2"
-                    data_set = data_set_for_env(bs_env)
-                    tester(ref_ini="webprod2.ini", bs_env=bs_env, data_set=data_set,
-                           es_server="search-fourfront-webprod2-fkav4x4wjvhgejtcg6ilrmczpe.%s" % us_east,
-                           line_checker=FFProdChecker(expect_indexer=index_default,
-                                                      expect_index_server=index_server_default))
-
-                    with override_environ(ENCODED_INDEXER="FALSE", ENCODED_INDEX_SERVER="TRUE"):
-
-                        tester(ref_ini="cgap.ini", bs_env="fourfront-cgap", data_set="prod",
-                               es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
-                               line_checker=CGAPProdChecker(expect_indexer=None,
-                                                            expect_index_server="true"))
-
-                        tester(ref_ini="blue.ini", bs_env="fourfront-blue", data_set="prod",
+                        bs_env = "fourfront-blue"
+                        data_set = data_set_for_env(bs_env)
+                        tester(ref_ini="blue.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
-                               line_checker=FFProdChecker(expect_indexer=None,
-                                                          expect_index_server="true"))
+                               line_checker=FFProdChecker(expect_indexer=index_default,
+                                                          expect_index_server=index_server_default))
 
-                        tester(ref_ini="webdev.ini", bs_env="fourfront-webdev", data_set="prod",
+                        bs_env = "fourfront-green"
+                        data_set = data_set_for_env(bs_env)
+                        tester(ref_ini="green.ini", env_name=bs_env, data_set=data_set,
+                               es_server="search-fourfront-green-cghpezl64x4uma3etijfknh7ja.%s" % us_east,
+                               line_checker=FFProdChecker(expect_indexer=index_default,
+                                                          expect_index_server=index_server_default))
+
+                        bs_env = "fourfront-hotseat"
+                        data_set = data_set_for_env(bs_env)
+                        tester(ref_ini="hotseat.ini", env_name=bs_env, data_set=data_set,
+                               es_server="search-fourfront-hotseat-f3oxd2wjxw3h2wsxxbcmzhhd4i.%s" % us_east,
+                               line_checker=Checker(expect_indexer=index_default,
+                                                    expect_index_server=index_server_default))
+
+                        bs_env = "fourfront-mastertest"
+                        data_set = data_set_for_env(bs_env)
+                        tester(ref_ini="mastertest.ini", env_name=bs_env, data_set=data_set,
+                               es_server="search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.%s" % us_east,
+                               line_checker=Checker(expect_indexer=index_default,
+                                                    expect_index_server=index_server_default))
+
+                        bs_env = "fourfront-webdev"
+                        data_set = data_set_for_env(bs_env)
+                        tester(ref_ini="webdev.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
-                               line_checker=Checker(expect_indexer=None,
-                                                    expect_index_server="true"))
+                               line_checker=Checker(expect_indexer=index_default,
+                                                    expect_index_server=index_server_default))
 
-                    # === Beyond this is auot-indexer tests ===
+                        bs_env = "fourfront-webprod"
+                        data_set = data_set_for_env(bs_env)
+                        tester(ref_ini="webprod.ini", env_name=bs_env, data_set=data_set,
+                               es_server="search-fourfront-webprod-hmrrlalm4ifyhl4bzbvl73hwv4.%s" % us_east,
+                               line_checker=FFProdChecker(expect_indexer=index_default,
+                                                          expect_index_server=index_server_default))
 
-                    # If the app version name contains the special token in AUTO_INDEX_SERVER_TOKEN,
-                    # AND if there is no explicit argument OR environment variable setting,
-                    # then use index_server=True.
+                        bs_env = "fourfront-webprod2"
+                        data_set = data_set_for_env(bs_env)
+                        tester(ref_ini="webprod2.ini", env_name=bs_env, data_set=data_set,
+                               es_server="search-fourfront-webprod2-fkav4x4wjvhgejtcg6ilrmczpe.%s" % us_east,
+                               line_checker=FFProdChecker(expect_indexer=index_default,
+                                                          expect_index_server=index_server_default))
 
-                    # In other words, the app_version will be something like "foo__index_server",
-                    # which has magic effect of becoming an index server when not specified otherwise.
-                    mock_get_app_version.return_value = "foo" + TestDeployer.AUTO_INDEX_SERVER_TOKEN
+                        with override_environ(ENCODED_INDEXER="FALSE", ENCODED_INDEX_SERVER="TRUE"):
 
-                    # The next three cases test the useful case where those conditions are met.
+                            tester(ref_ini="cgap.ini", env_name="fourfront-cgap", data_set="prod",
+                                   es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   line_checker=CGAPProdChecker(expect_indexer=None,
+                                                                expect_index_server="true"))
 
-                    tester(ref_ini="cgap.ini", bs_env="fourfront-cgap", data_set="prod",
-                           es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
-                           line_checker=CGAPProdChecker(expect_indexer=index_default,
+                            tester(ref_ini="blue.ini", env_name="fourfront-blue", data_set="prod",
+                                   es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                                   line_checker=FFProdChecker(expect_indexer=None,
+                                                              expect_index_server="true"))
+
+                            tester(ref_ini="webdev.ini", env_name="fourfront-webdev", data_set="prod",
+                                   es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                                   line_checker=Checker(expect_indexer=None,
                                                         expect_index_server="true"))
 
-                    tester(ref_ini="blue.ini", bs_env="fourfront-blue", data_set="prod",
-                           es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
-                           line_checker=FFProdChecker(expect_indexer=index_default,
-                                                      expect_index_server="true"))
+                        # === Beyond this is auot-indexer tests ===
 
-                    tester(ref_ini="webdev.ini", bs_env="fourfront-webdev", data_set="prod",
-                           es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
-                           line_checker=Checker(expect_indexer=index_default,
-                                                expect_index_server="true"))
+                        # If the app version name contains the special token in AUTO_INDEX_SERVER_TOKEN,
+                        # AND if there is no explicit argument OR environment variable setting,
+                        # then use index_server=True.
 
-                    # The next 6 tests just test that the other cases are not perturbed.
+                        # In other words, the app_version will be something like "foo__index_server",
+                        # which has magic effect of becoming an index server when not specified otherwise.
+                        mock_get_app_version.return_value = "foo" + TestDeployer.AUTO_INDEX_SERVER_TOKEN
 
-                    with override_environ(ENCODED_INDEX_SERVER="FALSE"):
+                        # The next three cases test the useful case where those conditions are met.
 
-                        # This tests we can override the app version by setting an explicit env variable value.
-
-                        tester(ref_ini="cgap.ini", bs_env="fourfront-cgap", data_set="prod",
-                               es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
-                               line_checker=CGAPProdChecker(expect_indexer=index_default,
-                                                            expect_index_server=None))
-
-                        tester(ref_ini="blue.ini", bs_env="fourfront-blue", data_set="prod",
-                               es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
-                               line_checker=FFProdChecker(expect_indexer=index_default,
-                                                          expect_index_server=None))
-
-                        tester(ref_ini="webdev.ini", bs_env="fourfront-webdev", data_set="prod",
-                               es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
-                               line_checker=Checker(expect_indexer=index_default,
-                                                    expect_index_server=None))
-
-                    with override_environ(ENCODED_INDEX_SERVER="TRUE"):
-
-                        # We can override the app version by setting an explicit env variable value,
-                        # although we wouldn't know the difference here because it's true either way.
-
-                        tester(ref_ini="cgap.ini", bs_env="fourfront-cgap", data_set="prod",
+                        tester(ref_ini="cgap.ini", env_name="fourfront-cgap", data_set="prod",
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server="true"))
 
-                        tester(ref_ini="blue.ini", bs_env="fourfront-blue", data_set="prod",
+                        tester(ref_ini="blue.ini", env_name="fourfront-blue", data_set="prod",
                                es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
                                line_checker=FFProdChecker(expect_indexer=index_default,
                                                           expect_index_server="true"))
 
-                        tester(ref_ini="webdev.ini", bs_env="fourfront-webdev", data_set="prod",
+                        tester(ref_ini="webdev.ini", env_name="fourfront-webdev", data_set="prod",
                                es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server="true"))
+
+                        # The next 6 tests just test that the other cases are not perturbed.
+
+                        with override_environ(ENCODED_INDEX_SERVER="FALSE"):
+
+                            # This tests we can override the app version by setting an explicit env variable value.
+
+                            tester(ref_ini="cgap.ini", env_name="fourfront-cgap", data_set="prod",
+                                   es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                                expect_index_server=None))
+
+                            tester(ref_ini="blue.ini", env_name="fourfront-blue", data_set="prod",
+                                   es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                                   line_checker=FFProdChecker(expect_indexer=index_default,
+                                                              expect_index_server=None))
+
+                            tester(ref_ini="webdev.ini", env_name="fourfront-webdev", data_set="prod",
+                                   es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                                   line_checker=Checker(expect_indexer=index_default,
+                                                        expect_index_server=None))
+
+                        with override_environ(ENCODED_INDEX_SERVER="TRUE"):
+
+                            # We can override the app version by setting an explicit env variable value,
+                            # although we wouldn't know the difference here because it's true either way.
+
+                            tester(ref_ini="cgap.ini", env_name="fourfront-cgap", data_set="prod",
+                                   es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   line_checker=CGAPProdChecker(expect_indexer=index_default,
+                                                                expect_index_server="true"))
+
+                            tester(ref_ini="blue.ini", env_name="fourfront-blue", data_set="prod",
+                                   es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                                   line_checker=FFProdChecker(expect_indexer=index_default,
+                                                              expect_index_server="true"))
+
+                            tester(ref_ini="webdev.ini", env_name="fourfront-webdev", data_set="prod",
+                                   es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                                   line_checker=Checker(expect_indexer=index_default,
+                                                        expect_index_server="true"))
 
 
 def test_deployment_utils_main_no_env_name():
@@ -1095,6 +1140,9 @@ def test_deployment_utils_main():
                             'bs_env': None,
                             'bs_mirror_env': None,
                             'data_set': None,
+                            'env_bucket': None,
+                            'env_ecosystem': 'main',
+                            'env_name': None,
                             'es_namespace': None,
                             'es_server': None,
                             'identity': None,
@@ -1125,6 +1173,9 @@ def test_deployment_utils_main():
                             'bs_env': None,
                             'bs_mirror_env': None,
                             'data_set': None,
+                            'env_bucket': None,
+                            'env_ecosystem': 'main',
+                            'env_name': None,
                             'es_namespace': None,
                             'es_server': None,
                             'identity': None,
@@ -1153,6 +1204,9 @@ def test_deployment_utils_main():
                                 'bs_env': None,
                                 'bs_mirror_env': None,
                                 'data_set': None,
+                                'env_bucket': None,
+                                'env_ecosystem': 'main',
+                                'env_name': None,
                                 'es_namespace': None,
                                 'es_server': None,
                                 'identity': None,
