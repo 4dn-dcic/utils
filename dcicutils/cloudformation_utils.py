@@ -1,6 +1,7 @@
 import boto3
 import re
 
+from .common import DEFAULT_ECOSYSTEM
 from .misc_utils import PRINT, find_associations, find_association, snake_case_to_camel_case, ignored
 from .env_utils import prod_bucket_env, is_stg_or_prd_env
 
@@ -62,9 +63,6 @@ def get_ecs_real_url(env):
 #    will require better isolation.
 #
 # * Shared use of common repos between various platforms without repeated uploads.
-
-DEFAULT_ECOSYSTEM = 'main'
-
 
 def get_ecr_repo_url(env_name=None, *, ecosystem=DEFAULT_ECOSYSTEM, from_stack_output_key=None):
     """
