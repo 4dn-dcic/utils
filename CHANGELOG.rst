@@ -65,6 +65,10 @@ these new items:
   NOTE: These continue to work for now, but will be removed in the future.
   Please update code to use recommended replacement.
 
+* In ``env_base``:
+
+  * Added ``EnvManager.filter_config_names``
+
 * In ``env_utils``:
 
   * Removed:
@@ -79,6 +83,7 @@ these new items:
     * ``compute_prd_env_for_project``
     * ``get_env_real_url``
     * ``get_foursight_bucket``
+    * ``get_foursight_bucket_prefix``
 
   * Always erring:
 

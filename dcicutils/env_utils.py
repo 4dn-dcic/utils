@@ -756,6 +756,8 @@ def get_foursight_bucket(envname: EnvName, stage: ChaliceStage) -> str:
             return bucket
         raise IncompleteFoursightBucketTable(f"No foursight bucket is defined for envname={envname} stage={stage}"
                                              f" in bucket_table={bucket_table}.")
+    elif EnvUtils.FOURSIGHT_BUCKET_PREFIX:
+        return f"{EnvUtils.FOURSIGHT_BUCKET_PREFIX}-{stage}-{infer_foursight_from_env(envname=envname)}"
     else:
         raise MissingFoursightBucketTable("No foursight bucket table is declared.")
 
@@ -842,7 +844,9 @@ def infer_foursight_from_env(request=None, envname: Optional[EnvName] = None):
             if public_name:
                 return public_name
 
-    entry = find_association(EnvUtils.PUBLIC_URL_TABLE, environment=envname)
+    entry = (find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname) or
+             find_association(EnvUtils.PUBLIC_URL_TABLE, environment=full_env_name(envname)) or
+             find_association(EnvUtils.PUBLIC_URL_TABLE, environment=short_env_name(envname)))
     if entry:
         envname = entry[p.NAME]
     return short_env_name(envname)  # remove_prefix(EnvUtils.FULL_ENV_PREFIX, envname, required=False)

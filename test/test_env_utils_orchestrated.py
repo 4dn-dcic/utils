@@ -2035,6 +2035,23 @@ def test_get_foursight_bucket():
 
     with local_attrs(EnvUtils, FOURSIGHT_BUCKET_TABLE="not-a-dict"):
 
+        with EnvUtils.local_env_utils():
+            EnvUtils.FOURSIGHT_BUCKET_PREFIX = 'alpha-omega'
+            EnvUtils.FOURSIGHT_BUCKET_TABLE = None
+            EnvUtils.FULL_ENV_PREFIX = 'acme-'
+
+            assert full_env_name(envname='acme-foo') == 'acme-foo'
+            assert short_env_name(envname='acme-foo') == 'foo'
+
+            assert full_env_name(envname='acme-stg') == 'acme-stg'
+            assert short_env_name(envname='acme-stg') == 'stg'
+
+            assert infer_foursight_from_env(envname='acme-foo') == 'foo'
+            assert infer_foursight_from_env(envname='acme-stg') == 'stg'
+
+            assert get_foursight_bucket(envname='acme-foo', stage='prod') == 'alpha-omega-prod-foo'
+            assert get_foursight_bucket(envname='acme-stg', stage='dev') == 'alpha-omega-dev-stg'
+
         with pytest.raises(MissingFoursightBucketTable):
             get_foursight_bucket(envname='acme-foo', stage='prod')
 
