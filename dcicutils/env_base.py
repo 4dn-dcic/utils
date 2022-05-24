@@ -229,15 +229,19 @@ class EnvManager:
             or LEGACY_GLOBAL_ENV_BUCKET)
         s3_resource = boto3.resource('s3')
         env_bucket_model = s3_resource.Bucket(env_bucket_name)
-        configs = []
-        key_objs = env_bucket_model.objects.all()
-        for key_obj in key_objs:
-            key_name = key_obj.key
-            if kind == 'env' and '.' not in key_name:
-                configs.append(key_name)
-            elif kind == 'ecosystem' and key_name.endswith('.ecosystem'):
-                configs.append(remove_suffix('.ecosystem', key_name))
+        key_names = [key_obj.key for key_obj in env_bucket_model.objects.all()]
+        configs = cls.filter_config_names(key_names, kind=kind)
         return sorted(configs)
+
+    @classmethod
+    def filter_config_names(cls, configs, kind):
+        result = []
+        for config in configs:
+            if kind == 'env' and '.' not in config:
+                result.append(config)
+            elif kind == 'ecosystem' and config.endswith('.ecosystem'):
+                result.append(remove_suffix('.ecosystem', config))
+        return result
 
     @classmethod
     def get_all_environments(cls, env_bucket=None):

@@ -4,6 +4,7 @@ import json
 import os
 import pytest
 
+from dcicutils.env_base import EnvManager
 from dcicutils.env_utils import (
     is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env,
     get_mirror_env_from_context, is_test_env, is_hotseat_env, get_standard_mirror_env,
@@ -13,14 +14,14 @@ from dcicutils.env_utils import (
     is_indexer_env, indexer_env_for_env, classify_server_url,
     short_env_name, full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
     # make_env_name_cfn_compatible,
-    get_foursight_bucket,
+    get_foursight_bucket, get_foursight_bucket_prefix,
     # New support
     EnvUtils, p, c, get_env_real_url
 )
 from dcicutils.exceptions import (
     BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
 )
-from dcicutils.misc_utils import decorator, local_attrs, ignorable
+from dcicutils.misc_utils import decorator, local_attrs, ignorable, override_environ
 from dcicutils.qa_utils import raises_regexp
 from unittest import mock
 from urllib.parse import urlparse
@@ -290,6 +291,29 @@ def test_orchestrated_data_set_for_env():
             assert data_set_for_env('stg') == 'prod'
             assert data_set_for_env('acme-stg', 'test') == 'prod'
             assert data_set_for_env('stg', 'test') == 'prod'
+
+
+@using_orchestrated_behavior()
+def test_get_foursight_bucket_prefix():
+
+    with override_environ(GLOBAL_BUCKET_ENV=None, GLOBAL_ENV_BUCKET=None):
+
+        with EnvManager.global_env_bucket_named('some-sample-envs'):
+            # If the global bucket ends in '-envs', we guess
+            assert get_foursight_bucket_prefix() == 'some-sample'
+
+        with EnvManager.global_env_bucket_named('some-sample-environments'):
+            # If the global bucket doesn't end in '-envs', we don't guess
+            with pytest.raises(Exception):
+                get_foursight_bucket_prefix()
+
+        with EnvUtils.local_env_utils():
+            some_prefix = 'sample-foursight-bucket-prefix'
+            EnvUtils.FOURSIGHT_BUCKET_PREFIX = some_prefix
+            assert get_foursight_bucket_prefix() == some_prefix
+
+        with pytest.raises(Exception):
+            get_foursight_bucket_prefix()
 
 
 @using_orchestrated_behavior()

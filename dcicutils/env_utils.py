@@ -19,7 +19,8 @@ from .exceptions import (
     EnvUtilsLoadError, BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
 )
 from .misc_utils import (
-    decorator, full_object_name, ignored, ignorable, remove_prefix, check_true, find_association, override_environ,
+    decorator, full_object_name, ignored, ignorable, remove_prefix, remove_suffix, check_true, find_association,
+    override_environ,
 )
 
 
@@ -101,6 +102,7 @@ class EnvNames:
     DEV_DATA_SET_TABLE = 'dev_data_set_table'  # dictionary mapping envnames to their preferred data set
     DEV_ENV_DOMAIN_SUFFIX = 'dev_env_domain_suffix'  # e.g., .abc123def456ghi789.us-east-1.rds.amazonaws.com
     ECOSYSTEM = 'ecosystem'  # name of an ecosystem file, such as "main.ecosystem"
+    FOURSIGHT_BUCKET_PREFIX = 'foursight_bucket_prefix'
     FOURSIGHT_URL_PREFIX = 'foursight_url_prefix'
     FOURSIGHT_BUCKET_TABLE = 'foursight_bucket_table'
     FULL_ENV_PREFIX = 'full_env_prefix'  # a string like "cgap-" that precedes all env names
@@ -158,6 +160,7 @@ class EnvUtils:
     DEV_DATA_SET_TABLE = None  # dictionary mapping envnames to their preferred data set
     DEV_ENV_DOMAIN_SUFFIX = None
     FOURSIGHT_BUCKET_TABLE = None
+    FOURSIGHT_BUCKET_PREFIX = None
     FOURSIGHT_URL_PREFIX = None
     FULL_ENV_PREFIX = None  # a string like "cgap-" that precedes all env names (does NOT have to include 'cgap')
     HOTSEAT_ENVS = None
@@ -726,6 +729,17 @@ def get_mirror_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT
         return get_standard_mirror_env(who_i_am)
     else:
         return None
+
+
+def get_foursight_bucket_prefix():
+    declared_foursight_bucket_prefix = EnvUtils.FOURSIGHT_BUCKET_PREFIX
+    if declared_foursight_bucket_prefix:
+        return declared_foursight_bucket_prefix
+    bucket_env = EnvManager.global_env_bucket_name()
+    if bucket_env and bucket_env.endswith("-envs"):
+        return remove_suffix('-envs', bucket_env)
+    else:
+        raise RuntimeError("No foursight_bucket_prefix is declared and one cannot be inferred.")
 
 
 @if_orchestrated
