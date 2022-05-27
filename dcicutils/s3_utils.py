@@ -300,9 +300,9 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         Args:
             key (string): object key
             bucket (string): S3 bucket
-            
+
         Returns:
-            Returns list of object tags. 
+            Returns list of object tags.
             The format is [{'Key': 'KEY1','Value': 'VALUE1'},{...}]
         """
 
@@ -324,7 +324,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             key (string): object key
             bucket (string): S3 bucket
             tags (list): List of tags of the form [{'Key': 'KEY1','Value': 'VALUE1'}, {...}]
-            replace_tags (bool): If True, existing tags are replaced with the provided ones. 
+            replace_tags (bool): If True, existing tags are replaced with the provided ones.
                 Otherwise, the provided tags are added to the existing ones
 
         Returns:
