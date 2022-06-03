@@ -1,7 +1,8 @@
 import pytest
 
-from dcicutils.misc_utils import ignored
 from dcicutils.diff_utils import DiffManager
+from dcicutils.misc_utils import ignored
+from dcicutils.qa_utils import known_bug_expected
 
 
 def test_diffmanager_unknown_style():
@@ -448,3 +449,12 @@ def test_patch_diffs_with_omitted_subscripts_python_style():
         'a["c"]["beta"]',
         'a["c"]["gamma"]',
     ]
+
+
+def test_patch_diffs_regression_c4_838():
+
+    with known_bug_expected(jira_ticket="C4-838", fixed=False):
+
+        dm = DiffManager(label='arbitrary')
+        # With bug C4-838, this is returning [] instead of ['arbitrary.assessment']
+        assert dm.patch_diffs({'assessment': {}}) == ['arbitrary.assessment']
