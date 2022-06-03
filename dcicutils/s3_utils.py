@@ -24,6 +24,7 @@ exported(get_beanstalk_real_url, EnvManager)
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 
+
 class HealthPageKey:  # This is moving here from cgap-portal.
     APPLICATION_BUCKET_PREFIX = 'application_bucket_prefix'
     BEANSTALK_APP_VERSION = 'beanstalk_app_version'
