@@ -1,7 +1,8 @@
 import pytest
 
-from dcicutils.misc_utils import ignored
 from dcicutils.diff_utils import DiffManager
+from dcicutils.misc_utils import ignored
+from dcicutils.qa_utils import known_bug_expected
 
 
 def test_diffmanager_unknown_style():
@@ -155,6 +156,14 @@ def test_diffs():
     assert dm.diffs(1, 1) == {"same": ["item"]}
 
     assert dm.diffs("foo", "bar") == {"changed": ["item"]}
+
+    assert dm.diffs([], ['a', 'b']) == {
+        "added": ["item[0]", "item[1]"],
+    }
+
+    assert dm.diffs({}, {"a": "foo", "b": "baz"}) == {
+        "added": ["item.a", "item.b"],
+    }
 
     assert dm.diffs({"a": "foo", "b": "bar"}, {"a": "foo", "b": "baz"}) == {
         "changed": ["item.b"],
@@ -448,3 +457,45 @@ def test_patch_diffs_with_omitted_subscripts_python_style():
         'a["c"]["beta"]',
         'a["c"]["gamma"]',
     ]
+
+
+def test_patch_diffs_regression_c4_838():
+
+    with known_bug_expected(jira_ticket="C4-838", fixed=True):
+
+        dm = DiffManager(label='arbitrary')
+        # With bug C4-838, this is returning [] instead of ['arbitrary.assessment']
+        assert dm.patch_diffs({'assessment': {}}) == ['arbitrary.assessment']
+
+
+# This is useful for testing interim_run_all below.
+#
+# def test_fails():
+#     raise AssertionError("Failure")
+
+
+def interim_run_all():  # TODO: Remove this when the configurable env_utils code is merged and dcicutils tests pass.
+    """
+    This function is temporary while the tests on master are broken. Usage:
+
+        $ python
+        > from test.test_diff_utils import interim_run_all
+        > interim_run_all()
+
+    This will run all diff_utils tests without trying to load any other pytest stuff that might fail
+    for unrelated reasons that are going to be fixed later.
+    """
+    import sys
+    for definition_name in globals():
+        if definition_name.startswith("test_"):
+            print(f"Running {definition_name}...", end="")
+            sys.stdout.flush()
+            fn = eval(definition_name)
+            try:
+                fn()
+            except Exception:
+                print("FAILED")
+                raise
+            print("PASSED")
+    print("All tests passed.")
+
