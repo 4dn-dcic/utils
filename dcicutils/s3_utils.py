@@ -24,7 +24,6 @@ exported(get_beanstalk_real_url, EnvManager)
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 
-
 class HealthPageKey:  # This is moving here from cgap-portal.
     APPLICATION_BUCKET_PREFIX = 'application_bucket_prefix'
     BEANSTALK_APP_VERSION = 'beanstalk_app_version'
@@ -33,6 +32,9 @@ class HealthPageKey:  # This is moving here from cgap-portal.
     DATABASE = 'database'
     DISPLAY_TITLE = 'display_title'
     ELASTICSEARCH = 'elasticsearch'
+    ENV_BUCKET = 'env_bucket'
+    ENV_ECOSYSTEM = 'env_ecosystem'
+    ENV_NAME = 'env_name'
     FILE_UPLOAD_BUCKET = 'file_upload_bucket'                # = s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY
     FOURSIGHT = 'foursight'
     FOURSIGHT_BUCKET_PREFIX = 'foursight_bucket_prefix'

@@ -813,6 +813,10 @@ def test_s3_utils_buckets_modern():
                     HealthPageKey.TIBANNA_CWLS_BUCKET: "the-tibanna-cwls-bucket",
                     HealthPageKey.TIBANNA_OUTPUT_BUCKET: "the-tibanna-output-bucket",
                     HealthPageKey.S3_ENCRYPT_KEY_ID: "my-encrypt-key",
+                    HealthPageKey.ENV_BUCKET: "fourfront-foo-foursight-envs",
+                    HealthPageKey.ENV_ECOSYSTEM: "secondary",
+                    HealthPageKey.ENV_NAME: "fourfront-foo",
+                    HealthPageKey.BEANSTALK_ENV: "fourfront-foo",
                 }
             mock_fetch.side_effect = mocked_fetch_health_page_json
 
