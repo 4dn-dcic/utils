@@ -478,7 +478,9 @@ class EnglishUtils:
         >>> conjoined_list(['up', 'down', 'all around'], comma=False)
         'up and down and all around'
 
-        :param items: a list of items
+        :param items: a list of items.
+            If a dictionary is given, a list of its keys will be used.
+            If a set is used, it will be converted to a sorted list.
         :param conjunction: a string (default 'and') to be used before the last item if there's more than one
         :param comma: a string (default ',') to use as a comma. Semicolon (';') is the most obvious other choice,
                       or False to indicate that the conjunction should be used between all elements.
@@ -507,6 +509,11 @@ class EnglishUtils:
         else:
             assert isinstance(oxford_comma, str), "The 'oxford_comma' argument must a string or boolean."
             final_sep = oxford_comma + whitespace
+
+        if isinstance(items, dict):
+            items = list(items.keys())
+        elif isinstance(items, set):
+            items = sorted(items)
 
         n = len(items)
 
