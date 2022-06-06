@@ -11,7 +11,8 @@ from typing import Optional
 from urllib.parse import urlparse
 from . import env_utils_legacy as legacy
 from .common import (
-    EnvName, OrchestratedApp, APP_FOURFRONT, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD
+    EnvName, OrchestratedApp, APP_FOURFRONT, ChaliceStage,
+    CHALICE_STAGE_DEV, CHALICE_STAGE_PROD,
 )
 from .env_base import EnvManager
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
@@ -96,6 +97,9 @@ def if_orchestrated(*, unimplemented=False, use_legacy=False, assumes_cgap=False
         return wrapped
 
     return _decorate
+
+
+ENV_DEFAULT = 'default'
 
 
 class EnvNames:
@@ -184,9 +188,12 @@ class EnvUtils:
         e.DEV_DATA_SET_TABLE: {'acme-hotseat': 'prod', 'acme-test': 'test'},
         e.DEV_ENV_DOMAIN_SUFFIX: DEV_SUFFIX_FOR_TESTING,
         e.FOURSIGHT_BUCKET_TABLE: {
-            "acme-prd": {CHALICE_STAGE_DEV: "acme-foursight-dev-prd", CHALICE_STAGE_PROD: "acme-foursight-prod-prd"},
-            "acme-stg": {CHALICE_STAGE_DEV: "acme-foursight-dev-stg", CHALICE_STAGE_PROD: "acme-foursight-prod-stg"},
-            "default": {CHALICE_STAGE_DEV: "acme-foursight-dev-other", CHALICE_STAGE_PROD: "acme-foursight-prod-other"},
+            "acme-prd": {CHALICE_STAGE_DEV: "acme-foursight-dev-prd",
+                         CHALICE_STAGE_PROD: "acme-foursight-prod-prd"},
+            "acme-stg": {CHALICE_STAGE_DEV: "acme-foursight-dev-stg",
+                         CHALICE_STAGE_PROD: "acme-foursight-prod-stg"},
+            ENV_DEFAULT: {CHALICE_STAGE_DEV: "acme-foursight-dev-other",
+                          CHALICE_STAGE_PROD: "acme-foursight-prod-other"},
         },
         e.FOURSIGHT_URL_PREFIX: 'https://foursight.genetics.example.com/api/view/',
         e.FULL_ENV_PREFIX: 'acme-',
@@ -234,9 +241,12 @@ class EnvUtils:
         e.DEV_DATA_SET_TABLE: {'acme-hotseat': 'prod', 'acme-test': 'test'},
         e.DEV_ENV_DOMAIN_SUFFIX: DEV_SUFFIX_FOR_TESTING,
         e.FOURSIGHT_BUCKET_TABLE: {
-            "acme-prd": {CHALICE_STAGE_DEV: "acme-foursight-dev-prd", CHALICE_STAGE_PROD: "acme-foursight-prod-prd"},
-            "acme-stg": {CHALICE_STAGE_DEV: "acme-foursight-dev-stg", CHALICE_STAGE_PROD: "acme-foursight-prod-stg"},
-            "default": {CHALICE_STAGE_DEV: "acme-foursight-dev-other", CHALICE_STAGE_PROD: "acme-foursight-prod-other"},
+            "acme-prd": {CHALICE_STAGE_DEV: "acme-foursight-dev-prd",
+                         CHALICE_STAGE_PROD: "acme-foursight-prod-prd"},
+            "acme-stg": {CHALICE_STAGE_DEV: "acme-foursight-dev-stg",
+                         CHALICE_STAGE_PROD: "acme-foursight-prod-stg"},
+            ENV_DEFAULT: {CHALICE_STAGE_DEV: "acme-foursight-dev-other",
+                          CHALICE_STAGE_PROD: "acme-foursight-prod-other"},
         },
         e.FOURSIGHT_URL_PREFIX: 'https://foursight.genetics.example.com/api/view/',
         e.FULL_ENV_PREFIX: 'acme-',
@@ -744,22 +754,29 @@ def get_foursight_bucket_prefix():
 
 @if_orchestrated
 def get_foursight_bucket(envname: EnvName, stage: ChaliceStage) -> str:
+
     bucket = None
     bucket_table = EnvUtils.FOURSIGHT_BUCKET_TABLE
+
+    bucket_table_seen = False
     if isinstance(bucket_table, dict):
+        bucket_table_seen = True
         env_entry = bucket_table.get(envname)
         if not env_entry:
-            env_entry = bucket_table.get("default")
+            env_entry = bucket_table.get(ENV_DEFAULT)
         if isinstance(env_entry, dict):
             bucket = env_entry.get(stage)
         if bucket:
             return bucket
-        raise IncompleteFoursightBucketTable(f"No foursight bucket is defined for envname={envname} stage={stage}"
-                                             f" in bucket_table={bucket_table}.")
-    elif EnvUtils.FOURSIGHT_BUCKET_PREFIX:
+
+    if EnvUtils.FOURSIGHT_BUCKET_PREFIX:
         return f"{EnvUtils.FOURSIGHT_BUCKET_PREFIX}-{stage}-{infer_foursight_from_env(envname=envname)}"
+
+    if bucket_table_seen:
+        raise IncompleteFoursightBucketTable(f"No foursight bucket is defined for envname={envname} stage={stage}"
+                                             f" in {EnvNames.FOURSIGHT_BUCKET_TABLE}={bucket_table}.")
     else:
-        raise MissingFoursightBucketTable("No foursight bucket table is declared.")
+        raise MissingFoursightBucketTable(f"No {EnvNames.FOURSIGHT_BUCKET_TABLE} is declared.")
 
 
 @if_orchestrated
