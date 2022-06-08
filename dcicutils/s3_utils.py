@@ -18,7 +18,7 @@ from .exceptions import (
     InferredBucketConflict, CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv,
     GlobalBucketAccessError, SynonymousEnvironmentVariablesMismatched,
 )
-from .misc_utils import PRINT, override_environ, ignored, exported
+from .misc_utils import PRINT, override_environ, ignored, exported, merge_key_value_pairs
 
 
 exported(get_beanstalk_real_url)
@@ -336,7 +336,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             if not replace_tags:
                 existing_tags = self.get_object_tags(key, bucket)
                 if existing_tags:
-                    new_tags = existing_tags + new_tags
+                    new_tags = merge_key_value_pairs(existing_tags, new_tags)
             return self.s3.put_object_tagging(
                 Bucket=bucket,
                 Key=key,

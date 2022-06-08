@@ -11,7 +11,8 @@ from dcicutils import s3_utils as s3_utils_module, beanstalk_utils
 from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
 from dcicutils.env_utils import (
     get_standard_mirror_env,
-    FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD, _CGAP_MGB_PUBLIC_URL_PRD
+    FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD,
+    _CGAP_MGB_PUBLIC_URL_PRD,  # noQA - Yes, we do want to import a protected member (for testing)
 )
 from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs
 from dcicutils.misc_utils import ignored, ignorable
@@ -941,3 +942,48 @@ def test_env_manager_global_env_bucket_name():
                 assert os.environ.get('GLOBAL_ENV_BUCKET') == 'bar'
                 assert os.environ.get('GLOBAL_BUCKET_ENV') == 'bar'
                 assert EnvManager.global_env_bucket_name() == 'bar'
+
+
+def test_get_and_set_object_tags():
+
+    mock_boto3 = MockBoto3()
+
+    bucket = 'sample-bucket'
+    key = 'sample-key'
+
+    with mock.patch.object(s3_utils_module, "boto3", mock_boto3):
+
+        s3u = s3Utils(sys_bucket='irrelevant')
+
+        actual = s3u.get_object_tags(key=key, bucket=bucket)
+        expected = []
+        # print(f"actual={actual} expected={expected}")
+        assert actual == expected, f"Got {actual} but expected {expected}"
+
+        s3u.set_object_tags(key=key, bucket=bucket, tags=[{'Key': 'a', 'Value': 'alpha'}])
+
+        actual = s3u.get_object_tags(key=key, bucket=bucket)
+        expected = [{'Key': 'a', 'Value': 'alpha'}]
+        # print(f"actual={actual} expected={expected}")
+        assert actual == expected, f"Got {actual} but expected {expected}"
+
+        s3u.set_object_tags(key=key, bucket=bucket, tags=[{'Key': 'b', 'Value': 'beta'}])
+
+        actual = s3u.get_object_tags(key=key, bucket=bucket)
+        expected = [{'Key': 'b', 'Value': 'beta'}]
+        # print(f"actual={actual} expected={expected}")
+        assert actual == expected, f"Got {actual} but expected {expected}"
+
+        s3u.set_object_tags(key=key, bucket=bucket, tags=[{'Key': 'a', 'Value': 'alpha'}], replace_tags=False)
+
+        actual = s3u.get_object_tags(key=key, bucket=bucket)
+        expected = [{'Key': 'b', 'Value': 'beta'}, {'Key': 'a', 'Value': 'alpha'}]
+        # print(f"actual={actual} expected={expected}")
+        assert actual == expected, f"Got {actual} but expected {expected}"
+
+        s3u.set_object_tags(key=key, bucket=bucket, tags=[{'Key': 'b', 'Value': 'bravo'}], replace_tags=False)
+
+        actual = s3u.get_object_tags(key=key, bucket=bucket)
+        expected = [{'Key': 'b', 'Value': 'bravo'}, {'Key': 'a', 'Value': 'alpha'}]
+        # print(f"actual={actual} expected={expected}")
+        assert actual == expected, f"Got {actual} but expected {expected}"
