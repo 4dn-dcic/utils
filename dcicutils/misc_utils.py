@@ -1518,6 +1518,19 @@ class NamedObject(object):
         return f"<{self.name}@{id(self):x}>"
 
 
+def key_value_pair(key, value):
+    return {'Key': key, 'Value': value}
+
+
+def merge_key_value_pairs(x, y):
+    merged = {}
+    for pair in x:
+        merged[pair['Key']] = pair['Value']
+    for pair in y:
+        merged[pair['Key']] = pair['Value']
+    return [key_value_pair(k, v) for k, v in merged.items()]
+
+
 # The names HMS_TZ and hms_now were deprecated for a while and are removed in dcicutils 3.0
 # HMS_TZ = REF_TZ
 # hms_now = ref_now

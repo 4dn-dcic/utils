@@ -13,6 +13,7 @@ import uuid
 import warnings
 import webtest
 
+from dcicutils.lang_utils import n_of
 from dcicutils.misc_utils import (
     PRINT, ignored, ignorable, filtered_warnings, get_setting_from_context, TestApp, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
@@ -24,7 +25,7 @@ from dcicutils.misc_utils import (
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
     capitalize1, local_attrs, dict_zip, json_leaf_subst, _is_function_of_exactly_one_required_arg, string_list,
-    string_md5,
+    string_md5, key_value_pair, merge_key_value_pairs,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -532,7 +533,7 @@ def test_filtered_warnings():
     def expect_warnings(pairs):
         with warnings.catch_warnings(record=True) as w:
             # Trigger a warning.
-            warnings.warn("oh, this is deprecated for sure", DeprecationWarning)  # noqa
+            warnings.warn("oh, what a bad user you are", RuntimeWarning)  # noqa
             warnings.warn("tsk, tsk, tsk, what ugly code", SyntaxWarning)  # noqa
             # Verify some things
             for expected_count, expected_type in pairs:
@@ -540,21 +541,23 @@ def test_filtered_warnings():
                 for warning in w:
                     if issubclass(warning.category, expected_type):
                         count += 1
-                assert count == expected_count
+                assert count == expected_count, (
+                    f"Warnings: {[e.message for e in w]} (count={count} expected{expected_count})"
+                )
 
-    expect_warnings([(2, Warning), (1, DeprecationWarning), (1, SyntaxWarning)])
+    expect_warnings([(2, Warning), (1, RuntimeWarning), (1, SyntaxWarning)])
 
     with filtered_warnings("ignore"):
-        expect_warnings([(0, Warning), (0, DeprecationWarning), (0, SyntaxWarning)])
+        expect_warnings([(0, Warning), (0, RuntimeWarning), (0, SyntaxWarning)])
 
     with filtered_warnings("ignore", category=Warning):
-        expect_warnings([(0, Warning), (0, DeprecationWarning), (0, SyntaxWarning)])
+        expect_warnings([(0, Warning), (0, RuntimeWarning), (0, SyntaxWarning)])
 
-    with filtered_warnings("ignore", category=DeprecationWarning):
-        expect_warnings([(1, Warning), (0, DeprecationWarning), (1, SyntaxWarning)])
+    with filtered_warnings("ignore", category=RuntimeWarning):
+        expect_warnings([(1, Warning), (0, RuntimeWarning), (1, SyntaxWarning)])
 
     with filtered_warnings("ignore", category=SyntaxWarning):
-        expect_warnings([(1, Warning), (1, DeprecationWarning), (0, SyntaxWarning)])
+        expect_warnings([(1, Warning), (1, RuntimeWarning), (0, SyntaxWarning)])
 
 
 def _adder(n):
@@ -2566,3 +2569,74 @@ def test_json_leaf_subst():
     assert json_leaf_subst("x", subs) == "ex"
     assert json_leaf_subst(["x", "y"], subs) == ["ex", "why"]
     assert json_leaf_subst({"x": "y", "y": "x"}, subs) == {"ex": "why", "why": "ex"}
+
+
+def test_key_value_pair():
+
+    assert key_value_pair('a', 'b') == {'Key': 'a', 'Value': 'b'}
+
+
+def test_merge_key_value_pairs():
+
+    old = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '2'}]
+    new = [{'Key': 'c', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
+    actual = merge_key_value_pairs(old, new)
+    expected = [
+        {'Key': 'a', 'Value': '1'},
+        {'Key': 'b', 'Value': '2'},
+        {'Key': 'c', 'Value': '3'},
+        {'Key': 'd', 'Value': '4'}
+    ]
+    assert actual == expected
+
+    old = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '2'}]
+    new = [{'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
+    actual = merge_key_value_pairs(old, new)
+    expected = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
+    assert actual == expected
+
+    old = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '2'}]
+    new = [{'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}, {'Key': 'a', 'Value': '7'}]
+    actual = merge_key_value_pairs(old, new)
+    expected = [{'Key': 'a', 'Value': '7'}, {'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
+    assert actual == expected
+
+
+def interim_run_all():  # TODO: Remove this when the configurable env_utils code is merged and dcicutils tests pass.
+    """
+    This function is temporary while the tests on master are broken. Usage:
+
+        $ python
+        > from test.test_diff_utils import interim_run_all
+        > interim_run_all()
+
+    This will run all diff_utils tests without trying to load any other pytest stuff that might fail
+    for unrelated reasons that are going to be fixed later.
+    """
+    import sys
+    failed = 0
+    print("fFAILED={failed}")
+    for definition_name in globals():
+        if definition_name.startswith("test_"):
+            print(f"Running {definition_name}...", end="")
+            sys.stdout.flush()
+            fn = eval(definition_name)
+            try:
+                try:
+                    fn()
+                except TypeError as e:
+                    if 'positional' in str(e):
+                        print("SKIPPED (needs fixtures)")
+                        continue
+                    raise
+            except Exception as e:
+                failed += 1
+                print("****************** FAILED:")
+                print(f" {e.__class__.__name__}: {e}")
+                continue
+            print(f"PASSED (failed={failed})")
+    if failed == 0:
+        print("All tests PASSED.")
+    else:
+        print(failed)
+        print(f"{n_of(failed, 'test')} FAILED.")
