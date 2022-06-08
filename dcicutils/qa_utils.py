@@ -1003,7 +1003,9 @@ class MockBotoS3Client:
 
     def _object_attribute_block(self, filename):
         """
-        Returns the storage class for the 'filename' in this S3 mock.
+        Returns the attribute_block for an S3 object.
+        This contains information like storage class and tagsets.
+
         Because this is an internal routine, 'filename' is 'bucket/key' to match the mock file system we use internally.
 
         Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
@@ -1017,7 +1019,7 @@ class MockBotoS3Client:
 
     def _object_tagset(self, filename):
         """
-        Returns the storage class for the 'filename' in this S3 mock.
+        Returns the tagset for the 'filename' in this S3 mock.
         Because this is an internal routine, 'filename' is 'bucket/key' to match the mock file system we use internally.
 
         Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
@@ -1028,7 +1030,7 @@ class MockBotoS3Client:
 
     def _set_object_tagset(self, filename, tagset):
         """
-        Sets the storage class for the 'filename' in this S3 mock to the given value.
+        Sets the tagset for the 'filename' in this S3 mock to the given value.
         Because this is an internal routine, 'filename' is 'bucket/key' to match the mock file system we use internally.
 
         Presently the value is not error-checked. That might change.
