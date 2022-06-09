@@ -12,8 +12,8 @@ Change Log
 
 * In ``misc_utils``:
 
-  * New function ``key_value_pair``.
-  * New function ``merge_key_value_pairs``.
+  * New function ``key_value_dict``.
+  * New function ``merge_key_value_dict_lists``.
 
 * In ``qa_utils``:
 

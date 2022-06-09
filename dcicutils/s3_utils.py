@@ -18,7 +18,7 @@ from .exceptions import (
     InferredBucketConflict, CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv,
     GlobalBucketAccessError, SynonymousEnvironmentVariablesMismatched,
 )
-from .misc_utils import PRINT, override_environ, ignored, exported, merge_key_value_pairs
+from .misc_utils import PRINT, override_environ, ignored, exported, merge_key_value_dict_lists, key_value_dict
 
 
 exported(get_beanstalk_real_url)
@@ -293,13 +293,13 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             return False
         return file_metadata
 
-    def get_object_tags(self, key, bucket):
+    def get_object_tags(self, *, bucket, key):
         """
         Get all tags of an object.
 
         Args:
-            key (string): object key
             bucket (string): S3 bucket
+            key (string): object key
 
         Returns:
             Returns list of object tags.
@@ -315,17 +315,39 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         except Exception as e:
             logger.warning(f'Could not get tags for object {bucket}/{key}: {str(e)}')
             raise e
+    
+    def set_object_tag(self, *, bucket, key, tag_key, tag_value):
+        """
+        Adds (tag_key,tag_value) pair to the object. If a tag with key tag_key is already present,
+        it will be overwritten.
 
-    def set_object_tags(self, key, bucket, tags, replace_tags=True):
+        Args:
+            bucket (string): S3 bucket
+            key (string): object key
+            tag_key (string): Tag key
+            tag_value (string): Tag value
+
+        Returns:
+            Dict with the versionId of the object the tag-set was added to
+        """
+
+        return self.set_object_tags(
+            bucket=bucket,
+            key=key,
+            tags=[key_value_dict(tag_key,tag_value)],
+            merge_existing_tags=True,
+        )
+
+    def set_object_tags(self, *, bucket, key, tags, merge_existing_tags=True):
         """
         Adds or replaces tags of an object with the ones specified in `tags`.
 
         Args:
-            key (string): object key
             bucket (string): S3 bucket
+            key (string): object key
             tags (list): List of tags of the form [{'Key': 'KEY1','Value': 'VALUE1'}, {...}]
-            replace_tags (bool): If True, existing tags are replaced with the provided ones.
-                Otherwise, the provided tags are added to the existing ones
+            merge_existing_tags (bool): If False, existing tags are replaced with the provided ones (use with care!).
+                Otherwise, the provided tags are merged with the existing ones (default)
 
         Returns:
             Dict with the versionId of the object the tag-set was added to
@@ -333,10 +355,10 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
 
         try:
             new_tags = tags
-            if not replace_tags:
-                existing_tags = self.get_object_tags(key, bucket)
+            if merge_existing_tags:
+                existing_tags = self.get_object_tags(bucket=bucket, key=key)
                 if existing_tags:
-                    new_tags = merge_key_value_pairs(existing_tags, new_tags)
+                    new_tags = merge_key_value_dict_lists(existing_tags, new_tags)
             return self.s3.put_object_tagging(
                 Bucket=bucket,
                 Key=key,

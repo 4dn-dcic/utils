@@ -25,7 +25,7 @@ from dcicutils.misc_utils import (
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
     capitalize1, local_attrs, dict_zip, json_leaf_subst, _is_function_of_exactly_one_required_arg, string_list,
-    string_md5, key_value_pair, merge_key_value_pairs,
+    string_md5, key_value_dict, merge_key_value_dict_lists,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -2571,16 +2571,16 @@ def test_json_leaf_subst():
     assert json_leaf_subst({"x": "y", "y": "x"}, subs) == {"ex": "why", "why": "ex"}
 
 
-def test_key_value_pair():
+def test_key_value_dict():
 
-    assert key_value_pair('a', 'b') == {'Key': 'a', 'Value': 'b'}
+    assert key_value_dict('a', 'b') == {'Key': 'a', 'Value': 'b'}
 
 
-def test_merge_key_value_pairs():
+def test_merge_key_value_dict_lists():
 
     old = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '2'}]
     new = [{'Key': 'c', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
-    actual = merge_key_value_pairs(old, new)
+    actual = merge_key_value_dict_lists(old, new)
     expected = [
         {'Key': 'a', 'Value': '1'},
         {'Key': 'b', 'Value': '2'},
@@ -2591,13 +2591,13 @@ def test_merge_key_value_pairs():
 
     old = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '2'}]
     new = [{'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
-    actual = merge_key_value_pairs(old, new)
+    actual = merge_key_value_dict_lists(old, new)
     expected = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
     assert actual == expected
 
     old = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '2'}]
     new = [{'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}, {'Key': 'a', 'Value': '7'}]
-    actual = merge_key_value_pairs(old, new)
+    actual = merge_key_value_dict_lists(old, new)
     expected = [{'Key': 'a', 'Value': '7'}, {'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
     assert actual == expected
 
