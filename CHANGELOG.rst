@@ -24,6 +24,7 @@ Change Log
 
   * Add ``s3Utils.get_object_tags``
   * Add ``s3Utils.set_object_tags``
+  * Add ``s3Utils.get_object_tag``
 
 
 3.13.1
