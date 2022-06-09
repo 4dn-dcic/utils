@@ -1535,8 +1535,3 @@ class NamedObject(object):
 
     def __repr__(self):
         return f"<{self.name}@{id(self):x}>"
-
-
-# The names HMS_TZ and hms_now were deprecated for a while and are removed in dcicutils 3.0
-# HMS_TZ = REF_TZ
-# hms_now = ref_now
