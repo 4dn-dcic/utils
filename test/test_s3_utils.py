@@ -970,7 +970,7 @@ def test_get_and_set_object_tags():
         s3u.set_object_tags(key=key, bucket=bucket, tags=[{'Key': 'b', 'Value': 'beta'}])
 
         actual = s3u.get_object_tags(key=key, bucket=bucket)
-        expected = [{'Key': 'a', 'Value': 'alpha'},{'Key': 'b', 'Value': 'beta'}]
+        expected = [{'Key': 'a', 'Value': 'alpha'}, {'Key': 'b', 'Value': 'beta'}]
         # print(f"actual={actual} expected={expected}")
         assert actual == expected, f"Got {actual} but expected {expected}"
 
