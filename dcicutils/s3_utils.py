@@ -315,7 +315,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         except Exception as e:
             logger.warning(f'Could not get tags for object {bucket}/{key}: {str(e)}')
             raise e
-    
+
     def set_object_tag(self, *, bucket, key, tag_key, tag_value):
         """
         Adds (tag_key,tag_value) pair to the object. If a tag with key tag_key is already present,
@@ -334,7 +334,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         return self.set_object_tags(
             bucket=bucket,
             key=key,
-            tags=[key_value_dict(tag_key,tag_value)],
+            tags=[key_value_dict(tag_key, tag_value)],
             merge_existing_tags=True,
         )
 

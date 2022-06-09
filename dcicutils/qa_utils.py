@@ -20,7 +20,6 @@ import uuid
 import warnings
 
 from botocore.exceptions import ClientError
-from collections import defaultdict
 from json import dumps as json_dumps, loads as json_loads
 from unittest import mock
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
@@ -1045,7 +1044,6 @@ class MockBotoS3Client:
         )
         attribute_block = self._object_attribute_block(filename)
         attribute_block.tagset = copy.deepcopy(tagset)  # Don't share state with our argument
-
 
     def _object_storage_class(self, filename):
         """
