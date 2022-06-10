@@ -13,6 +13,7 @@ import uuid
 import warnings
 import webtest
 
+from dcicutils.lang_utils import n_of
 from dcicutils.misc_utils import (
     PRINT, ignored, ignorable, filtered_warnings, get_setting_from_context, TestApp, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
@@ -25,8 +26,7 @@ from dcicutils.misc_utils import (
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
     capitalize1, local_attrs, dict_zip, json_leaf_subst,
     _is_function_of_exactly_one_required_arg,  # noQA
-    string_list,
-    string_md5, SingletonManager,
+    string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -534,7 +534,7 @@ def test_filtered_warnings():
     def expect_warnings(pairs):
         with warnings.catch_warnings(record=True) as w:
             # Trigger a warning.
-            warnings.warn("oh, this is deprecated for sure", DeprecationWarning)  # noqa
+            warnings.warn("oh, what a bad user you are", RuntimeWarning)  # noqa
             warnings.warn("tsk, tsk, tsk, what ugly code", SyntaxWarning)  # noqa
             # Verify some things
             for expected_count, expected_type in pairs:
@@ -542,21 +542,23 @@ def test_filtered_warnings():
                 for warning in w:
                     if issubclass(warning.category, expected_type):
                         count += 1
-                assert count == expected_count
+                assert count == expected_count, (
+                    f"Warnings: {[e.message for e in w]} (count={count} expected{expected_count})"
+                )
 
-    expect_warnings([(2, Warning), (1, DeprecationWarning), (1, SyntaxWarning)])
+    expect_warnings([(2, Warning), (1, RuntimeWarning), (1, SyntaxWarning)])
 
     with filtered_warnings("ignore"):
-        expect_warnings([(0, Warning), (0, DeprecationWarning), (0, SyntaxWarning)])
+        expect_warnings([(0, Warning), (0, RuntimeWarning), (0, SyntaxWarning)])
 
     with filtered_warnings("ignore", category=Warning):
-        expect_warnings([(0, Warning), (0, DeprecationWarning), (0, SyntaxWarning)])
+        expect_warnings([(0, Warning), (0, RuntimeWarning), (0, SyntaxWarning)])
 
-    with filtered_warnings("ignore", category=DeprecationWarning):
-        expect_warnings([(1, Warning), (0, DeprecationWarning), (1, SyntaxWarning)])
+    with filtered_warnings("ignore", category=RuntimeWarning):
+        expect_warnings([(1, Warning), (0, RuntimeWarning), (1, SyntaxWarning)])
 
     with filtered_warnings("ignore", category=SyntaxWarning):
-        expect_warnings([(1, Warning), (1, DeprecationWarning), (0, SyntaxWarning)])
+        expect_warnings([(1, Warning), (1, RuntimeWarning), (0, SyntaxWarning)])
 
 
 def _adder(n):
@@ -2609,3 +2611,34 @@ def test_singleton_manager():
     assert foo3_manager.singleton.secret_token == foo3_manager.singleton.secret_token
     assert foo3_manager.singleton.secret_token2 is not None
     assert foo3_manager.singleton.secret_token2 == foo3_manager.singleton.secret_token2
+
+
+def test_key_value_dict():
+
+    assert key_value_dict('a', 'b') == {'Key': 'a', 'Value': 'b'}
+
+
+def test_merge_key_value_dict_lists():
+
+    old = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '2'}]
+    new = [{'Key': 'c', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
+    actual = merge_key_value_dict_lists(old, new)
+    expected = [
+        {'Key': 'a', 'Value': '1'},
+        {'Key': 'b', 'Value': '2'},
+        {'Key': 'c', 'Value': '3'},
+        {'Key': 'd', 'Value': '4'}
+    ]
+    assert actual == expected
+
+    old = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '2'}]
+    new = [{'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
+    actual = merge_key_value_dict_lists(old, new)
+    expected = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
+    assert actual == expected
+
+    old = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '2'}]
+    new = [{'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}, {'Key': 'a', 'Value': '7'}]
+    actual = merge_key_value_dict_lists(old, new)
+    expected = [{'Key': 'a', 'Value': '7'}, {'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
+    assert actual == expected

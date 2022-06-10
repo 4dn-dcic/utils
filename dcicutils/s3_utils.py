@@ -9,8 +9,11 @@ from zipfile import ZipFile
 from .base import get_beanstalk_real_url
 from .env_base import EnvManager
 from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name
-from .exceptions import InferredBucketConflict
-from .misc_utils import PRINT, exported
+from .exceptions import (
+    InferredBucketConflict, CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv,
+    GlobalBucketAccessError, SynonymousEnvironmentVariablesMismatched,
+)
+from .misc_utils import PRINT, override_environ, ignored, exported, merge_key_value_dict_lists, key_value_dict
 
 
 # For legacy reasons, other modules or repos might expect these names in this file.
@@ -290,6 +293,83 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 PRINT(str(e))
             return False
         return file_metadata
+
+    def get_object_tags(self, *, bucket, key):
+        """
+        Get all tags of an object.
+
+        Args:
+            bucket (string): S3 bucket
+            key (string): object key
+
+        Returns:
+            Returns list of object tags.
+            The format is [{'Key': 'KEY1','Value': 'VALUE1'},{...}]
+        """
+
+        try:
+            response = self.s3.get_object_tagging(
+                Bucket=bucket,
+                Key=key,
+            )
+            return response["TagSet"]
+        except Exception as e:
+            logger.warning(f'Could not get tags for object {bucket}/{key}: {str(e)}')
+            raise e
+
+    def set_object_tag(self, *, bucket, key, tag_key, tag_value):
+        """
+        Adds (tag_key,tag_value) pair to the object. If a tag with key tag_key is already present,
+        it will be overwritten.
+
+        Args:
+            bucket (string): S3 bucket
+            key (string): object key
+            tag_key (string): Tag key
+            tag_value (string): Tag value
+
+        Returns:
+            Dict with the versionId of the object the tag-set was added to
+        """
+
+        return self.set_object_tags(
+            bucket=bucket,
+            key=key,
+            tags=[key_value_dict(tag_key, tag_value)],
+            merge_existing_tags=True,
+        )
+
+    def set_object_tags(self, *, bucket, key, tags, merge_existing_tags=True):
+        """
+        Adds or replaces tags of an object with the ones specified in `tags`.
+
+        Args:
+            bucket (string): S3 bucket
+            key (string): object key
+            tags (list): List of tags of the form [{'Key': 'KEY1','Value': 'VALUE1'}, {...}]
+            merge_existing_tags (bool): If False, existing tags are replaced with the provided ones (use with care!).
+                Otherwise, the provided tags are merged with the existing ones (default)
+
+        Returns:
+            Dict with the versionId of the object the tag-set was added to
+        """
+
+        try:
+            new_tags = tags
+            if merge_existing_tags:
+                existing_tags = self.get_object_tags(bucket=bucket, key=key)
+                if existing_tags:
+                    new_tags = merge_key_value_dict_lists(existing_tags, new_tags)
+            return self.s3.put_object_tagging(
+                Bucket=bucket,
+                Key=key,
+                Tagging={
+                    'TagSet': new_tags,
+                },
+            )
+        except Exception as e:
+            logger.warning(f'{bucket}/{key} could not be tagged: {str(e)}')
+            raise e
 
     def get_file_size(self, key, bucket=None, add_bytes=0, add_gb=0,
                       size_in_gb=False):

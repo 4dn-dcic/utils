@@ -103,6 +103,32 @@ these new items:
     has been temporarily disabled
 
 
+3.14.0
+======
+
+* In ``misc_utils``:
+
+  * New function ``key_value_dict``.
+  * New function ``merge_key_value_dict_lists``.
+
+* In ``qa_utils``:
+
+  * Add ``MockBotoS3Client.get_object_tagging``.
+  * Add ``MockBotoS3Client.put_object_tagging``.
+
+* In ``s3_utils``:
+
+  * Add ``s3Utils.get_object_tags``
+  * Add ``s3Utils.set_object_tags``
+  * Add ``s3Utils.set_object_tag``
+
+
+3.13.1
+======
+
+* Fix a bug in ``diff_utils``.
+
+
 3.13.0
 ======
 

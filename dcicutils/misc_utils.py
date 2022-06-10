@@ -1535,3 +1535,26 @@ class NamedObject(object):
 
     def __repr__(self):
         return f"<{self.name}@{id(self):x}>"
+
+
+def key_value_dict(key, value):
+    """
+    Given a key k and a value v, returns the dictionary {"Key": k, "Value": v}, which is a format AWS is fond of.
+    """
+    return {'Key': key, 'Value': value}
+
+
+def merge_key_value_dict_lists(x, y):
+    """
+    Merges two lists of the form [{"Key": k1, "Value": v1}, {"Key": k2, "Value": v2}].
+    It is assumed that neither list has repeated keys, and that the resulting list also should not.
+    Entries in the resulting list will be in the same order as the original two lists except when both
+    lists contain entries that share a key. In that case, the two entries will be merged
+    into a single entry with the position of the first such entry and value of the second.
+    """
+    merged = {}
+    for pair in x:
+        merged[pair['Key']] = pair['Value']
+    for pair in y:
+        merged[pair['Key']] = pair['Value']
+    return [key_value_dict(k, v) for k, v in merged.items()]

@@ -802,6 +802,15 @@ class MockBotoCloudFormationResourceSummary:
         self.stack_name = None  # This will get filled out if used as a resource on a mock stack
 
 
+class MockObjectAttributeBlock:
+
+    def __init__(self, filename, boto3):
+        self.filename = filename
+        self.storage_class = boto3.storage_class
+        self.tagset = []
+        # keys go here
+
+
 @MockBoto3.register_client(kind='s3')
 class MockBotoS3Client:
     """
@@ -941,7 +950,45 @@ class MockBotoS3Client:
         # This is different but similar to list_objects. However we don't really care about that.
         return self.list_objects(Bucket=Bucket)
 
-    def _storage_class_map(self):
+    def get_object_tagging(self, Bucket, Key):
+        pseudo_file = f"{Bucket}/{Key}"
+        return {
+            'ResponseMetadata': {
+                # Not presently mocked: RequestId, HostId
+                'HTTPStatusCode': 200,
+                'HTTPHeaders': {
+                    # Not presently mocked: x-amz-id-2, x-amz-request-id, date, transfer-encoding
+                    'server': 'AmazonS3',
+                },
+                'RetryAttempts': 0,
+            },
+            'TagSet': self._object_tagset(pseudo_file)
+        }
+
+    def put_object_tagging(self, Bucket, Key, Tagging):
+        pseudo_file = f"{Bucket}/{Key}"
+        assert isinstance(Tagging, dict), "The Tagging argument must be a dictionary."
+        assert list(Tagging.keys()) == ['TagSet'], "The Tagging argument dictionary should have only the 'TagSet' key."
+        tagset = Tagging['TagSet']
+        assert isinstance(tagset, list), "The Tagging argument's TagSet must be a list."
+        for tag in tagset:
+            assert set(tag.keys()) == {'Key', 'Value'}, "Each tag must be a dictionary of Key and Value."
+            assert isinstance(tag['Key'], str), "Each tag's key must be a string."
+            assert isinstance(tag['Value'], str), "Each tag's value must be a string."
+        self._set_object_tagset(pseudo_file, Tagging['TagSet'])
+        return {
+            'ResponseMetadata': {
+                # Not presently mocked: RequestId, HostId
+                'HTTPStatusCode': 200,
+                'HTTPHeaders': {
+                    # Not presently mocked: x-amz-id-2, x-amz-request-id, date, transfer-encoding
+                    'server': 'AmazonS3',
+                },
+                'RetryAttempts': 0,
+            },
+        }
+
+    def _object_attribute_map(self):
         """
         Returns the storage class map for this mock.
 
@@ -953,6 +1000,51 @@ class MockBotoS3Client:
             self.boto3.shared_reality['storage_class_map'] = storage_class_map = {}
         return storage_class_map
 
+    def _object_attribute_block(self, filename):
+        """
+        Returns the attribute_block for an S3 object.
+        This contains information like storage class and tagsets.
+
+        Because this is an internal routine, 'filename' is 'bucket/key' to match the mock file system we use internally.
+
+        Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
+        so that if another client is created by that same boto3 mock, it will see the same storage classes.
+        """
+        attribute_map = self._object_attribute_map()
+        attribute_block = attribute_map.get(filename)
+        if not attribute_block:
+            attribute_map[filename] = attribute_block = MockObjectAttributeBlock(filename=filename, boto3=self)
+        return attribute_block
+
+    def _object_tagset(self, filename):
+        """
+        Returns the tagset for the 'filename' in this S3 mock.
+        Because this is an internal routine, 'filename' is 'bucket/key' to match the mock file system we use internally.
+
+        Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
+        so that if another client is created by that same boto3 mock, it will see the same storage classes.
+        """
+        attribute_block = self._object_attribute_block(filename)
+        return copy.deepcopy(attribute_block.tagset)  # Don't let recipient of value change our stored value
+
+    def _set_object_tagset(self, filename, tagset):
+        """
+        Sets the tagset for the 'filename' in this S3 mock to the given value.
+        Because this is an internal routine, 'filename' is 'bucket/key' to match the mock file system we use internally.
+
+        Presently the value is not error-checked. That might change.
+        By special exception, passing value=None will revert the storage class to the default for the given mock,
+        for which the default default is 'STANDARD'.
+
+        Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
+        so that if another client is created by that same boto3 mock, it will see the same storage classes.
+        """
+        assert isinstance(tagset, list) and all(isinstance(pair, dict) for pair in tagset), (
+            f"An internal tagset must be a list of Key/Value dictionaries: {tagset}"
+        )
+        attribute_block = self._object_attribute_block(filename)
+        attribute_block.tagset = copy.deepcopy(tagset)  # Don't share state with our argument
+
     def _object_storage_class(self, filename):
         """
         Returns the storage class for the 'filename' in this S3 mock.
@@ -961,7 +1053,8 @@ class MockBotoS3Client:
         Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
         so that if another client is created by that same boto3 mock, it will see the same storage classes.
         """
-        return self._storage_class_map().get(filename) or self.storage_class
+        attribute_block = self._object_attribute_block(filename)
+        return attribute_block.storage_class
 
     def _set_object_storage_class(self, filename, value):
         """
@@ -975,7 +1068,8 @@ class MockBotoS3Client:
         Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
         so that if another client is created by that same boto3 mock, it will see the same storage classes.
         """
-        self._storage_class_map()[filename] = value
+        attribute_block = self._object_attribute_block(filename)
+        attribute_block.storage_class = value
 
     def list_objects(self, Bucket, Prefix=None):  # noQA - AWS argument naming style
         # Ref: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects
