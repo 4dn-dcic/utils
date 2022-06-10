@@ -26,120 +26,120 @@ SEAGAP_ENV = {
 
 
 def test_get_beanstalk_real_url_ff_prd_data_containerized():
-    with EnvUtils.locally_declared_data(FAUXFRONT_ENV):
+    with EnvUtils.locally_declared_data_for_testing(FAUXFRONT_ENV):
         env = 'fauxfront-prd'
         assert base.get_beanstalk_real_url(env) == 'https://fauxfront.org'
 
 
 def test_get_beanstalk_real_url_ff_dev_data_containerized():
-    with EnvUtils.locally_declared_data(FAUXFRONT_ENV):
+    with EnvUtils.locally_declared_data_for_testing(FAUXFRONT_ENV):
         env = 'fauxfront-webdev'
         assert base.get_beanstalk_real_url(env) == 'http://webdev.dev.fauxfront.org'
 
 
 def test_get_beanstalk_real_url_cgap_prd_data_containerized():
-    with EnvUtils.locally_declared_data(SEAGAP_ENV):
+    with EnvUtils.locally_declared_data_for_testing(SEAGAP_ENV):
         env = 'seagap-prd'
         assert base.get_beanstalk_real_url(env) == 'https://seagap.hahvahd.edu'
 
 
 def test_get_beanstalk_real_url_cgap_dev_data_containerized():
-    with EnvUtils.locally_declared_data(SEAGAP_ENV):
+    with EnvUtils.locally_declared_data_for_testing(SEAGAP_ENV):
         env = 'seagap-webdev'
         assert base.get_beanstalk_real_url(env) == 'https://seagap-webdev.hahvahd.edu'
 
 
 def test_compute_ff_prd_env():
 
-    with EnvUtils.locally_declared_data(FAUXFRONT_ENV):
+    with EnvUtils.locally_declared_data_for_testing(FAUXFRONT_ENV):
         computed = base.compute_ff_prd_env()
         assert computed == 'fauxfront-prd'
 
 
 def test_compute_ff_stg_env():
 
-    with EnvUtils.locally_declared_data(FAUXFRONT_ENV):
+    with EnvUtils.locally_declared_data_for_testing(FAUXFRONT_ENV):
         computed = base.compute_ff_stg_env()
         assert computed == 'fauxfront-stg'
 
 
 def test_compute_cgap_prd_env():
 
-    with EnvUtils.locally_declared_data(SEAGAP_ENV):
+    with EnvUtils.locally_declared_data_for_testing(SEAGAP_ENV):
         computed = base.compute_cgap_prd_env()
         assert computed == 'seagap-prd'
 
 
 def test_compute_cgap_stg_env():
 
-    with EnvUtils.locally_declared_data(SEAGAP_ENV):
+    with EnvUtils.locally_declared_data_for_testing(SEAGAP_ENV):
         computed = base.compute_cgap_stg_env()
         assert computed is None
 
 
 def test_compute_prd_env_for_env_ff_containerized():
 
-    with EnvUtils.locally_declared_data(FAUXFRONT_ENV):
+    with EnvUtils.locally_declared_data_for_testing(FAUXFRONT_ENV):
         assert compute_prd_env_for_env('fauxfront-mastertest') == 'fauxfront-prd'
 
-    with EnvUtils.locally_declared_data(FAUXFRONT_ENV):
+    with EnvUtils.locally_declared_data_for_testing(FAUXFRONT_ENV):
         assert compute_prd_env_for_env('fauxfront-prd') == 'fauxfront-prd'
 
-    with EnvUtils.locally_declared_data(FAUXFRONT_ENV):
+    with EnvUtils.locally_declared_data_for_testing(FAUXFRONT_ENV):
         with pytest.raises(ValueError):  # Unknown environment: fourfront-mastertest
             compute_prd_env_for_env('fourfront-mastertest')
 
-    with EnvUtils.locally_declared_data(FAUXFRONT_ENV):
+    with EnvUtils.locally_declared_data_for_testing(FAUXFRONT_ENV):
         with pytest.raises(ValueError):  # Unknown environment: cgap-webdev
             compute_prd_env_for_env('cgap-webdev')
 
 
 def test_compute_stg_env_for_env_ff_containerized():
 
-    with EnvUtils.locally_declared_data(FAUXFRONT_ENV):
+    with EnvUtils.locally_declared_data_for_testing(FAUXFRONT_ENV):
         assert compute_stg_env_for_env('fauxfront-mastertest') == 'fauxfront-stg'
 
-    with EnvUtils.locally_declared_data(FAUXFRONT_ENV):
+    with EnvUtils.locally_declared_data_for_testing(FAUXFRONT_ENV):
         assert compute_stg_env_for_env('fauxfront-prd') == 'fauxfront-stg'
 
-    with EnvUtils.locally_declared_data(FAUXFRONT_ENV):
+    with EnvUtils.locally_declared_data_for_testing(FAUXFRONT_ENV):
         with pytest.raises(ValueError):  # Unknown environment: fourfront-mastertest
             compute_stg_env_for_env('fourfront-mastertest')
 
-    with EnvUtils.locally_declared_data(FAUXFRONT_ENV):
+    with EnvUtils.locally_declared_data_for_testing(FAUXFRONT_ENV):
         with pytest.raises(ValueError):  # Unknown environment: cgap-webdev
             compute_stg_env_for_env('cgap-webdev')
 
 
 def test_compute_prd_env_for_env_cgap_containerized():
 
-    with EnvUtils.locally_declared_data(SEAGAP_ENV):
+    with EnvUtils.locally_declared_data_for_testing(SEAGAP_ENV):
         assert compute_prd_env_for_env('seagap-webdev') == 'seagap-prd'
 
-    with EnvUtils.locally_declared_data(SEAGAP_ENV):
+    with EnvUtils.locally_declared_data_for_testing(SEAGAP_ENV):
         assert compute_prd_env_for_env('seagap-prd') == 'seagap-prd'
 
-    with EnvUtils.locally_declared_data(SEAGAP_ENV):
+    with EnvUtils.locally_declared_data_for_testing(SEAGAP_ENV):
         with pytest.raises(ValueError):  # Unknown environment: fourfront-mastertest
             compute_prd_env_for_env('fourfront-mastertest')
 
-    with EnvUtils.locally_declared_data(SEAGAP_ENV):
+    with EnvUtils.locally_declared_data_for_testing(SEAGAP_ENV):
         with pytest.raises(ValueError):  # Unknown environment: cgap-webdev
             compute_prd_env_for_env('cgap-webdev')
 
 
 def test_compute_stg_env_for_env_cgap_containerized():
 
-    with EnvUtils.locally_declared_data(SEAGAP_ENV):
+    with EnvUtils.locally_declared_data_for_testing(SEAGAP_ENV):
         assert compute_stg_env_for_env('seagap-webdev') is None
 
-    with EnvUtils.locally_declared_data(SEAGAP_ENV):
+    with EnvUtils.locally_declared_data_for_testing(SEAGAP_ENV):
         assert compute_stg_env_for_env('seagap-prd') is None
 
-    with EnvUtils.locally_declared_data(SEAGAP_ENV):
+    with EnvUtils.locally_declared_data_for_testing(SEAGAP_ENV):
         with pytest.raises(ValueError):  # Unknown environment: fourfront-mastertest
             compute_stg_env_for_env('fourfront-mastertest')
 
-    with EnvUtils.locally_declared_data(SEAGAP_ENV):
+    with EnvUtils.locally_declared_data_for_testing(SEAGAP_ENV):
         with pytest.raises(ValueError):  # Unknown environment: cgap-webdev
             compute_stg_env_for_env('cgap-webdev')

@@ -119,7 +119,7 @@ def _notice_health_page_connection_problem_for_test(env):
 @pytest.mark.integrated
 @pytest.mark.parametrize('ff_ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat'])
 def test_s3utils_creation_ff_ordinary(ff_ordinary_envname):
-    with EnvUtils.local_env_utils(global_env_bucket=LEGACY_GLOBAL_ENV_BUCKET, env_name=ff_ordinary_envname):
+    with EnvUtils.local_env_utils_for_testing(global_env_bucket=LEGACY_GLOBAL_ENV_BUCKET, env_name=ff_ordinary_envname):
         problem = _notice_health_page_connection_problem_for_test(ff_ordinary_envname)
         if not problem:
             util = s3Utils(env=ff_ordinary_envname)
@@ -171,7 +171,7 @@ def test_s3utils_creation_ff_prd():
     print("In test_s3Utils_creation_ff_prd. It is now", str(datetime.datetime.now()))
 
     def test_prd(ff_production_envname):
-        with EnvUtils.locally_declared_data():
+        with EnvUtils.locally_declared_data_for_testing():
             EnvUtils.init(ff_production_envname)
             util = s3Utils(env=ff_production_envname)
             actual_props = {
@@ -1131,20 +1131,20 @@ def test_get_and_set_object_tags():
         s3u.set_object_tags(key=key, bucket=bucket, tags=[{'Key': 'b', 'Value': 'bravo'}], merge_existing_tags=True)
 
         actual = s3u.get_object_tags(key=key, bucket=bucket)
-        expected = [{'Key': 'a', 'Value': 'alpha'}, {'Key': 'b', 'Value': 'bravo'} ]
+        expected = [{'Key': 'a', 'Value': 'alpha'}, {'Key': 'b', 'Value': 'bravo'}]
         # print(f"actual={actual} expected={expected}")
         assert actual == expected, f"Got {actual} but expected {expected}"
 
         s3u.set_object_tag(key=key, bucket=bucket, tag_key="a", tag_value="alpha_2")
 
         actual = s3u.get_object_tags(key=key, bucket=bucket)
-        expected = [{'Key': 'a', 'Value': 'alpha_2'}, {'Key': 'b', 'Value': 'bravo'} ]
+        expected = [{'Key': 'a', 'Value': 'alpha_2'}, {'Key': 'b', 'Value': 'bravo'}]
         # print(f"actual={actual} expected={expected}")
         assert actual == expected, f"Got {actual} but expected {expected}"
 
         s3u.set_object_tag(key=key, bucket=bucket, tag_key="c", tag_value="gamma")
-        
+
         actual = s3u.get_object_tags(key=key, bucket=bucket)
-        expected = [{'Key': 'a', 'Value': 'alpha_2'}, {'Key': 'b', 'Value': 'bravo'}, {'Key': 'c', 'Value': 'gamma'} ]
+        expected = [{'Key': 'a', 'Value': 'alpha_2'}, {'Key': 'b', 'Value': 'bravo'}, {'Key': 'c', 'Value': 'gamma'}]
         # print(f"actual={actual} expected={expected}")
         assert actual == expected, f"Got {actual} but expected {expected}"

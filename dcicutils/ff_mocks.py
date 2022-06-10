@@ -154,14 +154,17 @@ def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=
                             # sets up that environment variable.
                             if require_sse:
                                 with override_environ(S3_ENCRYPT_KEY=s3_class.SSE_ENCRYPT_KEY):
-                                    with EnvUtils.local_env_utils(global_env_bucket=os.environ.get('GLOBAL_ENV_BUCKET'),
-                                                                  env_name=environments[0]
-                                                                  if environments else
-                                                                  os.environ.get('ENV_NAME')):
+                                    with EnvUtils.local_env_utils_for_testing(
+                                            global_env_bucket=os.environ.get('GLOBAL_ENV_BUCKET'),
+                                            env_name=(
+                                                    environments[0]
+                                                    if environments else
+                                                    os.environ.get('ENV_NAME'))):
                                         yield mock_boto3
                             else:
-                                with EnvUtils.local_env_utils(global_env_bucket=os.environ.get('GLOBAL_ENV_BUCKET'),
-                                                              env_name=os.environ.get('ENV_NAME')):
+                                with EnvUtils.local_env_utils_for_testing(
+                                        global_env_bucket=os.environ.get('GLOBAL_ENV_BUCKET'),
+                                        env_name=os.environ.get('ENV_NAME')):
                                     yield mock_boto3
 
 

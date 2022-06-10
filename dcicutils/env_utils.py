@@ -316,7 +316,7 @@ class EnvUtils:
                     setattr(EnvUtils, var, None)
 
     @classmethod
-    def _snapshot_envutils_state(cls):
+    def snapshot_envutils_state_for_testing(cls):
         result = {}
         for attr in EnvNames.__dict__.keys():
             if attr.isupper():
@@ -324,29 +324,29 @@ class EnvUtils:
         return result
 
     @classmethod
-    def _restore_envutils_state_from_snapshot(cls, snapshot):
+    def restore_envutils_state_from_snapshot_for_testing(cls, snapshot):
         for attr, val in snapshot.items():
             setattr(EnvUtils, attr, val)
 
     @classmethod
     @contextlib.contextmanager
-    def local_env_utils(cls, global_env_bucket=None, env_name=None, raise_load_errors=True):
+    def local_env_utils_for_testing(cls, global_env_bucket=None, env_name=None, raise_load_errors=True):
         attrs = {}
         if global_env_bucket:
             attrs['GLOBAL_ENV_BUCKET'] = global_env_bucket
         if env_name:
             attrs['ENV_NAME'] = env_name
-        with EnvUtils.locally_declared_data():
+        with EnvUtils.locally_declared_data_for_testing():
             with override_environ(**attrs):
                 EnvUtils.init(force=True, raise_load_errors=raise_load_errors)
                 yield
 
     @classmethod
     @contextlib.contextmanager
-    def locally_declared_data(cls, data=None, **kwargs):
+    def locally_declared_data_for_testing(cls, data=None, **kwargs):
         if data is None:
             data = {}
-        snapshot = cls._snapshot_envutils_state()
+        snapshot = cls.snapshot_envutils_state_for_testing()
         try:
             if data is not None:
                 cls.set_declared_data(data)  # First set the given data, if any
@@ -355,7 +355,7 @@ class EnvUtils:
                 setattr(cls, attr, val)
             yield
         finally:
-            cls._restore_envutils_state_from_snapshot(snapshot)
+            cls.restore_envutils_state_from_snapshot_for_testing(snapshot)
 
     # Vaguely, the thing we're trying to recognize is this (sanitized slightly here),
     # which we first call str() on and then check with a regular expression:

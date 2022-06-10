@@ -13,7 +13,6 @@ import uuid
 import warnings
 import webtest
 
-from dcicutils.lang_utils import n_of
 from dcicutils.misc_utils import (
     PRINT, ignored, ignorable, filtered_warnings, get_setting_from_context, TestApp, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it

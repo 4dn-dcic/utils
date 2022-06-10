@@ -1,5 +1,4 @@
 import contextlib
-import copy
 import functools
 import json
 import os
@@ -46,12 +45,12 @@ def orchestrated_behavior_for_testing(data: Optional[dict] = None):
 
     :param data: an ecosystem description (default EnvUtils.SAMPLE_TEMPLATE_FOR_CGAP_TESTING)
     """
-    snapshot = EnvUtils._snapshot_envutils_state()
+    snapshot = EnvUtils.snapshot_envutils_state_for_testing()
     try:
         EnvUtils.set_declared_data(data or EnvUtils.SAMPLE_TEMPLATE_FOR_CGAP_TESTING)
         yield
     finally:
-        EnvUtils._restore_envutils_state_from_snapshot(snapshot)
+        EnvUtils.restore_envutils_state_from_snapshot_for_testing(snapshot)
 
 
 @decorator()
@@ -326,7 +325,7 @@ def test_get_foursight_bucket_prefix():
             with pytest.raises(Exception):
                 get_foursight_bucket_prefix()
 
-        with EnvUtils.local_env_utils():
+        with EnvUtils.local_env_utils_for_testing():
             some_prefix = 'sample-foursight-bucket-prefix'
             EnvUtils.FOURSIGHT_BUCKET_PREFIX = some_prefix
             assert get_foursight_bucket_prefix() == some_prefix
@@ -2054,7 +2053,7 @@ def test_get_foursight_bucket():
 
     with local_attrs(EnvUtils, FOURSIGHT_BUCKET_TABLE="not-a-dict"):
 
-        with EnvUtils.local_env_utils():
+        with EnvUtils.local_env_utils_for_testing():
             EnvUtils.FOURSIGHT_BUCKET_PREFIX = 'alpha-omega'
             EnvUtils.FOURSIGHT_BUCKET_TABLE = None
             EnvUtils.FULL_ENV_PREFIX = 'acme-'
