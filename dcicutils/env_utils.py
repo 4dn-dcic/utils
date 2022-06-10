@@ -11,8 +11,7 @@ from typing import Optional
 from urllib.parse import urlparse
 from . import env_utils_legacy as legacy
 from .common import (
-    EnvName, OrchestratedApp, APP_FOURFRONT, ChaliceStage,
-    CHALICE_STAGE_DEV, CHALICE_STAGE_PROD,
+    EnvName, OrchestratedApp, APP_FOURFRONT, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD,
 )
 from .env_base import EnvManager
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
@@ -65,7 +64,7 @@ def if_orchestrated(*, unimplemented=False, use_legacy=False, assumes_cgap=False
 
     def _decorate(fn):
 
-        EnvUtils.init()
+        EnvUtils.init(raise_load_errors=False)
 
         try:
             legacy_fn = getattr(legacy, fn.__name__)
@@ -297,13 +296,13 @@ class EnvUtils:
     }
 
     @classmethod
-    def init(cls, env_name=None, ecosystem=None, force=False):
+    def init(cls, env_name=None, ecosystem=None, force=False, raise_load_errors=True):
         if force or cls._DECLARED_DATA is None:
-            cls.load_declared_data(env_name=env_name, ecosystem=ecosystem)
+            cls.load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors)
 
     @classmethod
     def declared_data(cls):
-        cls.init()
+        cls.init(raise_load_errors=False)
         return cls._DECLARED_DATA
 
     @classmethod
@@ -317,8 +316,21 @@ class EnvUtils:
                     setattr(EnvUtils, var, None)
 
     @classmethod
+    def _snapshot_envutils_state(cls):
+        result = {}
+        for attr in EnvNames.__dict__.keys():
+            if attr.isupper():
+                result[attr] = copy.deepcopy(getattr(EnvUtils, attr))
+        return result
+
+    @classmethod
+    def _restore_envutils_state_from_snapshot(cls, snapshot):
+        for attr, val in snapshot.items():
+            setattr(EnvUtils, attr, val)
+
+    @classmethod
     @contextlib.contextmanager
-    def local_env_utils(cls, global_env_bucket=None, env_name=None):
+    def local_env_utils(cls, global_env_bucket=None, env_name=None, raise_load_errors=True):
         attrs = {}
         if global_env_bucket:
             attrs['GLOBAL_ENV_BUCKET'] = global_env_bucket
@@ -326,7 +338,7 @@ class EnvUtils:
             attrs['ENV_NAME'] = env_name
         with EnvUtils.locally_declared_data():
             with override_environ(**attrs):
-                EnvUtils.init(force=True)
+                EnvUtils.init(force=True, raise_load_errors=raise_load_errors)
                 yield
 
     @classmethod
@@ -334,8 +346,7 @@ class EnvUtils:
     def locally_declared_data(cls, data=None, **kwargs):
         if data is None:
             data = {}
-        old_data = {attr: copy.copy(val) if isinstance(val, (dict, list)) else val
-                    for attr, val in cls.__dict__.items() if attr.isupper()}
+        snapshot = cls._snapshot_envutils_state()
         try:
             if data is not None:
                 cls.set_declared_data(data)  # First set the given data, if any
@@ -344,8 +355,7 @@ class EnvUtils:
                 setattr(cls, attr, val)
             yield
         finally:
-            for attr, old_val in old_data.items():
-                setattr(cls, attr, old_val)
+            cls._restore_envutils_state_from_snapshot(snapshot)
 
     # Vaguely, the thing we're trying to recognize is this (sanitized slightly here),
     # which we first call str() on and then check with a regular expression:
@@ -384,7 +394,27 @@ class EnvUtils:
             raise
 
     @classmethod
-    def load_declared_data(cls, env_name=None, ecosystem=None):
+    def _get_config_ecosystem_from_s3(cls, env_bucket, config_key):
+        seen = set()
+        while config_key not in seen:
+            seen.add(config_key)
+            config_data = cls._get_config_object_from_s3(env_bucket=env_bucket, config_key=config_key)
+            ecosystem = config_data.get(e.ECOSYSTEM)
+            if not ecosystem:
+                break
+            # Indirect to ecosystem
+            # Format should be:               "ecosystem": "main"
+            # But for now we also tolerate:   "ecosystem": "main.ecosystem"
+            config_key = ecosystem
+            if config_key and not config_key.endswith(".ecosystem"):
+                config_key = f"{ecosystem}.ecosystem"
+        ecosystem = config_data.get(e.ECOSYSTEM)  # noQA - PyCharm worries wrongly this won't have been set
+        if ecosystem and ecosystem.endswith(".ecosystem"):
+            config_data[e.ECOSYSTEM] = remove_suffix(".ecosystem", ecosystem)
+        return config_data                        # noQA - PyCharm worries wrongly this won't have been set
+
+    @classmethod
+    def load_declared_data(cls, env_name=None, ecosystem=None, raise_load_errors=True):
         """
         Tries to load environmental data from any of various keys in the global env bucket.
         1. If an ecosystem was specified, load from <ecosystem>.ecosystem.
@@ -398,19 +428,15 @@ class EnvUtils:
         env_bucket = EnvManager.global_env_bucket_name()
         if env_bucket and config_key:
             try:
-                config_data = cls._get_config_object_from_s3(env_bucket=env_bucket,
-                                                             config_key=config_key)
-                ecosystem_key_from_config_data = config_data.get(e.ECOSYSTEM)
-                if ecosystem_key_from_config_data:
-                    config_data = cls._get_config_object_from_s3(env_bucket=env_bucket,
-                                                                 config_key=ecosystem_key_from_config_data)
+                config_data = cls._get_config_ecosystem_from_s3(env_bucket=env_bucket, config_key=config_key)
                 cls.set_declared_data(config_data)
                 return
             except Exception as err_obj:
-                raise EnvUtilsLoadError(str(err_obj),
-                                        env_bucket=env_bucket,
-                                        config_key=config_key,
-                                        encapsulated_error=err_obj)
+                if raise_load_errors:
+                    raise EnvUtilsLoadError(str(err_obj),
+                                            env_bucket=env_bucket,
+                                            config_key=config_key,
+                                            encapsulated_error=err_obj)
 
         cls.set_declared_data({e.IS_LEGACY: True})
 

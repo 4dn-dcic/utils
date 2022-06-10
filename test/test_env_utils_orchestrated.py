@@ -1,4 +1,5 @@
 import contextlib
+import copy
 import functools
 import json
 import os
@@ -20,9 +21,11 @@ from dcicutils.env_utils import (
 )
 from dcicutils.exceptions import (
     BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
+    EnvUtilsLoadError,
 )
 from dcicutils.misc_utils import decorator, local_attrs, ignorable, override_environ
 from dcicutils.qa_utils import raises_regexp
+from typing import Optional
 from unittest import mock
 from urllib.parse import urlparse
 
@@ -36,18 +39,34 @@ def stage_mirroring(*, enabled=True):
         yield
 
 
+@contextlib.contextmanager
+def orchestrated_behavior_for_testing(data: Optional[dict] = None):
+    """
+    Context manager that arranges for a dynamic executation context to use a specified ecosystem description.
+
+    :param data: an ecosystem description (default EnvUtils.SAMPLE_TEMPLATE_FOR_CGAP_TESTING)
+    """
+    snapshot = EnvUtils._snapshot_envutils_state()
+    try:
+        EnvUtils.set_declared_data(data or EnvUtils.SAMPLE_TEMPLATE_FOR_CGAP_TESTING)
+        yield
+    finally:
+        EnvUtils._restore_envutils_state_from_snapshot(snapshot)
+
+
 @decorator()
-def using_orchestrated_behavior(data=None):
+def using_orchestrated_behavior(data: Optional[dict] = None):
+    """
+     Decorator that arranges for the function it decorates to dynamically use a specified ecosystem description.
+
+    :param data: an ecosystem description (default EnvUtils.SAMPLE_TEMPLATE_FOR_CGAP_TESTING)
+    """
     def _decorate(fn):
 
         @functools.wraps(fn)
         def _wrapped(*args, **kwargs):
-            old_data = EnvUtils.declared_data()
-            try:
-                EnvUtils.set_declared_data(data or EnvUtils.SAMPLE_TEMPLATE_FOR_CGAP_TESTING)
+            with orchestrated_behavior_for_testing(data=data):
                 return fn(*args, **kwargs)
-            finally:
-                EnvUtils.set_declared_data(old_data)
 
         return _wrapped
 
@@ -2127,3 +2146,117 @@ def test_cgap_get_env_real_url():
         #  * Uses 'https' uniformly for security reasons.
         #  * Uses full env name.
         assert get_env_real_url(env) == f'https://{env}{dev_suffix}'
+
+
+def test_get_config_ecosystem_from_s3():
+
+    with mock.patch.object(EnvUtils, "_get_config_object_from_s3") as mock_get_config_object_from_s3:
+
+        main_ecosystem = {"ecosystem": "blue"}
+
+        blue_ecosystem = {"_ecosystem_name": "blue"}
+
+        green_ecosystem = {"_ecosystem_name": "green"}
+
+        cgap_foo = {
+            "ff_env": "cgap-foo",
+            "es": "http://es.etc",
+            "fourfront": "http://fourfront.etc",
+            "ecosystem": "main"
+        }
+
+        cgap_bar = {
+            "ff_env": "cgap-bar",
+            "es": "http://es.etc",
+            "fourfront": "http://fourfront.etc"
+        }
+
+        bucket_for_testing = 'bucket-for-testing'
+
+        cgap_ping = {
+            "ff_env": "cgap-ping",
+            "es": "http://es.etc",
+            "fourfront": "http://fourfront.etc",
+            "ecosystem": "ping"
+        }
+
+        cgap_pong = {
+            "ff_env": "cgap-pong",
+            "es": "http://es.etc",
+            "fourfront": "http://fourfront.etc",
+            "ecosystem": "pong"
+        }
+
+        ping_ecosystem = {"ecosystem": "pong"}
+        pong_ecosystem = {"ecosystem": "ping"}
+
+        circular_testing_bucket = 'circular-testing-bucket'
+
+        envs = {
+            bucket_for_testing: {
+                "cgap-foo": cgap_foo,
+                "cgap-bar": cgap_bar,
+                "main.ecosystem": main_ecosystem,
+                "blue.ecosystem": blue_ecosystem,
+                "green.ecosystem": green_ecosystem
+            },
+            circular_testing_bucket: {
+                "cgap-ping": cgap_ping,
+                "cgap-pong": cgap_pong,
+                "ping.ecosystem": ping_ecosystem,
+                "pong.ecosystem": pong_ecosystem
+            }
+        }
+
+        def mocked_get_config_object_from_s3(env_bucket, config_key):
+            try:
+                return envs[env_bucket][config_key]
+            except Exception as e:
+                # Typically an error raised due to boto3 S3 issues will end up getting caught and repackaged this way:
+                raise EnvUtilsLoadError("Mocked bucket/key lookup failed.",
+                                        env_bucket=env_bucket, config_key=config_key,
+                                        encapsulated_error=e)
+
+        mock_get_config_object_from_s3.side_effect = mocked_get_config_object_from_s3
+
+        expected = cgap_bar
+        actual = EnvUtils._get_config_ecosystem_from_s3(env_bucket=bucket_for_testing, config_key='cgap-bar')
+        assert actual == expected
+
+        expected = blue_ecosystem
+        actual = EnvUtils._get_config_ecosystem_from_s3(env_bucket=bucket_for_testing, config_key='cgap-foo')
+        assert actual == expected
+
+        expected = blue_ecosystem
+        actual = EnvUtils._get_config_ecosystem_from_s3(env_bucket=bucket_for_testing, config_key='main.ecosystem')
+        assert actual == expected
+
+        expected = blue_ecosystem
+        actual = EnvUtils._get_config_ecosystem_from_s3(env_bucket=bucket_for_testing, config_key='blue.ecosystem')
+        assert actual == expected
+
+        expected = green_ecosystem
+        actual = EnvUtils._get_config_ecosystem_from_s3(env_bucket=bucket_for_testing, config_key='green.ecosystem')
+        assert actual == expected
+
+        with pytest.raises(EnvUtilsLoadError):
+            EnvUtils._get_config_ecosystem_from_s3(env_bucket=bucket_for_testing, config_key='missing')
+
+        # Remaining tests test circularity.
+        # We just stop at the point of being pointed back to something we've seen before.
+
+        expected = pong_ecosystem
+        actual = EnvUtils._get_config_ecosystem_from_s3(env_bucket=circular_testing_bucket, config_key='cgap-ping')
+        assert actual == expected
+
+        expected = ping_ecosystem
+        actual = EnvUtils._get_config_ecosystem_from_s3(env_bucket=circular_testing_bucket, config_key='cgap-pong')
+        assert actual == expected
+
+        expected = pong_ecosystem
+        actual = EnvUtils._get_config_ecosystem_from_s3(env_bucket=circular_testing_bucket, config_key='ping.ecosystem')
+        assert actual == expected
+
+        expected = ping_ecosystem
+        actual = EnvUtils._get_config_ecosystem_from_s3(env_bucket=circular_testing_bucket, config_key='pong.ecosystem')
+        assert actual == expected
