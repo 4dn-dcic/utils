@@ -14,13 +14,16 @@ import os
 import pytest
 import pytz
 import re
+import sys
 import time
 import toml
 import uuid
 import warnings
 
 from botocore.exceptions import ClientError
+from collections import defaultdict
 from json import dumps as json_dumps, loads as json_loads
+from typing import Optional, List, DefaultDict
 from unittest import mock
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
 from .misc_utils import (
@@ -571,16 +574,39 @@ class _PrintCapturer:
     """
 
     def __init__(self):
-        self.lines = []
-        self.last = None
+        self.reset()
 
     def mock_print_handler(self, *args, **kwargs):
+        """
+        For the simple case of stdout, .last has the last line and .lines contains all lines.
+        For all cases, even stdout, .file_lines[fp] and .lines[fp] contain it.
+        Notes:
+            * If None is the fp value, sys.stdout is used instead. so that None and the current
+              value of sys.stdout are synonyms.
+            * This mock ignores 'end=' and will treat all calls to PRINT as if they were separate lines.
+        """
         text = " ".join(map(str, args))
         print(text, **kwargs)
         # This only captures non-file output output.
-        if kwargs.get('file') is None:
-            self.last = text
+        file = kwargs.get('file')
+        if file is None:
+            file = sys.stdout
+        if file is sys.stdout:
+            # Easy access to stdout
             self.lines.append(text)
+            self.last = text
+            # Every output to stdout is implicitly like output to no file (None)
+            self.file_lines[None].append(text)
+            self.file_last[None] = text
+        # All accesses of any file/fp, including stdout, get associated with that destination
+        self.file_lines[file].append(text)
+        self.file_last[file] = text
+
+    def reset(self):
+        self.lines: List[str] = []
+        self.last: Optional[str] = None
+        self.file_lines: DefaultDict[Optional[str], List[str]] = defaultdict(lambda: [])
+        self.file_last: DefaultDict[Optional[str], Optional[str]] = defaultdict(lambda: None)
 
 
 @contextlib.contextmanager
