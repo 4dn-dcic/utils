@@ -977,6 +977,46 @@ def test_uppercase_print_with_printed_output():
         assert printed.lines == ["foo", "bar"]
         assert printed.last == "bar"
 
+        printed.reset()
+
+        mfs = MockFileSystem()
+        with mfs.mock_exists_open_remove():
+
+            with io.open("some-file.txt", 'w') as fp:
+                PRINT("stuff to file", file=fp)
+                PRINT("stuff to console")
+                PRINT("more stuff to file", file=fp)
+                PRINT("more stuff to console")
+
+            assert printed.lines == ["stuff to console", "more stuff to console"]
+            assert printed.last == "more stuff to console"
+            assert printed.lines == printed.file_lines[None]
+            assert printed.last == printed.file_last[None]
+            assert printed.file_lines[None] == ["stuff to console", "more stuff to console"]
+            assert printed.file_last[None] == "more stuff to console"
+            assert printed.file_lines[fp] == ["stuff to file", "more stuff to file"]
+            assert printed.file_last[fp] == "more stuff to file"
+
+            PRINT("Done.")
+            assert printed.last == "Done."
+            assert printed.file_last[None] == "Done."
+            assert printed.lines == ["stuff to console", "more stuff to console", "Done."]
+            assert printed.file_lines[None] == ["stuff to console", "more stuff to console", "Done."]
+
+            PRINT("Done, too.", file=fp)
+            assert printed.file_last[fp] == "Done, too."
+            assert printed.file_lines[fp] == ["stuff to file", "more stuff to file", "Done, too."]
+
+            with io.open("another-file.txt", 'w') as fp2:
+
+                assert printed.file_last == None
+                assert printed.file_lines[fp2] == []
+                assert printed.file_last[fp2] == None
+                print("foo", file=fp2)
+                assert printed.file_last == None
+                assert printed.file_lines[fp2] == ["foo"]
+                assert printed.file_last[fp2] == "foo"
+
 
 def test_uppercase_print_with_time():
 
