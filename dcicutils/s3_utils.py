@@ -7,7 +7,7 @@ import os
 from io import BytesIO
 from zipfile import ZipFile
 from .base import get_beanstalk_real_url
-from .env_base import EnvManager
+from .env_manager import EnvManager
 from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name
 from .exceptions import InferredBucketConflict
 from .misc_utils import PRINT, exported, merge_key_value_dict_lists, key_value_dict

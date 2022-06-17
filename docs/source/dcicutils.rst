@@ -107,13 +107,6 @@ env_base
   :members:
 
 
-env_basic
-^^^^^^^^^
-
-.. automodule:: dcicutils.env_basic
-  :members:
-
-
 env_manager
 ^^^^^^^^^^^
 

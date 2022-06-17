@@ -8,7 +8,7 @@ import urllib.request
 
 from typing import Optional
 # from .common import LEGACY_GLOBAL_ENV_BUCKET
-from .env_basic import EnvBase
+from .env_base import EnvBase
 from .exceptions import (
     CannotInferEnvFromManyGlobalEnvs,
     MissingGlobalEnv,

@@ -17,7 +17,7 @@ from dcicutils.qa_utils import (
 )
 from dcicutils.s3_utils import EnvManager
 from unittest import mock
-from . import beanstalk_utils, ff_utils, s3_utils, env_utils, env_basic, env_manager  # env_base, base
+from . import beanstalk_utils, ff_utils, s3_utils, env_utils, env_base, env_manager  # env_base, base
 from .common import LEGACY_GLOBAL_ENV_BUCKET
 
 
@@ -135,7 +135,7 @@ def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=
         with mock.patch.object(ff_utils, "boto3", mock_boto3):
             with mock.patch.object(beanstalk_utils, "boto3", mock_boto3):
                 with mock.patch.object(env_utils, "boto3", mock_boto3):
-                    with mock.patch.object(env_basic, "boto3", mock_boto3):
+                    with mock.patch.object(env_base, "boto3", mock_boto3):
                         with mock.patch.object(env_manager, "boto3", mock_boto3):
                             with mock.patch.object(s3_utils.EnvManager, "fetch_health_page_json") as mock_fetcher:
                                 # This is all that's needed for s3Utils to initialize an EnvManager.

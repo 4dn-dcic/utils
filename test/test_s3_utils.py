@@ -11,6 +11,7 @@ from dcicutils import s3_utils as s3_utils_module
 from dcicutils.beanstalk_utils import get_beanstalk_real_url
 from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
 from dcicutils.common import LEGACY_GLOBAL_ENV_BUCKET
+from dcicutils.env_manager import EnvManager
 from dcicutils.env_utils import (
     get_standard_mirror_env, EnvUtils,
 )
@@ -22,7 +23,7 @@ from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, Canno
 from dcicutils.ff_mocks import make_mock_es_url, make_mock_portal_url
 from dcicutils.misc_utils import ignored, ignorable
 from dcicutils.qa_utils import override_environ, MockBoto3, MockResponse, known_bug_expected
-from dcicutils.s3_utils import s3Utils, EnvManager, HealthPageKey
+from dcicutils.s3_utils import s3Utils, HealthPageKey
 from requests.exceptions import ConnectionError
 from unittest import mock
 from .test_ff_utils import mocked_s3utils_with_sse
