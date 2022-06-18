@@ -33,7 +33,7 @@ import time
 import boto3
 from git import Repo
 
-from .beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env
+from .base import compute_ff_prd_env, compute_cgap_prd_env
 from .common import LEGACY_GLOBAL_ENV_BUCKET, LEGACY_CGAP_GLOBAL_ENV_BUCKET, DEFAULT_ECOSYSTEM
 from .env_utils import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env,

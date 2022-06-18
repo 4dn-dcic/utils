@@ -129,7 +129,7 @@ class MissingGlobalEnv(ConfigurationError):
         self.global_bucket = global_bucket
         self.keys = keys
         self.env = env
-        super().__init__("No matches for global env bucket: {global_bucket}; keys: {keys}; desired env: {env}"
+        super().__init__("No matches for env {env} in bucket {global_bucket}; keys: {keys}"
                          .format(global_bucket=global_bucket, keys=keys, env=env))
 
 

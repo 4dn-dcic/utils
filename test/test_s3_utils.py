@@ -26,7 +26,9 @@ from dcicutils.qa_utils import override_environ, MockBoto3, MockResponse, known_
 from dcicutils.s3_utils import s3Utils, HealthPageKey
 from requests.exceptions import ConnectionError
 from unittest import mock
+from .helpers import using_fresh_ff_state, using_fresh_cgap_state
 from .test_ff_utils import mocked_s3utils_with_sse
+from .test_env_utils_orchestrated import using_orchestrated_behavior
 
 
 @contextlib.contextmanager
@@ -249,6 +251,7 @@ def test_s3utils_creation_cgap_stg():
 
 
 @pytest.mark.integrated
+@using_fresh_ff_state()
 def test_s3utils_get_keys_for_data():
     util = s3Utils(env='data')
     keys = util.get_access_keys()
@@ -263,6 +266,7 @@ def test_s3utils_get_keys_for_data():
 
 
 @pytest.mark.integrated
+@using_fresh_ff_state()
 def test_s3utils_get_keys_for_staging():
     # TODO: I'm not sure what this is testing, so it's hard to rewrite
     #   But I fear this use of env 'staging' implies the GA test environment has overbroad privilege.
@@ -270,10 +274,11 @@ def test_s3utils_get_keys_for_staging():
     #   -kmp 13-Jan-2021
     util = s3Utils(env='staging')
     keys = util.get_ff_key()
-    assert keys['server'] == 'http://staging.4dnucleome.org'
+    assert keys['server'] == 'https://staging.4dnucleome.org'
 
 
 @pytest.mark.integrated
+@using_fresh_ff_state()
 def test_s3utils_get_jupyterhub_key():
     # TODO: I'm not sure what this is testing, so it's hard to rewrite
     #   But I fear this use of env 'data' implies the GA test environment has overbroad privilege.
@@ -286,6 +291,7 @@ def test_s3utils_get_jupyterhub_key():
 
 
 @pytest.mark.integrated
+@using_fresh_ff_state()
 def test_s3utils_get_higlass_key_integrated():
     # TODO: I'm not sure what this is testing, so it's hard to rewrite
     #   But I fear this use of env 'staging' implies the GA test environment has overbroad privilege.
@@ -294,9 +300,11 @@ def test_s3utils_get_higlass_key_integrated():
     util = s3Utils(env='staging')
     keys = util.get_higlass_key()
     assert isinstance(keys, dict)
-    assert 3 == len(keys.keys())
+    assert len(keys.keys()) == 3
 
 
+@pytest.mark.integrated
+@using_fresh_ff_state()
 def test_s3utils_get_google_key():
     util = s3Utils(env='staging')
     keys = util.get_google_key()
@@ -308,6 +316,7 @@ def test_s3utils_get_google_key():
 
 
 @pytest.mark.unit
+@using_fresh_ff_state()
 def test_s3utils_get_access_keys_with_old_style_default():
     util = s3Utils(env='fourfront-mastertest')
     with mock.patch.object(util, "get_key") as mock_get_key:
@@ -324,6 +333,7 @@ def test_s3utils_get_access_keys_with_old_style_default():
 
 
 @pytest.mark.unit
+@using_fresh_ff_state()
 def test_s3utils_get_key_non_json_data():
 
     util = s3Utils(env='fourfront-mastertest')
@@ -340,6 +350,7 @@ def test_s3utils_get_key_non_json_data():
 
 
 @pytest.mark.unit
+@using_fresh_ff_state()
 def test_s3utils_delete_key():
 
     sample_key_name = "--- reserved_key_name_for_unit_testing ---"
@@ -374,6 +385,7 @@ def test_s3utils_delete_key():
 
 
 @pytest.mark.unit
+@using_fresh_ff_state()
 def test_s3utils_s3_put():
 
     util = s3Utils(env='fourfront-mastertest')
@@ -404,6 +416,7 @@ def test_s3utils_s3_put():
 
 
 @pytest.mark.unit
+@using_fresh_ff_state()
 def test_s3utils_s3_put_secret():
 
     util = s3Utils(env='fourfront-mastertest')
@@ -937,7 +950,7 @@ def test_env_manager_fetch_health_page_json():
 def test_env_manager():
 
     test_env = 'fourfront-foo'
-    test_env2 = 'another-plausible-env'
+    test_env2 = 'fourfront-another-plausible-env'
 
     # This tests that with no env_name argument, we can figure out there's only one environment
     with mocked_s3utils_with_sse(beanstalks=[test_env]):
