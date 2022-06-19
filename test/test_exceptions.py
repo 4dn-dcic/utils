@@ -147,9 +147,8 @@ def test_cannot_infer_env_from_many_global_envs():
 
 def test_missing_global_env():
     e = MissingGlobalEnv(global_bucket="my-envs", keys=['myorg-prod', 'myorg-dev', 'myorg-test'], env='my-demo')
-    assert str(e) == ("No matches for global env bucket: my-envs;"
-                      " keys: ['myorg-prod', 'myorg-dev', 'myorg-test'];"
-                      " desired env: my-demo")
+    assert str(e) == ("No matches for env my-demo in bucket my-envs;"
+                      " keys: ['myorg-prod', 'myorg-dev', 'myorg-test']")
     assert isinstance(e, MissingGlobalEnv)
     assert isinstance(e, ConfigurationError)
     assert isinstance(e, ValueError)

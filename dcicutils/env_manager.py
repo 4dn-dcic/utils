@@ -3,12 +3,13 @@ import botocore.client
 # import contextlib
 import json
 import logging
-# import os
+import os
 import urllib.request
 
 from typing import Optional
 # from .common import LEGACY_GLOBAL_ENV_BUCKET
 from .env_basic import EnvBase
+from .env_utils import full_env_name
 from .exceptions import (
     CannotInferEnvFromManyGlobalEnvs,
     MissingGlobalEnv,
@@ -76,7 +77,6 @@ class EnvManager(EnvBase):
         Although the s3 client can be created for you, but if you already have acess to an s3 client via some existing
         object, you should pass that.
         """
-
         self.s3 = s3 or boto3.client('s3')
         if env_name and env_description:
             raise ValueError("You may only specify an env_name or an env_description")
@@ -155,13 +155,16 @@ class EnvManager(EnvBase):
         return self._env_name
 
     @classmethod
-    def verify_and_get_env_config(cls, s3_client, global_bucket: str, env):
+    def verify_and_get_env_config(cls, s3_client, global_bucket: str, env: Optional[str]):
         """
         Verifies the S3 environment from which the env config is coming from, and returns the S3-based env config
         Throws exceptions if the S3 bucket is unreachable, or an env based on the name of the global S3 bucket
         is not present.
         """
         logger.warning(f'Fetching bucket data via global env bucket: {global_bucket}')
+
+        if env:
+            env = full_env_name(env)
 
         # head_response = s3_client.head_bucket(Bucket=global_bucket)
         # status = head_response['ResponseMetadata']['HTTPStatusCode']  # should be 200; raise error for 404 or 403
@@ -198,3 +201,4 @@ class EnvManager(EnvBase):
         res_body = res.read()
         j = json.loads(res_body.decode("utf-8"))
         return j
+

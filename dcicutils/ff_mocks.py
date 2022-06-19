@@ -122,14 +122,19 @@ def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=
                            elasticbeanstalk=make_mock_boto_eb_client_class(beanstalks=environments))
     s3_client = mock_boto3.client('s3')  # This creates the s3 file system
     assert isinstance(s3_client, s3_class)
+    def write_config(config_name, record):
+        record_string = json.dumps(record)
+        s3_client.s3_files.files[f"{LEGACY_GLOBAL_ENV_BUCKET}/{config_name}"] = bytes(record_string.encode('utf-8'))
+    ecosystem_file = "main.ecosystem"
     for environment in environments:
         record = {
             EnvManager.LEGACY_PORTAL_URL_KEY: make_mock_portal_url(environment),
             EnvManager.LEGACY_ES_URL_KEY: make_mock_es_url(environment),
-            EnvManager.LEGACY_ENV_NAME_KEY: environment
+            EnvManager.LEGACY_ENV_NAME_KEY: environment,
+            "ecosystem": ecosystem_file
         }
-        record_string = json.dumps(record)
-        s3_client.s3_files.files[f"{LEGACY_GLOBAL_ENV_BUCKET}/{environment}"] = bytes(record_string.encode('utf-8'))
+        write_config(environment, record)
+    write_config(ecosystem_file, {"is_legacy": True})
     # Now we arrange that s3_utils, ff_utils, etc. modules share the illusion that our mock IS the boto3 library
     with mock.patch.object(s3_utils, "boto3", mock_boto3):
         with mock.patch.object(ff_utils, "boto3", mock_boto3):

@@ -13,7 +13,7 @@ from . import env_utils_legacy as legacy
 from .common import (
     EnvName, OrchestratedApp, APP_FOURFRONT, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD,
 )
-from .env_base import EnvManager
+from .env_basic import EnvBase
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
 from .exceptions import (
     EnvUtilsLoadError, BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
@@ -102,6 +102,7 @@ ENV_DEFAULT = 'default'
 
 
 class EnvNames:
+    DEFAULT_WORKFLOW_ENV = 'default_workflow_env'
     DEV_DATA_SET_TABLE = 'dev_data_set_table'  # dictionary mapping envnames to their preferred data set
     DEV_ENV_DOMAIN_SUFFIX = 'dev_env_domain_suffix'  # e.g., .abc123def456ghi789.us-east-1.rds.amazonaws.com
     ECOSYSTEM = 'ecosystem'  # name of an ecosystem file, such as "main.ecosystem"
@@ -160,6 +161,7 @@ class EnvUtils:
 
     _DECLARED_DATA = None
 
+    DEFAULT_WORKFLOW_ENV = None
     DEV_DATA_SET_TABLE = None  # dictionary mapping envnames to their preferred data set
     DEV_ENV_DOMAIN_SUFFIX = None
     FOURSIGHT_BUCKET_TABLE = None
@@ -234,6 +236,7 @@ class EnvUtils:
         # e.STG_ENV_NAME: None,
         e.TEST_ENVS: ['acme-test', 'acme-mastertest', 'acme-pubtest'],
         e.WEBPROD_PSEUDO_ENV: 'production-data',
+        e.DEFAULT_WORKFLOW_ENV: 'acme-dev',
     }
 
     SAMPLE_TEMPLATE_FOR_FOURFRONT_TESTING = {
@@ -293,6 +296,7 @@ class EnvUtils:
         # e.STG_ENV_NAME: None,
         e.TEST_ENVS: ['acme-test', 'acme-mastertest', 'acme-pubtest'],
         e.WEBPROD_PSEUDO_ENV: 'production-data',
+        e.DEFAULT_WORKFLOW_ENV: 'acme-dev',
     }
 
     @classmethod
@@ -330,13 +334,22 @@ class EnvUtils:
 
     @classmethod
     @contextlib.contextmanager
+    def temporary_state(cls):
+        snapshot = cls.snapshot_envutils_state_for_testing()
+        try:
+            yield
+        finally:
+            cls.restore_envutils_state_from_snapshot_for_testing(snapshot)
+
+    @classmethod
+    @contextlib.contextmanager
     def local_env_utils_for_testing(cls, global_env_bucket=None, env_name=None, raise_load_errors=True):
         attrs = {}
         if global_env_bucket:
             attrs['GLOBAL_ENV_BUCKET'] = global_env_bucket
         if env_name:
             attrs['ENV_NAME'] = env_name
-        with EnvUtils.locally_declared_data_for_testing():
+        with EnvUtils.temporary_state():
             with override_environ(**attrs):
                 EnvUtils.init(force=True, raise_load_errors=raise_load_errors)
                 yield
@@ -346,16 +359,36 @@ class EnvUtils:
     def locally_declared_data_for_testing(cls, data=None, **kwargs):
         if data is None:
             data = {}
-        snapshot = cls.snapshot_envutils_state_for_testing()
-        try:
+        with cls.temporary_state():
             if data is not None:
                 cls.set_declared_data(data)  # First set the given data, if any
             # Now override individual specified attributes
             for attr, val in kwargs.items():
                 setattr(cls, attr, val)
             yield
-        finally:
-            cls.restore_envutils_state_from_snapshot_for_testing(snapshot)
+
+    @classmethod
+    @contextlib.contextmanager
+    def fresh_state_from(cls, *, bucket=None, data=None):
+        with EnvBase.global_env_bucket_named(bucket):
+            with EnvUtils.temporary_state():
+                if bucket:
+                    assert data is None, "You must supply bucket or data, but not both."
+                    EnvUtils.init(force=True)
+                elif data:
+                    EnvUtils.set_declared_data(data)
+                else:
+                    raise AssertionError("You must supply either bucket or data.")
+                yield
+
+    FF_BUCKET = 'foursight-prod-envs'
+    CGAP_BUCKET = 'foursight-cgap-envs'
+
+    @classmethod
+    @contextlib.contextmanager
+    def fresh_ff_state(cls):
+        with cls.fresh_state_from(bucket=cls.FF_BUCKET):
+            yield
 
     # Vaguely, the thing we're trying to recognize is this (sanitized slightly here),
     # which we first call str() on and then check with a regular expression:
@@ -425,7 +458,7 @@ class EnvUtils:
         config_key = f"{ecosystem}.ecosystem" if ecosystem else (env_name or os.environ.get('ENV_NAME'))
         if not config_key:
             config_key = f"{os.environ.get('ECOSYSTEM', 'main')}.ecosystem"
-        env_bucket = EnvManager.global_env_bucket_name()
+        env_bucket = EnvBase.global_env_bucket_name()
         if env_bucket and config_key:
             try:
                 config_data = cls._get_config_ecosystem_from_s3(env_bucket=env_bucket, config_key=config_key)
@@ -533,7 +566,7 @@ def prod_bucket_env(envname: EnvName) -> Optional[EnvName]:
 @if_orchestrated()
 def default_workflow_env(orchestrated_app: OrchestratedApp) -> EnvName:
     _check_appname(orchestrated_app, required=True)
-    return EnvUtils.WEBPROD_PSEUDO_ENV
+    return EnvUtils.DEFAULT_WORKFLOW_ENV or (EnvUtils.HOTSEAT_ENVS[0] if EnvUtils.HOTSEAT_ENVS else None)
 
 
 @if_orchestrated
@@ -771,7 +804,7 @@ def get_foursight_bucket_prefix():
     declared_foursight_bucket_prefix = EnvUtils.FOURSIGHT_BUCKET_PREFIX
     if declared_foursight_bucket_prefix:
         return declared_foursight_bucket_prefix
-    bucket_env = EnvManager.global_env_bucket_name()
+    bucket_env = EnvBase.global_env_bucket_name()
     if bucket_env and bucket_env.endswith("-envs"):
         return remove_suffix('-envs', bucket_env)
     else:
@@ -865,7 +898,7 @@ def infer_foursight_url_from_env(request=None, envname: Optional[EnvName] = None
 
 
 @if_orchestrated
-def infer_foursight_from_env(request=None, envname: Optional[EnvName] = None):
+def infer_foursight_from_env(request=None, envname: Optional[EnvName] = None, short: bool = True):
     """
     Infers the Foursight environment token to view based on the given envname and request context
 
@@ -892,7 +925,9 @@ def infer_foursight_from_env(request=None, envname: Optional[EnvName] = None):
              find_association(EnvUtils.PUBLIC_URL_TABLE, environment=short_env_name(envname)))
     if entry:
         envname = entry[p.NAME]
-    return short_env_name(envname)  # remove_prefix(EnvUtils.FULL_ENV_PREFIX, envname, required=False)
+    else:
+        envname = short_env_name(envname) if short else envname
+    return envname
 
 
 @if_orchestrated()

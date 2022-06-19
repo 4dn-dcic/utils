@@ -9,6 +9,7 @@ import urllib.parse
 from dcicutils import s3_utils, ff_utils
 from dcicutils.qa_utils import override_environ, MockFileSystem
 from unittest import mock
+from .helpers import using_fresh_ff_state
 
 pytestmark = pytest.mark.working
 
@@ -37,6 +38,7 @@ def test_import_fails_without_initialization():
 
 
 @pytest.mark.integrated
+@using_fresh_ff_state()
 def test_proper_initialization(integrated_ff):
     test_server = integrated_ff['ff_key']['server']
     initialize_jh_env(test_server)
@@ -52,6 +54,7 @@ def test_proper_initialization(integrated_ff):
 
 
 @pytest.mark.integrated
+@using_fresh_ff_state()
 def test_some_decorated_methods_work(integrated_ff):
     test_server = integrated_ff['ff_key']['server']
     initialize_jh_env(test_server)
@@ -147,6 +150,7 @@ class MockResponse:
 
 
 @pytest.mark.unit
+@using_fresh_ff_state()
 def test_find_valid_file_or_extra_file(integrated_ff):
 
     # This setup isn't good for a unit test, but right now we can't load jh_utils otherwise. -kmp 15-Feb-2021
@@ -218,6 +222,7 @@ def test_find_valid_file_or_extra_file(integrated_ff):
 
 
 @pytest.mark.unit
+@using_fresh_ff_state()
 def test_jh_open_4dn_file_unit(integrated_ff):
 
     # This setup isn't good for a unit test, but right now we can't load jh_utils otherwise. -kmp 15-Feb-2021
@@ -286,6 +291,7 @@ def test_jh_open_4dn_file_unit(integrated_ff):
 
 
 @pytest.mark.integratedx
+@using_fresh_ff_state()
 def test_jh_open_4dn_file_integrated(integrated_ff):
     # this is tough because uploaded files don't actually exist on mastertest s3
     # so, this test pretty much assumes urllib will work for actually present
@@ -349,6 +355,7 @@ def test_add_mounted_file_to_session(integrated_ff):
     assert 'test' in res2.get('jupyterhub_session', {}).get('files_mounted', [])
 
 
+@using_fresh_ff_state()
 def test_mount_4dn_file(integrated_ff):
     """ Tests getting full filepath of test file on JH
         Needs an additional test (how to?)
