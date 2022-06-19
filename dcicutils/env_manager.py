@@ -1,25 +1,14 @@
 import boto3
 import botocore.client
-# import contextlib
 import json
 import logging
-import os
 import urllib.request
 
 from typing import Optional
-# from .common import LEGACY_GLOBAL_ENV_BUCKET
 from .env_basic import EnvBase
 from .env_utils import full_env_name
-from .exceptions import (
-    CannotInferEnvFromManyGlobalEnvs,
-    MissingGlobalEnv,
-    # SynonymousEnvironmentVariablesMismatched,
-)
-from .misc_utils import (
-    # override_environ,
-    ignored,
-    # remove_suffix,
-)
+from .exceptions import CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv
+from .misc_utils import ignored
 
 
 logger = logging.getLogger(__name__)
@@ -201,4 +190,3 @@ class EnvManager(EnvBase):
         res_body = res.read()
         j = json.loads(res_body.decode("utf-8"))
         return j
-

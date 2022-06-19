@@ -7,7 +7,6 @@ import requests
 import shutil
 import time
 
-from dcicutils.env_utils import EnvUtils
 from botocore.exceptions import ClientError
 from dcicutils import es_utils, ff_utils, s3_utils
 from dcicutils.exceptions import MissingGlobalEnv
@@ -15,12 +14,12 @@ from dcicutils.ff_mocks import mocked_s3utils, TestScenarios, TestRecorder
 from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true
 from dcicutils.qa_utils import (
     check_duplicated_items_by_key, ignored, raises_regexp, MockResponse, MockBoto3, MockBotoSQSClient,
-    MockBotoS3Client
+    MockBotoS3Client,
 )
 from types import GeneratorType
 from unittest import mock
 from urllib.parse import urlsplit, parse_qsl
-from .helpers import using_fresh_ff_state, using_fresh_cgap_state
+from .helpers import using_fresh_ff_state
 
 
 pytestmark = pytest.mark.working
@@ -256,7 +255,6 @@ def mocked_s3utils_with_sse(beanstalks=None, require_sse=True, files=None):
 def test_unified_authentication_unit():
 
     ts = TestScenarios
-
 
     with mocked_s3utils_with_sse(beanstalks=['fourfront-mastertest', ts.foo_env, ts.bar_env]):
 

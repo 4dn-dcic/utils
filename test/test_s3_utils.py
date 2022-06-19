@@ -25,9 +25,8 @@ from dcicutils.qa_utils import override_environ, MockBoto3, MockResponse, known_
 from dcicutils.s3_utils import s3Utils, EnvManager, HealthPageKey
 from requests.exceptions import ConnectionError
 from unittest import mock
-from .helpers import using_fresh_ff_state, using_fresh_cgap_state
+from .helpers import using_fresh_ff_state
 from .test_ff_utils import mocked_s3utils_with_sse
-from .test_env_utils_orchestrated import using_orchestrated_behavior
 
 
 @contextlib.contextmanager

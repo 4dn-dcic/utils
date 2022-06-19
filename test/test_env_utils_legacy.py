@@ -7,9 +7,7 @@ from dcicutils.env_utils import (
     full_env_name, full_fourfront_env_name, get_bucket_env, get_mirror_env_from_context, get_standard_mirror_env,
     indexer_env_for_env, infer_foursight_from_env, infer_foursight_url_from_env, infer_repo_from_env,
     is_cgap_env, is_cgap_server, is_fourfront_env, is_fourfront_server, is_hotseat_env, is_indexer_env,
-    is_stg_or_prd_env, is_test_env,
-    # make_env_name_cfn_compatible,
-    permit_load_data,
+    is_stg_or_prd_env, is_test_env, permit_load_data,
     prod_bucket_env, prod_bucket_env_for_app, public_url_for_app, public_url_mappings, short_env_name, is_beanstalk_env,
 )
 from dcicutils.env_utils_legacy import (
@@ -27,7 +25,7 @@ from dcicutils.env_utils_legacy import (
 from dcicutils.exceptions import InvalidParameterError
 from dcicutils.qa_utils import raises_regexp
 from unittest import mock
-from .helpers import using_fresh_cgap_state, using_fresh_ff_state, using_fresh_legacy_state
+from .helpers import using_fresh_legacy_state
 
 
 @using_fresh_legacy_state()
