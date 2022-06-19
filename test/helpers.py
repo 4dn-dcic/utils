@@ -27,7 +27,6 @@ def using_fresh_legacy_state():
     return wrap
 
 
-
 @decorator()
 def using_fresh_cgap_state():
     def wrap(function):

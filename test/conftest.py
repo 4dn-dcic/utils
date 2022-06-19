@@ -71,7 +71,7 @@ class IntegratedFixture:
         A dictionary pseudo-element 'self' describes this object itself.
         """
         entries = ', '.join([f'{key!r}: {"<redacted>" if "key" in key else repr(self.INTEGRATED_FF_ITEMS[key])}'
-                               for key in self.INTEGRATED_FF_ITEMS])
+                             for key in self.INTEGRATED_FF_ITEMS])
         return f"{{'self': <{self.__class__.__name__} {self.name!r} {id(self)}>, {entries}}}"
 
     def __repr__(self):

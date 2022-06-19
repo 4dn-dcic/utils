@@ -17,7 +17,7 @@ from dcicutils.qa_utils import (
 )
 from dcicutils.s3_utils import EnvManager
 from unittest import mock
-from . import beanstalk_utils, ff_utils, s3_utils, env_utils, env_base, env_manager  # env_base, base
+from . import beanstalk_utils, ff_utils, s3_utils, env_utils, env_base, env_manager
 from .common import LEGACY_GLOBAL_ENV_BUCKET
 
 
@@ -122,9 +122,11 @@ def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=
                            elasticbeanstalk=make_mock_boto_eb_client_class(beanstalks=environments))
     s3_client = mock_boto3.client('s3')  # This creates the s3 file system
     assert isinstance(s3_client, s3_class)
+
     def write_config(config_name, record):
         record_string = json.dumps(record)
         s3_client.s3_files.files[f"{LEGACY_GLOBAL_ENV_BUCKET}/{config_name}"] = bytes(record_string.encode('utf-8'))
+
     ecosystem_file = "main.ecosystem"
     for environment in environments:
         record = {

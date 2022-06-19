@@ -21,7 +21,7 @@ from dcicutils.env_utils import (
 )
 from dcicutils.exceptions import (
     BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
-    EnvUtilsLoadError, InvalidParameterError,
+    EnvUtilsLoadError,
 )
 from dcicutils.misc_utils import decorator, local_attrs, ignorable, override_environ
 from dcicutils.qa_utils import raises_regexp
