@@ -2607,7 +2607,7 @@ def interim_run_all():  # TODO: Remove this when the configurable env_utils code
     This function is temporary while the tests on master are broken. Usage:
 
         $ python
-        > from test.test_diff_utils import interim_run_all
+        > from test.test_misc_utils import interim_run_all
         > interim_run_all()
 
     This will run all diff_utils tests without trying to load any other pytest stuff that might fail
@@ -2616,7 +2616,7 @@ def interim_run_all():  # TODO: Remove this when the configurable env_utils code
     import sys
     failed = 0
     print("fFAILED={failed}")
-    for definition_name in globals():
+    for definition_name in list(globals()):
         if definition_name.startswith("test_"):
             print(f"Running {definition_name}...", end="")
             sys.stdout.flush()

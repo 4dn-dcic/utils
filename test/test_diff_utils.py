@@ -486,7 +486,7 @@ def interim_run_all():  # TODO: Remove this when the configurable env_utils code
     for unrelated reasons that are going to be fixed later.
     """
     import sys
-    for definition_name in globals():
+    for definition_name in list(globals()):
         if definition_name.startswith("test_"):
             print(f"Running {definition_name}...", end="")
             sys.stdout.flush()
