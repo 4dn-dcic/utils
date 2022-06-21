@@ -1065,6 +1065,7 @@ class CreateMappingOnDeployManager:
     # Set SKIP to True to skip the create_mapping step.
 
     DEFAULT_DEPLOYMENT_OPTIONS = {'SKIP': False, 'STRICT': False, 'WIPE_ES': False}
+    PRODUCTION_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': False, 'STRICT': True}
     STAGING_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': True, 'STRICT': True}
     HOTSEAT_DEPLOYMENT_OPTION_OVERRIDES = {'SKIP': True, 'STRICT': True}
     OTHER_TEST_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': True}
@@ -1129,7 +1130,10 @@ class CreateMappingOnDeployManager:
             if val:
                 deploy_cfg[key] = val
 
-        if env == get_standard_mirror_env(current_prod_env):
+        if env == current_prod_env:
+            description = "currently the production environment"
+            apply_dict_overrides(deploy_cfg, **cls.PRODUCTION_DEPLOYMENT_OPTION_OVERRIDES)
+        elif env == get_standard_mirror_env(current_prod_env):
             description = "currently the staging environment"
             apply_dict_overrides(deploy_cfg, **cls.STAGING_DEPLOYMENT_OPTION_OVERRIDES)
         elif is_stg_or_prd_env(env):
