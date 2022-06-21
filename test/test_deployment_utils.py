@@ -1303,23 +1303,26 @@ def test_get_deployment_config_cgap_prd_orchestrated():
     """ Tests get_deployment_config in the new production case """
     with fresh_cgap_state():
         my_log = MockedInfoLog()
-        with pytest.raises(RuntimeError):
-            _get_deploy_config(env=EnvUtils.PRD_ENV_NAME, log=my_log)
+        cfg = _get_deploy_config(env=EnvUtils.PRD_ENV_NAME, log=my_log)
+        assert cfg['ENV_NAME'] == EnvUtils.PRD_ENV_NAME  # sanity
+        assert cfg['SKIP'] is False
+        assert cfg['WIPE_ES'] is False
+        assert cfg['STRICT'] is True
         assert my_log.last_msg == (f"Environment {EnvUtils.PRD_ENV_NAME} is currently the production environment."
-                                   f" Something is definitely wrong. We never deploy there, we always CNAME swap."
-                                   f" This deploy cannot proceed. DeploymentFailure will be raised.")
-
+                                   f" Processing mode: STRICT")
 
 @pytest.mark.integrated
 def test_get_deployment_config_ff_prd_orchestrated():
     """ Tests get_deployment_config in the new production case """
     with EnvUtils.fresh_ff_state():
         my_log = MockedInfoLog()
-        with pytest.raises(RuntimeError):
-            _get_deploy_config(env=EnvUtils.PRD_ENV_NAME, log=my_log)
+        cfg = _get_deploy_config(env=EnvUtils.PRD_ENV_NAME, log=my_log)
+        assert cfg['ENV_NAME'] == EnvUtils.PRD_ENV_NAME  # sanity
+        assert cfg['SKIP'] is False
+        assert cfg['WIPE_ES'] is False
+        assert cfg['STRICT'] is True
         assert my_log.last_msg == (f"Environment {EnvUtils.PRD_ENV_NAME} is currently the production environment."
-                                   f" Something is definitely wrong. We never deploy there, we always CNAME swap."
-                                   f" This deploy cannot proceed. DeploymentFailure will be raised.")
+                                   f" Processing mode: STRICT")
 
 
 @pytest.mark.integrated
