@@ -9,7 +9,8 @@ import requests
 import time
 
 from dcicutils.env_utils import EnvUtils
-from dcicutils.lang_utils import disjoined_list
+from dcicutils.ff_utils import authorized_request
+from dcicutils.lang_utils import disjoined_list, conjoined_list
 from dcicutils.misc_utils import ignored, override_environ, remove_prefix, full_class_name, PRINT, environ_bool
 from dcicutils.qa_utils import (
     MockBoto3, MockBotoElasticBeanstalkClient, MockBotoS3Client, ControlledTime, MockResponse,
@@ -17,7 +18,7 @@ from dcicutils.qa_utils import (
 )
 from dcicutils.s3_utils import EnvManager
 from unittest import mock
-from . import beanstalk_utils, ff_utils, s3_utils, env_utils, env_base, env_manager  # env_base, base
+from . import beanstalk_utils, ff_utils, s3_utils, env_utils, env_base, env_manager
 from .common import LEGACY_GLOBAL_ENV_BUCKET
 
 
@@ -122,14 +123,21 @@ def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=
                            elasticbeanstalk=make_mock_boto_eb_client_class(beanstalks=environments))
     s3_client = mock_boto3.client('s3')  # This creates the s3 file system
     assert isinstance(s3_client, s3_class)
+
+    def write_config(config_name, record):
+        record_string = json.dumps(record)
+        s3_client.s3_files.files[f"{LEGACY_GLOBAL_ENV_BUCKET}/{config_name}"] = bytes(record_string.encode('utf-8'))
+
+    ecosystem_file = "main.ecosystem"
     for environment in environments:
         record = {
             EnvManager.LEGACY_PORTAL_URL_KEY: make_mock_portal_url(environment),
             EnvManager.LEGACY_ES_URL_KEY: make_mock_es_url(environment),
-            EnvManager.LEGACY_ENV_NAME_KEY: environment
+            EnvManager.LEGACY_ENV_NAME_KEY: environment,
+            "ecosystem": ecosystem_file
         }
-        record_string = json.dumps(record)
-        s3_client.s3_files.files[f"{LEGACY_GLOBAL_ENV_BUCKET}/{environment}"] = bytes(record_string.encode('utf-8'))
+        write_config(environment, record)
+    write_config(ecosystem_file, {"is_legacy": True})
     # Now we arrange that s3_utils, ff_utils, etc. modules share the illusion that our mock IS the boto3 library
     with mock.patch.object(s3_utils, "boto3", mock_boto3):
         with mock.patch.object(ff_utils, "boto3", mock_boto3):
@@ -510,3 +518,100 @@ class TestRecorder:
                                                 PUT=mock_replayed('PUT'),
                                                 DELETE=mock_replayed('DELETE')):
                     yield mocked_integrated_ff
+
+
+def _portal_health_get(namespace, portal_url, key):
+    # We used to wire in this URL, but it's better to discover it dynamically so that it can change.
+    healh_json_url = f"{portal_url}/health?format=json"
+    response = requests.get(healh_json_url)
+    health_json = response.json()
+    assert health_json['namespace'] == namespace  # check we're talking to proper host
+    return health_json[key]
+
+
+class AbstractIntegratedFixture:
+    """
+    A class that implements the integrated_ff fixture.
+    Implementing this as a class assures that the initialization is done at toplevel before any mocking occurs.
+    """
+
+    ENV_NAME = None
+    ENV_INDEX_NAMESPACE = None
+    ENV_PORTAL_URL = None
+    S3_CLIENT = None
+    ES_URL = None
+    PORTAL_ACCESS_KEY = None
+    HIGLASS_ACCESS_KEY = None
+    INTEGRATED_FF_ITEMS = None
+
+    @classmethod
+    def initialize_class(cls):
+        cls.S3_CLIENT = s3_utils.s3Utils(env=cls.ENV_NAME)
+        cls.ES_URL = _portal_health_get(portal_url=cls.ENV_PORTAL_URL,
+                                        namespace=cls.ENV_INDEX_NAMESPACE,
+                                        key="elasticsearch")
+        cls.PORTAL_ACCESS_KEY = cls.S3_CLIENT.get_access_keys()
+        cls.HIGLASS_ACCESS_KEY = cls.S3_CLIENT.get_higlass_key()
+
+        cls.INTEGRATED_FF_ITEMS = {
+            'ff_key': cls.PORTAL_ACCESS_KEY,
+            'higlass_key': cls.HIGLASS_ACCESS_KEY,
+            'ff_env': cls.ENV_NAME,
+            'ff_env_index_namespace': cls.ENV_INDEX_NAMESPACE,
+            'es_url': cls.ES_URL,
+        }
+
+    @classmethod
+    def verify_portal_access(cls, portal_access_key):
+        response = authorized_request(
+            portal_access_key['server'],
+            auth=portal_access_key)
+        if response.status_code != 200:
+            raise Exception(f'Environment {cls.ENV_NAME} is not ready for integrated status.'
+                            f' Requesting the homepage gave status of: {response.status_code}')
+
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        """
+        Print is object as a dictionary with credentials (entries with 'key' in their name) redacted.
+        A dictionary pseudo-element 'self' describes this object itself.
+        """
+        entries = ', '.join([f'{key!r}: {"<redacted>" if "key" in key else repr(self.INTEGRATED_FF_ITEMS[key])}'
+                             for key in self.INTEGRATED_FF_ITEMS])
+        return f"{{'self': <{self.__class__.__name__} {self.name!r} {id(self)}>, {entries}}}"
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(name={self.name!r})"
+
+    def __getitem__(self, item):
+        """
+        Allows objects of this class to be treated as a dictionary proxy. See cls.INTEGRATED_FF_ITEMS.
+        The advantage of this is that when this dictionary shows up in stack traces, its contents won't be visible.
+        That, in turn, means that access keys won't get logged in GA (Github Actions).
+        """
+        if item == 'self':  # In case someone accesses the 'self' key we print in the __str__ method.
+            return self
+        assert item in self.INTEGRATED_FF_ITEMS, (
+            f"The integrated_ff fixture has no key named {item}."
+            f" Valid keys are {conjoined_list(list(self.INTEGRATED_FF_ITEMS.keys()) + ['self'])}")
+        return self.INTEGRATED_FF_ITEMS[item]
+
+    def portal_access_key(self, s3_client=None):
+        s3_client = s3_client or self.S3_CLIENT
+        return s3_client.get_access_keys()
+
+    def higlass_access_key(self, s3_client=None):
+        s3_client = s3_client or self.S3_CLIENT
+        return s3_client.get_higlass_key()
+
+
+class IntegratedFixture(AbstractIntegratedFixture):
+    ENV_NAME = 'fourfront-mastertest'
+    ENV_INDEX_NAMESPACE = 'fourfront_mastertest'
+    ENV_PORTAL_URL = 'https://mastertest.4dnucleome.org'
+
+
+IntegratedFixture.initialize_class()
+IntegratedFixture.verify_portal_access(IntegratedFixture.PORTAL_ACCESS_KEY)

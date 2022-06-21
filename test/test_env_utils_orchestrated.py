@@ -4,6 +4,7 @@ import json
 import os
 import pytest
 
+from dcicutils.common import APP_CGAP, APP_FOURFRONT
 from dcicutils.env_manager import EnvManager
 from dcicutils.env_utils import (
     is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env,
@@ -27,6 +28,7 @@ from dcicutils.qa_utils import raises_regexp
 from typing import Optional
 from unittest import mock
 from urllib.parse import urlparse
+from .helpers import using_fresh_cgap_state, using_fresh_ff_state
 
 
 ignorable(BeanstalkOperationNotImplemented)  # Stuff that does or doesn't use this might come and go
@@ -65,7 +67,8 @@ def using_orchestrated_behavior(data: Optional[dict] = None):
         @functools.wraps(fn)
         def _wrapped(*args, **kwargs):
             with orchestrated_behavior_for_testing(data=data):
-                return fn(*args, **kwargs)
+                result = fn(*args, **kwargs)
+            return result
 
         return _wrapped
 
@@ -211,28 +214,32 @@ def test_orchestrated_infer_foursight_url_from_env():
                 == 'https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/cgapwolf')
 
 
-@using_orchestrated_behavior()
-def test_orchestrated_default_workflow_env():
+@using_fresh_ff_state()
+def test_ff_default_workflow_env():
 
-    assert default_workflow_env('cgap') == EnvUtils.WEBPROD_PSEUDO_ENV == 'production-data'  # the Acme producton bucket
+    assert (default_workflow_env('fourfront')
+            == default_workflow_env(APP_FOURFRONT)
+            == 'fourfront-webdev')
+
     with pytest.raises(Exception):
-        default_workflow_env('fourfront')
+        default_workflow_env('foo')  # noQA - we expect this error
+
     with pytest.raises(Exception):
-        default_workflow_env(None)  # noQA - We're expecting a problem
+        default_workflow_env(APP_CGAP)  # noQA - we expect this error
 
-    with local_attrs(EnvUtils, **CGAP_SETTINGS_FOR_TESTING):
-        assert default_workflow_env('cgap') == EnvUtils.WEBPROD_PSEUDO_ENV == 'fourfront-cgap'
-        with pytest.raises(Exception):
-            default_workflow_env('fourfront')
-        with pytest.raises(Exception):
-            default_workflow_env(None)  # noQA - We're expecting a problem
 
-    with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
-        assert default_workflow_env('fourfront') == EnvUtils.WEBPROD_PSEUDO_ENV == 'fourfront-webprod'
-        with pytest.raises(Exception):
-            default_workflow_env('cgap')
-        with pytest.raises(Exception):
-            default_workflow_env(None)  # noQA - We're expecting a problem
+@using_fresh_cgap_state()
+def test_cgap_default_workflow_env():
+
+    assert (default_workflow_env('cgap')
+            == default_workflow_env(APP_CGAP)
+            == 'cgap-wolf')
+
+    with pytest.raises(Exception):
+        default_workflow_env('foo')  # noQA - we expect this error
+
+    with pytest.raises(Exception):
+        default_workflow_env(APP_FOURFRONT)  # noQA - we expect this error
 
 
 @using_orchestrated_behavior()

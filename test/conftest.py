@@ -3,9 +3,9 @@ import pytest
 import requests
 
 from dcicutils.common import LEGACY_GLOBAL_ENV_BUCKET
-from dcicutils.ff_utils import authorized_request  # , get_health_page
-from dcicutils.s3_utils import s3Utils
-from .conftest_settings import TEST_DIR, INTEGRATED_ENV, INTEGRATED_ENV_INDEX_NAMESPACE, INTEGRATED_ENV_PORTAL_URL
+from dcicutils.env_utils import EnvUtils
+from dcicutils.ff_mocks import IntegratedFixture
+from .conftest_settings import TEST_DIR, INTEGRATED_ENV
 
 
 def _portal_health_get(namespace, portal_url, key):
@@ -16,16 +16,10 @@ def _portal_health_get(namespace, portal_url, key):
     return health_json[key]
 
 
-# We used to wire in this URL, but it's better to discover it dynamically
-# so that it can change.
-# INTEGRATED_ES = _discover_es_url_from_boto3_eb_metadata(INTEGRATED_ENV)
-
-INTEGRATED_ES = _portal_health_get(portal_url=INTEGRATED_ENV_PORTAL_URL,
-                                   namespace=INTEGRATED_ENV_INDEX_NAMESPACE,
-                                   key="elasticsearch")
-
 os.environ['GLOBAL_ENV_BUCKET'] = LEGACY_GLOBAL_ENV_BUCKET
 os.environ['ENV_NAME'] = INTEGRATED_ENV
+
+EnvUtils.init(force=True)  # This would be a good time to force EnvUtils to synchronize with the real environment
 
 
 @pytest.fixture(scope='session')
@@ -33,20 +27,7 @@ def integrated_ff():
     """
     Object that contains keys and ff_env for integrated environment
     """
-    integrated = {}
-    s3 = s3Utils(env=INTEGRATED_ENV)
-    integrated['ff_key'] = s3.get_access_keys()
-    integrated['higlass_key'] = s3.get_higlass_key()
-    integrated['ff_env'] = INTEGRATED_ENV
-    integrated['ff_env_index_namespace'] = INTEGRATED_ENV_INDEX_NAMESPACE
-    integrated['es_url'] = INTEGRATED_ES
-    # do this to make sure env is up (will error if not)
-    res = authorized_request(integrated['ff_key']['server'],  # noQA - PyCharm fears the ['server'] part won't be there.
-                             auth=integrated['ff_key'])
-    if res.status_code != 200:
-        raise Exception('Environment %s is not ready for integrated status. Requesting '
-                        'the homepage gave status of: %s' % (INTEGRATED_ENV, res.status_code))
-    return integrated
+    return IntegratedFixture('integrated_ff')
 
 
 @pytest.fixture(scope='session')
@@ -78,9 +59,10 @@ def integrated_s3_info(integrated_names):
     Ensure the test files are present in the s3 sys bucket of the integrated
     environment (probably 'fourfront-mastertest') and return some info on them
     """
+
     test_filename = integrated_names['filename']
 
-    s3_obj = s3Utils(env=INTEGRATED_ENV)
+    s3_obj = IntegratedFixture.S3_CLIENT
     # for now, always upload these files
     s3_obj.s3.put_object(Bucket=s3_obj.outfile_bucket, Key=test_filename,
                          Body=str.encode('thisisatest'))
