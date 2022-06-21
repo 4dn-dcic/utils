@@ -13,7 +13,7 @@ from . import env_utils_legacy as legacy
 from .common import (
     EnvName, OrchestratedApp, APP_FOURFRONT, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD,
 )
-from .env_base import EnvManager
+from .env_manager import EnvManager
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
 from .exceptions import (
     EnvUtilsLoadError, BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,

@@ -4,7 +4,7 @@ import json
 import os
 import pytest
 
-from dcicutils.env_base import EnvManager
+from dcicutils.env_manager import EnvManager
 from dcicutils.env_utils import (
     is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env,
     get_mirror_env_from_context, is_test_env, is_hotseat_env, get_standard_mirror_env,
