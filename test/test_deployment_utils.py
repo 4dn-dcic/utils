@@ -1311,6 +1311,7 @@ def test_get_deployment_config_cgap_prd_orchestrated():
         assert my_log.last_msg == (f"Environment {EnvUtils.PRD_ENV_NAME} is currently the production environment."
                                    f" Processing mode: STRICT")
 
+
 @pytest.mark.integrated
 def test_get_deployment_config_ff_prd_orchestrated():
     """ Tests get_deployment_config in the new production case """

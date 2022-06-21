@@ -5,10 +5,7 @@ import requests
 from dcicutils.common import LEGACY_GLOBAL_ENV_BUCKET
 from dcicutils.env_utils import EnvUtils
 from dcicutils.ff_mocks import IntegratedFixture
-from dcicutils.ff_utils import authorized_request
-from dcicutils.lang_utils import conjoined_list
-from dcicutils.s3_utils import s3Utils
-from .conftest_settings import TEST_DIR, INTEGRATED_ENV, INTEGRATED_ENV_INDEX_NAMESPACE, INTEGRATED_ENV_PORTAL_URL
+from .conftest_settings import TEST_DIR, INTEGRATED_ENV
 
 
 def _portal_health_get(namespace, portal_url, key):
@@ -17,7 +14,6 @@ def _portal_health_get(namespace, portal_url, key):
     health_json = response.json()
     assert health_json['namespace'] == namespace  # check we're talking to proper host
     return health_json[key]
-
 
 
 os.environ['GLOBAL_ENV_BUCKET'] = LEGACY_GLOBAL_ENV_BUCKET
