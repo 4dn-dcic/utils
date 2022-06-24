@@ -1,9 +1,16 @@
 import boto3
+import logging
+import os
 import re
 
 from .common import DEFAULT_ECOSYSTEM
+from .lang_utils import conjoined_list
 from .misc_utils import PRINT, find_associations, find_association, snake_case_to_camel_case, ignored
 from .env_utils import prod_bucket_env, is_stg_or_prd_env
+
+
+logging.basicConfig()
+logger = logging.getLogger(__name__)
 
 
 def camelize(snake_name):
@@ -218,6 +225,49 @@ class AbstractOrchestrationManager:
                 else:
                     return getattr(summary, attr, default)
         return default
+
+    CHECK_RUNNER_DEV_PATTERN = re.compile(".*foursight.*development.*CheckRunner.*")
+    CHECK_RUNNER_PROD_PATTERN = re.compile(".*foursight.*production.*CheckRunner.*")
+
+    ENCACHE_RUNNER_NAME = True
+
+    @classmethod
+    def discover_foursight_check_runner_name(cls, stage, encache=ENCACHE_RUNNER_NAME):
+
+        check_runner = os.environ.get('CHECK_RUNNER')
+
+        if check_runner:
+            return check_runner
+
+        # Prod has its own check runner, distinct from dev and test, though .get_stage() will have converted
+        # 'test' to 'dev' by this point anyway. Still, this code is tolerant of not doing that...
+        name_pattern = cls.CHECK_RUNNER_PROD_PATTERN if stage == 'prod' else cls.CHECK_RUNNER_DEV_PATTERN
+        lambda_client = boto3.client('lambda')
+        candidates = []
+        chunk = lambda_client.list_functions()
+        while True:
+            entries = chunk['Functions']
+            for entry in entries:
+                name = entry['FunctionName']
+                if name_pattern.match(name):
+                    candidates.append(name)
+            next_marker = chunk.get('NextMarker')
+            if not next_marker:
+                break
+            chunk = lambda_client.list_functions(Marker=next_marker)
+        if len(candidates) == 1:
+            check_runner = candidates[0]
+            logger.warning(f"CHECK_RUNNER inferred to be {check_runner}")
+        else:
+            logger.error(f"CHECK_RUNNER cannot be inferred"
+                         f" from {conjoined_list(candidates, nothing='no matches')}.")
+
+        if encache:
+            # Discovery is slow. We could encache this value so it's faster next time. I defaulted this to off for now.
+            logger.warning(f"Setting environment variable CHECK_RUNNER={check_runner}.")
+            os.environ['CHECK_RUNNER'] = check_runner
+
+        return check_runner
 
 
 class C4OrchestrationManager(AbstractOrchestrationManager):

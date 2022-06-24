@@ -1,6 +1,10 @@
+import os
 import pytest
 
 from dcicutils import cloudformation_utils
+from dcicutils.ff_mocks import mocked_s3utils
+from dcicutils.env_base import EnvBase
+from dcicutils.misc_utils import override_environ
 from dcicutils.qa_utils import (
     MockBoto3, MockBotoCloudFormationClient, MockBotoCloudFormationStack, MockBotoCloudFormationResourceSummary,
 )
@@ -369,3 +373,105 @@ def test_c4_orchestration_manager_find_stack_resource():
 
         assert manager.find_stack_resource('network', 'MyPrivateSubnetC', 'physical_resource_id') is None
         assert manager.find_stack_resource('network', 'MyPrivateSubnetC', 'physical_resource_id', 'foo') == 'foo'
+
+
+MOCKED_DEV_CHECK_RUNNER = "c4-foursight-development-stack-CheckRunner-XvXOKPYFFIye"
+MOCKED_PRD_CHECK_RUNNER = "c4-foursight-fourfront-production-stac-CheckRunner-MW4VHuCIsDXc"
+
+MOCKED_LAMBDA_NAMES = [
+    "c4-foursight-development-stack-HourlyChecks3-B0dVPPczSind"
+    "c4-foursight-development-stack-MorningChecks3-U8C7kjQcai7a",
+    "c4-foursight-development-stack-ThirtyMinChecks-MFWFKtAiWKil",
+    "c4-foursight-fourfront-pro-FridayAutoscalingChecks-gqqwcoQYmsC8",
+    "c4-foursight-fourfront-production--ThirtyMinChecks-VQDQXvsDHTJj",
+    "c4-foursight-fourfront-production-s-MorningChecks1-X5oI034JbLze",
+    "c4-foursight-fourfront-production-s-MorningChecks4-0ndpdpBpMyFU",
+    MOCKED_PRD_CHECK_RUNNER,
+    "c4-foursight-fourfront-production-stack-APIHandler-CoLjJ3aRtcFh",
+    "c4-foursight-fourfront-production-stack-APIHandler-CoLjJ3aRtcFh",
+] + [f"decoy-{i}" for i in range(50)] + [
+    "c4-foursight-development-s-MondayAutoscalingChecks-PNk0IOw1hKIO",
+    MOCKED_DEV_CHECK_RUNNER,
+    "c4-foursight-development-stack-TenMinChecks-0mWRApze1Vy5"
+]
+
+
+def test_abstract_orchestration_manager_discover_foursight_check_runner_name():
+
+    with EnvBase.global_env_bucket_named('foursight-envs'):
+        with mocked_s3utils(environments=['fourfront-mastertest']) as b3:
+            with mock.patch.object(cloudformation_utils, "boto3", b3):
+
+                b3.client('lambda').register_lambdas_for_testing(
+                    {
+                        name: {}
+                        for name in MOCKED_LAMBDA_NAMES
+                    }
+                )
+
+                # We only need the class for this test, not the instance
+                abstract_manager = cloudformation_utils.AbstractOrchestrationManager
+
+                with override_environ(CHECK_RUNNER=None):
+                    print("-" * 20)
+                    print(f"CHECK_RUNNER={os.environ.get('CHECK_RUNNER')}")
+
+                    dev_runner = abstract_manager.discover_foursight_check_runner_name('dev', encache=False)
+                    print(f"dev_runner={dev_runner}")
+                    assert dev_runner == MOCKED_DEV_CHECK_RUNNER
+                    assert os.environ.get('CHECK_RUNNER') is None
+                    print(f"CHECK_RUNNER={os.environ.get('CHECK_RUNNER')}")
+
+                    dev_runner = abstract_manager.discover_foursight_check_runner_name('dev', encache=True)
+                    print(f"dev_runner={dev_runner}")
+                    assert dev_runner == MOCKED_DEV_CHECK_RUNNER
+                    assert os.environ.get('CHECK_RUNNER') == dev_runner
+                    print(f"CHECK_RUNNER={os.environ.get('CHECK_RUNNER')}")
+
+                with override_environ(CHECK_RUNNER=None):
+                    print("-" * 20)
+                    print(f"CHECK_RUNNER={os.environ.get('CHECK_RUNNER')}")
+
+                    prd_runner = abstract_manager.discover_foursight_check_runner_name('prod', encache=False)
+                    print(f"prd_runner={prd_runner}")
+                    assert prd_runner == MOCKED_PRD_CHECK_RUNNER
+                    assert os.environ.get('CHECK_RUNNER') is None
+                    print(f"CHECK_RUNNER={os.environ.get('CHECK_RUNNER')}")
+
+                    prd_runner = abstract_manager.discover_foursight_check_runner_name('prod', encache=True)
+                    print(f"prd_runner={prd_runner}")
+                    assert prd_runner == MOCKED_PRD_CHECK_RUNNER
+                    assert os.environ.get('CHECK_RUNNER') == prd_runner
+                    print(f"CHECK_RUNNER={os.environ.get('CHECK_RUNNER')}")
+
+                with override_environ(CHECK_RUNNER=None):
+                    print("-" * 20)
+                    print(f"CHECK_RUNNER={os.environ.get('CHECK_RUNNER')}")
+
+                    tst_runner = abstract_manager.discover_foursight_check_runner_name('test', encache=False)
+                    print(f"tst_runner={tst_runner}")
+                    assert tst_runner == MOCKED_DEV_CHECK_RUNNER
+                    assert os.environ.get('CHECK_RUNNER') is None
+                    print(f"CHECK_RUNNER={os.environ.get('CHECK_RUNNER')}")
+
+                    tst_runner = abstract_manager.discover_foursight_check_runner_name('test', encache=True)
+                    print(f"tst_runner={tst_runner}")
+                    assert tst_runner == MOCKED_DEV_CHECK_RUNNER
+                    assert os.environ.get('CHECK_RUNNER') == tst_runner
+                    print(f"CHECK_RUNNER={os.environ.get('CHECK_RUNNER')}")
+
+                with override_environ(CHECK_RUNNER=None):
+                    print("-" * 20)
+                    print(f"CHECK_RUNNER={os.environ.get('CHECK_RUNNER')}")
+
+                    foo_runner = abstract_manager.discover_foursight_check_runner_name('foo', encache=False)
+                    print(f"foo_runner={foo_runner}")
+                    assert foo_runner == MOCKED_DEV_CHECK_RUNNER
+                    assert os.environ.get('CHECK_RUNNER') is None
+                    print(f"CHECK_RUNNER={os.environ.get('CHECK_RUNNER')}")
+
+                    foo_runner = abstract_manager.discover_foursight_check_runner_name('foo', encache=True)
+                    print(f"foo_runner={foo_runner}")
+                    assert foo_runner == MOCKED_DEV_CHECK_RUNNER
+                    assert os.environ.get('CHECK_RUNNER') == foo_runner
+                    print(f"CHECK_RUNNER={os.environ.get('CHECK_RUNNER')}")
