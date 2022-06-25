@@ -19,6 +19,7 @@ import toml
 import uuid
 import warnings
 
+from botocore.credentials import Credentials as Boto3Credentials
 from botocore.exceptions import ClientError
 from json import dumps as json_dumps, loads as json_loads
 from unittest import mock
@@ -678,14 +679,88 @@ class MockBoto3:
         return _SessionModule(boto3=self)
 
 
+@MockBoto3.register_client(kind='session')
 class MockBoto3Session:
 
-    def __init__(self, *, region_name, boto3):
-        self.region_name = region_name
-        self.boto3 = boto3
+    _SHARED_DATA_MARKER = '_SESSION_SHARED_DATA_MARKER'
+
+    def __init__(self, *, region_name=None, boto3=None):
+        self.boto3 = boto3 or MockBoto3()
+        self.shared_data = self.boto3.shared_reality.get(self._SHARED_DATA_MARKER)
+        if self.shared_data is None:
+            self.boto3.shared_reality[self._SHARED_DATA_MARKER] = self.shared_data = {}
+        self.shared_data["credentials"] = {}
 
     def client(self, service_name, **kwargs):
         return self.boto3.client(service_name, **kwargs)
+
+    def unset_environ_credentials_for_testing(self) -> None:
+        """
+        Unsets any/all AWS credentials related environment variables.
+        """
+        os.environ.pop("AWS_ACCESS_KEY_ID", None)
+        os.environ.pop("AWS_CONFIG_FILE", None)
+        os.environ.pop("AWS_DEFAULT_REGION", None)
+        os.environ.pop("AWS_SECRET_ACCESS_KEY", None)
+        os.environ.pop("AWS_SESSION_TOKEN", None)
+        os.environ.pop("AWS_SHARED_CREDENTIALS_FILE", None)
+
+    def set_credentials_for_testing(self, **kwargs) -> None:
+        """
+        Sets AWS credentials for testing.
+        The given named arguments may contain any of: access_key, secret_key, region
+        :param kwargs: May contain any of: access_key, secret_key, region
+        """
+        if not self.shared_data.get("credentials"):
+            self.shared_data["credentials"] = {}
+        self.shared_data["credentials"]["access_key"] = kwargs.get("access_key")
+        self.shared_data["credentials"]["secret_key"] = kwargs.get("secret_key")
+        self.shared_data["region"] = kwargs.get("region")
+
+    def get_credentials(self) -> Boto3Credentials:
+        """
+        Returns the AWS credentials (Boto3Credentials) from the (access_key and secret_key) values set in
+        set_credentials_for_testing(), or if any of those are not set there then gets them from the standard
+        AWS environment variable names, i.e. AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (via os.environ).
+        Use unset_environ_credentials_for_testing() to clear these environment variables beforehand.
+        :return: AWS credentials determined as described above, in a Boto3Credentials object.
+        """
+        credentials = self.shared_data.get("credentials")
+        credentials = credentials.copy() if credentials else {}
+        if not credentials.get("access_key"):
+            credentials["access_key"] = os.environ.get("AWS_ACCESS_KEY_ID")
+        if not credentials.get("secret_key"):
+            credentials["secret_key"] = os.environ.get("AWS_SECRET_ACCESS_KEY")
+        return Boto3Credentials(**credentials)
+
+    @property
+    def region_name(self):
+        """
+        Returns the AWS default region from the value set in set_credentials_for_testing(), or if not set there
+        then gets it from the standard AWS environment variable name, i.e. AWS_DEFAULT_REGION (via os.environ).
+        Use unset_environ_credentials_for_testing() to clear these environment variables beforehand.
+        :return: AWS default region determined as described above.
+        """
+        aws_default_region = self.shared_data.get("region")
+        return aws_default_region if aws_default_region else os.environ.get("AWS_DEFAULT_REGION")
+
+
+@MockBoto3.register_client(kind='sts')
+class MockBoto3Sts:
+
+    _SHARED_DATA_MARKER = '_STS_SHARED_DATA_MARKER'
+
+    def __init__(self, boto3=None):
+        self.boto3 = boto3 or MockBoto3()
+        self.shared_data = self.boto3.shared_reality.get(self._SHARED_DATA_MARKER)
+        if self.shared_data is None:
+            self.boto3.shared_reality[self._SHARED_DATA_MARKER] = self.shared_data = {}
+
+    def set_caller_identity_for_testing(self, value: dict):
+        self.shared_data["caller_identity"] = value
+
+    def get_caller_identity(self):
+        return self.shared_data.get("caller_identity")
 
 
 @MockBoto3.register_client(kind='secretsmanager')
