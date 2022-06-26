@@ -717,7 +717,7 @@ class MockBoto3Session:
         NOTE: AWS session token not currently handled.
 
         FYI: Some things to note about how boto3 (and probably any AWS client) reads AWS credentials/region.
-        - It looks (of course) at envrionment variable before files.
+        - It looks (of course) at envrionment variables before files.
         - It wants access key ID and secret access key BOTH to come from the same source,
           e.g. does not get access key ID from environment variable and secret access key from file.
         - It reads region from EITHER the credentials file OR the config file, the former FIRST;
@@ -759,8 +759,8 @@ class MockBoto3Session:
         set there, then gets them via the standard AWS environment variable names, i.e. AWS_ACCESS_KEY_ID,
         AWS_SECRET_ACCESS_KEY, AWS_SHARED_CREDENTIALS_FILE.
 
-        More specifically, returns AWS credentials, access key ID and secret access key, as a tuple,
-        from the first of these where BOTH are defined; if BOTH not defined returns tuple with None values.
+        More specifically, returns AWS access key ID and secret access key as Boto3Credentials, from the
+        first of these where BOTH are defined; if BOTH not defined returns Boto3Credentials with no values.
         1. From the access_key and secret_key values set explicitly in set_credentials_for_testing().
         2. From the aws_access_key_id and aws_secret_access_key properties in the credentials
            file within the credentials_dir set explicitly in set_credentials_for_testing().
