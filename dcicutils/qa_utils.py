@@ -687,10 +687,12 @@ class MockBoto3Session:
 
     def __init__(self, *, region_name=None, boto3=None, **kwargs):
         self.boto3 = boto3 or MockBoto3()
+        # Hmm. Wait. Should credentials/region really be "shared" data?
         self.shared_data = self.boto3.shared_reality.get(self._SHARED_DATA_MARKER)
         if self.shared_data is None:
             self.boto3.shared_reality[self._SHARED_DATA_MARKER] = self.shared_data = {}
         self.shared_data["credentials"] = {}
+        self.shared_data["region"] = ""
 
     def client(self, service_name, **kwargs):
         return self.boto3.client(service_name, **kwargs)
