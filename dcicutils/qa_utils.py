@@ -687,12 +687,14 @@ class MockBoto3Session:
 
     def __init__(self, *, region_name=None, boto3=None, **kwargs):
         self.boto3 = boto3 or MockBoto3()
-        # Hmm. Wait. Should credentials/region really be "shared" data?
-        self.shared_data = self.boto3.shared_reality.get(self._SHARED_DATA_MARKER)
-        if self.shared_data is None:
-            self.boto3.shared_reality[self._SHARED_DATA_MARKER] = self.shared_data = {}
-        self.shared_data["credentials"] = {}
-        self.shared_data["region"] = ""
+
+        # These kwargs key names are the same as those for the boto3.Session() constructor.
+        self.aws_access_key_id = kwargs.get("aws_access_key_id")
+        self.aws_secret_access_key = kwargs.get("aws_secret_access_key")
+        self.aws_region = region_name
+
+        # These kwargs key names are specific to this method for testing.
+        self.aws_credentials_dir = kwargs.get("aws_credentials_dir")
 
     def client(self, service_name, **kwargs):
         return self.boto3.client(service_name, **kwargs)
@@ -712,8 +714,8 @@ class MockBoto3Session:
     def set_credentials_for_testing(self, **kwargs) -> None:
         """
         Sets AWS credentials for testing.
-        The given named arguments may contain any of: access_key, secret_key, region, credentials_dir
-        :param kwargs: May contain any of: access_key, secret_key, region, credentials_dir
+        The given named arguments may contain any of: aws_access_key_id, aws_secret_access_key, region_name, aws_credentials_dir
+        :param kwargs: May contain any of: aws_access_key_id, aws_secret_access_key, region_name, aws_credentials_dir
 
         NOTE: Use unset_environ_credentials_for_testing() to clear these environment variables beforehand.
         NOTE: AWS session token not currently handled.
@@ -730,12 +732,14 @@ class MockBoto3Session:
           i.e. set to None, it WILL look at the default credentials/config files (e.g. ~/.aws/credentials);
           which is why we set to /dev/null in unset_environ_credentials_for_testing().
         """
-        if not self.shared_data.get("credentials"):
-            self.shared_data["credentials"] = {}
-        self.shared_data["credentials"]["access_key"] = kwargs.get("access_key")
-        self.shared_data["credentials"]["secret_key"] = kwargs.get("secret_key")
-        self.shared_data["credentials"]["credentials_dir"] = kwargs.get("credentials_dir")
-        self.shared_data["region"] = kwargs.get("region")
+
+        # These kwargs key names are the same as those for the boto3.Session() constructor.
+        self.aws_access_key_id = kwargs.get("aws_access_key_id")
+        self.aws_secret_access_key = kwargs.get("aws_secret_access_key")
+        self.aws_region = kwargs.get("region_name")
+
+        # These kwargs key names are specific to this method for testing.
+        self.aws_credentials_dir = kwargs.get("aws_credentials_dir")
 
     def _read_aws_credentials_from_file(self, aws_credentials_file: str) -> (str, str, str):
         if not aws_credentials_file or not os.path.isfile(aws_credentials_file):
@@ -751,8 +755,8 @@ class MockBoto3Session:
         config_keys_values = {key.lower(): value for key, value in config[config_section_name].items()}
         aws_access_key_id = config_keys_values.get("aws_access_key_id")
         aws_secret_access_key = config_keys_values.get("aws_secret_access_key")
-        aws_default_region = config_keys_values.get("region")
-        return aws_access_key_id, aws_secret_access_key, aws_default_region
+        aws_region = config_keys_values.get("region")
+        return aws_access_key_id, aws_secret_access_key, aws_region
 
     def get_credentials(self) -> Boto3Credentials:
         """
@@ -771,78 +775,68 @@ class MockBoto3Session:
            credentials file specified by the AWS_SHARED_CREDENTIALS_FILE environment variable.
         5. From the aws_access_key_id and aws_secret_access_key properties in the ~/.aws/credentials file.
 
-        NOTE: Use unset_environ_credentials_for_testing() to clear these environment variables beforehand.
+        NOTE: Use unset_environ_credentials_for_testing() to clear related environment variables beforehand.
         NOTE: AWS session token not currently handled.
 
         :return: AWS credentials determined as described above, in a Boto3Credentials object.
         """
-
-        credentials = self.shared_data.get("credentials")
-        if not credentials:
-            credentials = {}
-
-        access_key = credentials.get("access_key")
-        secret_key = credentials.get("secret_key")
-
-        if not access_key or not secret_key:
-            credentials_dir = credentials.get("credentials_dir")
+        aws_access_key_id = self.aws_access_key_id
+        aws_secret_access_key = self.aws_secret_access_key
+        if not aws_access_key_id or not aws_secret_access_key:
+            credentials_dir = self.aws_credentials_dir
             if credentials_dir and os.path.isdir(credentials_dir):
                 credentials_file = os.path.join(credentials_dir, "credentials")
-                access_key, secret_key, _ = self._read_aws_credentials_from_file(credentials_file)
-        if not access_key or not secret_key:
-            access_key = os.environ.get("AWS_ACCESS_KEY_ID")
-            secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
-        if not access_key or not secret_key:
+                aws_access_key_id, aws_secret_access_key, _ = self._read_aws_credentials_from_file(credentials_file)
+        if not aws_access_key_id or not aws_secret_access_key:
+            aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
+            aws_secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
+        if not aws_access_key_id or not aws_secret_access_key:
             credentials_file = os.environ.get("AWS_SHARED_CREDENTIALS_FILE", "~/.aws/credentials")
-            access_key, secret_key, _ = self._read_aws_credentials_from_file(credentials_file)
-        if not access_key or not secret_key:
-            access_key = secret_key = None
-
-        credentials = {}
-        credentials["access_key"] = access_key
-        credentials["secret_key"] = secret_key
-        return Boto3Credentials(**credentials)
+            aws_access_key_id, aws_secret_access_key, _ = self._read_aws_credentials_from_file(credentials_file)
+        if not aws_access_key_id or not aws_secret_access_key:
+            aws_access_key_id = aws_secret_access_key = None
+        return Boto3Credentials(access_key=aws_access_key_id, secret_key=aws_secret_access_key)
 
     @property
     def region_name(self) -> str:
         """
-        Returns the AWS region from the region value, or in the credentials or config file within the credentials_dir,
-        set in set_credentials_for_testing(); or if not set there, then gets via the standard AWS environment
-        variable names, i.e. AWS_REGION, AWS_DEFAULT_REGION, AWS_SHARED_CREDENTIALS_FILE, or AWS_CONFIG_FILE.
+        Returns the AWS region from the aws_region value, or in the credentials or config file
+        within the aws_credentials_dir, set in the constructor or set_credentials_for_testing();
+        or if not set there, then gets it via the standard AWS environment variable names,
+        i.e. AWS_REGION, AWS_DEFAULT_REGION, AWS_SHARED_CREDENTIALS_FILE, or AWS_CONFIG_FILE.
 
         More specifically, returns AWS region from the first of these where defined; if defined returns None.
-        1. From the region value set explicitly in set_credentials_for_testing().
+        1. From the aws_region value set explicitly in the constructor or set_credentials_for_testing().
         2. From the region property in the credentials file within the
-           credentials_dir set explicitly in set_credentials_for_testing().
-        3. From the value in the AWS_REGION environment variable.
-        4. From the value in the AWS_DEFAULT_REGION environment variable.
+           aws_credentials_dir set explicitly in the constructor or set_credentials_for_testing().
+        3. From the value in the AWS_REGION environment variable (via os.environ).
+        4. From the value in the AWS_DEFAULT_REGION environment variable (via os.environ).
         5. From the region property in the credentials file specified
-           by the AWS_SHARED_CREDENTIALS_FILE environment variable,
+           by the AWS_SHARED_CREDENTIALS_FILE environment variable (via os.environ).
         6. From the region property in the config file specified
-           by the AWS_CONFIG_FILE environment variable,.
+           by the AWS_CONFIG_FILE environment variable (via os.environ).
         7. From the region property in the ~/.aws/credentials file.
         8. From the region property in the ~/.aws/config file.
 
-        NOTE: Use unset_environ_credentials_for_testing() to clear these environment variables beforehand.
+        NOTE: Use unset_environ_credentials_for_testing() to clear related environment variables beforehand.
 
         :return: AWS region determined as described above.
         """
-        region = self.shared_data.get("region")
-        if not region:
-            credentials = self.shared_data.get("credentials")
-            if credentials:
-                credentials_file = os.path.join(credentials.get("credentials_dir", ""), "credentials")
-                _, _, region = self._read_aws_credentials_from_file(credentials_file)
-                if not region:
-                    config_file = os.path.join(credentials.get("credentials_dir", ""), "config")
-                    _, _, region = self._read_aws_credentials_from_file(config_file)
-        if not region:
-            region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION"))
-        if not region:
-            _, _, region = self._read_aws_credentials_from_file(os.environ.get("AWS_SHARED_CREDENTIALS_FILE", "~/.aws/credentials"))
-        if not region:
-            _, _, region = self._read_aws_credentials_from_file(os.environ.get("AWS_CONFIG_FILE", "~/.aws/config"))
-        return region
+        aws_region = self.aws_region
+        if not aws_region:
+            if self.aws_credentials_dir:
+                aws_credentials_file = os.path.join(self.aws_credentials_dir, "credentials")
+                _, _, aws_region = self._read_aws_credentials_from_file(aws_credentials_file)
+                if not aws_region:
+                    aws_config_file = os.path.join(aws_credentials_dir, "config")
+                    _, _, aws_region = self._read_aws_credentials_from_file(aws_config_file)
+        if not aws_region:
+            aws_region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION"))
+        if not aws_region:
+            _, _, aws_region = self._read_aws_credentials_from_file(os.environ.get("AWS_SHARED_CREDENTIALS_FILE", "~/.aws/credentials"))
+        if not aws_region:
+            _, _, aws_region = self._read_aws_credentials_from_file(os.environ.get("AWS_CONFIG_FILE", "~/.aws/config"))
+        return aws_region
 
 
 @MockBoto3.register_client(kind='sts')
