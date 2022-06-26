@@ -716,14 +716,17 @@ class MockBoto3Session:
         NOTE: Use unset_environ_credentials_for_testing() to clear these environment variables beforehand.
         NOTE: AWS session token not currently handled.
 
-        FYI: Some things to note about the way boto3 (and probably any AWS client) reads AWS credentials/region.
+        FYI: Some things to note about how boto3 (and probably any AWS client) reads AWS credentials/region.
         - It looks (of course) at envrionment variable before files.
         - It wants access key ID and secret access key BOTH to come from the same source,
           e.g. does not get access key ID from environment variable and secret access key from file.
-        - It reads region from EITHER credentials file OR config file, the former FIRST;
-          though (of course) it does NOT read access key ID or secret access key from config file. 
+        - It reads region from EITHER the credentials file OR the config file, the former FIRST;
+          though (of course) it does NOT read access key ID or secret access key from the config file. 
         - The aws_access_key_id, aws_secret_access_key, and region properties in the credentials/config
           files may be EITHER upper AND/OR lower case; but the environment variables MUST be all upper case.
+        - If file environment variables (i.e. AWS_SHARED_CREDENTIALS_FILE, AWS_CONFIG_FILE) are NOT set,
+          i.e. set to None, it WILL look at the default credentials/config files (e.g. ~/.aws/credentials);
+          which is why we set to /dev/null in unset_environ_credentials_for_testing().
         """
         if not self.shared_data.get("credentials"):
             self.shared_data["credentials"] = {}
@@ -757,14 +760,14 @@ class MockBoto3Session:
         AWS_SECRET_ACCESS_KEY, AWS_SHARED_CREDENTIALS_FILE.
 
         More specifically, returns AWS credentials, access key ID and secret access key, as a tuple,
-        from the first of these where BOTH are defined; if BOTH not defined return tuple with None values.
+        from the first of these where BOTH are defined; if BOTH not defined returns tuple with None values.
         1. From the access_key and secret_key values set explicitly in set_credentials_for_testing().
         2. From the aws_access_key_id and aws_secret_access_key properties in the credentials
            file within the credentials_dir set explicitly in set_credentials_for_testing().
         3. From the values in the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.
         4. From the aws_access_key_id and aws_secret_access_key properties in the
            credentials file specified by the AWS_SHARED_CREDENTIALS_FILE environment variable.
-        5. If AWS_SHARED_CREDENTIALS_FILE is not set
+        5. From the aws_access_key_id and aws_secret_access_key properties in the ~/.aws/credentials file.
 
         NOTE: Use unset_environ_credentials_for_testing() to clear these environment variables beforehand.
         NOTE: AWS session token not currently handled.
@@ -788,7 +791,7 @@ class MockBoto3Session:
             access_key = os.environ.get("AWS_ACCESS_KEY_ID")
             secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
         if not access_key or not secret_key:
-            credentials_file = os.environ.get("AWS_SHARED_CREDENTIALS_FILE")
+            credentials_file = os.environ.get("AWS_SHARED_CREDENTIALS_FILE", "~/.aws/credentials")
             access_key, secret_key, _ = self._read_aws_credentials_from_file(credentials_file)
         if not access_key or not secret_key:
             access_key = secret_key = None
@@ -804,6 +807,19 @@ class MockBoto3Session:
         Returns the AWS region from the region value, or in the credentials or config file within the credentials_dir,
         set in set_credentials_for_testing(); or if not set there, then gets via the standard AWS environment
         variable names, i.e. AWS_REGION, AWS_DEFAULT_REGION, AWS_SHARED_CREDENTIALS_FILE, or AWS_CONFIG_FILE.
+
+        More specifically, returns AWS region from the first of these where defined; if defined returns None.
+        1. From the region value set explicitly in set_credentials_for_testing().
+        2. From the region property in the credentials file within the
+           credentials_dir set explicitly in set_credentials_for_testing().
+        3. From the value in the AWS_REGION environment variable.
+        4. From the value in the AWS_DEFAULT_REGION environment variable.
+        5. From the region property in the credentials file specified
+           by the AWS_SHARED_CREDENTIALS_FILE environment variable,
+        6. From the region property in the config file specified
+           by the AWS_CONFIG_FILE environment variable,.
+        7. From the region property in the ~/.aws/credentials file.
+        8. From the region property in the ~/.aws/config file.
 
         NOTE: Use unset_environ_credentials_for_testing() to clear these environment variables beforehand.
 
@@ -821,7 +837,9 @@ class MockBoto3Session:
         if not region:
             region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION"))
         if not region:
-            _, _, region = self._read_aws_credentials_from_file(os.environ.get("AWS_SHARED_CREDENTIALS_FILE", os.environ.get("AWS_CONFIG_FILE")))
+            _, _, region = self._read_aws_credentials_from_file(os.environ.get("AWS_SHARED_CREDENTIALS_FILE", "~/.aws/credentials"))
+        if not region:
+            _, _, region = self._read_aws_credentials_from_file(os.environ.get("AWS_CONFIG_FILE", "~/.aws/config"))
         return region
 
 
