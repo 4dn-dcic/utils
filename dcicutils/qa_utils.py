@@ -715,6 +715,15 @@ class MockBoto3Session:
 
         NOTE: Use unset_environ_credentials_for_testing() to clear these environment variables beforehand.
         NOTE: AWS session token not currently handled.
+
+        FYI: Some things to note about the way boto3 (and probably any AWS client) reads AWS credentials/region.
+        - It looks (of course) at envrionment variable before files.
+        - It wants access key ID and secret access key BOTH to come from the same source,
+          e.g. does not get access key ID from environment variable and secret access key from file.
+        - It reads region from EITHER credentials file OR config file, the former FIRST;
+          though (of course) it does NOT read access key ID or secret access key from config file. 
+        - The aws_access_key_id, aws_secret_access_key, and region properties in the credentials/config
+          files may be EITHER upper AND/OR lower case; but the environment variables MUST be all upper case.
         """
         if not self.shared_data.get("credentials"):
             self.shared_data["credentials"] = {}
@@ -726,13 +735,12 @@ class MockBoto3Session:
     def _read_aws_credentials_from_file(self, aws_credentials_file: str) -> (str, str, str):
         if not aws_credentials_file or not os.path.isfile(aws_credentials_file):
             return None, None, None
-        default_section_name = "default"
         config = configparser.ConfigParser()
         config.read(aws_credentials_file)
         if not config or len(config) <= 0:
             return None, None, None
-        if default_section_name in config:
-            config_section_name = default_section_name
+        if "default" in config:
+            config_section_name = "default"
         else:
             config_section_name = config[0]
         config_keys_values = {key.lower(): value for key, value in config[config_section_name].items()}
@@ -756,6 +764,7 @@ class MockBoto3Session:
         3. From the values in the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.
         4. From the aws_access_key_id and aws_secret_access_key properties in the
            credentials file specified by the AWS_SHARED_CREDENTIALS_FILE environment variable.
+        5. If AWS_SHARED_CREDENTIALS_FILE is not set
 
         NOTE: Use unset_environ_credentials_for_testing() to clear these environment variables beforehand.
         NOTE: AWS session token not currently handled.
@@ -774,15 +783,13 @@ class MockBoto3Session:
             credentials_dir = credentials.get("credentials_dir")
             if credentials_dir and os.path.isdir(credentials_dir):
                 credentials_file = os.path.join(credentials_dir, "credentials")
-                if os.path.isfile(credentials_file):
-                    access_key, secret_key, _ = self._read_aws_credentials_from_file(credentials_file)
+                access_key, secret_key, _ = self._read_aws_credentials_from_file(credentials_file)
         if not access_key or not secret_key:
             access_key = os.environ.get("AWS_ACCESS_KEY_ID")
             secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
         if not access_key or not secret_key:
             credentials_file = os.environ.get("AWS_SHARED_CREDENTIALS_FILE")
-            if credentials_file and os.path.isfile(credentials_file):
-                access_key, secret_key, _ = self._read_aws_credentials_from_file(credentials_file)
+            access_key, secret_key, _ = self._read_aws_credentials_from_file(credentials_file)
         if not access_key or not secret_key:
             access_key = secret_key = None
 
@@ -806,9 +813,11 @@ class MockBoto3Session:
         if not region:
             credentials = self.shared_data.get("credentials")
             if credentials:
-                _, _, region = self._read_aws_credentials_from_file(os.path.join(credentials.get("credentials_dir", ""), "credentials"))
+                credentials_file = os.path.join(credentials.get("credentials_dir", ""), "credentials")
+                _, _, region = self._read_aws_credentials_from_file(credentials_file)
                 if not region:
-                    _, _, region = self._read_aws_credentials_from_file(os.path.join(credentials.get("credentials_dir", ""), "config"))
+                    config_file = os.path.join(credentials.get("credentials_dir", ""), "config")
+                    _, _, region = self._read_aws_credentials_from_file(config_file)
         if not region:
             region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION"))
         if not region:
