@@ -729,7 +729,7 @@ class MockBoto3Session:
         - The aws_access_key_id, aws_secret_access_key, and region properties in the credentials/config
           files may be EITHER upper AND/OR lower case; but the environment variables MUST be all upper case.
         - If file environment variables (i.e. AWS_SHARED_CREDENTIALS_FILE, AWS_CONFIG_FILE) are NOT set,
-          i.e. set to None, it WILL look at the default credentials/config files (e.g. ~/.aws/credentials);
+          i.e. SET to None, it WILL look at the default credentials/config files (e.g. ~/.aws/credentials);
           which is why we set to /dev/null in unset_environ_credentials_for_testing().
         """
 
