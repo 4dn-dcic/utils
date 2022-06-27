@@ -3,6 +3,7 @@ qa_utils: Tools for use in quality assurance testing.
 """
 
 
+from __future__ import annotations # allows type hint references to containing class 
 import configparser
 import contextlib
 import copy
@@ -17,6 +18,7 @@ import pytz
 import re
 import time
 import toml
+from typing import Any
 import uuid
 import warnings
 
@@ -712,6 +714,8 @@ class MockBoto3Session:
         os.environ.pop("AWS_SESSION_TOKEN", None)
         os.environ.pop("AWS_SHARED_CREDENTIALS_FILE", "/dev/null")
 
+    # TODO/dmichaels/2022-06-26: Should we set these credentials for testing as shared data,
+    # i.e. to lookup specifically in get_credentials and region_name?
     def set_credentials_for_testing(self, **kwargs) -> None:
         """
         Sets AWS credentials for testing.
@@ -846,78 +850,78 @@ class MockBoto3Iam:
 
     _SHARED_DATA_MARKER = "_IAM_SHARED_DATA_MARKER"
 
-    def __init__(self, boto3=None):
+    def __init__(self, boto3=None) -> None:
         self.boto3 = boto3 or MockBoto3()
 
     class _UserAccessKeyPair:
-        def __init__(self):
+        def __init__(self) -> None:
             self._id = str(uuid.uuid4())
             self._secret = str(uuid.uuid4())
             self._create_date = datetime.datetime.now()
             pass
         @property
-        def id(self):
+        def id(self) -> str:
             return self._id
         @property
-        def secret(self):
+        def secret(self) -> str:
             return self._secret
-        def get(self, key: str):
+        def get(self, key: str) -> Any:
             if key == "AccessKeyId":
                 return self._id
             elif key == "CreateDate":
                 return self._create_date
             return None
-        def __getitem__(self, key: str):
+        def __getitem__(self, key: str) -> Any:
             return self.get(key)
 
     class _UserAccessKeyPairCollection:
-        def __init__(self):
+        def __init__(self) -> None:
             self._access_key_pairs = []
-        def add(self, access_key_pair: object) -> None: # TODO: Why cannot reference MockBoto3Iam._UserAccessKeyPair as type hint here
+        def add(self, access_key_pair: MockBoto3Iam._UserAccessKeyPair) -> None:
             self._access_key_pairs.append(access_key_pair)
             pass
-        def get(self, key: str):
+        def get(self, key: str) -> Any:
             if key == "AccessKeyMetadata":
                 return self._access_key_pairs
             return None
-        def __getitem__(self, key: str):
+        def __getitem__(self, key: str) -> Any:
             return self.get(key)
 
     class _User:
-        def __init__(self, name: str):
+        def __init__(self, name: str) -> None:
             self._name = name
             self._access_keys = MockBoto3Iam._UserAccessKeyPairCollection()
         @property
-        def name(self):
+        def name(self) -> str:
             return self._name
-        def create_access_key_pair(self) -> object: # TODO: Why cannot reference MockBoto3Iam._UserAccessKeyPair type hint here
+        def create_access_key_pair(self) -> MockBoto3Iam._UserAccessKeyPair:
             access_key_pair = MockBoto3Iam._UserAccessKeyPair()
             self._access_keys.add(access_key_pair)
             return access_key_pair
 
     class _UserCollection:
-        def __init__(self):
+        def __init__(self) -> None:
             self._users = []
-        def all(self):
+        def all(self) -> list[MockBoto3Iam._User]:
             return self._users
 
     class _RoleCollection:
-        def __init__(self):
+        def __init__(self) -> None:
             self._roles = []
-        def __getitem__(self, key: str):
+        def __getitem__(self, key: str) -> Any:
             if key == "Roles":
                 return self._roles
             return None
 
     class _Role:
-        def __init__(self, arn: str):
+        def __init__(self, arn: str) -> None:
             self._arn = arn
-        def __getitem__(self, key: str):
+        def __getitem__(self, key: str) -> Any:
             if key == "Arn":
                 return self._arn
             return None
 
-    def _mocked_shared_data(self):
+    def _mocked_shared_data(self) -> dict:
         shared_reality = self.boto3.shared_reality
         shared_data = shared_reality.get(self._SHARED_DATA_MARKER)
         if shared_data is None:
@@ -926,20 +930,20 @@ class MockBoto3Iam:
             shared_data["roles"] = MockBoto3Iam._RoleCollection()
         return shared_data
 
-    def _mocked_users(self):
+    def _mocked_users(self) -> Any:
         return self._mocked_shared_data()["users"]
 
-    def _mocked_roles(self):
+    def _mocked_roles(self) -> Any:
         return self._mocked_shared_data()["roles"]
 
-    def set_users_for_testing(self, users: list) -> None:
+    def set_users_for_testing(self, users: list[str]) -> None:
         if isinstance(users, list) and len(users) > 0:
             existing_users = self._mocked_users().all()
             for user in users:
                 if user not in existing_users:
                     existing_users.append(MockBoto3Iam._User(user))
 
-    def set_roles_for_testing(self, roles: list) -> None:
+    def set_roles_for_testing(self, roles: list[str]) -> None:
         if isinstance(roles, list) and len(roles) > 0:
             existing_roles = self._mocked_roles()["Roles"]
             for role in roles:
@@ -947,13 +951,13 @@ class MockBoto3Iam:
                     existing_roles.append(MockBoto3Iam._Role(role))
 
     @property
-    def users(self):
+    def users(self) -> MockBoto3Iam._UserCollection:
         return self._mocked_users()
 
-    def list_roles(self):
+    def list_roles(self) -> MockBoto3Iam._RoleCollection:
         return self._mocked_roles()
 
-    def list_access_keys(self, UserName: str):
+    def list_access_keys(self, UserName: str) -> MockBoto3Iam._UserAccessKeyPairCollection:
         existing_users = self._mocked_users().all()
         for existing_user in existing_users:
             if existing_user.name == UserName:
@@ -967,16 +971,20 @@ class MockBoto3Sts:
 
     _SHARED_DATA_MARKER = '_STS_SHARED_DATA_MARKER'
 
-    def __init__(self, boto3=None):
+    def __init__(self, boto3=None) -> None:
         self.boto3 = boto3 or MockBoto3()
         self.shared_data = self.boto3.shared_reality.get(self._SHARED_DATA_MARKER)
         if self.shared_data is None:
             self.boto3.shared_reality[self._SHARED_DATA_MARKER] = self.shared_data = {}
 
-    def set_caller_identity_for_testing(self, value: dict):
-        self.shared_data["caller_identity"] = value
+    def set_caller_identity_for_testing(self, account: str, user_arn: str = None, user_id: str = None) -> None:
+        self.shared_data["caller_identity"] = {
+            "Account": account,
+            "Arn": user_arn,
+            "UserId": user_id
+        }
 
-    def get_caller_identity(self):
+    def get_caller_identity(self) -> dict:
         return self.shared_data.get("caller_identity")
 
 
