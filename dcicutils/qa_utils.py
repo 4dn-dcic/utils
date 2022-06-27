@@ -849,12 +849,6 @@ class MockBoto3Iam:
     def __init__(self, boto3=None):
         self.boto3 = boto3 or MockBoto3()
 
-    class _UsersCollection:
-        def __init__(self):
-            self._users = []
-        def all(self):
-            return self._users
-
     class _UserAccessKeyPair:
         def __init__(self):
             self._id = str(uuid.uuid4())
@@ -867,28 +861,57 @@ class MockBoto3Iam:
         @property
         def secret(self):
             return self._secret
-        def __getitem__(self, key: str):
+        def get(self, key: str):
             if key == "AccessKeyId":
                 return self._id
             elif key == "CreateDate":
                 return self._create_date
             return None
+        def __getitem__(self, key: str):
+            return self.get(key)
+
+    class _UserAccessKeyPairCollection:
+        def __init__(self):
+            self._access_key_pairs = []
+        def add(self, access_key_pair: object) -> None: # TODO: Why cannot reference MockBoto3Iam._UserAccessKeyPair as type hint here
+            self._access_key_pairs.append(access_key_pair)
+            pass
+        def get(self, key: str):
+            if key == "AccessKeyMetadata":
+                return self._access_key_pairs
+            return None
+        def __getitem__(self, key: str):
+            return self.get(key)
 
     class _User:
         def __init__(self, name: str):
             self._name = name
-            self._access_keys = []
+            self._access_keys = MockBoto3Iam._UserAccessKeyPairCollection()
         @property
         def name(self):
             return self._name
-        def create_access_key_pair(self) -> object: # TODO: Cannot reference MockBoto3Iam._UserAccessKeyPair here
-            access_key_pair = _UserAccessKeyPair()
-            self._access_keys.append(access_key_pair)
+        def create_access_key_pair(self) -> object: # TODO: Why cannot reference MockBoto3Iam._UserAccessKeyPair type hint here
+            access_key_pair = MockBoto3Iam._UserAccessKeyPair()
+            self._access_keys.add(access_key_pair)
             return access_key_pair
+
+    class _UserCollection:
+        def __init__(self):
+            self._users = []
+        def all(self):
+            return self._users
+
+    class _RoleCollection:
+        def __init__(self):
+            self._roles = []
+        def __getitem__(self, key: str):
+            if key == "Roles":
+                return self._roles
+            return None
 
     class _Role:
         def __init__(self, arn: str):
-            self._name = arn
+            self._arn = arn
         def __getitem__(self, key: str):
             if key == "Arn":
                 return self._arn
@@ -899,8 +922,8 @@ class MockBoto3Iam:
         shared_data = shared_reality.get(self._SHARED_DATA_MARKER)
         if shared_data is None:
             shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
-            shared_data["users"] = MockBoto3Iam._UsersCollection()
-            shared_data["roles"] = { "Roles": [] }
+            shared_data["users"] = MockBoto3Iam._UserCollection()
+            shared_data["roles"] = MockBoto3Iam._RoleCollection()
         return shared_data
 
     def _mocked_users(self):
@@ -921,7 +944,7 @@ class MockBoto3Iam:
             existing_roles = self._mocked_roles()["Roles"]
             for role in roles:
                 if role not in existing_roles:
-                    existing_roles.append(_Role(role))
+                    existing_roles.append(MockBoto3Iam._Role(role))
 
     @property
     def users(self):
@@ -934,7 +957,7 @@ class MockBoto3Iam:
         existing_users = self._mocked_users().all()
         for existing_user in existing_users:
             if existing_user.name == UserName:
-                return { "AccessKeyMetadata": existing_user.access_keys }
+                return existing_user._access_keys
         return None
 
 
