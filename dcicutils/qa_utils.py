@@ -898,11 +898,9 @@ class MockBoto3Iam:
         shared_reality = self.boto3.shared_reality
         shared_data = shared_reality.get(self._SHARED_DATA_MARKER)
         if shared_data is None:
-            users = MockBoto3Iam._UsersCollection()
-            roles = { "Roles": [] }
             shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
-            shared_data["users"] = users
-            shared_data["roles"] = roles
+            shared_data["users"] = MockBoto3Iam._UsersCollection()
+            shared_data["roles"] = { "Roles": [] }
         return shared_data
 
     def _mocked_users(self):
