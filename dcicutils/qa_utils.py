@@ -680,6 +680,7 @@ class MockBoto3:
         return _SessionModule(boto3=self)
 
 
+# TODO/dmichaels/2022-06-26: Changes IN PROGRESS.
 @MockBoto3.register_client(kind='session')
 class MockBoto3Session:
 
@@ -839,6 +840,107 @@ class MockBoto3Session:
         return aws_region
 
 
+# TODO/dmichaels/2022-06-26: New class IN PROGRESS.
+@MockBoto3.register_client(kind='iam')
+class MockBoto3Iam:
+
+    _SHARED_DATA_MARKER = "_IAM_SHARED_DATA_MARKER"
+
+    def __init__(self, boto3=None):
+        self.boto3 = boto3 or MockBoto3()
+
+    class _UsersCollection:
+        def __init__(self):
+            self._users = []
+        def all(self):
+            return self._users
+
+    class _UserAccessKeyPair:
+        def __init__(self):
+            self._id = str(uuid.uuid4())
+            self._secret = str(uuid.uuid4())
+            self._create_date = datetime.datetime.now()
+            pass
+        @property
+        def id(self):
+            return self._id
+        @property
+        def secret(self):
+            return self._secret
+        def __getitem__(self, key: str):
+            if key == "AccessKeyId":
+                return self._id
+            elif key == "CreateDate":
+                return self._create_date
+            return None
+
+    class _User:
+        def __init__(self, name: str):
+            self._name = name
+            self._access_keys = []
+        @property
+        def name(self):
+            return self._name
+        def create_access_key_pair(self) -> object: # TODO: Cannot reference MockBoto3Iam._UserAccessKeyPair here
+            access_key_pair = _UserAccessKeyPair()
+            self._access_keys.append(access_key_pair)
+            return access_key_pair
+
+    class _Role:
+        def __init__(self, arn: str):
+            self._name = arn
+        def __getitem__(self, key: str):
+            if key == "Arn":
+                return self._arn
+            return None
+
+    def _mocked_shared_data(self):
+        shared_reality = self.boto3.shared_reality
+        shared_data = shared_reality.get(self._SHARED_DATA_MARKER)
+        if shared_data is None:
+            users = MockBoto3Iam._UsersCollection()
+            roles = { "Roles": [] }
+            shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
+            shared_data["users"] = users
+            shared_data["roles"] = roles
+        return shared_data
+
+    def _mocked_users(self):
+        return self._mocked_shared_data()["users"]
+
+    def _mocked_roles(self):
+        return self._mocked_shared_data()["roles"]
+
+    def set_users_for_testing(self, users: list) -> None:
+        if isinstance(users, list) and len(users) > 0:
+            existing_users = self._mocked_users().all()
+            for user in users:
+                if user not in existing_users:
+                    existing_users.append(MockBoto3Iam._User(user))
+
+    def set_roles_for_testing(self, roles: list) -> None:
+        if isinstance(roles, list) and len(roles) > 0:
+            existing_roles = self._mocked_roles()["Roles"]
+            for role in roles:
+                if role not in existing_roles:
+                    existing_roles.append(_Role(role))
+
+    @property
+    def users(self):
+        return self._mocked_users()
+
+    def list_roles(self):
+        return self._mocked_roles()
+
+    def list_access_keys(self, UserName: str):
+        existing_users = self._mocked_users().all()
+        for existing_user in existing_users:
+            if existing_user.name == UserName:
+                return { "AccessKeyMetadata": existing_user.access_keys }
+        return None
+
+
+# TODO/dmichaels/2022-06-26: New class IN PROGRESS.
 @MockBoto3.register_client(kind='sts')
 class MockBoto3Sts:
 
@@ -886,6 +988,11 @@ class MockBoto3SecretsManager:
         secrets = self._mocked_secrets()
         # This really returns dictionaries with lots more things, but we'll start slow. :) -kmp 17-Feb-2022
         return {'SecretList': [{'Name': key} for key, _ in secrets.items()]}
+
+    def update_secret(self, SecretId: str, SecretString: str) -> None:
+        # TODO/dmichaels/2022-06-26: New method IN PROGRESS.
+        secrets = _mocked_secrets()
+        secrets[SecretId] = SecretString
 
 
 @MockBoto3.register_client(kind='cloudformation')
