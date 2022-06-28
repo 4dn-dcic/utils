@@ -996,7 +996,7 @@ class MockBoto3OpenSearch:
             self._domain_name = domain_name
             self._domain_endpoint_vpc = domain_endpoint_vpc
             self._domain_endpoint_https = domain_endpoint_https
-        def __getitem__(self, key: str) -> dict:
+        def __getitem__(self, key: str) -> Any:
             if key == "DomainName":
                 return self._domain_name
             elif key == "DomainStatus":
@@ -1015,7 +1015,7 @@ class MockBoto3OpenSearch:
             self._domains = []
         def add(self, domain: MockBoto3OpenSearch._Domain) -> None:
             self._domains.append(domain)
-        def __getitem__(self, key: str):
+        def __getitem__(self, key: str) -> Any:
             if key == "DomainNames":
                 return self._domains
             return None
@@ -1078,6 +1078,65 @@ class MockBoto3Sts:
 
     def get_caller_identity(self) -> dict:
         return self._mocked_caller_identity()
+
+
+# This MockBoto3Kms class is a minimal implementation, just enough to support the
+# original usage by 4dn-cloud-infra/setup-remaining-secrets unit tests (June 2022).
+@MockBoto3.register_client(kind='kms')
+class MockBoto3Kms:
+
+    _SHARED_DATA_MARKER = '_KMS_SHARED_DATA_MARKER'
+
+    class _Key:
+        def __init__(self, key_id: str):
+            self._key_id = key_id
+        def __getitem__(self, key: str) -> Any:
+            if key == "KeyId":
+                return self._key_id
+            return None
+
+    class _Keys:
+        def __init__(self):
+            self._keys = []
+        def add(self, key: MockBoto3Kms._Key) -> None:
+            self._keys.append(key)
+        def __getitem__(self, key: str):
+            if key == "Keys":
+                return self._keys
+            return None
+
+    def __init__(self, boto3=None) -> None:
+        self.boto3 = boto3 or MockBoto3()
+
+    def _mocked_shared_data(self) -> dict:
+        shared_reality = self.boto3.shared_reality
+        shared_data = shared_reality.get(self._SHARED_DATA_MARKER)
+        if shared_data is None:
+            shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
+            shared_data["keys"] = MockBoto3Kms._Keys()
+        return shared_data
+
+    def _mocked_keys(self) -> dict:
+        return self._mocked_shared_data()["keys"]
+
+    def put_key_for_testing(self, key_id: str) -> None:
+        keys = self._mocked_keys()
+        keys.add(MockBoto3Kms._Key(key_id))
+
+    def list_keys(self) -> dict:
+        return self._mocked_keys()
+
+    def describe_key(self, KeyId: str) -> Optional[dict]:  # noQA - Argument names chosen for AWS consistency
+        keys = self._mocked_keys()["Keys"]
+        if keys:
+            for key in keys:
+                if key["KeyId"] == KeyId:
+                    return {
+                        "KeyMetadata": {
+                            "KeyManager": "CUSTOMER"
+                        }
+                    }
+        return None
 
 
 @MockBoto3.register_client(kind='secretsmanager')
