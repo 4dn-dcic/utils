@@ -1083,9 +1083,21 @@ class MockBoto3SecretsManager:
         secrets = self._mocked_secrets()
         secrets[SecretId] = Value
 
+    def put_secret_key_value_for_testing(self, SecretId: str, SecretKey: str, SecretKeyValue: str):  # noQA - Argument names chosen for AWS consistency
+        if SecretId and SecretKey:
+            secrets = self._mocked_secrets()
+            secret_value = secrets.get(SecretId)
+            if not secret_value:
+                secrets[SecretId] = {}
+            secrets[SecretId][SecretKey] = SecretKeyValue
+
     def get_secret_value(self, SecretId):  # noQA - Argument names must be compatible with AWS
         secrets = self._mocked_secrets()
-        return {'SecretString': secrets[SecretId]}
+        secret_value = secrets[SecretId]
+        if isinstance(secret_value, dict):
+            return {'SecretString': json_dumps(secret_value)}
+        else:
+            return {'SecretString': secret_value}
 
     def list_secrets(self):
         secrets = self._mocked_secrets()
