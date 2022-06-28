@@ -780,8 +780,8 @@ class MockBoto3Session:
         set there, then gets them via the standard AWS environment variable names, i.e. AWS_ACCESS_KEY_ID,
         AWS_SECRET_ACCESS_KEY, AWS_SHARED_CREDENTIALS_FILE.
 
-        More specifically, returns AWS access key ID and secret access key as a Boto3Credentials, from the
-        first of these where BOTH are defined; if BOTH not defined returns a Boto3Credentials with no values.
+        More specifically, returns AWS access key ID and secret access key as a Boto3Credentials,
+        from the FIRST of these where BOTH are defined; if BOTH are NOT defined returns None.
         1. From the aws_access_key_id and aws_secret_access_key values set explicitly in set_credentials_for_testing().
         2. From the aws_access_key_id and aws_secret_access_key properties in the credentials
            file within the aws_credentials_dir set explicitly in set_credentials_for_testing().
