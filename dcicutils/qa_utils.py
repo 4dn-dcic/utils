@@ -1094,7 +1094,7 @@ class MockBoto3SecretsManager:
 
     def update_secret(self, SecretId: str, SecretString: str) -> None:
         # TODO/dmichaels/2022-06-26: New method IN PROGRESS.
-        secrets = _mocked_secrets()
+        secrets = self._mocked_secrets()
         secrets[SecretId] = SecretString
 
 
