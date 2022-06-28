@@ -716,7 +716,7 @@ class MockBoto3Session:
 
     # TODO/dmichaels/2022-06-26: Should we set these credentials for testing as shared data,
     # i.e. to lookup specifically in get_credentials and region_name?
-    def set_credentials_for_testing(self, **kwargs) -> None:
+    def put_credentials_for_testing(self, **kwargs) -> None:
         """
         Sets AWS credentials for testing.
         The given named arguments may contain any of: aws_access_key_id, aws_secret_access_key, region_name, aws_credentials_dir
@@ -736,6 +736,8 @@ class MockBoto3Session:
         - If file environment variables (i.e. AWS_SHARED_CREDENTIALS_FILE, AWS_CONFIG_FILE) are NOT set,
           i.e. SET to None, it WILL look at the default credentials/config files (e.g. ~/.aws/credentials);
           which is why we set to /dev/null in unset_environ_credentials_for_testing().
+
+        :param kwargs: Any of these arguments: aws_access_key_id, aws_secret_access_key, region_name, aws_credentials_dir
         """
 
         # These kwargs key names are the same as those for the boto3.Session() constructor.
@@ -747,6 +749,14 @@ class MockBoto3Session:
         self.aws_credentials_dir = kwargs.get("aws_credentials_dir")
 
     def _read_aws_credentials_from_file(self, aws_credentials_file: str) -> (str, str, str):
+        """
+        Returns from the given AWS credentials file the values of the following properties;
+        and returns a tuple with these values, in that order:
+        aws_access_key_id, aws_secret_access_key, region
+
+        :param aws_credentials_file: Full path to AWS credentials (or config) file.
+        :return: Tuple containing aws_access_key_id, aws_secret_access_key, region values; None if not present.
+        """
         if not aws_credentials_file or not os.path.isfile(aws_credentials_file):
             return None, None, None
         config = configparser.ConfigParser()
@@ -936,14 +946,14 @@ class MockBoto3Iam:
     def _mocked_roles(self) -> Any:
         return self._mocked_shared_data()["roles"]
 
-    def set_users_for_testing(self, users: list[str]) -> None:
+    def put_users_for_testing(self, users: list[str]) -> None:
         if isinstance(users, list) and len(users) > 0:
             existing_users = self._mocked_users().all()
             for user in users:
                 if user not in existing_users:
                     existing_users.append(MockBoto3Iam._User(user))
 
-    def set_roles_for_testing(self, roles: list[str]) -> None:
+    def put_roles_for_testing(self, roles: list[str]) -> None:
         if isinstance(roles, list) and len(roles) > 0:
             existing_roles = self._mocked_roles()["Roles"]
             for role in roles:
@@ -966,6 +976,71 @@ class MockBoto3Iam:
 
 
 # TODO/dmichaels/2022-06-26: New class IN PROGRESS.
+@MockBoto3.register_client(kind='opensearch')
+class MockBoto3OpenSearch:
+
+    _SHARED_DATA_MARKER = '_OPENSEARCH_SHARED_DATA_MARKER'
+
+    class _Domain:
+        def __init__(self, domain_name: str, domain_endpoint_vpc: str, domain_endpoint_https: bool) -> None:
+            self._domain_name = domain_name
+            self._domain_endpoint_vpc = domain_endpoint_vpc
+            self._domain_endpoint_https = domain_endpoint_https
+        def __getitem__(self, key: str) -> dict:
+            if key == "DomainName":
+                return self._domain_name
+            elif key == "DomainStatus":
+                return {
+                    "Endpoints": {
+                        "vpc": self._domain_endpoint_vpc
+                    },
+                    "DomainEndpointOptions": {
+                        "EnforceHTTPS": self._domain_endpoint_https
+                    }
+                }
+            return None
+
+    class _Domains:
+        def __init__(self) -> None:
+            self._domains = []
+        def add(self, domain: MockBoto3OpenSearch._Domain) -> None:
+            self._domains.append(domain)
+        def __getitem__(self, key: str):
+            if key == "DomainNames":
+                return self._domains
+            return None
+
+    def __init__(self, boto3=None) -> None:
+        self.boto3 = boto3 or MockBoto3()
+
+    def _mocked_shared_data(self) -> dict:
+        shared_reality = self.boto3.shared_reality
+        shared_data = shared_reality.get(self._SHARED_DATA_MARKER)
+        if shared_data is None:
+            shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
+            shared_data["domains"] = MockBoto3OpenSearch._Domains()
+        return shared_data
+
+    def _mocked_domains(self) -> dict:
+        return self._mocked_shared_data()["domains"]
+
+    def put_domain_for_testing(self, domain_name: str, domain_endpoint_vpc: str, domain_endpoint_https: bool) -> None:
+        domains = self._mocked_domains()
+        domains.add(MockBoto3OpenSearch._Domain(domain_name, domain_endpoint_vpc, domain_endpoint_https))
+
+    def list_domain_names(self) -> dict:
+        return self._mocked_domains()
+
+    def describe_domain(self, DomainName: str) -> dict:
+        domains = self._mocked_domains()["DomainNames"]
+        if domains:
+            for domain in domains:
+                if domain["DomainName"] == DomainName:
+                    return domain
+            return None
+
+
+# TODO/dmichaels/2022-06-26: New class IN PROGRESS.
 @MockBoto3.register_client(kind='sts')
 class MockBoto3Sts:
 
@@ -977,11 +1052,10 @@ class MockBoto3Sts:
         if self.shared_data is None:
             self.boto3.shared_reality[self._SHARED_DATA_MARKER] = self.shared_data = {}
 
-    def set_caller_identity_for_testing(self, account: str, user_arn: str = None, user_id: str = None) -> None:
+    def put_caller_identity_for_testing(self, account: str, user_arn: str = None) -> None:
         self.shared_data["caller_identity"] = {
             "Account": account,
-            "Arn": user_arn,
-            "UserId": user_id
+            "Arn": user_arn
         }
 
     def get_caller_identity(self) -> dict:
