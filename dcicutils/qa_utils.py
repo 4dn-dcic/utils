@@ -803,8 +803,8 @@ class MockBoto3Session:
         if credentials_dir and os.path.isdir(credentials_dir):
             credentials_file = os.path.join(credentials_dir, "credentials")
             aws_access_key_id, aws_secret_access_key, _ = self._read_aws_credentials_from_file(credentials_file)
-        if aws_access_key_id and aws_secret_access_key:
-            return Boto3Credentials(access_key=aws_access_key_id, secret_key=aws_secret_access_key)
+            if aws_access_key_id and aws_secret_access_key:
+                return Boto3Credentials(access_key=aws_access_key_id, secret_key=aws_secret_access_key)
         aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
         aws_secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
         if aws_access_key_id and aws_secret_access_key:
