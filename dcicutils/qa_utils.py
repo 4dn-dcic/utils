@@ -732,9 +732,9 @@ class MockBoto3Session:
         for environ_name in self.AWS_CREDENTIALS_ENVIRON_NAMES:
             if environ_name in os.environ:
                 if environ_name.endswith("_FILE"):
-                    os.environ.pop[environ_name] = "/dev/null"
+                    os.environ[environ_name] = "/dev/null"
                 else:
-                    del os.environ.pop[environ_name]
+                    del os.environ[environ_name]
 
     def put_credentials_for_testing(self, *,
                                     aws_access_key_id: str = None,
