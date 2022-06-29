@@ -877,7 +877,6 @@ class MockBoto3Iam:
             self._id = str(uuid.uuid4())
             self._secret = str(uuid.uuid4())
             self._create_date = datetime.datetime.now()
-            pass
         @property
         def id(self) -> str:
             return self._id
@@ -898,7 +897,6 @@ class MockBoto3Iam:
             self._access_key_pairs = []
         def add(self, access_key_pair: MockBoto3Iam._UserAccessKeyPair) -> None:
             self._access_key_pairs.append(access_key_pair)
-            pass
         def get(self, key: str) -> Any:
             if key == "AccessKeyMetadata":
                 return self._access_key_pairs
@@ -1114,14 +1112,21 @@ class MockBoto3Kms:
         if shared_data is None:
             shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
             shared_data["keys"] = MockBoto3Kms._Keys()
+            shared_data["key_policies"] = {}
         return shared_data
 
     def _mocked_keys(self) -> dict:
         return self._mocked_shared_data()["keys"]
 
-    def put_key_for_testing(self, key_id: str) -> None:
+    def _mocked_key_policies(self) -> dict:
+        return self._mocked_shared_data()["key_policies"]
+
+    def put_key_for_testing(self, KeyId: str) -> None:
         keys = self._mocked_keys()
-        keys.add(MockBoto3Kms._Key(key_id))
+        keys.add(MockBoto3Kms._Key(KeyId))
+
+    def put_key_policy_for_testing(self, KeyId: str, Policy: dict) -> None:
+        self.put_key_policy(KeyId, Policy, PolicyName="default")
 
     def list_keys(self) -> dict:
         return self._mocked_keys()
@@ -1138,17 +1143,25 @@ class MockBoto3Kms:
                     }
         return None
 
-    def put_key_policy_for_testing(self, KeyId: str, Policy: str, PolicyName: str) -> None:
-        # TODO
-        pass
-
     def put_key_policy(self, KeyId: str, Policy: str, PolicyName: str) -> None:
-        # TODO
-        pass
+        if not KeyId:
+            raise ValueError(f"KeyId value must be set for kms.put_key_policy.")
+        if PolicyName != "default":
+            raise ValueError(f"PolicyName value must be 'default' for kms.put_key_policy.")
+        if isinstance(Policy, dict):
+            key_policy_string = json_dumps(Policy)
+        elif isinstance(Policy, str):
+            key_policy_string = Policy
+        key_policies = self._mocked_key_policies()
+        key_policies[KeyId] = { "Policy": key_policy_string }
 
     def get_key_policy(self, KeyId: str, PolicyName: str) -> Optional[dict]:
-        # TODO
-        pass
+        if not KeyId:
+            raise ValueError(f"KeyId value must be set for kms.get_key_policy.")
+        if PolicyName != "default":
+            raise ValueError(f"PolicyName value must be 'default' for kms.get_key_policy.")
+        key_policies = self._mocked_key_policies()
+        return key_policies.get(KeyId)
 
 
 @MockBoto3.register_client(kind='secretsmanager')
