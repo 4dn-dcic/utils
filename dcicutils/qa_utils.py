@@ -885,7 +885,7 @@ class MockBoto3Iam:
 
     _SHARED_DATA_MARKER = "_IAM_SHARED_DATA_MARKER"
 
-    def __init__(self, boto3=None) -> None:
+    def __init__(self, *, region_name=None, boto3=None, **kwargs) -> None:
         self.boto3 = boto3 or MockBoto3()
 
     class _UserAccessKeyPair:
@@ -1055,7 +1055,7 @@ class MockBoto3OpenSearch:
                 return self._domains
             return None
 
-    def __init__(self, boto3=None) -> None:
+    def __init__(self, *, region_name=None, boto3=None, **kwargs) -> None:
         self.boto3 = boto3 or MockBoto3()
 
     def _mocked_shared_data(self) -> dict:
@@ -1095,7 +1095,7 @@ class MockBoto3Sts:
 
     _SHARED_DATA_MARKER = '_STS_SHARED_DATA_MARKER'
 
-    def __init__(self, boto3=None) -> None:
+    def __init__(self, *, region_name=None, boto3=None, **kwargs) -> None:
         self.boto3 = boto3 or MockBoto3()
 
     def _mocked_shared_data(self) -> dict:
@@ -1149,7 +1149,7 @@ class MockBoto3Kms:
                 return self._keys
             return None
 
-    def __init__(self, boto3=None) -> None:
+    def __init__(self, *, region_name=None, boto3=None, **kwargs) -> None:
         self.boto3 = boto3 or MockBoto3()
 
     def _mocked_shared_data(self) -> dict:
