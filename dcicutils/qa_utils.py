@@ -2,8 +2,7 @@
 qa_utils: Tools for use in quality assurance testing.
 """
 
-
-from __future__ import annotations # allows type hint references to containing class 
+from __future__ import annotations  # allows type hint references to containing class
 import configparser
 import contextlib
 import copy
@@ -703,7 +702,7 @@ class MockBoto3Session:
     #  - It wants access key ID and secret access key BOTH to come from the same source,
     #    e.g. does not get access key ID from environment variable and secret access key from file.
     #  - It reads region from EITHER the credentials file OR the config file, the former FIRST;
-    #    though (of course) it does NOT read access key ID or secret access key from the config file. 
+    #    though (of course) it does NOT read access key ID or secret access key from the config file.
     #  - The aws_access_key_id, aws_secret_access_key, and region properties in the credentials/config
     #    files may be EITHER upper AND/OR lower case; but the environment variables MUST be all upper case.
     #  - If file environment variables (i.e. AWS_SHARED_CREDENTIALS_FILE, AWS_CONFIG_FILE) are NOT set,
@@ -730,7 +729,7 @@ class MockBoto3Session:
         """
         Unsets any/all AWS credentials related environment variables for testing.
         """
-        for environ_name in AWS_CREDENTIALS_ENVIRON_NAMES:
+        for environ_name in self.AWS_CREDENTIALS_ENVIRON_NAMES:
             if environ_name in os.environ:
                 if environ_name.endswith("_FILE"):
                     os.environ.pop[environ_name] = "/dev/null"
@@ -740,7 +739,7 @@ class MockBoto3Session:
     def put_credentials_for_testing(self, *,
                                     aws_access_key_id: str = None,
                                     aws_secret_access_key: str = None,
-                                    region_name = None,
+                                    region_name: str = None,
                                     aws_credentials_dir: str = None, **kwargs) -> None:
         """
         Sets AWS credentials for testing.
@@ -755,7 +754,7 @@ class MockBoto3Session:
         NOTE: AWS session token not currently handled.
         """
 
-        # These kwargs key names are the same as those for the boto3.Session() constructor.
+        # These argument names are the same as those for the boto3.Session() constructor.
         self._aws_access_key_id = aws_access_key_id
         self._aws_secret_access_key = aws_secret_access_key
         self._aws_region = region_name
@@ -863,17 +862,19 @@ class MockBoto3Session:
             _, _, aws_region = self._read_aws_credentials_from_file(aws_credentials_file)
             if aws_region:
                 return aws_region
-            aws_config_file = os.path.join(aws_credentials_dir, "config")
+            aws_config_file = os.path.join(self._aws_credentials_dir, "config")
             _, _, aws_region = self._read_aws_credentials_from_file(aws_config_file)
             if aws_region:
                 return aws_region
         aws_region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION"))
         if aws_region:
             return aws_region
-        _, _, aws_region = self._read_aws_credentials_from_file(os.environ.get("AWS_SHARED_CREDENTIALS_FILE", "~/.aws/credentials"))
+        aws_credentials_file = os.environ.get("AWS_SHARED_CREDENTIALS_FILE", "~/.aws/credentials")
+        _, _, aws_region = self._read_aws_credentials_from_file(aws_credentials_file)
         if aws_region:
             return aws_region
-        _, _, aws_region = self._read_aws_credentials_from_file(os.environ.get("AWS_CONFIG_FILE", "~/.aws/config"))
+        aws_config_file = os.environ.get("AWS_CONFIG_FILE", "~/.aws/config")
+        _, _, aws_region = self._read_aws_credentials_from_file(aws_config_file)
         return aws_region
 
 
@@ -892,30 +893,37 @@ class MockBoto3Iam:
             self._id = str(uuid.uuid4())
             self._secret = str(uuid.uuid4())
             self._create_date = datetime.datetime.now()
+
         @property
         def id(self) -> str:
             return self._id
+
         @property
         def secret(self) -> str:
             return self._secret
+
         def get(self, key: str) -> Any:
             if key == "AccessKeyId":
                 return self._id
             elif key == "CreateDate":
                 return self._create_date
             return None
+
         def __getitem__(self, key: str) -> Any:
             return self.get(key)
 
     class _UserAccessKeyPairCollection:
         def __init__(self) -> None:
             self._access_key_pairs = []
+
         def add(self, access_key_pair: MockBoto3Iam._UserAccessKeyPair) -> None:
             self._access_key_pairs.append(access_key_pair)
+
         def get(self, key: str) -> Any:
             if key == "AccessKeyMetadata":
                 return self._access_key_pairs
             return None
+
         def __getitem__(self, key: str) -> Any:
             return self.get(key)
 
@@ -923,9 +931,11 @@ class MockBoto3Iam:
         def __init__(self, name: str) -> None:
             self._name = name
             self._access_keys = MockBoto3Iam._UserAccessKeyPairCollection()
+
         @property
         def name(self) -> str:
             return self._name
+
         def create_access_key_pair(self) -> MockBoto3Iam._UserAccessKeyPair:
             access_key_pair = MockBoto3Iam._UserAccessKeyPair()
             self._access_keys.add(access_key_pair)
@@ -934,12 +944,14 @@ class MockBoto3Iam:
     class _UserCollection:
         def __init__(self) -> None:
             self._users = []
+
         def all(self) -> list[MockBoto3Iam._User]:
             return self._users
 
     class _RoleCollection:
         def __init__(self) -> None:
             self._roles = []
+
         def __getitem__(self, key: str) -> Any:
             if key == "Roles":
                 return self._roles
@@ -948,6 +960,7 @@ class MockBoto3Iam:
     class _Role:
         def __init__(self, arn: str) -> None:
             self._arn = arn
+
         def __getitem__(self, key: str) -> Any:
             if key == "Arn":
                 return self._arn
@@ -1015,6 +1028,7 @@ class MockBoto3OpenSearch:
             self._domain_name = domain_name
             self._domain_endpoint_vpc = domain_endpoint_vpc
             self._domain_endpoint_https = domain_endpoint_https
+
         def __getitem__(self, key: str) -> Any:
             if key == "DomainName":
                 return self._domain_name
@@ -1032,8 +1046,10 @@ class MockBoto3OpenSearch:
     class _Domains:
         def __init__(self) -> None:
             self._domains = []
+
         def add(self, domain: MockBoto3OpenSearch._Domain) -> None:
             self._domains.append(domain)
+
         def __getitem__(self, key: str) -> Any:
             if key == "DomainNames":
                 return self._domains
@@ -1115,6 +1131,7 @@ class MockBoto3Kms:
     class _Key:
         def __init__(self, key_id: str):
             self._key_id = key_id
+
         def __getitem__(self, key: str) -> Any:
             if key == "KeyId":
                 return self._key_id
@@ -1123,8 +1140,10 @@ class MockBoto3Kms:
     class _Keys:
         def __init__(self):
             self._keys = []
+
         def add(self, key: MockBoto3Kms._Key) -> None:
             self._keys.append(key)
+
         def __getitem__(self, key: str):
             if key == "Keys":
                 return self._keys
