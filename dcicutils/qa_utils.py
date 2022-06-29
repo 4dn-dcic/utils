@@ -1186,7 +1186,7 @@ class MockBoto3Kms:
         elif isinstance(Policy, str):
             key_policy_string = Policy
         key_policies = self._mocked_key_policies()
-        key_policies[KeyId] = { "Policy": key_policy_string }
+        key_policies[KeyId] = {"Policy": key_policy_string}
 
     def get_key_policy(self, KeyId: str, PolicyName: str) -> Optional[dict]:
         if not KeyId:
