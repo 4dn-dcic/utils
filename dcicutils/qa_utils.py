@@ -1138,6 +1138,18 @@ class MockBoto3Kms:
                     }
         return None
 
+    def put_key_policy_for_testing(self, KeyId: str, Policy: str, PolicyName: str) -> None:
+        # TODO
+        pass
+
+    def put_key_policy(self, KeyId: str, Policy: str, PolicyName: str) -> None:
+        # TODO
+        pass
+
+    def get_key_policy(self, KeyId: str, PolicyName: str) -> Optional[dict]:
+        # TODO
+        pass
+
 
 @MockBoto3.register_client(kind='secretsmanager')
 class MockBoto3SecretsManager:
