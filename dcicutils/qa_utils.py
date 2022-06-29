@@ -691,12 +691,12 @@ class MockBoto3Session:
         self.boto3 = boto3 or MockBoto3()
 
         # These kwargs key names are the same as those for the boto3.Session() constructor.
-        self.aws_access_key_id = kwargs.get("aws_access_key_id")
-        self.aws_secret_access_key = kwargs.get("aws_secret_access_key")
-        self.aws_region = region_name
+        self._aws_access_key_id = kwargs.get("aws_access_key_id")
+        self._aws_secret_access_key = kwargs.get("aws_secret_access_key")
+        self._aws_region = region_name
 
         # These is specific for testing.
-        self.aws_credentials_dir = None
+        self._aws_credentials_dir = None
 
     # FYI: Some things to note about how boto3 (and probably any AWS client) reads AWS credentials/region.
     #  - It looks (of course) at envrionment variables before files.
@@ -716,37 +716,52 @@ class MockBoto3Session:
     def client(self, service_name, **kwargs):
         return self.boto3.client(service_name, **kwargs)
 
+    AWS_CREDENTIALS_ENVIRON_NAMES = [
+        "AWS_ACCESS_KEY_ID"
+        "AWS_CONFIG_FILE",
+        "AWS_DEFAULT_REGION",
+        "AWS_REGION",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+        "AWS_SHARED_CREDENTIALS_FILE"
+    ]
+
     def unset_environ_credentials_for_testing(self) -> None:
         """
         Unsets any/all AWS credentials related environment variables for testing.
         """
-        os.environ.pop("AWS_ACCESS_KEY_ID", None)
-        os.environ.pop("AWS_CONFIG_FILE", "/dev/null")
-        os.environ.pop("AWS_DEFAULT_REGION", None)
-        os.environ.pop("AWS_REGION", None)
-        os.environ.pop("AWS_SECRET_ACCESS_KEY", None)
-        os.environ.pop("AWS_SESSION_TOKEN", None)
-        os.environ.pop("AWS_SHARED_CREDENTIALS_FILE", "/dev/null")
+        for environ_name in AWS_CREDENTIALS_ENVIRON_NAMES:
+            if environ_name in os.environ:
+                if environ_name.endswith("_FILE"):
+                    os.environ.pop[environ_name] = "/dev/null"
+                else:
+                    del os.environ.pop[environ_name]
 
-    def put_credentials_for_testing(self, **kwargs) -> None:
+    def put_credentials_for_testing(self, *,
+                                    aws_access_key_id: str = None,
+                                    aws_secret_access_key: str = None,
+                                    region_name = None,
+                                    aws_credentials_dir: str = None, **kwargs) -> None:
         """
         Sets AWS credentials for testing.
-        The given named arguments may contain any of: aws_access_key_id, aws_secret_access_key, region_name, aws_credentials_dir
-        :param kwargs: May contain any of: aws_access_key_id, aws_secret_access_key, region_name, aws_credentials_dir
+
+        :param aws_access_key_id: AWS access key ID.
+        :param aws_secret_access_key: AWS secret access key.
+        :param region_name: AWS region name.
+        :param aws_credentials_dir: Full path to AWS credentials directory.
+        :param kwargs: Other arguments; none currently used.
 
         NOTE: Use unset_environ_credentials_for_testing() to clear these environment variables beforehand.
         NOTE: AWS session token not currently handled.
-
-        :param kwargs: Any of these arguments: aws_access_key_id, aws_secret_access_key, region_name, aws_credentials_dir
         """
 
         # These kwargs key names are the same as those for the boto3.Session() constructor.
-        self.aws_access_key_id = kwargs.get("aws_access_key_id")
-        self.aws_secret_access_key = kwargs.get("aws_secret_access_key")
-        self.aws_region = kwargs.get("region_name")
+        self._aws_access_key_id = aws_access_key_id
+        self._aws_secret_access_key = aws_secret_access_key
+        self._aws_region = region_name
 
         # These is specific for testing.
-        self.aws_credentials_dir = kwargs.get("aws_credentials_dir")
+        self._aws_credentials_dir = aws_credentials_dir
 
     def _read_aws_credentials_from_file(self, aws_credentials_file: str) -> (str, str, str):
         """
@@ -795,11 +810,11 @@ class MockBoto3Session:
 
         :return: AWS credentials determined as described above, in a Boto3Credentials object, or None.
         """
-        aws_access_key_id = self.aws_access_key_id
-        aws_secret_access_key = self.aws_secret_access_key
+        aws_access_key_id = self._aws_access_key_id
+        aws_secret_access_key = self._aws_secret_access_key
         if aws_access_key_id and aws_secret_access_key:
             return Boto3Credentials(access_key=aws_access_key_id, secret_key=aws_secret_access_key)
-        credentials_dir = self.aws_credentials_dir
+        credentials_dir = self._aws_credentials_dir
         if credentials_dir and os.path.isdir(credentials_dir):
             credentials_file = os.path.join(credentials_dir, "credentials")
             aws_access_key_id, aws_secret_access_key, _ = self._read_aws_credentials_from_file(credentials_file)
@@ -818,15 +833,15 @@ class MockBoto3Session:
     @property
     def region_name(self) -> Optional[str]:
         """
-        Returns the AWS region from the aws_region value, or in the credentials or config file
-        within the aws_credentials_dir, set in the constructor or set_credentials_for_testing();
+        Returns the AWS region from the _aws_region value, or in the credentials or config file
+        within the _aws_credentials_dir, set in the constructor or set_credentials_for_testing();
         or if not set there, then gets it via the standard AWS environment variable names,
         i.e. AWS_REGION, AWS_DEFAULT_REGION, AWS_SHARED_CREDENTIALS_FILE, or AWS_CONFIG_FILE.
 
         More specifically, returns AWS region from the first of these where defined; if defined returns None.
-        1. From the aws_region value set explicitly in the constructor or set_credentials_for_testing().
+        1. From the _aws_region value set explicitly in the constructor or set_credentials_for_testing().
         2. From the region property in the credentials file within the
-           aws_credentials_dir set explicitly in the constructor or set_credentials_for_testing().
+           _aws_credentials_dir set explicitly in the constructor or set_credentials_for_testing().
         3. From the value in the AWS_REGION environment variable (via os.environ).
         4. From the value in the AWS_DEFAULT_REGION environment variable (via os.environ).
         5. From the region property in the credentials file specified
@@ -838,13 +853,13 @@ class MockBoto3Session:
 
         NOTE: Use unset_environ_credentials_for_testing() to clear related environment variables beforehand.
 
-        :return: AWS region determined as described above, or None.
+        :return: AWS region name determined as described above, or None.
         """
-        aws_region = self.aws_region
+        aws_region = self._aws_region
         if aws_region:
             return aws_region
-        if self.aws_credentials_dir:
-            aws_credentials_file = os.path.join(self.aws_credentials_dir, "credentials")
+        if self._aws_credentials_dir:
+            aws_credentials_file = os.path.join(self._aws_credentials_dir, "credentials")
             _, _, aws_region = self._read_aws_credentials_from_file(aws_credentials_file)
             if aws_region:
                 return aws_region
@@ -943,15 +958,21 @@ class MockBoto3Iam:
         shared_data = shared_reality.get(self._SHARED_DATA_MARKER)
         if shared_data is None:
             shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
-            shared_data["users"] = MockBoto3Iam._UserCollection()
-            shared_data["roles"] = MockBoto3Iam._RoleCollection()
         return shared_data
 
-    def _mocked_users(self) -> Any:
-        return self._mocked_shared_data()["users"]
+    def _mocked_users(self) -> MockBoto3Iam._UserCollection:
+        mocked_shared_data = self._mocked_shared_data()
+        mocked_users = mocked_shared_data.get("users")
+        if not mocked_users:
+            mocked_shared_data["users"] = mocked_users = MockBoto3Iam._UserCollection()
+        return mocked_users
 
     def _mocked_roles(self) -> Any:
-        return self._mocked_shared_data()["roles"]
+        mocked_shared_data = self._mocked_shared_data()
+        mocked_roles = mocked_shared_data.get("roles")
+        if not mocked_roles:
+            mocked_shared_data["roles"] = mocked_roles = MockBoto3Iam._RoleCollection()
+        return mocked_roles
 
     def put_users_for_testing(self, users: list[str]) -> None:
         if isinstance(users, list) and len(users) > 0:
@@ -1026,11 +1047,14 @@ class MockBoto3OpenSearch:
         shared_data = shared_reality.get(self._SHARED_DATA_MARKER)
         if shared_data is None:
             shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
-            shared_data["domains"] = MockBoto3OpenSearch._Domains()
         return shared_data
 
     def _mocked_domains(self) -> dict:
-        return self._mocked_shared_data()["domains"]
+        mocked_shared_data = self._mocked_shared_data()
+        mocked_domains = mocked_shared_data.get("domains")
+        if not mocked_domains:
+            mocked_shared_data["domains"] = mocked_domains = MockBoto3OpenSearch._Domains()
+        return mocked_domains
 
     def put_domain_for_testing(self, domain_name: str, domain_endpoint_vpc: str, domain_endpoint_https: bool) -> None:
         domains = self._mocked_domains()
@@ -1063,11 +1087,14 @@ class MockBoto3Sts:
         shared_data = shared_reality.get(self._SHARED_DATA_MARKER)
         if shared_data is None:
             shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
-            shared_data["caller_identity"] = {}
         return shared_data
 
     def _mocked_caller_identity(self) -> dict:
-        return self._mocked_shared_data()["caller_identity"]
+        mocked_shared_data = self._mocked_shared_data()
+        mocked_caller_identity = mocked_shared_data.get("caller_identity")
+        if not mocked_caller_identity:
+            mocked_shared_data["caller_identity"] = mocked_caller_identity = {}
+        return mocked_caller_identity
 
     def put_caller_identity_for_testing(self, account: str, user_arn: str = None) -> None:
         caller_identity = self._mocked_caller_identity()
@@ -1111,15 +1138,21 @@ class MockBoto3Kms:
         shared_data = shared_reality.get(self._SHARED_DATA_MARKER)
         if shared_data is None:
             shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
-            shared_data["keys"] = MockBoto3Kms._Keys()
-            shared_data["key_policies"] = {}
         return shared_data
 
     def _mocked_keys(self) -> dict:
-        return self._mocked_shared_data()["keys"]
+        mocked_shared_data = self._mocked_shared_data()
+        mocked_keys = mocked_shared_data.get("keys")
+        if not mocked_keys:
+            mocked_shared_data["keys"] = mocked_keys = MockBoto3Kms._Keys()
+        return mocked_keys
 
     def _mocked_key_policies(self) -> dict:
-        return self._mocked_shared_data()["key_policies"]
+        mocked_shared_data = self._mocked_shared_data()
+        mocked_key_policies = mocked_shared_data.get("key_policies")
+        if not mocked_key_policies:
+            mocked_shared_data["key_policies"] = mocked_key_policies = {}
+        return mocked_key_policies
 
     def put_key_for_testing(self, KeyId: str) -> None:
         keys = self._mocked_keys()
