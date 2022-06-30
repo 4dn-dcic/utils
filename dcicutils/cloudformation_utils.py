@@ -6,7 +6,7 @@ import re
 from .common import DEFAULT_ECOSYSTEM
 from .lang_utils import conjoined_list
 from .misc_utils import PRINT, find_associations, find_association, snake_case_to_camel_case, ignored
-from .env_utils import prod_bucket_env, is_stg_or_prd_env, ecr_repository_for_env
+from .env_utils import is_stg_or_prd_env, ecr_repository_for_env
 
 
 logging.basicConfig()
