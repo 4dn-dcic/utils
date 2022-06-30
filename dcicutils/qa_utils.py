@@ -2,7 +2,6 @@
 qa_utils: Tools for use in quality assurance testing.
 """
 
-from __future__ import annotations  # allows type hint references to containing class
 import configparser
 import contextlib
 import copy
@@ -919,7 +918,7 @@ class MockBoto3Iam:
         def __init__(self) -> None:
             self._access_key_pairs = []
 
-        def add(self, access_key_pair: MockBoto3Iam._UserAccessKeyPair) -> None:
+        def add(self, access_key_pair: object) -> None:
             self._access_key_pairs.append(access_key_pair)
 
         def get(self, key: str) -> Any:
@@ -939,7 +938,7 @@ class MockBoto3Iam:
         def name(self) -> str:
             return self._name
 
-        def create_access_key_pair(self) -> MockBoto3Iam._UserAccessKeyPair:
+        def create_access_key_pair(self) -> object:
             access_key_pair = MockBoto3Iam._UserAccessKeyPair()
             self._access_keys.add(access_key_pair)
             return access_key_pair
@@ -948,7 +947,7 @@ class MockBoto3Iam:
         def __init__(self) -> None:
             self._users = []
 
-        def all(self) -> list[MockBoto3Iam._User]:
+        def all(self) -> list:
             return self._users
 
     class _RoleCollection:
@@ -976,7 +975,7 @@ class MockBoto3Iam:
             shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
         return shared_data
 
-    def _mocked_users(self) -> MockBoto3Iam._UserCollection:
+    def _mocked_users(self) -> object:
         mocked_shared_data = self._mocked_shared_data()
         mocked_users = mocked_shared_data.get("users")
         if not mocked_users:
@@ -990,14 +989,14 @@ class MockBoto3Iam:
             mocked_shared_data["roles"] = mocked_roles = MockBoto3Iam._RoleCollection()
         return mocked_roles
 
-    def put_users_for_testing(self, users: list[str]) -> None:
+    def put_users_for_testing(self, users: list) -> None:
         if isinstance(users, list) and len(users) > 0:
             existing_users = self._mocked_users().all()
             for user in users:
                 if user not in existing_users:
                     existing_users.append(MockBoto3Iam._User(user))
 
-    def put_roles_for_testing(self, roles: list[str]) -> None:
+    def put_roles_for_testing(self, roles: list) -> None:
         if isinstance(roles, list) and len(roles) > 0:
             existing_roles = self._mocked_roles()["Roles"]
             for role in roles:
@@ -1005,13 +1004,13 @@ class MockBoto3Iam:
                     existing_roles.append(MockBoto3Iam._Role(role))
 
     @property
-    def users(self) -> MockBoto3Iam._UserCollection:
+    def users(self) -> object:
         return self._mocked_users()
 
-    def list_roles(self) -> MockBoto3Iam._RoleCollection:
+    def list_roles(self) -> object:
         return self._mocked_roles()
 
-    def list_access_keys(self, UserName: str) -> Optional[MockBoto3Iam._UserAccessKeyPairCollection]:
+    def list_access_keys(self, UserName: str) -> Optional[object]:
         existing_users = self._mocked_users().all()
         for existing_user in existing_users:
             if existing_user.name == UserName:
@@ -1050,7 +1049,7 @@ class MockBoto3OpenSearch:
         def __init__(self) -> None:
             self._domains = []
 
-        def add(self, domain: MockBoto3OpenSearch._Domain) -> None:
+        def add(self, domain: object) -> None:
             self._domains.append(domain)
 
         def __getitem__(self, key: str) -> Any:
@@ -1144,7 +1143,7 @@ class MockBoto3Kms:
         def __init__(self):
             self._keys = []
 
-        def add(self, key: MockBoto3Kms._Key) -> None:
+        def add(self, key: object) -> None:
             self._keys.append(key)
 
         def __getitem__(self, key: str):
