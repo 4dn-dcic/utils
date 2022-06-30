@@ -2,7 +2,7 @@
 qa_utils: Tools for use in quality assurance testing.
 """
 
-
+import configparser
 import contextlib
 import copy
 import datetime
@@ -16,9 +16,11 @@ import pytz
 import re
 import time
 import toml
+from typing import Any, Optional
 import uuid
 import warnings
 
+from botocore.credentials import Credentials as Boto3Credentials
 from botocore.exceptions import ClientError
 from json import dumps as json_dumps, loads as json_loads
 from unittest import mock
@@ -678,14 +680,542 @@ class MockBoto3:
         return _SessionModule(boto3=self)
 
 
+@MockBoto3.register_client(kind='session')
 class MockBoto3Session:
 
-    def __init__(self, *, region_name, boto3):
-        self.region_name = region_name
-        self.boto3 = boto3
+    _SHARED_DATA_MARKER = "_SESSION_SHARED_DATA_MARKER"
+
+    def __init__(self, *, region_name=None, boto3=None, **kwargs):
+        self.boto3 = boto3 or MockBoto3()
+
+        # These kwargs key names are the same as those for the boto3.Session() constructor.
+        self._aws_access_key_id = kwargs.get("aws_access_key_id")
+        self._aws_secret_access_key = kwargs.get("aws_secret_access_key")
+        self._aws_region = region_name
+
+        # These is specific for testing.
+        self._aws_credentials_dir = None
+
+    # FYI: Some things to note about how boto3 (and probably any AWS client) reads AWS credentials/region.
+    #  - It looks (of course) at envrionment variables before files.
+    #  - It wants access key ID and secret access key BOTH to come from the same source,
+    #    e.g. does not get access key ID from environment variable and secret access key from file.
+    #  - It reads region from EITHER the credentials file OR the config file, the former FIRST;
+    #    though (of course) it does NOT read access key ID or secret access key from the config file.
+    #  - The aws_access_key_id, aws_secret_access_key, and region properties in the credentials/config
+    #    files may be EITHER upper AND/OR lower case; but the environment variables MUST be all upper case.
+    #  - If file environment variables (i.e. AWS_SHARED_CREDENTIALS_FILE, AWS_CONFIG_FILE) are NOT set,
+    #    i.e. SET to None, it WILL look at the default credentials/config files (e.g. ~/.aws/credentials);
+    #    which is why we set to /dev/null in unset_environ_credentials_for_testing().
+    #
+    # NOTE: The get_credentials method, region_name property, and related methods were
+    # added to support usage by 4dn-cloud-infra/setup-remaining-secrets unit tests (June 2022).
 
     def client(self, service_name, **kwargs):
         return self.boto3.client(service_name, **kwargs)
+
+    AWS_CREDENTIALS_ENVIRON_NAMES = [
+        "AWS_ACCESS_KEY_ID"
+        "AWS_CONFIG_FILE",
+        "AWS_DEFAULT_REGION",
+        "AWS_REGION",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+        "AWS_SHARED_CREDENTIALS_FILE"
+    ]
+
+    def unset_environ_credentials_for_testing(self) -> None:
+        """
+        Unsets any/all AWS credentials related environment variables for testing.
+        """
+        for environ_name in self.AWS_CREDENTIALS_ENVIRON_NAMES:
+            if environ_name in os.environ:
+                if environ_name.endswith("_FILE"):
+                    os.environ[environ_name] = "/dev/null"
+                else:
+                    del os.environ[environ_name]
+
+    def put_credentials_for_testing(self, *,
+                                    aws_access_key_id: str = None,
+                                    aws_secret_access_key: str = None,
+                                    region_name: str = None,
+                                    aws_credentials_dir: str = None, **kwargs) -> None:
+        """
+        Sets AWS credentials for testing.
+
+        :param aws_access_key_id: AWS access key ID.
+        :param aws_secret_access_key: AWS secret access key.
+        :param region_name: AWS region name.
+        :param aws_credentials_dir: Full path to AWS credentials directory.
+        :param kwargs: Other arguments; none currently used.
+
+        NOTE: Use unset_environ_credentials_for_testing() to clear these environment variables beforehand.
+        NOTE: AWS session token not currently handled.
+        """
+
+        # These argument names are the same as those for the boto3.Session() constructor.
+        self._aws_access_key_id = aws_access_key_id
+        self._aws_secret_access_key = aws_secret_access_key
+        self._aws_region = region_name
+
+        # These is specific for testing.
+        self._aws_credentials_dir = aws_credentials_dir
+
+    def _read_aws_credentials_from_file(self, aws_credentials_file: str) -> (str, str, str):
+        """
+        Returns from the given AWS credentials file the values of the following properties;
+        and returns a tuple with these values, in this listed order:
+        aws_access_key_id, aws_secret_access_key, region
+
+        :param aws_credentials_file: Full path to AWS credentials (or config) file.
+        :return: Tuple containing aws_access_key_id, aws_secret_access_key, region values; None if not present.
+        """
+        try:
+            if not aws_credentials_file or not os.path.isfile(aws_credentials_file):
+                return None, None, None
+            config = configparser.ConfigParser()
+            config.read(aws_credentials_file)
+            if not config or not config.sections() or len(config.sections()) <= 0:
+                return None, None, None
+            if "default" in config.sections():
+                config_section_name = "default"
+            else:
+                config_section_name = config.sections()[0]
+            config_keys_values = {key.lower(): value for key, value in config[config_section_name].items()}
+            aws_access_key_id = config_keys_values.get("aws_access_key_id")
+            aws_secret_access_key = config_keys_values.get("aws_secret_access_key")
+            aws_region = config_keys_values.get("region")
+            return aws_access_key_id, aws_secret_access_key, aws_region
+        except Exception:
+            return None, None, None,
+
+    def get_credentials(self) -> Optional[Boto3Credentials]:
+        """
+        Returns the AWS credentials (Boto3Credentials) from the aws_access_key_id and aws_secret_access_key values,
+        or in the credentials file within the aws_credentials_dir, set in set_credentials_for_testing(); or if not
+        set there, then gets them via the standard AWS environment variable names, i.e. AWS_ACCESS_KEY_ID,
+        AWS_SECRET_ACCESS_KEY, AWS_SHARED_CREDENTIALS_FILE.
+
+        More specifically, returns AWS access key ID and secret access key as a Boto3Credentials,
+        from the FIRST of these where BOTH are defined; if BOTH are NOT defined returns None.
+        1. From the aws_access_key_id and aws_secret_access_key values set explicitly in set_credentials_for_testing().
+        2. From the aws_access_key_id and aws_secret_access_key properties in the credentials
+           file within the aws_credentials_dir set explicitly in set_credentials_for_testing().
+        3. From the values in the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.
+        4. From the aws_access_key_id and aws_secret_access_key properties in the
+           credentials file specified by the AWS_SHARED_CREDENTIALS_FILE environment variable.
+        5. From the aws_access_key_id and aws_secret_access_key properties in the ~/.aws/credentials file.
+
+        NOTE: Use unset_environ_credentials_for_testing() to clear related environment variables beforehand.
+        NOTE: AWS session token not currently handled.
+
+        :return: AWS credentials determined as described above, in a Boto3Credentials object, or None.
+        """
+        aws_access_key_id = self._aws_access_key_id
+        aws_secret_access_key = self._aws_secret_access_key
+        if aws_access_key_id and aws_secret_access_key:
+            return Boto3Credentials(access_key=aws_access_key_id, secret_key=aws_secret_access_key)
+        aws_credentials_dir = self._aws_credentials_dir
+        if aws_credentials_dir and os.path.isdir(aws_credentials_dir):
+            aws_credentials_file = os.path.join(aws_credentials_dir, "credentials")
+            aws_access_key_id, aws_secret_access_key, _ = self._read_aws_credentials_from_file(aws_credentials_file)
+            if aws_access_key_id and aws_secret_access_key:
+                return Boto3Credentials(access_key=aws_access_key_id, secret_key=aws_secret_access_key)
+        aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
+        aws_secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
+        if aws_access_key_id and aws_secret_access_key:
+            return Boto3Credentials(access_key=aws_access_key_id, secret_key=aws_secret_access_key)
+        aws_credentials_file = os.environ.get("AWS_SHARED_CREDENTIALS_FILE", "~/.aws/credentials")
+        aws_access_key_id, aws_secret_access_key, _ = self._read_aws_credentials_from_file(aws_credentials_file)
+        if aws_access_key_id and aws_secret_access_key:
+            return Boto3Credentials(access_key=aws_access_key_id, secret_key=aws_secret_access_key)
+        return Boto3Credentials(access_key=None, secret_key=None)
+
+    @property
+    def region_name(self) -> Optional[str]:
+        """
+        Returns the AWS region from the _aws_region value, or in the credentials or config file
+        within the _aws_credentials_dir, set in the constructor or set_credentials_for_testing();
+        or if not set there, then gets it via the standard AWS environment variable names,
+        i.e. AWS_REGION, AWS_DEFAULT_REGION, AWS_SHARED_CREDENTIALS_FILE, or AWS_CONFIG_FILE.
+
+        More specifically, returns AWS region from the first of these where defined; if defined returns None.
+        1. From the _aws_region value set explicitly in the constructor or set_credentials_for_testing().
+        2. From the region property in the credentials file within the
+           _aws_credentials_dir set explicitly in the constructor or set_credentials_for_testing().
+        3. From the value in the AWS_REGION environment variable (via os.environ).
+        4. From the value in the AWS_DEFAULT_REGION environment variable (via os.environ).
+        5. From the region property in the credentials file specified
+           by the AWS_SHARED_CREDENTIALS_FILE environment variable (via os.environ).
+        6. From the region property in the config file specified
+           by the AWS_CONFIG_FILE environment variable (via os.environ).
+        7. From the region property in the ~/.aws/credentials file.
+        8. From the region property in the ~/.aws/config file.
+
+        NOTE: Use unset_environ_credentials_for_testing() to clear related environment variables beforehand.
+
+        :return: AWS region name determined as described above, or None.
+        """
+        aws_region = self._aws_region
+        if aws_region:
+            return aws_region
+        if self._aws_credentials_dir:
+            aws_credentials_file = os.path.join(self._aws_credentials_dir, "credentials")
+            _, _, aws_region = self._read_aws_credentials_from_file(aws_credentials_file)
+            if aws_region:
+                return aws_region
+            aws_config_file = os.path.join(self._aws_credentials_dir, "config")
+            _, _, aws_region = self._read_aws_credentials_from_file(aws_config_file)
+            if aws_region:
+                return aws_region
+        aws_region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION"))
+        if aws_region:
+            return aws_region
+        aws_credentials_file = os.environ.get("AWS_SHARED_CREDENTIALS_FILE", "~/.aws/credentials")
+        _, _, aws_region = self._read_aws_credentials_from_file(aws_credentials_file)
+        if aws_region:
+            return aws_region
+        aws_config_file = os.environ.get("AWS_CONFIG_FILE", "~/.aws/config")
+        _, _, aws_region = self._read_aws_credentials_from_file(aws_config_file)
+        return aws_region
+
+
+# This MockBoto3Iam class is a minimal implementation, just enough to support the
+# original usage by 4dn-cloud-infra/setup-remaining-secrets unit tests (June 2022).
+@MockBoto3.register_client(kind='iam')
+class MockBoto3Iam:
+
+    _SHARED_DATA_MARKER = "_IAM_SHARED_DATA_MARKER"
+
+    def __init__(self, *, region_name=None, boto3=None, **kwargs) -> None:
+        self.boto3 = boto3 or MockBoto3()
+
+    class _UserAccessKeyPair:
+        def __init__(self) -> None:
+            self._id = str(uuid.uuid4())
+            self._secret = str(uuid.uuid4())
+            self._create_date = datetime.datetime.now()
+
+        @property
+        def id(self) -> str:
+            return self._id
+
+        @property
+        def secret(self) -> str:
+            return self._secret
+
+        def get(self, key: str) -> Any:
+            if key == "AccessKeyId":
+                return self._id
+            elif key == "CreateDate":
+                return self._create_date
+            return None
+
+        def __getitem__(self, key: str) -> Any:
+            return self.get(key)
+
+    class _UserAccessKeyPairCollection:
+        def __init__(self) -> None:
+            self._access_key_pairs = []
+
+        def add(self, access_key_pair: object) -> None:
+            self._access_key_pairs.append(access_key_pair)
+
+        def get(self, key: str) -> Any:
+            if key == "AccessKeyMetadata":
+                return self._access_key_pairs
+            return None
+
+        def __getitem__(self, key: str) -> Any:
+            return self.get(key)
+
+    class _User:
+        def __init__(self, name: str) -> None:
+            self._name = name
+            self._access_keys = MockBoto3Iam._UserAccessKeyPairCollection()
+
+        @property
+        def name(self) -> str:
+            return self._name
+
+        def create_access_key_pair(self) -> object:
+            access_key_pair = MockBoto3Iam._UserAccessKeyPair()
+            self._access_keys.add(access_key_pair)
+            return access_key_pair
+
+    class _UserCollection:
+        def __init__(self) -> None:
+            self._users = []
+
+        def all(self) -> list:
+            return self._users
+
+    class _RoleCollection:
+        def __init__(self) -> None:
+            self._roles = []
+
+        def __getitem__(self, key: str) -> Any:
+            if key == "Roles":
+                return self._roles
+            return None
+
+    class _Role:
+        def __init__(self, arn: str) -> None:
+            self._arn = arn
+
+        def __getitem__(self, key: str) -> Any:
+            if key == "Arn":
+                return self._arn
+            return None
+
+    def _mocked_shared_data(self) -> dict:
+        shared_reality = self.boto3.shared_reality
+        shared_data = shared_reality.get(self._SHARED_DATA_MARKER)
+        if shared_data is None:
+            shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
+        return shared_data
+
+    def _mocked_users(self) -> object:
+        mocked_shared_data = self._mocked_shared_data()
+        mocked_users = mocked_shared_data.get("users")
+        if not mocked_users:
+            mocked_shared_data["users"] = mocked_users = MockBoto3Iam._UserCollection()
+        return mocked_users
+
+    def _mocked_roles(self) -> Any:
+        mocked_shared_data = self._mocked_shared_data()
+        mocked_roles = mocked_shared_data.get("roles")
+        if not mocked_roles:
+            mocked_shared_data["roles"] = mocked_roles = MockBoto3Iam._RoleCollection()
+        return mocked_roles
+
+    def put_users_for_testing(self, users: list) -> None:
+        if isinstance(users, list) and len(users) > 0:
+            existing_users = self._mocked_users().all()
+            for user in users:
+                if user not in existing_users:
+                    existing_users.append(MockBoto3Iam._User(user))
+
+    def put_roles_for_testing(self, roles: list) -> None:
+        if isinstance(roles, list) and len(roles) > 0:
+            existing_roles = self._mocked_roles()["Roles"]
+            for role in roles:
+                if role not in existing_roles:
+                    existing_roles.append(MockBoto3Iam._Role(role))
+
+    @property
+    def users(self) -> object:
+        return self._mocked_users()
+
+    def list_roles(self) -> object:
+        return self._mocked_roles()
+
+    def list_access_keys(self, UserName: str) -> Optional[object]:
+        existing_users = self._mocked_users().all()
+        for existing_user in existing_users:
+            if existing_user.name == UserName:
+                return existing_user._access_keys
+        return None
+
+
+# This MockBoto3OpenSearch class is a minimal implementation, just enough to support
+# the original usage by 4dn-cloud-infra/setup-remaining-secrets unit tests (June 2022).
+@MockBoto3.register_client(kind='opensearch')
+class MockBoto3OpenSearch:
+
+    _SHARED_DATA_MARKER = '_OPENSEARCH_SHARED_DATA_MARKER'
+
+    class _Domain:
+        def __init__(self, domain_name: str, domain_endpoint_vpc: str, domain_endpoint_https: bool) -> None:
+            self._domain_name = domain_name
+            self._domain_endpoint_vpc = domain_endpoint_vpc
+            self._domain_endpoint_https = domain_endpoint_https
+
+        def __getitem__(self, key: str) -> Any:
+            if key == "DomainName":
+                return self._domain_name
+            elif key == "DomainStatus":
+                return {
+                    "Endpoints": {
+                        "vpc": self._domain_endpoint_vpc
+                    },
+                    "DomainEndpointOptions": {
+                        "EnforceHTTPS": self._domain_endpoint_https
+                    }
+                }
+            return None
+
+    class _Domains:
+        def __init__(self) -> None:
+            self._domains = []
+
+        def add(self, domain: object) -> None:
+            self._domains.append(domain)
+
+        def __getitem__(self, key: str) -> Any:
+            if key == "DomainNames":
+                return self._domains
+            return None
+
+    def __init__(self, *, region_name=None, boto3=None, **kwargs) -> None:
+        self.boto3 = boto3 or MockBoto3()
+
+    def _mocked_shared_data(self) -> dict:
+        shared_reality = self.boto3.shared_reality
+        shared_data = shared_reality.get(self._SHARED_DATA_MARKER)
+        if shared_data is None:
+            shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
+        return shared_data
+
+    def _mocked_domains(self) -> dict:
+        mocked_shared_data = self._mocked_shared_data()
+        mocked_domains = mocked_shared_data.get("domains")
+        if not mocked_domains:
+            mocked_shared_data["domains"] = mocked_domains = MockBoto3OpenSearch._Domains()
+        return mocked_domains
+
+    def put_domain_for_testing(self, domain_name: str, domain_endpoint_vpc: str, domain_endpoint_https: bool) -> None:
+        domains = self._mocked_domains()
+        domains.add(MockBoto3OpenSearch._Domain(domain_name, domain_endpoint_vpc, domain_endpoint_https))
+
+    def list_domain_names(self) -> dict:
+        return self._mocked_domains()
+
+    def describe_domain(self, DomainName: str) -> Optional[dict]:
+        domains = self._mocked_domains()["DomainNames"]
+        if domains:
+            for domain in domains:
+                if domain["DomainName"] == DomainName:
+                    return domain
+        return None
+
+
+# This MockBoto3Sts class is a minimal implementation, just enough to support the
+# original usage by 4dn-cloud-infra/setup-remaining-secrets unit tests (June 2022).
+@MockBoto3.register_client(kind='sts')
+class MockBoto3Sts:
+
+    _SHARED_DATA_MARKER = '_STS_SHARED_DATA_MARKER'
+
+    def __init__(self, *, region_name=None, boto3=None, **kwargs) -> None:
+        self.boto3 = boto3 or MockBoto3()
+
+    def _mocked_shared_data(self) -> dict:
+        shared_reality = self.boto3.shared_reality
+        shared_data = shared_reality.get(self._SHARED_DATA_MARKER)
+        if shared_data is None:
+            shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
+        return shared_data
+
+    def _mocked_caller_identity(self) -> dict:
+        mocked_shared_data = self._mocked_shared_data()
+        mocked_caller_identity = mocked_shared_data.get("caller_identity")
+        if not mocked_caller_identity:
+            mocked_shared_data["caller_identity"] = mocked_caller_identity = {}
+        return mocked_caller_identity
+
+    def put_caller_identity_for_testing(self, account: str, user_arn: str = None) -> None:
+        caller_identity = self._mocked_caller_identity()
+        caller_identity["Account"] = account
+        caller_identity["Arn"] = user_arn
+
+    def get_caller_identity(self) -> dict:
+        return self._mocked_caller_identity()
+
+
+# This MockBoto3Kms class is a minimal implementation, just enough to support the
+# original usage by 4dn-cloud-infra/setup-remaining-secrets unit tests (June 2022).
+@MockBoto3.register_client(kind='kms')
+class MockBoto3Kms:
+
+    _SHARED_DATA_MARKER = '_KMS_SHARED_DATA_MARKER'
+
+    class _Key:
+        def __init__(self, key_id: str):
+            self._key_id = key_id
+
+        def __getitem__(self, key: str) -> Any:
+            if key == "KeyId":
+                return self._key_id
+            return None
+
+    class _Keys:
+        def __init__(self):
+            self._keys = []
+
+        def add(self, key: object) -> None:
+            self._keys.append(key)
+
+        def __getitem__(self, key: str):
+            if key == "Keys":
+                return self._keys
+            return None
+
+    def __init__(self, *, region_name=None, boto3=None, **kwargs) -> None:
+        self.boto3 = boto3 or MockBoto3()
+
+    def _mocked_shared_data(self) -> dict:
+        shared_reality = self.boto3.shared_reality
+        shared_data = shared_reality.get(self._SHARED_DATA_MARKER)
+        if shared_data is None:
+            shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
+        return shared_data
+
+    def _mocked_keys(self) -> dict:
+        mocked_shared_data = self._mocked_shared_data()
+        mocked_keys = mocked_shared_data.get("keys")
+        if not mocked_keys:
+            mocked_shared_data["keys"] = mocked_keys = MockBoto3Kms._Keys()
+        return mocked_keys
+
+    def _mocked_key_policies(self) -> dict:
+        mocked_shared_data = self._mocked_shared_data()
+        mocked_key_policies = mocked_shared_data.get("key_policies")
+        if not mocked_key_policies:
+            mocked_shared_data["key_policies"] = mocked_key_policies = {}
+        return mocked_key_policies
+
+    def put_key_for_testing(self, KeyId: str) -> None:
+        keys = self._mocked_keys()
+        keys.add(MockBoto3Kms._Key(KeyId))
+
+    def put_key_policy_for_testing(self, KeyId: str, Policy: dict) -> None:
+        self.put_key_policy(KeyId, Policy, PolicyName="default")
+
+    def list_keys(self) -> dict:
+        return self._mocked_keys()
+
+    def describe_key(self, KeyId: str) -> Optional[dict]:  # noQA - Argument names chosen for AWS consistency
+        keys = self._mocked_keys()["Keys"]
+        if keys:
+            for key in keys:
+                if key["KeyId"] == KeyId:
+                    return {
+                        "KeyMetadata": {
+                            "KeyManager": "CUSTOMER"
+                        }
+                    }
+        return None
+
+    def put_key_policy(self, KeyId: str, Policy: str, PolicyName: str) -> None:
+        if not KeyId:
+            raise ValueError(f"KeyId value must be set for kms.put_key_policy.")
+        if PolicyName != "default":
+            raise ValueError(f"PolicyName value must be 'default' for kms.put_key_policy.")
+        if isinstance(Policy, dict):
+            key_policy_string = json_dumps(Policy)
+        elif isinstance(Policy, str):
+            key_policy_string = Policy
+        key_policies = self._mocked_key_policies()
+        key_policies[KeyId] = {"Policy": key_policy_string}
+
+    def get_key_policy(self, KeyId: str, PolicyName: str) -> Optional[dict]:
+        if not KeyId:
+            raise ValueError(f"KeyId value must be set for kms.get_key_policy.")
+        if PolicyName != "default":
+            raise ValueError(f"PolicyName value must be 'default' for kms.get_key_policy.")
+        key_policies = self._mocked_key_policies()
+        return key_policies.get(KeyId)
 
 
 @MockBoto3.register_client(kind='secretsmanager')
@@ -711,12 +1241,37 @@ class MockBoto3SecretsManager:
 
     def get_secret_value(self, SecretId):  # noQA - Argument names must be compatible with AWS
         secrets = self._mocked_secrets()
-        return {'SecretString': secrets[SecretId]}
+        secret_value = secrets[SecretId]
+        if isinstance(secret_value, dict):
+            return {'SecretString': json_dumps(secret_value)}
+        else:
+            return {'SecretString': secret_value}
+
+    def put_secret_key_value_for_testing(self, SecretId: str, SecretKey: str, SecretKeyValue: str):  # noQA - Argument names chosen for AWS consistency
+        if SecretId and SecretKey:
+            secrets = self._mocked_secrets()
+            secret_value = secrets.get(SecretId)
+            if not secret_value:
+                secrets[SecretId] = {}
+            secrets[SecretId][SecretKey] = SecretKeyValue
+
+    def get_secret_key_value_for_testing(self, SecretId, SecretKey):  # noQA - Argument names must be compatible with AWS
+        secrets = self._mocked_secrets()
+        secret_value = secrets[SecretId]
+        if isinstance(secret_value, dict):
+            secret_value_json = secret_value
+        else:
+            secret_value_json = json_loads(secret_value)
+        return secret_value_json[SecretKey]
 
     def list_secrets(self):
         secrets = self._mocked_secrets()
         # This really returns dictionaries with lots more things, but we'll start slow. :) -kmp 17-Feb-2022
         return {'SecretList': [{'Name': key} for key, _ in secrets.items()]}
+
+    def update_secret(self, SecretId: str, SecretString: str) -> None:
+        secrets = self._mocked_secrets()
+        secrets[SecretId] = SecretString
 
 
 @MockBoto3.register_client(kind='cloudformation')
