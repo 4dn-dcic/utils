@@ -771,21 +771,24 @@ class MockBoto3Session:
         :param aws_credentials_file: Full path to AWS credentials (or config) file.
         :return: Tuple containing aws_access_key_id, aws_secret_access_key, region values; None if not present.
         """
-        if not aws_credentials_file or not os.path.isfile(aws_credentials_file):
-            return None, None, None
-        config = configparser.ConfigParser()
-        config.read(aws_credentials_file)
-        if not config or len(config) <= 0:
-            return None, None, None
-        if "default" in config:
-            config_section_name = "default"
-        else:
-            config_section_name = config[0]
-        config_keys_values = {key.lower(): value for key, value in config[config_section_name].items()}
-        aws_access_key_id = config_keys_values.get("aws_access_key_id")
-        aws_secret_access_key = config_keys_values.get("aws_secret_access_key")
-        aws_region = config_keys_values.get("region")
-        return aws_access_key_id, aws_secret_access_key, aws_region
+        try:
+            if not aws_credentials_file or not os.path.isfile(aws_credentials_file):
+                return None, None, None
+            config = configparser.ConfigParser()
+            config.read(aws_credentials_file)
+            if not config or not config.sections() or len(config.sections()) <= 0:
+                return None, None, None
+            if "default" in config.sections():
+                config_section_name = "default"
+            else:
+                config_section_name = config.sections()[0]
+            config_keys_values = {key.lower(): value for key, value in config[config_section_name].items()}
+            aws_access_key_id = config_keys_values.get("aws_access_key_id")
+            aws_secret_access_key = config_keys_values.get("aws_secret_access_key")
+            aws_region = config_keys_values.get("region")
+            return aws_access_key_id, aws_secret_access_key, aws_region
+        except:
+            return None, None, None,
 
     def get_credentials(self) -> Optional[Boto3Credentials]:
         """
@@ -827,7 +830,7 @@ class MockBoto3Session:
         aws_access_key_id, aws_secret_access_key, _ = self._read_aws_credentials_from_file(aws_credentials_file)
         if aws_access_key_id and aws_secret_access_key:
             return Boto3Credentials(access_key=aws_access_key_id, secret_key=aws_secret_access_key)
-        return None
+        return Boto3Credentials(access_key=None, secret_key=None)
 
     @property
     def region_name(self) -> Optional[str]:
