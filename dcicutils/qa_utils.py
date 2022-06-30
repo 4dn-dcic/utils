@@ -787,7 +787,7 @@ class MockBoto3Session:
             aws_secret_access_key = config_keys_values.get("aws_secret_access_key")
             aws_region = config_keys_values.get("region")
             return aws_access_key_id, aws_secret_access_key, aws_region
-        except:
+        except Exception:
             return None, None, None,
 
     def get_credentials(self) -> Optional[Boto3Credentials]:
