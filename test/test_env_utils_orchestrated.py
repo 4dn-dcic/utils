@@ -15,10 +15,11 @@ from dcicutils.env_utils import (
     is_indexer_env, indexer_env_for_env, classify_server_url,
     short_env_name, full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
     # make_env_name_cfn_compatible,
-    get_foursight_bucket, get_foursight_bucket_prefix,
+    get_foursight_bucket, get_foursight_bucket_prefix, ecr_repository_for_env,
     # New support
     EnvUtils, p, c, get_env_real_url
 )
+from dcicutils.env_utils_legacy import FF_PRODUCTION_ECR_REPOSITORY
 from dcicutils.exceptions import (
     BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
     EnvUtilsLoadError,
@@ -76,6 +77,35 @@ def using_orchestrated_behavior(data: Optional[dict] = None):
 
 
 @using_orchestrated_behavior()
+def test_orchestrated_ecr_repository_for_cgap_env():
+
+    for env in ['acme-prd', 'acme-stg']:
+        val = ecr_repository_for_env(env)
+        print(f"env={env} val={val}")
+        assert val != FF_PRODUCTION_ECR_REPOSITORY
+        assert val == env
+    for env in ['acme-mastertest', 'acme-foo']:
+        val = ecr_repository_for_env(env)
+        print(f"env={env} val={val}")
+        assert val == env
+
+
+@using_orchestrated_behavior(data=EnvUtils.SAMPLE_TEMPLATE_FOR_FOURFRONT_TESTING)
+def test_orchestrated_ecr_repository_for_ff_env():
+
+    for env in ['acme-prd', 'acme-stg']:
+        val = ecr_repository_for_env(env)
+        print(f"env={env} is_stg_or_prd={is_stg_or_prd_env(env)} val={val}")
+        assert val != FF_PRODUCTION_ECR_REPOSITORY
+        assert val != env
+        assert val == EnvUtils.PRODUCTION_ECR_REPOSITORY
+    for env in ['acme-mastertest', 'acme-foo']:
+        val = ecr_repository_for_env(env)
+        print(f"env={env} is_stg_or_prd={is_stg_or_prd_env(env)} val={val}")
+        assert val == env
+
+
+@using_orchestrated_behavior()
 def test_orchestrated_get_bucket_env():
 
     assert EnvUtils.PRD_ENV_NAME == 'acme-prd'
@@ -121,6 +151,7 @@ def test_orchestrated_get_bucket_env():
             assert get_bucket_env('stg') == 'production-data'
 
 
+@pytest.mark.skip(reason="Beanstalk functionality no longer supported.")
 @using_orchestrated_behavior()
 def test_orchestrated_prod_bucket_env():
 
@@ -166,6 +197,7 @@ def test_orchestrated_prod_bucket_env():
             assert prod_bucket_env('stg') == 'production-data'           # WITH mirroring enabled, this uses prod bucket
 
 
+@pytest.mark.skip(reason="Beanstalk functionality no longer supported.")
 @using_orchestrated_behavior()
 def test_orchestrated_prod_bucket_env_for_app():
 
@@ -1165,15 +1197,15 @@ def test_orchestrated_is_stg_or_prd_env_for_fourfront():
     assert is_stg_or_prd_env('acme-test') is False
     assert is_stg_or_prd_env('anything') is False
 
-    assert is_stg_or_prd_env('acme-stg') is False
+    assert is_stg_or_prd_env('acme-stg') is True
 
-    with local_attrs(EnvUtils, STG_ENV_NAME='acme-stg'):
-
+    # Not declaring a stg_env_name is enough to disable staging.
+    with local_attrs(EnvUtils, STG_ENV_NAME=None):
         assert is_stg_or_prd_env('acme-stg') is False
 
-        with stage_mirroring(enabled=True):
-
-            assert is_stg_or_prd_env('acme-stg') is True
+    # Not enabling stage mirroring is enough to disable staging
+    with stage_mirroring(enabled=False):
+        assert is_stg_or_prd_env('acme-stg') is False
 
 
 @using_orchestrated_behavior()

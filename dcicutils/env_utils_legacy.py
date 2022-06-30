@@ -360,6 +360,23 @@ def default_workflow_env(orchestrated_app: OrchestratedApp) -> EnvName:
                                   if_fourfront=FF_ENV_WEBDEV)
 
 
+FF_PRODUCTION_ECR_REPOSITORY = 'fourfront-production'
+
+
+def ecr_repository_for_env(envname: EnvName):
+    # This wasn't originally needed in the legacy environment, which didn't have ECR repos.
+    # We handle this case so that if an env was improperly bootstrapped, there is a plausible
+    # return value for the operation.
+    if 'cgap' in envname:
+        result = envname
+    elif is_stg_or_prd_env(envname):
+        result = FF_PRODUCTION_ECR_REPOSITORY
+    else:
+        result = envname
+    logger.warning(f"ecr_repository_for_env({envname!r}) called in legacy mode. Returning {result!r}.")
+    return result
+
+
 def get_bucket_env(envname: EnvName):
     return prod_bucket_env(envname) if is_stg_or_prd_env(envname) else envname
 

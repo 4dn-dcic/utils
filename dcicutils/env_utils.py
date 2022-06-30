@@ -116,6 +116,7 @@ class EnvNames:
     STAGE_MIRRORING_ENABLED = 'stage_mirroring_enabled'
     ORCHESTRATED_APP = 'orchestrated_app'  # This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
     PRD_ENV_NAME = 'prd_env_name'  # the name of the prod env
+    PRODUCTION_ECR_REPOSITORY = "production_ecr_repository"  # the name of an ecr repository shared between stg and prd
     PUBLIC_URL_TABLE = 'public_url_table'  # dictionary mapping envnames & pseudo_envnames to public urls
     STG_ENV_NAME = 'stg_env_name'  # the name of the stage env (or None)
     TEST_ENVS = 'test_envs'  # a list of environments that are for testing
@@ -178,6 +179,7 @@ class EnvUtils:
     STAGE_MIRRORING_ENABLED = None  # if True, orchestration-enabled function may offer mirroring behavior
     ORCHESTRATED_APP = None  # This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
     PRD_ENV_NAME = None  # the name of the prod env
+    PRODUCTION_ECR_REPOSITORY = None  # the name of an ecr repository shared between stg and prd
     PUBLIC_URL_TABLE = None  # dictionary mapping envnames & pseudo_envnames to public urls
     STG_ENV_NAME = None  # the name of the stage env (or None)
     TEST_ENVS = None  # a list of environments that are for testing
@@ -256,6 +258,8 @@ class EnvUtils:
         e.INDEXER_ENV_NAME: 'acme-indexer',
         e.IS_LEGACY: False,
         e.ORCHESTRATED_APP: 'fourfront',
+        e.STAGE_MIRRORING_ENABLED: True,
+        e.STG_ENV_NAME: 'acme-stg',
         e.PRD_ENV_NAME: 'acme-prd',
         e.PUBLIC_URL_TABLE: [
             {
@@ -296,6 +300,7 @@ class EnvUtils:
         # e.STG_ENV_NAME: None,
         e.TEST_ENVS: ['acme-test', 'acme-mastertest', 'acme-pubtest'],
         e.WEBPROD_PSEUDO_ENV: 'production-data',
+        e.PRODUCTION_ECR_REPOSITORY: 'acme-production',
         e.DEFAULT_WORKFLOW_ENV: 'acme-dev',
     }
 
@@ -551,22 +556,35 @@ def prod_bucket_env_for_app(appname: Optional[OrchestratedApp] = None):
     return prod_bucket_env(EnvUtils.PRD_ENV_NAME)
 
 
-@if_orchestrated
-def prod_bucket_env(envname: EnvName) -> Optional[EnvName]:
-    if is_stg_or_prd_env(envname):
-        if EnvUtils.WEBPROD_PSEUDO_ENV:
-            return EnvUtils.WEBPROD_PSEUDO_ENV
-        elif EnvUtils.STAGE_MIRRORING_ENABLED and envname == EnvUtils.STG_ENV_NAME:
-            return EnvUtils.PRD_ENV_NAME
-        return envname
-    else:  # For a non-prod env, we just return None
-        return None
+def prod_bucket_env(envname: EnvName) -> None:
+    ignored(envname)
+    raise BeanstalkOperationNotImplemented(operation='prod_bucket_env')
+
+# @if_orchestrated
+# def prod_bucket_env(envname: EnvName) -> Optional[EnvName]:
+#     if is_stg_or_prd_env(envname):
+#         if EnvUtils.WEBPROD_PSEUDO_ENV:
+#             return EnvUtils.WEBPROD_PSEUDO_ENV
+#         elif EnvUtils.STAGE_MIRRORING_ENABLED and envname == EnvUtils.STG_ENV_NAME:
+#             return EnvUtils.PRD_ENV_NAME
+#         return envname
+#     else:  # For a non-prod env, we just return None
+#         return None
 
 
 @if_orchestrated()
 def default_workflow_env(orchestrated_app: OrchestratedApp) -> EnvName:
     _check_appname(orchestrated_app, required=True)
     return EnvUtils.DEFAULT_WORKFLOW_ENV or (EnvUtils.HOTSEAT_ENVS[0] if EnvUtils.HOTSEAT_ENVS else None)
+
+
+@if_orchestrated()
+def ecr_repository_for_env(envname):
+    if is_stg_or_prd_env(envname):
+        # Prefer a declared name if there is one.
+        return EnvUtils.PRODUCTION_ECR_REPOSITORY or envname
+    else:
+        return envname
 
 
 @if_orchestrated
@@ -904,6 +922,7 @@ def infer_foursight_from_env(request=None, envname: Optional[EnvName] = None, sh
 
     :param request: the current request (or an object that has a 'domain' attribute)
     :param envname: name of the environment we are on
+    :param short: whether to shorten the result using short_env_name.
     :return: Foursight env at the end of the url ie: for fourfront-green, could be either 'data' or 'staging'
     """
     if envname is None:

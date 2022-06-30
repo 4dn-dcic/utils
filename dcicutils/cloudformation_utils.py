@@ -6,7 +6,7 @@ import re
 from .common import DEFAULT_ECOSYSTEM
 from .lang_utils import conjoined_list
 from .misc_utils import PRINT, find_associations, find_association, snake_case_to_camel_case, ignored
-from .env_utils import prod_bucket_env, is_stg_or_prd_env
+from .env_utils import prod_bucket_env, is_stg_or_prd_env, ecr_repository_for_env
 
 
 logging.basicConfig()
@@ -94,9 +94,10 @@ def get_ecr_repo_url(env_name=None, *, ecosystem=DEFAULT_ECOSYSTEM, from_stack_o
 
     # If there was not repo called 'fourfront-blue' or 'fourfront-green',
     # but there is a 'fourfront-webprod' use that. This could be helpful
-    # some day if there is an orchestrated cgap.
+    # some day if there is an orchestrated cgap, but in the interim it can
+    # still be used to find the fourfront-production ecr repo for fourfront.
     if is_stg_or_prd_env:
-        prod_bucket_suffix = f"/{prod_bucket_env(env_name)}"
+        prod_bucket_suffix = f"/{ecr_repository_for_env(env_name)}"
         for url in found:
             if url.endswith(prod_bucket_suffix):
                 return url

@@ -102,6 +102,7 @@ def test_legacy_get_bucket_env():
     assert get_bucket_env('fourfront-cgapwolf') == 'fourfront-cgapwolf'
 
 
+@pytest.mark.skip("The prod_bucket_env_for_app beanstalk function is obsolete and should no longer be used.")
 @using_legacy_behavior()
 def test_legacy_prod_bucket_env_for_app():
 
@@ -115,6 +116,7 @@ def test_legacy_prod_bucket_env_for_app():
         prod_bucket_env_for_app('foo')  # noQA - we expect this error
 
 
+@pytest.mark.skip("The prod_bucket_env beanstalk function is obsolete and should no longer be used.")
 @using_legacy_behavior()
 def test_legacy_prod_bucket_env():
 

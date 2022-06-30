@@ -379,6 +379,9 @@ MOCKED_DEV_CHECK_RUNNER = "c4-foursight-development-stack-CheckRunner-XvXOKPYFFI
 MOCKED_PRD_CHECK_RUNNER = "c4-foursight-fourfront-production-stac-CheckRunner-MW4VHuCIsDXc"
 
 MOCKED_LAMBDA_NAMES = [
+    # The intent is to provide a bunch of different items, including enough
+    # to force things into pagination because the AWS endpoint will give a max
+    # of 50 items even if you ask for a larger MaxItems. -kmp 24-Jun-2022
     "c4-foursight-development-stack-HourlyChecks3-B0dVPPczSind"
     "c4-foursight-development-stack-MorningChecks3-U8C7kjQcai7a",
     "c4-foursight-development-stack-ThirtyMinChecks-MFWFKtAiWKil",
@@ -386,6 +389,9 @@ MOCKED_LAMBDA_NAMES = [
     "c4-foursight-fourfront-production--ThirtyMinChecks-VQDQXvsDHTJj",
     "c4-foursight-fourfront-production-s-MorningChecks1-X5oI034JbLze",
     "c4-foursight-fourfront-production-s-MorningChecks4-0ndpdpBpMyFU",
+    # This next is an actual lambda function but not the one we want.
+    # We use the tokens 'development' and 'CheckRunner'.
+    "foursight-cgap-dev-check_runner",
     MOCKED_PRD_CHECK_RUNNER,
     "c4-foursight-fourfront-production-stack-APIHandler-CoLjJ3aRtcFh",
     "c4-foursight-fourfront-production-stack-APIHandler-CoLjJ3aRtcFh",

@@ -7,7 +7,7 @@ from dcicutils.env_utils import (
     full_env_name, full_fourfront_env_name, get_bucket_env, get_mirror_env_from_context, get_standard_mirror_env,
     indexer_env_for_env, infer_foursight_from_env, infer_foursight_url_from_env, infer_repo_from_env,
     is_cgap_env, is_cgap_server, is_fourfront_env, is_fourfront_server, is_hotseat_env, is_indexer_env,
-    is_stg_or_prd_env, is_test_env, permit_load_data,
+    is_stg_or_prd_env, is_test_env, permit_load_data, ecr_repository_for_env,
     prod_bucket_env, prod_bucket_env_for_app, public_url_for_app, public_url_mappings, short_env_name, is_beanstalk_env,
 )
 from dcicutils.env_utils_legacy import (
@@ -20,7 +20,7 @@ from dcicutils.env_utils_legacy import (
     FF_ENV_HOTSEAT, FF_ENV_INDEXER, FF_ENV_MASTERTEST, FF_ENV_PRODUCTION_BLUE, FF_ENV_PRODUCTION_GREEN,
     FF_ENV_WEBDEV, FF_ENV_WEBPROD, FF_ENV_WEBPROD2, FF_ENV_WOLF,
     FF_PRODUCTION_IDENTIFIER, FF_PROD_BUCKET_ENV, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG,
-    FF_PUBLIC_URLS, FF_PUBLIC_URL_PRD, FF_STAGING_IDENTIFIER,
+    FF_PUBLIC_URLS, FF_PUBLIC_URL_PRD, FF_STAGING_IDENTIFIER, FF_PRODUCTION_ECR_REPOSITORY,
 )
 from dcicutils.exceptions import InvalidParameterError
 from dcicutils.qa_utils import raises_regexp
@@ -42,6 +42,22 @@ def test_default_workflow_env():
 
     with pytest.raises(Exception):
         default_workflow_env('foo')  # noQA - we expect this error
+
+
+@using_fresh_legacy_state()
+def test_ecr_repository_for_env():
+
+    # All CGAP values just return their arguments.
+    for env in ['fourfront-cgap', 'fourfront-cgap-blue', 'fourfront-cgap-green', 'cgap-blue', 'cgap-green',
+                'fourfront-cgapwolf', 'cgap-wolf', 'fourfront-cgapdev', 'cgap-dev', 'cgap-foo']:
+        assert ecr_repository_for_env(env) == env
+
+    # Fourfront mostly returns arguments except for production
+    for env in ['fourfront-blue', 'fourfront-green', 'fourfront-production-blue', 'fourfront-production-green',
+                'data', 'staging']:
+        assert ecr_repository_for_env(env) == FF_PRODUCTION_ECR_REPOSITORY
+    for env in ['fourfront-mastertest', 'fourfront-hotseat', 'fourfront-webdev', 'fourfront-foo']:
+        assert ecr_repository_for_env(env) == env
 
 
 @using_fresh_legacy_state()
@@ -69,6 +85,7 @@ def test_get_bucket_env():
     assert get_bucket_env('fourfront-cgapwolf') == 'fourfront-cgapwolf'
 
 
+@pytest.mark.skip(reason="Beanstalk functionality no longer supported.")
 @using_fresh_legacy_state()
 def test_prod_bucket_env_for_app():
 
@@ -82,6 +99,7 @@ def test_prod_bucket_env_for_app():
         prod_bucket_env_for_app('foo')  # noQA - we expect this error
 
 
+@pytest.mark.skip(reason="Beanstalk functionality no longer supported.")
 @using_fresh_legacy_state()
 def test_prod_bucket_env():
 
