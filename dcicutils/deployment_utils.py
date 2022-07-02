@@ -38,7 +38,7 @@ from .common import LEGACY_GLOBAL_ENV_BUCKET, LEGACY_CGAP_GLOBAL_ENV_BUCKET, DEF
 from .env_utils import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env,
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, is_test_env, is_hotseat_env,
-    is_indexer_env, indexer_env_for_env,
+    is_indexer_env, indexer_env_for_env, full_env_name,
 )
 from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ, file_contents
 from .s3_utils import s3Utils, EnvManager
@@ -1117,6 +1117,8 @@ class CreateMappingOnDeployManager:
             if called on a production environment
 
         """
+
+        env = full_env_name(env)
 
         deploy_cfg = {
             'ENV_NAME': env
