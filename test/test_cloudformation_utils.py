@@ -2,6 +2,7 @@ import os
 import pytest
 
 from dcicutils import cloudformation_utils
+from dcicutils.common import LEGACY_GLOBAL_ENV_BUCKET
 from dcicutils.ff_mocks import mocked_s3utils
 from dcicutils.env_base import EnvBase
 from dcicutils.misc_utils import override_environ
@@ -404,7 +405,7 @@ MOCKED_LAMBDA_NAMES = [
 
 def test_abstract_orchestration_manager_discover_foursight_check_runner_name():
 
-    with EnvBase.global_env_bucket_named('foursight-envs'):
+    with EnvBase.global_env_bucket_named(LEGACY_GLOBAL_ENV_BUCKET):
         with mocked_s3utils(environments=['fourfront-mastertest']) as b3:
             with mock.patch.object(cloudformation_utils, "boto3", b3):
 

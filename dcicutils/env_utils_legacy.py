@@ -392,6 +392,16 @@ def public_url_mappings(envname: EnvName):
     return CGAP_PUBLIC_URLS if is_cgap_env(envname) else FF_PUBLIC_URLS
 
 
+def get_env_real_url(envname):
+    if 'cgap' in envname:
+        # For CGAP, everything has to be 'https'. Part of our security model.
+        return f"https://{short_env_name(envname)}.hms.harvard.edu"
+    else:  # presumably Fourfront
+        # For Fourfront, we're a little more flexible on the security (for now).
+        protocol = 'https' if is_stg_or_prd_env(envname) else 'http'
+        return f"{protocol}://{short_env_name(envname)}.4dnucleome.org"
+
+
 def is_cgap_server(server, allow_localhost=False):
     """
     Returns True if the given string looks like a CGAP server name. Otherwise returns False.
@@ -556,8 +566,8 @@ CGAP_FOURSIGHT_URL_PREFIX = "https://u9feld4va7.execute-api.us-east-1.amazonaws.
 FF_FOURSIGHT_URL_PREFIX = "https://foursight.4dnucleome.org/view/"
 
 
-def infer_foursight_url_from_env(request, envname: Optional[EnvName]):
-    token = infer_foursight_from_env(request, envname)
+def infer_foursight_url_from_env(*, request=None, envname: Optional[EnvName] = None):
+    token = infer_foursight_from_env(request=request, envname=envname)
     if token is not None:
         prefix = CGAP_FOURSIGHT_URL_PREFIX if is_cgap_env(envname) else FF_FOURSIGHT_URL_PREFIX
         return prefix + token
@@ -565,7 +575,7 @@ def infer_foursight_url_from_env(request, envname: Optional[EnvName]):
         return None
 
 
-def infer_foursight_from_env(request, envname: Optional[EnvName]):
+def infer_foursight_from_env(*, request=None, envname: Optional[EnvName] = None):
     """  Infers the Foursight environment to view based on the given envname and request context
 
     :param request: the current request (or an object that has member 'domain')

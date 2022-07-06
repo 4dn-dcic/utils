@@ -43,7 +43,7 @@ def _make_no_legacy(fn, function_name):
     @functools.wraps(fn)
     def _missing_legacy_function(*args, **kwargs):
         ignored(*args, **kwargs)
-        raise NotImplementedError(f"There is only an orchestrated version of {function_name}, not a legacy version.")
+        raise NotImplementedError(f"There is only an orchestrated version of {function_name}, not a legacy version. args={args} kwargs={kwargs}")
     return _missing_legacy_function
 
 
@@ -633,7 +633,7 @@ def get_env_real_url(envname):
         # Fourfront is a low-security application, so only 'data' is 'https' and the rest are 'http'.
         # TODO: This should be table-driven, too, but we're not planning to distribute Fourfront,
         #       so it's not high priority. -kmp 13-May-2022
-        protocol = 'https' if envname == 'data' else 'http'
+        protocol = 'https' if is_stg_or_prd_env(envname) else 'http'
         return f"{protocol}://{short_env_name(envname)}{EnvUtils.DEV_ENV_DOMAIN_SUFFIX}"
     else:
         # For CGAP, everything has to be 'https'. Part of our security model.
@@ -899,7 +899,7 @@ def infer_repo_from_env(envname):
 
 
 @if_orchestrated()
-def infer_foursight_url_from_env(request=None, envname: Optional[EnvName] = None):
+def infer_foursight_url_from_env(*, request=None, envname: Optional[EnvName] = None):
     """
     Infers the Foursight URL for the given envname and request context.
 
@@ -916,7 +916,7 @@ def infer_foursight_url_from_env(request=None, envname: Optional[EnvName] = None
 
 
 @if_orchestrated
-def infer_foursight_from_env(request=None, envname: Optional[EnvName] = None, short: bool = True):
+def infer_foursight_from_env(*, request=None, envname: Optional[EnvName] = None, short: bool = True):
     """
     Infers the Foursight environment token to view based on the given envname and request context
 

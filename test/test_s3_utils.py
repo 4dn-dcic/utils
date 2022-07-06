@@ -4,6 +4,7 @@ import io
 import json
 import os
 import pytest
+import re
 import requests
 
 from botocore.exceptions import ClientError
@@ -13,7 +14,7 @@ from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, 
 from dcicutils.common import LEGACY_GLOBAL_ENV_BUCKET
 from dcicutils.env_manager import EnvManager
 from dcicutils.env_utils import (
-    get_standard_mirror_env, EnvUtils,
+    get_standard_mirror_env, EnvUtils, short_env_name, full_env_name, infer_foursight_from_env
 )
 from dcicutils.env_utils_legacy import (
     FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD,
@@ -26,7 +27,7 @@ from dcicutils.qa_utils import override_environ, MockBoto3, MockResponse, known_
 from dcicutils.s3_utils import s3Utils, HealthPageKey
 from requests.exceptions import ConnectionError
 from unittest import mock
-from .helpers import using_fresh_ff_state
+from .helpers import using_fresh_ff_state, using_fresh_cgap_state
 from .test_ff_utils import mocked_s3utils_with_sse
 
 
@@ -91,6 +92,7 @@ def test_s3utils_constants():
 
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
+@using_fresh_ff_state()
 def test_regression_s3_utils_short_name_c4_706():
 
     # TODO: This test is broken because it calls beanstalk_info which calls describe_beanstalk_environments.
@@ -120,6 +122,7 @@ def _notice_health_page_connection_problem_for_test(env):
 
 @pytest.mark.integrated
 @pytest.mark.parametrize('ff_ordinary_envname', ['fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat'])
+@using_fresh_ff_state()
 def test_s3utils_creation_ff_ordinary(ff_ordinary_envname):
     with EnvUtils.local_env_utils_for_testing(global_env_bucket=LEGACY_GLOBAL_ENV_BUCKET, env_name=ff_ordinary_envname):
         problem = _notice_health_page_connection_problem_for_test(ff_ordinary_envname)
@@ -132,6 +135,7 @@ def test_s3utils_creation_ff_ordinary(ff_ordinary_envname):
 
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
+@using_fresh_ff_state()
 def test_s3utils_creation_ff_stg():
     # TODO: I was never sure what this was testing, so it's fine if it doesn't run.
     #       The problem is that staging is not properly declared in foursight-envs for now, so this can't work.
@@ -165,6 +169,7 @@ def test_s3utils_creation_ff_stg():
 
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
+@using_fresh_ff_state()
 def test_s3utils_creation_ff_prd():
     # TODO: I was never sure what this was testing, so it's fine if it doesn't run.
     #       The problem may be that data is not properly declared in foursight-envs for now.
@@ -202,6 +207,7 @@ def test_s3utils_creation_ff_prd():
 #
 # @pytest.mark.integrated
 # @pytest.mark.parametrize('cgap_ordinary_envname', ['fourfront-cgaptest', 'fourfront-cgapwolf'])
+# @using_fresh_cgap_state()
 # # 'fourfront-cgapdev' has been decommissioned.
 # def test_s3utils_creation_cgap_ordinary(cgap_ordinary_envname):
 #     util = s3Utils(env=cgap_ordinary_envname)
@@ -210,6 +216,7 @@ def test_s3utils_creation_ff_prd():
 
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
+@using_fresh_cgap_state()
 def test_s3utils_creation_cgap_prd():
     # TODO: I'm not sure what this is testing, so it's hard to rewrite
     #   But I fear this use of env 'data' implies the GA test environment has overbroad privilege.
@@ -242,6 +249,7 @@ def test_s3utils_creation_cgap_prd():
 
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
+@using_fresh_cgap_state()
 def test_s3utils_creation_cgap_stg():
     # Not sure why this is failing, but staging is declared wrong. -kmp 11-May-2022
     print("In test_s3Utils_creation_cgap_prd. It is now", str(datetime.datetime.now()))
@@ -273,7 +281,8 @@ def test_s3utils_get_keys_for_staging():
     #   -kmp 13-Jan-2021
     util = s3Utils(env='staging')
     keys = util.get_ff_key()
-    assert keys['server'] == 'https://staging.4dnucleome.org'
+    # This is in transition. Eventually it will reliably be https.
+    assert re.match('https?://staging.4dnucleome.org', keys['server'])
 
 
 @pytest.mark.integrated
@@ -455,6 +464,7 @@ def test_s3utils_s3_put_secret():
 
 @pytest.mark.beanstalk_failure
 @pytest.mark.integratedx
+@using_fresh_ff_state()
 def test_does_key_exist_integrated():
     """ Use staging to check for non-existant key """
     # TODO: One problem is that staging is not properly declared in foursight-envs for now.
@@ -465,6 +475,7 @@ def test_does_key_exist_integrated():
 
 @pytest.mark.beanstalk_failure
 @pytest.mark.unit
+@using_fresh_ff_state()
 def test_does_key_exist_unit(integrated_names):
     """ Use staging to check for non-existant key """
     # TODO: One problem is that staging is not properly declared in foursight-envs for now.
@@ -474,12 +485,14 @@ def test_does_key_exist_unit(integrated_names):
 
 
 @pytest.mark.integratedx
+@using_fresh_ff_state()
 def test_read_s3_integrated(integrated_s3_info):
     read = integrated_s3_info['s3Obj'].read_s3(integrated_s3_info['filename'])
     assert read.strip() == b'thisisatest'
 
 
 @pytest.mark.unit
+@using_fresh_ff_state()
 def test_read_s3_unit(integrated_names):
     # This unit test needs work, but its corresponding integration test works.
     # with mocked_s3_integration(integrated_names=integrated_names) as s3_connection:
@@ -496,6 +509,7 @@ def test_read_s3_unit(integrated_names):
 
 
 @pytest.mark.integratedx
+@using_fresh_ff_state()
 def test_get_file_size_integrated(integrated_s3_info):
     size = integrated_s3_info['s3Obj'].get_file_size(integrated_s3_info['filename'])
     assert size == 11
@@ -505,6 +519,7 @@ def test_get_file_size_integrated(integrated_s3_info):
 
 
 @pytest.mark.unit
+@using_fresh_ff_state()
 def test_get_file_size_unit(integrated_names):
 
     # This unit test needs work, but its corresponding integration test works.
@@ -526,6 +541,7 @@ def test_get_file_size_unit(integrated_names):
 
 
 @pytest.mark.integratedx
+@using_fresh_ff_state()
 def test_size_integrated(integrated_s3_info):
     """ Get size of non-existent, real bucket """
     bucket = integrated_s3_info['s3Obj'].sys_bucket
@@ -537,6 +553,7 @@ def test_size_integrated(integrated_s3_info):
 
 
 @pytest.mark.unit
+@using_fresh_ff_state()
 def test_size_unit(integrated_names):
     """ Get size of non-existent, real bucket """
 
@@ -565,6 +582,7 @@ def test_size_unit(integrated_names):
 
 
 @pytest.mark.integratedx
+@using_fresh_ff_state()
 def test_get_file_size_in_gb_integrated(integrated_s3_info):
 
     s3_connection = integrated_s3_info['s3Obj']
@@ -575,6 +593,7 @@ def test_get_file_size_in_gb_integrated(integrated_s3_info):
 
 
 @pytest.mark.unit
+@using_fresh_ff_state()
 def test_get_file_size_in_gb_unit(integrated_names):
 
     # This unit test needs work, but its corresponding integration test works.
@@ -594,6 +613,7 @@ def test_get_file_size_in_gb_unit(integrated_names):
 
 
 @pytest.mark.integratedx
+@using_fresh_ff_state()
 def test_read_s3_zip_integrated(integrated_s3_info):
     filename = integrated_s3_info['zip_filename']
     files = integrated_s3_info['s3Obj'].read_s3_zipfile(filename, ['summary.txt', 'fastqc_data.txt'])
@@ -603,6 +623,7 @@ def test_read_s3_zip_integrated(integrated_s3_info):
 
 
 @pytest.mark.unit
+@using_fresh_ff_state()
 def test_read_s3_zip_unit(integrated_names):
 
     # with mocked_s3_integration(integrated_names=integrated_names) as s3_connection:
@@ -632,6 +653,7 @@ def test_read_s3_zip_unit(integrated_names):
 
 @pytest.mark.integratedx
 @pytest.mark.parametrize("suffix, expected_report", [("", "fastqc_report.html"), ("2", "qc_report.html")])
+@using_fresh_ff_state()
 def test_unzip_s3_to_s3_integrated(integrated_s3_info, suffix, expected_report):
     """test for unzip_s3_to_s3 with case where there is a basdir"""
 
@@ -660,6 +682,7 @@ def test_unzip_s3_to_s3_integrated(integrated_s3_info, suffix, expected_report):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("suffix, expected_report", [("", "fastqc_report.html"), ("2", "qc_report.html")])
+@using_fresh_ff_state()
 def test_unzip_s3_to_s3_unit(integrated_names, suffix, expected_report):
     """test for unzip_s3_to_s3 with case where there is no basdir"""
 
@@ -694,6 +717,7 @@ def test_unzip_s3_to_s3_unit(integrated_names, suffix, expected_report):
 
 
 @pytest.mark.integratedx
+@using_fresh_ff_state()
 def test_unzip_s3_to_s3_store_results_integrated(integrated_s3_info):
     """test for unzip_s3_to_s3 with case where there is a basdir and store_results=False"""
     prefix = '__test_data/extracted'
@@ -716,6 +740,7 @@ def test_unzip_s3_to_s3_store_results_integrated(integrated_s3_info):
 
 
 @pytest.mark.unit
+@using_fresh_ff_state()
 def test_unzip_s3_to_s3_store_results_unit(integrated_names):
     """test for unzip_s3_to_s3 with case where there is a basdir and store_results=False"""
 
@@ -748,6 +773,7 @@ def test_unzip_s3_to_s3_store_results_unit(integrated_names):
         assert objs.get('Contents')
 
 
+@using_fresh_ff_state()
 def test_s3_utils_legacy_behavior():
     # From https://hms-dbmi.atlassian.net/browse/C4-674
 
@@ -786,6 +812,7 @@ def test_s3_utils_legacy_behavior():
         test_it()
 
 
+@using_fresh_ff_state()
 def test_s3_utils_buckets_modern():
 
     env_name = 'fourfront-foo'
@@ -802,11 +829,11 @@ def test_s3_utils_buckets_modern():
         assert s.tibanna_cwls_bucket != 'the-tibanna-cwls-bucket'
         assert s.tibanna_output_bucket != 'the-tibanna-output-bucket'
 
-        assert s.outfile_bucket == 'elasticbeanstalk-fourfront-foo-wfoutput'
-        assert s.sys_bucket == 'elasticbeanstalk-fourfront-foo-system'
-        assert s.raw_file_bucket == 'elasticbeanstalk-fourfront-foo-files'
-        assert s.blob_bucket == 'elasticbeanstalk-fourfront-foo-blobs'
-        assert s.metadata_bucket == 'elasticbeanstalk-fourfront-foo-metadata-bundles'
+        assert s.outfile_bucket == f'elasticbeanstalk-{env_name}-wfoutput'
+        assert s.sys_bucket == f'elasticbeanstalk-{env_name}-system'
+        assert s.raw_file_bucket == f'elasticbeanstalk-{env_name}-files'
+        assert s.blob_bucket == f'elasticbeanstalk-{env_name}-blobs'
+        assert s.metadata_bucket == f'elasticbeanstalk-{env_name}-metadata-bundles'
         assert s.tibanna_cwls_bucket == 'tibanna-cwls'
         assert s.tibanna_output_bucket == 'tibanna-output'
 
@@ -816,7 +843,8 @@ def test_s3_utils_buckets_modern():
 
         with mock.patch.object(s3_utils_module.EnvManager, "fetch_health_page_json") as mock_fetch:
             def mocked_fetch_health_page_json(url):
-                assert env_name in url
+                # Should match fourfront-foo-xxxx.some-aws-domain or foo.some-hms-domain
+                assert any(re.match(f'https?://{e}[.-].*', url) for e in [env_name, short_env_name(env_name)])
                 return {
                     HealthPageKey.ELASTICSEARCH: es_url,  # es_server_short,
                     HealthPageKey.SYSTEM_BUCKET: "the-system-bucket",
@@ -855,6 +883,7 @@ def test_s3_utils_buckets_modern():
             assert e.env_name == env_name
 
 
+@using_fresh_ff_state()
 def test_s3_utils_environment_variable_use():
 
     with pytest.raises(SynonymousEnvironmentVariablesMismatched):
@@ -871,6 +900,7 @@ def test_s3_utils_environment_variable_use():
                 s3Utils()
 
 
+@using_fresh_ff_state()
 def test_s3_utils_verify_and_get_env_config():
 
     with mock.patch.object(EnvManager, "verify_and_get_env_config") as mock_implementation:
@@ -887,6 +917,7 @@ def test_s3_utils_verify_and_get_env_config():
         s3Utils.verify_and_get_env_config('dummy-s3', 'dummy-bucket', 'dummy-env')
 
 
+@using_fresh_ff_state()
 def test_s3_utils_fetch_health_page_json():
 
     with mock.patch.object(EnvManager, "fetch_health_page_json") as mock_implementation:
@@ -902,6 +933,7 @@ def test_s3_utils_fetch_health_page_json():
         s3Utils.fetch_health_page_json('dummy-url', 'dummy-use-urllib')
 
 
+@using_fresh_ff_state()
 def test_env_manager_fetch_health_page_json():
 
     sample_health_page = {"mocked": "health-page"}
@@ -946,6 +978,7 @@ def test_env_manager_fetch_health_page_json():
             assert helper.used_mocked_urlopen is True
 
 
+@using_fresh_ff_state()
 def test_env_manager():
 
     test_env = 'fourfront-foo'
@@ -999,6 +1032,7 @@ def test_env_manager():
         assert env_mgr.env_name == test_env2
 
 
+@using_fresh_ff_state()
 def test_env_manager_verify_and_get_env_config():
 
     test_env = 'fourfront-foo'
@@ -1024,6 +1058,7 @@ def test_env_manager_verify_and_get_env_config():
         assert config['ff_env'] == test_env
 
 
+@using_fresh_ff_state()
 def test_env_manager_compose():
 
     test_env = 'fourfront-foo'
@@ -1051,6 +1086,7 @@ def test_env_manager_compose():
         assert env_manager_from_desc.env_description['es'] == test_es
 
 
+@using_fresh_ff_state()
 def test_env_manager_global_env_bucket_name():
 
     # Now that we're containerized, there is always something in GLOBAL_ENV_BUCKET
@@ -1104,6 +1140,7 @@ def test_env_manager_global_env_bucket_name():
                 assert EnvManager.global_env_bucket_name() == 'bar'
 
 
+@using_fresh_ff_state()
 def test_get_and_set_object_tags():
 
     mock_boto3 = MockBoto3()

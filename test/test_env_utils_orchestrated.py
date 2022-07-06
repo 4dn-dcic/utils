@@ -222,27 +222,27 @@ def test_orchestrated_prod_bucket_env_for_app():
 @using_orchestrated_behavior()
 def test_orchestrated_infer_foursight_url_from_env():
 
-    assert (infer_foursight_url_from_env('ignored-request', 'demo')
+    assert (infer_foursight_url_from_env(request='ignored-request', envname='demo')
             == 'https://foursight.genetics.example.com/api/view/demo')
-    assert (infer_foursight_url_from_env('ignored-request', 'acme-foo')
+    assert (infer_foursight_url_from_env(request='ignored-request', envname='acme-foo')
             == 'https://foursight.genetics.example.com/api/view/foo')
-    assert (infer_foursight_url_from_env('ignored-request', 'fourfront-cgapwolf')
+    assert (infer_foursight_url_from_env(request='ignored-request', envname='fourfront-cgapwolf')
             == 'https://foursight.genetics.example.com/api/view/fourfront-cgapwolf')
 
     with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
-        assert (infer_foursight_url_from_env('ignored-request', 'data')
+        assert (infer_foursight_url_from_env(request='ignored-request', envname='data')
                 == 'https://foursight.4dnucleome.org/api/view/data')
-        assert (infer_foursight_url_from_env('ignored-request', 'acme-foo')
+        assert (infer_foursight_url_from_env(request='ignored-request', envname='acme-foo')
                 == 'https://foursight.4dnucleome.org/api/view/acme-foo')
-        assert (infer_foursight_url_from_env('ignored-request', 'fourfront-cgapwolf')
+        assert (infer_foursight_url_from_env(request='ignored-request', envname='fourfront-cgapwolf')
                 == 'https://foursight.4dnucleome.org/api/view/cgapwolf')
 
     with local_attrs(EnvUtils, **CGAP_SETTINGS_FOR_TESTING):
-        assert (infer_foursight_url_from_env('ignored-request', 'data')
+        assert (infer_foursight_url_from_env(request='ignored-request', envname='data')
                 == 'https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/data')
-        assert (infer_foursight_url_from_env('ignored-request', 'acme-foo')
+        assert (infer_foursight_url_from_env(request='ignored-request', envname='acme-foo')
                 == 'https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/acme-foo')
-        assert (infer_foursight_url_from_env('ignored-request', 'fourfront-cgapwolf')
+        assert (infer_foursight_url_from_env(request='ignored-request', envname='fourfront-cgapwolf')
                 == 'https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/cgapwolf')
 
 
@@ -1626,74 +1626,74 @@ def test_orchestrated_infer_foursight_from_env():
     def mock_request(domain):  # build a dummy request with the 'domain' member, checked in the method
         return MockedRequest(domain)
 
-    assert infer_foursight_from_env(mock_request('acme-prd' + dev_suffix), 'acme-prd') == 'cgap'
-    assert infer_foursight_from_env(mock_request('acme-mastertest' + dev_suffix), 'acme-mastertest') == 'mastertest'
-    assert infer_foursight_from_env(mock_request('acme-webdev' + dev_suffix), 'acme-webdev') == 'webdev'
-    assert infer_foursight_from_env(mock_request('acme-hotseat' + dev_suffix), 'acme-hotseat') == 'hotseat'
+    assert infer_foursight_from_env(request=mock_request('acme-prd' + dev_suffix), envname='acme-prd') == 'cgap'
+    assert infer_foursight_from_env(request=mock_request('acme-mastertest' + dev_suffix), envname='acme-mastertest') == 'mastertest'
+    assert infer_foursight_from_env(request=mock_request('acme-webdev' + dev_suffix), envname='acme-webdev') == 'webdev'
+    assert infer_foursight_from_env(request=mock_request('acme-hotseat' + dev_suffix), envname='acme-hotseat') == 'hotseat'
 
     with stage_mirroring(enabled=True):
 
         with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
 
             # (active) fourfront testing environments
-            assert infer_foursight_from_env(mock_request('fourfront-mastertest' + dev_suffix),
-                                            'fourfront-mastertest') == 'mastertest'
-            assert infer_foursight_from_env(mock_request('fourfront-webdev' + dev_suffix),
-                                            'fourfront-webdev') == 'webdev'
-            assert infer_foursight_from_env(mock_request('fourfront-hotseat' + dev_suffix),
-                                            'fourfront-hotseat') == 'hotseat'
+            assert infer_foursight_from_env(request=mock_request('fourfront-mastertest' + dev_suffix),
+                                            envname='fourfront-mastertest') == 'mastertest'
+            assert infer_foursight_from_env(request=mock_request('fourfront-webdev' + dev_suffix),
+                                            envname='fourfront-webdev') == 'webdev'
+            assert infer_foursight_from_env(request=mock_request('fourfront-hotseat' + dev_suffix),
+                                            envname='fourfront-hotseat') == 'hotseat'
 
             # (active) fourfront production environments
-            assert (infer_foursight_from_env(mock_request(domain='data.4dnucleome.org'), 'fourfront-blue')
+            assert (infer_foursight_from_env(request=mock_request(domain='data.4dnucleome.org'), envname='fourfront-blue')
                     == 'data')
-            assert (infer_foursight_from_env(mock_request(domain='data.4dnucleome.org'), 'fourfront-green')
+            assert (infer_foursight_from_env(request=mock_request(domain='data.4dnucleome.org'), envname='fourfront-green')
                     == 'data')
-            assert (infer_foursight_from_env(mock_request(domain='staging.4dnucleome.org'), 'fourfront-blue')
+            assert (infer_foursight_from_env(request=mock_request(domain='staging.4dnucleome.org'), envname='fourfront-blue')
                     == 'staging')
-            assert (infer_foursight_from_env(mock_request(domain='staging.4dnucleome.org'), 'fourfront-green')
+            assert (infer_foursight_from_env(request=mock_request(domain='staging.4dnucleome.org'), envname='fourfront-green')
                     == 'staging')
 
             # These next four are pathological and hopefully not used, but they illustrate that the domain dominates.
             # This does not illustrate intended use.
-            assert (infer_foursight_from_env(mock_request(domain='data.4dnucleome.org'), 'data')
+            assert (infer_foursight_from_env(request=mock_request(domain='data.4dnucleome.org'), envname='data')
                     == 'data')
-            assert (infer_foursight_from_env(mock_request(domain='data.4dnucleome.org'), 'staging')
+            assert (infer_foursight_from_env(request=mock_request(domain='data.4dnucleome.org'), envname='staging')
                     == 'data')
 
-            assert (infer_foursight_from_env(mock_request(domain='staging.4dnucleome.org'), 'data')
+            assert (infer_foursight_from_env(request=mock_request(domain='staging.4dnucleome.org'), envname='data')
                     == 'staging')
-            assert (infer_foursight_from_env(mock_request(domain='staging.4dnucleome.org'), 'staging')
+            assert (infer_foursight_from_env(request=mock_request(domain='staging.4dnucleome.org'), envname='staging')
                     == 'staging')
 
-            assert (infer_foursight_from_env('data.4dnucleome.org', 'data') == 'data')
-            assert (infer_foursight_from_env('data.4dnucleome.org', 'staging') == 'data')
+            assert (infer_foursight_from_env(request='data.4dnucleome.org', envname='data') == 'data')
+            assert (infer_foursight_from_env(request='data.4dnucleome.org', envname='staging') == 'data')
 
-            assert (infer_foursight_from_env('https://data.4dnucleome.org', 'data') == 'data')
-            assert (infer_foursight_from_env('https://data.4dnucleome.org', 'staging') == 'data')
+            assert (infer_foursight_from_env(request='https://data.4dnucleome.org', envname='data') == 'data')
+            assert (infer_foursight_from_env(request='https://data.4dnucleome.org', envname='staging') == 'data')
 
-            assert (infer_foursight_from_env('staging.4dnucleome.org', 'data') == 'staging')
-            assert (infer_foursight_from_env('staging.4dnucleome.org', 'staging') == 'staging')
+            assert (infer_foursight_from_env(request='staging.4dnucleome.org', envname='data') == 'staging')
+            assert (infer_foursight_from_env(request='staging.4dnucleome.org', envname='staging') == 'staging')
 
-            assert (infer_foursight_from_env('http://staging.4dnucleome.org', 'data') == 'staging')
-            assert (infer_foursight_from_env('http://staging.4dnucleome.org', 'staging') == 'staging')
+            assert (infer_foursight_from_env(request='http://staging.4dnucleome.org', envname='data') == 'staging')
+            assert (infer_foursight_from_env(request='http://staging.4dnucleome.org', envname='staging') == 'staging')
 
-            assert (infer_foursight_from_env(None, 'data') == 'data')
-            assert (infer_foursight_from_env(None, 'staging') == 'staging')
+            assert (infer_foursight_from_env(request=None, envname='data') == 'data')
+            assert (infer_foursight_from_env(request=None, envname='staging') == 'staging')
 
         # (active) cgap environments
         with local_attrs(EnvUtils, **CGAP_SETTINGS_FOR_TESTING):
 
-            assert infer_foursight_from_env(mock_request('fourfront-cgapdev' + dev_suffix),
-                                            'fourfront-cgapdev') == 'cgapdev'
-            assert infer_foursight_from_env(mock_request('fourfront-cgaptest' + dev_suffix),
-                                            'fourfront-cgaptest') == 'cgaptest'
-            assert infer_foursight_from_env(mock_request('fourfront-cgapwolf' + dev_suffix),
-                                            'fourfront-cgapwolf') == 'cgapwolf'
-            assert infer_foursight_from_env(mock_request('fourfront-cgap' + dev_suffix),
-                                            'fourfront-cgap') == 'cgap'
+            assert infer_foursight_from_env(request=mock_request('fourfront-cgapdev' + dev_suffix),
+                                            envname='fourfront-cgapdev') == 'cgapdev'
+            assert infer_foursight_from_env(request=mock_request('fourfront-cgaptest' + dev_suffix),
+                                            envname='fourfront-cgaptest') == 'cgaptest'
+            assert infer_foursight_from_env(request=mock_request('fourfront-cgapwolf' + dev_suffix),
+                                            envname='fourfront-cgapwolf') == 'cgapwolf'
+            assert infer_foursight_from_env(request=mock_request('fourfront-cgap' + dev_suffix),
+                                            envname='fourfront-cgap') == 'cgap'
 
-            assert infer_foursight_from_env(mock_request('cgap.hms.harvard.edu'), 'fourfront-cgap') == 'cgap'
-            assert infer_foursight_from_env(mock_request('cgap.hms.harvard.edu'), 'cgap') == 'cgap'
+            assert infer_foursight_from_env(request=mock_request('cgap.hms.harvard.edu'), envname='fourfront-cgap') == 'cgap'
+            assert infer_foursight_from_env(request=mock_request('cgap.hms.harvard.edu'), envname='cgap') == 'cgap'
 
 
 @pytest.mark.skip

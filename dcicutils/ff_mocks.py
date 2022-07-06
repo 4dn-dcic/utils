@@ -8,7 +8,7 @@ import re
 import requests
 import time
 
-from dcicutils.env_utils import EnvUtils
+from dcicutils.env_utils import EnvUtils, short_env_name, full_env_name, is_stg_or_prd_env
 from dcicutils.ff_utils import authorized_request
 from dcicutils.lang_utils import disjoined_list, conjoined_list
 from dcicutils.misc_utils import ignored, override_environ, remove_prefix, full_class_name, PRINT, environ_bool
@@ -88,7 +88,9 @@ def make_mock_es_url(env_name):
 
 
 def make_mock_portal_url(env_name):
-    return f"http://{make_mock_beanstalk_cname(env_name)}"
+    protocol = 'https' if is_stg_or_prd_env(env_name) else 'http'
+    result = f"{protocol}://{make_mock_beanstalk_cname(env_name)}"
+    return result
 
 
 def make_mock_health_page(env_name):
@@ -152,10 +154,13 @@ def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=
                                     ignored(use_urllib)  # we don't test this
                                     m = re.match(r'.*(fourfront-[a-z0-9-]+)(?:[.]|$)', url)
                                     if m:
-                                        env_name = m.group(1)
+                                        env_name = m.group(1)  # we found it with a fourfront-prefix, so use as is
                                         return make_mock_health_page(env_name)
-                                    else:
-                                        raise NotImplementedError(f"Mock can't handle URL: {url}")
+                                    m = re.match(r'(?:https?://)?([a-z0-9-]+)(?:[.](4dnucleome[.]org|hms.harvard.edu)([/].*)|$)', url)
+                                    if m:
+                                        env_name = full_env_name(m.group(1))  # no fourfront- prefix, so add one
+                                        return make_mock_health_page(env_name)
+                                    raise NotImplementedError(f"Mock can't handle URL: {url}")
 
                                 mock_fetcher.side_effect = mocked_fetch_health_page_json
                                 # The mocked encrypt key is expected by various tools in the s3_utils module

@@ -74,7 +74,9 @@ def integrated_s3_info(integrated_names):
                           Key=integrated_names['zip_filename2'])
 
     return {
+        'ffenv': INTEGRATED_ENV,
         's3Obj': s3_obj,
+        'bucket': s3_obj.outfile_bucket,
         'filename': test_filename,
         'zip_filename': integrated_names['zip_filename'],
         'zip_filename2': integrated_names['zip_filename2'],

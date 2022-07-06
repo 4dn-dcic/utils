@@ -740,7 +740,7 @@ def test_infer_foursight_from_env():
 
     def check(token_in, token_out, request=None):
         request = request or mock_request()
-        assert infer_foursight_from_env(request, token_in) == token_out
+        assert infer_foursight_from_env(request=request, envname=token_in) == token_out
 
     # (active) fourfront testing environments
     check(FF_ENV_MASTERTEST, 'mastertest')
@@ -802,7 +802,7 @@ def test_infer_foursight_url_from_env():
         request = request or mock_request()
         prefix = cg_foursight_prefix if cgap else ff_foursight_prefix
         expected = prefix + token_out if token_out else None
-        assert infer_foursight_url_from_env(request, token_in) == expected
+        assert infer_foursight_url_from_env(request=request, envname=token_in) == expected
 
     # (active) fourfront testing environments
     check(FF_ENV_MASTERTEST, 'mastertest')

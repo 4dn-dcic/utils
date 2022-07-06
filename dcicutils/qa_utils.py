@@ -24,6 +24,7 @@ from botocore.credentials import Credentials as Boto3Credentials
 from botocore.exceptions import ClientError
 from json import dumps as json_dumps, loads as json_loads
 from unittest import mock
+from .env_utils import short_env_name
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
 from .misc_utils import (
     PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ,
@@ -1585,7 +1586,7 @@ class MockBotoS3Client:
             # I would need to research what specific error is needed here and hwen,
             # since it might be a 404 (not found) or a 403 (permissions), depending on various details.
             # For now, just fail in any way since maybe our code doesn't care.
-            raise Exception(f"Mock File Not Found: {pseudo_filename}")
+            raise Exception(f"Mock File Not Found: {pseudo_filename}. Existing files: {list(self.s3_files.files.keys())}")
 
     def head_bucket(self, Bucket):  # noQA - AWS argument naming style
         bucket_prefix = Bucket + "/"
@@ -2134,7 +2135,8 @@ class MockBotoElasticBeanstalkClient:
 
 
 def make_mock_beanstalk_cname(env_name):
-    return f"{env_name}.9wzadzju3p.us-east-1.elasticbeanstalk.com"
+    # return f"{env_name}.9wzadzju3p.us-east-1.elasticbeanstalk.com"
+    return f"{short_env_name(env_name)}.4dnucleome.org"
 
 
 def make_mock_beanstalk(env_name, cname=None):
