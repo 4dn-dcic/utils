@@ -8,8 +8,8 @@ from io import BytesIO
 from zipfile import ZipFile
 from .base import get_beanstalk_real_url
 from .env_manager import EnvManager
-from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name, infer_foursight_from_env, get_env_real_url, EnvUtils
-from .exceptions import InferredBucketConflict, BeanstalkOperationNotImplemented
+from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name, get_env_real_url, EnvUtils
+from .exceptions import InferredBucketConflict
 from .misc_utils import PRINT, exported, merge_key_value_dict_lists, key_value_dict
 
 
@@ -131,7 +131,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 # env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket, env=env)
                 # ff_url = env_config['fourfront']
                 # self.env_manager = global_manager = EnvManager(env_name=env, s3=self.s3)
-                portal_url = get_env_real_url(env)  # self.env_manager.portal_url.rstrip('/')  # TO DO: LOOK UP FROM EnvUtils
+                portal_url = get_env_real_url(env)  # self.env_manager.portal_url.rstrip('/')
                 env = full_env_name(env)
                 self.url = portal_url
                 es_url = self._infer_es_url()
@@ -197,7 +197,9 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 if env:
                     if is_stg_or_prd_env(env):
                         self.url = get_beanstalk_real_url(env)  # done BEFORE prod_bucket_env blurring stg/prd
-                        env = prod_bucket_env(env)  # used to return fourfront-webprod for BOTH staging and data
+                        # this used to return fourfront-webprod for BOTH staging and data
+                        # now in fact this doesn't even return, it throws an error.
+                        env = prod_bucket_env(env)  # noQA - raises error if called
                     else:
                         env = full_env_name(env)
                         self.url = get_beanstalk_real_url(env)  # done AFTER maybe prepending cgap- or foursight-.

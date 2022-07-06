@@ -43,7 +43,8 @@ def _make_no_legacy(fn, function_name):
     @functools.wraps(fn)
     def _missing_legacy_function(*args, **kwargs):
         ignored(*args, **kwargs)
-        raise NotImplementedError(f"There is only an orchestrated version of {function_name}, not a legacy version. args={args} kwargs={kwargs}")
+        raise NotImplementedError(f"There is only an orchestrated version of {function_name}, not a legacy version."
+                                  f" args={args} kwargs={kwargs}")
     return _missing_legacy_function
 
 

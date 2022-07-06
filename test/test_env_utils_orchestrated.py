@@ -1626,10 +1626,14 @@ def test_orchestrated_infer_foursight_from_env():
     def mock_request(domain):  # build a dummy request with the 'domain' member, checked in the method
         return MockedRequest(domain)
 
-    assert infer_foursight_from_env(request=mock_request('acme-prd' + dev_suffix), envname='acme-prd') == 'cgap'
-    assert infer_foursight_from_env(request=mock_request('acme-mastertest' + dev_suffix), envname='acme-mastertest') == 'mastertest'
-    assert infer_foursight_from_env(request=mock_request('acme-webdev' + dev_suffix), envname='acme-webdev') == 'webdev'
-    assert infer_foursight_from_env(request=mock_request('acme-hotseat' + dev_suffix), envname='acme-hotseat') == 'hotseat'
+    assert infer_foursight_from_env(request=mock_request('acme-prd' + dev_suffix),
+                                    envname='acme-prd') == 'cgap'
+    assert infer_foursight_from_env(request=mock_request('acme-mastertest' + dev_suffix),
+                                    envname='acme-mastertest') == 'mastertest'
+    assert infer_foursight_from_env(request=mock_request('acme-webdev' + dev_suffix),
+                                    envname='acme-webdev') == 'webdev'
+    assert infer_foursight_from_env(request=mock_request('acme-hotseat' + dev_suffix),
+                                    envname='acme-hotseat') == 'hotseat'
 
     with stage_mirroring(enabled=True):
 
@@ -1644,13 +1648,17 @@ def test_orchestrated_infer_foursight_from_env():
                                             envname='fourfront-hotseat') == 'hotseat'
 
             # (active) fourfront production environments
-            assert (infer_foursight_from_env(request=mock_request(domain='data.4dnucleome.org'), envname='fourfront-blue')
+            assert (infer_foursight_from_env(request=mock_request(domain='data.4dnucleome.org'),
+                                             envname='fourfront-blue')
                     == 'data')
-            assert (infer_foursight_from_env(request=mock_request(domain='data.4dnucleome.org'), envname='fourfront-green')
+            assert (infer_foursight_from_env(request=mock_request(domain='data.4dnucleome.org'),
+                                             envname='fourfront-green')
                     == 'data')
-            assert (infer_foursight_from_env(request=mock_request(domain='staging.4dnucleome.org'), envname='fourfront-blue')
+            assert (infer_foursight_from_env(request=mock_request(domain='staging.4dnucleome.org'),
+                                             envname='fourfront-blue')
                     == 'staging')
-            assert (infer_foursight_from_env(request=mock_request(domain='staging.4dnucleome.org'), envname='fourfront-green')
+            assert (infer_foursight_from_env(request=mock_request(domain='staging.4dnucleome.org'),
+                                             envname='fourfront-green')
                     == 'staging')
 
             # These next four are pathological and hopefully not used, but they illustrate that the domain dominates.
@@ -1692,8 +1700,10 @@ def test_orchestrated_infer_foursight_from_env():
             assert infer_foursight_from_env(request=mock_request('fourfront-cgap' + dev_suffix),
                                             envname='fourfront-cgap') == 'cgap'
 
-            assert infer_foursight_from_env(request=mock_request('cgap.hms.harvard.edu'), envname='fourfront-cgap') == 'cgap'
-            assert infer_foursight_from_env(request=mock_request('cgap.hms.harvard.edu'), envname='cgap') == 'cgap'
+            assert infer_foursight_from_env(request=mock_request('cgap.hms.harvard.edu'),
+                                            envname='fourfront-cgap') == 'cgap'
+            assert infer_foursight_from_env(request=mock_request('cgap.hms.harvard.edu'),
+                                            envname='cgap') == 'cgap'
 
 
 @pytest.mark.skip

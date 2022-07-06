@@ -14,7 +14,7 @@ from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, 
 from dcicutils.common import LEGACY_GLOBAL_ENV_BUCKET
 from dcicutils.env_manager import EnvManager
 from dcicutils.env_utils import (
-    get_standard_mirror_env, EnvUtils, short_env_name, full_env_name, infer_foursight_from_env
+    get_standard_mirror_env, EnvUtils, short_env_name
 )
 from dcicutils.env_utils_legacy import (
     FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD,

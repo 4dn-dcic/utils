@@ -8,7 +8,7 @@ import re
 import requests
 import time
 
-from dcicutils.env_utils import EnvUtils, short_env_name, full_env_name, is_stg_or_prd_env
+from dcicutils.env_utils import EnvUtils, full_env_name, is_stg_or_prd_env
 from dcicutils.ff_utils import authorized_request
 from dcicutils.lang_utils import disjoined_list, conjoined_list
 from dcicutils.misc_utils import ignored, override_environ, remove_prefix, full_class_name, PRINT, environ_bool
@@ -156,7 +156,8 @@ def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=
                                     if m:
                                         env_name = m.group(1)  # we found it with a fourfront-prefix, so use as is
                                         return make_mock_health_page(env_name)
-                                    m = re.match(r'(?:https?://)?([a-z0-9-]+)(?:[.](4dnucleome[.]org|hms.harvard.edu)([/].*)|$)', url)
+                                    m = re.match(r'(?:https?://)?([a-z0-9-]+)'
+                                                 r'(?:[.](4dnucleome[.]org|hms.harvard.edu)([/].*)|$)', url)
                                     if m:
                                         env_name = full_env_name(m.group(1))  # no fourfront- prefix, so add one
                                         return make_mock_health_page(env_name)

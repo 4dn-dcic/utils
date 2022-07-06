@@ -790,6 +790,9 @@ class MockBoto3Session:
         except Exception:
             return None, None, None,
 
+    MISSING_ACCESS_KEY = 'missing access key'
+    MISSING_SECRET_KEY = 'missing secret key'
+
     def get_credentials(self) -> Optional[Boto3Credentials]:
         """
         Returns the AWS credentials (Boto3Credentials) from the aws_access_key_id and aws_secret_access_key values,
@@ -830,7 +833,7 @@ class MockBoto3Session:
         aws_access_key_id, aws_secret_access_key, _ = self._read_aws_credentials_from_file(aws_credentials_file)
         if aws_access_key_id and aws_secret_access_key:
             return Boto3Credentials(access_key=aws_access_key_id, secret_key=aws_secret_access_key)
-        return Boto3Credentials(access_key=None, secret_key=None)
+        return Boto3Credentials(access_key=self.MISSING_ACCESS_KEY, secret_key=self.MISSING_SECRET_KEY)
 
     @property
     def region_name(self) -> Optional[str]:
@@ -976,7 +979,7 @@ class MockBoto3Iam:
             shared_data = shared_reality[self._SHARED_DATA_MARKER] = {}
         return shared_data
 
-    def _mocked_users(self) -> object:
+    def _mocked_users(self):
         mocked_shared_data = self._mocked_shared_data()
         mocked_users = mocked_shared_data.get("users")
         if not mocked_users:
@@ -1586,7 +1589,8 @@ class MockBotoS3Client:
             # I would need to research what specific error is needed here and hwen,
             # since it might be a 404 (not found) or a 403 (permissions), depending on various details.
             # For now, just fail in any way since maybe our code doesn't care.
-            raise Exception(f"Mock File Not Found: {pseudo_filename}. Existing files: {list(self.s3_files.files.keys())}")
+            raise Exception(f"Mock File Not Found: {pseudo_filename}."
+                            f" Existing files: {list(self.s3_files.files.keys())}")
 
     def head_bucket(self, Bucket):  # noQA - AWS argument naming style
         bucket_prefix = Bucket + "/"
