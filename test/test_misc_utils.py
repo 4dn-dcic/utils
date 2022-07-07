@@ -25,7 +25,7 @@ from dcicutils.misc_utils import (
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
     capitalize1, local_attrs, dict_zip, json_leaf_subst,
     _is_function_of_exactly_one_required_arg,  # noQA
-    string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists,
+    string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, print_error_message,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -2064,6 +2064,47 @@ def test_customized_class():
                                                  % test_class_prefix):
             PRINT(getattr_customized(SampleClass2, 'FAVORITE_SONG'))
         assert printed.last is None
+
+
+class SampleException(Exception):  # Used for testing print_error_message
+    pass
+
+
+def test_print_error_message():
+
+    print()  # Start test output on a fresh line
+
+    with printed_output() as printed:
+
+        empty_dict = {}
+
+        try:
+            empty_dict['foo']  # NoQA - the x['foo'] will unconditonally err, so we don't need the value to get used
+        except Exception as e:
+            print_error_message(e)
+
+        assert printed.last == "KeyError: 'foo'"
+
+        try:
+            empty_dict['foo']  # NoQA - the x['foo'] will unconditonally err, so we don't need the value to get used
+        except Exception as e:
+            print_error_message(e, full=True)  # For KeyError, a built-in class, this won't do anything different.
+
+        assert printed.last == "KeyError: 'foo'"
+
+        try:
+            raise SampleException("Something happened.")
+        except Exception as e:
+            print_error_message(e)
+
+        assert printed.last == "SampleException: Something happened."
+
+        try:
+            raise SampleException("Something happened.")
+        except Exception as e:
+            print_error_message(e, full=True)
+
+        assert printed.last == "test.test_misc_utils.SampleException: Something happened."
 
 
 def test_url_path_join():
