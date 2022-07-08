@@ -497,6 +497,7 @@ ALLOW_ENVIRON_BY_DEFAULT = True
 
 
 def get_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT):
+    """Look for an env in settings or in an environemnt variable."""
     return get_setting_from_context(settings, ini_var='env.name', env_var=None if allow_environ else False)
 
 

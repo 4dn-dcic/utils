@@ -17,14 +17,19 @@ from .env_base import EnvBase
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
 from .exceptions import (
     EnvUtilsLoadError, BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
+    LegacyDispatchDisabled,
 )
 from .misc_utils import (
     decorator, full_object_name, ignored, ignorable, remove_prefix, remove_suffix, check_true, find_association,
-    override_environ,
+    override_environ, get_setting_from_context,
 )
 
 
 ignorable(BeanstalkOperationNotImplemented)  # Stuff that does or doesn't use this might come and go
+
+
+class LegacyController:
+    LEGACY_DISPATCH_ENABLED = False
 
 
 class UseLegacy(BaseException):
@@ -67,18 +72,25 @@ def if_orchestrated(*, unimplemented=False, use_legacy=False, assumes_cgap=False
 
         EnvUtils.init(raise_load_errors=False)
 
+        orchestrated_function_name = fn.__name__
+
         try:
-            legacy_fn = getattr(legacy, fn.__name__)
+            legacy_fn = getattr(legacy, orchestrated_function_name)
         except AttributeError:
             # If is no legacy function (e.g., for new functionality), conjure a function with nicer error message
-            legacy_fn = _make_no_legacy(fn, fn.__name__)
+            legacy_fn = _make_no_legacy(fn, orchestrated_function_name)
 
         if use_legacy:
+            if not LegacyController.LEGACY_DISPATCH_ENABLED:
+                raise LegacyDispatchDisabled(operation=orchestrated_function_name, mode='decorate')
             return legacy_fn
 
         @functools.wraps(legacy_fn)
         def wrapped(*args, **kwargs):
             if EnvUtils.IS_LEGACY:
+                if not LegacyController.LEGACY_DISPATCH_ENABLED:
+                    raise LegacyDispatchDisabled(operation=orchestrated_function_name,
+                                                 mode='dispatch', call_args=args, call_kwargs=kwargs)
                 return legacy_fn(*args, **kwargs)
             elif unimplemented:
                 raise NotImplementedError(f"Unimplemented: {full_object_name(fn)}")
@@ -92,6 +104,10 @@ def if_orchestrated(*, unimplemented=False, use_legacy=False, assumes_cgap=False
                 try:
                     return fn(*args, **kwargs)
                 except UseLegacy:
+                    if not LegacyController.LEGACY_DISPATCH_ENABLED:
+                        raise LegacyDispatchDisabled(operation=orchestrated_function_name,
+                                                     mode='raised', call_args=args, call_kwargs=kwargs)
+
                     return legacy_fn(*args, **kwargs)
 
         return wrapped
@@ -375,8 +391,8 @@ class EnvUtils:
 
     @classmethod
     @contextlib.contextmanager
-    def fresh_state_from(cls, *, bucket=None, data=None):
-        with EnvBase.global_env_bucket_named(bucket):
+    def fresh_state_from(cls, *, bucket=None, data=None, global_bucket=None):
+        with EnvBase.global_env_bucket_named(global_bucket or bucket):
             with EnvUtils.temporary_state():
                 if bucket:
                     assert data is None, "You must supply bucket or data, but not both."
@@ -387,13 +403,19 @@ class EnvUtils:
                     raise AssertionError("You must supply either bucket or data.")
                 yield
 
-    FF_BUCKET = 'foursight-prod-envs'
+    FF_BUCKET = 'foursight-test-envs'
     CGAP_BUCKET = 'foursight-cgap-envs'
 
     @classmethod
     @contextlib.contextmanager
-    def fresh_ff_state(cls):
+    def fresh_ff_deployed_state(cls):
         with cls.fresh_state_from(bucket=cls.FF_BUCKET):
+            yield
+
+    @classmethod
+    @contextlib.contextmanager
+    def fresh_cgap_deployed_state(cls):
+        with cls.fresh_state_from(bucket=cls.CGAP_BUCKET):
             yield
 
     # Vaguely, the thing we're trying to recognize is this (sanitized slightly here),
@@ -542,13 +564,24 @@ def permit_load_data(envname: Optional[EnvName], allow_prod: bool, orchestrated_
     return bool(allow_prod)  # in case a non-bool allow_prod value is given, canonicalize the result
 
 
-@if_orchestrated(use_legacy=True)
+@if_orchestrated(use_legacy=False)  # was True until recently
 def blue_green_mirror_env(envname):
     """
     Given a blue envname, returns its green counterpart, or vice versa.
     For other envnames that aren't blue/green participants, this returns None.
     """
-    ignored(envname)
+    # This was copioed from the legacy definition, but we're phasing out legacy now.
+    # Odd as the definition is, we're still using this function.
+    # See: https://github.com/search?q=blue_green_mirror_env&type=code
+    # -kmp 8-Jul-2022
+    if 'blue' in envname:
+        if 'green' in envname:
+            raise ValueError('A blue/green mirror env must have only one of blue or green in its name.')
+        return envname.replace('blue', 'green')
+    elif 'green' in envname:
+        return envname.replace('green', 'blue')
+    else:
+        return None
 
 
 @if_orchestrated()
@@ -793,10 +826,11 @@ def is_hotseat_env(envname: Optional[EnvName]) -> bool:
             return False
 
 
-@if_orchestrated(use_legacy=True)
+@if_orchestrated(use_legacy=False)  # was True until recently
 def get_env_from_context(settings, allow_environ=True):
-    # The legacy handler will look in settings or in an environemnt variable. Probably that's OK for us.
-    ignored(settings, allow_environ)
+    """Look for an env in settings or in an environemnt variable."""
+    # This definition was capied from the lgegacy definition.
+    return get_setting_from_context(settings, ini_var='env.name', env_var=None if allow_environ else False)
 
 
 @if_orchestrated

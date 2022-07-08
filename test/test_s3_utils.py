@@ -260,16 +260,17 @@ def test_s3utils_creation_cgap_stg():
 @pytest.mark.integrated
 @using_fresh_ff_state()
 def test_s3utils_get_keys_for_data():
-    util = s3Utils(env='data')
-    keys = util.get_access_keys()
-    assert keys['server'] == 'https://data.4dnucleome.org'
-    # make sure we have keys for foursight and tibanna as well
-    keys_tb = util.get_access_keys('access_key_tibanna')
-    assert keys_tb['key'] != keys['key']
-    assert keys_tb['server'] == keys['server']
-    keys_fs = util.get_access_keys('access_key_foursight')
-    assert keys_fs['key'] != keys_tb['key'] != keys['key']
-    assert keys_fs['server'] == keys['server']
+    with EnvManager.global_env_bucket_named(LEGACY_GLOBAL_ENV_BUCKET):
+        util = s3Utils(env='data')
+        keys = util.get_access_keys()
+        assert keys['server'] == 'https://data.4dnucleome.org'
+        # make sure we have keys for foursight and tibanna as well
+        keys_tb = util.get_access_keys('access_key_tibanna')
+        assert keys_tb['key'] != keys['key']
+        assert keys_tb['server'] == keys['server']
+        keys_fs = util.get_access_keys('access_key_foursight')
+        assert keys_fs['key'] != keys_tb['key'] != keys['key']
+        assert keys_fs['server'] == keys['server']
 
 
 @pytest.mark.integrated

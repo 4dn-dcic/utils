@@ -3,7 +3,7 @@ import pytest
 import requests
 
 from dcicutils.common import LEGACY_GLOBAL_ENV_BUCKET
-from dcicutils.env_utils import EnvUtils
+from dcicutils.env_utils import LegacyController, EnvUtils
 from dcicutils.ff_mocks import IntegratedFixture
 from .conftest_settings import TEST_DIR, INTEGRATED_ENV
 
@@ -15,6 +15,30 @@ def _portal_health_get(namespace, portal_url, key):
     assert health_json['namespace'] == namespace  # check we're talking to proper host
     return health_json[key]
 
+
+# When we've rewritten these tests:
+# we can
+# (a) disable tests in test_env_utils_legacy.py and test_env_utils_orchestrated_legacy_compatibility.py
+#     perhaps by just renaming those to .py.DISABLED
+# (b) fix these tests:
+#         test/test_ff_utils.py::test_unified_authentication_unit FAILED
+#         test/test_ff_utils.py::test_get_authentication_with_server_unit FAILED
+#         test/test_ff_utils.py::test_are_counts_even_unit[True-sample_counts0] FAILED
+#         test/test_ff_utils.py::test_are_counts_even_unit[False-sample_counts1] FAILED
+#         test/test_s3_utils.py::test_read_s3_unit FAILED
+#         test/test_s3_utils.py::test_get_file_size_unit FAILED
+#         test/test_s3_utils.py::test_size_unit FAILED
+#         test/test_s3_utils.py::test_get_file_size_in_gb_unit FAILED
+#         test/test_s3_utils.py::test_read_s3_zip_unit FAILED
+#         test/test_s3_utils.py::test_unzip_s3_to_s3_unit[-fastqc_report.html] FAILED
+#         test/test_s3_utils.py::test_unzip_s3_to_s3_unit[2-qc_report.html] FAILED
+#         test/test_s3_utils.py::test_unzip_s3_to_s3_store_results_unit FAILED
+#         test/test_s3_utils.py::test_s3_utils_buckets_modern FAILED
+#         test/test_s3_utils.py::test_env_manager FAILED
+#         test/test_s3_utils.py::test_env_manager_verify_and_get_env_config FAILED
+#         test/test_s3_utils.py::test_env_manager_compose FAILED
+# (c) comment out the next line:
+LegacyController.LEGACY_DISPATCH_ENABLED = True
 
 os.environ['GLOBAL_ENV_BUCKET'] = LEGACY_GLOBAL_ENV_BUCKET
 os.environ['ENV_NAME'] = INTEGRATED_ENV

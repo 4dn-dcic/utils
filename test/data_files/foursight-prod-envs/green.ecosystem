@@ -1,0 +1,67 @@
+{
+    "full_env_prefix": "fourfront-",
+    "foursight_url_prefix": "https://foursight.4dnucleome.org/view/",
+    "orchestrated_app": "fourfront",
+    "prd_env_name": "fourfront-production-green",
+    "stg_env_name": "fourfront-production-blue",
+    "test_envs": ["fourfront-mastertest", "fourfront-hotseat", "fourfront-webdev"],
+    "hotseat_envs": ["fourfront-hotseat"],
+    "stage_mirroring_enabled": true,
+    "webprod_pseudo_env": "fourfront-webprod",
+    "production_ecr_repository": "fourfront-production",
+    "default_workflow_env": "fourfront-webdev",
+    "public_url_table": [
+        {
+            "name": "data",
+            "url": "https://data.4dnucleome.org",
+            "host": "data.4dnucleome.org",
+            "environment": "fourfront-production-green"
+        },
+        {
+            "name": "staging",
+            "url": "http://staging.4dnucleome.org",
+            "host": "staging.4dnucleome.org",
+            "environment": "fourfront-production-blue"
+        },
+        {
+            "name": "mastertest",
+            "url": "https://mastertest.4dnucleome.org",
+            "host": "mastertest.4dnucleome.org",
+            "environment": "fourfront-mastertest"
+        },
+        {
+            "name": "hotseat",
+            "url": "http://fourfront-hotseat-1650461284.us-east-1.elb.amazonaws.com:80",
+            "host": "fourfront-hotseat-1650461284.us-east-1.elb.amazonaws.com",
+            "environment": "fourfront-hotseat"
+        },
+        {
+            "name": "webdev",
+            "url": "http://fourfront-webdev-1726959209.us-east-1.elb.amazonaws.com:80",
+            "host": "fourfront-webdev-1726959209.us-east-1.elb.amazonaws.com",
+            "environment": "fourfront-webdev"
+        }
+    ],
+    "foursight_bucket_prefix": "foursight",
+    "foursight_bucket_table": {
+        "data": {
+            "dev": "foursight-dev-data",
+            "prod": "foursight-prod-data"
+        },
+        "staging": {
+            "dev": "foursight-dev-staging", "prod": "foursight-prod-staging"
+        },
+        "mastertest": {
+            "dev": "foursight-dev-mastertest",
+            "prod": "foursight-prod-mastertest"
+        },
+        "hotseat": {
+            "dev": "foursight-dev-hotseat",
+            "prod": "foursight-prod-hotseat"
+        },
+        "webdev": {
+            "dev": "foursight-dev-webdev",
+            "prod": "foursight-prod-webdev"
+        }
+    }
+}
