@@ -156,7 +156,7 @@ class AbstractOrchestrationManager:
         [candidate] = candidates or [None]
         return candidate
 
-    def find_stack_outputs(self, key_or_pred, value_only=False):
+    def find_stack_outputs(self, key_or_pred, value_only=False, stack_name: str = None):
         """
         If value_only is False, this finds all outputs of all stacks (see .all_stacks() for what "all" means),
         that match key_or_pred, returning a dictionary of {key1: val1, key2: val2, ...}.
@@ -169,7 +169,12 @@ class AbstractOrchestrationManager:
         If two stacks had the same output key, only one of them would be required.
         """
         results = {}
-        for stack in self.all_stacks():
+        stacks = self.all_stacks()
+        if stack_name:
+            stacks = [stack for stack in stacks if stack.name == stack_name]
+            if not stacks:
+                return results
+        for stack in stacks:
             for found in find_associations(stack.outputs or [], OutputKey=key_or_pred):
                 results[found['OutputKey']] = found['OutputValue']
         if value_only:
@@ -177,13 +182,13 @@ class AbstractOrchestrationManager:
         else:
             return results
 
-    def find_stack_output(self, key_or_pred, value_only=False):
+    def find_stack_output(self, key_or_pred, value_only=False, stack_name: str = None):
         """
         This is like find_stack_outputs, but assumes that only zero or one values will be returned.
         If one value, it returns the first of what find_stack_outputs would return as a list.
         If no value, it returns None.
         """
-        results = self.find_stack_outputs(key_or_pred, value_only=value_only)
+        results = self.find_stack_outputs(key_or_pred, value_only=value_only, stack_name=stack_name)
         n = len(results)
         if n == 0:
             return None
