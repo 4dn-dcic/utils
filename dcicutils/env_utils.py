@@ -403,13 +403,14 @@ class EnvUtils:
                     raise AssertionError("You must supply either bucket or data.")
                 yield
 
+    FF_DEPLOYED_BUCKET = 'foursight-prod-envs'
     FF_BUCKET = 'foursight-test-envs'
     CGAP_BUCKET = 'foursight-cgap-envs'
 
     @classmethod
     @contextlib.contextmanager
     def fresh_ff_deployed_state(cls):
-        with cls.fresh_state_from(bucket=cls.FF_BUCKET):
+        with cls.fresh_state_from(bucket=cls.FF_DEPLOYED_BUCKET):
             yield
 
     @classmethod
@@ -660,10 +661,17 @@ def _find_public_url_entry(envname):
 
 @if_orchestrated
 def get_env_real_url(envname):
+
     entry = _find_public_url_entry(envname)
     if entry:
         return entry.get('url')
-    elif EnvUtils.ORCHESTRATED_APP == APP_FOURFRONT:  # Only fourfront shortens
+
+    if not EnvUtils.DEV_ENV_DOMAIN_SUFFIX:
+        raise RuntimeError(f"DEV_ENV_DOMAIN_SUFFIX is not defined."
+                           f" It is needed for get_env_real_url({envname!r})"
+                           f" because env {envname} has no entry in {EnvNames.PUBLIC_URL_TABLE}.")
+
+    if EnvUtils.ORCHESTRATED_APP == APP_FOURFRONT:  # Only fourfront shortens
         # Fourfront is a low-security application, so only 'data' is 'https' and the rest are 'http'.
         # TODO: This should be table-driven, too, but we're not planning to distribute Fourfront,
         #       so it's not high priority. -kmp 13-May-2022
@@ -988,7 +996,12 @@ def infer_foursight_from_env(*, request=None, envname: Optional[EnvName] = None,
 def short_env_name(envname: Optional[EnvName]):
     if not envname:
         return None
-    elif not EnvUtils.FULL_ENV_PREFIX:  # "" or None
+
+    entry = find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname)
+    if entry:
+        envname = entry[p.ENVIRONMENT]
+
+    if not EnvUtils.FULL_ENV_PREFIX:  # "" or None
         return envname
     return remove_prefix(EnvUtils.FULL_ENV_PREFIX, envname, required=False)
 

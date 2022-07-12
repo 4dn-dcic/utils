@@ -7,7 +7,6 @@
     "test_envs": ["fourfront-mastertest", "fourfront-hotseat", "fourfront-webdev"],
     "hotseat_envs": ["fourfront-hotseat"],
     "stage_mirroring_enabled": true,
-    "webprod_pseudo_env": "fourfront-webprod",
     "production_ecr_repository": "fourfront-production",
     "default_workflow_env": "fourfront-webdev",
     "public_url_table": [
