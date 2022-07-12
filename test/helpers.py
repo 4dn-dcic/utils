@@ -75,3 +75,25 @@ def using_fresh_ff_state():
                 return function(*args, **kwargs)
         return _wrapped
     return wrap
+
+
+@decorator()
+def using_fresh_cgap_deployed_state():
+    def wrap(function):
+        @functools.wraps(function)
+        def _wrapped(*args, **kwargs):
+            with fresh_cgap_deployed_state():
+                return function(*args, **kwargs)
+        return _wrapped
+    return wrap
+
+
+@decorator()
+def using_fresh_ff_deployed_state():
+    def wrap(function):
+        @functools.wraps(function)
+        def _wrapped(*args, **kwargs):
+            with fresh_ff_deployed_state():
+                return function(*args, **kwargs)
+        return _wrapped
+    return wrap
