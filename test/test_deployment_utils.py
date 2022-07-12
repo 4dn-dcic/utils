@@ -574,7 +574,8 @@ def test_deployment_utils_transitional_equivalence():
         # TODO: Once this mechanism is in place, the files cgap.ini, cgapdev.ini, cgaptest.ini, and cgapwolf.ini
         #       can either be removed (and these transitional tests removed) or transitioned to be test data.
 
-        def tester(ref_ini, env_name, data_set, es_server, *, any_ini=None, es_namespace=None, line_checker=None,
+        def tester(ref_ini, env_name, data_set, es_server, *,
+                   higlass_server=None, any_ini=None, es_namespace=None, line_checker=None,
                    use_ini_file_manager_kind=None, **others):
             """
             This common tester program checks that the any.ini does the same thing as a given ref ini,
@@ -760,6 +761,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="cgap.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default))
 
@@ -771,6 +773,7 @@ def test_deployment_utils_transitional_equivalence():
                         tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
                                use_ini_file_manager_kind="orchestrated-cgap",
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
                                                             expected_values={
@@ -784,6 +787,7 @@ def test_deployment_utils_transitional_equivalence():
                         tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
                                use_ini_file_manager_kind="legacy-cgap",
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
                                                             expected_values={
@@ -797,6 +801,7 @@ def test_deployment_utils_transitional_equivalence():
                         tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
                                use_ini_file_manager_kind='orchestrated-cgap',
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
                                                             expected_values={
@@ -808,6 +813,7 @@ def test_deployment_utils_transitional_equivalence():
                         tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
                                use_ini_file_manager_kind="orchestrated-cgap",
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
                                                             expected_values={
@@ -822,6 +828,7 @@ def test_deployment_utils_transitional_equivalence():
                         tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
                                use_ini_file_manager_kind='orchestrated-cgap',
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
                                                             expected_values={
@@ -836,6 +843,7 @@ def test_deployment_utils_transitional_equivalence():
                         bs_env = "cgap-alfa"
                         tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                use_ini_file_manager_kind='orchestrated-cgap',
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
@@ -881,6 +889,7 @@ def test_deployment_utils_transitional_equivalence():
                             tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", env_name=bs_env,
                                    data_set=data_set, use_ini_file_manager_kind="orchestrated-cgap",
                                    es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                                 expect_index_server=index_server_default,
                                                                 expected_values={
@@ -921,6 +930,7 @@ def test_deployment_utils_transitional_equivalence():
                             tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", env_name=bs_env,
                                    data_set=data_set, use_ini_file_manager_kind="orchestrated-cgap",
                                    es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                                 expect_index_server=index_server_default,
                                                                 expected_values={
@@ -940,6 +950,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="cgapdev.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-cgapdev-gnv2sgdngkjbcemdadmaoxcsae.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server=index_server_default))
 
@@ -947,6 +958,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="cgaptest.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-cgaptest-dxiczz2zv7f3nshshvevcvmpmy.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server=index_server_default))
 
@@ -956,6 +968,7 @@ def test_deployment_utils_transitional_equivalence():
                                # This ini file will have 'app_kind = ccgap' rather than 'app_kind = unknown'.
                                use_ini_file_manager_kind='legacy-cgap',
                                es_server="search-fourfront-cgapwolf-r5kkbokabymtguuwjzspt2kiqa.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server=index_server_default))
 
@@ -966,6 +979,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="blue.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=FFProdChecker(expect_indexer=index_default,
                                                           expect_index_server=index_server_default))
 
@@ -973,6 +987,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="green.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-green-cghpezl64x4uma3etijfknh7ja.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=FFProdChecker(expect_indexer=index_default,
                                                           expect_index_server=index_server_default))
 
@@ -980,6 +995,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="hotseat.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-hotseat-f3oxd2wjxw3h2wsxxbcmzhhd4i.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server=index_server_default))
 
@@ -987,6 +1003,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="mastertest.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server=index_server_default))
 
@@ -994,6 +1011,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="webdev.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server=index_server_default))
 
@@ -1001,6 +1019,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="webprod.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-webprod-hmrrlalm4ifyhl4bzbvl73hwv4.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=FFProdChecker(expect_indexer=index_default,
                                                           expect_index_server=index_server_default))
 
@@ -1008,6 +1027,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="webprod2.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-webprod2-fkav4x4wjvhgejtcg6ilrmczpe.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=FFProdChecker(expect_indexer=index_default,
                                                           expect_index_server=index_server_default))
 
@@ -1015,16 +1035,19 @@ def test_deployment_utils_transitional_equivalence():
 
                             tester(ref_ini="cgap.ini", env_name="fourfront-cgap", data_set="prod",
                                    es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=CGAPProdChecker(expect_indexer=None,
                                                                 expect_index_server="true"))
 
                             tester(ref_ini="blue.ini", env_name="fourfront-blue", data_set="prod",
                                    es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=FFProdChecker(expect_indexer=None,
                                                               expect_index_server="true"))
 
                             tester(ref_ini="webdev.ini", env_name="fourfront-webdev", data_set="prod",
                                    es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=Checker(expect_indexer=None,
                                                         expect_index_server="true"))
 
@@ -1042,16 +1065,19 @@ def test_deployment_utils_transitional_equivalence():
 
                         tester(ref_ini="cgap.ini", env_name="fourfront-cgap", data_set="prod",
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server="true"))
 
                         tester(ref_ini="blue.ini", env_name="fourfront-blue", data_set="prod",
                                es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=FFProdChecker(expect_indexer=index_default,
                                                           expect_index_server="true"))
 
                         tester(ref_ini="webdev.ini", env_name="fourfront-webdev", data_set="prod",
                                es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server="true"))
 
@@ -1063,16 +1089,19 @@ def test_deployment_utils_transitional_equivalence():
 
                             tester(ref_ini="cgap.ini", env_name="fourfront-cgap", data_set="prod",
                                    es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                                 expect_index_server=None))
 
                             tester(ref_ini="blue.ini", env_name="fourfront-blue", data_set="prod",
                                    es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=FFProdChecker(expect_indexer=index_default,
                                                               expect_index_server=None))
 
                             tester(ref_ini="webdev.ini", env_name="fourfront-webdev", data_set="prod",
                                    es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=Checker(expect_indexer=index_default,
                                                         expect_index_server=None))
 
@@ -1083,16 +1112,19 @@ def test_deployment_utils_transitional_equivalence():
 
                             tester(ref_ini="cgap.ini", env_name="fourfront-cgap", data_set="prod",
                                    es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                                 expect_index_server="true"))
 
                             tester(ref_ini="blue.ini", env_name="fourfront-blue", data_set="prod",
                                    es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=FFProdChecker(expect_indexer=index_default,
                                                               expect_index_server="true"))
 
                             tester(ref_ini="webdev.ini", env_name="fourfront-webdev", data_set="prod",
                                    es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=Checker(expect_indexer=index_default,
                                                         expect_index_server="true"))
 
@@ -1151,6 +1183,7 @@ def test_deployment_utils_main():
                             'env_name': None,
                             'es_namespace': None,
                             'es_server': None,
+                            'higlass_server': None,
                             'identity': None,
                             'index_server': None,
                             'indexer': None,
@@ -1184,6 +1217,7 @@ def test_deployment_utils_main():
                             'env_name': None,
                             'es_namespace': None,
                             'es_server': None,
+                            'higlass_server': None,
                             'identity': None,
                             'index_server': 'true',
                             'indexer': 'false',
@@ -1215,6 +1249,7 @@ def test_deployment_utils_main():
                                 'env_name': None,
                                 'es_namespace': None,
                                 'es_server': None,
+                                'higlass_server': None,
                                 'identity': None,
                                 'index_server': 'true',
                                 'indexer': 'false',

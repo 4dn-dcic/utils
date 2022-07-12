@@ -419,6 +419,7 @@ class IniFileManager:
                                      bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
                                      s3_encrypt_key_id=None, env_bucket=None, env_ecosystem=None, env_name=None,
                                      data_set=None, es_server=None, es_namespace=None, identity=None,
+                                     higlass_server=None,
                                      indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
                                      tibanna_output_bucket=None,
                                      application_bucket_prefix=None, foursight_bucket_prefix=None,
@@ -448,6 +449,7 @@ class IniFileManager:
             es_server (str): The server name (or server:port) for the ElasticSearch server.
             es_namespace (str): The ElasticSearch namespace to use (probably but not necessarily same as env_name).
             identity (str): The AWS application configuration key that represents the current environment.
+            higlass_server (str): The server name (or server:port) for the HiGlass server.
             indexer (bool): Whether or not we are building an ini file for an indexer.
             index_server (bool): Whether or not we are building an ini file for an index server.
             sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
@@ -478,6 +480,7 @@ class IniFileManager:
                                                es_server=es_server,
                                                es_namespace=es_namespace,
                                                identity=identity,
+                                               higlass_server=higlass_server,
                                                indexer=indexer,
                                                index_server=index_server,
                                                sentry_dsn=sentry_dsn,
@@ -545,6 +548,7 @@ class IniFileManager:
                                        bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
                                        s3_encrypt_key_id=None, env_bucket=None, env_ecosystem=None, env_name=None,
                                        data_set=None, es_server=None, es_namespace=None, identity=None,
+                                       higlass_server=None,
                                        indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
                                        tibanna_output_bucket=None,
                                        application_bucket_prefix=None, foursight_bucket_prefix=None,
@@ -571,6 +575,7 @@ class IniFileManager:
             es_server: The name of an es server to use.
             es_namespace: The namespace to use on the es server. If None, this uses the env_name.
             identity (str): The AWS application configuration key that represents the current environment.
+            higlass_server: The name of a HiGlass server to use.
             indexer: Whether or not we are building an ini file for an indexer.
             index_server: Whether or not we are building an ini file for an index server.
             sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
@@ -596,6 +601,7 @@ class IniFileManager:
                 and os.environ.get("ENCODED_BS_ENV") != os.environ.get("ENCODED_ENV_NAME")):
             raise ValueError("If both ENCODED_BS_ENV and ENCODED_ENV_NAME are supplied, they must agree.")
 
+        higlass_server = higlass_server or os.environ.get('ENCODED_HIGLASS_SERVER', "MISSING_ENCODED_HIGLASS_SERVER")
         es_server = es_server or os.environ.get('ENCODED_ES_SERVER', "MISSING_ENCODED_ES_SERVER")
         env_bucket = (env_bucket
                       or EnvManager.global_env_bucket_name()
@@ -720,6 +726,7 @@ class IniFileManager:
             'PROJECT_VERSION': toml.load(cls.PYPROJECT_FILE_NAME)['tool']['poetry']['version'],
             'SNOVAULT_VERSION': pkg_resources.get_distribution("dcicsnovault").version,
             'UTILS_VERSION': pkg_resources.get_distribution("dcicutils").version,
+            'HIGLASS_SERVER': higlass_server,
             'ES_SERVER': es_server,
             'ENV_BUCKET': env_bucket,
             'ENV_ECOSYSTEM': env_ecosystem,
@@ -869,6 +876,9 @@ class IniFileManager:
             parser.add_argument("--identity",
                                 help="the AWS application configuration key that represents the current environment",
                                 default=None)
+            parser.add_argument("--higlass_server",
+                                help="a HiGlass servername or servername:port",
+                                default=None)
             parser.add_argument("--indexer",
                                 help="whether this server does indexing at all",
                                 choices=["true", "false"],
@@ -935,7 +945,7 @@ class IniFileManager:
                                              data_set=args.data_set, s3_encrypt_key_id=args.s3_encrypt_key_id,
                                              es_server=args.es_server, es_namespace=args.es_namespace,
                                              indexer=args.indexer, index_server=args.index_server,
-                                             identity=args.identity,
+                                             identity=args.identity, higlass_server=args.higlass_server,
                                              sentry_dsn=args.sentry_dsn,
                                              tibanna_cwls_bucket=args.tibanna_cwls_bucket,
                                              tibanna_output_bucket=args.tibanna_output_bucket,

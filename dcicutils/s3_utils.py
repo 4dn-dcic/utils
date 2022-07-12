@@ -39,6 +39,7 @@ class HealthPageKey:  # This is moving here from cgap-portal.
     FILE_UPLOAD_BUCKET = 'file_upload_bucket'                # = s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY
     FOURSIGHT = 'foursight'
     FOURSIGHT_BUCKET_PREFIX = 'foursight_bucket_prefix'
+    HIGLASS = 'higlass'
     IDENTITY = 'identity'
     INDEXER = 'indexer'
     INDEX_SERVER = 'index_server'
@@ -136,20 +137,20 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 self.url = portal_url
                 es_url = self._infer_es_url()
                 self.env_manager = EnvManager.compose(portal_url=self.url, es_url=es_url, env_name=env, s3=self.s3)
-                self.s3_encrypt_key_id = self._health_json_get(HealthPageKey.S3_ENCRYPT_KEY_ID, default=None)
-                sys_bucket_from_health_page = self._health_json_get(HealthPageKey.SYSTEM_BUCKET)
-                outfile_bucket_from_health_page = self._health_json_get(HealthPageKey.PROCESSED_FILE_BUCKET)
-                raw_file_bucket_from_health_page = self._health_json_get(HealthPageKey.FILE_UPLOAD_BUCKET)
-                blob_bucket_from_health_page = self._health_json_get(HealthPageKey.BLOB_BUCKET)
-                metadata_bucket_from_health_page = self._health_json_get(HealthPageKey.METADATA_BUNDLES_BUCKET,
-                                                                         # N/A for 4DN
-                                                                         default=None)
-                tibanna_cwls_bucket_from_health_page = self._health_json_get(HealthPageKey.TIBANNA_CWLS_BUCKET,
-                                                                             # new, so it may be missing
-                                                                             default=None)
-                tibanna_output_bucket_from_health_page = self._health_json_get(HealthPageKey.TIBANNA_OUTPUT_BUCKET,
-                                                                               # new, so it may be missing
-                                                                               default=None)
+                self.s3_encrypt_key_id = self.health_json_get(HealthPageKey.S3_ENCRYPT_KEY_ID, default=None)
+                sys_bucket_from_health_page = self.health_json_get(HealthPageKey.SYSTEM_BUCKET)
+                outfile_bucket_from_health_page = self.health_json_get(HealthPageKey.PROCESSED_FILE_BUCKET)
+                raw_file_bucket_from_health_page = self.health_json_get(HealthPageKey.FILE_UPLOAD_BUCKET)
+                blob_bucket_from_health_page = self.health_json_get(HealthPageKey.BLOB_BUCKET)
+                metadata_bucket_from_health_page = self.health_json_get(HealthPageKey.METADATA_BUNDLES_BUCKET,
+                                                                        # N/A for 4DN
+                                                                        default=None)
+                tibanna_cwls_bucket_from_health_page = self.health_json_get(HealthPageKey.TIBANNA_CWLS_BUCKET,
+                                                                            # new, so it may be missing
+                                                                            default=None)
+                tibanna_output_bucket_from_health_page = self.health_json_get(HealthPageKey.TIBANNA_OUTPUT_BUCKET,
+                                                                              # new, so it may be missing
+                                                                              default=None)
                 sys_bucket = sys_bucket_from_health_page  # OK to overwrite because we checked it's None above
                 if outfile_bucket and outfile_bucket != outfile_bucket_from_health_page:
                     raise InferredBucketConflict(kind="outfile", specified=outfile_bucket,
@@ -206,7 +207,7 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
 
                     es_url = self._infer_es_url()
                     self.env_manager = EnvManager.compose(portal_url=self.url, es_url=es_url, env_name=env, s3=self.s3)
-                    self.s3_encrypt_key_id = self._health_json_get(HealthPageKey.S3_ENCRYPT_KEY_ID, default=None)
+                    self.s3_encrypt_key_id = self.health_json_get(HealthPageKey.S3_ENCRYPT_KEY_ID, default=None)
 
                 # TODO: This branch is not setting self.global_env_bucket_manager, but it _could_ do that from the
                 #       description. -kmp 21-Aug-2021
@@ -237,12 +238,19 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
 
     def _infer_es_url(self):
         """Obtains the es URL from the health page, on a theory that the """
-        es_url = self._health_json_get(HealthPageKey.ELASTICSEARCH)
-        if not es_url.startswith("http"):  # will match http: and https:
+        es_url = self.health_json_get(HealthPageKey.ELASTICSEARCH)
+        if es_url is not None and not es_url.startswith("http"):  # will match http: and https:
             es_url = f"https://{es_url}"
         return es_url
 
-    def _health_json_get(self, health_page_key, default=None):
+    def _infer_higlass_url(self):  # Not used yet. Need to figure out where this value would go. -kmp 12-Jul-2022
+        """Obtains the es URL from the health page, on a theory that the """
+        higlass_url = self.health_json_get(HealthPageKey.HIGLASS)
+        if higlass_url is not None and not higlass_url.startswith("http"):  # will match http: and https:
+            higlass_url = f"https://{higlass_url}"
+        return higlass_url
+
+    def health_json_get(self, health_page_key, default=None):
         health_json_url = self._health_json_url or f"{self.url}/health?format=json"
         logger.warning('health json url: {}'.format(health_json_url))
         self._health_json_url = health_json_url
