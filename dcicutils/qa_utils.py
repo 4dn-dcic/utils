@@ -789,6 +789,9 @@ class MockBoto3Session:
         except Exception:
             return None, None, None,
 
+    MISSING_ACCESS_KEY = 'missing access key'
+    MISSING_SECRET_KEY = 'missing secret key'
+
     def get_credentials(self) -> Optional[Boto3Credentials]:
         """
         Returns the AWS credentials (Boto3Credentials) from the aws_access_key_id and aws_secret_access_key values,
@@ -829,7 +832,7 @@ class MockBoto3Session:
         aws_access_key_id, aws_secret_access_key, _ = self._read_aws_credentials_from_file(aws_credentials_file)
         if aws_access_key_id and aws_secret_access_key:
             return Boto3Credentials(access_key=aws_access_key_id, secret_key=aws_secret_access_key)
-        return Boto3Credentials(access_key="", secret_key="")
+        return Boto3Credentials(access_key=self.MISSING_ACCESS_KEY, secret_key=self.MISSING_SECRET_KEY)
 
     @property
     def region_name(self) -> Optional[str]:
