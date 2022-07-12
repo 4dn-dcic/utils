@@ -6,6 +6,10 @@ dcicutils
 Change Log
 ----------
 
+3.14.2
+======
+* In ``qa_utils``:
+  * Minor updates related PEP8.
 
 3.14.1
 ======
