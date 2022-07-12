@@ -1,3 +1,5 @@
+import botocore.client
+import botocore.exceptions
 import contextlib
 import datetime
 import io
@@ -7,14 +9,14 @@ import pytest
 import re
 import requests
 
-from botocore.exceptions import ClientError
 from dcicutils import s3_utils as s3_utils_module
 from dcicutils.beanstalk_utils import get_beanstalk_real_url
 from dcicutils.beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env, compute_cgap_stg_env
 from dcicutils.common import LEGACY_GLOBAL_ENV_BUCKET
 from dcicutils.env_manager import EnvManager
 from dcicutils.env_utils import (
-    get_standard_mirror_env, EnvUtils, short_env_name
+    get_standard_mirror_env, EnvUtils, short_env_name,
+    is_stg_or_prd_env, full_env_name,
 )
 from dcicutils.env_utils_legacy import (
     FF_PUBLIC_URL_STG, FF_PUBLIC_URL_PRD,
@@ -27,7 +29,7 @@ from dcicutils.qa_utils import override_environ, MockBoto3, MockResponse, known_
 from dcicutils.s3_utils import s3Utils, HealthPageKey
 from requests.exceptions import ConnectionError
 from unittest import mock
-from .helpers import using_fresh_ff_state, using_fresh_cgap_state
+from .helpers import using_fresh_ff_state, using_fresh_cgap_state, using_fresh_ff_deployed_state
 from .test_ff_utils import mocked_s3utils_with_sse
 
 
@@ -102,7 +104,7 @@ def test_regression_s3_utils_short_name_c4_706():
     # Environment long names work (at least in legacy CGAP)
     s3Utils(env="fourfront-mastertest")
 
-    with known_bug_expected(jira_ticket="C4-706", fixed=True, error_class=ClientError):
+    with known_bug_expected(jira_ticket="C4-706", fixed=True, error_class=botocore.exceptions.ClientError):
         # Sort names not allowed.
         s3Utils(env="mastertest")
 
@@ -882,6 +884,96 @@ def test_s3_utils_buckets_modern():
             # assert e.portal_url = ...
             assert e.es_url == es_url  # es_server_https
             assert e.env_name == env_name
+
+
+@using_fresh_ff_deployed_state()
+def test_s3_utils_buckets_ff_live_ecosystem_not_production():
+
+    print()  # Start on fresh line
+    for env_name in [
+        'fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat',
+        'mastertest', 'webdev', 'hotseat'
+    ]:
+
+        print("=" * 80)
+        print(f"env_name={env_name}")
+        print("=" * 80)
+        s3u = s3Utils(env=env_name)
+
+        full_env = full_env_name(env_name)
+
+        print(f"s3u.sys_bucket={s3u.sys_bucket}")
+        assert s3u.sys_bucket == f'elasticbeanstalk-{full_env}-system'
+
+        print(f"s3u.outfile_bucket={s3u.outfile_bucket}")
+        assert s3u.outfile_bucket == f'elasticbeanstalk-{full_env}-wfoutput'
+        print(f"s3u.raw_file_bucket={s3u.raw_file_bucket}")
+        assert s3u.raw_file_bucket == f'elasticbeanstalk-{full_env}-files'
+        print(f"s3u.blob_bucket={s3u.blob_bucket}")
+        assert s3u.blob_bucket == f'elasticbeanstalk-{full_env}-blobs'
+        with known_bug_expected(jira_ticket="C4-853", fixed=False, error_class=AssertionError):
+            print(f"s3u.metadata_bucket={s3u.metadata_bucket}")
+            assert s3u.metadata_bucket == f'elasticbeanstalk-{full_env}-metadata-bundles'
+
+        with known_bug_expected(jira_ticket="C4-853", fixed=False, error_class=AssertionError):
+            assert s3u.tibanna_cwls_bucket == 'tibanna-cwls'
+        assert s3u.tibanna_output_bucket == 'tibanna-output'
+
+        assert s3u.s3_encrypt_key_id is None
+        assert isinstance(s3u.env_manager, EnvManager)
+        assert isinstance(s3u.env_manager.s3, botocore.client.BaseClient)  # It's hard to test for S3 specifically
+        es_url = s3u.env_manager.es_url
+        print(f"Checking {es_url}...")
+        # NOTE: The right answers differ here from production, but as long as the short name is in there, that's enough.
+        pattern = f"https://vpc-es-.*{short_env_name(env_name).replace('-', '.*')}.*[.]amazonaws[.]com:443"
+        print(f"pattern={pattern}")
+        assert es_url and re.match(pattern, es_url)
+        assert s3u.env_manager.env_name == full_env
+
+
+@using_fresh_ff_deployed_state()
+def test_s3_utils_buckets_ff_live_ecosystem_production():
+
+    print()  # Start on fresh line
+    for env_name in ['fourfront-production-blue', 'fourfront-production-green',
+                     'data', 'staging']:
+
+        print("=" * 80)
+        print(f"env_name={env_name}")
+        print("=" * 80)
+        s3u = s3Utils(env=env_name)
+
+        s3_sys_env_token = 'fourfront-webprod2'  # Shared by data and staging for sys bucket
+
+        print(f"s3u.sys_bucket={s3u.sys_bucket}")
+        assert s3u.sys_bucket == f'elasticbeanstalk-{s3_sys_env_token}-system'
+
+        s3_env_token = 'fourfront-webprod'  # Shared by data and staging for other than sys bucket
+
+        print(f"s3u.outfile_bucket={s3u.outfile_bucket}")
+        assert s3u.outfile_bucket == f'elasticbeanstalk-{s3_env_token}-wfoutput'
+        print(f"s3u.raw_file_bucket={s3u.raw_file_bucket}")
+        assert s3u.raw_file_bucket == f'elasticbeanstalk-{s3_env_token}-files'
+        print(f"s3u.blob_bucket={s3u.blob_bucket}")
+        assert s3u.blob_bucket == f'elasticbeanstalk-{s3_env_token}-blobs'
+        with known_bug_expected(jira_ticket="C4-853", fixed=False, error_class=AssertionError):
+            print(f"s3u.metadata_bucket={s3u.metadata_bucket}")
+            assert s3u.metadata_bucket == f'elasticbeanstalk-{s3_env_token}-metadata-bundles'
+
+        with known_bug_expected(jira_ticket="C4-853", fixed=False, error_class=AssertionError):
+            assert s3u.tibanna_cwls_bucket == 'tibanna-cwls'
+        assert s3u.tibanna_output_bucket == 'tibanna-output'
+
+        assert s3u.s3_encrypt_key_id is None
+        assert isinstance(s3u.env_manager, EnvManager)
+        assert isinstance(s3u.env_manager.s3, botocore.client.BaseClient)  # It's hard to test for S3 specifically
+        es_url = s3u.env_manager.es_url
+        print(f"Checking {es_url}...")
+        # tokenify(full_env_name(env_name)) matches better, but as long as short env name is there, it's enough.
+        pattern = f"https://vpc-es-.*{short_env_name(env_name).replace('-', '.*')}.*[.]amazonaws[.]com:443"
+        print(f"pattern={pattern}")
+        assert es_url and re.match(pattern, es_url)
+        assert is_stg_or_prd_env(s3u.env_manager.env_name)
 
 
 @using_fresh_ff_state()

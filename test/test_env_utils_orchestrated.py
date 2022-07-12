@@ -1765,7 +1765,7 @@ def test_orchestrated_is_indexer_env_disabled():
 def test_orchestrated_short_env_name():
 
     assert short_env_name(None) is None
-    assert short_env_name('demo') == 'demo'
+    assert short_env_name('demo') == 'pubdemo'
     assert short_env_name('anything') == 'anything'
     assert short_env_name('acme-anything') == 'anything'
     assert short_env_name('cgap-anything') == 'cgap-anything'
