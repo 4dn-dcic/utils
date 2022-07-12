@@ -40,6 +40,13 @@ def test_hyphenify():
     assert cloudformation_utils.hyphenify('_foo123-bar7baz__quux----') == '-foo123-bar7baz--quux----'
 
 
+def test_tokenify():
+
+    assert cloudformation_utils.tokenify('foo') == 'foo'
+    assert cloudformation_utils.tokenify('abc123') == 'abc123'
+    assert cloudformation_utils.tokenify('abc-123-bar17_19') == 'abc123bar1719'
+
+
 def test_make_key_for_ecs_application_url():
 
     expected = 'ECSApplicationURLcgapanytest'
