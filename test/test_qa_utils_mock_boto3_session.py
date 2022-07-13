@@ -7,13 +7,13 @@ import tempfile
 import uuid
 
 
-def test_mock_boto3_session():
+def test_mock_boto3_session() -> None:
     mock_boto3 = MockBoto3()
     assert isinstance(mock_boto3.client('session'), MockBoto3Session)
     assert isinstance(mock_boto3.client('session', region_name='us-east-1'), MockBoto3Session)
 
 
-def test_mock_boto3_session_get_credentials_via_explicit():
+def test_mock_boto3_session_get_credentials_via_explicit() -> None:
     mock_boto3 = MockBoto3()
     mocked_session = mock_boto3.session.Session()
 
@@ -34,7 +34,7 @@ def test_mock_boto3_session_get_credentials_via_explicit():
     assert mocked_session.region_name == aws_region
 
 
-def test_mock_boto3_session_get_credentials_via_environment():
+def test_mock_boto3_session_get_credentials_via_environment() -> None:
     mock_boto3 = MockBoto3()
     mocked_session = mock_boto3.client('session')
 
@@ -55,7 +55,7 @@ def test_mock_boto3_session_get_credentials_via_environment():
     assert mocked_session.region_name == aws_region
 
 
-def test_mock_boto3_session_get_credentials_via_file():
+def test_mock_boto3_session_get_credentials_via_file() -> None:
     mock_boto3 = MockBoto3()
     mocked_session = mock_boto3.client('session')
 

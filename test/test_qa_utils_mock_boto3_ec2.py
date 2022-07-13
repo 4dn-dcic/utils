@@ -93,7 +93,7 @@ def assert_security_group_rule_exists(mock_boto_ec2: MockBoto3Ec2,
             assert existing_security_group_rule["CidrIpv4"] == security_group_rule["CidrIpv4"]
 
 
-def test_mock_boto3_ec2_security():
+def test_mock_boto3_ec2_security() -> None:
 
     mock_boto = MockBoto3()
     mock_boto_ec2 = MockBoto3Ec2()
