@@ -21,9 +21,8 @@ from dcicutils.deployment_utils import (
 )
 from dcicutils.env_utils import is_cgap_env, is_hotseat_env, is_test_env, data_set_for_env, EnvUtils, full_env_name
 from dcicutils.exceptions import InvalidParameterError
-from dcicutils.qa_utils import MockFileSystem, printed_output, MockedCommandArgs
-from dcicutils.misc_utils import ignored, file_contents
-from dcicutils.qa_utils import override_environ
+from dcicutils.misc_utils import ignored, file_contents, override_environ
+from dcicutils.qa_utils import MockFileSystem, MockedCommandArgs, printed_output
 from .helpers import (
     fresh_cgap_state, fresh_ff_state,  # fresh_legacy_state,
     using_fresh_ff_state,  # using_fresh_legacy_state, using_fresh_cgap_state,

@@ -70,7 +70,7 @@ def if_orchestrated(*, unimplemented=False, use_legacy=False, assumes_cgap=False
 
     def _decorate(fn):
 
-        EnvUtils.init(raise_load_errors=False)
+        # EnvUtils.init(raise_load_errors=False)
 
         orchestrated_function_name = fn.__name__
 
@@ -87,6 +87,9 @@ def if_orchestrated(*, unimplemented=False, use_legacy=False, assumes_cgap=False
 
         @functools.wraps(legacy_fn)
         def wrapped(*args, **kwargs):
+
+            EnvUtils.init()  # In case this is the first time
+
             if EnvUtils.IS_LEGACY:
                 if not LegacyController.LEGACY_DISPATCH_ENABLED:
                     raise LegacyDispatchDisabled(operation=orchestrated_function_name,

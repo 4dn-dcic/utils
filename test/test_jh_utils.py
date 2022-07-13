@@ -7,7 +7,8 @@ import re
 import urllib.parse
 
 from dcicutils import s3_utils, ff_utils
-from dcicutils.qa_utils import override_environ, MockFileSystem
+from dcicutils.misc_utils import override_environ
+from dcicutils.qa_utils import MockFileSystem
 from unittest import mock
 from .helpers import using_fresh_ff_state
 
