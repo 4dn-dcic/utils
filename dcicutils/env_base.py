@@ -82,3 +82,39 @@ class EnvBase:
     @classmethod
     def get_all_ecosystems(cls, env_bucket=None):
         return cls._get_configs(env_bucket=env_bucket, kind='ecosystem')
+
+
+class s3Base:
+
+    # Some extra variables used in setup here so that other modules can be consistent with chosen values.
+
+    SYS_BUCKET_SUFFIX = "system"
+    OUTFILE_BUCKET_SUFFIX = "wfoutput"
+    RAW_BUCKET_SUFFIX = "files"
+    BLOB_BUCKET_SUFFIX = "blobs"
+    METADATA_BUCKET_SUFFIX = "metadata-bundles"
+    TIBANNA_OUTPUT_BUCKET_SUFFIX = 'tibanna-output'
+    TIBANNA_CWLS_BUCKET_SUFFIX = 'tibanna-cwls'
+
+    # NOTE: These were deprecated and retained for compatibility in dcicutils 2.
+    #       For dcicutils 3.0, please rewrite uses as HealthPageKey.xyz names.
+    # SYS_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.SYSTEM_BUCKET                     # = 'system_bucket'
+    # OUTFILE_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.PROCESSED_FILE_BUCKET         # = 'processed_file_bucket'
+    # RAW_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.FILE_UPLOAD_BUCKET                # = 'file_upload_bucket'
+    # BLOB_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.BLOB_BUCKET                      # = 'blob_bucket'
+    # METADATA_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.METADATA_BUNDLES_BUCKET      # = 'metadata_bundles_bucket'
+    # TIBANNA_CWLS_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.TIBANNA_CWLS_BUCKET      # = 'tibanna_cwls_bucket'
+    # TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.TIBANNA_OUTPUT_BUCKET  # = 'tibanna_output_bucket'
+    # This is also deprecated, even though not a bucket name. Use HealthPageKey.ELASTICSEARCH.
+    # ELASTICSEARCH_HEALTH_PAGE_KEY = HealthPageKey.ELASTICSEARCH                  # = 'elasticsearch'
+
+    EB_PREFIX = "elasticbeanstalk"
+    EB_AND_ENV_PREFIX = EB_PREFIX + "-%s-"  # = "elasticbeanstalk-%s-"
+
+    SYS_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + SYS_BUCKET_SUFFIX            # = "elasticbeanstalk-%s-system"
+    OUTFILE_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + OUTFILE_BUCKET_SUFFIX    # = "elasticbeanstalk-%s-wfoutput"
+    RAW_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + RAW_BUCKET_SUFFIX            # = "elasticbeanstalk-%s-files"
+    BLOB_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + BLOB_BUCKET_SUFFIX          # = "elasticbeanstalk-%s-blobs"
+    METADATA_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + METADATA_BUCKET_SUFFIX  # = "elasticbeanstalk-%s-metadata-bundles"
+    TIBANNA_OUTPUT_BUCKET_TEMPLATE = TIBANNA_OUTPUT_BUCKET_SUFFIX          # = "tibanna-output" (no prefix)
+    TIBANNA_CWLS_BUCKET_TEMPLATE = TIBANNA_CWLS_BUCKET_SUFFIX              # = "tibanna-cwls" (no prefix)

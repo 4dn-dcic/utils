@@ -333,6 +333,10 @@ class EnvUtils:
 
     @classmethod
     def set_declared_data(cls, data):
+
+        if data.get(e.IS_LEGACY) and not LegacyController.LEGACY_DISPATCH_ENABLED:
+            raise LegacyDispatchDisabled(operation='set_declared_data', mode='load-env')
+
         cls._DECLARED_DATA = data
         for var, key in EnvNames.__dict__.items():
             if var.isupper():
