@@ -6,9 +6,11 @@ dcicutils
 Change Log
 ----------
 
-<<<<<<< HEAD
-=====
-=======
+3.15.0
+======
+* In ``ecs_utils``:
+  * Adds the ``service_has_active_deployment`` method.
+
 3.14.2
 ======
 * In ``qa_utils``:
@@ -165,7 +167,6 @@ Change Log
 * Allow dcicutils to work in Python 3.8.
 
 
->>>>>>> master
 3.7.1
 =====
 
@@ -174,10 +175,6 @@ Change Log
   * No longer throw exception when listing services if <4 are returned
 
 
-<<<<<<< HEAD
-=====
-=======
->>>>>>> master
 3.7.0
 =====
 
