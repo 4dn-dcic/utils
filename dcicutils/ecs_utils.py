@@ -8,6 +8,7 @@ class ECSUtils:
     """ Utility class for interacting with ECS - mostly stubs at this point, but will likely
         expand a lot.
     """
+    DEPLOYMENT_COMPLETED = 'COMPLETED'
 
     REGION = COMMON_REGION  # this default must match what ecr_utils.ECRUtils and secrets_utils.assume_identity use
 
@@ -73,3 +74,13 @@ class ECSUtils:
                 }
             }
         )
+
+    def service_has_active_deployment(self, *, cluster_name: str, services: list) -> bool:
+        """ Checks if the given cluster/service has an active deployment running """
+        service_meta = self.client.describe_services(cluster=cluster_name, services=services)
+        for service in service_meta.get('services', []):
+            for deployment in service.get('deployments', []):
+                if deployment['rolloutState'] != self.DEPLOYMENT_COMPLETED:
+                    return True
+        return False
+
