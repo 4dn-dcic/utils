@@ -1,6 +1,7 @@
 import boto3
+
+from .common import REGION as COMMON_REGION
 from .misc_utils import PRINT
-from .ecr_utils import CGAP_ECR_REGION as CGAP_ECS_REGION
 
 
 class ECSUtils:
@@ -8,9 +9,11 @@ class ECSUtils:
         expand a lot.
     """
 
-    def __init__(self):
+    REGION = COMMON_REGION  # this default must match what ecr_utils.ECRUtils and secrets_utils.assume_identity use
+
+    def __init__(self, region=None):
         """ Creates a boto3 client for 'ecs'. """
-        self.client = boto3.client('ecs', region_name=CGAP_ECS_REGION)  # same as ECR
+        self.client = boto3.client('ecs', region_name=region or self.REGION)
 
     def list_ecs_clusters(self):
         """ Returns a list of ECS clusters ARNs. """

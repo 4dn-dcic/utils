@@ -5,7 +5,7 @@ import re
 import structlog
 
 from botocore.exceptions import ClientError
-from .ecr_utils import CGAP_ECR_REGION
+from .common import REGION as COMMON_REGION
 from .misc_utils import PRINT, full_class_name
 
 
@@ -28,7 +28,7 @@ def assume_identity():
         name of the environment.
     """
     secret_name = os.environ.get(GLOBAL_APPLICATION_CONFIGURATION, 'dev/beanstalk/cgap-dev')
-    region_name = CGAP_ECR_REGION  # us-east-1, must match ECR/ECS Region
+    region_name = COMMON_REGION  # us-east-1, must match ECR/ECS Region, which also imports its default from .common
     session = boto3.session.Session(region_name=region_name)
     client = session.client(
         service_name='secretsmanager',
@@ -80,7 +80,10 @@ class SecretsTable:
     NOTE: We could later extend this to allow creating or modifying the table as well,
     but that might involve extra permissions and be less broadly useful.
     """
-    def __init__(self, name, secretsmanager_client=None, stage=None):
+
+    REGION = COMMON_REGION
+
+    def __init__(self, name, secretsmanager_client=None, stage=None, region=None):
         """
         :param name: The SecretId of the secret to help with.
         :param secretsmanager_client: A Boto3 Secrets Manager client to use. If unsupplied, one is created.
@@ -88,7 +91,7 @@ class SecretsTable:
         if not str or not isinstance(name, str):
             raise ValueError(f"Bad secret name: {name}")
         self.secretsmanager_client = (secretsmanager_client
-                                      or boto3.client('secretsmanager', region_name=CGAP_ECR_REGION))
+                                      or boto3.client('secretsmanager', region_name=region or self.REGION))
         self.name = name
         self.stage = stage
 

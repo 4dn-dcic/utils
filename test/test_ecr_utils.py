@@ -25,7 +25,8 @@ def mocked_ecr_login(*, username, password, registry):
 @using_fresh_cgap_state()
 def test_ecr_utils_basic():
     """ Tests something simple for now, more tests to be added later. """
-    cli = ECRUtils()  # default args ok
+    # init args no longer default. -kmp 14-Jul-2022
+    cli = ECRUtils(env_name='cgap-mastertest', local_repository='cgap-wsgi')
     with mock.patch.object(cli.client, 'describe_repositories', mocked_describe_respositories):
         url = cli.resolve_repository_uri()
         assert url == REPO_URL
@@ -35,7 +36,8 @@ def test_ecr_utils_basic():
 @using_fresh_cgap_state()
 def test_ecr_utils_workflow():
     """ Tests URL + Login via Docker_cli"""
-    ecr_cli = ECRUtils()
+    # init args no longer default. -kmp 14-Jul-2022
+    ecr_cli = ECRUtils(env_name='cgap-mastertest', local_repository='cgap-wsgi')
     docker_cli = DockerUtils()
     with mock.patch.object(ecr_cli.client, 'describe_repositories', mocked_describe_respositories):
         ecr_cli.resolve_repository_uri()

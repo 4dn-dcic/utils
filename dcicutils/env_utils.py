@@ -23,6 +23,7 @@ from .misc_utils import (
     decorator, full_object_name, ignored, ignorable, remove_prefix, remove_suffix, check_true, find_association,
     override_environ, get_setting_from_context,
 )
+from .secrets_utils import assume_identity, GLOBAL_APPLICATION_CONFIGURATION
 
 
 ignorable(BeanstalkOperationNotImplemented)  # Stuff that does or doesn't use this might come and go
@@ -484,6 +485,21 @@ class EnvUtils:
 
     @classmethod
     def load_declared_data(cls, env_name=None, ecosystem=None, raise_load_errors=True):
+
+        if not EnvBase.global_env_bucket_name():
+            gac = os.environ.get(GLOBAL_APPLICATION_CONFIGURATION)
+            if gac:
+                secrets = assume_identity()
+                with override_environ(**secrets):
+                    if not EnvBase.global_env_bucket_name():
+                        raise RuntimeError("No global env bucket set, and assume_identity didn't find one in .")
+                    cls._load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors)
+                    return
+
+        cls._load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors)
+
+    @classmethod
+    def _load_declared_data(cls, *, env_name, ecosystem, raise_load_errors):
         """
         Tries to load environmental data from any of various keys in the global env bucket.
         1. If an ecosystem was specified, load from <ecosystem>.ecosystem.
