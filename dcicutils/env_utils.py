@@ -691,32 +691,38 @@ def get_env_real_url(envname):
 
 @if_orchestrated
 def is_cgap_server(server, allow_localhost=False) -> bool:
-    check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
-    is_cgap = EnvUtils.ORCHESTRATED_APP == 'cgap'
-    if not is_cgap:
-        return False
-    kind = classify_server_url(server, raise_error=False).get(c.KIND)
-    if kind == 'cgap':
-        return True
-    elif allow_localhost and kind == 'localhost':
-        return True
-    else:
-        return False
+    ignored(server, allow_localhost)
+    return EnvUtils.ORCHESTRATED_APP == 'cgap'
+    #
+    # check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
+    # is_cgap = EnvUtils.ORCHESTRATED_APP == 'cgap'
+    # if not is_cgap:
+    #     return False
+    # kind = classify_server_url(server, raise_error=False).get(c.KIND)
+    # if kind == 'cgap':
+    #     return True
+    # elif allow_localhost and kind == 'localhost':
+    #     return True
+    # else:
+    #     return False
 
 
 @if_orchestrated
 def is_fourfront_server(server, allow_localhost=False) -> bool:
-    check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
-    is_fourfront = EnvUtils.ORCHESTRATED_APP == 'fourfront'
-    if not is_fourfront:
-        return False
-    kind = classify_server_url(server, raise_error=False).get(c.KIND)
-    if kind == 'fourfront':
-        return True
-    elif allow_localhost and kind == 'localhost':
-        return True
-    else:
-        return False
+    ignored(server, allow_localhost)
+    return EnvUtils.ORCHESTRATED_APP == 'fourfront'
+    #
+    # check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
+    # is_fourfront = EnvUtils.ORCHESTRATED_APP == 'fourfront'
+    # if not is_fourfront:
+    #     return False
+    # kind = classify_server_url(server, raise_error=False).get(c.KIND)
+    # if kind == 'fourfront':
+    #     return True
+    # elif allow_localhost and kind == 'localhost':
+    #     return True
+    # else:
+    #     return False
 
 
 @if_orchestrated
@@ -979,15 +985,19 @@ def infer_foursight_from_env(*, request=None, envname: Optional[EnvName] = None,
         # We allow None only so we can gracefully phase out the 'request' argument. -kmp 15-May-2022
         raise ValueError("A non-null envname is required by infer_foursight_from_env.")
 
-    # If a request is passed and stage-mirroring is enabled, we can tell from the URL if we're staging
-    # then for anything that is a stg or prd, return its 'public name' token.
-    # TODO: Find a simpler way to write this block of code? It's not very abstract. -kmp 23-May-2022
-    if request and EnvUtils.STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME:
-        classification = classify_server_url(request if isinstance(request, str) else request.domain)
-        if classification[c.IS_STG_OR_PRD]:
-            public_name = classification[c.PUBLIC_NAME]
-            if public_name:
-                return public_name
+    # This isn't helpful any more. In Fargate we sometimes just get a random IP address.from
+    # The envname information should get us what we need.
+    # -kmp 14-Jul-2022
+    #
+    # # If a request is passed and stage-mirroring is enabled, we can tell from the URL if we're staging
+    # # then for anything that is a stg or prd, return its 'public name' token.
+    # # TODO: Find a simpler way to write this block of code? It's not very abstract. -kmp 23-May-2022
+    # if request and EnvUtils.STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME:
+    #     classification = classify_server_url(request if isinstance(request, str) else request.domain)
+    #     if classification[c.IS_STG_OR_PRD]:
+    #         public_name = classification[c.PUBLIC_NAME]
+    #         if public_name:
+    #             return public_name
 
     entry = (find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname) or
              find_association(EnvUtils.PUBLIC_URL_TABLE, environment=full_env_name(envname)) or
