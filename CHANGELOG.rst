@@ -6,6 +6,11 @@ dcicutils
 Change Log
 ----------
 
+3.15.0
+======
+* In ``ecs_utils``:
+  * Adds the ``service_has_active_deployment`` method.
+
 3.14.2
 ======
 * In ``qa_utils``:

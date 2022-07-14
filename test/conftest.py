@@ -29,8 +29,8 @@ def _discover_es_health_from_boto3_eb_metadata(envname):
                 health_json = res.json()
                 return health_json
     except Exception as e:
-        raise RuntimeError("Unable to discover elasticsearch info for %s:\n%s: %s" % (envname, e.__class__.__name__, e))
-
+        PRINT("Unable to discover elasticsearch info for %s:\n%s: %s" % (envname, e.__class__.__name__, e))
+        PRINT("Tests may not function as expected")
 
 
 def _discover_es_url_from_boto3_eb_metadata(integrated_envname):
@@ -66,7 +66,10 @@ def _discover_es_url_from_boto3_eb_metadata(integrated_envname):
         PRINT("**  enabled while running these tests.    **")
         PRINT("********************************************")
         PRINT(f"{e.__class__.__name__}: {e}")
-        raise RuntimeError(f"Failed to discover ES URL for {integrated_envname}.")
+        PRINT(f"Failed to discover ES URL for {integrated_envname}.")
+        PRINT("Tests that rely on ES will not function!")
+        return None
+
 
 # XXX: Refactor to config
 INTEGRATED_ENV = 'fourfront-mastertest'
