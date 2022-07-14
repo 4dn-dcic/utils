@@ -743,26 +743,24 @@ class MockBoto3Session:
     def client(self, service_name, **kwargs):
         return self.boto3.client(service_name, **kwargs)
 
-    AWS_CREDENTIALS_ENVIRON_NAMES = [
-        "AWS_ACCESS_KEY_ID"
-        "AWS_CONFIG_FILE",
-        "AWS_DEFAULT_REGION",
-        "AWS_REGION",
-        "AWS_SECRET_ACCESS_KEY",
-        "AWS_SESSION_TOKEN",
-        "AWS_SHARED_CREDENTIALS_FILE"
-    ]
+    AWS_CREDENTIALS_ENVIRON_NAME_OVERRIDES = {
+        "AWS_ACCESS_KEY_ID": None,
+        "AWS_CONFIG_FILE": "/dev/null",
+        "AWS_DEFAULT_REGION": None,
+        "AWS_REGION": None,
+        "AWS_SECRET_ACCESS_KEY": None,
+        "AWS_SESSION_TOKEN": None,
+        "AWS_SHARED_CREDENTIALS_FILE": "/dev/null"
+    }
 
-    def unset_environ_credentials_for_testing(self) -> None:
+    @staticmethod
+    @contextlib.contextmanager
+    def unset_environ_credentials_for_testing() -> None:
         """
-        Unsets any/all AWS credentials related environment variables for testing.
+        Unsets all AWS credentials related environment variables for the duration of this context manager.
         """
-        for environ_name in self.AWS_CREDENTIALS_ENVIRON_NAMES:
-            if environ_name in os.environ:
-                if environ_name.endswith("_FILE"):
-                    os.environ[environ_name] = "/dev/null"
-                else:
-                    del os.environ[environ_name]
+        with override_environ(**MockBoto3Session.AWS_CREDENTIALS_ENVIRON_NAME_OVERRIDES):
+            yield
 
     def put_credentials_for_testing(self,
                                     aws_access_key_id: str = None,
