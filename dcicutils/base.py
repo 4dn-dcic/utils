@@ -2,12 +2,13 @@ import boto3
 import time
 
 from botocore.exceptions import ClientError
-from dcicutils.common import REGION
-from dcicutils.misc_utils import PRINT
-from dcicutils.env_utils import (
+from .common import REGION
+from .misc_utils import PRINT
+from .env_utils import (
     is_cgap_env, is_fourfront_env, is_stg_or_prd_env, public_url_mappings,
-    blue_green_mirror_env, get_standard_mirror_env,
+    blue_green_mirror_env, get_standard_mirror_env, is_beanstalk_env,
 )
+from .exceptions import NotBeanstalkEnvironment
 
 
 FOURSIGHT_URL = 'https://foursight.4dnucleome.org/'
@@ -147,7 +148,9 @@ def compute_cgap_stg_env():
 
 def compute_prd_env_for_env(envname):
     """Given an environment, returns the name of the prod environment for its owning project."""
-    if is_cgap_env(envname):
+    if not is_beanstalk_env(envname):  # Doing this might catch some errors
+        raise NotBeanstalkEnvironment(envname=envname)
+    elif is_cgap_env(envname):
         return compute_cgap_prd_env()
     elif is_fourfront_env(envname):
         return compute_ff_prd_env()

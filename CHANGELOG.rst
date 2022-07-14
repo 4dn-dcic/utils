@@ -6,7 +6,166 @@ dcicutils
 Change Log
 ----------
 
+<<<<<<< HEAD
 =====
+=======
+3.14.2
+======
+* In ``qa_utils``:
+  * Minor updates related PEP8.
+
+3.14.1
+======
+* In ``qa_utils``:
+
+  * New class ``MockBotoS3Iam``.
+  * New class ``MockBotoS3Kms``.
+  * New class ``MockBotoS3OpenSearch``.
+  * New class ``MockBotoS3Sts``.
+  * New method  ``MockBotoS3Session.get_credentials``.
+  * New method ``MockBotoS3Session.put_credentials_for_testing``.
+  * New property ``MockBotoS3Session.region_name``.
+  * New method ``MockBotoS3Session.unset_environ_credentials_for_testing``.
+
+3.14.0
+======
+
+* In ``misc_utils``:
+
+  * New function ``key_value_dict``.
+  * New function ``merge_key_value_dict_lists``.
+
+* In ``qa_utils``:
+
+  * Add ``MockBotoS3Client.get_object_tagging``.
+  * Add ``MockBotoS3Client.put_object_tagging``.
+
+* In ``s3_utils``:
+
+  * Add ``s3Utils.get_object_tags``
+  * Add ``s3Utils.set_object_tags``
+  * Add ``s3Utils.set_object_tag``
+
+
+3.13.1
+======
+
+* Fix a bug in ``diff_utils``.
+
+
+3.13.0
+======
+
+* In ``deployment_utils``:
+
+  * In ``CreateMappingOnDeployManager``:
+
+    * Add ``get_deploy_config`` with slightly different arguments than ``get_deployment_config``,
+      so CGAP and FF can be more easily compared.
+
+    * Change ``--strict`` and ``--skip`` to not take an argument on the command line, and to default to False.
+
+      NOTE: After some discussion, this was decided to be treated as a bug fix, not as an incompatible change,
+      so the semantic version will not require a major version bump.
+
+  * When testing, test with switch arguments, too.
+
+* In ``env_utils``:
+
+  * Add ``FF_ENV_PRODUCTION_BLUE_NEW`` (value ``'fourfront-production-blue'``)
+    and ``FF_ENV_PRODUCTION_GREEN_NEW`` (value ``'fourfront-production-green'``)
+    and teach ``is_stg_or_prd_env`` and ``get_standard_mirror_env`` about them
+    as alternative stg/prd hosts.
+
+  * Add ``is_beanstalk_env`` to detect traditional/legacy beanstalk names during transition.
+
+* In ``qa_utils``:
+
+  * Add ``MockedCommandArgs``.
+
+
+3.12.0
+======
+
+* In ``diff_utils``:
+
+  * Add support for ``.diffs(..., include_mappings=True)``
+  * Add support for ``.diffs(..., normalizer=<fn>)`` where ``<fn>`` is a function of two keyword arguments,
+    ``item`` and ``label`` that can rewrite a given expression to be compared into a canonical form (e.g.,
+    reducing a dictionary with a ``uuid`` to just the ``uuid``, which is what we added the functionality for).
+
+
+3.11.1
+======
+
+* In ``ff_utils``:
+
+  * In ``get_metadata``, strip leading slashes on ids in API functions.
+
+
+3.11.0
+======
+
+* Adds support for ``creds_utils``.
+
+  * Class ``KeyManager``, with methods:
+
+    * ``KeyManager.get_keydict_for_env(self, env)``
+
+    * ``KeyManager.get_keydict_for_server(self, server)``
+
+    * ``KeyManager.get_keydicts(self)``
+
+    * ``KeyManager.get_keypair_for_env(self, env)``
+
+    * ``KeyManager.get_keypair_for_server(self, server)``
+
+    * ``KeyManager.keydict_to_keypair(auth_dict)``
+
+    * ``KeyManager.keypair_to_keydict(auth_tuple, *, server)``
+
+  * Class ``FourfrontKeyManager``
+
+  * Class ``CGAPKeyManager``
+
+
+3.10.0
+======
+
+* In ``docker_utils.py``:
+  * Add ``docker_is_running`` predicate (used by the fix to ``test_ecr_utils_workflow`` to skip that test
+    if docker is not running.
+* In ``test_ecr_utils.py``:
+  * Fix ``test_ecr_utils_workflow`` to skip if docker is not enabled.
+* In ``test_s3_utils.py``:
+  * Remove ``test_s3utils_creation_cgap_ordinary`` because there are no more CGAP beanstalks.
+  * Revise ``test_regression_s3_utils_short_name_c4_706`` to use ``fourfront-mastertest``
+    rather than a CGAP env, since the CGAP beanstalk envs have gone away.
+* In ``qa_utils.py``:
+  * ``MockBoto3Session``.
+  * ``MockBoto3SecretsManager`` and support for ``MockBoto3`` to make it.
+* In ``secrets_utils.py`` and ``test_secrets_utils.py``:
+  * Add support for ``SecretsTable``.
+  * Add unit tests for existing ``secrets_utils.assume_identity`` and for new ``SecretsTable`` functionality.
+* Small cosmetic adjustments to ``Makefile`` to show a timestamp and info about current branch state
+  when ``make test`` starts and again when it ends.
+* A name containing an underscore will not be shortened by ``short_env_name`` nor lengthened by
+  ``full_env_name`` (nor ``full_cgap_env_name`` nor ``full_fourfront_env_name``).
+
+
+3.9.0
+=====
+
+* Allow dcicutils to work in Python 3.9.
+
+
+3.8.0
+=====
+
+* Allow dcicutils to work in Python 3.8.
+
+
+>>>>>>> master
 3.7.1
 =====
 
@@ -15,7 +174,10 @@ Change Log
   * No longer throw exception when listing services if <4 are returned
 
 
+<<<<<<< HEAD
 =====
+=======
+>>>>>>> master
 3.7.0
 =====
 

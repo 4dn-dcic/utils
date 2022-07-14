@@ -10,15 +10,15 @@ from dcicutils.env_utils import (
     CGAP_ENV_HOTSEAT, CGAP_ENV_STAGING, CGAP_ENV_WEBDEV, CGAP_ENV_WOLF,
     CGAP_ENV_PRODUCTION_BLUE_NEW, CGAP_ENV_PRODUCTION_GREEN_NEW, CGAP_ENV_WEBPROD_NEW, CGAP_ENV_MASTERTEST_NEW,
     CGAP_ENV_HOTSEAT_NEW, CGAP_ENV_STAGING_NEW, CGAP_ENV_WEBDEV_NEW, CGAP_ENV_WOLF_NEW,
-    FF_PRODUCTION_IDENTIFIER, CGAP_PRODUCTION_IDENTIFIER,
+    FF_PRODUCTION_IDENTIFIER, _CGAP_MGB_PRODUCTION_IDENTIFIER,
     get_mirror_env_from_context, is_test_env, is_hotseat_env, get_standard_mirror_env, prod_bucket_env_for_app,
     prod_bucket_env, public_url_mappings, CGAP_PUBLIC_URLS, FF_PUBLIC_URLS, FF_PROD_BUCKET_ENV, CGAP_PROD_BUCKET_ENV,
-    CGAP_PUBLIC_URL_PRD, FF_PUBLIC_URL_PRD,
+    _CGAP_MGB_PUBLIC_URL_PRD, FF_PUBLIC_URL_PRD,
     infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env, infer_foursight_url_from_env,
-    FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV, CGAP_PUBLIC_DOMAIN_PRD,
+    FF_STAGING_IDENTIFIER, FF_PUBLIC_DOMAIN_PRD, FF_PUBLIC_DOMAIN_STG, CGAP_ENV_DEV, _CGAP_MGB_PUBLIC_DOMAIN_PRD,
     FF_ENV_INDEXER, CGAP_ENV_INDEXER, is_indexer_env, indexer_env_for_env, classify_server_url,
     short_env_name, full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
-    make_env_name_cfn_compatible, default_workflow_env, permit_load_data, public_url_for_app,
+    make_env_name_cfn_compatible, default_workflow_env, permit_load_data, public_url_for_app, is_beanstalk_env,
 )
 from dcicutils.exceptions import InvalidParameterError
 from dcicutils.qa_utils import raises_regexp
@@ -215,7 +215,7 @@ def test_public_url_mappings():
 
 def test_public_url_for_app():
 
-    assert public_url_for_app('cgap') == CGAP_PUBLIC_URL_PRD
+    assert public_url_for_app('cgap') == _CGAP_MGB_PUBLIC_URL_PRD
     assert public_url_for_app('fourfront') == FF_PUBLIC_URL_PRD
 
     with pytest.raises(InvalidParameterError):
@@ -332,6 +332,46 @@ def test_is_fourfront_env():
     assert is_fourfront_env('fourfront-blue') is True
 
     assert is_fourfront_env(None) is False
+
+
+def test_is_beanstalk_env():
+
+    assert is_beanstalk_env('fourfront-webprod') is True
+    assert is_beanstalk_env('fourfront-webprod2') is True
+    assert is_beanstalk_env('fourfront-blue') is True
+    assert is_beanstalk_env('fourfront-green') is True
+    assert is_beanstalk_env('fourfront-hotseat') is True
+    assert is_beanstalk_env('fourfront-webdev') is True
+    assert is_beanstalk_env('fourfront-mastertest') is True
+
+    assert is_beanstalk_env('fourfront-cgap') is True
+    assert is_beanstalk_env('fourfront-cgaptest') is True
+    assert is_beanstalk_env('fourfront-cgapdev') is True
+    assert is_beanstalk_env('fourfront-cgapwolf') is True
+
+    # The magic non-beanstalk names return False
+    assert is_beanstalk_env('data') is False
+    assert is_beanstalk_env('staging') is False
+    assert is_beanstalk_env('cgap') is False
+
+    # Other potential FF and CGAP environment names return False
+    assert is_beanstalk_env('fourfront-devtest') is False
+    assert is_beanstalk_env('fourfront-supertest') is False
+    assert is_beanstalk_env('fourfront-megatest') is False
+    assert is_beanstalk_env('fourfront-anything') is False
+
+    assert is_beanstalk_env('fourfront-cgapanything') is False
+
+    assert is_beanstalk_env('cgap-wolf') is False
+    assert is_beanstalk_env('cgap-mgb') is False
+    assert is_beanstalk_env('cgap-msa') is False
+    assert is_beanstalk_env('cgap-dfci') is False
+    assert is_beanstalk_env('cgap-core') is False
+    assert is_beanstalk_env('cgap-training') is False
+    assert is_beanstalk_env('cgap-clalit') is False
+    assert is_beanstalk_env('cgap-anything') is False
+
+    assert is_beanstalk_env('anything-at-all') is False
 
 
 def test_is_stg_or_prd_env():
@@ -695,7 +735,7 @@ def test_infer_foursight_from_env():
     check(CGAP_ENV_WEBPROD, 'cgap')
 
     # Traditionally this didn't work as inputs, but that seems silly, so I made it work, too. -kmp 4-Oct-2021
-    check('cgap', CGAP_PRODUCTION_IDENTIFIER, request=mock_request(CGAP_PUBLIC_DOMAIN_PRD))
+    check('cgap', _CGAP_MGB_PRODUCTION_IDENTIFIER, request=mock_request(_CGAP_MGB_PUBLIC_DOMAIN_PRD))
 
     check('', None)
     check(None, None)
@@ -756,7 +796,7 @@ def test_infer_foursight_url_from_env():
     check(CGAP_ENV_WEBPROD, 'cgap', cgap=True)
 
     # Traditionally this didn't work as inputs, but that seems silly, so I made it work, too. -kmp 4-Oct-2021
-    check('cgap', CGAP_PRODUCTION_IDENTIFIER, request=mock_request(CGAP_PUBLIC_DOMAIN_PRD), cgap=True)
+    check('cgap', _CGAP_MGB_PRODUCTION_IDENTIFIER, request=mock_request(_CGAP_MGB_PUBLIC_DOMAIN_PRD), cgap=True)
 
     check('', None, cgap=True)
     check(None, None, cgap=True)
@@ -815,6 +855,8 @@ def test_short_env_name():
     assert short_env_name('cgap') == 'cgap'
     assert short_env_name('anything') == 'anything'
 
+    assert short_env_name('fourfront_mastertest') == 'fourfront_mastertest'
+
 
 def test_full_env_name():
 
@@ -823,6 +865,8 @@ def test_full_env_name():
 
     assert full_env_name('fourfront-cgapdev') == 'fourfront-cgapdev'
     assert full_env_name('fourfront-mastertest') == 'fourfront-mastertest'
+
+    assert full_env_name('fourfront_mastertest') == 'fourfront_mastertest'
 
     # Does not require a registered env
     assert full_env_name('foo') == 'fourfront-foo'
@@ -850,6 +894,9 @@ def test_full_cgap_env_name():
         full_cgap_env_name('fourfront-mastertest')
 
     with pytest.raises(ValueError):
+        full_cgap_env_name('fourfront_mastertest')
+
+    with pytest.raises(ValueError):
         full_cgap_env_name('foo')
 
     # Special names 'staging' and 'data' don't work here.
@@ -864,6 +911,8 @@ def test_full_fourfront_env_name():
 
     assert full_fourfront_env_name('mastertest') == 'fourfront-mastertest'
     assert full_fourfront_env_name('fourfront-mastertest') == 'fourfront-mastertest'
+
+    assert full_fourfront_env_name('fourfront_mastertest') == 'fourfront_mastertest'
 
     # Does not require a registered env
     assert full_fourfront_env_name('foo') == 'fourfront-foo'
