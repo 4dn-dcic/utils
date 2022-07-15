@@ -6,6 +6,28 @@ dcicutils
 Change Log
 ----------
 
+3.15.0
+======
+* In ``ecs_utils``:
+  * Adds the ``service_has_active_deployment`` method.
+
+3.14.2
+======
+* In ``qa_utils``:
+  * Minor updates related PEP8.
+
+3.14.1
+======
+* In ``qa_utils``:
+
+  * New class ``MockBotoS3Iam``.
+  * New class ``MockBotoS3Kms``.
+  * New class ``MockBotoS3OpenSearch``.
+  * New class ``MockBotoS3Sts``.
+  * New method  ``MockBotoS3Session.get_credentials``.
+  * New method ``MockBotoS3Session.put_credentials_for_testing``.
+  * New property ``MockBotoS3Session.region_name``.
+  * New method ``MockBotoS3Session.unset_environ_credentials_for_testing``.
 
 3.15.0
 ======
