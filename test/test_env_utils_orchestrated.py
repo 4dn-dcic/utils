@@ -4,7 +4,7 @@ import json
 import os
 import pytest
 
-from dcicutils.common import APP_CGAP, APP_FOURFRONT
+from dcicutils.common import APP_CGAP, APP_FOURFRONT, LEGACY_GLOBAL_ENV_BUCKET
 from dcicutils.env_manager import EnvManager
 from dcicutils.env_utils import (
     is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env,
@@ -29,7 +29,7 @@ from dcicutils.qa_utils import raises_regexp
 from typing import Optional
 from unittest import mock
 from urllib.parse import urlparse
-from .helpers import using_fresh_cgap_state, using_fresh_ff_state
+from .helpers import using_fresh_cgap_state_for_testing, using_fresh_ff_state_for_testing
 
 
 ignorable(BeanstalkOperationNotImplemented)  # Stuff that does or doesn't use this might come and go
@@ -246,7 +246,7 @@ def test_orchestrated_infer_foursight_url_from_env():
                 == 'https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/cgapwolf')
 
 
-@using_fresh_ff_state()
+@using_fresh_ff_state_for_testing()
 def test_ff_default_workflow_env():
 
     assert (default_workflow_env('fourfront')
@@ -260,7 +260,7 @@ def test_ff_default_workflow_env():
         default_workflow_env(APP_CGAP)  # noQA - we expect this error
 
 
-@using_fresh_cgap_state()
+@using_fresh_cgap_state_for_testing()
 def test_cgap_default_workflow_env():
 
     assert (default_workflow_env('cgap')

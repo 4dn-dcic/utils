@@ -23,7 +23,7 @@ from .misc_utils import (
     decorator, full_object_name, ignored, ignorable, remove_prefix, remove_suffix, check_true, find_association,
     override_environ, get_setting_from_context,
 )
-from .secrets_utils import assume_identity, GLOBAL_APPLICATION_CONFIGURATION
+from .secrets_utils import assumed_identity_if  # , GLOBAL_APPLICATION_CONFIGURATION
 
 
 ignorable(BeanstalkOperationNotImplemented)  # Stuff that does or doesn't use this might come and go
@@ -326,9 +326,10 @@ class EnvUtils:
     }
 
     @classmethod
-    def init(cls, env_name=None, ecosystem=None, force=False, raise_load_errors=True):
+    def init(cls, env_name=None, ecosystem=None, force=False, raise_load_errors=True, assuming_identity=True):
         if force or cls._DECLARED_DATA is None:
-            cls.load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors)
+            cls.load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors,
+                                   assuming_identity=assuming_identity)
 
     @classmethod
     def declared_data(cls):
@@ -381,7 +382,7 @@ class EnvUtils:
             attrs['ENV_NAME'] = env_name
         with EnvUtils.temporary_state():
             with override_environ(**attrs):
-                EnvUtils.init(force=True, raise_load_errors=raise_load_errors)
+                EnvUtils.init(force=True, raise_load_errors=raise_load_errors, assuming_identity=False)
                 yield
 
     @classmethod
@@ -399,12 +400,12 @@ class EnvUtils:
 
     @classmethod
     @contextlib.contextmanager
-    def fresh_state_from(cls, *, bucket=None, data=None, global_bucket=None):
+    def fresh_testing_state_from(cls, *, bucket=None, data=None, global_bucket=None):
         with EnvBase.global_env_bucket_named(global_bucket or bucket):
             with EnvUtils.temporary_state():
                 if bucket:
                     assert data is None, "You must supply bucket or data, but not both."
-                    EnvUtils.init(force=True)
+                    EnvUtils.init(force=True, assuming_identity=False)
                 elif data:
                     EnvUtils.set_declared_data(data)
                 else:
@@ -417,14 +418,14 @@ class EnvUtils:
 
     @classmethod
     @contextlib.contextmanager
-    def fresh_ff_deployed_state(cls):
-        with cls.fresh_state_from(bucket=cls.FF_DEPLOYED_BUCKET):
+    def fresh_ff_deployed_state_for_testing(cls):
+        with cls.fresh_testing_state_from(bucket=cls.FF_DEPLOYED_BUCKET):
             yield
 
     @classmethod
     @contextlib.contextmanager
-    def fresh_cgap_deployed_state(cls):
-        with cls.fresh_state_from(bucket=cls.CGAP_BUCKET):
+    def fresh_cgap_deployed_state_for_testing(cls):
+        with cls.fresh_testing_state_from(bucket=cls.CGAP_BUCKET):
             yield
 
     # Vaguely, the thing we're trying to recognize is this (sanitized slightly here),
@@ -484,19 +485,9 @@ class EnvUtils:
         return config_data                        # noQA - PyCharm worries wrongly this won't have been set
 
     @classmethod
-    def load_declared_data(cls, env_name=None, ecosystem=None, raise_load_errors=True):
-
-        if not EnvBase.global_env_bucket_name():
-            gac = os.environ.get(GLOBAL_APPLICATION_CONFIGURATION)
-            if gac:
-                secrets = assume_identity()
-                with override_environ(**secrets):
-                    if not EnvBase.global_env_bucket_name():
-                        raise RuntimeError("No global env bucket set, and assume_identity didn't find one in .")
-                    cls._load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors)
-                    return
-
-        cls._load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors)
+    def load_declared_data(cls, env_name=None, ecosystem=None, raise_load_errors=True, assuming_identity=True):
+        with assumed_identity_if(assuming_identity, only_if_missing='GLOBAL_ENV_BUCKET'):
+            cls._load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors)
 
     @classmethod
     def _load_declared_data(cls, *, env_name, ecosystem, raise_load_errors):

@@ -4,7 +4,7 @@ from unittest import mock
 from dcicutils.ecr_utils import ECRUtils
 from dcicutils.docker_utils import DockerUtils
 from dcicutils.misc_utils import ignored
-from .helpers import using_fresh_cgap_state
+from .helpers import using_fresh_cgap_state_for_testing
 
 
 REPO_URL = '123456789.dkr.ecr.us-east-2.amazonaws.com/cgap-mastertest'  # dummy URL
@@ -22,7 +22,7 @@ def mocked_ecr_login(*, username, password, registry):
     return
 
 
-@using_fresh_cgap_state()
+@using_fresh_cgap_state_for_testing()
 def test_ecr_utils_basic():
     """ Tests something simple for now, more tests to be added later. """
     # init args no longer default. -kmp 14-Jul-2022
@@ -33,7 +33,7 @@ def test_ecr_utils_basic():
 
 
 @pytest.mark.skipif(not DockerUtils.docker_is_running(), reason="Docker is not running.")
-@using_fresh_cgap_state()
+@using_fresh_cgap_state_for_testing()
 def test_ecr_utils_workflow():
     """ Tests URL + Login via Docker_cli"""
     # init args no longer default. -kmp 14-Jul-2022

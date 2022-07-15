@@ -1,3 +1,4 @@
+import contextlib
 import os
 import boto3
 import json
@@ -6,7 +7,7 @@ import structlog
 
 from botocore.exceptions import ClientError
 from .common import REGION as COMMON_REGION
-from .misc_utils import PRINT, full_class_name
+from .misc_utils import PRINT, full_class_name, override_environ
 
 
 logger = structlog.getLogger(__name__)
@@ -20,14 +21,18 @@ logger = structlog.getLogger(__name__)
 GLOBAL_APPLICATION_CONFIGURATION = 'IDENTITY'
 
 
-def assume_identity():
+def get_identity_name(identity_kind=GLOBAL_APPLICATION_CONFIGURATION):
+    return os.environ.get(identity_kind, 'dev/beanstalk/cgap-dev')
+
+
+def get_identity_secrets(identity_kind=GLOBAL_APPLICATION_CONFIGURATION) -> dict:
     """ Grabs application identity from the secrets manager.
         Looks for environment variable IDENTITY, which should contain the name of
         a secret in secretsmanager that is a JSON blob of core configuration information.
         Default value is current value in the test account. This name should be the
         name of the environment.
     """
-    secret_name = os.environ.get(GLOBAL_APPLICATION_CONFIGURATION, 'dev/beanstalk/cgap-dev')
+    secret_name = get_identity_name(identity_kind)
     region_name = COMMON_REGION  # us-east-1, must match ECR/ECS Region, which also imports its default from .common
     session = boto3.session.Session(region_name=region_name)
     client = session.client(
@@ -53,12 +58,73 @@ def assume_identity():
         # Decrypts secret using the associated KMS CMK.
         # Depending on whether the secret is a string or binary, one of these fields will be populated.
         if 'SecretString' in get_secret_value_response:
-            identity = json.loads(get_secret_value_response['SecretString'])
+            identity_secrets = json.loads(get_secret_value_response['SecretString'])
         else:
             raise Exception('Got unexpected response structure from boto3')
-    if not identity:
+    if not identity_secrets:
         raise Exception('Identity could not be found! Check the secret name.')
-    return identity
+    return identity_secrets
+
+
+assume_identity = get_identity_secrets  # assume_identity is deprecated. Please rewrite
+
+
+@contextlib.contextmanager
+def assumed_identity_if(only_if, *, identity_kind=GLOBAL_APPLICATION_CONFIGURATION, only_if_missing=None,
+                        require_identity=False):
+    with assumed_identity(identity_kind=identity_kind, only_if=only_if, only_if_missing=only_if_missing,
+                          require_identity=require_identity):
+        yield
+
+
+@contextlib.contextmanager
+def assumed_identity(*, identity_kind=GLOBAL_APPLICATION_CONFIGURATION, only_if=True, only_if_missing=None,
+                     require_identity=False):
+    """
+    Assumes a given identity in a context.
+
+    NOTE: This assumes that global_env_bucket is in the GAC and not otherwise,
+          so it tests
+
+    :param identity_kind: The name of the identity to assume (default 'IDENTITY')
+    :param only_if: Whether to try assuming identity at all (default True)
+    :param only_if_missing: The name of an environment variable that would only be in the GAC.
+       Load the GAC only if this variable is not set. Default is None, meaning load unconditionally.
+    :param require_identity: Whether to raise an error if the identity_kind environment variable is not bound.
+
+    """
+    if only_if and (not only_if_missing or not os.environ.get(only_if_missing)):
+        identity_name = get_identity_name(identity_kind=identity_kind)
+        if identity_name:
+            secrets = get_identity_secrets(identity_kind=identity_kind)
+            if only_if_missing not in secrets:
+                raise RuntimeError(f"No {only_if_missing} was found where expected"
+                                   f" in {identity_kind} secrets at {identity_name}.")
+            with override_environ(**secrets):
+                yield
+                return  # Nothing to do after that
+
+        elif require_identity:
+            raise RuntimeError(f"An identity was not defined in environment variable {identity_kind}.")
+
+    yield
+
+
+def apply_identity(identity_kind=GLOBAL_APPLICATION_CONFIGURATION):
+    """
+    Assumes an identity globally.
+
+    Since this is assumed to be an initial startup action, we assume it's not already been done and don't
+    offer the only_if_missing mechanism that the assumed_identity context manager offers.
+
+    """
+    gac = os.environ.get(identity_kind)
+    if gac:
+        secrets = get_identity_secrets(identity_kind=identity_kind)
+        for var, val in secrets.items():
+            os.environ[var] = val
+    else:
+        raise RuntimeError(f"An identity was not defined in environment variable {identity_kind}.")
 
 
 # Some hints about how to manipulate secrets are here:
