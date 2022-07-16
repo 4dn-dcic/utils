@@ -984,20 +984,20 @@ def test_get_and_set_object_tags():
         s3u.set_object_tags(key=key, bucket=bucket, tags=[{'Key': 'b', 'Value': 'bravo'}], merge_existing_tags=True)
 
         actual = s3u.get_object_tags(key=key, bucket=bucket)
-        expected = [{'Key': 'a', 'Value': 'alpha'}, {'Key': 'b', 'Value': 'bravo'} ]
+        expected = [{'Key': 'a', 'Value': 'alpha'}, {'Key': 'b', 'Value': 'bravo'}]
         # print(f"actual={actual} expected={expected}")
         assert actual == expected, f"Got {actual} but expected {expected}"
 
         s3u.set_object_tag(key=key, bucket=bucket, tag_key="a", tag_value="alpha_2")
 
         actual = s3u.get_object_tags(key=key, bucket=bucket)
-        expected = [{'Key': 'a', 'Value': 'alpha_2'}, {'Key': 'b', 'Value': 'bravo'} ]
+        expected = [{'Key': 'a', 'Value': 'alpha_2'}, {'Key': 'b', 'Value': 'bravo'}]
         # print(f"actual={actual} expected={expected}")
         assert actual == expected, f"Got {actual} but expected {expected}"
 
         s3u.set_object_tag(key=key, bucket=bucket, tag_key="c", tag_value="gamma")
-        
+
         actual = s3u.get_object_tags(key=key, bucket=bucket)
-        expected = [{'Key': 'a', 'Value': 'alpha_2'}, {'Key': 'b', 'Value': 'bravo'}, {'Key': 'c', 'Value': 'gamma'} ]
+        expected = [{'Key': 'a', 'Value': 'alpha_2'}, {'Key': 'b', 'Value': 'bravo'}, {'Key': 'c', 'Value': 'gamma'}]
         # print(f"actual={actual} expected={expected}")
         assert actual == expected, f"Got {actual} but expected {expected}"
