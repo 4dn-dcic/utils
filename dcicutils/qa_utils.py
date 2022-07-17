@@ -1484,7 +1484,7 @@ class MockBoto3Ec2:
                 {"name": security_group_name, "id": security_group_id, "rules": [security_group_rule]})
         return security_group_rule_id
 
-    def put_security_group_for_testing(self, security_group_name: str) -> str:
+    def put_security_group_for_testing(self, security_group_name: str, security_group_id: str = None) -> str:
         if not security_group_name:
             raise ValueError(f"Missing name for mocked put_security_group_for_testing.")
         mocked_security_groups = self._mocked_security_groups()
@@ -1492,7 +1492,8 @@ class MockBoto3Ec2:
                                  for mocked_security_group in mocked_security_groups
                                  if mocked_security_group.get("name") == security_group_name]
         if not mocked_security_group:
-            security_group_id = str(uuid.uuid4())
+            if not security_group_id:
+                security_group_id = str(uuid.uuid4())
             mocked_security_groups.append({"name": security_group_name, "id": security_group_id, "rules": []})
             return security_group_id
         else:
@@ -1517,8 +1518,7 @@ class MockBoto3Ec2:
         result_groups = []
         for group in mocked_security_groups:
             if not security_group_name or group["name"] == security_group_name:
-                if group["rules"]:
-                    result_groups.append({"GroupId": group["rules"][0]["GroupId"]})
+                result_groups.append({"GroupId": group["id"]})
         return {"SecurityGroups": result_groups}
 
     def describe_security_group_rules(self, Filters: list) -> dict:  # noQA - Argument names chosen for AWS consistency
