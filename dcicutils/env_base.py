@@ -58,6 +58,8 @@ class EnvBase:
     def _legacy_global_env_bucket_for_testing(cls):
         if not LegacyController.LEGACY_DISPATCH_ENABLED:
             raise LegacyDispatchDisabled(operation="_legacy_global_env_bucket_for_testing", mode='setup-envbase')
+        # Strictly speaking, this isn't accessing the legacy state, but it's definitely not accessin gproduction state,
+        # so it does not want to be used in production. -kmp 18-Jul-2022
         return LEGACY_GLOBAL_ENV_BUCKET
 
     @classmethod
