@@ -8,6 +8,7 @@ import structlog
 from botocore.exceptions import ClientError
 from typing import Optional
 from .common import REGION as COMMON_REGION
+from .lang_utils import a_or_an
 from .misc_utils import PRINT, full_class_name, override_environ
 
 
@@ -76,9 +77,18 @@ def get_identity_secrets(identity_kind=GLOBAL_APPLICATION_CONFIGURATION) -> dict
 assume_identity = get_identity_secrets  # assume_identity is deprecated. Please rewrite
 
 
-def apply_overrides(*, secrets: dict, overrides: Optional[dict]) -> dict:
-    if overrides:
-        secrets = dict(secrets, **overrides)
+def apply_overrides(*, secrets: dict, rename_keys: Optional[dict] = None,
+                    override_values: Optional[dict] = None) -> dict:
+    if rename_keys:
+        secrets = secrets.copy()
+        for key, new_name in rename_keys.items():
+            if new_name in secrets:
+                raise ValueError(f"Cannot rename {key} to {new_name} because {a_or_an(new_name)} attribute already exists.")
+            if key not in secrets:
+                raise ValueError(f"Cannot rename {key} to {new_name} because the secrets has no {key} attribute.")
+            secrets[new_name] = secrets.pop(key)
+    if override_values:
+        secrets = dict(secrets, **override_values)
     return secrets
 
 
@@ -87,9 +97,10 @@ def assumed_identity_if(only_if: bool, *,
                         identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
                         only_if_missing: Optional[str] = None,
                         require_identity: bool = False,
-                        overrides: Optional[dict] = None):
+                        rename_keys: Optional[dict] = None,
+                        override_values: Optional[dict] = None):
     with assumed_identity(identity_kind=identity_kind, only_if=only_if, only_if_missing=only_if_missing,
-                          require_identity=require_identity, overrides=overrides):
+                          require_identity=require_identity, rename_keys=rename_keys, override_values=override_values):
         yield
 
 
@@ -99,9 +110,15 @@ def assumed_identity(*,
                      only_if: bool = True,
                      only_if_missing: Optional[str] = None,
                      require_identity: bool = False,
-                     overrides: Optional[dict] = None):
+                     rename_keys: Optional[dict] = None,
+                     override_values: Optional[dict] = None):
     """
     Assumes a given identity in a context.
+
+    The rename_keys happen before the override_values.
+
+    >>> apply_overrides(secrets={'x': 1, 'y': 2}, rename_keys={'x': 'ex', 'y': 'why'}, override_values={'x': 3, 'z': 9})
+    {'ex': 1, 'why': 2, 'z': 9, 'x': 3}
 
     NOTE: This assumes that global_env_bucket is in the GAC and not otherwise,
           so it tests
@@ -111,14 +128,15 @@ def assumed_identity(*,
     :param only_if_missing: The name of an environment variable that would only be in the GAC.
        Load the GAC only if this variable is not set. Default is None, meaning load unconditionally.
     :param require_identity: Whether to raise an error if the identity_kind environment variable is not bound.
-    :param overrides: If present, a dictionary of keys&values to override those in looked-up secrests. Default None.
+    :param rename_keys: If present, a dictionary mapping keys to override keys. Default None.
+    :param override_values: If present, a dictionary mapping keys to override values. Default None.
 
     """
     if only_if and (not only_if_missing or not os.environ.get(only_if_missing)):
         identity_name = get_identity_name(identity_kind=identity_kind)
         if identity_name:
             secrets = get_identity_secrets(identity_kind=identity_kind)
-            secrets = apply_overrides(secrets=secrets, overrides=overrides)
+            secrets = apply_overrides(secrets=secrets, rename_keys=rename_keys, override_values=override_values)
             if only_if_missing not in secrets:
                 raise RuntimeError(f"No {only_if_missing} was found where expected"
                                    f" in {identity_kind} secrets at {identity_name}.")
@@ -132,7 +150,8 @@ def assumed_identity(*,
     yield
 
 
-def apply_identity(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION, overrides: Optional[dict] = None):
+def apply_identity(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
+                   rename_keys: Optional[dict] = None, override_values: Optional[dict] = None):
     """
     Assumes an identity globally by assigning environment variables.
 
@@ -142,7 +161,7 @@ def apply_identity(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION, overri
     """
     if identity_is_defined(identity_kind):
         secrets = get_identity_secrets(identity_kind=identity_kind)
-        secrets = apply_overrides(secrets=secrets, overrides=overrides)
+        secrets = apply_overrides(secrets=secrets, rename_keys=rename_keys, override_values=override_values)
         for var, val in secrets.items():
             os.environ[var] = val
     else:

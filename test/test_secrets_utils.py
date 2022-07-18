@@ -4,7 +4,9 @@ import pytest
 from dcicutils import secrets_utils as secrets_utils_module
 from dcicutils.misc_utils import override_environ, ignored
 from dcicutils.qa_utils import MockBoto3
-from dcicutils.secrets_utils import assume_identity, SecretsTable
+from dcicutils.secrets_utils import (
+    assume_identity, SecretsTable, apply_overrides
+)
 from unittest import mock
 
 
@@ -34,6 +36,33 @@ some_unique_decoy_name = f'MockedDecoy2{some_unique_decoy_token}'
 decoy_2_identity = some_unique_decoy_name
 some_secret_identities_with_common_pattern = [some_secret_identity, decoy_1_identity]
 some_secret_identities = [some_secret_identity, decoy_1_identity, decoy_2_identity]
+
+
+def test_apply_overrides():
+
+    secrets = {'x': 1, 'y': 2}
+
+    assert apply_overrides(secrets=secrets, override_values=None) == secrets
+    assert apply_overrides(secrets=secrets, override_values={}) == secrets
+    assert apply_overrides(secrets=secrets) == secrets
+
+    assert apply_overrides(secrets=secrets, rename_keys={'x': 'ex'}) == {'ex': 1, 'y': 2}
+    assert apply_overrides(secrets=secrets, rename_keys={'x': 'ex', 'y': 'why'}) == {'ex': 1, 'why': 2}
+
+    with pytest.raises(ValueError):
+        apply_overrides(secrets=secrets, rename_keys={'z': 'zee'})
+
+    with pytest.raises(ValueError):
+        apply_overrides(secrets=secrets, rename_keys={'x': 'y'})
+
+    assert apply_overrides(secrets=secrets, override_values={'x': 3}) == {'x': 3, 'y': 2}
+    assert apply_overrides(secrets=secrets, override_values={'x': 3, 'z': 9}) == {'x': 3, 'y': 2, 'z': 9}
+
+    assert (apply_overrides(secrets=secrets, rename_keys={'x': 'ex', 'y': 'why'}, override_values={'ex': 3, 'zee': 9})
+            == {'ex': 3, 'why': 2, 'zee': 9})
+
+    assert (apply_overrides(secrets=secrets, rename_keys={'x': 'ex', 'y': 'why'}, override_values={'x': 3, 'zee': 9})
+            == {'ex': 1, 'why': 2, 'zee': 9, 'x': 3})
 
 
 def boto3_for_some_secrets_testing():
