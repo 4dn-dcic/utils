@@ -13,7 +13,7 @@ from . import env_utils_legacy as legacy
 from .common import (
     EnvName, OrchestratedApp, APP_FOURFRONT, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD,
 )
-from .env_base import EnvBase
+from .env_base import EnvBase, LegacyController
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
 from .exceptions import (
     EnvUtilsLoadError, BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
@@ -27,10 +27,6 @@ from .secrets_utils import assumed_identity_if  # , GLOBAL_APPLICATION_CONFIGURA
 
 
 ignorable(BeanstalkOperationNotImplemented)  # Stuff that does or doesn't use this might come and go
-
-
-class LegacyController:
-    LEGACY_DISPATCH_ENABLED = False
 
 
 class UseLegacy(BaseException):

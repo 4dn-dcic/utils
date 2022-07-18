@@ -6,6 +6,7 @@ import re
 import structlog
 
 from botocore.exceptions import ClientError
+from typing import Optional
 from .common import REGION as COMMON_REGION
 from .misc_utils import PRINT, full_class_name, override_environ
 
@@ -23,6 +24,10 @@ GLOBAL_APPLICATION_CONFIGURATION = 'IDENTITY'
 
 def get_identity_name(identity_kind=GLOBAL_APPLICATION_CONFIGURATION):
     return os.environ.get(identity_kind, 'dev/beanstalk/cgap-dev')
+
+
+def identity_is_defined(identity_kind=GLOBAL_APPLICATION_CONFIGURATION):
+    return bool(os.environ.get(identity_kind))
 
 
 def get_identity_secrets(identity_kind=GLOBAL_APPLICATION_CONFIGURATION) -> dict:
@@ -63,23 +68,38 @@ def get_identity_secrets(identity_kind=GLOBAL_APPLICATION_CONFIGURATION) -> dict
             raise Exception('Got unexpected response structure from boto3')
     if not identity_secrets:
         raise Exception('Identity could not be found! Check the secret name.')
+    elif not isinstance(identity_secrets, dict):
+        raise Exception("Identity was not in expected dictionary form.")
     return identity_secrets
 
 
 assume_identity = get_identity_secrets  # assume_identity is deprecated. Please rewrite
 
 
+def apply_overrides(*, secrets: dict, overrides: Optional[dict]) -> dict:
+    if overrides:
+        secrets = dict(secrets, **overrides)
+    return secrets
+
+
 @contextlib.contextmanager
-def assumed_identity_if(only_if, *, identity_kind=GLOBAL_APPLICATION_CONFIGURATION, only_if_missing=None,
-                        require_identity=False):
+def assumed_identity_if(only_if: bool, *,
+                        identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
+                        only_if_missing: Optional[str] = None,
+                        require_identity: bool = False,
+                        overrides: Optional[dict] = None):
     with assumed_identity(identity_kind=identity_kind, only_if=only_if, only_if_missing=only_if_missing,
-                          require_identity=require_identity):
+                          require_identity=require_identity, overrides=overrides):
         yield
 
 
 @contextlib.contextmanager
-def assumed_identity(*, identity_kind=GLOBAL_APPLICATION_CONFIGURATION, only_if=True, only_if_missing=None,
-                     require_identity=False):
+def assumed_identity(*,
+                     identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
+                     only_if: bool = True,
+                     only_if_missing: Optional[str] = None,
+                     require_identity: bool = False,
+                     overrides: Optional[dict] = None):
     """
     Assumes a given identity in a context.
 
@@ -91,12 +111,14 @@ def assumed_identity(*, identity_kind=GLOBAL_APPLICATION_CONFIGURATION, only_if=
     :param only_if_missing: The name of an environment variable that would only be in the GAC.
        Load the GAC only if this variable is not set. Default is None, meaning load unconditionally.
     :param require_identity: Whether to raise an error if the identity_kind environment variable is not bound.
+    :param overrides: If present, a dictionary of keys&values to override those in looked-up secrests. Default None.
 
     """
     if only_if and (not only_if_missing or not os.environ.get(only_if_missing)):
         identity_name = get_identity_name(identity_kind=identity_kind)
         if identity_name:
             secrets = get_identity_secrets(identity_kind=identity_kind)
+            secrets = apply_overrides(secrets=secrets, overrides=overrides)
             if only_if_missing not in secrets:
                 raise RuntimeError(f"No {only_if_missing} was found where expected"
                                    f" in {identity_kind} secrets at {identity_name}.")
@@ -110,17 +132,17 @@ def assumed_identity(*, identity_kind=GLOBAL_APPLICATION_CONFIGURATION, only_if=
     yield
 
 
-def apply_identity(identity_kind=GLOBAL_APPLICATION_CONFIGURATION):
+def apply_identity(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION, overrides: Optional[dict] = None):
     """
-    Assumes an identity globally.
+    Assumes an identity globally by assigning environment variables.
 
     Since this is assumed to be an initial startup action, we assume it's not already been done and don't
     offer the only_if_missing mechanism that the assumed_identity context manager offers.
 
     """
-    gac = os.environ.get(identity_kind)
-    if gac:
+    if identity_is_defined(identity_kind):
         secrets = get_identity_secrets(identity_kind=identity_kind)
+        secrets = apply_overrides(secrets=secrets, overrides=overrides)
         for var, val in secrets.items():
             os.environ[var] = val
     else:

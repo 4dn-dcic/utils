@@ -11,13 +11,17 @@ from .common import LEGACY_GLOBAL_ENV_BUCKET
 from .exceptions import (
     # CannotInferEnvFromManyGlobalEnvs,
     # MissingGlobalEnv,
-    SynonymousEnvironmentVariablesMismatched,
+    SynonymousEnvironmentVariablesMismatched, LegacyDispatchDisabled,
 )
 from .misc_utils import (
     override_environ,
     # ignored,
     remove_suffix,
 )
+
+
+class LegacyController:
+    LEGACY_DISPATCH_ENABLED = False
 
 
 class EnvBase:
@@ -51,6 +55,12 @@ class EnvBase:
             yield
 
     @classmethod
+    def _legacy_global_env_bucket_for_testing(cls):
+        if not LegacyController.LEGACY_DISPATCH_ENABLED:
+            raise LegacyDispatchDisabled(operation="_legacy_global_env_bucket_for_testing", mode='setup-envbase')
+        return LEGACY_GLOBAL_ENV_BUCKET
+
+    @classmethod
     def _get_configs(cls, env_bucket, kind):
         env_bucket_name = (
             # prefer a given bucket
@@ -58,7 +68,7 @@ class EnvBase:
             # or GLOBAL_ENV_BUCKET
             or cls.global_env_bucket_name()
             # but failing that, for legacy system, just use legacy name
-            or LEGACY_GLOBAL_ENV_BUCKET)
+            or cls._legacy_global_env_bucket_for_testing())
         s3_resource = boto3.resource('s3')
         env_bucket_model = s3_resource.Bucket(env_bucket_name)
         key_names = [key_obj.key for key_obj in env_bucket_model.objects.all()]
