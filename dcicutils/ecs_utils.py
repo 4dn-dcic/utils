@@ -83,4 +83,3 @@ class ECSUtils:
                 if deployment['rolloutState'] != self.DEPLOYMENT_COMPLETED:
                     return True
         return False
-

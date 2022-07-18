@@ -19,7 +19,7 @@ from dcicutils.qa_utils import (
 from types import GeneratorType
 from unittest import mock
 from urllib.parse import urlsplit, parse_qsl
-from .helpers import using_fresh_ff_state
+from .helpers import using_fresh_ff_state_for_testing
 
 
 pytestmark = pytest.mark.working
@@ -1226,7 +1226,7 @@ def test_get_es_search_generator(integrated_ff):
 
 @pytest.mark.integrated
 @pytest.mark.flaky
-@using_fresh_ff_state()
+@using_fresh_ff_state_for_testing()
 def test_get_health_page(integrated_ff):
     health_res = ff_utils.get_health_page(key=integrated_ff['ff_key'])
     assert health_res and 'error' not in health_res
@@ -1707,7 +1707,7 @@ def test_convert_param():
 
 
 @pytest.mark.integrated
-@using_fresh_ff_state()
+@using_fresh_ff_state_for_testing()
 def test_get_page(integrated_ff):
     ff_env = integrated_ff['ff_env']
     ff_env_index_namespace = integrated_ff['ff_env_index_namespace']

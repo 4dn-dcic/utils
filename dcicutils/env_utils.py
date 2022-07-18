@@ -399,7 +399,7 @@ class EnvUtils:
 
     @classmethod
     @contextlib.contextmanager
-    def fresh_state_from(cls, *, bucket=None, data=None, global_bucket=None):
+    def fresh_testing_state_from(cls, *, bucket=None, data=None, global_bucket=None):
         with EnvBase.global_env_bucket_named(global_bucket or bucket):
             with EnvUtils.temporary_state():
                 if bucket:
@@ -417,14 +417,14 @@ class EnvUtils:
 
     @classmethod
     @contextlib.contextmanager
-    def fresh_ff_deployed_state(cls):
-        with cls.fresh_state_from(bucket=cls.FF_DEPLOYED_BUCKET):
+    def fresh_ff_deployed_state_for_testing(cls):
+        with cls.fresh_testing_state_from(bucket=cls.FF_DEPLOYED_BUCKET):
             yield
 
     @classmethod
     @contextlib.contextmanager
-    def fresh_cgap_deployed_state(cls):
-        with cls.fresh_state_from(bucket=cls.CGAP_BUCKET):
+    def fresh_cgap_deployed_state_for_testing(cls):
+        with cls.fresh_testing_state_from(bucket=cls.CGAP_BUCKET):
             yield
 
     # Vaguely, the thing we're trying to recognize is this (sanitized slightly here),
