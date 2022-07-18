@@ -24,8 +24,8 @@ from dcicutils.exceptions import InvalidParameterError
 from dcicutils.misc_utils import ignored, file_contents, override_environ
 from dcicutils.qa_utils import MockFileSystem, MockedCommandArgs, printed_output
 from .helpers import (
-    fresh_cgap_state, fresh_ff_state,  # fresh_legacy_state,
-    using_fresh_ff_state,  # using_fresh_legacy_state, using_fresh_cgap_state,
+    fresh_cgap_state_for_testing, fresh_ff_state_for_testing,  # fresh_legacy_state,
+    using_fresh_ff_state_for_testing,  # using_fresh_legacy_state, using_fresh_cgap_state,
 )
 
 
@@ -1311,7 +1311,7 @@ def _get_deploy_config(*, env, args=None, log=None, allow_other_prod=False):
 @pytest.mark.integrated
 def test_get_deployment_config_cgap_stg_orchestrated():
     """ Tests get_deployment_config in a fourfront staging situation. """
-    with fresh_cgap_state():
+    with fresh_cgap_state_for_testing():
         if EnvUtils.STG_ENV_NAME is not None:
             my_log = MockedInfoLog()
             cfg = _get_deploy_config(env=EnvUtils.STG_ENV_NAME, log=my_log)
@@ -1326,7 +1326,7 @@ def test_get_deployment_config_cgap_stg_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_ff_stg_orchestrated():
     """ Tests get_deployment_config in a fourfront staging situation. """
-    with fresh_ff_state():
+    with fresh_ff_state_for_testing():
         my_log = MockedInfoLog()
         cfg = _get_deploy_config(env=EnvUtils.STG_ENV_NAME, log=my_log)
         assert cfg['ENV_NAME'] == EnvUtils.STG_ENV_NAME  # sanity
@@ -1340,7 +1340,7 @@ def test_get_deployment_config_ff_stg_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_cgap_prd_orchestrated():
     """ Tests get_deployment_config in the new production case """
-    with fresh_cgap_state():
+    with fresh_cgap_state_for_testing():
         my_log = MockedInfoLog()
         cfg = _get_deploy_config(env=EnvUtils.PRD_ENV_NAME, log=my_log)
         assert cfg['ENV_NAME'] == EnvUtils.PRD_ENV_NAME  # sanity
@@ -1354,7 +1354,7 @@ def test_get_deployment_config_cgap_prd_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_ff_prd_orchestrated():
     """ Tests get_deployment_config in the new production case """
-    with fresh_ff_state():
+    with fresh_ff_state_for_testing():
         my_log = MockedInfoLog()
         cfg = _get_deploy_config(env=EnvUtils.PRD_ENV_NAME, log=my_log)
         assert cfg['ENV_NAME'] == EnvUtils.PRD_ENV_NAME  # sanity
@@ -1368,7 +1368,7 @@ def test_get_deployment_config_ff_prd_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_cgap_uncorrelated_stg_or_prd_orchestrated():
     """ Tests get_deployment_config in the new production case """
-    with fresh_cgap_state():
+    with fresh_cgap_state_for_testing():
         # In the new world, this actually never happens because only EnvUtils.PRD_ENV_NAME and EnvUtils.STG_ENV_NAME
         # are possible stg-or-prd envs, but the control flow is there, so this tests it.
         with mock.patch('dcicutils.deployment_utils.is_stg_or_prd_env', return_value=True):
@@ -1384,7 +1384,7 @@ def test_get_deployment_config_cgap_uncorrelated_stg_or_prd_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_ff_uncorrelated_stg_or_prd_orchestrated():
     """ Tests get_deployment_config in the new production case """
-    with fresh_ff_state():
+    with fresh_ff_state_for_testing():
         # In the new world, this actually never happens because only EnvUtils.PRD_ENV_NAME and EnvUtils.STG_ENV_NAME
         # are possible stg-or-prd envs, but the control flow is there, so this tests it.
         with mock.patch('dcicutils.deployment_utils.is_stg_or_prd_env', return_value=True):
@@ -1400,7 +1400,7 @@ def test_get_deployment_config_ff_uncorrelated_stg_or_prd_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_cgap_test_envs_orchestrated():
     """ Tests get_deployment_config in the cgap-test case with an orchestrated ecosystem. """
-    with fresh_cgap_state():
+    with fresh_cgap_state_for_testing():
         for my_env in EnvUtils.TEST_ENVS:
             if not is_hotseat_env(my_env):
                 print(f"Testing {my_env}...")
@@ -1417,7 +1417,7 @@ def test_get_deployment_config_cgap_test_envs_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_ff_test_envs_orchestrated():
     """ Tests get_deployment_config in the mastertest case with an orchestrated ecosystem. """
-    with fresh_ff_state():
+    with fresh_ff_state_for_testing():
         for my_env in EnvUtils.TEST_ENVS:
             if not is_hotseat_env(my_env):
                 print(f"Testing {my_env}...")
@@ -1434,7 +1434,7 @@ def test_get_deployment_config_ff_test_envs_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_cgap_hotseat_orchestrated():
     """ Tests get_deployment_config in the hotseat case with an orchestrated ecosystem. """
-    with fresh_cgap_state():
+    with fresh_cgap_state_for_testing():
         for my_env in EnvUtils.HOTSEAT_ENVS:
             print(f"Testing {my_env}...")
             my_log = MockedInfoLog()
@@ -1464,7 +1464,7 @@ def test_get_deployment_config_cgap_hotseat_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_ff_hotseat_orchestrated():
     """ Tests get_deployment_config in the hotseat case with an orchestrated ecosystem. """
-    with fresh_ff_state():
+    with fresh_ff_state_for_testing():
         for my_env in EnvUtils.HOTSEAT_ENVS:
             print(f"Testing {my_env}...")
             my_log = MockedInfoLog()
@@ -1491,7 +1491,7 @@ def test_get_deployment_config_ff_hotseat_orchestrated():
                                            f' Processing mode: default')
 
 
-@using_fresh_ff_state()
+@using_fresh_ff_state_for_testing()
 @mock.patch.object(deployment_utils_module, "compute_ff_prd_env")
 @mock.patch.object(deployment_utils_module, "compute_cgap_prd_env")
 def test_actual_env_settings(mock_compute_cgap_prd_env, mock_compute_ff_prd_env):

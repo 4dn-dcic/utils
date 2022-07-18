@@ -17,7 +17,6 @@ import re
 import sys
 import time
 import toml
-from typing import Any, Optional
 import uuid
 import warnings
 
@@ -25,7 +24,7 @@ from botocore.credentials import Credentials as Boto3Credentials
 from botocore.exceptions import ClientError
 from collections import defaultdict
 from json import dumps as json_dumps, loads as json_loads
-from typing import Optional, List, DefaultDict
+from typing import Any, Optional, List, DefaultDict
 from unittest import mock
 from .env_utils import short_env_name
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
