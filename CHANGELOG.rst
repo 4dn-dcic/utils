@@ -6,10 +6,23 @@ dcicutils
 Change Log
 ----------
 
+
+3.16.0
+======
+
+* In ``qa_utils``:
+
+  * Extend the mocking so that output to files by ``PRINT`` can be tested
+    by ``with printed_output as printed`` using ``printed.file_last[fp]``
+    and ``printed.file_lines[fp]``.
+
+
 3.15.0
 ======
+
 * In ``ecs_utils``:
   * Adds the ``service_has_active_deployment`` method.
+
 
 3.14.2
 ======
