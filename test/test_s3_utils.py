@@ -29,7 +29,9 @@ from dcicutils.qa_utils import MockBoto3, MockResponse, known_bug_expected
 from dcicutils.s3_utils import s3Utils, HealthPageKey
 from requests.exceptions import ConnectionError
 from unittest import mock
-from .helpers import using_fresh_ff_state_for_testing, using_fresh_cgap_state_for_testing, using_fresh_ff_deployed_state_for_testing
+from .helpers import (
+    using_fresh_ff_state_for_testing, using_fresh_cgap_state_for_testing, using_fresh_ff_deployed_state_for_testing,
+)
 from .test_ff_utils import mocked_s3utils_with_sse
 
 
