@@ -133,6 +133,34 @@ def check_get_identity_secrets(fn):
             assert secrets == some_secret_table  # this is the parsed form of some_secret_string
 
 
+def test_apply_identity():
+
+    b3 = boto3_for_some_secrets_testing()
+    with mock.patch.object(secrets_utils_module, 'boto3', b3):
+
+        with override_environ(**{secret_name: None for secret_name in some_secret_names}):
+
+            for i in range(len(some_secret_names)):
+                secret_name = some_secret_names[i]
+                # Check that this test will be useful.
+                assert secret_name not in os.environ, f"Test secret variable {secret_name} is already in os.environ."
+
+            with override_environ(IDENTITY=some_secret_identity):
+
+                apply_identity()
+
+                for i in range(len(some_secret_names)):
+                    secret_name = some_secret_names[i]
+                    secret_value = some_secret_values[i]
+                    assert secret_name in os.environ, f"Test secret variable {secret_name} is missing in os.environ."
+                    assert os.environ[secret_name] == secret_value
+
+            for i in range(len(some_secret_names)):
+                secret_name = some_secret_names[i]
+                # Check that this test will be useful.
+                assert secret_name in os.environ, f"Test secret variable {secret_name} did not get globally set."
+
+
 def test_assumed_identity():
 
     b3 = boto3_for_some_secrets_testing()
@@ -141,14 +169,14 @@ def test_assumed_identity():
         for i in range(len(some_secret_names)):
             secret_name = some_secret_names[i]
             # Check that this test will be useful.
-            assert secret_name not in os.environ, f"The test secret variable {secret_name} is already in os.environ."
+            assert secret_name not in os.environ, f"Test secret variable {secret_name} is already in os.environ."
 
         with override_environ(IDENTITY=some_secret_identity):
             with assumed_identity():
                 for i in range(len(some_secret_names)):
                     secret_name = some_secret_names[i]
                     secret_value = some_secret_values[i]
-                    assert secret_name in os.environ, f"The test secret variable {secret_name} is missing in os.environ."
+                    assert secret_name in os.environ, f"Test secret variable {secret_name} is missing in os.environ."
                     assert os.environ[secret_name] == secret_value
 
         with override_environ(MY_IDENTITY=some_secret_identity):
@@ -156,7 +184,7 @@ def test_assumed_identity():
                 for i in range(len(some_secret_names)):
                     secret_name = some_secret_names[i]
                     secret_value = some_secret_values[i]
-                    assert secret_name in os.environ, f"The test secret variable {secret_name} is missing in os.environ."
+                    assert secret_name in os.environ, f"Test secret variable {secret_name} is missing in os.environ."
                     assert os.environ[secret_name] == secret_value
 
         alt_name_1 = f"alt_{some_secret_name_1}"
@@ -168,7 +196,7 @@ def test_assumed_identity():
                 for i in range(len(alt_secret_names)):
                     alt_name = alt_secret_names[i]
                     alt_value = alt_secret_values[i]
-                    assert alt_name in os.environ, f"The test secret variable {alt_name} is missing in os.environ."
+                    assert alt_name in os.environ, f"Test secret variable {alt_name} is missing in os.environ."
                     assert os.environ[secret_name] == alt_value
 
         some_overridden_value = 'some other value'
@@ -193,6 +221,7 @@ def test_assumed_identity():
             with assumed_identity(only_if_missing=some_secret_name_2):
                 assert some_secret_name_1 not in os.environ
 
+
 def test_assumed_identity_if():
 
     b3 = boto3_for_some_secrets_testing()
@@ -201,7 +230,7 @@ def test_assumed_identity_if():
         for i in range(len(some_secret_names)):
             secret_name = some_secret_names[i]
             # Check that this test will be useful.
-            assert secret_name not in os.environ, f"The test secret variable {secret_name} is already in os.environ."
+            assert secret_name not in os.environ, f"Test secret variable {secret_name} is already in os.environ."
 
         with override_environ(IDENTITY=some_secret_identity):
 
