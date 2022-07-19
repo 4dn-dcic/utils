@@ -4,7 +4,7 @@ import json
 import os
 import pytest
 
-from dcicutils.common import APP_CGAP, APP_FOURFRONT
+from dcicutils.common import APP_CGAP, APP_FOURFRONT  # , LEGACY_GLOBAL_ENV_BUCKET
 from dcicutils.env_manager import EnvManager
 from dcicutils.env_utils import (
     is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env,

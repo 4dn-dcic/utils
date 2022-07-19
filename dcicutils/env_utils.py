@@ -13,7 +13,7 @@ from . import env_utils_legacy as legacy
 from .common import (
     EnvName, OrchestratedApp, APP_FOURFRONT, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD,
 )
-from .env_base import EnvBase
+from .env_base import EnvBase, LegacyController
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
 from .exceptions import (
     EnvUtilsLoadError, BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
@@ -23,14 +23,10 @@ from .misc_utils import (
     decorator, full_object_name, ignored, ignorable, remove_prefix, remove_suffix, check_true, find_association,
     override_environ, get_setting_from_context,
 )
-from .secrets_utils import assume_identity, GLOBAL_APPLICATION_CONFIGURATION
+from .secrets_utils import assumed_identity_if  # , GLOBAL_APPLICATION_CONFIGURATION
 
 
 ignorable(BeanstalkOperationNotImplemented)  # Stuff that does or doesn't use this might come and go
-
-
-class LegacyController:
-    LEGACY_DISPATCH_ENABLED = False
 
 
 class UseLegacy(BaseException):
@@ -326,9 +322,10 @@ class EnvUtils:
     }
 
     @classmethod
-    def init(cls, env_name=None, ecosystem=None, force=False, raise_load_errors=True):
+    def init(cls, env_name=None, ecosystem=None, force=False, raise_load_errors=True, assuming_identity=True):
         if force or cls._DECLARED_DATA is None:
-            cls.load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors)
+            cls.load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors,
+                                   assuming_identity=assuming_identity)
 
     @classmethod
     def declared_data(cls):
@@ -381,7 +378,7 @@ class EnvUtils:
             attrs['ENV_NAME'] = env_name
         with EnvUtils.temporary_state():
             with override_environ(**attrs):
-                EnvUtils.init(force=True, raise_load_errors=raise_load_errors)
+                EnvUtils.init(force=True, raise_load_errors=raise_load_errors, assuming_identity=False)
                 yield
 
     @classmethod
@@ -404,7 +401,7 @@ class EnvUtils:
             with EnvUtils.temporary_state():
                 if bucket:
                     assert data is None, "You must supply bucket or data, but not both."
-                    EnvUtils.init(force=True)
+                    EnvUtils.init(force=True, assuming_identity=False)
                 elif data:
                     EnvUtils.set_declared_data(data)
                 else:
@@ -484,19 +481,9 @@ class EnvUtils:
         return config_data                        # noQA - PyCharm worries wrongly this won't have been set
 
     @classmethod
-    def load_declared_data(cls, env_name=None, ecosystem=None, raise_load_errors=True):
-
-        if not EnvBase.global_env_bucket_name():
-            gac = os.environ.get(GLOBAL_APPLICATION_CONFIGURATION)
-            if gac:
-                secrets = assume_identity()
-                with override_environ(**secrets):
-                    if not EnvBase.global_env_bucket_name():
-                        raise RuntimeError("No global env bucket set, and assume_identity didn't find one in .")
-                    cls._load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors)
-                    return
-
-        cls._load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors)
+    def load_declared_data(cls, env_name=None, ecosystem=None, raise_load_errors=True, assuming_identity=True):
+        with assumed_identity_if(assuming_identity, only_if_missing='GLOBAL_ENV_BUCKET'):
+            cls._load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors)
 
     @classmethod
     def _load_declared_data(cls, *, env_name, ecosystem, raise_load_errors):
