@@ -23,15 +23,20 @@ logger = structlog.getLogger(__name__)
 GLOBAL_APPLICATION_CONFIGURATION = 'IDENTITY'
 
 
-def get_identity_name(identity_kind=GLOBAL_APPLICATION_CONFIGURATION):
-    return os.environ.get(identity_kind, 'dev/beanstalk/cgap-dev')
+# TODO: Rethink whether this should be a constant. Maybe it should be a function of the identity_kind?
+#       Maybe the caller should pass a default and this function should have none. -kmp 18-Jul-2022
+LEGACY_DEFAULT_IDENTITY_NAME = 'dev/beanstalk/cgap-dev'
 
 
-def identity_is_defined(identity_kind=GLOBAL_APPLICATION_CONFIGURATION):
+def get_identity_name(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION):
+    return os.environ.get(identity_kind, LEGACY_DEFAULT_IDENTITY_NAME)
+
+
+def identity_is_defined(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> bool:
     return bool(os.environ.get(identity_kind))
 
 
-def get_identity_secrets(identity_kind=GLOBAL_APPLICATION_CONFIGURATION) -> dict:
+def get_identity_secrets(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> dict:
     """ Grabs application identity from the secrets manager.
         Looks for environment variable IDENTITY, which should contain the name of
         a secret in secretsmanager that is a JSON blob of core configuration information.
@@ -138,7 +143,7 @@ def assumed_identity(*,
         if identity_name:
             secrets = get_identity_secrets(identity_kind=identity_kind)
             secrets = apply_overrides(secrets=secrets, rename_keys=rename_keys, override_values=override_values)
-            if only_if_missing not in secrets:
+            if only_if_missing and only_if_missing not in secrets:
                 raise RuntimeError(f"No {only_if_missing} was found where expected"
                                    f" in {identity_kind} secrets at {identity_name}.")
             with override_environ(**secrets):
