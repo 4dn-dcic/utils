@@ -619,8 +619,16 @@ def prod_bucket_env(envname: EnvName) -> None:
 
 @if_orchestrated()
 def default_workflow_env(orchestrated_app: OrchestratedApp) -> EnvName:
+    """
+    Returns the default workflow environment to be used in testing (and with ill-constructed .ini files)
+    for WorkFlowRun situations in the portal when there is no env.name in the registry.
+    """
     _check_appname(orchestrated_app, required=True)
-    return EnvUtils.DEFAULT_WORKFLOW_ENV or (EnvUtils.HOTSEAT_ENVS[0] if EnvUtils.HOTSEAT_ENVS else None)
+    return (EnvUtils.DEFAULT_WORKFLOW_ENV
+            or (EnvUtils.HOTSEAT_ENVS[0]
+                if EnvUtils.HOTSEAT_ENVS
+                else None)
+            or EnvUtils.PRD_ENV_NAME)
 
 
 @if_orchestrated()
@@ -984,6 +992,14 @@ def infer_foursight_from_env(*, request=None, envname: Optional[EnvName] = None,
     :param short: whether to shorten the result using short_env_name.
     :return: Foursight env at the end of the url ie: for fourfront-green, could be either 'data' or 'staging'
     """
+
+    # We're phasing out this argument for this operation.  We should perhaps have a separate infer_foursight_from_url
+    # that can be used outside of the core operations by something that knows it has a public-facing URL,
+    # but this does not work in our orchestrated configuration to make necessary portal decisions because
+    # we sometimes receive URLs using hosts that contain explicit references to private IP addresses from
+    # which nothing useful can be inferred.  -kmp 20-Jul-2022
+    ignored(request)
+
     if envname is None:
         # We allow None only so we can gracefully phase out the 'request' argument. -kmp 15-May-2022
         raise ValueError("A non-null envname is required by infer_foursight_from_env.")
