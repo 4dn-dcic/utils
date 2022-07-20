@@ -914,7 +914,7 @@ def get_foursight_bucket(envname: EnvName, stage: ChaliceStage) -> str:
             return bucket
 
     if EnvUtils.FOURSIGHT_BUCKET_PREFIX:
-        return f"{EnvUtils.FOURSIGHT_BUCKET_PREFIX}-{stage}-{infer_foursight_from_env(envname=envname)}"
+        return f"{EnvUtils.FOURSIGHT_BUCKET_PREFIX}-{stage}-{full_env_name(envname)}"
 
     if bucket_table_seen:
         raise IncompleteFoursightBucketTable(f"No foursight bucket is defined for envname={envname} stage={stage}"

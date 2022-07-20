@@ -1540,8 +1540,8 @@ def test_get_foursight_bucket():
             assert infer_foursight_from_env(envname='acme-foo') == 'foo'
             assert infer_foursight_from_env(envname='acme-stg') == 'stg'
 
-            assert get_foursight_bucket(envname='acme-foo', stage='prod') == 'alpha-omega-prod-foo'
-            assert get_foursight_bucket(envname='acme-stg', stage='dev') == 'alpha-omega-dev-stg'
+            assert get_foursight_bucket(envname='acme-foo', stage='prod') == 'alpha-omega-prod-acme-foo'
+            assert get_foursight_bucket(envname='acme-stg', stage='dev') == 'alpha-omega-dev-acme-stg'
 
         with pytest.raises(MissingFoursightBucketTable):
             get_foursight_bucket(envname='acme-foo', stage='prod')
