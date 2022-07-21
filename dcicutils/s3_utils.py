@@ -8,6 +8,7 @@ from io import BytesIO
 from typing import Any
 from zipfile import ZipFile
 from .base import get_beanstalk_real_url
+from .common import EnvName
 from .env_base import s3Base
 from .env_manager import EnvManager
 from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name, get_env_real_url, EnvUtils
@@ -219,6 +220,29 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             higlass_url = f"https://{higlass_url}"
         return higlass_url
 
+    @staticmethod
+    def get_synthetic_env_config(env_name: EnvName) -> dict:
+
+        env_full_name = full_env_name(env_name)
+        s3u = s3Utils(env=env_full_name)
+
+        portal_url = get_env_real_url(env_full_name)
+
+        es_url = s3u.health_page_get(HealthPageKey.ELASTICSEARCH, force=True)
+        if not isinstance(es_url, str):
+            raise RuntimeError(f"Health page for {env_full_name} has no {HealthPageKey.ELASTICSEARCH} entry.")
+
+        if not es_url.startswith('http'):  # skips on both http:// and https://
+            es_url = ('https://' if es_url.endswith(":443") else 'http://') + es_url
+
+        env_info = {
+            'ff_env': env_full_name,
+            'fourfront': portal_url,
+            'es': es_url
+        }
+
+        return env_info
+
     def health_page_get(self, health_page_key: str, *, default: Any = None, force: bool = False):
         """
         Does a 'get' from the health page dictionary obtained from /health?format=json.
@@ -231,7 +255,7 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             self._health_json_url = self._health_json_url or f"{self.url}/health?format=json"
             logger.warning(f"health json url: {self._health_json_url}")
             self._health_json = EnvManager.fetch_health_page_json(url=self._health_json_url)
-            # logger.warning(f"health json: {self._health_json}")
+            logger.warning(f"health json: {self._health_json}")
         return self._health_json.get(health_page_key, default)
 
     ACCESS_KEYS_S3_KEY = 'access_key_admin'

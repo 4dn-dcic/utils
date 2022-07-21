@@ -899,13 +899,17 @@ def get_foursight_bucket_prefix():
 @if_orchestrated
 def get_foursight_bucket(envname: EnvName, stage: ChaliceStage) -> str:
 
+    public_name = infer_foursight_from_env(envname=envname)
+    short_name = short_env_name(envname)
+    full_name = full_env_name(envname)
+
     bucket = None
     bucket_table = EnvUtils.FOURSIGHT_BUCKET_TABLE
 
     bucket_table_seen = False
     if isinstance(bucket_table, dict):
         bucket_table_seen = True
-        env_entry = bucket_table.get(envname)
+        env_entry = bucket_table.get(public_name) or bucket_table.get(full_name) or bucket_table.get(short_name)
         if not env_entry:
             env_entry = bucket_table.get(ENV_DEFAULT)
         if isinstance(env_entry, dict):
@@ -914,10 +918,10 @@ def get_foursight_bucket(envname: EnvName, stage: ChaliceStage) -> str:
             return bucket
 
     if EnvUtils.FOURSIGHT_BUCKET_PREFIX:
-        return f"{EnvUtils.FOURSIGHT_BUCKET_PREFIX}-{stage}-{full_env_name(envname)}"
+        return f"{EnvUtils.FOURSIGHT_BUCKET_PREFIX}-{stage}-{full_name}"
 
     if bucket_table_seen:
-        raise IncompleteFoursightBucketTable(f"No foursight bucket is defined for envname={envname} stage={stage}"
+        raise IncompleteFoursightBucketTable(f"No foursight bucket is defined for envname={public_name} stage={stage}"
                                              f" in {EnvNames.FOURSIGHT_BUCKET_TABLE}={bucket_table}.")
     else:
         raise MissingFoursightBucketTable(f"No {EnvNames.FOURSIGHT_BUCKET_TABLE} is declared.")
