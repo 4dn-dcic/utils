@@ -965,6 +965,20 @@ def infer_repo_from_env(envname):
         return None
 
 
+def _default_envname_from_request_and_context(*, request, caller):
+    envname = None
+    try:
+        envname = request.registry.settings.get('env.name')
+    except Exception:
+        pass
+    envname = envname or os.environ.get('ENV_NAME')
+    if envname is None:
+        raise ValueError(f"A non-null envname is required by but not supplied to {caller},"
+                         f" and could not be inferred from env.name in the request's registry settings"
+                         f" or from the ENV_NAME environment variable.")
+    return envname
+
+
 @if_orchestrated()
 def infer_foursight_url_from_env(*, request=None, envname: Optional[EnvName] = None):
     """
@@ -974,11 +988,8 @@ def infer_foursight_url_from_env(*, request=None, envname: Optional[EnvName] = N
     :param envname: name of the environment we are on
     :return: Foursight env at the end of the url ie: for fourfront-green, could be either 'data' or 'staging'
     """
-    ignored(request)
-    if envname is None:
-        # Although short_env_name allows None, it will return None in that case and a more confusing error will result.
-        # (We allow None only so we can gracefully phase out the 'request' argument.) -kmp 15-May-2022
-        raise ValueError("A non-null envname is required by infer_foursight_url_from_env.")
+    envname = envname or _default_envname_from_request_and_context(request=request,
+                                                                   caller='infer_foursight_url_from_env')
     return EnvUtils.FOURSIGHT_URL_PREFIX + infer_foursight_from_env(request=request, envname=envname)
 
 
@@ -992,32 +1003,7 @@ def infer_foursight_from_env(*, request=None, envname: Optional[EnvName] = None,
     :param short: whether to shorten the result using short_env_name.
     :return: Foursight env at the end of the url ie: for fourfront-green, could be either 'data' or 'staging'
     """
-
-    # We're phasing out this argument for this operation.  We should perhaps have a separate infer_foursight_from_url
-    # that can be used outside of the core operations by something that knows it has a public-facing URL,
-    # but this does not work in our orchestrated configuration to make necessary portal decisions because
-    # we sometimes receive URLs using hosts that contain explicit references to private IP addresses from
-    # which nothing useful can be inferred.  -kmp 20-Jul-2022
-    ignored(request)
-
-    if envname is None:
-        # We allow None only so we can gracefully phase out the 'request' argument. -kmp 15-May-2022
-        raise ValueError("A non-null envname is required by infer_foursight_from_env.")
-
-    # This isn't helpful any more. In Fargate we sometimes just get a random IP address.from
-    # The envname information should get us what we need.
-    # -kmp 14-Jul-2022
-    #
-    # # If a request is passed and stage-mirroring is enabled, we can tell from the URL if we're staging
-    # # then for anything that is a stg or prd, return its 'public name' token.
-    # # TODO: Find a simpler way to write this block of code? It's not very abstract. -kmp 23-May-2022
-    # if request and EnvUtils.STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME:
-    #     classification = classify_server_url(request if isinstance(request, str) else request.domain)
-    #     if classification[c.IS_STG_OR_PRD]:
-    #         public_name = classification[c.PUBLIC_NAME]
-    #         if public_name:
-    #             return public_name
-
+    envname = envname or _default_envname_from_request_and_context(request=request, caller='infer_foursight_from_env')
     entry = (find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname) or
              find_association(EnvUtils.PUBLIC_URL_TABLE, environment=full_env_name(envname)) or
              find_association(EnvUtils.PUBLIC_URL_TABLE, environment=short_env_name(envname)))

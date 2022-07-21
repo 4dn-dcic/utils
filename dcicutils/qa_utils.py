@@ -193,6 +193,9 @@ class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
         """
         return self._just_now
 
+    def just_utcnow(self):
+        return self.just_now().astimezone(pytz.UTC).replace(tzinfo=None)
+
     def now(self) -> datetime.datetime:
         """
         This advances time by one tick and returns the new time.
