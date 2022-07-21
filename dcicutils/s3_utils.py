@@ -5,10 +5,12 @@ import mimetypes
 import os
 
 from io import BytesIO
+from typing import Any
 from zipfile import ZipFile
 from .base import get_beanstalk_real_url
+from .env_base import s3Base
 from .env_manager import EnvManager
-from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name
+from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name, get_env_real_url, EnvUtils
 from .exceptions import InferredBucketConflict
 from .misc_utils import PRINT, exported, merge_key_value_dict_lists, key_value_dict
 
@@ -39,6 +41,7 @@ class HealthPageKey:  # This is moving here from cgap-portal.
     FILE_UPLOAD_BUCKET = 'file_upload_bucket'                # = s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY
     FOURSIGHT = 'foursight'
     FOURSIGHT_BUCKET_PREFIX = 'foursight_bucket_prefix'
+    HIGLASS = 'higlass'
     IDENTITY = 'identity'
     INDEXER = 'indexer'
     INDEX_SERVER = 'index_server'
@@ -57,42 +60,9 @@ class HealthPageKey:  # This is moving here from cgap-portal.
     UTILS_VERSION = 'utils_version'
 
 
-class s3Utils(object):  # NOQA - This class name violates style rules, but a lot of things might break if we change it.
-
-    # Some extra variables used in setup here so that other modules can be consistent with chosen values.
-
-    SYS_BUCKET_SUFFIX = "system"
-    OUTFILE_BUCKET_SUFFIX = "wfoutput"
-    RAW_BUCKET_SUFFIX = "files"
-    BLOB_BUCKET_SUFFIX = "blobs"
-    METADATA_BUCKET_SUFFIX = "metadata-bundles"
-    TIBANNA_OUTPUT_BUCKET_SUFFIX = 'tibanna-output'
-    TIBANNA_CWLS_BUCKET_SUFFIX = 'tibanna-cwls'
+class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot of things might break if we change it.
 
     s3_encrypt_key_id = None  # default. might be overridden based on health page in various places below
-
-    EB_PREFIX = "elasticbeanstalk"
-    EB_AND_ENV_PREFIX = EB_PREFIX + "-%s-"  # = "elasticbeanstalk-%s-"
-
-    SYS_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + SYS_BUCKET_SUFFIX            # = "elasticbeanstalk-%s-system"
-    OUTFILE_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + OUTFILE_BUCKET_SUFFIX    # = "elasticbeanstalk-%s-wfoutput"
-    RAW_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + RAW_BUCKET_SUFFIX            # = "elasticbeanstalk-%s-files"
-    BLOB_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + BLOB_BUCKET_SUFFIX          # = "elasticbeanstalk-%s-blobs"
-    METADATA_BUCKET_TEMPLATE = EB_AND_ENV_PREFIX + METADATA_BUCKET_SUFFIX  # = "elasticbeanstalk-%s-metadata-bundles"
-    TIBANNA_OUTPUT_BUCKET_TEMPLATE = TIBANNA_OUTPUT_BUCKET_SUFFIX          # = "tibanna-output" (no prefix)
-    TIBANNA_CWLS_BUCKET_TEMPLATE = TIBANNA_CWLS_BUCKET_SUFFIX              # = "tibanna-cwls" (no prefix)
-
-    # NOTE: These were deprecated and retained for compatibility in dcicutils 2.
-    #       For dcicutils 3.0, please rewrite uses as HealthPageKey.xyz names.
-    # SYS_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.SYSTEM_BUCKET                     # = 'system_bucket'
-    # OUTFILE_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.PROCESSED_FILE_BUCKET         # = 'processed_file_bucket'
-    # RAW_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.FILE_UPLOAD_BUCKET                # = 'file_upload_bucket'
-    # BLOB_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.BLOB_BUCKET                      # = 'blob_bucket'
-    # METADATA_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.METADATA_BUNDLES_BUCKET      # = 'metadata_bundles_bucket'
-    # TIBANNA_CWLS_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.TIBANNA_CWLS_BUCKET      # = 'tibanna_cwls_bucket'
-    # TIBANNA_OUTPUT_BUCKET_HEALTH_PAGE_KEY = HealthPageKey.TIBANNA_OUTPUT_BUCKET  # = 'tibanna_output_bucket'
-    # This is also deprecated, even though not a bucket name. Use HealthPageKey.ELASTICSEARCH.
-    # ELASTICSEARCH_HEALTH_PAGE_KEY = HealthPageKey.ELASTICSEARCH                  # = 'elasticsearch'
 
     @staticmethod  # backward compatibility in case other repositories are using this
     def verify_and_get_env_config(s3_client, global_bucket: str, env):
@@ -117,7 +87,10 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         3) With no GLOBAL_ENV_BUCKET or env kwarg,
            we expect bucket kwargs to be set, and use those as bucket names directly.
         """
+        EnvUtils.init(env_name=env)
         self.url = ''
+        self._health_json_url = None
+        self._health_json = None
         self.s3 = boto3.client('s3', region_name='us-east-1')
         global_bucket = EnvManager.global_env_bucket_name()
         self.env_manager = None  # In a legacy environment, this will continue to be None
@@ -127,26 +100,26 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
             if global_bucket:
                 # env_config = self.verify_and_get_env_config(s3_client=self.s3, global_bucket=global_bucket, env=env)
                 # ff_url = env_config['fourfront']
-                self.env_manager = global_manager = EnvManager(env_name=env, s3=self.s3)
-                portal_url = global_manager.portal_url.rstrip('/')
+                # self.env_manager = global_manager = EnvManager(env_name=env, s3=self.s3)
+                portal_url = get_env_real_url(env)  # self.env_manager.portal_url.rstrip('/')
+                env = full_env_name(env)
                 self.url = portal_url
-                health_json_url = f"{portal_url}/health?format=json"
-                logger.warning('health json url: {}'.format(health_json_url))
-                health_json = EnvManager.fetch_health_page_json(url=health_json_url)
-                self.s3_encrypt_key_id = health_json.get(HealthPageKey.S3_ENCRYPT_KEY_ID, None)
-                sys_bucket_from_health_page = health_json[HealthPageKey.SYSTEM_BUCKET]
-                outfile_bucket_from_health_page = health_json[HealthPageKey.PROCESSED_FILE_BUCKET]
-                raw_file_bucket_from_health_page = health_json[HealthPageKey.FILE_UPLOAD_BUCKET]
-                blob_bucket_from_health_page = health_json[HealthPageKey.BLOB_BUCKET]
-                metadata_bucket_from_health_page = health_json.get(HealthPageKey.METADATA_BUNDLES_BUCKET,
-                                                                   # N/A for 4DN
-                                                                   None)
-                tibanna_cwls_bucket_from_health_page = health_json.get(HealthPageKey.TIBANNA_CWLS_BUCKET,
-                                                                       # new, so it may be missing
-                                                                       None)
-                tibanna_output_bucket_from_health_page = health_json.get(HealthPageKey.TIBANNA_OUTPUT_BUCKET,
-                                                                         # new, so it may be missing
-                                                                         None)
+                es_url = self._infer_es_url()
+                self.env_manager = EnvManager.compose(portal_url=self.url, es_url=es_url, env_name=env, s3=self.s3)
+                self.s3_encrypt_key_id = self.health_page_get(HealthPageKey.S3_ENCRYPT_KEY_ID, default=None)
+                sys_bucket_from_health_page = self.health_page_get(HealthPageKey.SYSTEM_BUCKET)
+                outfile_bucket_from_health_page = self.health_page_get(HealthPageKey.PROCESSED_FILE_BUCKET)
+                raw_file_bucket_from_health_page = self.health_page_get(HealthPageKey.FILE_UPLOAD_BUCKET)
+                blob_bucket_from_health_page = self.health_page_get(HealthPageKey.BLOB_BUCKET)
+                metadata_bucket_from_health_page = self.health_page_get(HealthPageKey.METADATA_BUNDLES_BUCKET,
+                                                                        # N/A for 4DN
+                                                                        default=None)
+                tibanna_cwls_bucket_from_health_page = self.health_page_get(HealthPageKey.TIBANNA_CWLS_BUCKET,
+                                                                            # new, so it may be missing
+                                                                            default=None)
+                tibanna_output_bucket_from_health_page = self.health_page_get(HealthPageKey.TIBANNA_OUTPUT_BUCKET,
+                                                                              # new, so it may be missing
+                                                                              default=None)
                 sys_bucket = sys_bucket_from_health_page  # OK to overwrite because we checked it's None above
                 if outfile_bucket and outfile_bucket != outfile_bucket_from_health_page:
                     raise InferredBucketConflict(kind="outfile", specified=outfile_bucket,
@@ -180,6 +153,12 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                     tibanna_output_bucket = tibanna_output_bucket_from_health_page
                 logger.warning('Buckets resolved successfully.')
             else:
+                # raise BeanstalkOperationNotImplemented(
+                #     operation="s3Utils.__init__",
+                #     message="s3Utils bucket initialization with no global env bucket is not implemented"
+                # )
+                # We believe it would do the wrong thing in several places to continue into this...
+
                 # staging and production share same buckets
                 # TODO: As noted in some of the comments on this conditional, when the new env_utils with
                 #       orchestration support is in place, this same generality needs to be done
@@ -188,22 +167,16 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
                 if env:
                     if is_stg_or_prd_env(env):
                         self.url = get_beanstalk_real_url(env)  # done BEFORE prod_bucket_env blurring stg/prd
-                        env = prod_bucket_env(env)
+                        # this used to return fourfront-webprod for BOTH staging and data
+                        # now in fact this doesn't even return, it throws an error.
+                        env = prod_bucket_env(env)  # noQA - raises error if called
                     else:
-                        # TODO: This is the part that is not yet supported in env_utils, but there is a pending
-                        #       patch that will fix that. -kmp 31-AUg-2021
                         env = full_env_name(env)
                         self.url = get_beanstalk_real_url(env)  # done AFTER maybe prepending cgap- or foursight-.
 
-                    health_json_url = f"{self.url}/health?format=json"
-                    # In the orchestrated case, we issue a warning here. Do we need that? -kmp 1-Sep-2021
-                    # logger.warning('health json url: {}'.format(health_json_url))
-                    health_json = EnvManager.fetch_health_page_json(url=health_json_url)
-                    es_url = health_json.get(HealthPageKey.ELASTICSEARCH)
-                    if not es_url.startswith("http"):  # will match http: and https:
-                        es_url = f"https://{es_url}"
+                    es_url = self._infer_es_url()
                     self.env_manager = EnvManager.compose(portal_url=self.url, es_url=es_url, env_name=env, s3=self.s3)
-                    self.s3_encrypt_key_id = health_json.get(HealthPageKey.S3_ENCRYPT_KEY_ID, None)
+                    self.s3_encrypt_key_id = self.health_page_get(HealthPageKey.S3_ENCRYPT_KEY_ID, default=None)
 
                 # TODO: This branch is not setting self.global_env_bucket_manager, but it _could_ do that from the
                 #       description. -kmp 21-Aug-2021
@@ -231,6 +204,35 @@ class s3Utils(object):  # NOQA - This class name violates style rules, but a lot
         self.metadata_bucket = metadata_bucket
         self.tibanna_cwls_bucket = tibanna_cwls_bucket
         self.tibanna_output_bucket = tibanna_output_bucket
+
+    def _infer_es_url(self):
+        """Obtains the es URL from the health page, on a theory that the """
+        es_url = self.health_page_get(HealthPageKey.ELASTICSEARCH)
+        if es_url is not None and not es_url.startswith("http"):  # will match http: and https:
+            es_url = f"https://{es_url}"
+        return es_url
+
+    def _infer_higlass_url(self):  # Not used yet. Need to figure out where this value would go. -kmp 12-Jul-2022
+        """Obtains the es URL from the health page, on a theory that the """
+        higlass_url = self.health_page_get(HealthPageKey.HIGLASS)
+        if higlass_url is not None and not higlass_url.startswith("http"):  # will match http: and https:
+            higlass_url = f"https://{higlass_url}"
+        return higlass_url
+
+    def health_page_get(self, health_page_key: str, *, default: Any = None, force: bool = False):
+        """
+        Does a 'get' from the health page dictionary obtained from /health?format=json.
+        If the named item is not present, the default value (default None) is returned.
+        The health page is kept cached.
+        """
+        if force or not self._health_json:
+            if force and self._health_json:
+                logger.warning("health json being reloaded because of force=True")
+            self._health_json_url = self._health_json_url or f"{self.url}/health?format=json"
+            logger.warning(f"health json url: {self._health_json_url}")
+            self._health_json = EnvManager.fetch_health_page_json(url=self._health_json_url)
+            # logger.warning(f"health json: {self._health_json}")
+        return self._health_json.get(health_page_key, default)
 
     ACCESS_KEYS_S3_KEY = 'access_key_admin'
 

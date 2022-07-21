@@ -54,6 +54,28 @@ PRINT = _PRINT()
 PRINT.__name__ = 'PRINT'
 
 
+def print_error_message(exception, full=False):
+    """
+    Prints an error message (using dcicutils.misc_utils.PRINT) in the conventional way, as:
+      <error-type>: <error-message>
+    With full=True, the error-type can be made to use dcicutils.misc_utils.full_class_name to get a module name, so:
+      <module-qualified-error-type>: <error-message>
+    """
+    PRINT(get_error_message(exception, full=full))
+
+
+def get_error_message(exception, full=False):
+    """
+    Returns an error message (using dcicutils.misc_utils.PRINT) formatted in the conventional way, as:
+      "<error-type>: <error-message>"
+    With full=True, the error-type can be made to use dcicutils.misc_utils.full_class_name to get a module name, so:
+      "<module-qualified-error-type>: <error-message>"
+    """
+    exception_type_name = full_class_name(exception) if full else exception.__class__.__name__
+    error_message = f"{exception_type_name}: {exception}"
+    return error_message
+
+
 absolute_uri_validator = (
     rfc3986.validators.Validator()
     # Validation qualifiers
@@ -1506,7 +1528,7 @@ def json_leaf_subst(exp, substitutions):
     return exp
 
 
-class SingletonManager():
+class SingletonManager:
 
     def __init__(self, singleton_class, *singleton_args, **singleton_kwargs):
         self._singleton = None

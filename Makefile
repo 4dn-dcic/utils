@@ -7,8 +7,9 @@ configure:  # does any pre-requisite installs
 	pip install poetry
 
 lint:
-	flake8 dcicutils
-	flake8 test
+	@echo "Running flake8..."
+	@flake8 dcicutils || echo "'flake8 dcicutils' failed."
+	@flake8 test || echo "'flake8 test' failed."
 
 build:  # builds
 	make configure

@@ -1,16 +1,20 @@
 import boto3
+
+from .common import REGION as COMMON_REGION
 from .misc_utils import PRINT
-from .ecr_utils import CGAP_ECR_REGION as CGAP_ECS_REGION
 
 
 class ECSUtils:
     """ Utility class for interacting with ECS - mostly stubs at this point, but will likely
         expand a lot.
     """
+    DEPLOYMENT_COMPLETED = 'COMPLETED'
 
-    def __init__(self):
+    REGION = COMMON_REGION  # this default must match what ecr_utils.ECRUtils and secrets_utils.assume_identity use
+
+    def __init__(self, region=None):
         """ Creates a boto3 client for 'ecs'. """
-        self.client = boto3.client('ecs', region_name=CGAP_ECS_REGION)  # same as ECR
+        self.client = boto3.client('ecs', region_name=region or self.REGION)
 
     def list_ecs_clusters(self):
         """ Returns a list of ECS clusters ARNs. """
@@ -70,3 +74,12 @@ class ECSUtils:
                 }
             }
         )
+
+    def service_has_active_deployment(self, *, cluster_name: str, services: list) -> bool:
+        """ Checks if the given cluster/service has an active deployment running """
+        service_meta = self.client.describe_services(cluster=cluster_name, services=services)
+        for service in service_meta.get('services', []):
+            for deployment in service.get('deployments', []):
+                if deployment['rolloutState'] != self.DEPLOYMENT_COMPLETED:
+                    return True
+        return False

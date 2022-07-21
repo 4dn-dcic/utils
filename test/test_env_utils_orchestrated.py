@@ -4,7 +4,7 @@ import json
 import os
 import pytest
 
-from dcicutils.common import APP_CGAP, APP_FOURFRONT
+from dcicutils.common import APP_CGAP, APP_FOURFRONT  # , LEGACY_GLOBAL_ENV_BUCKET
 from dcicutils.env_manager import EnvManager
 from dcicutils.env_utils import (
     is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env,
@@ -29,7 +29,7 @@ from dcicutils.qa_utils import raises_regexp
 from typing import Optional
 from unittest import mock
 from urllib.parse import urlparse
-from .helpers import using_fresh_cgap_state, using_fresh_ff_state
+from .helpers import using_fresh_cgap_state_for_testing, using_fresh_ff_state_for_testing
 
 
 ignorable(BeanstalkOperationNotImplemented)  # Stuff that does or doesn't use this might come and go
@@ -222,31 +222,31 @@ def test_orchestrated_prod_bucket_env_for_app():
 @using_orchestrated_behavior()
 def test_orchestrated_infer_foursight_url_from_env():
 
-    assert (infer_foursight_url_from_env('ignored-request', 'demo')
+    assert (infer_foursight_url_from_env(request='ignored-request', envname='demo')
             == 'https://foursight.genetics.example.com/api/view/demo')
-    assert (infer_foursight_url_from_env('ignored-request', 'acme-foo')
+    assert (infer_foursight_url_from_env(request='ignored-request', envname='acme-foo')
             == 'https://foursight.genetics.example.com/api/view/foo')
-    assert (infer_foursight_url_from_env('ignored-request', 'fourfront-cgapwolf')
+    assert (infer_foursight_url_from_env(request='ignored-request', envname='fourfront-cgapwolf')
             == 'https://foursight.genetics.example.com/api/view/fourfront-cgapwolf')
 
     with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
-        assert (infer_foursight_url_from_env('ignored-request', 'data')
+        assert (infer_foursight_url_from_env(request='ignored-request', envname='data')
                 == 'https://foursight.4dnucleome.org/api/view/data')
-        assert (infer_foursight_url_from_env('ignored-request', 'acme-foo')
+        assert (infer_foursight_url_from_env(request='ignored-request', envname='acme-foo')
                 == 'https://foursight.4dnucleome.org/api/view/acme-foo')
-        assert (infer_foursight_url_from_env('ignored-request', 'fourfront-cgapwolf')
+        assert (infer_foursight_url_from_env(request='ignored-request', envname='fourfront-cgapwolf')
                 == 'https://foursight.4dnucleome.org/api/view/cgapwolf')
 
     with local_attrs(EnvUtils, **CGAP_SETTINGS_FOR_TESTING):
-        assert (infer_foursight_url_from_env('ignored-request', 'data')
+        assert (infer_foursight_url_from_env(request='ignored-request', envname='data')
                 == 'https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/data')
-        assert (infer_foursight_url_from_env('ignored-request', 'acme-foo')
+        assert (infer_foursight_url_from_env(request='ignored-request', envname='acme-foo')
                 == 'https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/acme-foo')
-        assert (infer_foursight_url_from_env('ignored-request', 'fourfront-cgapwolf')
+        assert (infer_foursight_url_from_env(request='ignored-request', envname='fourfront-cgapwolf')
                 == 'https://u9feld4va7.execute-api.us-east-1.amazonaws.com/api/view/cgapwolf')
 
 
-@using_fresh_ff_state()
+@using_fresh_ff_state_for_testing()
 def test_ff_default_workflow_env():
 
     assert (default_workflow_env('fourfront')
@@ -260,7 +260,7 @@ def test_ff_default_workflow_env():
         default_workflow_env(APP_CGAP)  # noQA - we expect this error
 
 
-@using_fresh_cgap_state()
+@using_fresh_cgap_state_for_testing()
 def test_cgap_default_workflow_env():
 
     assert (default_workflow_env('cgap')
@@ -493,609 +493,29 @@ def test_orchestrated_public_url_for_app():
 @using_orchestrated_behavior()
 def test_orchestrated_is_cgap_server_for_cgap():
 
-    assert is_cgap_server("localhost") is False
-    assert is_cgap_server("localhost", allow_localhost=True) is True
-
-    assert is_cgap_server("http://localhost") is False
-    assert is_cgap_server("http://localhost", allow_localhost=True) is True
-
-    assert is_cgap_server("https://localhost") is False
-    assert is_cgap_server("https://localhost", allow_localhost=True) is True
-
-    assert is_cgap_server("127.0.0.1") is False
-    assert is_cgap_server("127.0.0.1", allow_localhost=True) is True
-
-    assert is_cgap_server("http://127.0.0.1") is False
-    assert is_cgap_server("http://127.0.0.1", allow_localhost=True) is True
-
-    assert is_cgap_server("https://127.0.0.1") is False
-    assert is_cgap_server("https://127.0.0.1", allow_localhost=True) is True
-
-    assert is_cgap_server("cgap.genetics.example.com") is True
-
-    assert is_cgap_server("http://cgap.genetics.example.com") is True
-    assert is_cgap_server("http://cgap.genetics.example.com/") is True
-    assert is_cgap_server("http://cgap.genetics.example.com/me") is True
-
-    assert is_cgap_server("https://cgap.genetics.example.com") is True
-    assert is_cgap_server("https://cgap.genetics.example.com/") is True
-    assert is_cgap_server("https://cgap.genetics.example.com/me") is True
-
-    assert is_cgap_server("example.com") is False
-    assert is_cgap_server("https://example.com") is False
-
-    with pytest.raises(ValueError):
-        is_cgap_server(None)
-
-    assert is_cgap_server("data.4dnucleome.org") is False             # Fourfront needs a separate orchestration
-    assert is_cgap_server("http://data.4dnucleome.org") is False      # ditto
-    assert is_cgap_server("https://data.4dnucleome.org") is False     # ditto
-
-    assert is_cgap_server("https://staging.4dnucleome.org") is False  # ditto
-    assert is_cgap_server("https://staging.4dnucleome.org") is False  # ditto
-    assert is_cgap_server("https://staging.4dnucleome.org") is False  # ditto
-
-    assert is_cgap_server("cgap.hms.harvard.edu") is False
-
-    assert EnvUtils.DEV_ENV_DOMAIN_SUFFIX == ".abc123def456ghi789.us-east-1.rds.amazonaws.com"
-
-    # An environment plus the suffix we require is the easy case here.
-    assert is_cgap_server("acme-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is True
-
-    # Extra middle components are allowed as we've presently implemented it.
-    assert is_cgap_server("acme-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is True
-
-    # Not all of the suffix is present here, so this will fail.
-    assert is_cgap_server("acme-foo.us-east-1.rds.amazonaws.com") is False
-
-    # Of course a just-plain-wrong suffix will fail.
-    assert is_cgap_server("acme-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False  # wrong suffix
-
-    # We're requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-    assert is_cgap_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_cgap_server("acme-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_cgap_server("acme-foo.us-west-1.rds.amazonaws.com") is False
-    assert is_cgap_server("acme-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-    # Matching on an environment name requires the prefix (here we've declared "acme-")
-
-    assert is_cgap_server("blah-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-    assert is_cgap_server("blah-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-    assert is_cgap_server("blah-foo.us-east-1.rds.amazonaws.com") is False
-    assert is_cgap_server("blah-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-    # Also, we're again requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-    assert is_cgap_server("blah-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_cgap_server("blah-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_cgap_server("blah-foo.us-west-1.rds.amazonaws.com") is False
-    assert is_cgap_server("blah-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-    with local_attrs(EnvUtils, DEV_ENV_DOMAIN_SUFFIX=".us-east-1.rds.amazonaws.com"):
-
-        assert is_cgap_server("acme-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is True
-        assert is_cgap_server("acme-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is True
-        assert is_cgap_server("acme-foo.us-east-1.rds.amazonaws.com") is True
-        assert is_cgap_server("acme-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is True
-
-        # We're requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-        assert is_cgap_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.us-west-1.rds.amazonaws.com") is False
-
-        # Matching on an environment name requires the prefix (here we've declared "acme-")
-
-        assert is_cgap_server("blah-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-        # Also, we're again requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-        assert is_cgap_server("blah-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-    with local_attrs(EnvUtils, DEV_ENV_DOMAIN_SUFFIX=".rds.amazonaws.com"):
-
-        assert is_cgap_server("acme-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is True
-        assert is_cgap_server("acme-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is True
-        assert is_cgap_server("acme-foo.us-east-1.rds.amazonaws.com") is True
-        assert is_cgap_server("acme-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is True
-
-        # We're only requiring .rds.amazon.com, so even .us-west-1... will match.
-
-        assert is_cgap_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is True
-        assert is_cgap_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is True
-        assert is_cgap_server("acme-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is True
-        assert is_cgap_server("acme-foo.us-west-1.rds.amazonaws.com") is True
-
-        # Matching on an environment name requires the prefix (here we've declared "acme-")
-
-        assert is_cgap_server("blah-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-        # Also, we're again requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-        assert is_cgap_server("blah-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-        assert is_cgap_server("www.google.com") is False
-
-        # Make sure we don't recognize the non-orchestrated ones.
-        # It might seem like the cgap one should succeed, but really we're trying not to recognize "anything cgap-like"
-        # but anything in my own cgap ecosystem. These are outside.
+    assert is_cgap_server('anything') is True
+    assert is_cgap_server('anything', allow_localhost=True) is True
 
 
 @using_orchestrated_behavior(data=EnvUtils.SAMPLE_TEMPLATE_FOR_FOURFRONT_TESTING)
 def test_orchestrated_is_cgap_server_for_fourfront():
 
-    assert is_cgap_server("localhost") is False
-    assert is_cgap_server("localhost", allow_localhost=True) is False
-
-    assert is_cgap_server("http://localhost") is False
-    assert is_cgap_server("http://localhost", allow_localhost=True) is False
-
-    assert is_cgap_server("https://localhost") is False
-    assert is_cgap_server("https://localhost", allow_localhost=True) is False
-
-    assert is_cgap_server("127.0.0.1") is False
-    assert is_cgap_server("127.0.0.1", allow_localhost=True) is False
-
-    assert is_cgap_server("http://127.0.0.1") is False
-    assert is_cgap_server("http://127.0.0.1", allow_localhost=True) is False
-
-    assert is_cgap_server("https://127.0.0.1") is False
-    assert is_cgap_server("https://127.0.0.1", allow_localhost=True) is False
-
-    assert is_cgap_server("genetics.example.com") is False
-
-    assert is_cgap_server("https://genetics.example.com") is False
-
-    assert is_cgap_server("http://genetics.example.com") is False
-    assert is_cgap_server("http://genetics.example.com/") is False
-    assert is_cgap_server("http://genetics.example.com/me") is False
-
-    assert is_cgap_server("https://genetics.example.com") is False
-    assert is_cgap_server("https://genetics.example.com/") is False
-    assert is_cgap_server("https://genetics.example.com/me") is False
-
-    assert is_cgap_server("example.com") is False
-    assert is_cgap_server("https://example.com") is False
-
-    with pytest.raises(ValueError):
-        is_cgap_server(None)
-
-    assert is_cgap_server("data.4dnucleome.org") is False             # Legacy Fourfront is not the orchestrated one
-    assert is_cgap_server("http://data.4dnucleome.org") is False      # ditto
-    assert is_cgap_server("https://data.4dnucleome.org") is False     # ditto
-
-    assert is_cgap_server("https://staging.4dnucleome.org") is False  # ditto
-    assert is_cgap_server("https://staging.4dnucleome.org") is False  # ditto
-    assert is_cgap_server("https://staging.4dnucleome.org") is False  # ditto
-
-    # NOTE: This last is actually a bug, but included here for reference.
-    #       We're matching 'cgap' in part1 of the hostname, which is no worse than what used to happen in legacy cgap.
-    #       But the cgap it's matching is in another domain. We don't presently enforce a domain suffix.
-    #       -kmp 24-Jul-2021
-    assert is_cgap_server("cgap.hms.harvard.edu") is False  # TODO: Fix this bug. See explanation above.
-
-    assert EnvUtils.DEV_ENV_DOMAIN_SUFFIX == ".abc123def456ghi789.us-east-1.rds.amazonaws.com"
-
-    # An environment plus the suffix we require is the easy case here.
-    assert is_cgap_server("acme-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-
-    # Extra middle components are allowed as we've presently implemented it.
-    assert is_cgap_server("acme-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-
-    # Not all of the suffix is present here, so this will fail.
-    assert is_cgap_server("acme-foo.us-east-1.rds.amazonaws.com") is False
-
-    # Of course a just-plain-wrong suffix will fail.
-    assert is_cgap_server("acme-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False  # wrong suffix
-
-    # We're requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-    assert is_cgap_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_cgap_server("acme-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_cgap_server("acme-foo.us-west-1.rds.amazonaws.com") is False
-    assert is_cgap_server("acme-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-    # Matching on an environment name requires the prefix (here we've declared "acme-")
-
-    assert is_cgap_server("blah-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-    assert is_cgap_server("blah-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-    assert is_cgap_server("blah-foo.us-east-1.rds.amazonaws.com") is False
-    assert is_cgap_server("blah-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-    # Also, we're again requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-    assert is_cgap_server("blah-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_cgap_server("blah-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_cgap_server("blah-foo.us-west-1.rds.amazonaws.com") is False
-    assert is_cgap_server("blah-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-    with local_attrs(EnvUtils, DEV_ENV_DOMAIN_SUFFIX=".us-east-1.rds.amazonaws.com"):
-
-        assert is_cgap_server("acme-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-        # We're requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-        assert is_cgap_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.us-west-1.rds.amazonaws.com") is False
-
-        # Matching on an environment name requires the prefix (here we've declared "acme-")
-
-        assert is_cgap_server("blah-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-        # Also, we're again requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-        assert is_cgap_server("blah-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-    with local_attrs(EnvUtils, DEV_ENV_DOMAIN_SUFFIX=".rds.amazonaws.com"):
-
-        assert is_cgap_server("acme-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-        # We're only requiring .rds.amazon.com, so even .us-west-1... will match.
-
-        assert is_cgap_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("acme-foo.us-west-1.rds.amazonaws.com") is False
-
-        # Matching on an environment name requires the prefix (here we've declared "acme-")
-
-        assert is_cgap_server("blah-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.us-east-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-        # Also, we're again requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-        assert is_cgap_server("blah-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.us-west-1.rds.amazonaws.com") is False
-        assert is_cgap_server("blah-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-        assert is_cgap_server("www.google.com") is False
-
-        # Make sure we don't recognize the non-orchestrated ones.
-        # It might seem like the cgap one should succeed, but really we're trying not to recognize "anything cgap-like"
-        # but anything in my own cgap ecosystem. These are outside.
+    assert is_cgap_server('anything') is False
+    assert is_cgap_server('anything', allow_localhost=True) is False
 
 
 @using_orchestrated_behavior(data=EnvUtils.SAMPLE_TEMPLATE_FOR_FOURFRONT_TESTING)
 def test_orchestrated_is_fourfront_server_for_fourfront():
 
-    assert is_fourfront_server("localhost") is False
-    assert is_fourfront_server("localhost", allow_localhost=True) is True
-
-    assert is_fourfront_server("http://localhost") is False
-    assert is_fourfront_server("http://localhost", allow_localhost=True) is True
-
-    assert is_fourfront_server("https://localhost") is False
-    assert is_fourfront_server("https://localhost", allow_localhost=True) is True
-
-    assert is_fourfront_server("127.0.0.1") is False
-    assert is_fourfront_server("127.0.0.1", allow_localhost=True) is True
-
-    assert is_fourfront_server("http://127.0.0.1") is False
-    assert is_fourfront_server("http://127.0.0.1", allow_localhost=True) is True
-
-    assert is_fourfront_server("https://127.0.0.1") is False
-    assert is_fourfront_server("https://127.0.0.1", allow_localhost=True) is True
-
-    assert is_fourfront_server("genetics.example.com") is True
-
-    assert is_fourfront_server("https://genetics.example.com") is True
-
-    assert is_fourfront_server("http://genetics.example.com") is True
-    assert is_fourfront_server("http://genetics.example.com/") is True
-    assert is_fourfront_server("http://genetics.example.com/me") is True
-
-    assert is_fourfront_server("https://genetics.example.com") is True
-    assert is_fourfront_server("https://genetics.example.com/") is True
-    assert is_fourfront_server("https://genetics.example.com/me") is True
-
-    assert is_fourfront_server("example.com") is False
-    assert is_fourfront_server("https://example.com") is False
-
-    with pytest.raises(ValueError):
-        is_fourfront_server(None)
-
-    assert is_fourfront_server("data.4dnucleome.org") is False             # Fourfront needs a separate orchestration
-    assert is_fourfront_server("http://data.4dnucleome.org") is False      # ditto
-    assert is_fourfront_server("https://data.4dnucleome.org") is False     # ditto
-
-    # NOTE: These only "succeed" (returning False) because we don't have mirroring on.
-
-    assert is_fourfront_server("https://staging.4dnucleome.org") is False  # ditto
-    assert is_fourfront_server("https://staging.4dnucleome.org") is False  # ditto
-    assert is_fourfront_server("https://staging.4dnucleome.org") is False  # ditto
-
-    with local_attrs(EnvUtils, STG_ENV_NAME='acme-stg'):
-
-        assert is_fourfront_server("https://staging.4dnucleome.org") is False  # ditto
-        assert is_fourfront_server("https://staging.4dnucleome.org") is False  # ditto
-        assert is_fourfront_server("https://staging.4dnucleome.org") is False  # ditto
-
-        with stage_mirroring(enabled=True):
-
-            assert is_fourfront_server("https://staging.4dnucleome.org") is False
-            assert is_fourfront_server("https://staging.4dnucleome.org") is False
-            assert is_fourfront_server("https://staging.4dnucleome.org") is False
-
-    assert is_fourfront_server("cgap.hms.harvard.edu") is False
-
-    assert EnvUtils.DEV_ENV_DOMAIN_SUFFIX == ".abc123def456ghi789.us-east-1.rds.amazonaws.com"
-
-    # An environment plus the suffix we require is the easy case here.
-    assert is_fourfront_server("acme-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is True
-
-    # Extra middle components are allowed as we've presently implemented it.
-    assert is_fourfront_server("acme-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is True
-
-    # Not all of the suffix is present here, so this will fail.
-    assert is_fourfront_server("acme-foo.us-east-1.rds.amazonaws.com") is False
-
-    # Of course a just-plain-wrong suffix will fail.
-    assert is_fourfront_server("acme-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False  # wrong suffix
-
-    # We're requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-    assert is_fourfront_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("acme-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("acme-foo.us-west-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("acme-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-    # Matching on an environment name requires the prefix (here we've declared "acme-")
-
-    assert is_fourfront_server("blah-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("blah-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("blah-foo.us-east-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("blah-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-    # Also, we're again requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-    assert is_fourfront_server("blah-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("blah-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("blah-foo.us-west-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("blah-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-    with local_attrs(EnvUtils, DEV_ENV_DOMAIN_SUFFIX=".us-east-1.rds.amazonaws.com"):
-
-        assert is_fourfront_server("acme-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is True
-        assert is_fourfront_server("acme-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is True
-        assert is_fourfront_server("acme-foo.us-east-1.rds.amazonaws.com") is True
-        assert is_fourfront_server("acme-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is True
-
-        # We're requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-        assert is_fourfront_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.us-west-1.rds.amazonaws.com") is False
-
-        # Matching on an environment name requires the prefix (here we've declared "acme-")
-
-        assert is_fourfront_server("blah-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-        # Also, we're again requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-        assert is_fourfront_server("blah-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-    with local_attrs(EnvUtils, DEV_ENV_DOMAIN_SUFFIX=".rds.amazonaws.com"):
-
-        assert is_fourfront_server("acme-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is True
-        assert is_fourfront_server("acme-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is True
-        assert is_fourfront_server("acme-foo.us-east-1.rds.amazonaws.com") is True
-        assert is_fourfront_server("acme-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is True
-
-        # We're only requiring .rds.amazon.com, so even .us-west-1... will match.
-
-        assert is_fourfront_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is True
-        assert is_fourfront_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is True
-        assert is_fourfront_server("acme-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is True
-        assert is_fourfront_server("acme-foo.us-west-1.rds.amazonaws.com") is True
-
-        # Matching on an environment name requires the prefix (here we've declared "acme-")
-
-        assert is_fourfront_server("blah-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-        # Also, we're again requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-        assert is_fourfront_server("blah-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-        assert is_fourfront_server("www.google.com") is False
-
-        # Make sure we don't recognize the non-orchestrated ones.
-        # It might seem like the cgap one should succeed, but really we're trying not to recognize "anything cgap-like"
-        # but anything in my own cgap ecosystem. These are outside.
+    assert is_fourfront_server('anything') is True
+    assert is_fourfront_server('anything', allow_localhost=True) is True
 
 
 @using_orchestrated_behavior()
 def test_orchestrated_is_fourfront_server_for_cgap():
 
-    assert is_fourfront_server("localhost") is False
-    assert is_fourfront_server("localhost", allow_localhost=True) is False
-
-    assert is_fourfront_server("http://localhost") is False
-    assert is_fourfront_server("http://localhost", allow_localhost=True) is False
-
-    assert is_fourfront_server("https://localhost") is False
-    assert is_fourfront_server("https://localhost", allow_localhost=True) is False
-
-    assert is_fourfront_server("127.0.0.1") is False
-    assert is_fourfront_server("127.0.0.1", allow_localhost=True) is False
-
-    assert is_fourfront_server("http://127.0.0.1") is False
-    assert is_fourfront_server("http://127.0.0.1", allow_localhost=True) is False
-
-    assert is_fourfront_server("https://127.0.0.1") is False
-    assert is_fourfront_server("https://127.0.0.1", allow_localhost=True) is False
-
-    assert is_fourfront_server("genetics.example.com") is False
-
-    assert is_fourfront_server("https://genetics.example.com") is False
-
-    assert is_fourfront_server("http://genetics.example.com") is False
-    assert is_fourfront_server("http://genetics.example.com/") is False
-    assert is_fourfront_server("http://genetics.example.com/me") is False
-
-    assert is_fourfront_server("https://genetics.example.com") is False
-    assert is_fourfront_server("https://genetics.example.com/") is False
-    assert is_fourfront_server("https://genetics.example.com/me") is False
-
-    assert is_fourfront_server("example.com") is False
-    assert is_fourfront_server("https://example.com") is False
-
-    with pytest.raises(ValueError):
-        is_fourfront_server(None)
-
-    assert is_fourfront_server("data.4dnucleome.org") is False             # Fourfront needs a separate orchestration
-    assert is_fourfront_server("http://data.4dnucleome.org") is False      # ditto
-    assert is_fourfront_server("https://data.4dnucleome.org") is False     # ditto
-
-    assert is_fourfront_server("https://staging.4dnucleome.org") is False  # ditto
-    assert is_fourfront_server("https://staging.4dnucleome.org") is False  # ditto
-    assert is_fourfront_server("https://staging.4dnucleome.org") is False  # ditto
-
-    # NOTE: This last is actually a bug, but included here for reference.
-    #       We're matching 'cgap' in part1 of the hostname, which is no worse than what used to happen in legacy cgap.
-    #       But the cgap it's matching is in another domain. We don't presently enforce a domain suffix.
-    #       -kmp 24-Jul-2021
-    assert is_fourfront_server("cgap.hms.harvard.edu") is False  # TODO: Fix this bug. See explanation above.
-
-    assert EnvUtils.DEV_ENV_DOMAIN_SUFFIX == ".abc123def456ghi789.us-east-1.rds.amazonaws.com"
-
-    # An environment plus the suffix we require is the easy case here.
-    assert is_fourfront_server("acme-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-
-    # Extra middle components are allowed as we've presently implemented it.
-    assert is_fourfront_server("acme-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-
-    # Not all of the suffix is present here, so this will fail.
-    assert is_fourfront_server("acme-foo.us-east-1.rds.amazonaws.com") is False
-
-    # Of course a just-plain-wrong suffix will fail.
-    assert is_fourfront_server("acme-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False  # wrong suffix
-
-    # We're requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-    assert is_fourfront_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("acme-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("acme-foo.us-west-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("acme-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-    # Matching on an environment name requires the prefix (here we've declared "acme-")
-
-    assert is_fourfront_server("blah-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("blah-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("blah-foo.us-east-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("blah-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-    # Also, we're again requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-    assert is_fourfront_server("blah-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("blah-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("blah-foo.us-west-1.rds.amazonaws.com") is False
-    assert is_fourfront_server("blah-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-    with local_attrs(EnvUtils, DEV_ENV_DOMAIN_SUFFIX=".us-east-1.rds.amazonaws.com"):
-
-        assert is_fourfront_server("acme-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-        # We're requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-        assert is_fourfront_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.us-west-1.rds.amazonaws.com") is False
-
-        # Matching on an environment name requires the prefix (here we've declared "acme-")
-
-        assert is_fourfront_server("blah-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-        # Also, we're again requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-        assert is_fourfront_server("blah-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-    with local_attrs(EnvUtils, DEV_ENV_DOMAIN_SUFFIX=".rds.amazonaws.com"):
-
-        assert is_fourfront_server("acme-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-        # We're only requiring .rds.amazon.com, so even .us-west-1... will match.
-
-        assert is_fourfront_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("acme-foo.us-west-1.rds.amazonaws.com") is False
-
-        # Matching on an environment name requires the prefix (here we've declared "acme-")
-
-        assert is_fourfront_server("blah-foo.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.something.abc123def456ghi789.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.us-east-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.xxx123xxx456xxx789.us-east-1.rds.amazonaws.com") is False
-
-        # Also, we're again requiring .us-east-1..., and these are .us-west-1..., so they will all fail.
-
-        assert is_fourfront_server("blah-foo.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.something.abc123def456ghi789.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.us-west-1.rds.amazonaws.com") is False
-        assert is_fourfront_server("blah-foo.xxx123xxx456xxx789.us-west-1.rds.amazonaws.com") is False
-
-        assert is_fourfront_server("www.google.com") is False
-
-        # Make sure we don't recognize the non-orchestrated ones.
-        # It might seem like the cgap one should succeed, but really we're trying not to recognize "anything cgap-like"
-        # but anything in my own cgap ecosystem. These are outside.
+    assert is_fourfront_server('anything') is False
+    assert is_fourfront_server('anything', allow_localhost=True) is False
 
 
 @using_orchestrated_behavior()
@@ -1626,74 +1046,88 @@ def test_orchestrated_infer_foursight_from_env():
     def mock_request(domain):  # build a dummy request with the 'domain' member, checked in the method
         return MockedRequest(domain)
 
-    assert infer_foursight_from_env(mock_request('acme-prd' + dev_suffix), 'acme-prd') == 'cgap'
-    assert infer_foursight_from_env(mock_request('acme-mastertest' + dev_suffix), 'acme-mastertest') == 'mastertest'
-    assert infer_foursight_from_env(mock_request('acme-webdev' + dev_suffix), 'acme-webdev') == 'webdev'
-    assert infer_foursight_from_env(mock_request('acme-hotseat' + dev_suffix), 'acme-hotseat') == 'hotseat'
+    assert infer_foursight_from_env(request=mock_request('acme-prd' + dev_suffix),
+                                    envname='acme-prd') == 'cgap'
+    assert infer_foursight_from_env(request=mock_request('acme-mastertest' + dev_suffix),
+                                    envname='acme-mastertest') == 'mastertest'
+    assert infer_foursight_from_env(request=mock_request('acme-webdev' + dev_suffix),
+                                    envname='acme-webdev') == 'webdev'
+    assert infer_foursight_from_env(request=mock_request('acme-hotseat' + dev_suffix),
+                                    envname='acme-hotseat') == 'hotseat'
 
     with stage_mirroring(enabled=True):
 
-        with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):
+        with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):  # PRD = Blue, STG = Green
 
             # (active) fourfront testing environments
-            assert infer_foursight_from_env(mock_request('fourfront-mastertest' + dev_suffix),
-                                            'fourfront-mastertest') == 'mastertest'
-            assert infer_foursight_from_env(mock_request('fourfront-webdev' + dev_suffix),
-                                            'fourfront-webdev') == 'webdev'
-            assert infer_foursight_from_env(mock_request('fourfront-hotseat' + dev_suffix),
-                                            'fourfront-hotseat') == 'hotseat'
+            assert infer_foursight_from_env(request=mock_request('fourfront-mastertest' + dev_suffix),
+                                            envname='fourfront-mastertest') == 'mastertest'
+            assert infer_foursight_from_env(request=mock_request('fourfront-webdev' + dev_suffix),
+                                            envname='fourfront-webdev') == 'webdev'
+            assert infer_foursight_from_env(request=mock_request('fourfront-hotseat' + dev_suffix),
+                                            envname='fourfront-hotseat') == 'hotseat'
 
             # (active) fourfront production environments
-            assert (infer_foursight_from_env(mock_request(domain='data.4dnucleome.org'), 'fourfront-blue')
+            assert (infer_foursight_from_env(request=mock_request(domain='data.4dnucleome.org'),
+                                             envname='fourfront-blue')
                     == 'data')
-            assert (infer_foursight_from_env(mock_request(domain='data.4dnucleome.org'), 'fourfront-green')
-                    == 'data')
-            assert (infer_foursight_from_env(mock_request(domain='staging.4dnucleome.org'), 'fourfront-blue')
-                    == 'staging')
-            assert (infer_foursight_from_env(mock_request(domain='staging.4dnucleome.org'), 'fourfront-green')
+            assert (infer_foursight_from_env(request=mock_request(domain='data.4dnucleome.org'),
+                                             envname='fourfront-green')
+                    == 'staging')  # Inconsistent args. The envname is used in preference to the request
+            assert (infer_foursight_from_env(request=mock_request(domain='staging.4dnucleome.org'),
+                                             envname='fourfront-blue')
+                    == 'data')  # Inconsistent args. The envname is used in preference to the request
+            assert (infer_foursight_from_env(request=mock_request(domain='staging.4dnucleome.org'),
+                                             envname='fourfront-green')
                     == 'staging')
 
             # These next four are pathological and hopefully not used, but they illustrate that the domain dominates.
             # This does not illustrate intended use.
-            assert (infer_foursight_from_env(mock_request(domain='data.4dnucleome.org'), 'data')
+            assert (infer_foursight_from_env(request=mock_request(domain='data.4dnucleome.org'), envname='data')
                     == 'data')
-            assert (infer_foursight_from_env(mock_request(domain='data.4dnucleome.org'), 'staging')
-                    == 'data')
+            assert (infer_foursight_from_env(request=mock_request(domain='data.4dnucleome.org'), envname='staging')
+                    == 'staging')  # Inconsistent args. The envname is used in preference to the request
 
-            assert (infer_foursight_from_env(mock_request(domain='staging.4dnucleome.org'), 'data')
+            assert (infer_foursight_from_env(request=mock_request(domain='staging.4dnucleome.org'), envname='data')
+                    == 'data')  # Inconsistent args. The envname is used in preference to the request
+            assert (infer_foursight_from_env(request=mock_request(domain='staging.4dnucleome.org'), envname='staging')
                     == 'staging')
-            assert (infer_foursight_from_env(mock_request(domain='staging.4dnucleome.org'), 'staging')
-                    == 'staging')
 
-            assert (infer_foursight_from_env('data.4dnucleome.org', 'data') == 'data')
-            assert (infer_foursight_from_env('data.4dnucleome.org', 'staging') == 'data')
+            assert (infer_foursight_from_env(request='data.4dnucleome.org', envname='data') == 'data')
+            # Inconsistent args. The envname is used in preference to the request
+            assert (infer_foursight_from_env(request='data.4dnucleome.org', envname='staging') == 'staging')
 
-            assert (infer_foursight_from_env('https://data.4dnucleome.org', 'data') == 'data')
-            assert (infer_foursight_from_env('https://data.4dnucleome.org', 'staging') == 'data')
+            assert (infer_foursight_from_env(request='https://data.4dnucleome.org', envname='data') == 'data')
+            # Inconsistent args. The envname is used in preference to the request
+            assert (infer_foursight_from_env(request='https://data.4dnucleome.org', envname='staging') == 'staging')
 
-            assert (infer_foursight_from_env('staging.4dnucleome.org', 'data') == 'staging')
-            assert (infer_foursight_from_env('staging.4dnucleome.org', 'staging') == 'staging')
+            # Inconsistent args. The envname is used in preference to the request
+            assert (infer_foursight_from_env(request='staging.4dnucleome.org', envname='data') == 'data')
+            assert (infer_foursight_from_env(request='staging.4dnucleome.org', envname='staging') == 'staging')
 
-            assert (infer_foursight_from_env('http://staging.4dnucleome.org', 'data') == 'staging')
-            assert (infer_foursight_from_env('http://staging.4dnucleome.org', 'staging') == 'staging')
+            # Inconsistent args. The envname is used in preference to the request
+            assert (infer_foursight_from_env(request='http://staging.4dnucleome.org', envname='data') == 'data')
+            assert (infer_foursight_from_env(request='http://staging.4dnucleome.org', envname='staging') == 'staging')
 
-            assert (infer_foursight_from_env(None, 'data') == 'data')
-            assert (infer_foursight_from_env(None, 'staging') == 'staging')
+            assert (infer_foursight_from_env(request=None, envname='data') == 'data')
+            assert (infer_foursight_from_env(request=None, envname='staging') == 'staging')
 
         # (active) cgap environments
         with local_attrs(EnvUtils, **CGAP_SETTINGS_FOR_TESTING):
 
-            assert infer_foursight_from_env(mock_request('fourfront-cgapdev' + dev_suffix),
-                                            'fourfront-cgapdev') == 'cgapdev'
-            assert infer_foursight_from_env(mock_request('fourfront-cgaptest' + dev_suffix),
-                                            'fourfront-cgaptest') == 'cgaptest'
-            assert infer_foursight_from_env(mock_request('fourfront-cgapwolf' + dev_suffix),
-                                            'fourfront-cgapwolf') == 'cgapwolf'
-            assert infer_foursight_from_env(mock_request('fourfront-cgap' + dev_suffix),
-                                            'fourfront-cgap') == 'cgap'
+            assert infer_foursight_from_env(request=mock_request('fourfront-cgapdev' + dev_suffix),
+                                            envname='fourfront-cgapdev') == 'cgapdev'
+            assert infer_foursight_from_env(request=mock_request('fourfront-cgaptest' + dev_suffix),
+                                            envname='fourfront-cgaptest') == 'cgaptest'
+            assert infer_foursight_from_env(request=mock_request('fourfront-cgapwolf' + dev_suffix),
+                                            envname='fourfront-cgapwolf') == 'cgapwolf'
+            assert infer_foursight_from_env(request=mock_request('fourfront-cgap' + dev_suffix),
+                                            envname='fourfront-cgap') == 'cgap'
 
-            assert infer_foursight_from_env(mock_request('cgap.hms.harvard.edu'), 'fourfront-cgap') == 'cgap'
-            assert infer_foursight_from_env(mock_request('cgap.hms.harvard.edu'), 'cgap') == 'cgap'
+            assert infer_foursight_from_env(request=mock_request('cgap.hms.harvard.edu'),
+                                            envname='fourfront-cgap') == 'cgap'
+            assert infer_foursight_from_env(request=mock_request('cgap.hms.harvard.edu'),
+                                            envname='cgap') == 'cgap'
 
 
 @pytest.mark.skip
@@ -1755,7 +1189,7 @@ def test_orchestrated_is_indexer_env_disabled():
 def test_orchestrated_short_env_name():
 
     assert short_env_name(None) is None
-    assert short_env_name('demo') == 'demo'
+    assert short_env_name('demo') == 'pubdemo'
     assert short_env_name('anything') == 'anything'
     assert short_env_name('acme-anything') == 'anything'
     assert short_env_name('cgap-anything') == 'cgap-anything'
@@ -2106,8 +1540,8 @@ def test_get_foursight_bucket():
             assert infer_foursight_from_env(envname='acme-foo') == 'foo'
             assert infer_foursight_from_env(envname='acme-stg') == 'stg'
 
-            assert get_foursight_bucket(envname='acme-foo', stage='prod') == 'alpha-omega-prod-foo'
-            assert get_foursight_bucket(envname='acme-stg', stage='dev') == 'alpha-omega-dev-stg'
+            assert get_foursight_bucket(envname='acme-foo', stage='prod') == 'alpha-omega-prod-acme-foo'
+            assert get_foursight_bucket(envname='acme-stg', stage='dev') == 'alpha-omega-dev-acme-stg'
 
         with pytest.raises(MissingFoursightBucketTable):
             get_foursight_bucket(envname='acme-foo', stage='prod')

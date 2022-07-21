@@ -11,6 +11,7 @@ import sys
 from io import StringIO
 from unittest import mock
 
+from dcicutils import deployment_utils as deployment_utils_module
 from dcicutils.deployment_utils import (
     IniFileManager, boolean_setting, CreateMappingOnDeployManager,
     BasicOrchestratedCGAPIniFileManager, BasicLegacyCGAPIniFileManager,
@@ -18,12 +19,14 @@ from dcicutils.deployment_utils import (
     # TODO: This isn't yet tested.
     # EBDeployer,
 )
-from dcicutils.env_utils import is_cgap_env, is_hotseat_env, is_test_env, data_set_for_env, EnvUtils
+from dcicutils.env_utils import is_cgap_env, is_hotseat_env, is_test_env, data_set_for_env, EnvUtils, full_env_name
 from dcicutils.exceptions import InvalidParameterError
-from dcicutils.qa_utils import MockFileSystem, printed_output, MockedCommandArgs
-from dcicutils.misc_utils import ignored, file_contents
-from dcicutils.qa_utils import override_environ
-from .helpers import fresh_cgap_state
+from dcicutils.misc_utils import ignored, file_contents, override_environ
+from dcicutils.qa_utils import MockFileSystem, MockedCommandArgs, printed_output
+from .helpers import (
+    fresh_cgap_state_for_testing, fresh_ff_state_for_testing,  # fresh_legacy_state,
+    using_fresh_ff_state_for_testing,  # using_fresh_legacy_state, using_fresh_cgap_state,
+)
 
 
 _MY_DIR = os.path.dirname(__file__)
@@ -570,7 +573,8 @@ def test_deployment_utils_transitional_equivalence():
         # TODO: Once this mechanism is in place, the files cgap.ini, cgapdev.ini, cgaptest.ini, and cgapwolf.ini
         #       can either be removed (and these transitional tests removed) or transitioned to be test data.
 
-        def tester(ref_ini, env_name, data_set, es_server, *, any_ini=None, es_namespace=None, line_checker=None,
+        def tester(ref_ini, env_name, data_set, es_server, *,
+                   higlass_server=None, any_ini=None, es_namespace=None, line_checker=None,
                    use_ini_file_manager_kind=None, **others):
             """
             This common tester program checks that the any.ini does the same thing as a given ref ini,
@@ -756,6 +760,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="cgap.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default))
 
@@ -767,6 +772,7 @@ def test_deployment_utils_transitional_equivalence():
                         tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
                                use_ini_file_manager_kind="orchestrated-cgap",
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
                                                             expected_values={
@@ -780,6 +786,7 @@ def test_deployment_utils_transitional_equivalence():
                         tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
                                use_ini_file_manager_kind="legacy-cgap",
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
                                                             expected_values={
@@ -793,6 +800,7 @@ def test_deployment_utils_transitional_equivalence():
                         tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
                                use_ini_file_manager_kind='orchestrated-cgap',
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
                                                             expected_values={
@@ -804,6 +812,7 @@ def test_deployment_utils_transitional_equivalence():
                         tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
                                use_ini_file_manager_kind="orchestrated-cgap",
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
                                                             expected_values={
@@ -818,6 +827,7 @@ def test_deployment_utils_transitional_equivalence():
                         tester(ref_ini="cgap_alpha.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
                                use_ini_file_manager_kind='orchestrated-cgap',
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
                                                             expected_values={
@@ -832,6 +842,7 @@ def test_deployment_utils_transitional_equivalence():
                         bs_env = "cgap-alfa"
                         tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                use_ini_file_manager_kind='orchestrated-cgap',
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server=index_server_default,
@@ -877,6 +888,7 @@ def test_deployment_utils_transitional_equivalence():
                             tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", env_name=bs_env,
                                    data_set=data_set, use_ini_file_manager_kind="orchestrated-cgap",
                                    es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                                 expect_index_server=index_server_default,
                                                                 expected_values={
@@ -917,6 +929,7 @@ def test_deployment_utils_transitional_equivalence():
                             tester(ref_ini="cgap_alfa.ini", any_ini="cg_any_alpha.ini", env_name=bs_env,
                                    data_set=data_set, use_ini_file_manager_kind="orchestrated-cgap",
                                    es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                                 expect_index_server=index_server_default,
                                                                 expected_values={
@@ -936,6 +949,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="cgapdev.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-cgapdev-gnv2sgdngkjbcemdadmaoxcsae.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server=index_server_default))
 
@@ -943,6 +957,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="cgaptest.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-cgaptest-dxiczz2zv7f3nshshvevcvmpmy.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server=index_server_default))
 
@@ -952,6 +967,7 @@ def test_deployment_utils_transitional_equivalence():
                                # This ini file will have 'app_kind = ccgap' rather than 'app_kind = unknown'.
                                use_ini_file_manager_kind='legacy-cgap',
                                es_server="search-fourfront-cgapwolf-r5kkbokabymtguuwjzspt2kiqa.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server=index_server_default))
 
@@ -962,6 +978,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="blue.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=FFProdChecker(expect_indexer=index_default,
                                                           expect_index_server=index_server_default))
 
@@ -969,6 +986,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="green.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-green-cghpezl64x4uma3etijfknh7ja.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=FFProdChecker(expect_indexer=index_default,
                                                           expect_index_server=index_server_default))
 
@@ -976,6 +994,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="hotseat.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-hotseat-f3oxd2wjxw3h2wsxxbcmzhhd4i.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server=index_server_default))
 
@@ -983,6 +1002,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="mastertest.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-mastertest-wusehbixktyxtbagz5wzefffp4.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server=index_server_default))
 
@@ -990,6 +1010,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="webdev.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server=index_server_default))
 
@@ -997,6 +1018,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="webprod.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-webprod-hmrrlalm4ifyhl4bzbvl73hwv4.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=FFProdChecker(expect_indexer=index_default,
                                                           expect_index_server=index_server_default))
 
@@ -1004,6 +1026,7 @@ def test_deployment_utils_transitional_equivalence():
                         data_set = data_set_for_env(bs_env)
                         tester(ref_ini="webprod2.ini", env_name=bs_env, data_set=data_set,
                                es_server="search-fourfront-webprod2-fkav4x4wjvhgejtcg6ilrmczpe.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=FFProdChecker(expect_indexer=index_default,
                                                           expect_index_server=index_server_default))
 
@@ -1011,16 +1034,19 @@ def test_deployment_utils_transitional_equivalence():
 
                             tester(ref_ini="cgap.ini", env_name="fourfront-cgap", data_set="prod",
                                    es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=CGAPProdChecker(expect_indexer=None,
                                                                 expect_index_server="true"))
 
                             tester(ref_ini="blue.ini", env_name="fourfront-blue", data_set="prod",
                                    es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=FFProdChecker(expect_indexer=None,
                                                               expect_index_server="true"))
 
                             tester(ref_ini="webdev.ini", env_name="fourfront-webdev", data_set="prod",
                                    es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=Checker(expect_indexer=None,
                                                         expect_index_server="true"))
 
@@ -1038,16 +1064,19 @@ def test_deployment_utils_transitional_equivalence():
 
                         tester(ref_ini="cgap.ini", env_name="fourfront-cgap", data_set="prod",
                                es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                             expect_index_server="true"))
 
                         tester(ref_ini="blue.ini", env_name="fourfront-blue", data_set="prod",
                                es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=FFProdChecker(expect_indexer=index_default,
                                                           expect_index_server="true"))
 
                         tester(ref_ini="webdev.ini", env_name="fourfront-webdev", data_set="prod",
                                es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                               higlass_server="http://some-higlass-server",
                                line_checker=Checker(expect_indexer=index_default,
                                                     expect_index_server="true"))
 
@@ -1059,16 +1088,19 @@ def test_deployment_utils_transitional_equivalence():
 
                             tester(ref_ini="cgap.ini", env_name="fourfront-cgap", data_set="prod",
                                    es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                                 expect_index_server=None))
 
                             tester(ref_ini="blue.ini", env_name="fourfront-blue", data_set="prod",
                                    es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=FFProdChecker(expect_indexer=index_default,
                                                               expect_index_server=None))
 
                             tester(ref_ini="webdev.ini", env_name="fourfront-webdev", data_set="prod",
                                    es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=Checker(expect_indexer=index_default,
                                                         expect_index_server=None))
 
@@ -1079,16 +1111,19 @@ def test_deployment_utils_transitional_equivalence():
 
                             tester(ref_ini="cgap.ini", env_name="fourfront-cgap", data_set="prod",
                                    es_server="search-fourfront-cgap-ewf7r7u2nq3xkgyozdhns4bkni.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=CGAPProdChecker(expect_indexer=index_default,
                                                                 expect_index_server="true"))
 
                             tester(ref_ini="blue.ini", env_name="fourfront-blue", data_set="prod",
                                    es_server="search-fourfront-blue-xkkzdrxkrunz35shbemkgrmhku.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=FFProdChecker(expect_indexer=index_default,
                                                               expect_index_server="true"))
 
                             tester(ref_ini="webdev.ini", env_name="fourfront-webdev", data_set="prod",
                                    es_server="search-fourfront-webdev-5uqlmdvvshqew46o46kcc2lxmy.%s" % us_east,
+                                   higlass_server="http://some-higlass-server",
                                    line_checker=Checker(expect_indexer=index_default,
                                                         expect_index_server="true"))
 
@@ -1147,6 +1182,7 @@ def test_deployment_utils_main():
                             'env_name': None,
                             'es_namespace': None,
                             'es_server': None,
+                            'higlass_server': None,
                             'identity': None,
                             'index_server': None,
                             'indexer': None,
@@ -1180,6 +1216,7 @@ def test_deployment_utils_main():
                             'env_name': None,
                             'es_namespace': None,
                             'es_server': None,
+                            'higlass_server': None,
                             'identity': None,
                             'index_server': 'true',
                             'indexer': 'false',
@@ -1211,6 +1248,7 @@ def test_deployment_utils_main():
                                 'env_name': None,
                                 'es_namespace': None,
                                 'es_server': None,
+                                'higlass_server': None,
                                 'identity': None,
                                 'index_server': 'true',
                                 'indexer': 'false',
@@ -1273,21 +1311,22 @@ def _get_deploy_config(*, env, args=None, log=None, allow_other_prod=False):
 @pytest.mark.integrated
 def test_get_deployment_config_cgap_stg_orchestrated():
     """ Tests get_deployment_config in a fourfront staging situation. """
-    with fresh_cgap_state():
-        my_log = MockedInfoLog()
-        cfg = _get_deploy_config(env=EnvUtils.STG_ENV_NAME, log=my_log)
-        assert cfg['ENV_NAME'] == EnvUtils.STG_ENV_NAME  # sanity
-        assert cfg['SKIP'] is False
-        assert cfg['WIPE_ES'] is True
-        assert cfg['STRICT'] is True
-        assert my_log.last_msg == (f"Environment {EnvUtils.STG_ENV_NAME} is currently the staging environment."
-                                   f" Processing mode: STRICT,WIPE_ES")
+    with fresh_cgap_state_for_testing():
+        if EnvUtils.STG_ENV_NAME is not None:
+            my_log = MockedInfoLog()
+            cfg = _get_deploy_config(env=EnvUtils.STG_ENV_NAME, log=my_log)
+            assert cfg['ENV_NAME'] == EnvUtils.STG_ENV_NAME  # sanity
+            assert cfg['SKIP'] is False
+            assert cfg['WIPE_ES'] is True
+            assert cfg['STRICT'] is True
+            assert my_log.last_msg == (f"Environment {EnvUtils.STG_ENV_NAME} is currently the staging environment."
+                                       f" Processing mode: STRICT,WIPE_ES")
 
 
 @pytest.mark.integrated
 def test_get_deployment_config_ff_stg_orchestrated():
     """ Tests get_deployment_config in a fourfront staging situation. """
-    with EnvUtils.fresh_ff_state():
+    with fresh_ff_state_for_testing():
         my_log = MockedInfoLog()
         cfg = _get_deploy_config(env=EnvUtils.STG_ENV_NAME, log=my_log)
         assert cfg['ENV_NAME'] == EnvUtils.STG_ENV_NAME  # sanity
@@ -1301,7 +1340,7 @@ def test_get_deployment_config_ff_stg_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_cgap_prd_orchestrated():
     """ Tests get_deployment_config in the new production case """
-    with fresh_cgap_state():
+    with fresh_cgap_state_for_testing():
         my_log = MockedInfoLog()
         cfg = _get_deploy_config(env=EnvUtils.PRD_ENV_NAME, log=my_log)
         assert cfg['ENV_NAME'] == EnvUtils.PRD_ENV_NAME  # sanity
@@ -1315,7 +1354,7 @@ def test_get_deployment_config_cgap_prd_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_ff_prd_orchestrated():
     """ Tests get_deployment_config in the new production case """
-    with EnvUtils.fresh_ff_state():
+    with fresh_ff_state_for_testing():
         my_log = MockedInfoLog()
         cfg = _get_deploy_config(env=EnvUtils.PRD_ENV_NAME, log=my_log)
         assert cfg['ENV_NAME'] == EnvUtils.PRD_ENV_NAME  # sanity
@@ -1329,11 +1368,11 @@ def test_get_deployment_config_ff_prd_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_cgap_uncorrelated_stg_or_prd_orchestrated():
     """ Tests get_deployment_config in the new production case """
-    with fresh_cgap_state():
+    with fresh_cgap_state_for_testing():
         # In the new world, this actually never happens because only EnvUtils.PRD_ENV_NAME and EnvUtils.STG_ENV_NAME
         # are possible stg-or-prd envs, but the control flow is there, so this tests it.
         with mock.patch('dcicutils.deployment_utils.is_stg_or_prd_env', return_value=True):
-            my_env = 'fourfront-prd-other'
+            my_env = 'cgap-prd-other'
             my_log = MockedInfoLog()
             with pytest.raises(RuntimeError):
                 _get_deploy_config(env=my_env, log=my_log)
@@ -1345,7 +1384,7 @@ def test_get_deployment_config_cgap_uncorrelated_stg_or_prd_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_ff_uncorrelated_stg_or_prd_orchestrated():
     """ Tests get_deployment_config in the new production case """
-    with EnvUtils.fresh_ff_state():
+    with fresh_ff_state_for_testing():
         # In the new world, this actually never happens because only EnvUtils.PRD_ENV_NAME and EnvUtils.STG_ENV_NAME
         # are possible stg-or-prd envs, but the control flow is there, so this tests it.
         with mock.patch('dcicutils.deployment_utils.is_stg_or_prd_env', return_value=True):
@@ -1361,7 +1400,7 @@ def test_get_deployment_config_ff_uncorrelated_stg_or_prd_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_cgap_test_envs_orchestrated():
     """ Tests get_deployment_config in the cgap-test case with an orchestrated ecosystem. """
-    with fresh_cgap_state():
+    with fresh_cgap_state_for_testing():
         for my_env in EnvUtils.TEST_ENVS:
             if not is_hotseat_env(my_env):
                 print(f"Testing {my_env}...")
@@ -1378,7 +1417,7 @@ def test_get_deployment_config_cgap_test_envs_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_ff_test_envs_orchestrated():
     """ Tests get_deployment_config in the mastertest case with an orchestrated ecosystem. """
-    with EnvUtils.fresh_ff_state():
+    with fresh_ff_state_for_testing():
         for my_env in EnvUtils.TEST_ENVS:
             if not is_hotseat_env(my_env):
                 print(f"Testing {my_env}...")
@@ -1395,7 +1434,7 @@ def test_get_deployment_config_ff_test_envs_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_cgap_hotseat_orchestrated():
     """ Tests get_deployment_config in the hotseat case with an orchestrated ecosystem. """
-    with fresh_cgap_state():
+    with fresh_cgap_state_for_testing():
         for my_env in EnvUtils.HOTSEAT_ENVS:
             print(f"Testing {my_env}...")
             my_log = MockedInfoLog()
@@ -1425,7 +1464,7 @@ def test_get_deployment_config_cgap_hotseat_orchestrated():
 @pytest.mark.integrated
 def test_get_deployment_config_ff_hotseat_orchestrated():
     """ Tests get_deployment_config in the hotseat case with an orchestrated ecosystem. """
-    with EnvUtils.fresh_ff_state():
+    with fresh_ff_state_for_testing():
         for my_env in EnvUtils.HOTSEAT_ENVS:
             print(f"Testing {my_env}...")
             my_log = MockedInfoLog()
@@ -1450,6 +1489,71 @@ def test_get_deployment_config_ff_hotseat_orchestrated():
                 assert cfg['STRICT'] is False
                 assert my_log.last_msg == (f'Environment {my_env} is an unrecognized environment.'
                                            f' Processing mode: default')
+
+
+@using_fresh_ff_state_for_testing()
+@mock.patch.object(deployment_utils_module, "compute_ff_prd_env")
+@mock.patch.object(deployment_utils_module, "compute_cgap_prd_env")
+def test_actual_env_settings(mock_compute_cgap_prd_env, mock_compute_ff_prd_env):
+    def dont_compute_cagp(*args, **kwargs):
+        ignored(args, kwargs)
+        raise AssertionError("Should not be trying to call compute_cgap_prd_env")
+    mock_compute_cgap_prd_env.side_effect = dont_compute_cagp
+    mock_compute_ff_prd_env.return_value = 'fourfront-prd'
+
+    assert EnvUtils.PRD_ENV_NAME == 'fourfront-prd'
+    assert EnvUtils.STG_ENV_NAME == 'fourfront-stg'
+
+    def describe(config):
+        return ('SKIP'
+                if config['SKIP'] else
+                ",".join((['WIPE_ES'] if config['WIPE_ES'] else []) +
+                         (['STRICT'] if config['STRICT'] else [])))
+
+    class MyCommandArgs(MockedCommandArgs):
+        VALID_ARGS = ['skip', 'wipe_es', 'strict']
+
+    def compute_and_show(kind, env, wipe_es=False):
+        info = "-------------------------"
+        try:
+            config = _get_deploy_config(env=env, args=MyCommandArgs(wipe_es=wipe_es))
+            info = describe(config).ljust(14)
+        finally:  # show even if we err
+            print(f"{info} env={env.ljust(20)} wipe_es={'Y' if wipe_es else 'N'}"
+                  f" full={full_env_name(env).ljust(20)} kind={kind}")
+        return config
+
+    print()  # Start on a fresh line
+    for wipe_es in [False, True]:
+        print(f"wipe_es={wipe_es}")
+        for kind_and_envs in [['production', ['fourfront-prd', 'prd', 'data']],
+                              ['staging', ['fourfront-stg', 'stg', 'staging']],
+                              ['hotseat', ['fourfront-hotseat', 'hotseat']],
+                              ['test', ['fourfront-mastertest', 'mastertest', 'fourfront-webdev', 'webdev']],
+                              ['other', ['fourfront-other', 'other']]]:
+            [kind, envs] = kind_and_envs
+            for env in envs:
+
+                config = compute_and_show(kind=kind, env=env, wipe_es=wipe_es)
+
+                if kind == 'production':
+                    assert config['SKIP'] is False
+                    assert config['WIPE_ES'] is False
+                    assert config['STRICT'] is True
+                elif kind == 'staging':
+                    assert config['SKIP'] is False
+                    assert config['WIPE_ES'] is True
+                    assert config['STRICT'] is True
+                elif kind == 'hotseat':
+                    assert config['SKIP'] is True
+                elif kind == 'test':
+                    assert config['SKIP'] is False
+                    assert config['WIPE_ES'] is True
+                    assert config['STRICT'] is False
+                else:  # other
+                    assert config['SKIP'] is False
+                    assert config['WIPE_ES'] is wipe_es
+                    assert config['STRICT'] is False
 
 
 def test_create_file_from_template():

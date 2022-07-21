@@ -38,10 +38,10 @@ from .common import LEGACY_GLOBAL_ENV_BUCKET, LEGACY_CGAP_GLOBAL_ENV_BUCKET, DEF
 from .env_utils import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env,
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, is_test_env, is_hotseat_env,
-    is_indexer_env, indexer_env_for_env,
+    is_indexer_env, indexer_env_for_env, full_env_name,
 )
 from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ, file_contents
-from .s3_utils import s3Utils, EnvManager
+from .env_base import EnvBase, s3Base
 
 
 # constants associated with EB-related APIs
@@ -419,6 +419,7 @@ class IniFileManager:
                                      bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
                                      s3_encrypt_key_id=None, env_bucket=None, env_ecosystem=None, env_name=None,
                                      data_set=None, es_server=None, es_namespace=None, identity=None,
+                                     higlass_server=None,
                                      indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
                                      tibanna_output_bucket=None,
                                      application_bucket_prefix=None, foursight_bucket_prefix=None,
@@ -448,6 +449,7 @@ class IniFileManager:
             es_server (str): The server name (or server:port) for the ElasticSearch server.
             es_namespace (str): The ElasticSearch namespace to use (probably but not necessarily same as env_name).
             identity (str): The AWS application configuration key that represents the current environment.
+            higlass_server (str): The server name (or server:port) for the HiGlass server.
             indexer (bool): Whether or not we are building an ini file for an indexer.
             index_server (bool): Whether or not we are building an ini file for an index server.
             sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
@@ -478,6 +480,7 @@ class IniFileManager:
                                                es_server=es_server,
                                                es_namespace=es_namespace,
                                                identity=identity,
+                                               higlass_server=higlass_server,
                                                indexer=indexer,
                                                index_server=index_server,
                                                sentry_dsn=sentry_dsn,
@@ -534,10 +537,10 @@ class IniFileManager:
 
     AUTO_INDEX_SERVER_TOKEN = "__index_server"
 
-    LEGACY_APPLICATION_BUCKET_ORG = s3Utils.EB_PREFIX                        # = "elasticbeanstalk"
+    LEGACY_APPLICATION_BUCKET_ORG = s3Base.EB_PREFIX                        # = "elasticbeanstalk"
     LEGACY_APPLICATION_BUCKET_PREFIX = LEGACY_APPLICATION_BUCKET_ORG + "-"   # = "elasticbeanstalk-"
-    LEGACY_TIBANNA_CWLS_BUCKET = s3Utils.TIBANNA_CWLS_BUCKET_TEMPLATE      # = "tibanna-cwls"
-    LEGACY_TIBANNA_OUTPUT_BUCKET = s3Utils.TIBANNA_OUTPUT_BUCKET_TEMPLATE    # = "tibanna-output"
+    LEGACY_TIBANNA_CWLS_BUCKET = s3Base.TIBANNA_CWLS_BUCKET_TEMPLATE      # = "tibanna-cwls"
+    LEGACY_TIBANNA_OUTPUT_BUCKET = s3Base.TIBANNA_OUTPUT_BUCKET_TEMPLATE    # = "tibanna-output"
     LEGACY_FOURSIGHT_BUCKET_PREFIX = "foursight-"
 
     @classmethod
@@ -545,6 +548,7 @@ class IniFileManager:
                                        bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
                                        s3_encrypt_key_id=None, env_bucket=None, env_ecosystem=None, env_name=None,
                                        data_set=None, es_server=None, es_namespace=None, identity=None,
+                                       higlass_server=None,
                                        indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
                                        tibanna_output_bucket=None,
                                        application_bucket_prefix=None, foursight_bucket_prefix=None,
@@ -571,6 +575,7 @@ class IniFileManager:
             es_server: The name of an es server to use.
             es_namespace: The namespace to use on the es server. If None, this uses the env_name.
             identity (str): The AWS application configuration key that represents the current environment.
+            higlass_server: The name of a HiGlass server to use.
             indexer: Whether or not we are building an ini file for an indexer.
             index_server: Whether or not we are building an ini file for an index server.
             sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
@@ -596,9 +601,10 @@ class IniFileManager:
                 and os.environ.get("ENCODED_BS_ENV") != os.environ.get("ENCODED_ENV_NAME")):
             raise ValueError("If both ENCODED_BS_ENV and ENCODED_ENV_NAME are supplied, they must agree.")
 
+        higlass_server = higlass_server or os.environ.get('ENCODED_HIGLASS_SERVER', "MISSING_ENCODED_HIGLASS_SERVER")
         es_server = es_server or os.environ.get('ENCODED_ES_SERVER', "MISSING_ENCODED_ES_SERVER")
         env_bucket = (env_bucket
-                      or EnvManager.global_env_bucket_name()
+                      or EnvBase.global_env_bucket_name()
                       or ("MISSING_GLOBAL_ENV_BUCKET"
                           if cls.APP_ORCHESTRATED
                           else (LEGACY_CGAP_GLOBAL_ENV_BUCKET if cls.APP_KIND == 'cgap' else LEGACY_GLOBAL_ENV_BUCKET)))
@@ -646,41 +652,41 @@ class IniFileManager:
         auth0_client = auth0_client or os.environ.get("ENCODED_AUTH0_CLIENT", "")
         auth0_secret = auth0_secret or os.environ.get("ENCODED_AUTH0_SECRET", "")
 
-        # corresponds to s3Utils legacy "elasticbeanstalk-%s-files"
+        # corresponds to s3Base/s3Utils legacy "elasticbeanstalk-%s-files"
         file_upload_bucket = (file_upload_bucket
                               or os.environ.get("ENCODED_FILE_UPLOAD_BUCKET")
-                              or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.RAW_BUCKET_SUFFIX}")
+                              or f"{application_bucket_prefix}{s3_bucket_env}-{s3Base.RAW_BUCKET_SUFFIX}")
 
-        # corresponds to s3Utils legacy "elasticbeanstalk-%s-wfoutput"
+        # corresponds to s3Base/s3Utils legacy "elasticbeanstalk-%s-wfoutput"
         file_wfout_bucket = (file_wfout_bucket
                              or os.environ.get("ENCODED_FILE_WFOUT_BUCKET")
-                             or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.OUTFILE_BUCKET_SUFFIX}")
+                             or f"{application_bucket_prefix}{s3_bucket_env}-{s3Base.OUTFILE_BUCKET_SUFFIX}")
 
-        # corresponds to s3Utils legacy "elasticbeanstalk-%s-blobs"
+        # corresponds to s3Base/s3Utils legacy "elasticbeanstalk-%s-blobs"
         blob_bucket = (blob_bucket
                        or os.environ.get("ENCODED_BLOB_BUCKET")
-                       or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.BLOB_BUCKET_SUFFIX}")
+                       or f"{application_bucket_prefix}{s3_bucket_env}-{s3Base.BLOB_BUCKET_SUFFIX}")
 
-        # corresponds to s3Utils legacy "elasticbeanstalk-%s-system"
+        # corresponds to s3Base/s3Utils legacy "elasticbeanstalk-%s-system"
         system_bucket = (system_bucket
                          or os.environ.get("ENCODED_SYSTEM_BUCKET")
-                         or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.SYS_BUCKET_SUFFIX}")
+                         or f"{application_bucket_prefix}{s3_bucket_env}-{s3Base.SYS_BUCKET_SUFFIX}")
 
-        # corresponds to s3Utils legacy "elasticbeanstalk-%s-metadata-bundles"
+        # corresponds to s3Base/s3Utils legacy "elasticbeanstalk-%s-metadata-bundles"
         metadata_bundles_bucket = (metadata_bundles_bucket
                                    or os.environ.get("ENCODED_METADATA_BUNDLES_BUCKET")
-                                   or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.METADATA_BUCKET_SUFFIX}")
+                                   or f"{application_bucket_prefix}{s3_bucket_env}-{s3Base.METADATA_BUCKET_SUFFIX}")
 
-        # corresponds to s3Utils legacy "tibanna-cwls" (no prefix)
+        # corresponds to s3Base/s3Utils legacy "tibanna-cwls" (no prefix)
         tibanna_cwls_bucket = (tibanna_cwls_bucket
                                or os.environ.get("ENCODED_TIBANNA_CWLS_BUCKET")
-                               or (f"{application_bucket_prefix}{s3Utils.TIBANNA_CWLS_BUCKET_SUFFIX}"
+                               or (f"{application_bucket_prefix}{s3Base.TIBANNA_CWLS_BUCKET_SUFFIX}"
                                    if cls.APP_ORCHESTRATED
                                    else cls.LEGACY_TIBANNA_CWLS_BUCKET))
-        # corresponds to s3Utils legacy "tibanna-output" (no prefix)
+        # corresponds to s3Base/s3Utils legacy "tibanna-output" (no prefix)
         tibanna_output_bucket = (tibanna_output_bucket
                                  or os.environ.get("ENCODED_TIBANNA_OUTPUT_BUCKET")
-                                 or (f"{application_bucket_prefix}{s3Utils.TIBANNA_OUTPUT_BUCKET_SUFFIX}"
+                                 or (f"{application_bucket_prefix}{s3Base.TIBANNA_OUTPUT_BUCKET_SUFFIX}"
                                      if cls.APP_ORCHESTRATED
                                      else cls.LEGACY_TIBANNA_OUTPUT_BUCKET))
         app_kind = cls.APP_KIND or "unknown"
@@ -720,6 +726,7 @@ class IniFileManager:
             'PROJECT_VERSION': toml.load(cls.PYPROJECT_FILE_NAME)['tool']['poetry']['version'],
             'SNOVAULT_VERSION': pkg_resources.get_distribution("dcicsnovault").version,
             'UTILS_VERSION': pkg_resources.get_distribution("dcicutils").version,
+            'HIGLASS_SERVER': higlass_server,
             'ES_SERVER': es_server,
             'ENV_BUCKET': env_bucket,
             'ENV_ECOSYSTEM': env_ecosystem,
@@ -869,6 +876,9 @@ class IniFileManager:
             parser.add_argument("--identity",
                                 help="the AWS application configuration key that represents the current environment",
                                 default=None)
+            parser.add_argument("--higlass_server",
+                                help="a HiGlass servername or servername:port",
+                                default=None)
             parser.add_argument("--indexer",
                                 help="whether this server does indexing at all",
                                 choices=["true", "false"],
@@ -935,7 +945,7 @@ class IniFileManager:
                                              data_set=args.data_set, s3_encrypt_key_id=args.s3_encrypt_key_id,
                                              es_server=args.es_server, es_namespace=args.es_namespace,
                                              indexer=args.indexer, index_server=args.index_server,
-                                             identity=args.identity,
+                                             identity=args.identity, higlass_server=args.higlass_server,
                                              sentry_dsn=args.sentry_dsn,
                                              tibanna_cwls_bucket=args.tibanna_cwls_bucket,
                                              tibanna_output_bucket=args.tibanna_output_bucket,
@@ -1117,6 +1127,8 @@ class CreateMappingOnDeployManager:
             if called on a production environment
 
         """
+
+        env = full_env_name(env)
 
         deploy_cfg = {
             'ENV_NAME': env

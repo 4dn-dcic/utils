@@ -237,5 +237,16 @@ class NotBeanstalkEnvironment(Exception):
 class BeanstalkOperationNotImplemented(NotImplementedError):
     def __init__(self, operation, message=None):
         self.operation = operation
-        super().__init__(f"Attempt to use an obsolete beanstalk operation {operation} in a container environment."
-                         or message)
+        super().__init__(message
+                         or f"Attempt to use an obsolete beanstalk operation {operation} in a container environment.")
+
+
+class LegacyDispatchDisabled(Exception):
+    def __init__(self, operation, call_args=None, call_kwargs=None, mode='dispatch', message=None):
+        self.operation = operation
+        self.call_args = call_args
+        self.call_kwargs = call_kwargs
+        self.mode = mode
+        super().__init__(message
+                         or f"Attempt to use legacy operation {operation}"
+                            f" with args={call_args} kwargs={call_kwargs} mode={mode}.")

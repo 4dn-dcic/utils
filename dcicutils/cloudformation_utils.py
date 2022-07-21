@@ -32,6 +32,11 @@ def hyphenify(s):
     return s.replace('_', '-')
 
 
+def tokenify(s):
+    """Strip out everything but alphanumerics from a given token"""
+    return ''.join([ch for ch in s if ch.isalpha() or ch.isdigit()])
+
+
 def make_required_key_for_ecs_application_url(env_name):
     """
     This pattern needs to remain fixed for various things to connect up.

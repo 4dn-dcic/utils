@@ -25,10 +25,10 @@ from dcicutils.env_utils_legacy import (
 from dcicutils.exceptions import InvalidParameterError
 from dcicutils.qa_utils import raises_regexp
 from unittest import mock
-from .helpers import using_fresh_legacy_state
+from .helpers import using_fresh_legacy_state_for_testing
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_default_workflow_env():
 
     assert (default_workflow_env('fourfront')
@@ -44,7 +44,7 @@ def test_default_workflow_env():
         default_workflow_env('foo')  # noQA - we expect this error
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_ecr_repository_for_env():
 
     # All CGAP values just return their arguments.
@@ -60,7 +60,7 @@ def test_ecr_repository_for_env():
         assert ecr_repository_for_env(env) == env
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_get_bucket_env():
 
     # Fourfront tests
@@ -86,7 +86,7 @@ def test_get_bucket_env():
 
 
 @pytest.mark.skip(reason="Beanstalk functionality no longer supported.")
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_prod_bucket_env_for_app():
 
     assert prod_bucket_env_for_app('fourfront') == FF_PROD_BUCKET_ENV
@@ -100,7 +100,7 @@ def test_prod_bucket_env_for_app():
 
 
 @pytest.mark.skip(reason="Beanstalk functionality no longer supported.")
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_prod_bucket_env():
 
     # Fourfront tests
@@ -125,7 +125,7 @@ def test_prod_bucket_env():
     assert prod_bucket_env('fourfront-cgapwolf') is None
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_permit_load_data():
 
     # Fourfront envs
@@ -203,7 +203,7 @@ def test_permit_load_data():
     assert permit_load_data('cgap-wolf', allow_prod=False, orchestrated_app='cgap') is False
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_data_set_for_env():
 
     assert data_set_for_env('fourfront-blue') == 'prod'
@@ -226,7 +226,7 @@ def test_data_set_for_env():
     assert data_set_for_env('cgap-wolf') == 'prod'  # see above
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_public_url_mappings():
 
     assert public_url_mappings('fourfront-webprod') == FF_PUBLIC_URLS
@@ -241,7 +241,7 @@ def test_public_url_mappings():
     assert public_url_mappings('cgap-green') == CGAP_PUBLIC_URLS
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_public_url_for_app():
 
     assert public_url_for_app('cgap') == _CGAP_MGB_PUBLIC_URL_PRD
@@ -251,7 +251,7 @@ def test_public_url_for_app():
         public_url_for_app('foo')  # noQA - we expect this error
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_blue_green_mirror_env():
 
     # Should work for basic fourfront
@@ -281,7 +281,7 @@ def test_blue_green_mirror_env():
         blue_green_mirror_env('green-blue')  # needs to be one or the other
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_is_cgap_server():
 
     with pytest.raises(ValueError):
@@ -315,7 +315,7 @@ def test_is_cgap_server():
     assert is_cgap_server("www.google.com") is False
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_is_fourfront_server():
     with pytest.raises(ValueError):
         is_fourfront_server(None)
@@ -348,7 +348,7 @@ def test_is_fourfront_server():
     assert is_fourfront_server("www.google.com") is False
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_is_cgap_env():
 
     assert is_cgap_env(None) is False
@@ -358,7 +358,7 @@ def test_is_cgap_env():
     assert is_cgap_env('fourfront-blue') is False
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_is_fourfront_env():
 
     assert is_fourfront_env('fourfront-cgap') is False
@@ -368,7 +368,7 @@ def test_is_fourfront_env():
     assert is_fourfront_env(None) is False
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_is_beanstalk_env():
 
     assert is_beanstalk_env('fourfront-webprod') is True
@@ -409,7 +409,7 @@ def test_is_beanstalk_env():
     assert is_beanstalk_env('anything-at-all') is False
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_is_stg_or_prd_env():
 
     assert is_stg_or_prd_env("fourfront-green") is True
@@ -465,7 +465,7 @@ def test_is_stg_or_prd_env():
     assert is_stg_or_prd_env(None) is False
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_is_test_env():
 
     assert is_test_env(FF_ENV_PRODUCTION_BLUE) is False
@@ -495,7 +495,7 @@ def test_is_test_env():
     assert is_test_env(None) is False
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_is_hotseat_env():
 
     assert is_hotseat_env(FF_ENV_PRODUCTION_BLUE) is False
@@ -530,7 +530,7 @@ def test_is_hotseat_env():
     assert is_hotseat_env(None) is False
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_get_mirror_env_from_context_without_environ():
     """ Tests that when getting mirror env on various envs returns the correct mirror """
 
@@ -580,7 +580,7 @@ def test_get_mirror_env_from_context_without_environ():
             assert mirror is None
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_get_mirror_env_from_context_with_environ_has_env():
     """ Tests override of env name from os.environ when getting mirror env on various envs """
 
@@ -626,7 +626,7 @@ def test_get_mirror_env_from_context_with_environ_has_env():
         assert mirror is None  # env name explicitly declared, but guessing disallowed (but no CGAP mirror)
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_get_mirror_env_from_context_with_environ_has_mirror_env():
     """ Tests override of mirror env name from os.environ when getting mirror env on various envs """
 
@@ -636,7 +636,7 @@ def test_get_mirror_env_from_context_with_environ_has_mirror_env():
         assert mirror == 'bar'  # explicitly declared, even if nothing else ise
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_get_mirror_env_from_context_with_environ_has_env_and_mirror_env():
     """ Tests override of env name and mirror env name from os.environ when getting mirror env on various envs """
 
@@ -646,7 +646,7 @@ def test_get_mirror_env_from_context_with_environ_has_env_and_mirror_env():
         assert mirror == 'bar'  # mirror explicitly declared, ignoring env name
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_get_standard_mirror_env():
 
     def assert_prod_mirrors(env, expected_mirror_env):
@@ -689,7 +689,7 @@ def test_get_standard_mirror_env():
     assert_prod_mirrors('cgap', None)
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_infer_repo_from_env():
 
     assert infer_repo_from_env(FF_ENV_PRODUCTION_BLUE) == 'fourfront'
@@ -725,7 +725,7 @@ def test_infer_repo_from_env():
     assert infer_repo_from_env('who-knows') is None
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_infer_foursight_from_env():
 
     class MockedRequest:
@@ -740,7 +740,7 @@ def test_infer_foursight_from_env():
 
     def check(token_in, token_out, request=None):
         request = request or mock_request()
-        assert infer_foursight_from_env(request, token_in) == token_out
+        assert infer_foursight_from_env(request=request, envname=token_in) == token_out
 
     # (active) fourfront testing environments
     check(FF_ENV_MASTERTEST, 'mastertest')
@@ -782,7 +782,7 @@ def test_infer_foursight_from_env():
     check(None, None)
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_infer_foursight_url_from_env():
 
     class MockedRequest:
@@ -802,7 +802,7 @@ def test_infer_foursight_url_from_env():
         request = request or mock_request()
         prefix = cg_foursight_prefix if cgap else ff_foursight_prefix
         expected = prefix + token_out if token_out else None
-        assert infer_foursight_url_from_env(request, token_in) == expected
+        assert infer_foursight_url_from_env(request=request, envname=token_in) == expected
 
     # (active) fourfront testing environments
     check(FF_ENV_MASTERTEST, 'mastertest')
@@ -844,7 +844,7 @@ def test_infer_foursight_url_from_env():
     check(None, None, cgap=True)
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_indexer_env_for_env():
 
     assert indexer_env_for_env('fourfront-mastertest') == FF_ENV_INDEXER
@@ -863,7 +863,7 @@ def test_indexer_env_for_env():
     assert indexer_env_for_env('blah-env') is None
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_is_indexer_env():
 
     assert is_indexer_env('fourfront-indexer')
@@ -880,7 +880,7 @@ def test_is_indexer_env():
     assert not is_indexer_env('fourfront-cgapwolf')
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_short_env_name():
 
     assert short_env_name('cgapdev') == 'cgapdev'
@@ -903,7 +903,7 @@ def test_short_env_name():
     assert short_env_name('fourfront_mastertest') == 'fourfront_mastertest'
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_full_env_name():
 
     assert full_env_name('cgapdev') == 'fourfront-cgapdev'
@@ -926,7 +926,7 @@ def test_full_env_name():
         full_env_name('data')
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_full_cgap_env_name():
     assert full_cgap_env_name('cgapdev') == 'fourfront-cgapdev'
     assert full_cgap_env_name('fourfront-cgapdev') == 'fourfront-cgapdev'
@@ -954,7 +954,7 @@ def test_full_cgap_env_name():
         full_cgap_env_name('data')
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_full_fourfront_env_name():
 
     assert full_fourfront_env_name('mastertest') == 'fourfront-mastertest'
@@ -982,7 +982,7 @@ def test_full_fourfront_env_name():
         full_fourfront_env_name('data')
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_classify_server_url_localhost():
 
     assert classify_server_url("http://localhost/foo/bar") == {
@@ -1010,7 +1010,7 @@ def test_classify_server_url_localhost():
     }
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_classify_server_url_cgap():
 
     assert classify_server_url("https://cgap.hms.harvard.edu/foo/bar") == {
@@ -1038,7 +1038,7 @@ def test_classify_server_url_cgap():
     }
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_classify_server_url_fourfront():
 
     assert classify_server_url("https://data.4dnucleome.org/foo/bar") == {
@@ -1072,7 +1072,7 @@ def test_classify_server_url_fourfront():
     }
 
 
-@using_fresh_legacy_state()
+@using_fresh_legacy_state_for_testing()
 def test_classify_server_url_other():
 
     with raises_regexp(RuntimeError, "not a Fourfront or CGAP server"):

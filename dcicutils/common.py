@@ -8,7 +8,7 @@ REGION = 'us-east-1'
 APP_CGAP = 'cgap'
 APP_FOURFRONT = 'fourfront'
 
-LEGACY_GLOBAL_ENV_BUCKET = 'foursight-envs'
+LEGACY_GLOBAL_ENV_BUCKET = 'foursight-test-envs'
 LEGACY_CGAP_GLOBAL_ENV_BUCKET = 'foursight-cgap-envs'
 
 DEFAULT_ECOSYSTEM = 'main'

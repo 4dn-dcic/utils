@@ -66,6 +66,7 @@ class EnvManager(EnvBase):
         Although the s3 client can be created for you, but if you already have acess to an s3 client via some existing
         object, you should pass that.
         """
+
         self.s3 = s3 or boto3.client('s3')
         if env_name and env_description:
             raise ValueError("You may only specify an env_name or an env_description")

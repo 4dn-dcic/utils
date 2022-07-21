@@ -23,7 +23,7 @@ from dcicutils.misc_utils import (
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ,
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
-    capitalize1, local_attrs, dict_zip, json_leaf_subst,
+    capitalize1, local_attrs, dict_zip, json_leaf_subst, print_error_message, get_error_message,
     _is_function_of_exactly_one_required_arg,  # noQA
     string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists,
 )
@@ -2064,6 +2064,54 @@ def test_customized_class():
                                                  % test_class_prefix):
             PRINT(getattr_customized(SampleClass2, 'FAVORITE_SONG'))
         assert printed.last is None
+
+
+class SampleException(Exception):  # Used for testing print_error_message
+    pass
+
+
+def test_get_error_message_and_print_error_message():
+
+    print()  # Start test output on a fresh line
+
+    def test_error(error_descriptor, expected, expected_full):
+
+        try:
+            # Allow either of two different ways to describe an error: as an exception or a function that raises one.
+            if isinstance(error_descriptor, Exception):
+                raise error_descriptor
+            else:
+                error_descriptor()
+
+        except Exception as exception:
+
+            # Test the ability to get or print the error message.
+
+            with printed_output() as printed:
+
+                assert get_error_message(exception, full=False) == expected
+                print_error_message(exception, full=False)
+                assert printed.last == expected
+
+                assert get_error_message(exception, full=True) == expected_full
+                print_error_message(exception, full=True)
+                assert printed.last == expected_full
+
+            return
+
+        raise AssertionError("The exception_amker did not raise an error.")
+
+    empty_dict = {}
+
+    test_error(  # The empty_dict['foo'] will unconditonally err, so we don't need the value to get used
+               error_descriptor=lambda: empty_dict['foo'],
+               # There is no difference between short and long forms for primitive error classes that have no module id.
+               expected="KeyError: 'foo'",
+               expected_full="KeyError: 'foo'")
+
+    test_error(error_descriptor=SampleException("Something happened."),
+               expected="SampleException: Something happened.",
+               expected_full="test.test_misc_utils.SampleException: Something happened.")
 
 
 def test_url_path_join():

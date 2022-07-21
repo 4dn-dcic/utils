@@ -13,15 +13,17 @@ from . import env_utils_legacy as legacy
 from .common import (
     EnvName, OrchestratedApp, APP_FOURFRONT, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD,
 )
-from .env_base import EnvBase
+from .env_base import EnvBase, LegacyController
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
 from .exceptions import (
     EnvUtilsLoadError, BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
+    LegacyDispatchDisabled,
 )
 from .misc_utils import (
     decorator, full_object_name, ignored, ignorable, remove_prefix, remove_suffix, check_true, find_association,
-    override_environ,
+    override_environ, get_setting_from_context,
 )
+from .secrets_utils import assumed_identity_if  # , GLOBAL_APPLICATION_CONFIGURATION
 
 
 ignorable(BeanstalkOperationNotImplemented)  # Stuff that does or doesn't use this might come and go
@@ -43,7 +45,8 @@ def _make_no_legacy(fn, function_name):
     @functools.wraps(fn)
     def _missing_legacy_function(*args, **kwargs):
         ignored(*args, **kwargs)
-        raise NotImplementedError(f"There is only an orchestrated version of {function_name}, not a legacy version.")
+        raise NotImplementedError(f"There is only an orchestrated version of {function_name}, not a legacy version."
+                                  f" args={args} kwargs={kwargs}")
     return _missing_legacy_function
 
 
@@ -64,20 +67,30 @@ def if_orchestrated(*, unimplemented=False, use_legacy=False, assumes_cgap=False
 
     def _decorate(fn):
 
-        EnvUtils.init(raise_load_errors=False)
+        # EnvUtils.init(raise_load_errors=False)
+
+        orchestrated_function_name = fn.__name__
 
         try:
-            legacy_fn = getattr(legacy, fn.__name__)
+            legacy_fn = getattr(legacy, orchestrated_function_name)
         except AttributeError:
             # If is no legacy function (e.g., for new functionality), conjure a function with nicer error message
-            legacy_fn = _make_no_legacy(fn, fn.__name__)
+            legacy_fn = _make_no_legacy(fn, orchestrated_function_name)
 
         if use_legacy:
+            if not LegacyController.LEGACY_DISPATCH_ENABLED:
+                raise LegacyDispatchDisabled(operation=orchestrated_function_name, mode='decorate')
             return legacy_fn
 
         @functools.wraps(legacy_fn)
         def wrapped(*args, **kwargs):
+
+            EnvUtils.init()  # In case this is the first time
+
             if EnvUtils.IS_LEGACY:
+                if not LegacyController.LEGACY_DISPATCH_ENABLED:
+                    raise LegacyDispatchDisabled(operation=orchestrated_function_name,
+                                                 mode='dispatch', call_args=args, call_kwargs=kwargs)
                 return legacy_fn(*args, **kwargs)
             elif unimplemented:
                 raise NotImplementedError(f"Unimplemented: {full_object_name(fn)}")
@@ -91,6 +104,10 @@ def if_orchestrated(*, unimplemented=False, use_legacy=False, assumes_cgap=False
                 try:
                     return fn(*args, **kwargs)
                 except UseLegacy:
+                    if not LegacyController.LEGACY_DISPATCH_ENABLED:
+                        raise LegacyDispatchDisabled(operation=orchestrated_function_name,
+                                                     mode='raised', call_args=args, call_kwargs=kwargs)
+
                     return legacy_fn(*args, **kwargs)
 
         return wrapped
@@ -305,9 +322,10 @@ class EnvUtils:
     }
 
     @classmethod
-    def init(cls, env_name=None, ecosystem=None, force=False, raise_load_errors=True):
+    def init(cls, env_name=None, ecosystem=None, force=False, raise_load_errors=True, assuming_identity=True):
         if force or cls._DECLARED_DATA is None:
-            cls.load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors)
+            cls.load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors,
+                                   assuming_identity=assuming_identity)
 
     @classmethod
     def declared_data(cls):
@@ -316,6 +334,10 @@ class EnvUtils:
 
     @classmethod
     def set_declared_data(cls, data):
+
+        if data.get(e.IS_LEGACY) and not LegacyController.LEGACY_DISPATCH_ENABLED:
+            raise LegacyDispatchDisabled(operation='set_declared_data', mode='load-env')
+
         cls._DECLARED_DATA = data
         for var, key in EnvNames.__dict__.items():
             if var.isupper():
@@ -356,7 +378,7 @@ class EnvUtils:
             attrs['ENV_NAME'] = env_name
         with EnvUtils.temporary_state():
             with override_environ(**attrs):
-                EnvUtils.init(force=True, raise_load_errors=raise_load_errors)
+                EnvUtils.init(force=True, raise_load_errors=raise_load_errors, assuming_identity=False)
                 yield
 
     @classmethod
@@ -374,25 +396,32 @@ class EnvUtils:
 
     @classmethod
     @contextlib.contextmanager
-    def fresh_state_from(cls, *, bucket=None, data=None):
-        with EnvBase.global_env_bucket_named(bucket):
+    def fresh_testing_state_from(cls, *, bucket=None, data=None, global_bucket=None):
+        with EnvBase.global_env_bucket_named(global_bucket or bucket):
             with EnvUtils.temporary_state():
                 if bucket:
                     assert data is None, "You must supply bucket or data, but not both."
-                    EnvUtils.init(force=True)
+                    EnvUtils.init(force=True, assuming_identity=False)
                 elif data:
                     EnvUtils.set_declared_data(data)
                 else:
                     raise AssertionError("You must supply either bucket or data.")
                 yield
 
-    FF_BUCKET = 'foursight-prod-envs'
+    FF_DEPLOYED_BUCKET = 'foursight-prod-envs'
+    FF_BUCKET = 'foursight-test-envs'
     CGAP_BUCKET = 'foursight-cgap-envs'
 
     @classmethod
     @contextlib.contextmanager
-    def fresh_ff_state(cls):
-        with cls.fresh_state_from(bucket=cls.FF_BUCKET):
+    def fresh_ff_deployed_state_for_testing(cls):
+        with cls.fresh_testing_state_from(bucket=cls.FF_DEPLOYED_BUCKET):
+            yield
+
+    @classmethod
+    @contextlib.contextmanager
+    def fresh_cgap_deployed_state_for_testing(cls):
+        with cls.fresh_testing_state_from(bucket=cls.CGAP_BUCKET):
             yield
 
     # Vaguely, the thing we're trying to recognize is this (sanitized slightly here),
@@ -452,7 +481,12 @@ class EnvUtils:
         return config_data                        # noQA - PyCharm worries wrongly this won't have been set
 
     @classmethod
-    def load_declared_data(cls, env_name=None, ecosystem=None, raise_load_errors=True):
+    def load_declared_data(cls, env_name=None, ecosystem=None, raise_load_errors=True, assuming_identity=True):
+        with assumed_identity_if(assuming_identity, only_if_missing='GLOBAL_ENV_BUCKET'):
+            cls._load_declared_data(env_name=env_name, ecosystem=ecosystem, raise_load_errors=raise_load_errors)
+
+    @classmethod
+    def _load_declared_data(cls, *, env_name, ecosystem, raise_load_errors):
         """
         Tries to load environmental data from any of various keys in the global env bucket.
         1. If an ecosystem was specified, load from <ecosystem>.ecosystem.
@@ -541,13 +575,24 @@ def permit_load_data(envname: Optional[EnvName], allow_prod: bool, orchestrated_
     return bool(allow_prod)  # in case a non-bool allow_prod value is given, canonicalize the result
 
 
-@if_orchestrated(use_legacy=True)
+@if_orchestrated(use_legacy=False)  # was True until recently
 def blue_green_mirror_env(envname):
     """
     Given a blue envname, returns its green counterpart, or vice versa.
     For other envnames that aren't blue/green participants, this returns None.
     """
-    ignored(envname)
+    # This was copioed from the legacy definition, but we're phasing out legacy now.
+    # Odd as the definition is, we're still using this function.
+    # See: https://github.com/search?q=blue_green_mirror_env&type=code
+    # -kmp 8-Jul-2022
+    if 'blue' in envname:
+        if 'green' in envname:
+            raise ValueError('A blue/green mirror env must have only one of blue or green in its name.')
+        return envname.replace('blue', 'green')
+    elif 'green' in envname:
+        return envname.replace('green', 'blue')
+    else:
+        return None
 
 
 @if_orchestrated()
@@ -574,8 +619,16 @@ def prod_bucket_env(envname: EnvName) -> None:
 
 @if_orchestrated()
 def default_workflow_env(orchestrated_app: OrchestratedApp) -> EnvName:
+    """
+    Returns the default workflow environment to be used in testing (and with ill-constructed .ini files)
+    for WorkFlowRun situations in the portal when there is no env.name in the registry.
+    """
     _check_appname(orchestrated_app, required=True)
-    return EnvUtils.DEFAULT_WORKFLOW_ENV or (EnvUtils.HOTSEAT_ENVS[0] if EnvUtils.HOTSEAT_ENVS else None)
+    return (EnvUtils.DEFAULT_WORKFLOW_ENV
+            or (EnvUtils.HOTSEAT_ENVS[0]
+                if EnvUtils.HOTSEAT_ENVS
+                else None)
+            or EnvUtils.PRD_ENV_NAME)
 
 
 @if_orchestrated()
@@ -626,14 +679,21 @@ def _find_public_url_entry(envname):
 
 @if_orchestrated
 def get_env_real_url(envname):
+
     entry = _find_public_url_entry(envname)
     if entry:
         return entry.get('url')
-    elif EnvUtils.ORCHESTRATED_APP == APP_FOURFRONT:  # Only fourfront shortens
+
+    if not EnvUtils.DEV_ENV_DOMAIN_SUFFIX:
+        raise RuntimeError(f"DEV_ENV_DOMAIN_SUFFIX is not defined."
+                           f" It is needed for get_env_real_url({envname!r})"
+                           f" because env {envname} has no entry in {EnvNames.PUBLIC_URL_TABLE}.")
+
+    if EnvUtils.ORCHESTRATED_APP == APP_FOURFRONT:  # Only fourfront shortens
         # Fourfront is a low-security application, so only 'data' is 'https' and the rest are 'http'.
         # TODO: This should be table-driven, too, but we're not planning to distribute Fourfront,
         #       so it's not high priority. -kmp 13-May-2022
-        protocol = 'https' if envname == 'data' else 'http'
+        protocol = 'https' if is_stg_or_prd_env(envname) else 'http'
         return f"{protocol}://{short_env_name(envname)}{EnvUtils.DEV_ENV_DOMAIN_SUFFIX}"
     else:
         # For CGAP, everything has to be 'https'. Part of our security model.
@@ -642,32 +702,38 @@ def get_env_real_url(envname):
 
 @if_orchestrated
 def is_cgap_server(server, allow_localhost=False) -> bool:
-    check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
-    is_cgap = EnvUtils.ORCHESTRATED_APP == 'cgap'
-    if not is_cgap:
-        return False
-    kind = classify_server_url(server, raise_error=False).get(c.KIND)
-    if kind == 'cgap':
-        return True
-    elif allow_localhost and kind == 'localhost':
-        return True
-    else:
-        return False
+    ignored(server, allow_localhost)
+    return EnvUtils.ORCHESTRATED_APP == 'cgap'
+    #
+    # check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
+    # is_cgap = EnvUtils.ORCHESTRATED_APP == 'cgap'
+    # if not is_cgap:
+    #     return False
+    # kind = classify_server_url(server, raise_error=False).get(c.KIND)
+    # if kind == 'cgap':
+    #     return True
+    # elif allow_localhost and kind == 'localhost':
+    #     return True
+    # else:
+    #     return False
 
 
 @if_orchestrated
 def is_fourfront_server(server, allow_localhost=False) -> bool:
-    check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
-    is_fourfront = EnvUtils.ORCHESTRATED_APP == 'fourfront'
-    if not is_fourfront:
-        return False
-    kind = classify_server_url(server, raise_error=False).get(c.KIND)
-    if kind == 'fourfront':
-        return True
-    elif allow_localhost and kind == 'localhost':
-        return True
-    else:
-        return False
+    ignored(server, allow_localhost)
+    return EnvUtils.ORCHESTRATED_APP == 'fourfront'
+    #
+    # check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
+    # is_fourfront = EnvUtils.ORCHESTRATED_APP == 'fourfront'
+    # if not is_fourfront:
+    #     return False
+    # kind = classify_server_url(server, raise_error=False).get(c.KIND)
+    # if kind == 'fourfront':
+    #     return True
+    # elif allow_localhost and kind == 'localhost':
+    #     return True
+    # else:
+    #     return False
 
 
 @if_orchestrated
@@ -792,10 +858,11 @@ def is_hotseat_env(envname: Optional[EnvName]) -> bool:
             return False
 
 
-@if_orchestrated(use_legacy=True)
+@if_orchestrated(use_legacy=False)  # was True until recently
 def get_env_from_context(settings, allow_environ=True):
-    # The legacy handler will look in settings or in an environemnt variable. Probably that's OK for us.
-    ignored(settings, allow_environ)
+    """Look for an env in settings or in an environemnt variable."""
+    # This definition was capied from the lgegacy definition.
+    return get_setting_from_context(settings, ini_var='env.name', env_var=None if allow_environ else False)
 
 
 @if_orchestrated
@@ -847,7 +914,7 @@ def get_foursight_bucket(envname: EnvName, stage: ChaliceStage) -> str:
             return bucket
 
     if EnvUtils.FOURSIGHT_BUCKET_PREFIX:
-        return f"{EnvUtils.FOURSIGHT_BUCKET_PREFIX}-{stage}-{infer_foursight_from_env(envname=envname)}"
+        return f"{EnvUtils.FOURSIGHT_BUCKET_PREFIX}-{stage}-{full_env_name(envname)}"
 
     if bucket_table_seen:
         raise IncompleteFoursightBucketTable(f"No foursight bucket is defined for envname={envname} stage={stage}"
@@ -898,8 +965,22 @@ def infer_repo_from_env(envname):
         return None
 
 
+def _default_envname_from_request_and_context(*, request, caller):
+    envname = None
+    try:
+        envname = request.registry.settings.get('env.name')
+    except Exception:
+        pass
+    envname = envname or os.environ.get('ENV_NAME')
+    if envname is None:
+        raise ValueError(f"A non-null envname is required by but not supplied to {caller},"
+                         f" and could not be inferred from env.name in the request's registry settings"
+                         f" or from the ENV_NAME environment variable.")
+    return envname
+
+
 @if_orchestrated()
-def infer_foursight_url_from_env(request=None, envname: Optional[EnvName] = None):
+def infer_foursight_url_from_env(*, request=None, envname: Optional[EnvName] = None):
     """
     Infers the Foursight URL for the given envname and request context.
 
@@ -907,16 +988,13 @@ def infer_foursight_url_from_env(request=None, envname: Optional[EnvName] = None
     :param envname: name of the environment we are on
     :return: Foursight env at the end of the url ie: for fourfront-green, could be either 'data' or 'staging'
     """
-    ignored(request)
-    if envname is None:
-        # Although short_env_name allows None, it will return None in that case and a more confusing error will result.
-        # (We allow None only so we can gracefully phase out the 'request' argument.) -kmp 15-May-2022
-        raise ValueError("A non-null envname is required by infer_foursight_url_from_env.")
+    envname = envname or _default_envname_from_request_and_context(request=request,
+                                                                   caller='infer_foursight_url_from_env')
     return EnvUtils.FOURSIGHT_URL_PREFIX + infer_foursight_from_env(request=request, envname=envname)
 
 
 @if_orchestrated
-def infer_foursight_from_env(request=None, envname: Optional[EnvName] = None, short: bool = True):
+def infer_foursight_from_env(*, request=None, envname: Optional[EnvName] = None, short: bool = True):
     """
     Infers the Foursight environment token to view based on the given envname and request context
 
@@ -925,20 +1003,7 @@ def infer_foursight_from_env(request=None, envname: Optional[EnvName] = None, sh
     :param short: whether to shorten the result using short_env_name.
     :return: Foursight env at the end of the url ie: for fourfront-green, could be either 'data' or 'staging'
     """
-    if envname is None:
-        # We allow None only so we can gracefully phase out the 'request' argument. -kmp 15-May-2022
-        raise ValueError("A non-null envname is required by infer_foursight_from_env.")
-
-    # If a request is passed and stage-mirroring is enabled, we can tell from the URL if we're staging
-    # then for anything that is a stg or prd, return its 'public name' token.
-    # TODO: Find a simpler way to write this block of code? It's not very abstract. -kmp 23-May-2022
-    if request and EnvUtils.STAGE_MIRRORING_ENABLED and EnvUtils.STG_ENV_NAME:
-        classification = classify_server_url(request if isinstance(request, str) else request.domain)
-        if classification[c.IS_STG_OR_PRD]:
-            public_name = classification[c.PUBLIC_NAME]
-            if public_name:
-                return public_name
-
+    envname = envname or _default_envname_from_request_and_context(request=request, caller='infer_foursight_from_env')
     entry = (find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname) or
              find_association(EnvUtils.PUBLIC_URL_TABLE, environment=full_env_name(envname)) or
              find_association(EnvUtils.PUBLIC_URL_TABLE, environment=short_env_name(envname)))
@@ -953,7 +1018,12 @@ def infer_foursight_from_env(request=None, envname: Optional[EnvName] = None, sh
 def short_env_name(envname: Optional[EnvName]):
     if not envname:
         return None
-    elif not EnvUtils.FULL_ENV_PREFIX:  # "" or None
+
+    entry = find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname)
+    if entry:
+        envname = entry[p.ENVIRONMENT]
+
+    if not EnvUtils.FULL_ENV_PREFIX:  # "" or None
         return envname
     return remove_prefix(EnvUtils.FULL_ENV_PREFIX, envname, required=False)
 
