@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "3.16.0.3b66"  # originally based on 3.6.0, but merges 3.16.0, eventually to be "4.0.0"
+version = "3.16.0.3b68"  # originally based on 3.6.0, but merges 3.16.0, eventually to be "4.0.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -47,6 +47,7 @@ aws-requests-auth = ">=0.4.2,<1"
 docker = "^4.4.4"
 gitpython = "^3.1.2"
 pytz = ">=2020.4"
+PyYAML = ">=5.1,<5.5"
 requests = "^2.21.0"
 rfc3986 = "^1.4.0"
 structlog = "^19.2.0"
