@@ -86,6 +86,13 @@ docker_utils
    :members:
 
 
+ecr_scripts
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.ecr_scripts
+  :members:
+
+
 ecr_utils
 ^^^^^^^^^
 
@@ -111,6 +118,13 @@ env_manager
 ^^^^^^^^^^^
 
 .. automodule:: dcicutils.env_manager
+  :members:
+
+
+env_scripts
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.env_scripts
   :members:
 
 
