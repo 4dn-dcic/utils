@@ -14,7 +14,7 @@ def test_set_logging_not_prod(caplog):
     assert len(caplog.records) == 1
     log_record = caplog.records[0]
     # make sure there are no handlers and the message is non-dictionary
-    assert len(log_record._logger.handlers) == 0
+    assert len(log_record._logger.handlers) == 0  # noQA - PyCharm doesn't like the reference to ._logger
     assert 'baz' in log_record.__dict__['msg']
     assert 'error' in log_record.__dict__['msg']
     assert 'log_uuid' in log_record.__dict__['msg']
@@ -31,7 +31,7 @@ def test_set_logging_prod_but_no_es(caplog):
     log_record = caplog.records[0]
     assert isinstance(log_record.__dict__['msg'], dict)
     assert 'log_uuid' in log_record.__dict__['msg']
-    assert len(log_record._logger.handlers) == 0
+    assert len(log_record._logger.handlers) == 0  # noQA - PyCharm doesn't like the reference to ._logger
 
 
 @pytest.mark.integrated
@@ -44,23 +44,43 @@ def test_set_logging_level(caplog, integrated_ff):
     assert len(caplog.records) == 1
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 def test_set_logging_in_prod(caplog, integrated_ff):
     # get es_client info from the health page
     health = ff_utils.get_health_page(key=integrated_ff['ff_key'])
     es_url = health['elasticsearch']
-    log_utils.set_logging(env='fourfront-mastertest', es_server=es_url, in_prod=True)
+    log_utils.set_logging(env=integrated_ff['ff_env'], es_server=es_url, in_prod=True)
     log = structlog.getLogger(__name__)
     log.warning('meh', foo='bar')
-    assert len(caplog.records) == 1
-    log_record = caplog.records[0]
-    # make sure the ES handler is present
-    assert len(log_record._logger.handlers) == 1
-    assert 'log_uuid' in caplog.records[0].__dict__['msg']
-    assert log_record.__dict__['msg']['event'] == 'meh'
-    assert log_record.__dict__['msg']['foo'] == 'bar'
-    assert log_record.__dict__['msg']['level'] == 'warning'
-    log_uuid = log_record.__dict__['msg']['log_uuid']
+
+    # There quite a number of records more than one, but they seem unrelated to this test.
+    # Banking that nothing else will warn seems poor test strategy, so I've written a search
+    # for the record of interest instead. -kmp 10-May-2022
+    #
+    # assert len(caplog.records) == 1
+    # log_record = caplog.records[0]
+    # # make sure the ES handler is present
+    # assert len(log_record._logger.handlers) == 1
+    # assert 'log_uuid' in caplog.records[0].__dict__['msg']
+    # assert log_record.__dict__['msg']['event'] == 'meh'
+    # assert log_record.__dict__['msg']['foo'] == 'bar'
+    # assert log_record.__dict__['msg']['level'] == 'warning'
+    # log_uuid = log_record.__dict__['msg']['log_uuid']
+    #
+    # This is the rewrite:
+
+    assert caplog.records, "There are no log records."
+    for log_record in caplog.records:
+        msg = log_record.__dict__['msg']  # gets around a method for .msg that does something we don't want.
+        if not isinstance(msg, str) and msg['event'] == 'meh':
+            assert msg['foo'] == 'bar'
+            assert msg['level'] == 'warning'
+            log_uuid = msg['log_uuid']
+            break
+    else:
+        raise AssertionError("Expected test record event='meh' not found.")
+
     # make sure the log was written successfully to mastertest ES
     time.sleep(1)
     es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
@@ -77,7 +97,7 @@ def test_set_logging_in_prod(caplog, integrated_ff):
     assert len(caplog.records) == 2  # two logs now
     log_record2 = caplog.records[1]
     # make sure the ES handler is present
-    assert len(log_record2._logger.handlers) == 1
+    assert len(log_record2._logger.handlers) == 1  # noQA - PyCharm doesn't like the reference to ._logger
     assert 'log_uuid' in log_record2.__dict__['msg']
     assert log_record2.__dict__['msg']['event'] == 'test_skip'
     log_uuid = log_record2.__dict__['msg']['log_uuid']
@@ -88,16 +108,35 @@ def test_set_logging_in_prod(caplog, integrated_ff):
     assert len(es_res) == 0  # log is not in ES, as anticipated
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 def test_logging_retry(caplog, integrated_ff):
     # get es_client info from the health page
     es_url = ff_utils.get_health_page(key=integrated_ff['ff_key'])['elasticsearch']
-    log_utils.set_logging(env='fourfront-mastertest', es_server=es_url, in_prod=True)
+    log_utils.set_logging(env=integrated_ff['ff_env'], es_server=es_url, in_prod=True)
     log = structlog.getLogger(__name__)
     log.warning('test_retry', _test_log_utils=True)
-    assert len(caplog.records) == 1
-    assert caplog.records[0].__dict__['msg']['event'] == 'test_retry'
-    log_uuid = caplog.records[0].__dict__['msg']['log_uuid']
+
+    # There quite a number of records more than one, but they seem unrelated to this test.
+    # Banking that nothing else will warn seems poor test strategy, so I've written a search
+    # for the record of interest instead. -kmp 10-May-2022
+    #
+    # assert len(caplog.records) == 1
+    # assert caplog.records[0].__dict__['msg']['event'] == 'test_retry'
+    # log_uuid = caplog.records[0].__dict__['msg']['log_uuid']
+    #
+    # This is the rewrite:
+
+    assert caplog.records, "There are no log records."
+    for log_record in caplog.records:
+        msg = log_record.__dict__['msg']  # gets around a method for .msg that does something we don't want.
+        if not isinstance(msg, str) and msg['event'] == 'test_retry':
+            assert msg['_test_log_utils'] is True
+            log_uuid = msg['log_uuid']
+            break
+    else:
+        raise AssertionError("Expected test record event='test_retry' not found.")
+
     # retrying will take 5 sec, so log shoudldn't be in ES yet
     time.sleep(1)
     es_client = es_utils.create_es_client(es_url, use_aws_auth=True)

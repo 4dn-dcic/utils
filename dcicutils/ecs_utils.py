@@ -1,6 +1,7 @@
 import boto3
+
+from .common import REGION as COMMON_REGION
 from .misc_utils import PRINT
-from .common import REGION
 
 
 class ECSUtils:
@@ -9,9 +10,11 @@ class ECSUtils:
     """
     DEPLOYMENT_COMPLETED = 'COMPLETED'
 
-    def __init__(self):
+    REGION = COMMON_REGION  # this default must match what ecr_utils.ECRUtils and secrets_utils.assume_identity use
+
+    def __init__(self, region=None):
         """ Creates a boto3 client for 'ecs'. """
-        self.client = boto3.client('ecs', region_name=REGION)  # same as ECR
+        self.client = boto3.client('ecs', region_name=region or self.REGION)
 
     def list_ecs_clusters(self):
         """ Returns a list of ECS clusters ARNs. """
@@ -80,4 +83,3 @@ class ECSUtils:
                 if deployment['rolloutState'] != self.DEPLOYMENT_COMPLETED:
                     return True
         return False
-

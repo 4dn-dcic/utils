@@ -7,6 +7,105 @@ Change Log
 ----------
 
 
+4.0.0
+=====
+
+The following change list is only interim. A followup change will revise this entry with better information
+covering whta changed in 4.0, which is considerably more.
+
+* New ``make`` targets:
+
+  * ``make test-all`` runs all tests
+  * ``make test-most`` runs all unit and integration tests (marked ``unit``, ``integration`` or ``integrationx``),
+    but not things likely to fail (marked ``beanstalk failure`` or ``direct_es_query``).
+  * ``make test-integrations`` runs all integration tests (marked ``integration`` or ``integrationx``),
+    but not things likely to fail (marked ``beanstalk failure`` or ``direct_es_query``).
+  * ``make test-direct-es-query`` runs any test marked ``direct_es_query```.
+
+* Configurable environmental support for orchestrated C4 applications (Fourfront and CGAP) in ``env_utils`` (C4-689).
+
+* Extend that support to allow mirroring to be enabled (C4-734).
+
+The net result is a configurable environment in which the env descriptor in the global env bucket can contain
+these new items:
+
+===============================  ===============================================================================
+    Key                              Notes
+===============================  ===============================================================================
+``"dev_data_set_table"``         Dictionary mapping envnames to their preferred data set
+``"dev_env_domain_suffix"``      e.g., .abc123def456ghi789.us-east-1.rds.amazonaws.com
+``"foursight_bucket_table"``     A table mapping environments to another table mapping chalice stages to buckets
+``"foursight_url_prefix"``       A prefix string for use by foursight.
+``"full_env_prefix"``            A string like "cgap-" that precedes all env names
+``"hotseat_envs"``               A list of environments that are for testing with hot data
+``"indexer_env_name"``           The environment name used for indexing (being phased out)
+``"is_legacy"``                  Should be ``"true"`` if legacy effect is desired, otherwise omitted.
+``"stage_mirroring_enabled"``    Should be ``"true"`` if mirroring is desired, otherwise omitted.
+``"orchestrated_app"``           This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
+``"prd_env_name"``               The name of the prod env
+``"public_url_table"``           Dictionary mapping envnames & pseudo_envnames to public urls
+``"stg_env_name"``               The name of the stage env (or None)
+``"test_envs"``                  A list of environments that are for testing
+``"webprod_pseudo_env"``         The pseudo-env that is a token name to use in place of the prd env for shared
+                                 stg/prd situations, replacing ``fourfront-webprod`` in the legacy system.
+                                 (In orchestrations, this should usually be the same as the ``prd_env_name``.
+                                 It may or may not need to be different if we orchestrate the legacy system.)
+===============================  ===============================================================================
+
+* In ``beanstalk_utils``:
+
+  * Removed:
+
+    * ``swap_cname``
+
+    NOTE: This was never invoked by automatic programs, so we didn't do a deprecation stage.
+
+* Deprecated:
+
+  * ``get_beanstalk_real_url`` is deprecated. Use ``env_utils.get_env_real_url``.
+  * ``get_beanstalk_info`` is deprecated. Use ``beanstalk_utils.get_env_info``.
+
+  NOTE: These continue to work for now, but will be removed in the future.
+  Please update code to use recommended replacement.
+
+* In ``env_base``:
+
+  * Added ``EnvManager.filter_config_names``
+
+* In ``env_utils``:
+
+  * Removed:
+
+    * ``make_env_name_cfn_compatible``
+
+    NOTE: This was not believed to be used anywhere so is presumably no great hardship.
+    (Kent also didn't like the naming, which used a confusing abbreviation.)
+
+  * New functionality:
+
+    * ``compute_prd_env_for_project``
+    * ``get_env_real_url``
+    * ``get_foursight_bucket``
+    * ``get_foursight_bucket_prefix``
+
+  * Always erring:
+
+    * ``is_indexer_env``
+    * ``indexer_env_for_env``
+
+    NOTE: These functions unconditionally raise an error indicating that the functionality is no longer available.
+          Their callers must be rewritten, probably in a way that is not a simple substitution.
+
+* Added tech debt by disabling certain tests or marking them for later scrutiny.
+  Three new pytest markers were added in ``pytest.ini``:
+
+  * ``beanstalk_failure`` - An obsolete beanstalk-related test that needs fixing
+  * ``direct_es_query`` - A test of direct ES _search that is disabled for now
+    and needs to move inside the firewall
+  * ``stg_or_prd_testing_needs_repair`` - Some or all of a test that was failing on stg/prd
+    has been temporarily disabled
+
+
 3.16.0
 ======
 
@@ -43,7 +142,7 @@ Change Log
   * New property ``MockBotoS3Session.region_name``.
   * New method ``MockBotoS3Session.unset_environ_credentials_for_testing``.
 
-  
+
 3.14.0
 ======
 

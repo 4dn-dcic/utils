@@ -7,6 +7,7 @@ from dcicutils.ff_utils import get_es_metadata
 from dcicutils.misc_utils import ignored
 from dcicutils.qa_utils import timed
 from unittest import mock
+from .conftest_settings import INTEGRATED_ENV_INDEX_NAMESPACE  # , INTEGRATED_ENV
 
 
 class TestElasticSearchServiceClient:
@@ -104,10 +105,13 @@ def es_client_fixture(integrated_ff):
     return create_es_client(integrated_ff['es_url'])
 
 
+@pytest.mark.skip(reason="Direct ES search cannot work outside the firewall.")
 @pytest.mark.integrated
+@pytest.mark.direct_es_query
 def test_lucene_query_basic(es_client_fixture):
     """ Tests basic lucene queries via the underlying endpoint on mastertest """
-    results = execute_lucene_query_on_es(client=es_client_fixture, index='fourfront-mastertestuser', query={})
+    user_index = f'{INTEGRATED_ENV_INDEX_NAMESPACE}user'
+    results = execute_lucene_query_on_es(client=es_client_fixture, index=user_index, query={})
     assert len(results) == 10
     test_query = {
         'query': {
@@ -120,37 +124,43 @@ def test_lucene_query_basic(es_client_fixture):
         },
         'sort': [{'_uid': {'order': 'desc'}}]
     }
-    results = execute_lucene_query_on_es(client=es_client_fixture, index='fourfront-mastertestuser', query=test_query)
+    results = execute_lucene_query_on_es(client=es_client_fixture, index=user_index, query=test_query)
     assert len(results) == 1
 
 
+@pytest.mark.skip(reason="Direct ES search cannot work outside the firewall.")
 @pytest.mark.integrated
+@pytest.mark.direct_es_query
 def test_get_bulk_uuids_embedded(es_client_fixture):
     """ Tests getting some bulk uuids acquired from search. """
     uuids = ['1a12362f-4eb6-4a9c-8173-776667226988']  # only one uuid first
-    result1 = get_bulk_uuids_embedded(es_client_fixture, 'fourfront-mastertestuser', uuids, is_generator=False)
+    user_index = f'{INTEGRATED_ENV_INDEX_NAMESPACE}user'
+    result1 = get_bulk_uuids_embedded(es_client_fixture, user_index, uuids, is_generator=False)
     assert len(result1) == 1
     assert result1[0]['uuid'] == uuids[0]  # check uuid
     assert result1[0]['lab']['awards'] is not None  # check embedding
     assert result1[0]['lab']['awards'][0]['project'] is not None
 
     # one page of results, should give us 10
-    users = execute_lucene_query_on_es(client=es_client_fixture, index='fourfront-mastertestuser', query={})
+    users = execute_lucene_query_on_es(client=es_client_fixture, index=user_index, query={})
     uuids = [doc['_id'] for doc in users]
-    result2 = get_bulk_uuids_embedded(es_client_fixture, 'fourfront-mastertestuser', uuids)
+    result2 = get_bulk_uuids_embedded(es_client_fixture, user_index, uuids)
     assert len(result2) == 10
     for doc in result2:
         assert doc['uuid'] in uuids  # check uuids
 
-    result3 = get_bulk_uuids_embedded(es_client_fixture, 'fourfront-mastertestuser', uuids, is_generator=True)
+    result3 = get_bulk_uuids_embedded(es_client_fixture, user_index, uuids, is_generator=True)
     for doc in result3:
         assert doc['uuid'] in uuids  # check uuids from gen
 
 
+@pytest.mark.skip(reason="Direct ES search cannot work outside the firewall.")
 @pytest.mark.integrated
+@pytest.mark.direct_es_query
 def test_get_bulk_uuids_outperforms_get_es_metadata(integrated_ff, es_client_fixture):
     """ Tests that the new method out performs the new one. """
-    users = execute_lucene_query_on_es(client=es_client_fixture, index='fourfront-mastertestuser', query={})
+    user_index = f'{INTEGRATED_ENV_INDEX_NAMESPACE}user'
+    users = execute_lucene_query_on_es(client=es_client_fixture, index=user_index, query={})
     uuids = [doc['_id'] for doc in users]
     times = []
 
@@ -158,7 +168,7 @@ def test_get_bulk_uuids_outperforms_get_es_metadata(integrated_ff, es_client_fix
         times.append(end - start)
 
     with timed(reporter=set_current_time):
-        get_bulk_uuids_embedded(es_client_fixture, 'fourfront-mastertestuser', uuids, is_generator=False)
+        get_bulk_uuids_embedded(es_client_fixture, user_index, uuids, is_generator=False)
     assert len(times) == 1
     with timed(reporter=set_current_time):
         get_es_metadata(uuids, key=integrated_ff['ff_key'], ff_env=integrated_ff['ff_env'])

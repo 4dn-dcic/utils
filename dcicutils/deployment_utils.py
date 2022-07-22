@@ -33,15 +33,15 @@ import time
 import boto3
 from git import Repo
 
-from .beanstalk_utils import compute_ff_prd_env, compute_cgap_prd_env
+from .base import compute_ff_prd_env, compute_cgap_prd_env
+from .common import LEGACY_GLOBAL_ENV_BUCKET, LEGACY_CGAP_GLOBAL_ENV_BUCKET, DEFAULT_ECOSYSTEM
 from .env_utils import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env,
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, is_test_env, is_hotseat_env,
-    is_indexer_env, indexer_env_for_env,
-    FF_ENV_INDEXER, CGAP_ENV_INDEXER, INDEXER_ENVS,
+    is_indexer_env, indexer_env_for_env, full_env_name,
 )
 from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ, file_contents
-from .s3_utils import s3Utils
+from .env_base import EnvBase, s3Base
 
 
 # constants associated with EB-related APIs
@@ -158,7 +158,7 @@ class EBDeployer:
         # Upload to s3
         success = cls.upload_application_to_s3(zip_location)
         if not success:  # XXX: how to correctly detect error? docs are not clear - Will
-            print(success)  # look at response
+            # print(success)  # look at response
             return False
 
         # Build application version
@@ -307,20 +307,21 @@ class EBDeployer:
         :raises RuntimeError if bad env given
         """
         eb_client = boto3.client('elasticbeanstalk')
+        indexer_env = indexer_env_for_env(env_name)
         if is_cgap_env(env_name):
             return eb_client.create_environment(
                 ApplicationName=cls.EB_APPLICATION,
-                EnvironmentName=CGAP_ENV_INDEXER,
-                TemplateName=CGAP_ENV_INDEXER,
+                EnvironmentName=indexer_env,
+                TemplateName=indexer_env,
                 VersionLabel=app_version
-            )[STATUS] == LAUNCHING and cls.delete_indexer_template(eb_client, CGAP_ENV_INDEXER)
+            )[STATUS] == LAUNCHING and cls.delete_indexer_template(eb_client, indexer_env)
         elif is_fourfront_env(env_name):
             return eb_client.create_environment(
                 ApplicationName=cls.EB_APPLICATION,
-                EnvironmentName=FF_ENV_INDEXER,
-                TemplateName=FF_ENV_INDEXER,
+                EnvironmentName=indexer_env,
+                TemplateName=indexer_env,
                 VersionLabel=app_version
-            )[STATUS] == LAUNCHING and cls.delete_indexer_template(eb_client, FF_ENV_INDEXER)
+            )[STATUS] == LAUNCHING and cls.delete_indexer_template(eb_client, indexer_env)
         else:  # should never get here, but for good measure
             raise RuntimeError('Tried to deploy indexer from an unknown environment: %s' % env_name)
 
@@ -332,6 +333,8 @@ class EBDeployer:
         :param template_name: template to delete, will only accept indexer env templates
         :return: True in success, False otherwise
         """
+        # Note: is_indexer_env unconditionally returns False now, so this will ALWAYS raise this error.
+        #       Is that right? -kmp 22-May-2022
         if not is_indexer_env(template_name):
             raise RuntimeError('Tried to delete non-indexer configuration template: %s. '
                                'Please use boto3 directly or the AWS Console to do this.' % template_name)
@@ -363,6 +366,8 @@ class EBDeployer:
         :param env_name: one of: FF_ENV_INDEXER or CGAP_ENV_INDEXER
         :return: True in success, False otherwise
         """
+        # Note: is_indexer_env unconditionally returns False now, so this will ALWAYS raise this error.
+        #       Is that right? -kmp 22-May-2022
         if not is_indexer_env(env_name):
             raise RuntimeError('Tried to terminate non-indexer environment: %s. '
                                'Please use boto3 directly or the AWS Console to do this.' % env_name)
@@ -412,8 +417,9 @@ class IniFileManager:
     @classmethod
     def build_ini_file_from_template(cls, template_file_name, init_file_name, *,
                                      bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
-                                     s3_encrypt_key_id=None,
+                                     s3_encrypt_key_id=None, env_bucket=None, env_ecosystem=None, env_name=None,
                                      data_set=None, es_server=None, es_namespace=None, identity=None,
+                                     higlass_server=None,
                                      indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
                                      tibanna_output_bucket=None,
                                      application_bucket_prefix=None, foursight_bucket_prefix=None,
@@ -427,7 +433,10 @@ class IniFileManager:
         Args:
             template_file_name (str): The name of the template file to drive the construction.
             init_file_name (str): The name of the .ini file to build.
-            bs_env (str): The ElasticBeanstalk environment name for which this .ini file should work.
+            env_bucket (str): The S3 bucket in which informatoin about the env_name and env_ecosystem can be obtained.
+            env_ecosystem (str): The portal ecosystem in which this portal's environment collaborates.
+            env_name (str): The portal environment name for which this .ini file should work.
+            bs_env (str): The beanstalk environment name for which this .ini file should work. Deprecated. Use env_name.
             bs_mirror_env (str): The name of the ElasticBeanstalk environment that acts as a blue/green mirror.
             s3_bucket_org (str): A token that uniquely identifies your organization for use in all s3 bucket names.
               In the original CGAP, this token was 'elasticbeanstalk'. Going forward, each account must choose
@@ -438,8 +447,9 @@ class IniFileManager:
             s3_encrypt_key_id (str): The name of the secret that contains s3_encrypt_key.
             data_set (str): An identifier for data to load (either 'prod' for prd/stg envs, or 'test' for others)
             es_server (str): The server name (or server:port) for the ElasticSearch server.
-            es_namespace (str): The ElasticSearch namespace to use (probably but not necessarily same as bs_env).
+            es_namespace (str): The ElasticSearch namespace to use (probably but not necessarily same as env_name).
             identity (str): The AWS application configuration key that represents the current environment.
+            higlass_server (str): The server name (or server:port) for the HiGlass server.
             indexer (bool): Whether or not we are building an ini file for an indexer.
             index_server (bool): Whether or not we are building an ini file for an index server.
             sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
@@ -459,6 +469,9 @@ class IniFileManager:
             cls.build_ini_stream_from_template(template_file_name=template_file_name,
                                                init_file_stream=init_file_fp,
                                                bs_env=bs_env,
+                                               env_bucket=env_bucket,
+                                               env_ecosystem=env_ecosystem,
+                                               env_name=env_name,
                                                bs_mirror_env=bs_mirror_env,
                                                s3_bucket_org=s3_bucket_org,
                                                s3_bucket_env=s3_bucket_env,
@@ -467,6 +480,7 @@ class IniFileManager:
                                                es_server=es_server,
                                                es_namespace=es_namespace,
                                                identity=identity,
+                                               higlass_server=higlass_server,
                                                indexer=indexer,
                                                index_server=index_server,
                                                sentry_dsn=sentry_dsn,
@@ -523,17 +537,18 @@ class IniFileManager:
 
     AUTO_INDEX_SERVER_TOKEN = "__index_server"
 
-    LEGACY_APPLICATION_BUCKET_ORG = s3Utils.EB_PREFIX                        # = "elasticbeanstalk"
+    LEGACY_APPLICATION_BUCKET_ORG = s3Base.EB_PREFIX                        # = "elasticbeanstalk"
     LEGACY_APPLICATION_BUCKET_PREFIX = LEGACY_APPLICATION_BUCKET_ORG + "-"   # = "elasticbeanstalk-"
-    LEGACY_TIBANNA_CWLS_BUCKET = s3Utils.TIBANNA_CWLS_BUCKET_TEMPLATE      # = "tibanna-cwls"
-    LEGACY_TIBANNA_OUTPUT_BUCKET = s3Utils.TIBANNA_OUTPUT_BUCKET_TEMPLATE    # = "tibanna-output"
+    LEGACY_TIBANNA_CWLS_BUCKET = s3Base.TIBANNA_CWLS_BUCKET_TEMPLATE      # = "tibanna-cwls"
+    LEGACY_TIBANNA_OUTPUT_BUCKET = s3Base.TIBANNA_OUTPUT_BUCKET_TEMPLATE    # = "tibanna-output"
     LEGACY_FOURSIGHT_BUCKET_PREFIX = "foursight-"
 
     @classmethod
     def build_ini_stream_from_template(cls, template_file_name, init_file_stream, *,
                                        bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
-                                       s3_encrypt_key_id=None,
+                                       s3_encrypt_key_id=None, env_bucket=None, env_ecosystem=None, env_name=None,
                                        data_set=None, es_server=None, es_namespace=None, identity=None,
+                                       higlass_server=None,
                                        indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
                                        tibanna_output_bucket=None,
                                        application_bucket_prefix=None, foursight_bucket_prefix=None,
@@ -548,15 +563,19 @@ class IniFileManager:
         Args:
             template_file_name: The template file to guide the output.
             init_file_stream: A stream to send output to.
-            bs_env: A beanstalk environment.
+            env_bucket (str): The S3 bucket in which informatoin about the env_name and env_ecosystem can be obtained.
+            env_ecosystem (str): The portal ecosystem in which this portal's environment collaborates.
+            env_name (str): The portal environment name for which this .ini file should work.
+            bs_env (str): The beanstalk environment name for which this .ini file should work. Deprecated. Use env_name.
             bs_mirror_env: A beanstalk environment.
             s3_bucket_org: Short name token unique to the organization, for use as a low-tech namespace separator.
             s3_bucket_env: Environment name that is part of the s3 bucket name. (Usually defaults properly.)
             s3_encrypt_key_id (str): The name of the secret that contains s3_encrypt_key.
-            data_set: 'test' or 'prod'. Default is 'test' unless bs_env is a staging or production environment.
+            data_set: 'test' or 'prod'. Default is 'test' unless env_name is a staging or production environment.
             es_server: The name of an es server to use.
-            es_namespace: The namespace to use on the es server. If None, this uses the bs_env.
+            es_namespace: The namespace to use on the es server. If None, this uses the env_name.
             identity (str): The AWS application configuration key that represents the current environment.
+            higlass_server: The name of a HiGlass server to use.
             indexer: Whether or not we are building an ini file for an indexer.
             index_server: Whether or not we are building an ini file for an index server.
             sentry_dsn (str): A sentry DSN specifier, or the empty string if none is desired.
@@ -576,9 +595,34 @@ class IniFileManager:
 
         """
 
+        if bs_env and env_name and bs_env != env_name:
+            raise ValueError("If both bs_env and env_name are supplied, they must agree.")
+        if (os.environ.get("ENCODED_BS_ENV") and os.environ.get("ENCODED_ENV_NAME")
+                and os.environ.get("ENCODED_BS_ENV") != os.environ.get("ENCODED_ENV_NAME")):
+            raise ValueError("If both ENCODED_BS_ENV and ENCODED_ENV_NAME are supplied, they must agree.")
+
+        higlass_server = higlass_server or os.environ.get('ENCODED_HIGLASS_SERVER', "MISSING_ENCODED_HIGLASS_SERVER")
         es_server = es_server or os.environ.get('ENCODED_ES_SERVER', "MISSING_ENCODED_ES_SERVER")
-        bs_env = bs_env or os.environ.get("ENCODED_BS_ENV", "MISSING_ENCODED_BS_ENV")
-        bs_mirror_env = bs_mirror_env or os.environ.get("ENCODED_BS_MIRROR_ENV", get_standard_mirror_env(bs_env)) or ""
+        env_bucket = (env_bucket
+                      or EnvBase.global_env_bucket_name()
+                      or ("MISSING_GLOBAL_ENV_BUCKET"
+                          if cls.APP_ORCHESTRATED
+                          else (LEGACY_CGAP_GLOBAL_ENV_BUCKET if cls.APP_KIND == 'cgap' else LEGACY_GLOBAL_ENV_BUCKET)))
+        env_ecosystem = (env_ecosystem
+                         or os.environ.get("ENCODED_ECOSYSTEM")
+                         or ("MISSING_ENCODED_ECOSYSTEM"
+                             if cls.APP_ORCHESTRATED
+                             else DEFAULT_ECOSYSTEM))
+        env_name = (env_name or bs_env
+                    or os.environ.get("ENCODED_BS_ENV")
+                    or os.environ.get("ENCODED_ENV_NAME")
+                    or os.environ.get("ENV_NAME")  # Grudgingly allow either. Special conflict checks are made later.
+                    or "MISSING_ENCODED_BS_ENV_OR_ENCODED_ENV_NAME")
+        # The bs_mirror_env specified here is probably ignored because this info is in the ecosystem now.
+        # -kmp 20-May-2022
+        deprecated_bs_mirror_env = (bs_mirror_env
+                                    or os.environ.get("ENCODED_BS_MIRROR_ENV", get_standard_mirror_env(env_name))
+                                    or "")
         s3_bucket_org = (s3_bucket_org
                          or os.environ.get("ENCODED_S3_BUCKET_ORG")
                          or ("MISSING_ENCODED_S3_BUCKET_ORG"
@@ -594,55 +638,55 @@ class IniFileManager:
                                    or ("MISSING_ENCODED_FOURSIGHT_BUCKET_PREFIX"
                                        if cls.APP_ORCHESTRATED
                                        else cls.LEGACY_FOURSIGHT_BUCKET_PREFIX))
-        s3_bucket_env = s3_bucket_env or os.environ.get("ENCODED_S3_BUCKET_ENV", get_bucket_env(bs_env))
+        s3_bucket_env = s3_bucket_env or os.environ.get("ENCODED_S3_BUCKET_ENV", get_bucket_env(env_name))
         s3_encrypt_key_id = (s3_encrypt_key_id
                              or os.environ.get("ENCODED_S3_ENCRYPT_KEY_ID")
                              or "")
         data_set = (data_set
                     or os.environ.get("ENCODED_DATA_SET")
-                    or data_set_for_env(bs_env)
+                    or data_set_for_env(env_name)
                     or "MISSING_ENCODED_DATA_SET")
-        es_namespace = es_namespace or os.environ.get("ENCODED_ES_NAMESPACE", bs_env)
+        es_namespace = es_namespace or os.environ.get("ENCODED_ES_NAMESPACE", env_name)
         identity = identity or os.environ.get("ENCODED_IDENTITY", "")
         sentry_dsn = sentry_dsn or os.environ.get("ENCODED_SENTRY_DSN", "")
         auth0_client = auth0_client or os.environ.get("ENCODED_AUTH0_CLIENT", "")
         auth0_secret = auth0_secret or os.environ.get("ENCODED_AUTH0_SECRET", "")
 
-        # corresponds to s3Utils legacy "elasticbeanstalk-%s-files"
+        # corresponds to s3Base/s3Utils legacy "elasticbeanstalk-%s-files"
         file_upload_bucket = (file_upload_bucket
                               or os.environ.get("ENCODED_FILE_UPLOAD_BUCKET")
-                              or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.RAW_BUCKET_SUFFIX}")
+                              or f"{application_bucket_prefix}{s3_bucket_env}-{s3Base.RAW_BUCKET_SUFFIX}")
 
-        # corresponds to s3Utils legacy "elasticbeanstalk-%s-wfoutput"
+        # corresponds to s3Base/s3Utils legacy "elasticbeanstalk-%s-wfoutput"
         file_wfout_bucket = (file_wfout_bucket
                              or os.environ.get("ENCODED_FILE_WFOUT_BUCKET")
-                             or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.OUTFILE_BUCKET_SUFFIX}")
+                             or f"{application_bucket_prefix}{s3_bucket_env}-{s3Base.OUTFILE_BUCKET_SUFFIX}")
 
-        # corresponds to s3Utils legacy "elasticbeanstalk-%s-blobs"
+        # corresponds to s3Base/s3Utils legacy "elasticbeanstalk-%s-blobs"
         blob_bucket = (blob_bucket
                        or os.environ.get("ENCODED_BLOB_BUCKET")
-                       or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.BLOB_BUCKET_SUFFIX}")
+                       or f"{application_bucket_prefix}{s3_bucket_env}-{s3Base.BLOB_BUCKET_SUFFIX}")
 
-        # corresponds to s3Utils legacy "elasticbeanstalk-%s-system"
+        # corresponds to s3Base/s3Utils legacy "elasticbeanstalk-%s-system"
         system_bucket = (system_bucket
                          or os.environ.get("ENCODED_SYSTEM_BUCKET")
-                         or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.SYS_BUCKET_SUFFIX}")
+                         or f"{application_bucket_prefix}{s3_bucket_env}-{s3Base.SYS_BUCKET_SUFFIX}")
 
-        # corresponds to s3Utils legacy "elasticbeanstalk-%s-metadata-bundles"
+        # corresponds to s3Base/s3Utils legacy "elasticbeanstalk-%s-metadata-bundles"
         metadata_bundles_bucket = (metadata_bundles_bucket
                                    or os.environ.get("ENCODED_METADATA_BUNDLES_BUCKET")
-                                   or f"{application_bucket_prefix}{s3_bucket_env}-{s3Utils.METADATA_BUCKET_SUFFIX}")
+                                   or f"{application_bucket_prefix}{s3_bucket_env}-{s3Base.METADATA_BUCKET_SUFFIX}")
 
-        # corresponds to s3Utils legacy "tibanna-cwls" (no prefix)
+        # corresponds to s3Base/s3Utils legacy "tibanna-cwls" (no prefix)
         tibanna_cwls_bucket = (tibanna_cwls_bucket
                                or os.environ.get("ENCODED_TIBANNA_CWLS_BUCKET")
-                               or (f"{application_bucket_prefix}{s3Utils.TIBANNA_CWLS_BUCKET_SUFFIX}"
+                               or (f"{application_bucket_prefix}{s3Base.TIBANNA_CWLS_BUCKET_SUFFIX}"
                                    if cls.APP_ORCHESTRATED
                                    else cls.LEGACY_TIBANNA_CWLS_BUCKET))
-        # corresponds to s3Utils legacy "tibanna-output" (no prefix)
+        # corresponds to s3Base/s3Utils legacy "tibanna-output" (no prefix)
         tibanna_output_bucket = (tibanna_output_bucket
                                  or os.environ.get("ENCODED_TIBANNA_OUTPUT_BUCKET")
-                                 or (f"{application_bucket_prefix}{s3Utils.TIBANNA_OUTPUT_BUCKET_SUFFIX}"
+                                 or (f"{application_bucket_prefix}{s3Base.TIBANNA_OUTPUT_BUCKET_SUFFIX}"
                                      if cls.APP_ORCHESTRATED
                                      else cls.LEGACY_TIBANNA_OUTPUT_BUCKET))
         app_kind = cls.APP_KIND or "unknown"
@@ -682,9 +726,13 @@ class IniFileManager:
             'PROJECT_VERSION': toml.load(cls.PYPROJECT_FILE_NAME)['tool']['poetry']['version'],
             'SNOVAULT_VERSION': pkg_resources.get_distribution("dcicsnovault").version,
             'UTILS_VERSION': pkg_resources.get_distribution("dcicutils").version,
+            'HIGLASS_SERVER': higlass_server,
             'ES_SERVER': es_server,
-            'BS_ENV': bs_env,
-            'BS_MIRROR_ENV': bs_mirror_env,
+            'ENV_BUCKET': env_bucket,
+            'ENV_ECOSYSTEM': env_ecosystem,
+            'ENV_NAME': env_name,
+            'BS_ENV': env_name,  # The ENV_NAME should be preferred. This one is deprecated now. -kmp 20-May-2022
+            'BS_MIRROR_ENV': deprecated_bs_mirror_env,  # This info is in the ecosystem. -kmp 20-May-2022
             'S3_BUCKET_ORG': s3_bucket_org,
             'S3_BUCKET_ENV': s3_bucket_env,
             'S3_ENCRYPT_KEY_ID': s3_encrypt_key_id,
@@ -707,18 +755,28 @@ class IniFileManager:
             'FOURSIGHT_BUCKET_PREFIX': foursight_bucket_prefix,
         }
 
-        # if we specify an indexer name for bs_env, we did the deployment wrong and should bail
-        if bs_env in INDEXER_ENVS:
-            raise RuntimeError("Deployed with bs_env %s, which is an indexer env."
-                               " Re-deploy with the env you want to index and set the 'ENCODED_INDEXER'"
-                               " environment variable." % bs_env)
+        # The indexer_env concept is no longer meaningful with containers. is_indexer_env unconditionally returns False.
+        # -kmp 22-May-2022
+        #
+        # # if we specify an indexer name for bs_env, we did the deployment wrong and should bail
+        # if is_indexer_env(env_name):
+        #     raise RuntimeError("Deployed with bs_env %s, which is an indexer env."
+        #                        " Re-deploy with the env you want to index and set the 'ENCODED_INDEXER'"
+        #                        " environment variable." % env_name)
+
+        conflict_message = ("The environment variable {env_var} is already set to {env_val!r},"
+                            " but you are trying to set it to {set_val!r}.")
 
         # We assume these variables are not set, but best to check first. Confusion might result otherwise.
         for extra_var, extra_var_val in extra_vars.items():
-            if extra_var in os.environ and extra_var_val != os.environ[extra_var]:
-                raise RuntimeError("The environment variable %s is already set to %s,"
-                                   " but you are trying to set it to %s."
-                                   % (extra_var, os.environ[extra_var], extra_var_val))
+            env_val = os.environ.get(extra_var)
+            if env_val and extra_var_val != env_val:
+                raise RuntimeError(conflict_message.format(env_var=extra_var, env_val=env_val,
+                                                           set_val=extra_var_val))
+
+        active_env_name = os.environ.get('ENV_NAME')
+        if active_env_name and env_name != active_env_name:
+            raise RuntimeError(conflict_message.format(env_var='ENV_NAME', env_val=active_env_name, set_val=env_name))
 
         # When we've checked everything, go ahead and do the bindings.
         create_file_from_template(template_file=template_file_name,
@@ -781,8 +839,17 @@ class IniFileManager:
             parser.add_argument("--target",
                                 help="the name of a .ini file to generate",
                                 default=cls.INI_FILE_NAME)
+            parser.add_argument("--env_bucket",
+                                help="S3 bucket in which to find information about portal environments and ecosystems",
+                                default=None)
+            parser.add_argument("--env_ecosystem",
+                                help="the portal environment's ecosystem name",
+                                default=DEFAULT_ECOSYSTEM)
+            parser.add_argument("--env_name",
+                                help="the portal's environment name",
+                                default=None)
             parser.add_argument("--bs_env",
-                                help="an ElasticBeanstalk environment name",
+                                help="an ElasticBeanstalk environment name (deprecated, please use --env_name)",
                                 default=None)
             parser.add_argument("--bs_mirror_env",
                                 help="the name of the mirror of the ElasticBeanstalk environment name",
@@ -808,6 +875,9 @@ class IniFileManager:
                                 default=None)
             parser.add_argument("--identity",
                                 help="the AWS application configuration key that represents the current environment",
+                                default=None)
+            parser.add_argument("--higlass_server",
+                                help="a HiGlass servername or servername:port",
                                 default=None)
             parser.add_argument("--indexer",
                                 help="whether this server does indexing at all",
@@ -869,11 +939,13 @@ class IniFileManager:
             # print("ini_file_name=", ini_file_name)
             cls.build_ini_file_from_template(template_file_name, ini_file_name,
                                              bs_env=args.bs_env, bs_mirror_env=args.bs_mirror_env,
+                                             env_bucket=args.env_bucket, env_ecosystem=args.env_ecosystem,
+                                             env_name=args.env_name,
                                              s3_bucket_org=args.s3_bucket_org, s3_bucket_env=args.s3_bucket_env,
                                              data_set=args.data_set, s3_encrypt_key_id=args.s3_encrypt_key_id,
                                              es_server=args.es_server, es_namespace=args.es_namespace,
                                              indexer=args.indexer, index_server=args.index_server,
-                                             identity=args.identity,
+                                             identity=args.identity, higlass_server=args.higlass_server,
                                              sentry_dsn=args.sentry_dsn,
                                              tibanna_cwls_bucket=args.tibanna_cwls_bucket,
                                              tibanna_output_bucket=args.tibanna_output_bucket,
@@ -1003,6 +1075,7 @@ class CreateMappingOnDeployManager:
     # Set SKIP to True to skip the create_mapping step.
 
     DEFAULT_DEPLOYMENT_OPTIONS = {'SKIP': False, 'STRICT': False, 'WIPE_ES': False}
+    PRODUCTION_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': False, 'STRICT': True}
     STAGING_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': True, 'STRICT': True}
     HOTSEAT_DEPLOYMENT_OPTION_OVERRIDES = {'SKIP': True, 'STRICT': True}
     OTHER_TEST_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': True}
@@ -1055,6 +1128,8 @@ class CreateMappingOnDeployManager:
 
         """
 
+        env = full_env_name(env)
+
         deploy_cfg = {
             'ENV_NAME': env
         }
@@ -1067,7 +1142,10 @@ class CreateMappingOnDeployManager:
             if val:
                 deploy_cfg[key] = val
 
-        if env == get_standard_mirror_env(current_prod_env):
+        if env == current_prod_env:
+            description = "currently the production environment"
+            apply_dict_overrides(deploy_cfg, **cls.PRODUCTION_DEPLOYMENT_OPTION_OVERRIDES)
+        elif env == get_standard_mirror_env(current_prod_env):
             description = "currently the staging environment"
             apply_dict_overrides(deploy_cfg, **cls.STAGING_DEPLOYMENT_OPTION_OVERRIDES)
         elif is_stg_or_prd_env(env):

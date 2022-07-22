@@ -42,7 +42,16 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           S3_ENCRYPT_KEY: ${{ secrets.S3_ENCRYPT_KEY }}
+          GLOBAL_ENV_BUCKET: foursight-envs
         run: |
           poetry install
           poetry run flake8 dcicutils
-          make test
+          poetry run flake8 test
+          make test-for-ga
+
+      - name: Coveralls
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: ${{ matrix.python_version == '3.9' }}
+        run: |
+          poetry run coveralls --service=github

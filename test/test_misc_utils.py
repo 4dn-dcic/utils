@@ -13,7 +13,6 @@ import uuid
 import warnings
 import webtest
 
-from dcicutils.lang_utils import n_of
 from dcicutils.misc_utils import (
     PRINT, ignored, ignorable, filtered_warnings, get_setting_from_context, TestApp, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
@@ -24,8 +23,9 @@ from dcicutils.misc_utils import (
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ,
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
-    capitalize1, local_attrs, dict_zip, json_leaf_subst, _is_function_of_exactly_one_required_arg, string_list,
-    string_md5, key_value_dict, merge_key_value_dict_lists,
+    capitalize1, local_attrs, dict_zip, json_leaf_subst, print_error_message, get_error_message,
+    _is_function_of_exactly_one_required_arg,  # noQA
+    string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -1467,27 +1467,35 @@ def test_is_function_of_exactly_one_required_arg():
         return ['n_args', 0]
 
     def f1(x):
+        ignored(x)
         return ['n_args', 1]
 
     def f2(x, y):
+        ignored(x, y)
         return ['n_args', 2]
 
     def f0_k1(*, k):
+        ignored(k)
         return ['n_args', 0, 'n_kwargs', 1]
 
     def f1_k1(*, k):
+        ignored(k)
         return ['n_args', 1, 'n_kwargs', 1]
 
     def f2_k1(*, k):
+        ignored(k)
         return ['n_args', 2, 'n_kwargs', 1]
 
     def f0_1(x=0):
+        ignored(x)
         return ['n_args_min', 0, 'n_args_max', 1]
 
     def f0_2(x=0, y=0):
+        ignored(x, y)
         return ['n_args_min', 0, 'n_args_max', 1]
 
     def f0_k0_1(*, k=0):
+        ignored(k)
         return ['n_args', 0, 'n_kwargs_min', 0, 'n_kwargs_max', 1]
 
     assert _is_function_of_exactly_one_required_arg(f0) is False
@@ -2058,6 +2066,54 @@ def test_customized_class():
         assert printed.last is None
 
 
+class SampleException(Exception):  # Used for testing print_error_message
+    pass
+
+
+def test_get_error_message_and_print_error_message():
+
+    print()  # Start test output on a fresh line
+
+    def test_error(error_descriptor, expected, expected_full):
+
+        try:
+            # Allow either of two different ways to describe an error: as an exception or a function that raises one.
+            if isinstance(error_descriptor, Exception):
+                raise error_descriptor
+            else:
+                error_descriptor()
+
+        except Exception as exception:
+
+            # Test the ability to get or print the error message.
+
+            with printed_output() as printed:
+
+                assert get_error_message(exception, full=False) == expected
+                print_error_message(exception, full=False)
+                assert printed.last == expected
+
+                assert get_error_message(exception, full=True) == expected_full
+                print_error_message(exception, full=True)
+                assert printed.last == expected_full
+
+            return
+
+        raise AssertionError("The exception_amker did not raise an error.")
+
+    empty_dict = {}
+
+    test_error(  # The empty_dict['foo'] will unconditonally err, so we don't need the value to get used
+               error_descriptor=lambda: empty_dict['foo'],
+               # There is no difference between short and long forms for primitive error classes that have no module id.
+               expected="KeyError: 'foo'",
+               expected_full="KeyError: 'foo'")
+
+    test_error(error_descriptor=SampleException("Something happened."),
+               expected="SampleException: Something happened.",
+               expected_full="test.test_misc_utils.SampleException: Something happened.")
+
+
 def test_url_path_join():
 
     assert url_path_join('foo', 'bar') == 'foo/bar'
@@ -2571,6 +2627,39 @@ def test_json_leaf_subst():
     assert json_leaf_subst({"x": "y", "y": "x"}, subs) == {"ex": "why", "why": "ex"}
 
 
+def test_singleton_manager():
+
+    class Foo:
+        def __init__(self, token2=None):
+            self.secret_token = uuid.uuid4()
+            self.secret_token2 = token2
+
+    foo1_manager = SingletonManager(Foo)
+
+    assert foo1_manager.singleton_class is Foo
+    assert isinstance(foo1_manager.singleton, Foo)
+    assert foo1_manager.singleton is foo1_manager.singleton
+    assert foo1_manager.singleton.secret_token == foo1_manager.singleton.secret_token
+    assert foo1_manager.singleton.secret_token2 is None
+
+    foo2_manager = SingletonManager(Foo, str(uuid.uuid4()))
+
+    assert foo2_manager.singleton_class is Foo
+    assert isinstance(foo2_manager.singleton, Foo)
+    assert foo2_manager.singleton is foo2_manager.singleton
+    assert foo2_manager.singleton.secret_token == foo2_manager.singleton.secret_token
+    assert foo2_manager.singleton.secret_token2 == foo2_manager.singleton.secret_token2
+
+    foo3_manager = SingletonManager(Foo, token2=str(uuid.uuid4()))
+
+    assert foo3_manager.singleton_class is Foo
+    assert isinstance(foo3_manager.singleton, Foo)
+    assert foo3_manager.singleton is foo3_manager.singleton
+    assert foo3_manager.singleton.secret_token == foo3_manager.singleton.secret_token
+    assert foo3_manager.singleton.secret_token2 is not None
+    assert foo3_manager.singleton.secret_token2 == foo3_manager.singleton.secret_token2
+
+
 def test_key_value_dict():
 
     assert key_value_dict('a', 'b') == {'Key': 'a', 'Value': 'b'}
@@ -2600,43 +2689,3 @@ def test_merge_key_value_dict_lists():
     actual = merge_key_value_dict_lists(old, new)
     expected = [{'Key': 'a', 'Value': '7'}, {'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
     assert actual == expected
-
-
-def interim_run_all():  # TODO: Remove this when the configurable env_utils code is merged and dcicutils tests pass.
-    """
-    This function is temporary while the tests on master are broken. Usage:
-
-        $ python
-        > from test.test_misc_utils import interim_run_all
-        > interim_run_all()
-
-    This will run all diff_utils tests without trying to load any other pytest stuff that might fail
-    for unrelated reasons that are going to be fixed later.
-    """
-    import sys
-    failed = 0
-    print("fFAILED={failed}")
-    for definition_name in list(globals()):
-        if definition_name.startswith("test_"):
-            print(f"Running {definition_name}...", end="")
-            sys.stdout.flush()
-            fn = eval(definition_name)
-            try:
-                try:
-                    fn()
-                except TypeError as e:
-                    if 'positional' in str(e):
-                        print("SKIPPED (needs fixtures)")
-                        continue
-                    raise
-            except Exception as e:
-                failed += 1
-                print("****************** FAILED:")
-                print(f" {e.__class__.__name__}: {e}")
-                continue
-            print(f"PASSED (failed={failed})")
-    if failed == 0:
-        print("All tests PASSED.")
-    else:
-        print(failed)
-        print(f"{n_of(failed, 'test')} FAILED.")

@@ -17,7 +17,6 @@ import re
 import sys
 import time
 import toml
-from typing import Any, Optional
 import uuid
 import warnings
 
@@ -25,8 +24,9 @@ from botocore.credentials import Credentials as Boto3Credentials
 from botocore.exceptions import ClientError
 from collections import defaultdict
 from json import dumps as json_dumps, loads as json_loads
-from typing import Optional, List, DefaultDict
+from typing import Any, Optional, List, DefaultDict
 from unittest import mock
+from .env_utils import short_env_name
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
 from .misc_utils import (
     PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ,
@@ -192,6 +192,9 @@ class ControlledTime:  # This will move to dcicutils -kmp 7-May-2020
         it just tells you the previously known virtual clock time.
         """
         return self._just_now
+
+    def just_utcnow(self):
+        return self.just_now().astimezone(pytz.UTC).replace(tzinfo=None)
 
     def now(self) -> datetime.datetime:
         """
@@ -1259,6 +1262,104 @@ class MockBoto3Kms:
         return key_policies.get(KeyId)
 
 
+class MockBoto3Client:
+
+    MOCK_CONTENT_TYPE = 'text/xml'
+    MOCK_CONTENT_LENGTH = 350
+    MOCK_RETRY_ATTEMPTS = 0
+    MOCK_STATUS_CODE = 200
+
+    @classmethod
+    def compute_mock_response_metadata(cls, request_id=None, http_status_code=None, retry_attempts=None):
+        # It may be that uuid.uuid4() is further mocked, but either way it needs to return something
+        # that is used in two places consistently.
+        request_id = request_id or str(uuid.uuid4())
+        http_status_code = http_status_code or cls.MOCK_STATUS_CODE
+        retry_attempts = retry_attempts or cls.MOCK_RETRY_ATTEMPTS
+        return {
+            'RequestId': request_id,
+            'HTTPStatusCode': http_status_code,
+            'HTTPHeaders': cls.compute_mock_request_headers(request_id=request_id),
+            'RetryAttempts': retry_attempts,
+        }
+
+    @classmethod
+    def compute_mock_request_headers(cls, request_id):
+        # request_date_str = 'Thu, 01 Oct 2020 06:00:00 GMT'
+        #   or maybe pytz.UTC.localize(datetime.datetime.utcnow()), where .utcnow() may be further mocked
+        # request_content_type = self.MOCK_CONTENT_TYPE
+        return {
+            'x-amzn-requestid': request_id,
+            # We probably don't need these other values, and if we do we might need different values,
+            # so we prefer not to provide mock values until/unless need is shown. -kmp 15-Oct-2020
+            #
+            # 'date': request_date_str,  # see above
+            # 'content-type': 'text/xml',
+            # 'content-length': 350,
+        }
+
+
+@MockBoto3.register_client(kind='lambda')
+class MockBoto3Lambda(MockBoto3Client):
+
+    _UNSUPPLIED = object()
+    _MOCKED_LAMBDAS = '_MOCKED_LAMBDAS'
+    _DEFAULT_MAX_ITEMS = 50
+
+    def __init__(self, region_name=None, boto3=None):
+        self.region_name = region_name
+        self.boto3 = boto3 or MockBoto3()
+
+    def _lambdas(self):
+        shared_reality = self.boto3.shared_reality
+        lambdas = shared_reality.get(self._MOCKED_LAMBDAS)
+        if lambdas is None:
+            # Export the list in case other clients want the same list.
+            shared_reality[self._MOCKED_LAMBDAS] = lambdas = {}
+        return lambdas
+
+    def _some_lambdas(self, marker=_UNSUPPLIED, max_items=_DEFAULT_MAX_ITEMS):
+        all_entries = list(self._lambdas().values())
+        if not all_entries:
+            return all_entries, None
+        idx = None
+        if marker is not self._UNSUPPLIED:
+            for i in range(len(all_entries)):
+                entry = all_entries[i]
+                if entry['FunctionName'] == marker:
+                    idx = i
+                    break
+            if idx is None:
+                raise RuntimeError(f"Invalid marker: {marker}")
+        if idx is None:
+            idx = 0
+        rest = all_entries[idx:]
+        more = rest[max_items:]
+        some = rest[:max_items]
+        next = more[0]['FunctionName'] if more else None
+        return some, next
+
+    def register_lambda_for_testing(self, key, **data):
+        entry = data.copy()
+        entry['FunctionName'] = key
+        self._lambdas()[key] = entry
+
+    def register_lambdas_for_testing(self, lambdas: dict) -> None:
+        for key, data in lambdas.items():
+            self.register_lambda_for_testing(key, **data)
+
+    def list_functions(self, MaxItems=_DEFAULT_MAX_ITEMS, Marker=_UNSUPPLIED):
+        assert Marker is self._UNSUPPLIED or isinstance(Marker, str)
+        functions, next_marker = self._some_lambdas(max_items=MaxItems, marker=Marker)
+        result = {
+            'MetaData': self.compute_mock_response_metadata(),
+            'Functions': functions,
+        }
+        if next_marker is not None:
+            result['NextMarker'] = next_marker
+        return result
+
+
 @MockBoto3.register_client(kind='secretsmanager')
 class MockBoto3SecretsManager:
 
@@ -1528,7 +1629,8 @@ class MockBotoS3Client:
             # I would need to research what specific error is needed here and hwen,
             # since it might be a 404 (not found) or a 403 (permissions), depending on various details.
             # For now, just fail in any way since maybe our code doesn't care.
-            raise Exception(f"Mock File Not Found: {pseudo_filename}")
+            raise Exception(f"Mock File Not Found: {pseudo_filename}."
+                            f" Existing files: {list(self.s3_files.files.keys())}")
 
     def head_bucket(self, Bucket):  # noQA - AWS argument naming style
         bucket_prefix = Bucket + "/"
@@ -1769,7 +1871,7 @@ class MockBotoS3BucketObjects:
 
 
 @MockBoto3.register_client(kind='sqs')
-class MockBotoSQSClient:
+class MockBotoSQSClient(MockBoto3Client):
     """
     This is a mock of certain SQS functionality.
     """
@@ -1784,38 +1886,6 @@ class MockBotoSQSClient:
         __tracebackhide__ = True
         if self._mock_queue_name_seen:
             assert self._mock_queue_name_seen in queue_url, "This mock only supports one queue at a time."
-
-    MOCK_CONTENT_TYPE = 'text/xml'
-    MOCK_CONTENT_LENGTH = 350
-    MOCK_RETRY_ATTEMPTS = 0
-    MOCK_STATUS_CODE = 200
-
-    def compute_mock_response_metadata(self):
-        # It may be that uuid.uuid4() is further mocked, but either way it needs to return something
-        # that is used in two places consistently.
-        request_id = str(uuid.uuid4())
-        http_status_code = self.MOCK_STATUS_CODE
-        return {
-            'RequestId': request_id,
-            'HTTPStatusCode': http_status_code,
-            'HTTPHeaders': self.compute_mock_request_headers(request_id),
-            'RetryAttempts': self.MOCK_RETRY_ATTEMPTS,
-        }
-
-    @classmethod
-    def compute_mock_request_headers(cls, request_id):
-        # request_date_str = 'Thu, 01 Oct 2020 06:00:00 GMT'
-        #   or maybe pytz.UTC.localize(datetime.datetime.utcnow()), where .utcnow() may be further mocked
-        # request_content_type = self.MOCK_CONTENT_TYPE
-        return {
-            'x-amzn-requestid': request_id,
-            # We probably don't need these other values, and if we do we might need different values,
-            # so we prefer not to provide mock values until/unless need is shown. -kmp 15-Oct-2020
-            #
-            # 'date': request_date_str,  # see above
-            # 'content-type': 'text/xml',
-            # 'content-length': 350,
-        }
 
     MOCK_QUEUE_URL_PREFIX = 'https://queue.amazonaws.com.mock/12345/'  # just something to make it look like a URL
 
@@ -2109,7 +2179,8 @@ class MockBotoElasticBeanstalkClient:
 
 
 def make_mock_beanstalk_cname(env_name):
-    return f"{env_name}.9wzadzju3p.us-east-1.elasticbeanstalk.com"
+    # return f"{env_name}.9wzadzju3p.us-east-1.elasticbeanstalk.com"
+    return f"{short_env_name(env_name)}.4dnucleome.org"
 
 
 def make_mock_beanstalk(env_name, cname=None):

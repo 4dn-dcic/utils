@@ -1,22 +1,8 @@
 import boto3
 import base64
 
-from .common import REGION
+from .common import REGION as COMMON_REGION
 from .misc_utils import PRINT
-from .env_utils import is_cgap_env
-
-
-# Defines the standard Docker image tags for CGAP ECR
-# Latest and stable - something like this should be reasonable?
-CGAP_ECR_LAYOUT = {
-    'latest-wsgi': 'Latest version of WSGI Application',
-    'latest-indexer': 'Latest version of Indexer Application',
-    'latest-ingester': 'Latest version of the Ingester Application',
-    'stable-wsgi': 'Stable version of WSGI Application',
-    'stable-indexer': 'Stable version of Indexer Application',
-    'stable-ingester': 'Stable version of the Ingester Application'
-}
-CGAP_ECR_REGION = REGION
 
 
 class ECRUtils(object):
@@ -28,14 +14,25 @@ class ECRUtils(object):
         NOTE 2: the (already created) ECR repository must have the env_name in the URI
     """
 
-    def __init__(self, *, env_name='cgap-mastertest', local_repository='cgap-wsgi'):
+    REGION = COMMON_REGION  # this default must match what ecs_utils.ECSUtils and secrets_utils.assume_identity use
+
+    # Will thinks this is no longer used. -kmp 14-Jul-2022
+    #
+    # ECR_LAYOUT = {
+    #     'latest-wsgi': 'Latest version of WSGI Application',
+    #     'latest-indexer': 'Latest version of Indexer Application',
+    #     'latest-ingester': 'Latest version of the Ingester Application',
+    #     'stable-wsgi': 'Stable version of WSGI Application',
+    #     'stable-indexer': 'Stable version of Indexer Application',
+    #     'stable-ingester': 'Stable version of the Ingester Application'
+    # }
+
+    # defaults were formerly env_name='cgap-mastertest', local_repository='cgap-wsgi'
+    def __init__(self, *, env_name, local_repository, region=None):
         """ Creates an ECR client on startup """
         self.env = env_name
         self.local_repository = local_repository
-        self.is_cgap = is_cgap_env(env_name)
-        if not self.is_cgap:
-            raise NotImplementedError('ECR setup is not implemented for fourfront!')
-        self.client = boto3.client('ecr', region_name=CGAP_ECR_REGION)  # XXX: constant?
+        self.client = boto3.client('ecr', region_name=region or self.REGION)
         self.url = None  # set by calling the below method
 
     def resolve_repository_uri(self, url=None):
@@ -79,3 +76,8 @@ class ECRUtils(object):
             above API call.
         """
         return base64.b64decode(authorization['authorizationToken']).replace(b'AWS:', b'').decode('utf-8')
+
+
+# These two variables are deprecated. Please use references to ECRUtils instead. They will go away in the future.
+# CGAP_ECR_LAYOUT = ECRUtils.ECR_LAYOUT
+CGAP_ECR_REGION = ECRUtils.REGION

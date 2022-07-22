@@ -347,6 +347,12 @@ def test_conjoined_list():
     assert EnglishUtils.conjoined_list(['a', 'b', 'c']) == 'a, b and c'
     assert EnglishUtils.conjoined_list(['a', 'b', 'c', 'd']) == 'a, b, c and d'
 
+    # For a set, we use the elements sorted.
+    assert conjoined_list({'apple', 'lemon', 'grape'}) == 'apple, grape and lemon'
+
+    # For dictionary, we use the keys in the order they occur.
+    assert conjoined_list({'apple': 'delicious', 'lemon': 'meyer', 'grape': 'seedless'}) == 'apple, lemon and grape'
+
 
 def test_disjoined_list():
 
@@ -359,6 +365,12 @@ def test_disjoined_list():
     assert disjoined_list(['a', 'b'], oxford_comma=True) == 'a or b'
     assert disjoined_list(['a', 'b', 'c'], oxford_comma=True) == 'a, b, or c'
     assert disjoined_list(['a', 'b', 'c', 'd'], oxford_comma=True) == 'a, b, c, or d'
+
+    # For a set, we use the elements sorted.
+    assert disjoined_list({'apple', 'lemon', 'grape'}) == 'apple, grape or lemon'
+
+    # For dictionary, we use the keys in the order they occur.
+    assert disjoined_list({'apple': 'delicious', 'lemon': 'meyer', 'grape': 'seedless'}) == 'apple, lemon or grape'
 
 
 def test_there_are():

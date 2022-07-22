@@ -1,3 +1,4 @@
+import contextlib
 import os
 import boto3
 import json
@@ -5,8 +6,10 @@ import re
 import structlog
 
 from botocore.exceptions import ClientError
-from .ecr_utils import CGAP_ECR_REGION
-from .misc_utils import PRINT, full_class_name
+from typing import Optional
+from .common import REGION as COMMON_REGION
+from .lang_utils import a_or_an
+from .misc_utils import PRINT, full_class_name, override_environ
 
 
 logger = structlog.getLogger(__name__)
@@ -20,15 +23,28 @@ logger = structlog.getLogger(__name__)
 GLOBAL_APPLICATION_CONFIGURATION = 'IDENTITY'
 
 
-def assume_identity():
+# TODO: Rethink whether this should be a constant. Maybe it should be a function of the identity_kind?
+#       Maybe the caller should pass a default and this function should have none. -kmp 18-Jul-2022
+LEGACY_DEFAULT_IDENTITY_NAME = 'dev/beanstalk/cgap-dev'
+
+
+def get_identity_name(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION):
+    return os.environ.get(identity_kind, LEGACY_DEFAULT_IDENTITY_NAME)
+
+
+def identity_is_defined(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> bool:
+    return bool(os.environ.get(identity_kind))
+
+
+def get_identity_secrets(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> dict:
     """ Grabs application identity from the secrets manager.
         Looks for environment variable IDENTITY, which should contain the name of
         a secret in secretsmanager that is a JSON blob of core configuration information.
         Default value is current value in the test account. This name should be the
         name of the environment.
     """
-    secret_name = os.environ.get(GLOBAL_APPLICATION_CONFIGURATION, 'dev/beanstalk/cgap-dev')
-    region_name = CGAP_ECR_REGION  # us-east-1, must match ECR/ECS Region
+    secret_name = get_identity_name(identity_kind)
+    region_name = COMMON_REGION  # us-east-1, must match ECR/ECS Region, which also imports its default from .common
     session = boto3.session.Session(region_name=region_name)
     client = session.client(
         service_name='secretsmanager',
@@ -53,12 +69,109 @@ def assume_identity():
         # Decrypts secret using the associated KMS CMK.
         # Depending on whether the secret is a string or binary, one of these fields will be populated.
         if 'SecretString' in get_secret_value_response:
-            identity = json.loads(get_secret_value_response['SecretString'])
+            identity_secrets = json.loads(get_secret_value_response['SecretString'])
         else:
             raise Exception('Got unexpected response structure from boto3')
-    if not identity:
+    if not identity_secrets:
         raise Exception('Identity could not be found! Check the secret name.')
-    return identity
+    elif not isinstance(identity_secrets, dict):
+        raise Exception("Identity was not in expected dictionary form.")
+    return identity_secrets
+
+
+assume_identity = get_identity_secrets  # assume_identity is deprecated. Please rewrite
+
+
+def apply_overrides(*, secrets: dict, rename_keys: Optional[dict] = None,
+                    override_values: Optional[dict] = None) -> dict:
+    if rename_keys:
+        secrets = secrets.copy()
+        for key, new_name in rename_keys.items():
+            if new_name in secrets:
+                raise ValueError(f"Cannot rename {key} to {new_name}"
+                                 f" because {a_or_an(new_name)} attribute already exists.")
+            if key not in secrets:
+                raise ValueError(f"Cannot rename {key} to {new_name} because the secrets has no {key} attribute.")
+            secrets[new_name] = secrets.pop(key)
+    if override_values:
+        secrets = dict(secrets, **override_values)
+    return secrets
+
+
+@contextlib.contextmanager
+def assumed_identity_if(only_if: bool, *,
+                        identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
+                        only_if_missing: Optional[str] = None,
+                        require_identity: bool = False,
+                        rename_keys: Optional[dict] = None,
+                        override_values: Optional[dict] = None):
+    with assumed_identity(identity_kind=identity_kind, only_if=only_if, only_if_missing=only_if_missing,
+                          require_identity=require_identity, rename_keys=rename_keys, override_values=override_values):
+        yield
+
+
+@contextlib.contextmanager
+def assumed_identity(*,
+                     identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
+                     only_if: bool = True,
+                     only_if_missing: Optional[str] = None,
+                     require_identity: bool = False,
+                     rename_keys: Optional[dict] = None,
+                     override_values: Optional[dict] = None):
+    """
+    Assumes a given identity in a context.
+
+    The rename_keys happen before the override_values.
+
+    >>> apply_overrides(secrets={'x': 1, 'y': 2}, rename_keys={'x': 'ex', 'y': 'why'}, override_values={'x': 3, 'z': 9})
+    {'ex': 1, 'why': 2, 'z': 9, 'x': 3}
+
+    NOTE: This assumes that global_env_bucket is in the GAC and not otherwise,
+          so it tests
+
+    :param identity_kind: The name of the identity to assume (default 'IDENTITY')
+    :param only_if: Whether to try assuming identity at all (default True)
+    :param only_if_missing: The name of an environment variable that would only be in the GAC.
+       Load the GAC only if this variable is not set. Default is None, meaning load unconditionally.
+    :param require_identity: Whether to raise an error if the identity_kind environment variable is not bound.
+    :param rename_keys: If present, a dictionary mapping keys to override keys. Default None.
+    :param override_values: If present, a dictionary mapping keys to override values. Default None.
+
+    """
+    if only_if and (not only_if_missing or not os.environ.get(only_if_missing)):
+        identity_name = get_identity_name(identity_kind=identity_kind)
+        if identity_name:
+            secrets = get_identity_secrets(identity_kind=identity_kind)
+            secrets = apply_overrides(secrets=secrets, rename_keys=rename_keys, override_values=override_values)
+            if only_if_missing and only_if_missing not in secrets:
+                raise RuntimeError(f"No {only_if_missing} was found where expected"
+                                   f" in {identity_kind} secrets at {identity_name}.")
+            with override_environ(**secrets):
+                yield
+                return  # Nothing to do after that
+
+        elif require_identity:
+            raise RuntimeError(f"An identity was not defined in environment variable {identity_kind}.")
+
+    yield
+
+
+def apply_identity(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
+                   rename_keys: Optional[dict] = None, override_values: Optional[dict] = None):
+    """
+    Assumes an identity globally by assigning environment variables.
+
+    Since this is assumed to be an initial startup action, we assume it's not already been done and don't
+    offer the only_if_missing mechanism that the assumed_identity context manager offers.
+
+    """
+    if identity_is_defined(identity_kind):
+        secrets = get_identity_secrets(identity_kind=identity_kind)
+        secrets = apply_overrides(secrets=secrets, rename_keys=rename_keys, override_values=override_values)
+        for var, val in secrets.items():
+            os.environ[var] = val
+    else:
+        raise RuntimeError(f"An identity was not defined in environment variable {identity_kind}.")
 
 
 # Some hints about how to manipulate secrets are here:
@@ -80,7 +193,10 @@ class SecretsTable:
     NOTE: We could later extend this to allow creating or modifying the table as well,
     but that might involve extra permissions and be less broadly useful.
     """
-    def __init__(self, name, secretsmanager_client=None, stage=None):
+
+    REGION = COMMON_REGION
+
+    def __init__(self, name, secretsmanager_client=None, stage=None, region=None):
         """
         :param name: The SecretId of the secret to help with.
         :param secretsmanager_client: A Boto3 Secrets Manager client to use. If unsupplied, one is created.
@@ -88,7 +204,7 @@ class SecretsTable:
         if not str or not isinstance(name, str):
             raise ValueError(f"Bad secret name: {name}")
         self.secretsmanager_client = (secretsmanager_client
-                                      or boto3.client('secretsmanager', region_name=CGAP_ECR_REGION))
+                                      or boto3.client('secretsmanager', region_name=region or self.REGION))
         self.name = name
         self.stage = stage
 
