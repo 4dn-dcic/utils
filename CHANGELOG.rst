@@ -7,30 +7,11 @@ Change Log
 ----------
 
 
-3.16.0
-======
-
-* In ``qa_utils``:
-
-  * Extend the mocking so that output to files by ``PRINT`` can be tested
-    by ``with printed_output as printed`` using ``printed.file_last[fp]``
-    and ``printed.file_lines[fp]``.
-
-
-3.15.0
-======
-
-* In ``ecs_utils``:
-  * Adds the ``service_has_active_deployment`` method.
-
-
-3.14.2
-======
-* In ``qa_utils``:
-  * Minor updates related PEP8.
-
 4.0.0
 =====
+
+The following change list is only interim. A followup change will revise this entry with better information
+covering whta changed in 4.0, which is considerably more.
 
 * New ``make`` targets:
 
@@ -123,6 +104,29 @@ these new items:
     and needs to move inside the firewall
   * ``stg_or_prd_testing_needs_repair`` - Some or all of a test that was failing on stg/prd
     has been temporarily disabled
+
+
+3.16.0
+======
+
+* In ``qa_utils``:
+
+  * Extend the mocking so that output to files by ``PRINT`` can be tested
+    by ``with printed_output as printed`` using ``printed.file_last[fp]``
+    and ``printed.file_lines[fp]``.
+
+
+3.15.0
+======
+
+* In ``ecs_utils``:
+  * Adds the ``service_has_active_deployment`` method.
+
+
+3.14.2
+======
+* In ``qa_utils``:
+  * Minor updates related PEP8.
 
 
 3.14.1
