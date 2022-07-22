@@ -255,7 +255,7 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             self._health_json_url = self._health_json_url or f"{self.url}/health?format=json"
             logger.warning(f"health json url: {self._health_json_url}")
             self._health_json = EnvManager.fetch_health_page_json(url=self._health_json_url)
-            logger.warning(f"health json: {self._health_json}")
+            # logger.warning(f"health json: {self._health_json}")
         return self._health_json.get(health_page_key, default)
 
     ACCESS_KEYS_S3_KEY = 'access_key_admin'
