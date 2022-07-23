@@ -6,8 +6,8 @@ dcicutils
 Change Log
 ----------
 
-3.16.1
-======
+4.0.1
+=====
 * In ``qa_utils``:
   * New class ``MockBoto3Ec2`` geared toward security group rules related unit testing.
 
