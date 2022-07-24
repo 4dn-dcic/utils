@@ -71,7 +71,8 @@ def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False) 
     def has_values_to_obfuscate(dictionary: dict) -> bool:
         for key, value in dictionary.items():
             if isinstance(value, dict):
-                return has_values_to_obfuscate(value)
+                if has_values_to_obfuscate(value):
+                    return True
             elif isinstance(value, str) and should_obfuscate(key) and not already_obfuscated(value):
                 return True
         return False

@@ -67,3 +67,9 @@ def test_obfuscate_dict():
     x = obfuscate_dict(d)
     assert x == d
     assert id(x) == id(d)
+
+    d = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "789"}}
+    o = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "***"}}
+    x = obfuscate_dict(d)
+    assert x == o
+    assert id(x) != id(d)
