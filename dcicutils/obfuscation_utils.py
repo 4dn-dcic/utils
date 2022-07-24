@@ -56,8 +56,8 @@ def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False) 
     inplace argument is False, a COPY of the dictionary is returned, but ONLY if it actually needs to
     be modified (i.e. has values to obfuscate, based on key name, and which are not already obfuscated);
     i.e. the given dictionary is NOT modified if there are no values to obfuscate or if such values are
-    already abfuscated. If the inplace argument is True, then any changes (value obfuscations) are made
-    to the given dictionary in place. In either case the resultant dictionary is returned.
+    already abfuscated. If the inplace argument is True, then any changes (value obfuscations) are made to
+    the given dictionary itself in place (NOT a copy). In either case the resultant dictionary is returned.
     If the show argument is True then does not actually obfuscate and simply returns the given dictionary.
 
     :param dictionary: Given dictionary whose senstive values obfuscate.
