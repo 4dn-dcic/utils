@@ -6,6 +6,11 @@ dcicutils
 Change Log
 ----------
 
+4.0.1
+=====
+* In ``qa_utils``:
+  * New class ``MockBoto3Ec2`` geared toward security group rules related unit testing.
+* New ``obfuscation_utils`` module.
 
 4.0.0
 =====
@@ -115,19 +120,16 @@ these new items:
     by ``with printed_output as printed`` using ``printed.file_last[fp]``
     and ``printed.file_lines[fp]``.
 
-
 3.15.0
 ======
 
 * In ``ecs_utils``:
   * Adds the ``service_has_active_deployment`` method.
 
-
 3.14.2
 ======
 * In ``qa_utils``:
   * Minor updates related PEP8.
-
 
 3.14.1
 ======
@@ -141,7 +143,6 @@ these new items:
   * New method ``MockBotoS3Session.put_credentials_for_testing``.
   * New property ``MockBotoS3Session.region_name``.
   * New method ``MockBotoS3Session.unset_environ_credentials_for_testing``.
-
 
 3.14.0
 ======

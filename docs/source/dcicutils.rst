@@ -184,6 +184,13 @@ misc_utils
    :members:
 
 
+obfuscation_utils
+^^^^^^^^
+
+.. automodule:: dcicutils.obfuscation_utils
+   :members:
+
+
 qa_utils
 ^^^^^^^^
 
