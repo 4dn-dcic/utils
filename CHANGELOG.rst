@@ -10,6 +10,7 @@ Change Log
 =====
 * In ``qa_utils``:
   * New class ``MockBoto3Ec2`` geared toward security group rules related unit testing.
+* New ``obfuscation_utils`` module.
 
 4.0.0
 =====
