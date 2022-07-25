@@ -1,6 +1,3 @@
-import pytest
-
-from dcicutils.lang_utils import n_of
 from dcicutils.obfuscation_utils import (
     should_obfuscate,
     obfuscate,
@@ -42,12 +39,14 @@ def test_obfuscate():
     assert_string_contains_only_asterisks(obfuscate("abc"))
     assert_string_contains_only_asterisks(obfuscate("prufrock"))
     assert obfuscate("") == ""
-    assert obfuscate(None) == None
+    assert obfuscate(None) is None
 
 
 def test_obfuscate_dict():
-    d = {"abc": "123", "def_password_ghi": "456", "secret": 789, "foo": { "jkl": "678", "secret": "789", "encrypt_id": "9012", "encrypt_key_id": "foo" }}
-    o = {"abc": "123", "def_password_ghi": "***", "secret": 789, "foo": { "jkl": "678", "secret": "***", "encrypt_id": "****", "encrypt_key_id": "foo" }}
+    d = {"abc": "123", "def_password_ghi": "456", "secret": 789, "foo":
+         {"jkl": "678", "secret": "789", "encrypt_id": "9012", "encrypt_key_id": "foo"}}
+    o = {"abc": "123", "def_password_ghi": "***", "secret": 789, "foo":
+         {"jkl": "678", "secret": "***", "encrypt_id": "****", "encrypt_key_id": "foo"}}
 
     x = obfuscate_dict(d)
     assert x == o

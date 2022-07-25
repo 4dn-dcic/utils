@@ -1,6 +1,5 @@
 # Unit tests for the qa_utils MockBoto3Session credentials related mocks.
 
-from dcicutils.misc_utils import override_environ
 from dcicutils.qa_utils import MockBoto3, MockBoto3Session
 import io
 import os
