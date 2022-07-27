@@ -246,8 +246,6 @@ class AbstractOrchestrationManager:
             return []
         elif isinstance(name_pattern, str):
             name_pattern = re.compile(name_pattern)
-        elif not isinstance(name_pattern, re.Pattern):
-            return []
         matching_function_names = []
         lambda_client = boto3.client('lambda')
         lambda_response = lambda_client.list_functions()
