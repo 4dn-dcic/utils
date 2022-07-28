@@ -506,7 +506,7 @@ def test_find_lambda_function_names():
     mocked_boto_lambda = mocked_boto.client('lambda')
     assert isinstance(mocked_boto_lambda, MockBoto3Lambda)
 
-    mocked_boto_lambda.register_lambdas_for_testing({ name: {} for name in mocked_lambdas})
+    mocked_boto_lambda.register_lambdas_for_testing({name: {} for name in mocked_lambdas})
 
     with mock.patch.object(cloudformation_utils, "boto3", mocked_boto):
 
