@@ -7,7 +7,8 @@ from dcicutils.ff_mocks import mocked_s3utils
 from dcicutils.env_base import EnvBase
 from dcicutils.misc_utils import override_environ
 from dcicutils.qa_utils import (
-    MockBoto3, MockBotoCloudFormationClient, MockBotoCloudFormationStack, MockBotoCloudFormationResourceSummary,
+    MockBoto3, MockBotoCloudFormationClient, MockBotoCloudFormationStack,
+    MockBotoCloudFormationResourceSummary, MockBoto3Lambda,
 )
 from unittest import mock
 
@@ -489,3 +490,47 @@ def test_abstract_orchestration_manager_discover_foursight_check_runner_name():
                     assert foo_runner == MOCKED_DEV_CHECK_RUNNER
                     assert os.environ.get('CHECK_RUNNER') == foo_runner
                     print(f"CHECK_RUNNER={os.environ.get('CHECK_RUNNER')}")
+
+
+def test_find_lambda_function_names():
+
+    mocked_lambdas = [
+        "c4-foursight-cgap-supertest-stack-CheckRunner-ABC",
+        "c4-foursight-fourfront-production-stac-CheckRunner-DEFGHI",
+        "c4-foursight-cgap-supertest-stack-CheckRunner-JKLMNOPQRST",
+    ]
+
+    mocked_boto = MockBoto3()
+    assert isinstance(mocked_boto, MockBoto3)
+
+    mocked_boto_lambda = mocked_boto.client('lambda')
+    assert isinstance(mocked_boto_lambda, MockBoto3Lambda)
+
+    mocked_boto_lambda.register_lambdas_for_testing({ name: {} for name in mocked_lambdas})
+
+    with mock.patch.object(cloudformation_utils, "boto3", mocked_boto):
+
+        names = cloudformation_utils.AbstractOrchestrationManager.find_lambda_function_names(".*")
+        assert len(names) == 3
+        for mocked_lambda in mocked_lambdas:
+            assert mocked_lambda in names
+
+        names = cloudformation_utils.AbstractOrchestrationManager.find_lambda_function_names(".*CheckRunner.*")
+        assert len(names) == 3
+        for mocked_lambda in mocked_lambdas:
+            assert mocked_lambda in names
+
+        names = cloudformation_utils.AbstractOrchestrationManager.find_lambda_function_names(".*FOO.*")
+        assert len(names) == 0
+
+        names = cloudformation_utils.AbstractOrchestrationManager.find_lambda_function_names(".*ABC.*")
+        assert len(names) == 1
+        assert names[0] == mocked_lambdas[0]
+
+        names = cloudformation_utils.AbstractOrchestrationManager.find_lambda_function_names(".*DEFG.*")
+        assert len(names) == 1
+        assert names[0] == mocked_lambdas[1]
+
+        names = cloudformation_utils.AbstractOrchestrationManager.find_lambda_function_names(".*PQRS.*")
+        assert len(names) == 1
+        assert names[0] == mocked_lambdas[2]
