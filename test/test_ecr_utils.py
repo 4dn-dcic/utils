@@ -3,7 +3,7 @@ import pytest
 from unittest import mock
 from dcicutils.ecr_utils import ECRUtils
 from dcicutils.docker_utils import DockerUtils
-from dcicutils.misc_utils import ignored
+from dcicutils.misc_utils import ignored, ignorable, filtered_warnings
 from .helpers import using_fresh_cgap_state_for_testing
 
 
@@ -43,8 +43,15 @@ def test_ecr_utils_workflow():
         ecr_cli.resolve_repository_uri()
         ecr_user, ecr_pass = 'dummy', 'dummy'  # XXX: integrated test for this mechanism
         with mock.patch.object(docker_cli.client, 'login', mocked_ecr_login):
-            docker_cli.login(ecr_repo_uri=ecr_cli.url,
-                             ecr_user=ecr_user, ecr_pass=ecr_pass)
+            ignorable(filtered_warnings)
+            with filtered_warnings("ignore", category=DeprecationWarning):
+                # e.g., as of docker 4.4.4, we see in site-packages/docker/utils/utils.py, lines 59-60:
+                #  DeprecationWarning: distutils Version classes are deprecated. Use packaging.version instead.
+                #    s1 = StrictVersion(v1)
+                #  DeprecationWarning: distutils Version classes are deprecated. Use packaging.version instead.
+                #    s2 = StrictVersion(v2)
+                docker_cli.login(ecr_repo_uri=ecr_cli.url,
+                                 ecr_user=ecr_user, ecr_pass=ecr_pass)
             # XXX: integrated test the remaining?
 
 

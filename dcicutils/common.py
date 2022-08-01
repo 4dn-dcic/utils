@@ -1,3 +1,5 @@
+import os
+
 from typing_extensions import Literal
 
 
@@ -29,3 +31,5 @@ EnvName = str
 
 ChaliceStage = Literal['dev', 'prod']
 OrchestratedApp = Literal['cgap', 'fourfront']
+
+LIBRARY_DIR = os.path.dirname(__file__)

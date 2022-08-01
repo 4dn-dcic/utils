@@ -1313,13 +1313,14 @@ def test_faceted_search_exp_set(integrated_ff):
 
     project = {'Project': '4DN'}
     project.update(for_all)
+    # print(f"project={json.dumps(project, indent=2)}")
     resp = ff_utils.faceted_search(**project)
-    assert len(resp) == 8
+    assert len(resp) == 3
     validate_items(resp, all_facets['Project'], '4DN')
     lab = {'Lab': '4DN Testing Lab'}
     lab.update(for_all)
     resp = ff_utils.faceted_search(**lab)
-    assert len(resp) == 12
+    assert len(resp) == 5
     validate_items(resp, all_facets['Lab'], '4DN Testing Lab')
     exp_cat = {'Experiment Category': 'Microscopy'}
     exp_cat.update(for_all)
@@ -1328,39 +1329,39 @@ def test_faceted_search_exp_set(integrated_ff):
     exp_type = {'Experiment Type': 'Dilution Hi-C'}
     exp_type.update(for_all)
     resp = ff_utils.faceted_search(**exp_type)
-    assert len(resp) == 3
+    assert len(resp) == 2
     dataset = {'Dataset': 'No value'}
     dataset.update(for_all)
     resp = ff_utils.faceted_search(**dataset)
-    assert len(resp) == 9
+    assert len(resp) == 4
     sample_type = {'Sample Type': 'immortalized cells'}
     sample_type.update(for_all)
     resp = ff_utils.faceted_search(**sample_type)
-    assert len(resp) == 13
+    assert len(resp) == 6
     sample_cat = {'Sample Category': 'In vitro Differentiation'}
     sample_cat.update(for_all)
     resp = ff_utils.faceted_search(**sample_cat)
-    assert len(resp) == 1
+    assert len(resp) == 0
     sample = {'Sample': 'GM12878'}
     sample.update(for_all)
     resp = ff_utils.faceted_search(**sample)
-    assert len(resp) == 13
+    assert len(resp) == 6
     tissue_src = {'Tissue Source': 'endoderm'}
     tissue_src.update(for_all)
     resp = ff_utils.faceted_search(**tissue_src)
-    assert len(resp) == 1
+    assert len(resp) == 0
     pub = {'Publication': 'No value'}
     pub.update(for_all)
     resp = ff_utils.faceted_search(**pub)
-    assert len(resp) == 9
+    assert len(resp) == 4
     mods = {'Modifications': 'Stable Transfection'}
     mods.update(for_all)
     resp = ff_utils.faceted_search(**mods)
-    assert len(resp) == 7
+    assert len(resp) == 4
     treats = {'Treatments': 'RNAi'}
     treats.update(for_all)
     resp = ff_utils.faceted_search(**treats)
-    assert len(resp) == 7
+    assert len(resp) == 4
     assay_details = {'Assay Details': 'No value'}
     assay_details.update(for_all)
     resp = ff_utils.faceted_search(**assay_details)
@@ -1368,33 +1369,33 @@ def test_faceted_search_exp_set(integrated_ff):
     status = {'Status': 'released'}
     status.update(for_all)
     resp = ff_utils.faceted_search(**status)
-    assert len(resp) == 12
+    assert len(resp) == 5
     warnings = {'Warnings': 'No value'}
     warnings.update(for_all)
     resp = ff_utils.faceted_search(**warnings)
-    assert len(resp) == 4
+    assert len(resp) == 2
     both_projects = {'Project': '4DN|External'}
     both_projects.update(for_all)
     resp = ff_utils.faceted_search(**both_projects)
-    assert len(resp) == 13
+    assert len(resp) == 6
     both_labs = {'Lab': '4DN Testing Lab|Some Other Guys lab'}
     both_labs.update(for_all)
     resp = ff_utils.faceted_search(**both_labs)
-    assert len(resp) == 13
+    assert len(resp) == 6
     proj_exp_type = {'Project': '4DN', 'Experiment Type': 'Dilution Hi-C'}
     proj_exp_type.update(for_all)
     resp = ff_utils.faceted_search(**proj_exp_type)
-    assert len(resp) == 2
+    assert len(resp) == 1
     proj_exp_type = {'Project': '4DN|External', 'Experiment Type': 'Dilution Hi-C|2-stage Repli-seq'}
     proj_exp_type.update(for_all)
     resp = ff_utils.faceted_search(**proj_exp_type)
-    assert len(resp) == 5
+    assert len(resp) == 3
     proj_exp_sam = {'Project': '4DN|External',
                     'Experiment Type': 'Dilution Hi-C|2-stage Repli-seq',
                     'Sample Type': 'in vitro differentiated cells'}
     proj_exp_sam.update(for_all)
     resp = ff_utils.faceted_search(**proj_exp_sam)
-    assert len(resp) == 1
+    assert len(resp) == 0
     exp_sam = {'Experiment Type': 'ATAC-seq'}
     exp_sam.update(for_all)
     resp = ff_utils.faceted_search(**exp_sam)
@@ -1411,7 +1412,7 @@ def test_faceted_search_exp_set(integrated_ff):
                     'Dataset': 'Z et al. 2-Stage Repliseq'}
     exp_sam_data.update(for_all)
     resp = ff_utils.faceted_search(**exp_sam_data)
-    assert len(resp) == 2
+    assert len(resp) == 1
 
 
 @pytest.mark.integrated

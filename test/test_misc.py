@@ -3,8 +3,10 @@ import io
 import os
 import re
 
+from dcicutils.common import LIBRARY_DIR
 from dcicutils.misc_utils import PRINT, remove_suffix
 from dcicutils.lang_utils import there_are
+from dcicutils.qa_utils import confirm_no_uses
 
 
 _MY_DIR = os.path.dirname(__file__)
@@ -78,3 +80,10 @@ def test_documentation():
             message = there_are(problems, kind="problem", tense='past', show=False,
                                 context=f"found in the readthedocs declaration file, {_DCICUTILS_DOC_FILE!r}")
             raise AssertionError(message)
+
+
+def test_for_debugging_print():
+    confirm_no_uses(where=os.path.join(LIBRARY_DIR, "*.py"), patterns={
+        "call to print": "^[^#]*print[(]",
+        "active use of pdb.set_trace": "^[^#]*pdb[.]set_trace[(][)]"
+    })

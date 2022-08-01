@@ -885,13 +885,15 @@ def get_mirror_env_from_context(settings, allow_environ=ALLOW_ENVIRON_BY_DEFAULT
         return None
 
 
-def get_foursight_bucket_prefix():
+def get_foursight_bucket_prefix(allow_missing=False):
     declared_foursight_bucket_prefix = EnvUtils.FOURSIGHT_BUCKET_PREFIX
     if declared_foursight_bucket_prefix:
         return declared_foursight_bucket_prefix
     bucket_env = EnvBase.global_env_bucket_name()
     if bucket_env and bucket_env.endswith("-envs"):
         return remove_suffix('-envs', bucket_env)
+    elif allow_missing:
+        return None
     else:
         raise RuntimeError("No foursight_bucket_prefix is declared and one cannot be inferred.")
 
@@ -917,14 +919,17 @@ def get_foursight_bucket(envname: EnvName, stage: ChaliceStage) -> str:
         if bucket:
             return bucket
 
-    if EnvUtils.FOURSIGHT_BUCKET_PREFIX:
-        return f"{EnvUtils.FOURSIGHT_BUCKET_PREFIX}-{stage}-{full_name}"
+    bucket_prefix = get_foursight_bucket_prefix(allow_missing=True)  # Will also try to infer prefix if missing
+    if bucket_prefix:
+        return f"{bucket_prefix}-{stage}-{full_name}"
 
     if bucket_table_seen:
         raise IncompleteFoursightBucketTable(f"No foursight bucket is defined for envname={public_name} stage={stage}"
-                                             f" in {EnvNames.FOURSIGHT_BUCKET_TABLE}={bucket_table}.")
+                                             f" in {EnvNames.FOURSIGHT_BUCKET_TABLE}={bucket_table},"
+                                             f" and no {EnvNames.FOURSIGHT_BUCKET_PREFIX} is declared or inferrable.")
     else:
-        raise MissingFoursightBucketTable(f"No {EnvNames.FOURSIGHT_BUCKET_TABLE} is declared.")
+        raise MissingFoursightBucketTable(f"No {EnvNames.FOURSIGHT_BUCKET_TABLE} or {EnvNames.FOURSIGHT_BUCKET_PREFIX}"
+                                          f" is declared or inferrable.")
 
 
 @if_orchestrated
@@ -998,7 +1003,7 @@ def infer_foursight_url_from_env(*, request=None, envname: Optional[EnvName] = N
 
 
 @if_orchestrated
-def infer_foursight_from_env(*, request=None, envname: Optional[EnvName] = None, short: bool = True):
+def infer_foursight_from_env(*, request=None, envname: Optional[EnvName] = None, short: bool = True) -> EnvName:
     """
     Infers the Foursight environment token to view based on the given envname and request context
 
@@ -1008,18 +1013,21 @@ def infer_foursight_from_env(*, request=None, envname: Optional[EnvName] = None,
     :return: Foursight env at the end of the url ie: for fourfront-green, could be either 'data' or 'staging'
     """
     envname = envname or _default_envname_from_request_and_context(request=request, caller='infer_foursight_from_env')
+    return public_env_name(envname) or (short_env_name(envname) if short else envname)
+
+
+def public_env_name(envname: Optional[EnvName]) -> Optional[EnvName]:
+    check_true(isinstance(envname, str), "The envname is not a string.", error_class=ValueError)
     entry = (find_association(EnvUtils.PUBLIC_URL_TABLE, name=envname) or
              find_association(EnvUtils.PUBLIC_URL_TABLE, environment=full_env_name(envname)) or
              find_association(EnvUtils.PUBLIC_URL_TABLE, environment=short_env_name(envname)))
     if entry:
-        envname = entry[p.NAME]
-    else:
-        envname = short_env_name(envname) if short else envname
-    return envname
+        return entry[p.NAME]
+    return None
 
 
 @if_orchestrated()
-def short_env_name(envname: Optional[EnvName]):
+def short_env_name(envname: Optional[EnvName]) -> Optional[EnvName]:
     if not envname:
         return None
 

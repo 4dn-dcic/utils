@@ -386,16 +386,16 @@ class TestRecorder:
 
         @pytest.mark.recordable
         @pytest.mark.integratedx
-        def test_something(integrated_ff):
+        def test_something_integrated(integrated_ff):
             with TestRecorder().recorded_requests('test_something', integrated_ff):
                 # Call common subroutine shared by integrated and unit test
                 check_something(integrated_ff)
 
         @pytest.mark.unit
-        def test_post_delete_purge_links_metadata_unit():
+        def test_something_unit():
             with TestRecorder().replayed_requests('test_post_delete_purge_links_metadata') as mocked_integrated_ff:
                 # Call common subroutine shared by integrated and unit test
-                check_post_delete_purge_links_metadata(mocked_integrated_ff)
+                check_something(mocked_integrated_ff)
 
         def check_something(integrated_ff):  # Not a test but a common subroutine
             ... the meat of the test ...
@@ -403,6 +403,10 @@ class TestRecorder:
     The integration test must be run once by doing something like:
 
         $ RECORDING_ENABLED=TRUE pytest -vv -m recordable
+
+    or individually for each test
+
+        $ RECORDING_ENABLED=TRUE pytest -vv -m test_something_integrated
 
     This will create the recordings. After that, one can invoke tests in the normal way, but the recorded test
     will be used. Be sure to check in the recording.
@@ -531,6 +535,10 @@ def _portal_health_get(namespace, portal_url, key):
     healh_json_url = f"{portal_url}/health?format=json"
     response = requests.get(healh_json_url)
     health_json = response.json()
+    # print("got health page:")
+    # print(json.dumps(health_json, indent=2))
+    # print(f"health_json_namespace = {health_json.get('namespace')!r}")
+    # print(f"namespace={namespace}")
     assert health_json['namespace'] == namespace  # check we're talking to proper host
     return health_json[key]
 
@@ -615,7 +623,7 @@ class AbstractIntegratedFixture:
 
 class IntegratedFixture(AbstractIntegratedFixture):
     ENV_NAME = 'fourfront-mastertest'
-    ENV_INDEX_NAMESPACE = 'fourfront_mastertest'
+    ENV_INDEX_NAMESPACE = 'fourfront-mastertest'
     ENV_PORTAL_URL = 'https://mastertest.4dnucleome.org'
 
 

@@ -41,7 +41,7 @@ def print_heading(head, width=80, style='='):
 def show_global_env_bucket(bucket, mode='json', key=None):
 
     single_key = key
-    print(f"bucket={bucket} mode={mode} single_key={single_key}")
+    # print(f"bucket={bucket} mode={mode} single_key={single_key}")
 
     client = boto3.client('s3')
 

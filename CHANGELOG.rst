@@ -6,17 +6,34 @@ dcicutils
 Change Log
 ----------
 
+
+4.0.2
+=====
+
+Adds better ``CHANGELOG.rst`` for the changes that happened in 4.0.0.
+
+
 4.0.1
 =====
 * In ``qa_utils``:
   * New class ``MockBoto3Ec2`` geared toward security group rules related unit testing.
 * New ``obfuscation_utils`` module.
 
+
 4.0.0
 =====
 
 The following change list is only interim. A followup change will revise this entry with better information
-covering whta changed in 4.0, which is considerably more.
+covering what changed in 4.0, which is considerably more.
+
+* Some new modules. The scripts modules came from other repositories, for centralization reasons. The other modules
+  are originally refactorings to make functionality more broadly available at various stages of bootstrapping
+  this library.
+
+  * ``ecr_scripts`` has support for command line scripts related to ECR repositories.
+  * ``env_base`` has support for bits of environmental foothold needed before ``env_utils`` or ``s3_utils`` are ready.
+  * ``env_manager`` is a higher-level environmental abstraction built after ``env_utils`` is available.
+  * ``env_scripts`` has support for command line scripts related to configurable environments and the global env bucket.
 
 * New ``make`` targets:
 
@@ -26,6 +43,9 @@ covering whta changed in 4.0, which is considerably more.
   * ``make test-integrations`` runs all integration tests (marked ``integration`` or ``integrationx``),
     but not things likely to fail (marked ``beanstalk failure`` or ``direct_es_query``).
   * ``make test-direct-es-query`` runs any test marked ``direct_es_query```.
+  * ``test-units-with-coverage`` runs unit tests with the ``coverage`` feature.
+  * ``test-for-ga`` is an indirect way to call ``test-units-with-coverage``, and will be what the GithubActions
+    workflow calls.
 
 * Configurable environmental support for orchestrated C4 applications (Fourfront and CGAP) in ``env_utils`` (C4-689).
 
@@ -57,6 +77,13 @@ these new items:
                                  It may or may not need to be different if we orchestrate the legacy system.)
 ===============================  ===============================================================================
 
+* In ``base``:
+
+  * ``compute_prd_env_for_project``
+  * ``compute_stg_env_for_project``
+  * ``get_env_info`` (replaces ``beanstalk_utils.get_beanstalk_info``)
+  * ``get_env_real_url`` (replaces ``beanstalk_utils.get_beanstalk_real_url``)
+
 * In ``beanstalk_utils``:
 
   * Removed:
@@ -65,43 +92,113 @@ these new items:
 
     NOTE: This was never invoked by automatic programs, so we didn't do a deprecation stage.
 
-* Deprecated:
+  * Deprecated:
 
-  * ``get_beanstalk_real_url`` is deprecated. Use ``env_utils.get_env_real_url``.
-  * ``get_beanstalk_info`` is deprecated. Use ``beanstalk_utils.get_env_info``.
+    * ``get_beanstalk_info`` is deprecated. Use ``beanstalk_utils.get_env_info``.
+    * ``get_beanstalk_real_url`` is deprecated. Use ``env_utils.get_env_real_url``.
 
-  NOTE: These continue to work for now, but will be removed in the future.
-  Please update code to use recommended replacement.
+    NOTE: These continue to work for now, but will be removed in the future.
+    Please update code to use recommended replacement.
+
+* In ``cloudformation_utils``:
+
+  * Added function``discover_foursight_check_runner_name``.
+  * Added function ``tokenify``.
+  * Moved ``DEFAULT_ECOSYSTEM`` to ``cloudformation_utils``. Importing it from this library is now deprecated.
+
+* In ``common``:
+
+  * New variables:
+
+    * ``CHALICE_STAGE_DEV``
+    * ``CHALICE_STAGE_PROD``
+    * ``CHALICE_STAGES``
+    * ``DEFAULT_ECOSYSTEM`` (moved from ``cloudformation_utils``)
+    * ``LEGACY_CGAP_GLOBAL_ENV_BUCKET``
+    * ``LEGACY_GLOBAL_ENV_BUCKET``
+
+ * New type hint (variable):
+
+    * ``ChaliceStage``
+
+* In ``ecr_utils``:
+
+  * Removed ``CGAP_ECR_LAYOUT``.  Use ``ECRUtils.ECR_LAYOUT`` instead.
+  * Deprecated ``CGAP_ECR_REGION``. Use ``ECRUtils.REGION`` or ``common.REGION`` instead.
+
+* In ``ecs_utils``:
+
+  * Added ``ECSUtils.REGION``.
 
 * In ``env_base``:
 
-  * Added ``EnvManager.filter_config_names``
+  * Moved ``EnvBase`` to here from ``s3_utils``.
+  * Added ``s3_utils.s3Base`` (factored out of ``s3_utils.s3Utils``)
 
 * In ``env_utils``:
 
   * Removed:
 
+    * ``guess_mirror_env``
     * ``make_env_name_cfn_compatible``
 
     NOTE: This was not believed to be used anywhere so is presumably no great hardship.
     (Kent also didn't like the naming, which used a confusing abbreviation.)
 
-  * New functionality:
+  * New functions:
 
+    * ``blue_green_mirror_env``
     * ``compute_prd_env_for_project``
-    * ``get_env_real_url``
+    * ``data_set_for_env``
+    * ``ecr_repository_for_env``
+    * ``full_cgap_env_name``
+    * ``full_fourfront_env_name``
+    * ``get_env_from_context``
+    * ``get_env_real_url`` (replaces ``beanstalk_utils.get_beanstalk_real_url``)
     * ``get_foursight_bucket``
     * ``get_foursight_bucket_prefix``
+    * ``get_standard_mirror_env``
+    * ``has_declared_stg_env``
+    * ``indexer_env_for_env`` (introduced _and_ deprecated during beta)
+    * ``infer_foursight_from_env``
+    * ``infer_foursight_url_from_env``
+    * ``is_indexer_env`` (introduced _and_ deprecated during beta)
+    * ``is_orchestrated``
+    * ``maybe_get_declared_prd_env_name``
+    * ``permit_load_data``
+
+  * New classes:
+
+    * ``ClassificationParts``
+    * ``EnvNames``
+    * ``EnvUtils``
+    * ``PublicUrlParts``
 
   * Always erring:
 
-    * ``is_indexer_env``
     * ``indexer_env_for_env``
+    * ``is_indexer_env``
 
     NOTE: These functions unconditionally raise an error indicating that the functionality is no longer available.
           Their callers must be rewritten, probably in a way that is not a simple substitution.
 
+  * Removed all top-level variables from ``env_utils`` variables, moving them to ``env_utils_legacy``.
+    This includes but is not limited to variables with names starting with ``CGAP_``, ``FF_`` or ``BEANSTALK_``.
+    These are deprecated and should not be used outside of ``dcicutils``.
+    Within ``dcicutils``, they may be used only for testing.
+    All ``env_utils`` functionality should be accessed through functions, not variables.
+
+* In ``exceptions``:
+
+  * ``BeanstalkOperationNotImplemented``
+  * ``EnvUtilsLoadError``
+  * ``IncompleteFoursightBucketTable``
+  * ``LegacyDispatchDisabled``
+  * ``MissingFoursightBucketTable``
+  * ``NotUsingBeanstalksAnyMore``
+
 * Added tech debt by disabling certain tests or marking them for later scrutiny.
+
   Three new pytest markers were added in ``pytest.ini``:
 
   * ``beanstalk_failure`` - An obsolete beanstalk-related test that needs fixing
@@ -109,6 +206,8 @@ these new items:
     and needs to move inside the firewall
   * ``stg_or_prd_testing_needs_repair`` - Some or all of a test that was failing on stg/prd
     has been temporarily disabled
+  * ``recordable`` declares a test to use "recorded" technology so that if ``RECORDING_ENABLED=TRUE``,
+    a new test recording is made
 
 
 3.16.0
@@ -120,16 +219,19 @@ these new items:
     by ``with printed_output as printed`` using ``printed.file_last[fp]``
     and ``printed.file_lines[fp]``.
 
+
 3.15.0
 ======
 
 * In ``ecs_utils``:
   * Adds the ``service_has_active_deployment`` method.
 
+
 3.14.2
 ======
 * In ``qa_utils``:
   * Minor updates related PEP8.
+
 
 3.14.1
 ======
@@ -143,6 +245,7 @@ these new items:
   * New method ``MockBotoS3Session.put_credentials_for_testing``.
   * New property ``MockBotoS3Session.region_name``.
   * New method ``MockBotoS3Session.unset_environ_credentials_for_testing``.
+
 
 3.14.0
 ======
@@ -1388,4 +1491,3 @@ the ``poetry.app`` section of ``pyproject.toml``, as in::
    name = "dcicutils"
    version = "100.200.300"
    ...etc.
-

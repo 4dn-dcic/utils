@@ -1318,7 +1318,7 @@ def test_get_deployment_config_cgap_stg_orchestrated():
             assert cfg['ENV_NAME'] == EnvUtils.STG_ENV_NAME  # sanity
             assert cfg['SKIP'] is False
             assert cfg['WIPE_ES'] is True
-            assert cfg['STRICT'] is True
+            assert cfg['STRICT'] is True  # but it doesn't matter because WIPE_ES is True
             assert my_log.last_msg == (f"Environment {EnvUtils.STG_ENV_NAME} is currently the staging environment."
                                        f" Processing mode: STRICT,WIPE_ES")
 
@@ -1332,7 +1332,7 @@ def test_get_deployment_config_ff_stg_orchestrated():
         assert cfg['ENV_NAME'] == EnvUtils.STG_ENV_NAME  # sanity
         assert cfg['SKIP'] is False
         assert cfg['WIPE_ES'] is True
-        assert cfg['STRICT'] is True
+        assert cfg['STRICT'] is True  # but it doesn't matter because WIPE_ES is True
         assert my_log.last_msg == (f"Environment {EnvUtils.STG_ENV_NAME} is currently the staging environment."
                                    f" Processing mode: STRICT,WIPE_ES")
 
@@ -1346,9 +1346,9 @@ def test_get_deployment_config_cgap_prd_orchestrated():
         assert cfg['ENV_NAME'] == EnvUtils.PRD_ENV_NAME  # sanity
         assert cfg['SKIP'] is False
         assert cfg['WIPE_ES'] is False
-        assert cfg['STRICT'] is True
+        assert cfg['STRICT'] is False
         assert my_log.last_msg == (f"Environment {EnvUtils.PRD_ENV_NAME} is currently the production environment."
-                                   f" Processing mode: STRICT")
+                                   f" Processing mode: default")
 
 
 @pytest.mark.integrated
@@ -1360,9 +1360,9 @@ def test_get_deployment_config_ff_prd_orchestrated():
         assert cfg['ENV_NAME'] == EnvUtils.PRD_ENV_NAME  # sanity
         assert cfg['SKIP'] is False
         assert cfg['WIPE_ES'] is False
-        assert cfg['STRICT'] is True
+        assert cfg['STRICT'] is False
         assert my_log.last_msg == (f"Environment {EnvUtils.PRD_ENV_NAME} is currently the production environment."
-                                   f" Processing mode: STRICT")
+                                   f" Processing mode: default")
 
 
 @pytest.mark.integrated
@@ -1409,7 +1409,7 @@ def test_get_deployment_config_cgap_test_envs_orchestrated():
                 assert cfg['ENV_NAME'] == my_env  # sanity
                 assert cfg['SKIP'] is False
                 assert cfg['WIPE_ES'] is True
-                assert cfg['STRICT'] is False
+                assert cfg['STRICT'] is False  # but it doesn't matter because WIPE_ES is True
                 assert my_log.last_msg == (f'Environment {my_env} is a non-hotseat test environment.'
                                            f' Processing mode: WIPE_ES')
 
@@ -1426,7 +1426,7 @@ def test_get_deployment_config_ff_test_envs_orchestrated():
                 assert cfg['ENV_NAME'] == my_env  # sanity
                 assert cfg['SKIP'] is False
                 assert cfg['WIPE_ES'] is True
-                assert cfg['STRICT'] is False
+                assert cfg['STRICT'] is False  # but it doesn't matter because WIPE_ES is True
                 assert my_log.last_msg == (f'Environment {my_env} is a non-hotseat test environment.'
                                            f' Processing mode: WIPE_ES')
 
@@ -1539,7 +1539,7 @@ def test_actual_env_settings(mock_compute_cgap_prd_env, mock_compute_ff_prd_env)
                 if kind == 'production':
                     assert config['SKIP'] is False
                     assert config['WIPE_ES'] is False
-                    assert config['STRICT'] is True
+                    assert config['STRICT'] is False
                 elif kind == 'staging':
                     assert config['SKIP'] is False
                     assert config['WIPE_ES'] is True
@@ -1549,11 +1549,12 @@ def test_actual_env_settings(mock_compute_cgap_prd_env, mock_compute_ff_prd_env)
                 elif kind == 'test':
                     assert config['SKIP'] is False
                     assert config['WIPE_ES'] is True
-                    assert config['STRICT'] is False
+                    assert config['STRICT'] is False  # but it doesn't matter because WIPE_ES is True
                 else:  # other
                     assert config['SKIP'] is False
                     assert config['WIPE_ES'] is wipe_es
-                    assert config['STRICT'] is False
+                    if not wipe_es:
+                        assert config['STRICT'] is False
 
 
 def test_create_file_from_template():

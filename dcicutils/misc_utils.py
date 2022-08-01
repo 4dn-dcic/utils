@@ -282,7 +282,7 @@ def exported(*variables):
     ---file3.py---
     # This file has not been updated to realize that file1.py is the new home of identity.
     from .file2 import identity
-    print("one=", identity(1))
+    print("one=", identity(1))  # noQA - code example
     """
     ignored(variables)
 

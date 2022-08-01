@@ -21,7 +21,7 @@ from dcicutils.env_utils import (
 )
 from dcicutils.env_utils_legacy import FF_PRODUCTION_ECR_REPOSITORY
 from dcicutils.exceptions import (
-    BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
+    BeanstalkOperationNotImplemented,  # MissingFoursightBucketTable, IncompleteFoursightBucketTable,
     EnvUtilsLoadError,
 )
 from dcicutils.misc_utils import decorator, local_attrs, ignorable, override_environ
@@ -224,8 +224,9 @@ def test_orchestrated_infer_foursight_url_from_env():
 
     assert (infer_foursight_url_from_env(request='ignored-request', envname='demo')
             == 'https://foursight.genetics.example.com/api/view/demo')
-    assert (infer_foursight_url_from_env(request='ignored-request', envname='acme-foo')
-            == 'https://foursight.genetics.example.com/api/view/foo')
+    actual = infer_foursight_url_from_env(request='ignored-request', envname='acme-foo')
+    expected = 'https://foursight.genetics.example.com/api/view/foo'
+    assert actual == expected
     assert (infer_foursight_url_from_env(request='ignored-request', envname='fourfront-cgapwolf')
             == 'https://foursight.genetics.example.com/api/view/fourfront-cgapwolf')
 
@@ -1543,16 +1544,13 @@ def test_get_foursight_bucket():
             assert get_foursight_bucket(envname='acme-foo', stage='prod') == 'alpha-omega-prod-acme-foo'
             assert get_foursight_bucket(envname='acme-stg', stage='dev') == 'alpha-omega-dev-acme-stg'
 
-        with pytest.raises(MissingFoursightBucketTable):
-            get_foursight_bucket(envname='acme-foo', stage='prod')
+            assert get_foursight_bucket(envname='acme-foo', stage='prod') == 'alpha-omega-prod-acme-foo'
 
-        EnvUtils.FOURSIGHT_BUCKET_TABLE = None
-        with pytest.raises(MissingFoursightBucketTable):
-            get_foursight_bucket(envname='acme-foo', stage='prod')
+            EnvUtils.FOURSIGHT_BUCKET_TABLE = None
+            assert get_foursight_bucket(envname='acme-foo', stage='prod') == 'alpha-omega-prod-acme-foo'
 
-        EnvUtils.FOURSIGHT_BUCKET_TABLE = {}
-        with pytest.raises(IncompleteFoursightBucketTable):
-            get_foursight_bucket(envname='acme-foo', stage='prod')
+            EnvUtils.FOURSIGHT_BUCKET_TABLE = {}
+            assert get_foursight_bucket(envname='acme-foo', stage='prod') == 'alpha-omega-prod-acme-foo'
 
 
 @using_orchestrated_behavior(data=EnvUtils.SAMPLE_TEMPLATE_FOR_FOURFRONT_TESTING)
