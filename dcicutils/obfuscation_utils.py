@@ -9,11 +9,13 @@ import re
 _SENSITIVE_KEY_NAMES_REGEX = re.compile(
     r"""
     .*(
-        password |
-        passwd   |
-        secret   |
-        secrt    |
-        scret    |
+        password       |
+        passwd         |
+        secret         |
+        secrt          |
+        scret          |
+        session.*token |
+        session.*id    |
         crypt(?!_key_id$)
     ).*
     """, re.VERBOSE | re.IGNORECASE)
