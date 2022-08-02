@@ -19,6 +19,8 @@ test:  # runs default tests, which are the unit tests
 	make test-units
 
 test-for-ga:
+	poetry run flake8 dcicutils
+	poetry run flake8 test --exclude=data_files
 	make test-units-with-coverage
 
 retest:  # runs only failed tests from the last test run. (if no failures, it seems to run all?? -kmp 17-Dec-2020)

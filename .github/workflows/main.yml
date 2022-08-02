@@ -45,8 +45,6 @@ jobs:
           GLOBAL_ENV_BUCKET: foursight-envs
         run: |
           poetry install
-          poetry run flake8 dcicutils
-          poetry run flake8 test
           make test-for-ga
 
       - name: Coveralls
