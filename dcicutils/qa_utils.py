@@ -581,7 +581,17 @@ class _PrintCapturer:
     """
 
     def __init__(self):
+        self.lines: List[str] = []
+        self.last: Optional[str] = None
+        self.file_lines: DefaultDict[Optional[str], List[str]] = self._file_lines_dict()
+        self.file_last: DefaultDict[Optional[str], Optional[str]] = self._file_last_dict()
         self.reset()
+
+    def _file_lines_dict(self):
+        return defaultdict(lambda: [])
+
+    def _file_last_dict(self):
+        return defaultdict(lambda: None)
 
     def mock_print_handler(self, *args, **kwargs):
         """
@@ -610,10 +620,10 @@ class _PrintCapturer:
         self.file_last[file] = text
 
     def reset(self):
-        self.lines: List[str] = []
-        self.last: Optional[str] = None
-        self.file_lines: DefaultDict[Optional[str], List[str]] = defaultdict(lambda: [])
-        self.file_last: DefaultDict[Optional[str], Optional[str]] = defaultdict(lambda: None)
+        self.lines = []
+        self.last = None
+        self.file_lines = self._file_lines_dict()
+        self.file_last = self._file_last_dict()
 
 
 @contextlib.contextmanager
@@ -2464,12 +2474,13 @@ class MockedCommandArgs:
 
 QA_EXCEPTION_PATTERN = re.compile(r"[#].*\b[N][O][Q][A]\b", re.IGNORECASE)
 
+
 def find_uses(*, where, patterns):
     """
     In the files specified by where (a glob pattern), finds uses of pattern (a regular expression).
 
     :param where: a glob pattern
-    :param pattern: a regular expression
+    :param patterns: a dictionary mapping problem summaries to regular expressions
     """
 
     checks = []
@@ -2486,7 +2497,8 @@ def find_uses(*, where, patterns):
                     if matcher.search(line):
                         problem_ignorable = QA_EXCEPTION_PATTERN.search(line)
                         if not problem_ignorable:
-                            uses[file].append({"line_number": line_number, "line": line, "summary": summary})
+                            uses[file].append({"line_number": line_number, "line": line.rstrip('\n'),
+                                               "summary": summary})
     return uses
 
 
@@ -2512,4 +2524,4 @@ def confirm_no_uses(*, where, patterns):
             n += len(matches)
             detail += f"\n In {file}, {summarize(matches)}."
         message = f"{n_of(n, 'problem')} detected:" + detail
-        raise RuntimeError(message)
+        raise AssertionError(message)

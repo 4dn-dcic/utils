@@ -82,8 +82,14 @@ def test_documentation():
             raise AssertionError(message)
 
 
+PRINT_PATTERN = "^[^#]*print[(]"
+TRACE_PATTERN = "^[^#]*pdb[.]set_trace[(][)]"
+
+DEBUGGING_PATTERNS = {
+    "call to print": PRINT_PATTERN,
+    "active use of pdb.set_trace": TRACE_PATTERN
+}
+
+
 def test_for_debugging_print():
-    confirm_no_uses(where=os.path.join(LIBRARY_DIR, "*.py"), patterns={
-        "call to print": "^[^#]*print[(]",
-        "active use of pdb.set_trace": "^[^#]*pdb[.]set_trace[(][)]"
-    })
+    confirm_no_uses(where=os.path.join(LIBRARY_DIR, "*.py"), patterns=DEBUGGING_PATTERNS)
