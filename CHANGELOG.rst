@@ -6,6 +6,10 @@ dcicutils
 Change Log
 ----------
 
+4.0.1.1b1
+=========
+* Updated obfuscation_utils.should_obfuscate to include "session" related keys.
+
 4.0.1.1b0
 =========
 * In ``cloudformation_utils``:
