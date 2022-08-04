@@ -6,11 +6,33 @@ dcicutils
 Change Log
 ----------
 
+4.1.0
+=====
+
+* Add better ``CHANGELOG.rst`` for the changes that happened in 4.0.0.
+* Add unit testing for stray ``print(...)`` or ``pdb.set_trace()``
+* Support for ``ENCODED_CREATE_MAPPING_SKIP``, ``ENCODED_CREATE_MAPPING_WIPE_ES``,
+  and ``ENCODED_CREATE_MAPPING_STRICT`` in GAC to allow ``$CREATE_MAPPING_SKIP,``
+  ``$CREATE_MAPPING_WIPE_ES``, and ``$CREATE_MAPPING_STRICT`` in ``.ini`` files.
+* Allow ``get_foursight_bucket`` to infer a bucket prefix if one is not
+  explicitly supplied. (The heuristic removes ``-envs`` from the global env bucket
+  name and uses what remains.)
+* Fix various tests that had grown stale due to data changes.
+  * ``test_post_delete_purge_links_metadata`` (needed to be re-recorded)
+  * ``test_upsert_metadata`` (needed to be re-recorded)
+  * ``test_unified_authentication_prod_envs_integrated_only`` (needed to be re-recorded)
+  * ``test_faceted_search_exp_set`` (needed many different counts)
+  * ``test_some_decorated_methods_work`` (needed one different count)
+
 
 4.0.2
 =====
 
-Adds better ``CHANGELOG.rst`` for the changes that happened in 4.0.0.
+* In ``cloudformation_utils``:
+  * New function ``find_lambda_function_names`` in ``AbstractOrchestrationManager`` which
+    factors out the lookup part from the ``discover_foursight_check_runner_name`` function.
+* In ``obfuscation_utils``:
+  * Changed ``should_obfuscate`` to include "session" related keys.
 
 
 4.0.1
