@@ -6,6 +6,14 @@ dcicutils
 Change Log
 ----------
 
+4.0.2
+=========
+* In ``cloudformation_utils``:
+  * New function ``find_lambda_function_names`` in ``AbstractOrchestrationManager`` which
+    factors out the lookup part from the ``discover_foursight_check_runner_name`` function.
+* In ``obfuscation_utils``:
+  * Changed ``should_obfuscate`` to include "session" related keys.
+
 4.0.1
 =====
 * In ``qa_utils``:

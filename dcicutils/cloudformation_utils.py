@@ -232,6 +232,35 @@ class AbstractOrchestrationManager:
                     return getattr(summary, attr, default)
         return default
 
+    @classmethod
+    def find_lambda_function_names(cls, name_pattern) -> list:
+        """
+        Returns a list of AWS lambda function names which match the given regular expression,
+        which may be a regular expression string or a compiled one (i.e. of type re.Pattern);
+        returns an empty list if no matches.
+
+        :param name_pattern: Regex pattern to match AWS lambda function name; string or re.Pattern.
+        :return: List of matching AWS lambda function names, or empty list if none.
+        """
+        if not name_pattern:
+            return []
+        elif isinstance(name_pattern, str):
+            name_pattern = re.compile(name_pattern)
+        matching_function_names = []
+        lambda_client = boto3.client('lambda')
+        lambda_response = lambda_client.list_functions()
+        while True:
+            functions = lambda_response['Functions']
+            for function in functions:
+                function_name = function['FunctionName']
+                if name_pattern.match(function_name):
+                    matching_function_names.append(function_name)
+            lambda_response_next_marker = lambda_response.get('NextMarker')
+            if not lambda_response_next_marker:
+                break
+            lambda_response = lambda_client.list_functions(Marker=lambda_response_next_marker)
+        return matching_function_names
+
     CHECK_RUNNER_DEV_PATTERN = re.compile(".*foursight.*development.*CheckRunner.*")
     CHECK_RUNNER_PROD_PATTERN = re.compile(".*foursight.*production.*CheckRunner.*")
 
@@ -248,19 +277,7 @@ class AbstractOrchestrationManager:
         # Prod has its own check runner, distinct from dev and test, though .get_stage() will have converted
         # 'test' to 'dev' by this point anyway. Still, this code is tolerant of not doing that...
         name_pattern = cls.CHECK_RUNNER_PROD_PATTERN if stage == 'prod' else cls.CHECK_RUNNER_DEV_PATTERN
-        lambda_client = boto3.client('lambda')
-        candidates = []
-        chunk = lambda_client.list_functions()
-        while True:
-            entries = chunk['Functions']
-            for entry in entries:
-                name = entry['FunctionName']
-                if name_pattern.match(name):
-                    candidates.append(name)
-            next_marker = chunk.get('NextMarker')
-            if not next_marker:
-                break
-            chunk = lambda_client.list_functions(Marker=next_marker)
+        candidates = cls.find_lambda_function_names(name_pattern)
         if len(candidates) == 1:
             check_runner = candidates[0]
             logger.warning(f"CHECK_RUNNER inferred to be {check_runner}")
