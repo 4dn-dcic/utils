@@ -475,11 +475,12 @@ class TestRecorder:
                         raise
                 _mocked.__name__ = f"_mocked_{verb}_after_recording"
                 return _mocked
+
             def mocked_stuff_in_queues(ff_env_index_namespace, check_secondary):
                 # This mock assumes the queue checks don't err. If we find they do, it needs to be a bit more elaborate.
                 start = datetime.datetime.now()
-                result = ff_utils._real_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace,
-                                                        check_secondary=check_secondary)
+                result = ff_utils.internal_compute_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace,
+                                                                   check_secondary=check_secondary)
                 duration = (datetime.datetime.now() - start).total_seconds()
                 duration = math.floor(duration * 10) / 10.0  # round to tenths of a second
                 event = {"verb": 'stuff-in-queues', "url": None,
@@ -492,12 +493,13 @@ class TestRecorder:
                 else:
                     PRINT(f"{'>' * self.recording_level} NOT recording stuff-in-queues")
                 return result
+
             with mocked_authorized_request_verbs(GET=mock_recorded('GET'),
                                                  PATCH=mock_recorded('PATCH'),
                                                  POST=mock_recorded('POST'),
                                                  PUT=mock_recorded('PUT'),
                                                  DELETE=mock_recorded('DELETE')):
-                with mock.patch.object(ff_utils, "_mockable_stuff_in_queues") as mock_stuff_in_queues:
+                with mock.patch.object(ff_utils, "mockable_stuff_in_queues") as mock_stuff_in_queues:
                     mock_stuff_in_queues.side_effect = mocked_stuff_in_queues
                     yield
 
@@ -544,6 +546,7 @@ class TestRecorder:
 
                     _mocked.__name__ = f"_mocked_{verb}_by_replay"
                     return _mocked
+
                 def mocked_replayed_stuff_in_queues(ff_env_index_namespace, check_secondary):
                     PRINT(f"Replaying stuff-in-queues {ff_env_index_namespace} {check_secondary}")
                     verb = 'stuff-in-queues'
@@ -557,12 +560,13 @@ class TestRecorder:
                         raise Exception(error_message)
                     else:
                         return expected_event['result']
+
                 with mocked_authorized_request_verbs(GET=mock_replayed('GET'),
                                                      PATCH=mock_replayed('PATCH'),
                                                      POST=mock_replayed('POST'),
                                                      PUT=mock_replayed('PUT'),
                                                      DELETE=mock_replayed('DELETE')):
-                    with mock.patch.object(ff_utils, "_mockable_stuff_in_queues") as mock_replayed_stuff_in_queues:
+                    with mock.patch.object(ff_utils, "mockable_stuff_in_queues") as mock_replayed_stuff_in_queues:
                         mock_replayed_stuff_in_queues.side_effect = mocked_replayed_stuff_in_queues
                         yield mocked_integrated_ff
 
@@ -582,7 +586,7 @@ class TestRecorder:
                 data = kwargs.get('data')
                 try:
                     with self.creating_record():
-                        response =  ff_utils._real_authorized_request(url, verb=verb, **kwargs)
+                        response = ff_utils.internal_compute_authorized_request(url, verb=verb, **kwargs)
                     status = response.status_code
                     result = response.json()
                     duration = (datetime.datetime.now() - start).total_seconds()
@@ -607,11 +611,12 @@ class TestRecorder:
                     else:
                         PRINT(f"{'>' * self.recording_level} NOT recording authorized {verb} {url} error result")
                     raise
+
             def mocked_stuff_in_queues(ff_env_index_namespace, check_secondary):
                 # This mock assumes the queue checks don't err. If we find they do, it needs to be a bit more elaborate.
                 start = datetime.datetime.now()
-                result = ff_utils._real_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace,
-                                                        check_secondary=check_secondary)
+                result = ff_utils.internal_compute_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace,
+                                                                   check_secondary=check_secondary)
                 duration = (datetime.datetime.now() - start).total_seconds()
                 duration = math.floor(duration * 10) / 10.0  # round to tenths of a second
                 event = {"verb": 'stuff-in-queues', "url": None,
@@ -624,8 +629,9 @@ class TestRecorder:
                 else:
                     PRINT(f"{'>' * self.recording_level} NOT recording stuff-in-queues")
                 return result
-            with mock.patch.object(ff_utils, "_mockable_authorized_request") as mock_authorized_request:
-                with mock.patch.object(ff_utils, "_mockable_stuff_in_queues") as mock_stuff_in_queues:
+
+            with mock.patch.object(ff_utils, "mockable_authorized_request") as mock_authorized_request:
+                with mock.patch.object(ff_utils, "mockable_stuff_in_queues") as mock_stuff_in_queues:
                     mock_authorized_request.side_effect = mocked_authorized_request
                     mock_stuff_in_queues.side_effect = mocked_stuff_in_queues
                     yield
@@ -668,6 +674,7 @@ class TestRecorder:
                         raise Exception(error_message)
                     else:
                         return MockResponse(status_code=expected_event['status'], json=expected_event['result'])
+
                 def mocked_replayed_stuff_in_queues(ff_env_index_namespace, check_secondary):
                     PRINT(f"Replaying stuff-in-queues {ff_env_index_namespace} {check_secondary}")
                     verb = 'stuff-in-queues'
@@ -681,8 +688,9 @@ class TestRecorder:
                         raise Exception(error_message)
                     else:
                         return expected_event['result']
-                with mock.patch.object(ff_utils, "_mockable_authorized_request") as mock_authorized_request:
-                    with mock.patch.object(ff_utils, "_mockable_stuff_in_queues") as mock_stuff_in_queues:
+
+                with mock.patch.object(ff_utils, "mockable_authorized_request") as mock_authorized_request:
+                    with mock.patch.object(ff_utils, "mockable_stuff_in_queues") as mock_stuff_in_queues:
                         mock_authorized_request.side_effect = mocked_replayed_authorized_request
                         mock_stuff_in_queues.side_effect = mocked_replayed_stuff_in_queues
                         yield mocked_integrated_ff

@@ -7,6 +7,7 @@ import time
 
 from collections import namedtuple
 from elasticsearch.exceptions import AuthorizationException
+from typing import Dict, List
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from . import (
     s3_utils,
@@ -195,14 +196,15 @@ REQUESTS_VERBS = {
 
 def authorized_request(url, auth=None, ff_env=None, verb='GET',
                        retry_fxn=standard_request_with_retries, **kwargs):
-    return _mockable_authorized_request(url=url, auth=auth, ff_env=ff_env, verb=verb, retry_fxn=retry_fxn, **kwargs)
+    return mockable_authorized_request(url=url, auth=auth, ff_env=ff_env, verb=verb, retry_fxn=retry_fxn, **kwargs)
 
 
-def _mockable_authorized_request(url, *, auth, ff_env, verb, retry_fxn, **kwargs):  # defaulted in authorized_request
-    return _real_authorized_request(url=url, auth=auth, ff_env=ff_env, verb=verb, retry_fxn=retry_fxn, **kwargs)
+def mockable_authorized_request(url, *, auth, ff_env, verb, retry_fxn, **kwargs):
+    return internal_compute_authorized_request(url=url, auth=auth, ff_env=ff_env, verb=verb, retry_fxn=retry_fxn,
+                                               **kwargs)
 
 
-def _real_authorized_request(url, *, auth, ff_env, verb, retry_fxn, **kwargs):  # defaulted in authorized_request
+def internal_compute_authorized_request(url, *, auth, ff_env, verb, retry_fxn, **kwargs):
     """
     Generalized function that handles authentication for any type of request to FF.
     Takes a required url, request verb, auth, fourfront environment, and optional
@@ -367,8 +369,8 @@ def get_search_generator(search_url, auth=None, ff_env=None, page_limit=50):
         try:
             search_res = get_response_json(response)['@graph']
         except KeyError:
-            raise('Cannot get "@graph" from the search request for %s. Response '
-                  'status code is %s.' % (search_url, response.status_code))
+            raise Exception(f'Cannot get "@graph" from the search request for {search_url}.'
+                            f' Response status code is {response.status_code}.')
         last_total = len(search_res)
         curr_from += last_total
         if search_limit != 'all' and curr_from - initial_from > search_limit:
@@ -1243,14 +1245,15 @@ def stuff_in_queues(ff_env_index_namespace, check_secondary=False):
     If items are currently waiting in the primary queue, return False.
     If check_secondary is True, will also check the secondary queue.
     """
-    return _mockable_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace, check_secondary=check_secondary)
+    return mockable_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace, check_secondary=check_secondary)
 
 
-def _mockable_stuff_in_queues(ff_env_index_namespace, check_secondary):
-    return _real_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace, check_secondary=check_secondary)
+def mockable_stuff_in_queues(ff_env_index_namespace, check_secondary):
+    return internal_compute_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace,
+                                            check_secondary=check_secondary)
 
 
-def _real_stuff_in_queues(ff_env_index_namespace, check_secondary):
+def internal_compute_stuff_in_queues(ff_env_index_namespace, check_secondary):
     if not ff_env_index_namespace:
         raise ValueError(f"Must provide a full fourfront environment name to this function"
                          f" (such as 'fourfront-webdev'). You gave: {ff_env_index_namespace!r}")
@@ -1287,7 +1290,7 @@ def fetch_network_ids(subnet_names, security_group_names):
     subnet_ids = []
     security_group_ids = []
     for i in subnet_names:
-        response = ec2_client.describe_subnets()
+        # response = ec2_client.describe_subnets()
         subnet_id = i
         subnet_ids.append(subnet_id)
     for i in security_group_names:
@@ -1326,14 +1329,15 @@ def process_add_on(add_on):
     return add_on
 
 
-def get_url_params(url):
+def get_url_params(url) -> Dict[str, List[str]]:
     """
     Returns a dictionary of url params using parse_qs.
     Example: get_url_params('<server>/search/?type=Biosample&limit=5') returns
     {'type': ['Biosample'], 'limit': '5'}
     """
     parsed_url = urlparse(url)
-    return parse_qs(parsed_url.query)
+    query_string: str = parsed_url.query
+    return parse_qs(query_string)
 
 
 def update_url_params_and_unparse(url, url_params):

@@ -17,12 +17,17 @@ Change Log
 * Allow ``get_foursight_bucket`` to infer a bucket prefix if one is not
   explicitly supplied. (The heuristic removes ``-envs`` from the global env bucket
   name and uses what remains.)
+* Fix test recording capability. Add (though unused) ability to record at
+  the abstraction level of ``authorized_request``.
 * Fix various tests that had grown stale due to data changes.
   * ``test_post_delete_purge_links_metadata`` (needed to be re-recorded)
   * ``test_upsert_metadata`` (needed to be re-recorded)
-  * ``test_unified_authentication_prod_envs_integrated_only`` (needed to be re-recorded)
+  * ``test_unified_authentication_prod_envs_integrated_only`` 
+    (simplified, removed bogus attempts at recording)
   * ``test_faceted_search_exp_set`` (needed many different counts)
   * ``test_some_decorated_methods_work`` (needed one different count)
+  * ``test_faceted_search_exp_set`` (newly recorded)
+  * ``test_faceted_search_users`` (newly recorded)
 * Specify pytest options in pyproject.toml instead of a separate file.
 
 

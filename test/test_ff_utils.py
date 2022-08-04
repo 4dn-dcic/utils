@@ -9,7 +9,6 @@ import time
 
 from botocore.exceptions import ClientError
 from dcicutils import es_utils, ff_utils, s3_utils
-from dcicutils.exceptions import MissingGlobalEnv
 from dcicutils.ff_mocks import mocked_s3utils, TestScenarios, TestRecorder
 from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true
 from dcicutils.qa_utils import (
