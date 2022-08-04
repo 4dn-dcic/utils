@@ -70,7 +70,7 @@ def test_some_decorated_methods_work(integrated_ff):
                                         post_res['@graph'][0]['uuid'])
     assert patch_res['@graph'][0]['other_tracking']['test_field'] == 'test_value'
     faceted_search_res = jh_utils.faceted_search(**{'Project': '4DN'})
-    assert len(faceted_search_res) == 3
+    assert len(faceted_search_res) == 8
 
 
 NOT_AN_ID = 'not_an_id'

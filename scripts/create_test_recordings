@@ -1,0 +1,3 @@
+#!/bin/bash
+
+RECORDING_ENABLED=TRUE poetry run pytest -s -vv -m recordable

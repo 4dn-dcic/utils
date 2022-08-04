@@ -68,6 +68,9 @@ test-direct-es-query:  # must be called inside VPC (e.g., from foursight after c
 	@git log -1 --decorate | head -1
 	@date
 
+recordings:
+	@scripts/create_test_recordings
+
 update:  # updates dependencies
 	poetry update
 
@@ -88,4 +91,5 @@ info:
 	   $(info - Use 'make publish' to publish this library, but only if auto-publishing has failed.)
 	   $(info - Use 'make test' to run tests with the normal options we use on travis)
 	   $(info - Use 'make update' to update dependencies (and the lock file))
+	   $(info - Use 'make recordings' to refresh the recorded tests. (Always makes new recordings even if not needed.))
 	   $(info - Use 'make clear-poetry-cache' to clear the poetry pypi cache if in a bad state. (Safe, but later recaching can be slow.))
