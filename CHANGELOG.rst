@@ -23,6 +23,7 @@ Change Log
   * ``test_unified_authentication_prod_envs_integrated_only`` (needed to be re-recorded)
   * ``test_faceted_search_exp_set`` (needed many different counts)
   * ``test_some_decorated_methods_work`` (needed one different count)
+* Specify pytest options in pyproject.toml instead of a separate file.
 
 
 4.0.2
