@@ -195,6 +195,14 @@ REQUESTS_VERBS = {
 
 def authorized_request(url, auth=None, ff_env=None, verb='GET',
                        retry_fxn=standard_request_with_retries, **kwargs):
+    return _mockable_authorized_request(url=url, auth=auth, ff_env=ff_env, verb=verb, retry_fxn=retry_fxn, **kwargs)
+
+
+def _mockable_authorized_request(url, *, auth, ff_env, verb, retry_fxn, **kwargs):  # defaulted in authorized_request
+    return _real_authorized_request(url=url, auth=auth, ff_env=ff_env, verb=verb, retry_fxn=retry_fxn, **kwargs)
+
+
+def _real_authorized_request(url, *, auth, ff_env, verb, retry_fxn, **kwargs):  # defaulted in authorized_request
     """
     Generalized function that handles authentication for any type of request to FF.
     Takes a required url, request verb, auth, fourfront environment, and optional
@@ -1235,6 +1243,14 @@ def stuff_in_queues(ff_env_index_namespace, check_secondary=False):
     If items are currently waiting in the primary queue, return False.
     If check_secondary is True, will also check the secondary queue.
     """
+    return _mockable_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace, check_secondary=check_secondary)
+
+
+def _mockable_stuff_in_queues(ff_env_index_namespace, check_secondary):
+    return _real_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace, check_secondary=check_secondary)
+
+
+def _real_stuff_in_queues(ff_env_index_namespace, check_secondary):
     if not ff_env_index_namespace:
         raise ValueError(f"Must provide a full fourfront environment name to this function"
                          f" (such as 'fourfront-webdev'). You gave: {ff_env_index_namespace!r}")

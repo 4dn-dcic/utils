@@ -19,7 +19,7 @@ from dcicutils.qa_utils import (
 from types import GeneratorType
 from unittest import mock
 from urllib.parse import urlsplit, parse_qsl
-from .helpers import using_fresh_ff_state_for_testing
+from .helpers import using_fresh_ff_state_for_testing, using_fresh_ff_deployed_state_for_testing
 
 
 pytestmark = pytest.mark.working
@@ -312,24 +312,11 @@ def test_unified_authentication_integrated(integrated_ff):
     assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
 
-@pytest.mark.recordable
 @pytest.mark.stg_or_prd_testing_needs_repair
-@pytest.mark.integratedx
+@pytest.mark.integrated
 @pytest.mark.flaky
-def test_unified_authentication_prod_envs_integrated_only_integrated(integrated_ff):
-    with TestRecorder().recorded_requests('unified_authentication_prod_envs_integrated_only', integrated_ff):
-        check_post_delete_purge_links_metadata(integrated_ff)
-
-
-@pytest.mark.unit
-def test_unified_authentication_prod_envs_integrated_only_unit():
-    # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
-    # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
-    with TestRecorder().replayed_requests('unified_authentication_prod_envs_integrated_only') as mocked_integrated_ff:
-        check_post_delete_purge_links_metadata(mocked_integrated_ff)
-
-
-def check_unified_authentication_prod_envs_integrated_only():
+@using_fresh_ff_deployed_state_for_testing()
+def test_unified_authentication_prod_envs_integrated_only():
     # This is ONLY an integration test. There is no unit test functionality tested here.
     # All of the functionality used here is already tested elsewhere.
 
@@ -338,23 +325,6 @@ def check_unified_authentication_prod_envs_integrated_only():
     assert len(ff_prod_auth) == 2
     staging_auth = ff_utils.unified_authentication(ff_env="staging")
     assert staging_auth == ff_prod_auth
-#     green_auth = ff_utils.unified_authentication(ff_env="fourfront-production-green")
-#     assert green_auth == ff_prod_auth
-#     blue_auth = ff_utils.unified_authentication(ff_env="fourfront-production-blue")
-#     assert blue_auth == ff_prod_auth
-
-    # Decommissioned
-    # # CGAP prod
-    # cgap_prod_auth = ff_utils.unified_authentication(ff_env="fourfront-cgap")
-    # assert len(cgap_prod_auth) == 2
-    #
-    # # Assure CGAP and Fourfront don't share auth
-    # auth_is_shared = cgap_prod_auth == ff_prod_auth
-    # assert not auth_is_shared
-
-    with pytest.raises(MissingGlobalEnv):
-        # There is no such environment as 'fourfront-data'
-        ff_utils.unified_authentication(ff_env="fourfront-data")
 
 
 def test_get_authentication_with_server_unit():
@@ -785,7 +755,7 @@ def check_post_delete_purge_links_metadata(integrated_ff):
 @pytest.mark.flaky
 def test_upsert_metadata_integrated(integrated_ff):
     with TestRecorder().recorded_requests('test_upsert_metadata', integrated_ff):
-        check_post_delete_purge_links_metadata(integrated_ff)
+        check_upsert_metadata(integrated_ff)
 
 
 @pytest.mark.unit
@@ -793,7 +763,7 @@ def test_upsert_metadata_unit():
     # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
     # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
     with TestRecorder().replayed_requests('test_upsert_metadata') as mocked_integrated_ff:
-        check_post_delete_purge_links_metadata(mocked_integrated_ff)
+        check_upsert_metadata(mocked_integrated_ff)
 
 
 def check_upsert_metadata(integrated_ff):
@@ -1295,8 +1265,23 @@ def test_get_item_facet_values(integrated_ff):
     assert 'Status' in facets
 
 
-@pytest.mark.integrated
-def test_faceted_search_exp_set(integrated_ff):
+@pytest.mark.recordable
+@pytest.mark.integratedx
+@pytest.mark.flaky
+def test_faceted_search_exp_set_integrated(integrated_ff):
+    with TestRecorder().recorded_requests('test_faceted_search_exp_set', integrated_ff):
+        check_faceted_search_exp_set(integrated_ff)
+
+
+@pytest.mark.unit
+def test_faceted_search_exp_set_unit():
+    # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
+    # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
+    with TestRecorder().replayed_requests('test_faceted_search_exp_set') as mocked_integrated_ff:
+        check_faceted_search_exp_set(mocked_integrated_ff)
+
+
+def check_faceted_search_exp_set(integrated_ff):
     """ Tests the experiment set search features using mastertest """
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     all_facets = ff_utils.get_item_facets('experiment_set_replicate', key=key, ff_env=ff_env)
@@ -1415,8 +1400,23 @@ def test_faceted_search_exp_set(integrated_ff):
     assert len(resp) == 1
 
 
-@pytest.mark.integrated
-def test_faceted_search_users(integrated_ff):
+@pytest.mark.recordable
+@pytest.mark.integratedx
+@pytest.mark.flaky
+def test_faceted_search_users_integrated(integrated_ff):
+    with TestRecorder().recorded_requests('test_faceted_search_users', integrated_ff):
+        check_faceted_search_users(integrated_ff)
+
+
+@pytest.mark.unit
+def test_faceted_search_users_unit():
+    # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
+    # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
+    with TestRecorder().replayed_requests('test_faceted_search_users') as mocked_integrated_ff:
+        check_faceted_search_users(mocked_integrated_ff)
+
+
+def check_faceted_search_users(integrated_ff):
     """
     Tests faceted_search with users intead of experiment set
     Tests a negative search as well

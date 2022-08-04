@@ -331,7 +331,7 @@ REQUESTS_KEYS = list(ff_utils.REQUESTS_VERBS.keys())
 
 
 @contextlib.contextmanager
-def mocked_authorized_requests(**mocks):
+def mocked_authorized_request_verbs(**mocks):
     for key in mocks:
         assert key in REQUESTS_KEYS, (f"The string {key} does not name a requests verb."
                                       f" Each key must be {disjoined_list(REQUESTS_KEYS)}.")
@@ -423,21 +423,25 @@ class TestRecorder:
     def __init__(self, recordings_dir=None):
         self.recordings_dir = recordings_dir or self.DEFAULT_RECORDINGS_DIR
         self.recording_enabled = self.RECORDING_ENABLED
+        self.recording_level = 0
 
     @contextlib.contextmanager
-    def disable_recording(self):
+    def creating_record(self):
         old_enabled = self.recording_enabled
+        old_level = self.recording_level
         try:
             self.recording_enabled = False
+            self.recording_level += 1
             yield
         finally:
             self.recording_enabled = old_enabled
+            self.recording_level = old_level
 
     @contextlib.contextmanager
     def recorded_requests(self, test_name, integrated_ff):
         with io.open(os.path.join(self.recordings_dir, test_name), 'w') as recording_fp:
 
-            # Write an initial record with sufficient integratoin context information for replaying
+            # Write an initial record with sufficient integration context information for replaying
             PRINT(json.dumps({
                 "ff_key": {"key": "some-key", "secret": "some-secret", "server": integrated_ff["ff_key"]["server"]},
                 "ff_env": integrated_ff["ff_env"],
@@ -471,15 +475,34 @@ class TestRecorder:
                         raise
                 _mocked.__name__ = f"_mocked_{verb}_after_recording"
                 return _mocked
-            with mocked_authorized_requests(GET=mock_recorded('GET'),
-                                            PATCH=mock_recorded('PATCH'),
-                                            POST=mock_recorded('POST'),
-                                            PUT=mock_recorded('PUT'),
-                                            DELETE=mock_recorded('DELETE')):
-                yield
+            def mocked_stuff_in_queues(ff_env_index_namespace, check_secondary):
+                # This mock assumes the queue checks don't err. If we find they do, it needs to be a bit more elaborate.
+                start = datetime.datetime.now()
+                result = ff_utils._real_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace,
+                                                        check_secondary=check_secondary)
+                duration = (datetime.datetime.now() - start).total_seconds()
+                duration = math.floor(duration * 10) / 10.0  # round to tenths of a second
+                event = {"verb": 'stuff-in-queues', "url": None,
+                         "data": {"ff_env_index_namespace": ff_env_index_namespace,
+                                  "check_secondary": check_secondary},
+                         "duration": duration, "result": result}
+                if self.recording_enabled:
+                    PRINT(f"Recording stuff-in-queues")
+                    PRINT(json.dumps(event), file=recording_fp)
+                else:
+                    PRINT(f"{'>' * self.recording_level} NOT recording stuff-in-queues")
+                return result
+            with mocked_authorized_request_verbs(GET=mock_recorded('GET'),
+                                                 PATCH=mock_recorded('PATCH'),
+                                                 POST=mock_recorded('POST'),
+                                                 PUT=mock_recorded('PUT'),
+                                                 DELETE=mock_recorded('DELETE')):
+                with mock.patch.object(ff_utils, "_mockable_stuff_in_queues") as mock_stuff_in_queues:
+                    mock_stuff_in_queues.side_effect = mocked_stuff_in_queues
+                    yield
 
     @contextlib.contextmanager
-    def replayed_requests(self, test_name, mock_time=False):
+    def replayed_requests(self, test_name, mock_time=True):
         with controlled_time_mocking(enabled=mock_time) as dt:
             with io.open(os.path.join(self.recordings_dir, test_name)) as recording_fp:
 
@@ -521,13 +544,148 @@ class TestRecorder:
 
                     _mocked.__name__ = f"_mocked_{verb}_by_replay"
                     return _mocked
+                def mocked_replayed_stuff_in_queues(ff_env_index_namespace, check_secondary):
+                    PRINT(f"Replaying stuff-in-queues {ff_env_index_namespace} {check_secondary}")
+                    verb = 'stuff-in-queues'
+                    expected_event = get_next_json()
+                    expected_verb = expected_event['verb']
+                    if verb != expected_verb:
+                        raise AssertionError(f"Actual call {verb} does not match expected call {expected_verb}")
+                    dt.sleep(expected_event['duration'])
+                    error_message = expected_event.get('error_message')
+                    if error_message:
+                        raise Exception(error_message)
+                    else:
+                        return expected_event['result']
+                with mocked_authorized_request_verbs(GET=mock_replayed('GET'),
+                                                     PATCH=mock_replayed('PATCH'),
+                                                     POST=mock_replayed('POST'),
+                                                     PUT=mock_replayed('PUT'),
+                                                     DELETE=mock_replayed('DELETE')):
+                    with mock.patch.object(ff_utils, "_mockable_stuff_in_queues") as mock_replayed_stuff_in_queues:
+                        mock_replayed_stuff_in_queues.side_effect = mocked_replayed_stuff_in_queues
+                        yield mocked_integrated_ff
 
-                with mocked_authorized_requests(GET=mock_replayed('GET'),
-                                                PATCH=mock_replayed('PATCH'),
-                                                POST=mock_replayed('POST'),
-                                                PUT=mock_replayed('PUT'),
-                                                DELETE=mock_replayed('DELETE')):
-                    yield mocked_integrated_ff
+    @contextlib.contextmanager
+    def recorded_authorized_requests(self, test_name, integrated_ff):
+        with io.open(os.path.join(self.recordings_dir, test_name), 'w') as recording_fp:
+
+            # Write an initial record with sufficient integration context information for replaying
+            PRINT(json.dumps({
+                "ff_key": {"key": "some-key", "secret": "some-secret", "server": integrated_ff["ff_key"]["server"]},
+                "ff_env": integrated_ff["ff_env"],
+                "ff_env_index_namespace": integrated_ff["ff_env_index_namespace"]
+            }), file=recording_fp)
+
+            def mocked_authorized_request(url, *, verb, **kwargs):
+                start = datetime.datetime.now()
+                data = kwargs.get('data')
+                try:
+                    with self.creating_record():
+                        response =  ff_utils._real_authorized_request(url, verb=verb, **kwargs)
+                    status = response.status_code
+                    result = response.json()
+                    duration = (datetime.datetime.now() - start).total_seconds()
+                    duration = math.floor(duration * 10) / 10.0  # round to tenths of a second
+                    event = {"verb": verb, "url": url, "data": data,
+                             "duration": duration, "status": status, "result": result}
+                    if self.recording_enabled:
+                        PRINT(f"Recording authorized {verb} {url}")
+                        PRINT(json.dumps(event), file=recording_fp)
+                    else:
+                        PRINT(f"{'>' * self.recording_level} NOT recording authorized {verb} {url}")
+                    return response
+                except Exception as e:
+                    error_type = full_class_name(e)
+                    error_message = str(e)
+                    duration = (datetime.datetime.now() - start).total_seconds()
+                    event = {"verb": verb, "url": url, "data": data,
+                             "duration": duration, "error_type": error_type, "error_message": error_message}
+                    if self.recording_enabled:
+                        PRINT(f"Recording authorized {verb} {url} error result")
+                        PRINT(json.dumps(event), file=recording_fp)
+                    else:
+                        PRINT(f"{'>' * self.recording_level} NOT recording authorized {verb} {url} error result")
+                    raise
+            def mocked_stuff_in_queues(ff_env_index_namespace, check_secondary):
+                # This mock assumes the queue checks don't err. If we find they do, it needs to be a bit more elaborate.
+                start = datetime.datetime.now()
+                result = ff_utils._real_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace,
+                                                        check_secondary=check_secondary)
+                duration = (datetime.datetime.now() - start).total_seconds()
+                duration = math.floor(duration * 10) / 10.0  # round to tenths of a second
+                event = {"verb": 'stuff-in-queues', "url": None,
+                         "data": {"ff_env_index_namespace": ff_env_index_namespace,
+                                  "check_secondary": check_secondary},
+                         "duration": duration, "result": result}
+                if self.recording_enabled:
+                    PRINT(f"Recording stuff-in-queues")
+                    PRINT(json.dumps(event), file=recording_fp)
+                else:
+                    PRINT(f"{'>' * self.recording_level} NOT recording stuff-in-queues")
+                return result
+            with mock.patch.object(ff_utils, "_mockable_authorized_request") as mock_authorized_request:
+                with mock.patch.object(ff_utils, "_mockable_stuff_in_queues") as mock_stuff_in_queues:
+                    mock_authorized_request.side_effect = mocked_authorized_request
+                    mock_stuff_in_queues.side_effect = mocked_stuff_in_queues
+                    yield
+
+    @contextlib.contextmanager
+    def replayed_authorized_requests(self, test_name, mock_time=False):
+        with controlled_time_mocking(enabled=mock_time) as dt:
+            with io.open(os.path.join(self.recordings_dir, test_name)) as recording_fp:
+
+                PRINT()  # Start output on a fresh line
+
+                def get_next_json():
+                    line = recording_fp.readline()
+                    if not line:
+                        raise AssertionError("Out of replayable records.")
+                    parsed_json = json.loads(line)
+                    if parsed_json.get('verb') is None:
+                        PRINT(f"Consuming special non-request replay record.")
+                    else:
+                        PRINT(f"Consuming replay record {parsed_json.get('verb')} {parsed_json.get('url')}")
+                    return parsed_json
+
+                # Read back initial record with sufficient integratoin context information for replaying
+                mocked_integrated_ff = get_next_json()
+
+                def mocked_replayed_authorized_request(url, *, verb, **kwargs):
+                    ignored(kwargs)
+                    PRINT(f"Replaying {verb} {url}")
+                    expected_event = get_next_json()
+                    expected_verb = expected_event['verb']
+                    expected_url = expected_event['url']
+                    if verb != expected_verb or url != expected_url:
+                        raise AssertionError(f"Actual call {verb} {url} does not match"
+                                             f" expected call {expected_verb} {expected_url}")
+                    if expected_event.get('data') != kwargs.get('data'):  # might or might not have data
+                        raise AssertionError(f"Data mismatch on call {verb} {url}.")
+                    dt.sleep(expected_event['duration'])
+                    error_message = expected_event.get('error_message')
+                    if error_message:
+                        raise Exception(error_message)
+                    else:
+                        return MockResponse(status_code=expected_event['status'], json=expected_event['result'])
+                def mocked_replayed_stuff_in_queues(ff_env_index_namespace, check_secondary):
+                    PRINT(f"Replaying stuff-in-queues {ff_env_index_namespace} {check_secondary}")
+                    verb = 'stuff-in-queues'
+                    expected_event = get_next_json()
+                    expected_verb = expected_event['verb']
+                    if verb != expected_verb:
+                        raise AssertionError(f"Actual call {verb} does not match expected call {expected_verb}")
+                    dt.sleep(expected_event['duration'])
+                    error_message = expected_event.get('error_message')
+                    if error_message:
+                        raise Exception(error_message)
+                    else:
+                        return expected_event['result']
+                with mock.patch.object(ff_utils, "_mockable_authorized_request") as mock_authorized_request:
+                    with mock.patch.object(ff_utils, "_mockable_stuff_in_queues") as mock_stuff_in_queues:
+                        mock_authorized_request.side_effect = mocked_replayed_authorized_request
+                        mock_stuff_in_queues.side_effect = mocked_replayed_stuff_in_queues
+                        yield mocked_integrated_ff
 
 
 def _portal_health_get(namespace, portal_url, key):
