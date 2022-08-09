@@ -36,7 +36,8 @@ jobs:
       - name: Install Deps
         run: |
           pip install poetry
-
+          poetry --version
+          pip freeze | grep poetry-core
       - name: QA
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -44,7 +45,7 @@ jobs:
           S3_ENCRYPT_KEY: ${{ secrets.S3_ENCRYPT_KEY }}
           GLOBAL_ENV_BUCKET: foursight-envs
         run: |
-          poetry install
+          poetry install -vvv
           make test-for-ga
 
       - name: Coveralls
