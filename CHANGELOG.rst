@@ -6,9 +6,15 @@ dcicutils
 Change Log
 ----------
 
-4.1.0
+5.0.0
 =====
 
+Breaking change:
+
+* Drop support for Python 3.6
+
+Other changes:
+  
 * Add better ``CHANGELOG.rst`` for the changes that happened in 4.0.0.
 * Add unit testing for stray ``print(...)`` or ``pdb.set_trace()``
 * Support for ``ENCODED_CREATE_MAPPING_SKIP``, ``ENCODED_CREATE_MAPPING_WIPE_ES``,
