@@ -7,6 +7,7 @@ import contextlib
 import copy
 import datetime
 import dateutil.tz as dateutil_tz
+import glob
 import hashlib
 import io
 import logging
@@ -28,6 +29,7 @@ from typing import Any, Optional, List, DefaultDict
 from unittest import mock
 from .env_utils import short_env_name
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
+from .lang_utils import n_of, conjoined_list, there_are
 from .misc_utils import (
     PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ,
     environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name,
@@ -394,7 +396,7 @@ class MockFileWriter:
     def __exit__(self, exc_type, exc_val, exc_tb):
         content = self.stream.getvalue()
         if FILE_SYSTEM_VERBOSE:
-            print("Writing %r to %s." % (content, self.file))
+            PRINT("Writing %r to %s." % (content, self.file))
         self.file_system.files[self.file] = content if isinstance(content, bytes) else content.encode(self.encoding)
 
 
@@ -439,7 +441,7 @@ class MockFileSystem:
 
     def open(self, file, mode='r', encoding=None):
         if FILE_SYSTEM_VERBOSE:
-            print("Opening %r in mode %r." % (file, mode))
+            PRINT("Opening %r in mode %r." % (file, mode))
         if mode in ('w', 'wt', 'w+', 'w+t', 'wt+'):
             return self._open_for_write(file_system=self, file=file, binary=False, encoding=encoding)
         elif mode in ('wb', 'w+b', 'wb+'):
@@ -457,7 +459,7 @@ class MockFileSystem:
         if content is None:
             raise FileNotFoundError("No such file or directory: %s" % file)
         if FILE_SYSTEM_VERBOSE:
-            print("Read %r from %s." % (content, file))
+            PRINT("Read %r from %s." % (content, file))
         return io.BytesIO(content) if binary else io.StringIO(content.decode(encoding or self.default_encoding))
 
     def _open_for_write(self, file_system, file, binary=False, encoding=None):
@@ -579,7 +581,19 @@ class _PrintCapturer:
     """
 
     def __init__(self):
+        self.lines: List[str] = []
+        self.last: Optional[str] = None
+        self.file_lines: DefaultDict[Optional[str], List[str]] = self._file_lines_dict()
+        self.file_last: DefaultDict[Optional[str], Optional[str]] = self._file_last_dict()
         self.reset()
+
+    @classmethod
+    def _file_lines_dict(cls):
+        return defaultdict(lambda: [])
+
+    @classmethod
+    def _file_last_dict(cls):
+        return defaultdict(lambda: None)
 
     def mock_print_handler(self, *args, **kwargs):
         """
@@ -591,7 +605,7 @@ class _PrintCapturer:
             * This mock ignores 'end=' and will treat all calls to PRINT as if they were separate lines.
         """
         text = " ".join(map(str, args))
-        print(text, **kwargs)
+        print(text, **kwargs)  # noQA - This call to print is low-level implementation
         # This only captures non-file output output.
         file = kwargs.get('file')
         if file is None:
@@ -608,10 +622,10 @@ class _PrintCapturer:
         self.file_last[file] = text
 
     def reset(self):
-        self.lines: List[str] = []
-        self.last: Optional[str] = None
-        self.file_lines: DefaultDict[Optional[str], List[str]] = defaultdict(lambda: [])
-        self.file_last: DefaultDict[Optional[str], Optional[str]] = defaultdict(lambda: None)
+        self.lines = []
+        self.last = None
+        self.file_lines = self._file_lines_dict()
+        self.file_last = self._file_last_dict()
 
 
 @contextlib.contextmanager
@@ -1790,7 +1804,7 @@ class MockBotoS3Client:
     def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
         self.check_for_kwargs_required_by_mock("upload_fileobj", Bucket=Bucket, Key=Key, **kwargs)
         data = Fileobj.read()
-        print("Uploading %s (%s bytes) to bucket %s key %s"
+        PRINT("Uploading %s (%s bytes) to bucket %s key %s"
               % (Fileobj, len(data), Bucket, Key))
         with self.s3_files.open(os.path.join(Bucket, Key), 'wb') as fp:
             fp.write(data)
@@ -1804,7 +1818,7 @@ class MockBotoS3Client:
         self.check_for_kwargs_required_by_mock("download_fileobj", Bucket=Bucket, Key=Key, **kwargs)
         with self.s3_files.open(os.path.join(Bucket, Key), 'rb') as fp:
             data = fp.read()
-        print("Downloading bucket %s key %s (%s bytes) to %s"
+        PRINT("Downloading bucket %s key %s (%s bytes) to %s"
               % (Bucket, Key, len(data), Fileobj))
         Fileobj.write(data)
 
@@ -2458,3 +2472,133 @@ class MockedCommandArgs:
         for arg, v in args.items():
             assert arg in self.VALID_ARGS
             setattr(self, arg, v)
+
+
+QA_EXCEPTION_PATTERN = re.compile(r"[#].*\b[N][O][Q][A]\b", re.IGNORECASE)
+
+
+def find_uses(*, where, patterns):
+    """
+    In the files specified by where (a glob pattern), finds uses of pattern (a regular expression).
+
+    :param where: a glob pattern
+    :param patterns: a dictionary mapping problem summaries to regular expressions
+    """
+
+    checks = []
+    for summary, pattern in patterns.items():
+        checks.append((re.compile(pattern), summary))
+    uses = defaultdict(lambda: [])
+    files = glob.glob(where)
+    for file in files:
+        with io.open(file, 'r') as fp:
+            line_number = 0
+            for line in fp:
+                line_number += 1
+                for matcher, summary in checks:
+                    if matcher.search(line):
+                        problem_ignorable = QA_EXCEPTION_PATTERN.search(line)
+                        if not problem_ignorable:
+                            uses[file].append({"line_number": line_number, "line": line.rstrip('\n'),
+                                               "summary": summary})
+    return uses
+
+
+def confirm_no_uses(*, where, patterns):
+    """
+    In the files specified by where (a glob pattern), finds uses of pattern (a regular expression).
+
+    :param where: a glob pattern
+    :param patterns: dicionary mapping summaries to regular expressions
+    """
+
+    def summarize(problems):
+        categories = defaultdict(lambda: 0)
+        for problem in problems:
+            categories[problem['summary']] += 1
+        return conjoined_list([n_of(count, category) for category, count in categories.items()])
+
+    uses = find_uses(patterns=patterns, where=where)
+    if uses:
+        detail = ""
+        n = 0
+        for file, matches in uses.items():
+            n += len(matches)
+            detail += f"\n In {file}, {summarize(matches)}."
+        message = f"{n_of(n, 'problem')} detected:" + detail
+        raise AssertionError(message)
+
+
+@contextlib.contextmanager
+def input_mocked(*inputs, module):  # module is a required keyword arg (only a single module is supported)
+    input_stack = list(reversed(inputs))
+
+    def mocked_input(*args, **kwargs):
+        ignored(args, kwargs)
+        assert input_stack, "There are not enough mock inputs."
+        return input_stack.pop()
+
+    with mock.patch.object(module, "input") as mock_input:
+        mock_input.side_effect = mocked_input
+        yield mock_input
+        if input_stack:
+            # e.g., "There is 1 unused input." or "There are 2 unused inputs."
+            raise AssertionError(there_are(kind="unused mock input", items=input_stack, punctuate=True, show=False))
+
+
+class MockLog:
+
+    def __init__(self, *, messages=None, key=None, allow_warn=False):
+        self.messages = messages or {}
+        self.key = key
+        self._all_messages = []
+        self.allow_warn = allow_warn
+
+    def _addmsg(self, kind, msg):
+        self.messages[kind] = msgs = self.messages.get(kind, [])
+        msgs.append(msg[self.key] if self.key else msg)
+        item = f"{kind.upper()}: {msg}"
+        self._all_messages.append(item)
+
+    def debug(self, msg):
+        self._addmsg('debug', msg)
+
+    def info(self, msg):
+        self._addmsg('info', msg)
+
+    def warning(self, msg):
+        self._addmsg('warning', msg)
+
+    def warn(self, msg):
+        if self.allow_warn:
+            self._addmsg('warning', msg)
+        else:
+            raise AssertionError(f"{self}.warn called. Should be 'warning'")
+
+    def error(self, msg):
+        self._addmsg('error', msg)
+
+    def critical(self, msg):
+        self._addmsg('critical', msg)
+
+    @property
+    def all_log_messages(self):
+        return self._all_messages
+
+
+@contextlib.contextmanager
+def logged_messages(*args, module,  # module is a required keyword arg (only a single module is supported)
+                    log_class=MockLog, logvar="log", allow_warn=False, **kwargs):
+    mocked_log = log_class(allow_warn=allow_warn)
+    with mock.patch.object(module, logvar, mocked_log):
+        yield mocked_log
+        if args or not kwargs:
+            expected = list(args)
+            assert mocked_log.all_log_messages == expected, (
+                f"Expected {logvar}.all_log_messages = {expected}, but got {mocked_log.all_log_messages}"
+            )
+        if kwargs:
+            expected = dict(**kwargs)
+            assert mocked_log.messages == expected, (
+                f"Expected {logvar}.all_log_messages = {expected}, but got {mocked_log.messages}"
+            )

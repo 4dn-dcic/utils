@@ -9,7 +9,7 @@ configure:  # does any pre-requisite installs
 lint:
 	@echo "Running flake8..."
 	@flake8 dcicutils || echo "'flake8 dcicutils' failed."
-	@flake8 test || echo "'flake8 test' failed."
+	@flake8 test --exclude=data_files || echo "'flake8 test' failed."
 
 build:  # builds
 	make configure
@@ -19,6 +19,8 @@ test:  # runs default tests, which are the unit tests
 	make test-units
 
 test-for-ga:
+	poetry run flake8 dcicutils
+	poetry run flake8 test --exclude=data_files
 	make test-units-with-coverage
 
 retest:  # runs only failed tests from the last test run. (if no failures, it seems to run all?? -kmp 17-Dec-2020)
@@ -66,6 +68,9 @@ test-direct-es-query:  # must be called inside VPC (e.g., from foursight after c
 	@git log -1 --decorate | head -1
 	@date
 
+recordings:
+	@scripts/create_test_recordings
+
 update:  # updates dependencies
 	poetry update
 
@@ -86,4 +91,5 @@ info:
 	   $(info - Use 'make publish' to publish this library, but only if auto-publishing has failed.)
 	   $(info - Use 'make test' to run tests with the normal options we use on travis)
 	   $(info - Use 'make update' to update dependencies (and the lock file))
+	   $(info - Use 'make recordings' to refresh the recorded tests. (Always makes new recordings even if not needed.))
 	   $(info - Use 'make clear-poetry-cache' to clear the poetry pypi cache if in a bad state. (Safe, but later recaching can be slow.))

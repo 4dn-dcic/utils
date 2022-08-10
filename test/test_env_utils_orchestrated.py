@@ -21,7 +21,7 @@ from dcicutils.env_utils import (
 )
 from dcicutils.env_utils_legacy import FF_PRODUCTION_ECR_REPOSITORY
 from dcicutils.exceptions import (
-    BeanstalkOperationNotImplemented, MissingFoursightBucketTable, IncompleteFoursightBucketTable,
+    BeanstalkOperationNotImplemented,  # MissingFoursightBucketTable, IncompleteFoursightBucketTable,
     EnvUtilsLoadError,
 )
 from dcicutils.misc_utils import decorator, local_attrs, ignorable, override_environ
@@ -224,8 +224,9 @@ def test_orchestrated_infer_foursight_url_from_env():
 
     assert (infer_foursight_url_from_env(request='ignored-request', envname='demo')
             == 'https://foursight.genetics.example.com/api/view/demo')
-    assert (infer_foursight_url_from_env(request='ignored-request', envname='acme-foo')
-            == 'https://foursight.genetics.example.com/api/view/foo')
+    actual = infer_foursight_url_from_env(request='ignored-request', envname='acme-foo')
+    expected = 'https://foursight.genetics.example.com/api/view/foo'
+    assert actual == expected
     assert (infer_foursight_url_from_env(request='ignored-request', envname='fourfront-cgapwolf')
             == 'https://foursight.genetics.example.com/api/view/fourfront-cgapwolf')
 
@@ -1543,16 +1544,13 @@ def test_get_foursight_bucket():
             assert get_foursight_bucket(envname='acme-foo', stage='prod') == 'alpha-omega-prod-acme-foo'
             assert get_foursight_bucket(envname='acme-stg', stage='dev') == 'alpha-omega-dev-acme-stg'
 
-        with pytest.raises(MissingFoursightBucketTable):
-            get_foursight_bucket(envname='acme-foo', stage='prod')
+            assert get_foursight_bucket(envname='acme-foo', stage='prod') == 'alpha-omega-prod-acme-foo'
 
-        EnvUtils.FOURSIGHT_BUCKET_TABLE = None
-        with pytest.raises(MissingFoursightBucketTable):
-            get_foursight_bucket(envname='acme-foo', stage='prod')
+            EnvUtils.FOURSIGHT_BUCKET_TABLE = None
+            assert get_foursight_bucket(envname='acme-foo', stage='prod') == 'alpha-omega-prod-acme-foo'
 
-        EnvUtils.FOURSIGHT_BUCKET_TABLE = {}
-        with pytest.raises(IncompleteFoursightBucketTable):
-            get_foursight_bucket(envname='acme-foo', stage='prod')
+            EnvUtils.FOURSIGHT_BUCKET_TABLE = {}
+            assert get_foursight_bucket(envname='acme-foo', stage='prod') == 'alpha-omega-prod-acme-foo'
 
 
 @using_orchestrated_behavior(data=EnvUtils.SAMPLE_TEMPLATE_FOR_FOURFRONT_TESTING)
@@ -1618,6 +1616,33 @@ def test_cgap_get_env_real_url():
         #  * Uses 'https' uniformly for security reasons.
         #  * Uses full env name.
         assert get_env_real_url(env) == f'https://{env}{dev_suffix}'
+
+
+def test_app_case():
+
+    with local_attrs(EnvUtils, ORCHESTRATED_APP=APP_CGAP):
+        assert EnvUtils.app_case(if_cgap='foo', if_fourfront='bar') == 'foo'
+
+    with local_attrs(EnvUtils, ORCHESTRATED_APP=APP_FOURFRONT):
+        assert EnvUtils.app_case(if_cgap='foo', if_fourfront='bar') == 'bar'
+
+    with local_attrs(EnvUtils, ORCHESTRATED_APP='whatever'):
+        with pytest.raises(ValueError):
+            EnvUtils.app_case(if_cgap='foo', if_fourfront='bar')
+
+
+def test_app_name():
+
+    assert EnvUtils.app_name() == EnvUtils.ORCHESTRATED_APP
+
+    with local_attrs(EnvUtils, ORCHESTRATED_APP=APP_CGAP):
+        assert EnvUtils.app_name() == APP_CGAP
+
+    with local_attrs(EnvUtils, ORCHESTRATED_APP=APP_FOURFRONT):
+        assert EnvUtils.app_name() == APP_FOURFRONT
+
+    with local_attrs(EnvUtils, ORCHESTRATED_APP='whatever'):
+        assert EnvUtils.app_name() == 'whatever'
 
 
 def test_get_config_ecosystem_from_s3():

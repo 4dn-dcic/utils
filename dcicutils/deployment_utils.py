@@ -543,6 +543,10 @@ class IniFileManager:
     LEGACY_TIBANNA_OUTPUT_BUCKET = s3Base.TIBANNA_OUTPUT_BUCKET_TEMPLATE    # = "tibanna-output"
     LEGACY_FOURSIGHT_BUCKET_PREFIX = "foursight-"
 
+    PRD_DEFAULT_CREATE_MAPPING_ON_DEPLOY_SKIP = None
+    PRD_DEFAULT_CREATE_MAPPING_ON_DEPLOY_WIPE_ES = None
+    PRD_DEFAULT_CREATE_MAPPING_ON_DEPLOY_STRICT = None
+
     @classmethod
     def build_ini_stream_from_template(cls, template_file_name, init_file_stream, *,
                                        bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
@@ -652,6 +656,13 @@ class IniFileManager:
         auth0_client = auth0_client or os.environ.get("ENCODED_AUTH0_CLIENT", "")
         auth0_secret = auth0_secret or os.environ.get("ENCODED_AUTH0_SECRET", "")
 
+        create_mapping_on_deploy_skip = os.environ.get("ENCODED_CREATE_MAPPING_SKIP",
+                                                       cls.PRD_DEFAULT_CREATE_MAPPING_ON_DEPLOY_SKIP)
+        create_mapping_on_deploy_wipe_es = os.environ.get("ENCODED_CREATE_MAPPING_WIPE_ES",
+                                                          cls.PRD_DEFAULT_CREATE_MAPPING_ON_DEPLOY_WIPE_ES)
+        create_mapping_on_deploy_strict = os.environ.get("ENCODED_CREATE_MAPPING_STRICT",
+                                                         cls.PRD_DEFAULT_CREATE_MAPPING_ON_DEPLOY_STRICT)
+
         # corresponds to s3Base/s3Utils legacy "elasticbeanstalk-%s-files"
         file_upload_bucket = (file_upload_bucket
                               or os.environ.get("ENCODED_FILE_UPLOAD_BUCKET")
@@ -746,6 +757,9 @@ class IniFileManager:
             'TIBANNA_OUTPUT_BUCKET': tibanna_output_bucket,
             'AUTH0_CLIENT': auth0_client,
             'AUTH0_SECRET': auth0_secret,
+            "CREATE_MAPPING_SKIP": create_mapping_on_deploy_skip,
+            "CREATE_MAPPING_WIPE_ES": create_mapping_on_deploy_wipe_es,
+            "CREATE_MAPPING_STRICT": create_mapping_on_deploy_strict,
             'FILE_UPLOAD_BUCKET': file_upload_bucket,
             'FILE_WFOUT_BUCKET': file_wfout_bucket,
             'BLOB_BUCKET': blob_bucket,
@@ -1074,8 +1088,8 @@ class CreateMappingOnDeployManager:
 
     # Set SKIP to True to skip the create_mapping step.
 
-    DEFAULT_DEPLOYMENT_OPTIONS = {'SKIP': False, 'STRICT': False, 'WIPE_ES': False}
-    PRODUCTION_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': False, 'STRICT': True}
+    DEFAULT_DEPLOYMENT_OPTIONS = {'SKIP': False, 'WIPE_ES': False, 'STRICT': False}
+    PRODUCTION_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': False, 'STRICT': False}
     STAGING_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': True, 'STRICT': True}
     HOTSEAT_DEPLOYMENT_OPTION_OVERRIDES = {'SKIP': True, 'STRICT': True}
     OTHER_TEST_DEPLOYMENT_OPTION_OVERRIDES = {'WIPE_ES': True}

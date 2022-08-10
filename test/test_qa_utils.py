@@ -1,3 +1,5 @@
+import logging
+
 import boto3
 import datetime
 import io
@@ -13,20 +15,26 @@ import uuid
 
 from dcicutils import qa_utils
 from dcicutils.exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix
-from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ
+from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ, remove_prefix
 from dcicutils.qa_utils import (
     mock_not_called, override_environ, override_dict, show_elapsed_time, timed,
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
+    find_uses, confirm_no_uses, logged_messages, input_mocked
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
 from unittest import mock
+from .conftest_settings import TEST_DIR
 from .fixtures.sample_fixtures import MockMathError, MockMath, math_enabled
+from .test_misc import DEBUGGING_PATTERNS
 
 
 notice_pytest_fixtures(math_enabled)   # Use care if editing this line. It is PART OF A TEST.
+
+
+logger = logging.getLogger(__name__)
 
 
 def test_mock_not_called():
@@ -1495,3 +1503,118 @@ def test_mocked_command_args():
     assert args.foo == 'x'      # noQA - PyCharm can't see we declared this arg
     assert args.bar == 'y'      # noQA - PyCharm can't see we declared this arg
     assert args.foobar == 'xy'  # noQA - PyCharm can't see we declared this arg
+
+
+def test_find_uses():
+
+    glob_pattern = os.path.join(TEST_DIR, 'data_files/sample_source_files/*.py')
+    raw = find_uses(where=glob_pattern,
+                    patterns=DEBUGGING_PATTERNS)
+    output = {remove_prefix(TEST_DIR + os.sep, file): problems for file, problems in raw.items()}
+    assert output == {
+        'data_files/sample_source_files/file1.py': [
+            {'line': '    print("first use")',
+             'line_number': 2,
+             'summary': 'call to print'},
+            {'line': '    print("second use")',
+             'line_number': 3,
+             'summary': 'call to print'},
+            {'line': '    print("third use", z)',
+             'line_number': 11,
+             'summary': 'call to print'},
+            {'line': '    import pdb; pdb.set_trace()',
+             'line_number': 12,
+             'summary': 'active use of pdb.set_trace'}
+        ],
+        'data_files/sample_source_files/file2.py': [
+            {'line': '    print("third use", z)',
+             'line_number': 5,
+             'summary': 'call to print'},
+            {'line': '    pdb.set_trace()  # Second tallied use',
+             'line_number': 13,
+             'summary': 'active use of pdb.set_trace'},
+            {'line': '    pdb.set_trace()  # Third tallied use',
+             'line_number': 17,
+             'summary': 'active use of pdb.set_trace'}
+        ]
+    }
+
+
+def test_confirm_no_uses():
+
+    with pytest.raises(AssertionError) as exc_info:
+
+        glob_pattern = os.path.join(TEST_DIR, 'data_files/sample_source_files/*.py')
+        confirm_no_uses(where=glob_pattern,
+                        patterns=DEBUGGING_PATTERNS)
+
+    lines = str(exc_info.value).split('\n')
+    assert len(lines) == 3
+    assert lines[0] == "7 problems detected:"
+
+    prefix = f" In {TEST_DIR}/data_files/sample_source_files/"
+    lines = [remove_prefix(prefix, line) for line in sorted(lines[1:])]
+
+    assert lines[0] == "file1.py, 3 calls to print and 1 active use of pdb.set_trace."
+    assert lines[1] == "file2.py, 1 call to print and 2 active uses of pdb.set_trace."
+
+
+MY_MODULE = sys.modules['test.test_qa_utils']
+
+
+def test_input_mocked():
+
+    def some_function_with_input():
+        return input("input something:")
+
+    with input_mocked("x", "y", module=MY_MODULE):
+        assert some_function_with_input() == "x"
+        assert some_function_with_input() == "y"
+        with pytest.raises(AssertionError) as exc_info:
+            some_function_with_input()
+        assert str(exc_info.value) == "There are not enough mock inputs."
+
+    with pytest.raises(AssertionError) as exc_info:
+        with input_mocked("x", "y", module=sys.modules['test.test_qa_utils']):
+            assert some_function_with_input() == "x"
+    assert str(exc_info.value) == "There is 1 unused mock input."
+
+
+def test_logged_messages():
+
+    with logged_messages("INFO: foo", module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+
+    with pytest.raises(AssertionError):
+        with logged_messages("INFO: foo", module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.info("bar")
+
+    with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+
+    with logged_messages(info=["foo"], warning=["bar"], module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+        logger.warning("bar")
+
+    with pytest.raises(AssertionError):
+        with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.info("bar")
+
+    with pytest.raises(AssertionError):
+        with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.warning("bar")
+
+    with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger', allow_warn=True):
+        logger.warn("bar")
+
+    with pytest.raises(AssertionError):
+        with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger', allow_warn=False):
+            logger.warn("bar")
+
+    with pytest.raises(AssertionError):
+        with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger'):
+            # allow_warn defaults to False
+            logger.warn("bar")

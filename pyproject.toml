@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "4.0.2"
+version = "4.1.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -36,6 +36,7 @@ classifiers = [
     'Programming Language :: Python :: 3.9',
 ]
 
+
 [tool.poetry.dependencies]
 python = ">=3.6.1,<3.10"
 boto3 = "^1.17.39"
@@ -56,6 +57,7 @@ typing-extensions = ">=3.8"  # Fourfront uses 3.8
 urllib3 = "^1.26.6"
 webtest = "^2.0.34"
 
+
 [tool.poetry.dev-dependencies]
 botocore-stubs = "1.21.22"
 boto3-stubs = "1.18.23"
@@ -69,6 +71,27 @@ pytest-mock = ">=1.11.0"
 pytest-runner = ">=5.1"
 
 
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning: distutils Version classes are deprecated. Use packaging.version instead.",
+]
+markers = [
+  "working: test should work",
+  "integrated: an integration test",
+  "integratedx: an excludable integration test, redundantly testing functionality also covered by a unit test",
+  "unit: a proper unit test",
+  "file_operation: a test that utilizes files",
+  "beanstalk_failure: an obsolete beanstalk-related test that needs fixing",
+  "direct_es_query: a test of direct ES _search that is disabled for now and needs to move inside the firewall",
+  "stg_or_prd_testing_needs_repair: some or all of a test that was failing on stg/prd has been temporarily disabled",
+  "recordable: uses recording technology so that if RECORDING_ENABLED=TRUE, a new test recording is made",
+]
+norecursedirs = ["*env", "site-packages", ".cache", ".git", ".idea", "*.egg-info"]
+# We don't use pytest-pep8, but if we ever did, its pep8xxx options could be specified here, as in:
+# pep8maxlinelength = 120
+testpaths = ["test"]
+
+
 [build-system]
-requires = ["poetry>=0.12"]
-build-backend = "poetry.masonry.api"
+requires = ["poetry_core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

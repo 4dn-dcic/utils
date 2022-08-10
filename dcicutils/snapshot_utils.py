@@ -196,10 +196,10 @@ class _ElasticSearchDataCache:
             PRINT(level * "  ", level, "Done loading additional requested class data", cls.__name__)
         # Finally, assure everything is indexed.
         if cls.VERBOSE_SNAPSHOTS:
-            print(level * "  ", level, "Starting indexing at", datetime.datetime.now())
+            PRINT(level * "  ", level, "Starting indexing at", datetime.datetime.now())
         es_testapp.post_json('/index', {'record': False})
         if cls.VERBOSE_SNAPSHOTS:
-            print(level * "  ", level, "Done indexing at", datetime.datetime.now())
+            PRINT(level * "  ", level, "Done indexing at", datetime.datetime.now())
         if cls.VERBOSE_SNAPSHOTS:
             PRINT(level * "  ", level, "Exiting %s.load_data at %s" % (cls.__name__, datetime.datetime.now()))
 
@@ -243,7 +243,7 @@ class _ElasticSearchDataCache:
             if existing and existing != value:
                 if cls.DEBUG_SNAPSHOTS:
                     import pdb
-                    pdb.set_trace()
+                    pdb.set_trace()  # noQA
                 raise RuntimeError("Conflicting %s: %s (new) and %s (existing)." % (attr, value, existing))
             setattr(cls, attr, value)
 
@@ -322,7 +322,7 @@ class _ElasticSearchDataCache:
             logging.error(str(e))
             if cls.DEBUG_SNAPSHOTS:
                 import pdb
-                pdb.set_trace()
+                pdb.set_trace()  # noQA
             raise
 
     @classmethod
@@ -366,7 +366,7 @@ class _ElasticSearchDataCache:
             # Maybe should reset cls.done to False?
             if cls.DEBUG_SNAPSHOTS:
                 import pdb
-                pdb.set_trace()
+                pdb.set_trace()  # noQA
             raise
 
     @classmethod

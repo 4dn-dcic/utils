@@ -256,7 +256,7 @@ def setup_subrepo(subrepo_name, subrepo_git_url=None, parent_root=None,
     venv_name = subrepo_name + "_env"
 
     if not os.path.exists(all_subrepos_path):
-        print(f"Creating {all_subrepos_path}...")
+        PRINT(f"Creating {all_subrepos_path}...")
         os.mkdir(all_subrepos_path)
 
     if not os.path.exists(subrepo_path):
