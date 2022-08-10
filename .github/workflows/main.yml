@@ -36,8 +36,9 @@ jobs:
       - name: Install Deps
         run: |
           pip install poetry
-          poetry --version
-          pip freeze | grep poetry-core
+          # show loaded versions of various poetry-related libraries
+          pip freeze --all | egrep '(pip|poetry(.[a-z]+)?|tomlkit)=='
+
       - name: QA
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

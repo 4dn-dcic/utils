@@ -35,6 +35,12 @@ Other changes:
   * ``test_faceted_search_exp_set`` (newly recorded)
   * ``test_faceted_search_users`` (newly recorded)
 * Specify pytest options in pyproject.toml instead of a separate file.
+* In ``env_utils``:
+  * Added ``EnvUtils.app_name`` to get the orchestrated app name.
+  * Added ``EnvUtils.app_case`` to conditionalize on ``if_cgap=`` and ``if_fourfront=``.
+* In ``qa_utils``:
+  * Added an ``input_mocked`` context manager.
+  * Added ``MockLog`` and a ``logged_messages`` context manager.
 
 
 4.0.2

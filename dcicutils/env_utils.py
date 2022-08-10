@@ -11,7 +11,7 @@ from typing import Optional
 from urllib.parse import urlparse
 from . import env_utils_legacy as legacy
 from .common import (
-    EnvName, OrchestratedApp, APP_FOURFRONT, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD,
+    EnvName, OrchestratedApp, APP_FOURFRONT, APP_CGAP, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD,
 )
 from .env_base import EnvBase, LegacyController
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
@@ -423,6 +423,19 @@ class EnvUtils:
     def fresh_cgap_deployed_state_for_testing(cls):
         with cls.fresh_testing_state_from(bucket=cls.CGAP_BUCKET):
             yield
+
+    @classmethod
+    def app_case(self, *, if_cgap, if_fourfront):
+        if EnvUtils.ORCHESTRATED_APP == APP_FOURFRONT:
+            return if_fourfront
+        elif EnvUtils.ORCHESTRATED_APP == APP_CGAP:
+            return if_cgap
+        else:
+            raise ValueError(f"EnvUtils.ORCHESTRATED_APP has an unexpected value: {EnvUtils.ORCHESTRATED_APP}")
+
+    @classmethod
+    def app_name(cls):
+        return EnvUtils.ORCHESTRATED_APP
 
     # Vaguely, the thing we're trying to recognize is this (sanitized slightly here),
     # which we first call str() on and then check with a regular expression:

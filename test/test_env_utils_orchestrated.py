@@ -1618,6 +1618,33 @@ def test_cgap_get_env_real_url():
         assert get_env_real_url(env) == f'https://{env}{dev_suffix}'
 
 
+def test_app_case():
+
+    with local_attrs(EnvUtils, ORCHESTRATED_APP=APP_CGAP):
+        assert EnvUtils.app_case(if_cgap='foo', if_fourfront='bar') == 'foo'
+
+    with local_attrs(EnvUtils, ORCHESTRATED_APP=APP_FOURFRONT):
+        assert EnvUtils.app_case(if_cgap='foo', if_fourfront='bar') == 'bar'
+
+    with local_attrs(EnvUtils, ORCHESTRATED_APP='whatever'):
+        with pytest.raises(ValueError):
+            EnvUtils.app_case(if_cgap='foo', if_fourfront='bar')
+
+
+def test_app_name():
+
+    assert EnvUtils.app_name() == EnvUtils.ORCHESTRATED_APP
+
+    with local_attrs(EnvUtils, ORCHESTRATED_APP=APP_CGAP):
+        assert EnvUtils.app_name() == APP_CGAP
+
+    with local_attrs(EnvUtils, ORCHESTRATED_APP=APP_FOURFRONT):
+        assert EnvUtils.app_name() == APP_FOURFRONT
+
+    with local_attrs(EnvUtils, ORCHESTRATED_APP='whatever'):
+        assert EnvUtils.app_name() == 'whatever'
+
+
 def test_get_config_ecosystem_from_s3():
 
     with mock.patch.object(EnvUtils, "_get_config_object_from_s3") as mock_get_config_object_from_s3:
