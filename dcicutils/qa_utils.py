@@ -29,7 +29,7 @@ from typing import Any, Optional, List, DefaultDict
 from unittest import mock
 from .env_utils import short_env_name
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
-from .lang_utils import n_of, conjoined_list
+from .lang_utils import n_of, conjoined_list, there_are
 from .misc_utils import (
     PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ,
     environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name,
@@ -587,10 +587,12 @@ class _PrintCapturer:
         self.file_last: DefaultDict[Optional[str], Optional[str]] = self._file_last_dict()
         self.reset()
 
-    def _file_lines_dict(self):
+    @classmethod
+    def _file_lines_dict(cls):
         return defaultdict(lambda: [])
 
-    def _file_last_dict(self):
+    @classmethod
+    def _file_last_dict(cls):
         return defaultdict(lambda: None)
 
     def mock_print_handler(self, *args, **kwargs):
@@ -2525,3 +2527,78 @@ def confirm_no_uses(*, where, patterns):
             detail += f"\n In {file}, {summarize(matches)}."
         message = f"{n_of(n, 'problem')} detected:" + detail
         raise AssertionError(message)
+
+
+@contextlib.contextmanager
+def input_mocked(*inputs, module):  # module is a required keyword arg (only a single module is supported)
+    input_stack = list(reversed(inputs))
+
+    def mocked_input(*args, **kwargs):
+        ignored(args, kwargs)
+        assert input_stack, "There are not enough mock inputs."
+        return input_stack.pop()
+
+    with mock.patch.object(module, "input") as mock_input:
+        mock_input.side_effect = mocked_input
+        yield mock_input
+        if input_stack:
+            # e.g., "There is 1 unused input." or "There are 2 unused inputs."
+            raise AssertionError(there_are(kind="unused mock input", items=input_stack, punctuate=True, show=False))
+
+
+class MockLog:
+
+    def __init__(self, *, messages=None, key=None, allow_warn=False):
+        self.messages = messages or {}
+        self.key = key
+        self._all_messages = []
+        self.allow_warn = allow_warn
+
+    def _addmsg(self, kind, msg):
+        self.messages[kind] = msgs = self.messages.get(kind, [])
+        msgs.append(msg[self.key] if self.key else msg)
+        item = f"{kind.upper()}: {msg}"
+        self._all_messages.append(item)
+
+    def debug(self, msg):
+        self._addmsg('debug', msg)
+
+    def info(self, msg):
+        self._addmsg('info', msg)
+
+    def warning(self, msg):
+        self._addmsg('warning', msg)
+
+    def warn(self, msg):
+        if self.allow_warn:
+            self._addmsg('warning', msg)
+        else:
+            raise AssertionError(f"{self}.warn called. Should be 'warning'")
+
+    def error(self, msg):
+        self._addmsg('error', msg)
+
+    def critical(self, msg):
+        self._addmsg('critical', msg)
+
+    @property
+    def all_log_messages(self):
+        return self._all_messages
+
+
+@contextlib.contextmanager
+def logged_messages(*args, module,  # module is a required keyword arg (only a single module is supported)
+                    log_class=MockLog, logvar="log", allow_warn=False, **kwargs):
+    mocked_log = log_class(allow_warn=allow_warn)
+    with mock.patch.object(module, logvar, mocked_log):
+        yield mocked_log
+        if args or not kwargs:
+            expected = list(args)
+            assert mocked_log.all_log_messages == expected, (
+                f"Expected {logvar}.all_log_messages = {expected}, but got {mocked_log.all_log_messages}"
+            )
+        if kwargs:
+            expected = dict(**kwargs)
+            assert mocked_log.messages == expected, (
+                f"Expected {logvar}.all_log_messages = {expected}, but got {mocked_log.messages}"
+            )

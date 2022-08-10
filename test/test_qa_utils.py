@@ -1,3 +1,5 @@
+import logging
+
 import boto3
 import datetime
 import io
@@ -19,7 +21,7 @@ from dcicutils.qa_utils import (
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
-    find_uses, confirm_no_uses,
+    find_uses, confirm_no_uses, logged_messages, input_mocked
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -30,6 +32,9 @@ from .test_misc import DEBUGGING_PATTERNS
 
 
 notice_pytest_fixtures(math_enabled)   # Use care if editing this line. It is PART OF A TEST.
+
+
+logger = logging.getLogger(__name__)
 
 
 def test_mock_not_called():
@@ -1552,3 +1557,64 @@ def test_confirm_no_uses():
 
     assert lines[0] == "file1.py, 3 calls to print and 1 active use of pdb.set_trace."
     assert lines[1] == "file2.py, 1 call to print and 2 active uses of pdb.set_trace."
+
+
+MY_MODULE = sys.modules['test.test_qa_utils']
+
+
+def test_input_mocked():
+
+    def some_function_with_input():
+        return input("input something:")
+
+    with input_mocked("x", "y", module=MY_MODULE):
+        assert some_function_with_input() == "x"
+        assert some_function_with_input() == "y"
+        with pytest.raises(AssertionError) as exc_info:
+            some_function_with_input()
+        assert str(exc_info.value) == "There are not enough mock inputs."
+
+    with pytest.raises(AssertionError) as exc_info:
+        with input_mocked("x", "y", module=sys.modules['test.test_qa_utils']):
+            assert some_function_with_input() == "x"
+    assert str(exc_info.value) == "There is 1 unused mock input."
+
+
+def test_logged_messages():
+
+    with logged_messages("INFO: foo", module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+
+    with pytest.raises(AssertionError):
+        with logged_messages("INFO: foo", module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.info("bar")
+
+    with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+
+    with logged_messages(info=["foo"], warning=["bar"], module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+        logger.warning("bar")
+
+    with pytest.raises(AssertionError):
+        with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.info("bar")
+
+    with pytest.raises(AssertionError):
+        with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.warning("bar")
+
+    with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger', allow_warn=True):
+        logger.warn("bar")
+
+    with pytest.raises(AssertionError):
+        with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger', allow_warn=False):
+            logger.warn("bar")
+
+    with pytest.raises(AssertionError):
+        with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger'):
+            # allow_warn defaults to False
+            logger.warn("bar")
