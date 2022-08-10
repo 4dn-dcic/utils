@@ -46,7 +46,7 @@ jobs:
           S3_ENCRYPT_KEY: ${{ secrets.S3_ENCRYPT_KEY }}
           GLOBAL_ENV_BUCKET: foursight-envs
         run: |
-          poetry install -vvv
+          poetry install
           make test-for-ga
 
       - name: Coveralls
