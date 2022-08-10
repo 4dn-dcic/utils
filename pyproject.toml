@@ -10,7 +10,7 @@ repository = "https://github.com/4dn-dcic/utils"
 packages = [
   { include="dcicutils", from="." }
 ]
-classifiers = [
+#classifiers = [
 #    # How mature is this project? Common values are
 #    #   3 - Alpha
 #    #   4 - Beta
@@ -34,8 +34,19 @@ classifiers = [
 #    'Programming Language :: Python :: 3.7',
 #    'Programming Language :: Python :: 3.8',
 #    'Programming Language :: Python :: 3.9',
+#]
+classifiers = [
+    'Development Status :: 4 - Beta',
+    'Intended Audience :: Developers',
+    'Intended Audience :: Science/Research',
+    'License :: OSI Approved :: MIT License',
+    'Topic :: Database :: Database Engines/Servers',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.6',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
 ]
-
 
 [tool.poetry.dependencies]
 python = ">=3.7,<3.10"
@@ -91,10 +102,7 @@ norecursedirs = ["*env", "site-packages", ".cache", ".git", ".idea", "*.egg-info
 # pep8maxlinelength = 120
 testpaths = ["test"]
 
-[build-system]
-requires = ["poetry>=0.12"]
-build-backend = "poetry.masonry.api"
 
-#[build-system]
-#requires = ["poetry_core>=1.0.0"]
-#build-backend = "poetry.core.masonry.api"
+[build-system]
+requires = ["poetry_core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
