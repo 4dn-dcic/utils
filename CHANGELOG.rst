@@ -9,12 +9,12 @@ Change Log
 5.0.0
 =====
 
-Breaking change:
+**BREAKING CHANGE**: Drop support for Python 3.6
 
-* Drop support for Python 3.6
 
-Other changes:
-  
+4.1.0
+=====
+
 * Add better ``CHANGELOG.rst`` for the changes that happened in 4.0.0.
 * Add unit testing for stray ``print(...)`` or ``pdb.set_trace()``
 * Support for ``ENCODED_CREATE_MAPPING_SKIP``, ``ENCODED_CREATE_MAPPING_WIPE_ES``,
@@ -1531,3 +1531,4 @@ the ``poetry.app`` section of ``pyproject.toml``, as in::
    name = "dcicutils"
    version = "100.200.300"
    ...etc.
+
