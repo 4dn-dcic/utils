@@ -29,6 +29,9 @@ Change Log
   * ``test_faceted_search_exp_set`` (newly recorded)
   * ``test_faceted_search_users`` (newly recorded)
 * Specify pytest options in pyproject.toml instead of a separate file.
+* In ``env_utils``:
+  * Add ``EnvUtils.app_name`` to get the orchestrated app name.
+  * Add ``EnvUtils.app_case`` to conditionalize on ``if_cgap=`` and ``if_fourfront=``.
 
 
 4.0.2
