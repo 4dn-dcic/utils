@@ -1255,12 +1255,27 @@ def test_get_item_facets(integrated_ff):
 def test_get_item_facet_values(integrated_ff):
     """ Tests that we correctly grab facets and all their possible values """
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
-    item_type = 'experiment_set_replicate'
+    item_type = 'ExperimentSetReplicate'
     facets = ff_utils.get_item_facet_values(item_type, key=key, ff_env=ff_env)
     assert 'Project' in facets
     assert '4DN' in facets['Project']
     assert 'Assay Details' in facets
     assert 'Target: YFG protein' in facets['Assay Details']
+    assert 'Status' in facets
+
+
+@pytest.mark.integrated
+def test_get_search_facet_values(integrated_ff):
+    """ Tests that we correctly grab facets and all their possible values
+    from a search query result """
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    query = 'search/?lab.display_title=4DN+DCIC%2C+HMS&type=Biosource'
+    facets = ff_utils.get_search_facet_values(query, key=key, ff_env=ff_env)
+    print(facets)
+    assert 'Project' in facets
+    assert '4DN' in facets['Project']
+    assert 'Tissue' in facets
+    assert 'brain' in facets['Tissue']
     assert 'Status' in facets
 
 
