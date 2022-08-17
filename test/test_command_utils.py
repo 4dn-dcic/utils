@@ -7,9 +7,9 @@ from unittest import mock
 from dcicutils import command_utils as command_utils_module
 from dcicutils.command_utils import (
     _ask_boolean_question,  # noQA - access to internal function is so we can test it
-    yes_or_no, y_or_n, ShellScript, shell_script,
+    yes_or_no, y_or_n, ShellScript, shell_script, script_catch_errors, DEBUG_SCRIPT, SCRIPT_ERROR_HERALD,
 )
-from dcicutils.misc_utils import ignored, file_contents
+from dcicutils.misc_utils import ignored, file_contents, PRINT
 from dcicutils.qa_utils import printed_output
 
 
@@ -289,3 +289,69 @@ def test_shell_script_context_manager(simulate):
         if os.path.exists(temp_filename):
             os.remove(temp_filename)  # cleanup, not that we actually have to
         assert not os.path.exists(temp_filename)  # make sure everything is tidy again
+
+
+def test_script_catch_errors():
+
+    normal_output = "This is normal program output."
+    custom_exit_message = "Command failure."
+    raw_error_message = "This is an error message."
+    value_error_message = f"ValueError: {raw_error_message}"
+
+    # Normal program, output occurs, no error raised, does an exit(0) implicitly via script_catch_errors.
+    with printed_output() as printed:
+        with pytest.raises(SystemExit) as exit_exc:
+            with script_catch_errors():
+                PRINT(normal_output)
+        sys_exit = exit_exc.value
+        assert isinstance(sys_exit, SystemExit)
+        assert sys_exit.code == 0
+        assert printed.lines == [normal_output]
+
+    # Erring program before output occurs. Does an exit(1) implicitly via script_catch_errors
+    # after catching and showing error.
+    with printed_output() as printed:
+        with pytest.raises(SystemExit) as exit_exc:
+            with script_catch_errors():
+                raise ValueError(raw_error_message)
+        sys_exit = exit_exc.value
+        assert isinstance(sys_exit, SystemExit)
+        assert sys_exit.code == 1
+        assert printed.lines == [SCRIPT_ERROR_HERALD, value_error_message]
+
+    # Erring program after output occurs. Does an exit(1) implicitly via script_catch_errors
+    # after catching and showing error.
+    with printed_output() as printed:
+        with pytest.raises(SystemExit) as exit_exc:
+            with script_catch_errors():
+                PRINT(normal_output)
+                raise ValueError(raw_error_message)
+        sys_exit = exit_exc.value
+        assert isinstance(sys_exit, SystemExit)
+        assert sys_exit.code == 1
+        assert printed.lines == [normal_output, SCRIPT_ERROR_HERALD, value_error_message]
+
+    # Erring program after output occurs. Does an exit(1) explicitly before script_catch_errors does.
+    with printed_output() as printed:
+        with pytest.raises(SystemExit) as exit_exc:
+            with script_catch_errors():
+                PRINT(normal_output)
+                PRINT(custom_exit_message)
+                exit(1)  # Bypasses script_catch_errors context manager, so won't show SCRIPT_ERROR_HERALD
+        sys_exit = exit_exc.value
+        assert isinstance(sys_exit, SystemExit)
+        assert sys_exit.code == 1
+        assert printed.lines == [normal_output, custom_exit_message]
+
+    print(f"NOTE: The DEBUG_SCRIPT environment bool is globally {DEBUG_SCRIPT!r}.")
+    with mock.patch.object(command_utils_module, "DEBUG_SCRIPT", "TRUE"):
+        # As if DEBUG_SCRIPT=environ_bool("DEBUG_SCRIPT") had given different value for module variable DEBUG_SCRIPT.
+        with printed_output() as printed:
+            with pytest.raises(Exception) as non_exit_exc:
+                with script_catch_errors():
+                    PRINT(normal_output)
+                    raise ValueError(raw_error_message)
+            non_exit_exception = non_exit_exc.value
+            assert isinstance(non_exit_exception, ValueError)
+            assert str(non_exit_exception) == raw_error_message
+            assert printed.lines == [normal_output]  # Any more output would be from Python itself reporting ValueError
