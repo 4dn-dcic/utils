@@ -435,6 +435,31 @@ def test_stuff_in_queues_integrated(integrated_ff):
     assert 'Must provide a full fourfront environment name' in str(exec_info.value)
 
 
+@pytest.mark.unit
+def test_is_bodyless():
+
+    for http_method in ['get', 'delete', 'trace', 'options', 'head']:
+        print(f"Testing {http_method}...")
+        assert ff_utils.is_bodyless(http_method) is True
+        assert ff_utils.is_bodyless(http_method.upper()) is True
+        assert ff_utils.is_bodyless(http_method.capitalize()) is True
+        print(f"OK: {http_method}")
+
+    for http_method in ['post', 'patch', 'put']:
+        print(f"Testing {http_method}...")
+        assert ff_utils.is_bodyless(http_method) is False
+        assert ff_utils.is_bodyless(http_method.upper()) is False
+        assert ff_utils.is_bodyless(http_method.capitalize()) is False
+        print(f"OK: {http_method}")
+
+    for http_method in ['anythingelse']:
+        print(f"Testing {http_method}...")
+        assert ff_utils.is_bodyless(http_method) is False
+        assert ff_utils.is_bodyless(http_method.upper()) is False
+        assert ff_utils.is_bodyless(http_method.capitalize()) is False
+        print(f"OK: {http_method}")
+
+
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_authorized_request_integrated(integrated_ff):

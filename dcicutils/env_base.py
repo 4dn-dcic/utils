@@ -55,6 +55,11 @@ class EnvBase:
             yield
 
     @classmethod
+    def set_global_env_bucket(cls, bucket_name):
+        os.environ['GLOBAL_ENV_BUCKET'] = bucket_name
+        os.environ['GLOBAL_BUCKET_ENV'] = bucket_name  # Deprecated, but set for consistency.
+
+    @classmethod
     def _legacy_global_env_bucket_for_testing(cls):
         if not LegacyController.LEGACY_DISPATCH_ENABLED:
             raise LegacyDispatchDisabled(operation="_legacy_global_env_bucket_for_testing", mode='setup-envbase')

@@ -185,6 +185,22 @@ def purge_request_with_retries(request_fxn, url, auth, verb, **kwargs):
     return final_res
 
 
+# Per https://specs.openstack.org/openstack/api-wg/guidelines/http/methods.html
+# although TRACE is the only method that actively disallows a body,
+# in normal practice GET, DELETE, TRACE, OPTIONS and HEAD methods are not expected to have a body.
+
+BODYLESS_REQUEST_METHODS = {'GET', 'DELETE', 'TRACE', 'OPTIONS', 'HEAD'}
+
+
+def is_bodyless(request_method):
+    """
+    Tests the given HTTP request method name to see if it needs a body in its http(s) request.
+    """
+    u = request_method.upper()
+    res = u in BODYLESS_REQUEST_METHODS
+    return res
+
+
 REQUESTS_VERBS = {
     'GET': requests.get,
     'POST': requests.post,

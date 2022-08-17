@@ -6,6 +6,19 @@ dcicutils
 Change Log
 ----------
 
+
+4.2.0
+=====
+
+* In ``ff_utils``:
+
+  * Add ``is_bodyless`` predicate on http methods (verbs) to say if they want a data arg.
+
+* In ``env_base``:
+
+  * Add ``EnvBase.set_global_env_bucket`` to avoid setting ``os.environ['GLOBAL_ENV_BUCKET']`` directly.
+
+
 4.1.0
 =====
 
