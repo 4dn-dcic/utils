@@ -6,6 +6,23 @@ dcicutils
 Change Log
 ----------
 
+
+4.2.0
+=====
+
+* In ``command_utils``:
+
+  * Add ``script_catch_errors`` context manager, borrowed from ``SubmitCGAP``.
+
+* In ``ff_utils``:
+
+  * Add ``is_bodyless`` predicate on http methods (verbs) to say if they want a data arg.
+
+* In ``env_base``:
+
+  * Add ``EnvBase.set_global_env_bucket`` to avoid setting ``os.environ['GLOBAL_ENV_BUCKET']`` directly.
+
+
 4.1.0
 =====
 
@@ -1519,9 +1536,11 @@ Older Versions
 A record of older changes can be found
 `in GitHub <https://github.com/4dn-dcic/utils/pulls?q=is%3Apr+is%3Aclosed>`_.
 To find the specific version numbers, see the ``version`` value in
-the ``poetry.app`` section of ``pyproject.toml``, as in::
+the ``poetry.app`` section of ``pyproject.toml`` for the corresponding change, as in::
 
    [poetry.app]
    name = "dcicutils"
    version = "100.200.300"
    ...etc.
+
+This would correspond with ``dcicutils 100.200.300``.
