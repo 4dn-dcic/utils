@@ -3,6 +3,9 @@
 import copy
 import re
 
+from dcicutils.misc_utils import check_true
+from typing import Optional
+
 
 # The _SENSITIVE_KEY_NAMES_REGEX regex defines key names representing sensitive values, case-insensitive.
 # Note the below 'crypt(?!_key_id$)' regex matches any thing with 'crypt' except for 'crypt_key_id'.
@@ -36,7 +39,7 @@ def should_obfuscate(key: str) -> bool:
     return _SENSITIVE_KEY_NAMES_REGEX.match(key) is not None
 
 
-def obfuscate(value: str, show: bool = False) -> str:
+def obfuscate(value: str, show: bool = False, obfuscated: Optional[str] = None) -> str:
     """
     Obfuscates and returns the given string value.
     If the given value is not a string, is None, or is empty then just returns the given value.
@@ -44,14 +47,36 @@ def obfuscate(value: str, show: bool = False) -> str:
 
     :param value: Value to obfuscate.
     :param show: If True then do not actually obfuscate, rather simply returns the given value.
+    :param obfuscated:
     :return: Obfuscated (or not if show) value or empty string if not a string or empty.
     """
     if not isinstance(value, str) or not value:
         return value
-    return value if show else len(value) * "*"
+    return value if show else obfuscated or len(value) * "*"
 
 
-def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False) -> dict:
+# The rationale here is theoretically passwords can have "<" and ">" in them, so we want a pretty
+# restricted set of characters in order that real passwords that are just coincidentally arranged
+# this way are unlikely. -kmp 18-Aug-2022
+
+OBFUSCATED_VALUE_DESCRIPTION = ("a series of asterisks or a meta-identifier like <some-name>,"
+                                " made up only of alphanumerics, hyphens and underscores")
+OBFUSCATED_VALUE = re.compile(r'^([*]+|[<][a-z0-9_-]+[>])$', re.IGNORECASE)
+
+
+def is_obfuscated(value: str) -> bool:
+    """
+    Returns True if a given string is in the format we use as an obfuscated value.
+    Returns False if the argument is not a string or is not in the obfuscated value format.
+
+    NOTE: This is heuristic. Your password MIGHT be *** or <my-password>, but we're hoping not.
+    """
+
+    return isinstance(value, str) and bool(OBFUSCATED_VALUE.match(value))
+
+
+def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False,
+                   obfuscated: Optional[str] = None) -> dict:
     """
     Obfuscates all STRING values within the given dictionary, RECURSIVELY, for all key names which look
     as if they represent sensitive values (based on the should_obfuscate function). By default, if the
@@ -67,15 +92,16 @@ def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False) 
     :param show: If True does not actually obfuscate and simply returns the given dictionary.
     :return: Resultant dictionary.
     """
-    def already_obfuscated(value: str) -> bool:
-        return set(list(value)) == {"*"}
+
+    check_true(not obfuscated or is_obfuscated(obfuscated),
+               message=f"If obfuscated= is supplied, it must be {OBFUSCATED_VALUE_DESCRIPTION}.")
 
     def has_values_to_obfuscate(dictionary: dict) -> bool:
         for key, value in dictionary.items():
             if isinstance(value, dict):
                 if has_values_to_obfuscate(value):
                     return True
-            elif isinstance(value, str) and should_obfuscate(key) and not already_obfuscated(value):
+            elif isinstance(value, str) and should_obfuscate(key) and not is_obfuscated(value):
                 return True
         return False
 
@@ -89,6 +115,6 @@ def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False) 
     for key, value in dictionary.items():
         if isinstance(value, dict):
             dictionary[key] = obfuscate_dict(value, show=False, inplace=False)
-        elif isinstance(value, str) and should_obfuscate(key) and not already_obfuscated(value):
-            dictionary[key] = obfuscate(value, show=False)
+        elif isinstance(value, str) and should_obfuscate(key) and not is_obfuscated(value):
+            dictionary[key] = obfuscate(value, show=False, obfuscated=obfuscated)
     return dictionary
