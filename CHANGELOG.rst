@@ -10,6 +10,10 @@ Change Log
 4.3.0
 =====
 
+* In ``lang_utils``:
+
+  * Add ```"from"`` and ``"between"`` to the list of prepositions that the pluralizer understands.
+
 * In ``obfuscation_utils``:
 
   * Add ``is_obfuscated`` to predicate whether something is in obfuscated
