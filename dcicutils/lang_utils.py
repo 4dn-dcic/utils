@@ -52,7 +52,9 @@ class EnglishUtils:
     def _adjust_ending(cls, word, strip_chars, add_suffix):
         return (word[:-strip_chars] if strip_chars else word) + add_suffix
 
-    _COMPOUND_PLURAL_SIMPLE_PREPOSITIONS = ['about', 'at', 'by', 'for', 'in', 'of', 'on', 'to', 'with']
+    _COMPOUND_PLURAL_SIMPLE_PREPOSITIONS = [
+        'about', 'at', 'between', 'by', 'for', 'from', 'in', 'of', 'on', 'to', 'with'
+    ]
 
     # Phrases like 'using', 'used by', 'used in', etc. function similarly to prepositions when doing pluralization
     # in that the plural of 'a variant referencing a gene' would be 'variants referencing genes', just as

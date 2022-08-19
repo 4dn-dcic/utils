@@ -7,6 +7,25 @@ Change Log
 ----------
 
 
+4.4.0
+=====
+
+* In ``lang_utils``:
+
+  * Add ```"from"`` and ``"between"`` to the list of prepositions that the pluralizer understands.
+
+* In ``obfuscation_utils``:
+
+  * Add ``is_obfuscated`` to predicate whether something is in obfuscated
+    form. Among other things, this enables better testing.
+
+  * Add an ``obfuscated=`` argument to ``obfuscate`` and ``obfuscate_dict``,
+    allowing the choice of what obfuscated value to use. The argument must
+    be something for which ``is_obfuscated`` returns True.
+
+NOTE: Due to a versioning error in beta, there was no 4.3.0. The previous released version was 4.2.0.
+
+
 4.2.0
 =====
 
