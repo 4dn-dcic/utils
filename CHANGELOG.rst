@@ -7,7 +7,7 @@ Change Log
 ----------
 
 
-4.3.0
+4.4.0
 =====
 
 * In ``lang_utils``:
@@ -22,6 +22,8 @@ Change Log
   * Add an ``obfuscated=`` argument to ``obfuscate`` and ``obfuscate_dict``,
     allowing the choice of what obfuscated value to use. The argument must
     be something for which ``is_obfuscated`` returns True.
+
+NOTE: Due to a versioning error in beta, there was no 4.3.0. The previous released version was 4.2.0.
 
 
 4.2.0
