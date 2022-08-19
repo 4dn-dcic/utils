@@ -1,7 +1,5 @@
 from dcicutils.obfuscation_utils import (
-    should_obfuscate,
-    obfuscate,
-    obfuscate_dict,
+    is_obfuscated, should_obfuscate, obfuscate, obfuscate_dict,
 )
 
 
@@ -34,12 +32,52 @@ def assert_obfuscate(value: str) -> None:
     assert_string_contains_only_asterisks(obfuscate(value))
 
 
+def test_is_obfuscated():
+
+    assert is_obfuscated("") is False
+
+    assert is_obfuscated("*") is True
+    assert is_obfuscated("**") is True
+    assert is_obfuscated("***") is True
+
+    assert is_obfuscated("a") is False
+    assert is_obfuscated("ab") is False
+    assert is_obfuscated("abc") is False
+
+    assert is_obfuscated("<>") is False
+
+    assert is_obfuscated("<foo>") is True
+    assert is_obfuscated("<foo-bar>") is True
+    assert is_obfuscated("<foo-bar-1>") is True
+    assert is_obfuscated("<foo_bar>") is True
+    assert is_obfuscated("<foo_bar-1>") is True
+
+    assert is_obfuscated(" <foo-bar>") is False
+    assert is_obfuscated("<foo bar>") is False  # A space is not allowed in an obfuscation pattern
+    assert is_obfuscated("<foo*bar-1>") is False  # An asterisk is not allowed in an obfuscation pattern
+
+
 def test_obfuscate():
+
     assert_string_contains_only_asterisks(obfuscate("a"))
     assert_string_contains_only_asterisks(obfuscate("abc"))
     assert_string_contains_only_asterisks(obfuscate("prufrock"))
-    assert obfuscate("") == ""
-    assert obfuscate(None) is None
+
+    sample_obfuscation = "<sample-obfuscation>"
+
+    assert not is_obfuscated("abc")
+    assert is_obfuscated(obfuscate("abc"))
+    assert len(obfuscate("abc")) == len("abc") != len(sample_obfuscation)
+
+    assert obfuscate("abc") == "***"
+    assert obfuscate("abc", obfuscated=sample_obfuscation) == sample_obfuscation  # "<sample-obfuscation>"
+
+    for x in ["", None, 123, 3.14]:
+        assert not is_obfuscated(x)
+        assert obfuscate(x) == x  # although not obfuscated, they are nonetheless not obfuscated by special case
+        assert obfuscate(x, obfuscated=sample_obfuscation) == x
+        assert obfuscate(x, obfuscated=sample_obfuscation) != sample_obfuscation
+        assert not is_obfuscated(obfuscate(x))
 
 
 def test_obfuscate_dict():

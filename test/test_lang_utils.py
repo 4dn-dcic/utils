@@ -53,6 +53,8 @@ def test_string_pluralize():
     assert string_pluralize("ox") == "oxen"
 
     assert string_pluralize("file to show") == "files to show"
+    assert string_pluralize("change from point X to point Y") == "changes from point X to point Y"
+    assert string_pluralize("change between date X and date Y") == "changes between date X and date Y"
     assert string_pluralize("bucket to delete") == "buckets to delete"
     assert string_pluralize("a book about a gene") == "books about genes"
     assert string_pluralize("a good book about the defective gene") == "good books about the defective gene"
