@@ -7,6 +7,14 @@ Change Log
 ----------
 
 
+4.5.0
+=====
+
+* A few other changes to `lang_utils.string_pluralize` to give more refined
+  control of punctuation and to allow phrases with "that is/was" or
+  "which is/was" qualifiers.
+
+
 4.4.0
 =====
 
