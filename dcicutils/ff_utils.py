@@ -485,14 +485,15 @@ def get_item_facets(item_type, key=None, ff_env=None):
     return facets
 
 
-def get_item_facet_values(item_type, key=None, ff_env=None):
+def get_search_facet_values(search_query, key=None, ff_env=None):
     """
-    Gets all facets and returns all possible values for each one with counts
-    ie: dictionary of facets mapping to a dictionary containing all possible values
+    Gets all facets available from a provided search and returns all possible values for
+    each with counts - query should begin 'search/...'
+    ie: returns dictionary of facets mapping to a dictionary containing all possible values
     for that facet mapping to the count for that value
     format: {'Project': {'4DN': 2, 'Other': 6}, 'Lab': {...}}
     """
-    resp = get_metadata('search/?type=' + item_type, key=key, ff_env=ff_env)['facets']
+    resp = get_metadata(search_query, key=key, ff_env=ff_env)['facets']
     facets = {}
     for facet in resp:
         name = facet['title']
@@ -500,6 +501,15 @@ def get_item_facet_values(item_type, key=None, ff_env=None):
         for term in facet['terms']:
             facets[name][term['key']] = term['doc_count']
     return facets
+
+
+def get_item_facet_values(item_type, key=None, ff_env=None):
+    """
+    More specific version of the above function with passed item_type
+    used in faceted_search
+    """
+    query = 'search/?type=' + item_type
+    return get_search_facet_values(query, key=key, ff_env=ff_env)
 
 
 def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
