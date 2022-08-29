@@ -7,6 +7,14 @@ Change Log
 ----------
 
 
+4.5.0
+=====
+
+* A few other changes to ``lang_utils.string_pluralize`` to give more refined
+  control of punctuation and to allow phrases with "that is/was" or
+  "which is/was" qualifiers.
+
+
 4.4.1
 =====
 
@@ -1410,7 +1418,7 @@ Those tests were refactored, and the following additional support was added:
 
 In ``misc_utils``:
 
-* Fix ``as_datetime`` to raise an error on bad input, allowing `raise_error=False`
+* Fix ``as_datetime`` to raise an error on bad input, allowing ``raise_error=False``
   to suppress that if needed.
 * Add ``as_ref_datetime`` to convert times to the reference timezone (US/Eastern by default).
 * Add ``as_utc_datetime`` to convert times to UTC.
