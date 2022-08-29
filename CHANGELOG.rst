@@ -15,6 +15,14 @@ Change Log
   "which is/was" qualifiers.
 
 
+4.4.1
+=====
+
+* In ``ff_utils``;
+
+  * add function ``get_search_facet values`` to support count from facets from any search
+
+
 4.4.0
 =====
 
@@ -66,7 +74,7 @@ NOTE: Due to a versioning error in beta, there was no 4.3.0. The previous releas
 * Fix various tests that had grown stale due to data changes.
   * ``test_post_delete_purge_links_metadata`` (needed to be re-recorded)
   * ``test_upsert_metadata`` (needed to be re-recorded)
-  * ``test_unified_authentication_prod_envs_integrated_only`` 
+  * ``test_unified_authentication_prod_envs_integrated_only``
     (simplified, removed bogus attempts at recording)
   * ``test_faceted_search_exp_set`` (needed many different counts)
   * ``test_some_decorated_methods_work`` (needed one different count)
@@ -467,7 +475,7 @@ these new items:
 =====
 
 * In ``ecs_utils``:
-  
+
   * No longer throw exception when listing services if <4 are returned
 
 
