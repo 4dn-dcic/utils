@@ -26,24 +26,42 @@ GLOBAL_APPLICATION_CONFIGURATION = 'IDENTITY'
 # TODO: Rethink whether this should be a constant. Maybe it should be a function of the identity_kind?
 #       Maybe the caller should pass a default and this function should have none. -kmp 18-Jul-2022
 LEGACY_DEFAULT_IDENTITY_NAME = 'dev/beanstalk/cgap-dev'
+LEGACY_ACCOUNT_NUMBER = '643366669028'
 
 
-def get_identity_name(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION):
-    return os.environ.get(identity_kind, LEGACY_DEFAULT_IDENTITY_NAME)
+def get_identity_name(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> str:
+    identity_name = os.environ.get(identity_kind)
+    if identity_name:
+        return identity_name
+    account_number = os.environ.get('ACCOUNT_NUMBER')
+    if not account_number or account_number == LEGACY_ACCOUNT_NUMBER:
+        # We do this independent of identity_kind. Is that right? -kmp 31-Aug-2022
+        return LEGACY_DEFAULT_IDENTITY_NAME
+    # TODO: Add discovery here? This can probably be inferred.
+    #       Need to be careful because not all users may have IAM privileges.
+    #       -kmp 31-Aug-2022
+    raise ValueError(f"There is no default identity name available for account {account_number}.")
 
 
 def identity_is_defined(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> bool:
     return bool(os.environ.get(identity_kind))
 
 
-def get_identity_secrets(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> dict:
-    """ Grabs application identity from the secrets manager.
-        Looks for environment variable IDENTITY, which should contain the name of
-        a secret in secretsmanager that is a JSON blob of core configuration information.
-        Default value is current value in the test account. This name should be the
-        name of the environment.
+def get_identity_secrets(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
+                         *, identity_name: Optional[str] = None) -> dict:
+    f"""
+    Returns a dictionary of secrets that the secrets manager has associated with specified identity.
+    These secrets generally represent some kind of core configuration information for the application.
+    The identity may be specified by indicating its kind (an environment variable such as 'IDENTITY')
+    and looking it up from there, or by specifying the name of the identity itself. 
+
+    If an identity_kind is specified but there is no value (or a null value), the default is resolved
+    using get_identity_name.
+     
+    :param identity_kind: the kind of identity (default: 'IDENTITY')
+    :param identity_name: an actual identity name (default: None, meaning unspecified)
     """
-    secret_name = get_identity_name(identity_kind)
+    secret_name = identity_name or get_identity_name(identity_kind)
     region_name = COMMON_REGION  # us-east-1, must match ECR/ECS Region, which also imports its default from .common
     session = boto3.session.Session(region_name=region_name)
     client = session.client(
