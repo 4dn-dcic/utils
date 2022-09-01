@@ -99,11 +99,11 @@ def get_identity_secrets(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
         if 'SecretString' in get_secret_value_response:
             identity_secrets = json.loads(get_secret_value_response['SecretString'])
         else:
-            raise Exception('Got unexpected response structure from boto3')
+            raise Exception('Got unexpected response structure from boto3. (Missing SecretString.)')
     if not identity_secrets:
-        raise Exception('Identity could not be found! Check the secret name.')
+        raise Exception(f'Identity {secret_name!r} could not be found.')
     elif not isinstance(identity_secrets, dict):
-        raise Exception("Identity was not in expected dictionary form.")
+        raise Exception("Identity {secret_name!r} was found but was not in the expected dictionary form.")
     return identity_secrets
 
 
