@@ -47,7 +47,7 @@ def identity_is_defined(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -
     return bool(os.environ.get(identity_kind))
 
 
-KNOWN_SECRETS_ERRORS = {
+_KNOWN_SECRETS_ERRORS = {
     "DecryptionFailureException":
         "A protected secret text can't be decrypted using the provided KMS key.",
     "InternalServiceErrorException":
@@ -89,9 +89,9 @@ def get_identity_secrets(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
         )
     except ClientError as e:  # leaving some useful debug info to help narrow issues
         code = e.response['Error']['Code']
-        if code in KNOWN_SECRETS_ERRORS:
+        if code in _KNOWN_SECRETS_ERRORS:
             logger.warning(f'Encountered a known exception ({code}) trying to acquire secrets.'
-                           f' {KNOWN_SECRETS_ERRORS[code]}')
+                           f' {_KNOWN_SECRETS_ERRORS[code]}')
         raise e
     else:
         # Decrypts secret using the associated KMS CMK.
