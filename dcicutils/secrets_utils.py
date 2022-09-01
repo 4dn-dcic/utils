@@ -9,7 +9,7 @@ from botocore.exceptions import ClientError
 from typing import Optional
 from .common import REGION as COMMON_REGION
 from .lang_utils import a_or_an
-from .misc_utils import PRINT, full_class_name, override_environ
+from .misc_utils import full_class_name, override_environ
 
 
 logger = structlog.getLogger(__name__)
@@ -47,6 +47,20 @@ def identity_is_defined(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -
     return bool(os.environ.get(identity_kind))
 
 
+KNOWN_SECRETS_ERRORS = {
+    "DecryptionFailureException":
+        "A protected secret text can't be decrypted using the provided KMS key.",
+    "InternalServiceErrorException":
+        "A server-side error occurred.",
+    "InvalidParameterException":
+        "An invalid value for a parameter was provided.",
+    "InvalidRequestException":
+        "One or more parameter value were given that are invalid for the current state of the resource.",
+    "ResourceNotFoundException":
+        "A resource was specified that could not be found.",
+}
+
+
 def get_identity_secrets(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
                          *, identity_name: Optional[str] = None) -> dict:
     f"""
@@ -74,14 +88,10 @@ def get_identity_secrets(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
             SecretId=secret_name
         )
     except ClientError as e:  # leaving some useful debug info to help narrow issues
-        if e.response['Error']['Code'] in [
-            'DecryptionFailureException'  # SM can't decrypt the protected secret text using the provided KMS key.
-            'InternalServiceErrorException',  # An error occurred on the server side.
-            'InvalidParameterException',  # You provided an invalid value for a parameter.
-            'InvalidRequestException',  # Invalid parameter value for the current state of the resource.
-            'ResourceNotFoundException',
-        ]:
-            PRINT('Encountered a known exception trying to acquire secrets.')
+        code = e.response['Error']['Code']
+        if code in KNOWN_SECRETS_ERRORS:
+            logger.warning(f'Encountered a known exception ({code}) trying to acquire secrets.'
+                           f' {KNOWN_SECRETS_ERRORS[code]}')
         raise e
     else:
         # Decrypts secret using the associated KMS CMK.
@@ -119,11 +129,13 @@ def apply_overrides(*, secrets: dict, rename_keys: Optional[dict] = None,
 @contextlib.contextmanager
 def assumed_identity_if(only_if: bool, *,
                         identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
+                        identity_name: Optional[str] = None,
                         only_if_missing: Optional[str] = None,
                         require_identity: bool = False,
                         rename_keys: Optional[dict] = None,
                         override_values: Optional[dict] = None):
-    with assumed_identity(identity_kind=identity_kind, only_if=only_if, only_if_missing=only_if_missing,
+    with assumed_identity(identity_kind=identity_kind, identity_name=identity_name,
+                          only_if=only_if, only_if_missing=only_if_missing,
                           require_identity=require_identity, rename_keys=rename_keys, override_values=override_values):
         yield
 
@@ -131,6 +143,7 @@ def assumed_identity_if(only_if: bool, *,
 @contextlib.contextmanager
 def assumed_identity(*,
                      identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
+                     identity_name: Optional[str] = None,
                      only_if: bool = True,
                      only_if_missing: Optional[str] = None,
                      require_identity: bool = False,
@@ -148,6 +161,7 @@ def assumed_identity(*,
           so it tests
 
     :param identity_kind: The name of the identity to assume (default 'IDENTITY')
+    :param identity_name: an actual identity name (default: None, meaning unspecified)
     :param only_if: Whether to try assuming identity at all (default True)
     :param only_if_missing: The name of an environment variable that would only be in the GAC.
        Load the GAC only if this variable is not set. Default is None, meaning load unconditionally.
@@ -157,7 +171,7 @@ def assumed_identity(*,
 
     """
     if only_if and (not only_if_missing or not os.environ.get(only_if_missing)):
-        identity_name = get_identity_name(identity_kind=identity_kind)
+        identity_name = identity_name or get_identity_name(identity_kind=identity_kind)
         if identity_name:
             secrets = get_identity_secrets(identity_kind=identity_kind)
             secrets = apply_overrides(secrets=secrets, rename_keys=rename_keys, override_values=override_values)
@@ -169,13 +183,14 @@ def assumed_identity(*,
                 return  # Nothing to do after that
 
         elif require_identity:
-            raise RuntimeError(f"An identity was not defined in environment variable {identity_kind}.")
+            raise RuntimeError(f"An identity was neither supplied nor defined in environment variable {identity_kind}.")
 
     yield
 
 
 def apply_identity(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
-                   rename_keys: Optional[dict] = None, override_values: Optional[dict] = None):
+                   rename_keys: Optional[dict] = None, override_values: Optional[dict] = None,
+                   identity_name: Optional[str] = None):
     """
     Assumes an identity globally by assigning environment variables.
 
@@ -183,13 +198,13 @@ def apply_identity(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
     offer the only_if_missing mechanism that the assumed_identity context manager offers.
 
     """
-    if identity_is_defined(identity_kind):
-        secrets = get_identity_secrets(identity_kind=identity_kind)
+    if identity_name or identity_is_defined(identity_kind):
+        secrets = get_identity_secrets(identity_kind=identity_kind, identity_name=identity_name)
         secrets = apply_overrides(secrets=secrets, rename_keys=rename_keys, override_values=override_values)
         for var, val in secrets.items():
             os.environ[var] = val
     else:
-        raise RuntimeError(f"An identity was not defined in environment variable {identity_kind}.")
+        raise RuntimeError(f"An identity was neither supplied nor defined in environment variable {identity_kind}.")
 
 
 # Some hints about how to manipulate secrets are here:
