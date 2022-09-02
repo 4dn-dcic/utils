@@ -40,7 +40,7 @@ def get_identity_name(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> 
     # TODO: Add discovery here? This can probably be inferred.
     #       Need to be careful because not all users may have IAM privileges.
     #       -kmp 31-Aug-2022
-    raise ValueError(f"There is no default identity name available for account {account_number}.")
+    raise ValueError(f"There is no default identity name available for {identity_kind} in account {account_number}.")
 
 
 def identity_is_defined(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> bool:
@@ -173,7 +173,7 @@ def assumed_identity(*,
     if only_if and (not only_if_missing or not os.environ.get(only_if_missing)):
         identity_name = identity_name or get_identity_name(identity_kind=identity_kind)
         if identity_name:
-            secrets = get_identity_secrets(identity_kind=identity_kind)
+            secrets = get_identity_secrets(identity_name=identity_name)
             secrets = apply_overrides(secrets=secrets, rename_keys=rename_keys, override_values=override_values)
             if only_if_missing and only_if_missing not in secrets:
                 raise RuntimeError(f"No {only_if_missing} was found where expected"
