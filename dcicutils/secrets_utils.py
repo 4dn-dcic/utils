@@ -23,27 +23,22 @@ logger = structlog.getLogger(__name__)
 GLOBAL_APPLICATION_CONFIGURATION = 'IDENTITY'
 
 
-# TODO: Rethink whether this should be a constant. Maybe it should be a function of the identity_kind?
-#       Maybe the caller should pass a default and this function should have none. -kmp 18-Jul-2022
-LEGACY_DEFAULT_IDENTITY_NAME = 'dev/beanstalk/cgap-dev'
-LEGACY_ACCOUNT_NUMBER = '643366669028'
-
-
 def get_identity_name(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> str:
     """
-    This evaluates the given environment variable, handling defaults only in the legacy account.
+    This evaluates the given environment variable.
+    (In the future, it might also do discovery of some sort, but presently it does not.)
     """
     identity_name = os.environ.get(identity_kind)
     if identity_name:
         return identity_name
-    account_number = os.environ.get('ACCOUNT_NUMBER')
-    if not account_number or account_number == LEGACY_ACCOUNT_NUMBER:
-        # We do this independent of identity_kind. Is that right? -kmp 31-Aug-2022
-        return LEGACY_DEFAULT_IDENTITY_NAME
     # TODO: Add discovery here? This can probably be inferred.
     #       Need to be careful because not all users may have IAM privileges.
     #       -kmp 31-Aug-2022
-    raise ValueError(f"There is no default identity name available for {identity_kind} in account {account_number}.")
+    context = ""
+    account_number = os.environ.get('ACCOUNT_NUMBER')
+    if account_number:
+        context = f" in account {account_number}"
+    raise ValueError(f"There is no default identity name available for {identity_kind}{context}.")
 
 
 def identity_is_defined(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> bool:

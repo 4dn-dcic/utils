@@ -7,7 +7,7 @@ from dcicutils import secrets_utils as secrets_utils_module
 from dcicutils.misc_utils import override_environ, ignored
 from dcicutils.qa_utils import MockBoto3
 from dcicutils.secrets_utils import (
-    GLOBAL_APPLICATION_CONFIGURATION, LEGACY_DEFAULT_IDENTITY_NAME, LEGACY_ACCOUNT_NUMBER,
+    GLOBAL_APPLICATION_CONFIGURATION,
     get_identity_name, identity_is_defined, apply_overrides,
     assumed_identity, assumed_identity_if, apply_identity,
     get_identity_secrets, assume_identity, SecretsTable,
@@ -50,7 +50,7 @@ decoy_2_identity = some_unique_decoy_name
 some_secret_identities_with_common_pattern = [some_secret_identity, decoy_1_identity]
 some_secret_identities = [some_secret_identity, decoy_1_identity, decoy_2_identity]
 
-NON_LEGACY_ACCOUNT_NUMBER = '9' * len(LEGACY_ACCOUNT_NUMBER)  # an account number of all 9's
+SAMPLE_ACCOUNT_NUMBER = '111222333444'
 
 
 def test_get_identity_name():
@@ -61,28 +61,22 @@ def test_get_identity_name():
     some_other_identity = 'OtherIdentityForTesting'
 
     # No matter the account, if the identity variable has a value, that value gets used.
-    for account_number in [LEGACY_ACCOUNT_NUMBER, None, NON_LEGACY_ACCOUNT_NUMBER]:
+    for account_number in [SAMPLE_ACCOUNT_NUMBER, None]:
         with override_environ(ACCOUNT_NUMBER=account_number):
+
             with override_environ(IDENTITY=some_identity, OTHER_IDENTITY=some_other_identity):
                 assert get_identity_name() == some_identity
                 assert get_identity_name('IDENTITY') == some_identity
                 assert get_identity_name('OTHER_IDENTITY') == some_other_identity
 
-    # In legacy account, all identities default to value of LEGACY_DEFAULT_IDENTITY if no environment variable is set.
-    for account_number in [LEGACY_ACCOUNT_NUMBER, None]:
-        with override_environ(IDENTITY=None, OTHER_IDENTITY=None, ACCOUNT_NUMBER=account_number):
-            assert get_identity_name() == LEGACY_DEFAULT_IDENTITY_NAME
-            assert get_identity_name('IDENTITY') == LEGACY_DEFAULT_IDENTITY_NAME
-            assert get_identity_name('OTHER_IDENTITY') == LEGACY_DEFAULT_IDENTITY_NAME
-
-    # Outside the legacy account, all identities raise ValueError if no environment variable is set.
-    with override_environ(IDENTITY=None, OTHER_IDENTITY=None, ACCOUNT_NUMBER=NON_LEGACY_ACCOUNT_NUMBER):
-        with pytest.raises(ValueError):
-            get_identity_name()
-        with pytest.raises(ValueError):
-            get_identity_name('IDENTITY')
-        with pytest.raises(ValueError):
-            get_identity_name('OTHER_IDENTITY')
+            # All identities raise ValueError if no environment variable is set.
+            with override_environ(IDENTITY=None, OTHER_IDENTITY=None):
+                with pytest.raises(ValueError):
+                    get_identity_name()
+                with pytest.raises(ValueError):
+                    get_identity_name('IDENTITY')
+                with pytest.raises(ValueError):
+                    get_identity_name('OTHER_IDENTITY')
 
 
 def test_identity_is_defined():
