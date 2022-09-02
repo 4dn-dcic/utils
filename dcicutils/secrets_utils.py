@@ -30,6 +30,9 @@ LEGACY_ACCOUNT_NUMBER = '643366669028'
 
 
 def get_identity_name(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> str:
+    """
+    This evaluates the given environment variable, handling defaults only in the legacy account.
+    """
     identity_name = os.environ.get(identity_kind)
     if identity_name:
         return identity_name
@@ -67,11 +70,11 @@ def get_identity_secrets(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
     Returns a dictionary of secrets that the secrets manager has associated with specified identity.
     These secrets generally represent some kind of core configuration information for the application.
     The identity may be specified by indicating its kind (an environment variable such as 'IDENTITY')
-    and looking it up from there, or by specifying the name of the identity itself. 
+    and looking it up from there, or by specifying the name of the identity itself.
 
     If an identity_kind is specified but there is no value (or a null value), the default is resolved
     using get_identity_name.
-     
+
     :param identity_kind: the kind of identity (default: 'IDENTITY')
     :param identity_name: an actual identity name (default: None, meaning unspecified)
     """

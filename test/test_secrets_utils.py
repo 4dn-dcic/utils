@@ -50,7 +50,7 @@ decoy_2_identity = some_unique_decoy_name
 some_secret_identities_with_common_pattern = [some_secret_identity, decoy_1_identity]
 some_secret_identities = [some_secret_identity, decoy_1_identity, decoy_2_identity]
 
-NON_LEGACY_ACCOUNT_NUMBER = '9' * len(LEGACY_ACCOUNT_NUMBER)
+NON_LEGACY_ACCOUNT_NUMBER = '9' * len(LEGACY_ACCOUNT_NUMBER)  # an account number of all 9's
 
 
 def test_get_identity_name():
@@ -215,7 +215,6 @@ def check_apply_identity(secrets_applier):
                 secret_value = some_secret_values[i]
                 assert secret_name in os.environ, f"Test secret variable {secret_name} is missing in os.environ."
                 assert os.environ[secret_name] == secret_value
-
 
 
 def test_assumed_identity_by_kind():
