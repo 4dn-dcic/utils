@@ -5,7 +5,6 @@ import contextlib
 import os
 
 from typing import Optional, Union, List
-from .common import REGION
 from .command_utils import yes_or_no
 from .ecr_utils import ECRUtils
 from .misc_utils import PRINT, full_class_name
@@ -25,11 +24,7 @@ CONFIRM_DEFAULT_ACCOUNT_NUMBER = 'confirm-default-account-number'
 
 IMAGE_COUNT_LIMIT = ECRUtils.IMAGE_LIST_DEFAULT_COUNT_LIMIT  # Deprecated (to remove in release 5.0) -kmp 4-Sep-2022
 IMAGE_LIST_CHUNK_SIZE = ECRUtils.IMAGE_LIST_CHUNK_SIZE  # Deprecated (to remove in release 5.0) -kmp 4-Sep-2022
-
-# This tag is presently called "latest", but I'd like to call it "released". -kmp 12-Mar-2022
-# For now refer to it indirectly through a variable.
-
-RELEASED_TAG = 'latest'
+RELEASED_TAG = ECRUtils.IMAGE_RELEASED_TAG  # Deprecated (to remove in release 5.0) -kmp 4-Sep-2022
 
 
 def make_sorted_string_list(elements, separator=","):
