@@ -9,7 +9,7 @@ from botocore.exceptions import ClientError
 from typing import Optional
 from .common import REGION as COMMON_REGION
 from .lang_utils import a_or_an
-from .misc_utils import PRINT, full_class_name, override_environ
+from .misc_utils import full_class_name, override_environ
 
 
 logger = structlog.getLogger(__name__)
@@ -23,27 +23,57 @@ logger = structlog.getLogger(__name__)
 GLOBAL_APPLICATION_CONFIGURATION = 'IDENTITY'
 
 
-# TODO: Rethink whether this should be a constant. Maybe it should be a function of the identity_kind?
-#       Maybe the caller should pass a default and this function should have none. -kmp 18-Jul-2022
-LEGACY_DEFAULT_IDENTITY_NAME = 'dev/beanstalk/cgap-dev'
-
-
-def get_identity_name(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION):
-    return os.environ.get(identity_kind, LEGACY_DEFAULT_IDENTITY_NAME)
+def get_identity_name(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> str:
+    """
+    This evaluates the given environment variable.
+    (In the future, it might also do discovery of some sort, but presently it does not.)
+    """
+    identity_name = os.environ.get(identity_kind)
+    if identity_name:
+        return identity_name
+    # TODO: Add discovery here? This can probably be inferred.
+    #       Need to be careful because not all users may have IAM privileges.
+    #       -kmp 31-Aug-2022
+    context = ""
+    account_number = os.environ.get('ACCOUNT_NUMBER')
+    if account_number:
+        context = f" in account {account_number}"
+    raise ValueError(f"There is no default identity name available for {identity_kind}{context}.")
 
 
 def identity_is_defined(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> bool:
     return bool(os.environ.get(identity_kind))
 
 
-def get_identity_secrets(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) -> dict:
-    """ Grabs application identity from the secrets manager.
-        Looks for environment variable IDENTITY, which should contain the name of
-        a secret in secretsmanager that is a JSON blob of core configuration information.
-        Default value is current value in the test account. This name should be the
-        name of the environment.
+_KNOWN_SECRETS_ERRORS = {
+    "DecryptionFailureException":
+        "A protected secret text can't be decrypted using the provided KMS key.",
+    "InternalServiceErrorException":
+        "A server-side error occurred.",
+    "InvalidParameterException":
+        "An invalid value for a parameter was provided.",
+    "InvalidRequestException":
+        "One or more parameter value were given that are invalid for the current state of the resource.",
+    "ResourceNotFoundException":
+        "A resource was specified that could not be found.",
+}
+
+
+def get_identity_secrets(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
+                         *, identity_name: Optional[str] = None) -> dict:
+    f"""
+    Returns a dictionary of secrets that the secrets manager has associated with specified identity.
+    These secrets generally represent some kind of core configuration information for the application.
+    The identity may be specified by indicating its kind (an environment variable such as 'IDENTITY')
+    and looking it up from there, or by specifying the name of the identity itself.
+
+    If an identity_kind is specified but there is no value (or a null value), the default is resolved
+    using get_identity_name.
+
+    :param identity_kind: the kind of identity (default: 'IDENTITY')
+    :param identity_name: an actual identity name (default: None, meaning unspecified)
     """
-    secret_name = get_identity_name(identity_kind)
+    secret_name = identity_name or get_identity_name(identity_kind)
     region_name = COMMON_REGION  # us-east-1, must match ECR/ECS Region, which also imports its default from .common
     session = boto3.session.Session(region_name=region_name)
     client = session.client(
@@ -56,14 +86,10 @@ def get_identity_secrets(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) 
             SecretId=secret_name
         )
     except ClientError as e:  # leaving some useful debug info to help narrow issues
-        if e.response['Error']['Code'] in [
-            'DecryptionFailureException'  # SM can't decrypt the protected secret text using the provided KMS key.
-            'InternalServiceErrorException',  # An error occurred on the server side.
-            'InvalidParameterException',  # You provided an invalid value for a parameter.
-            'InvalidRequestException',  # Invalid parameter value for the current state of the resource.
-            'ResourceNotFoundException',
-        ]:
-            PRINT('Encountered a known exception trying to acquire secrets.')
+        code = e.response['Error']['Code']
+        if code in _KNOWN_SECRETS_ERRORS:
+            logger.warning(f'Encountered a known exception ({code}) trying to acquire secrets.'
+                           f' {_KNOWN_SECRETS_ERRORS[code]}')
         raise e
     else:
         # Decrypts secret using the associated KMS CMK.
@@ -71,11 +97,11 @@ def get_identity_secrets(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION) 
         if 'SecretString' in get_secret_value_response:
             identity_secrets = json.loads(get_secret_value_response['SecretString'])
         else:
-            raise Exception('Got unexpected response structure from boto3')
+            raise Exception('Got unexpected response structure from boto3. (Missing SecretString.)')
     if not identity_secrets:
-        raise Exception('Identity could not be found! Check the secret name.')
+        raise Exception(f'Identity {secret_name!r} could not be found.')
     elif not isinstance(identity_secrets, dict):
-        raise Exception("Identity was not in expected dictionary form.")
+        raise Exception("Identity {secret_name!r} was found but was not in the expected dictionary form.")
     return identity_secrets
 
 
@@ -101,11 +127,13 @@ def apply_overrides(*, secrets: dict, rename_keys: Optional[dict] = None,
 @contextlib.contextmanager
 def assumed_identity_if(only_if: bool, *,
                         identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
+                        identity_name: Optional[str] = None,
                         only_if_missing: Optional[str] = None,
                         require_identity: bool = False,
                         rename_keys: Optional[dict] = None,
                         override_values: Optional[dict] = None):
-    with assumed_identity(identity_kind=identity_kind, only_if=only_if, only_if_missing=only_if_missing,
+    with assumed_identity(identity_kind=identity_kind, identity_name=identity_name,
+                          only_if=only_if, only_if_missing=only_if_missing,
                           require_identity=require_identity, rename_keys=rename_keys, override_values=override_values):
         yield
 
@@ -113,6 +141,7 @@ def assumed_identity_if(only_if: bool, *,
 @contextlib.contextmanager
 def assumed_identity(*,
                      identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
+                     identity_name: Optional[str] = None,
                      only_if: bool = True,
                      only_if_missing: Optional[str] = None,
                      require_identity: bool = False,
@@ -130,6 +159,7 @@ def assumed_identity(*,
           so it tests
 
     :param identity_kind: The name of the identity to assume (default 'IDENTITY')
+    :param identity_name: an actual identity name (default: None, meaning unspecified)
     :param only_if: Whether to try assuming identity at all (default True)
     :param only_if_missing: The name of an environment variable that would only be in the GAC.
        Load the GAC only if this variable is not set. Default is None, meaning load unconditionally.
@@ -139,9 +169,9 @@ def assumed_identity(*,
 
     """
     if only_if and (not only_if_missing or not os.environ.get(only_if_missing)):
-        identity_name = get_identity_name(identity_kind=identity_kind)
+        identity_name = identity_name or get_identity_name(identity_kind=identity_kind)
         if identity_name:
-            secrets = get_identity_secrets(identity_kind=identity_kind)
+            secrets = get_identity_secrets(identity_name=identity_name)
             secrets = apply_overrides(secrets=secrets, rename_keys=rename_keys, override_values=override_values)
             if only_if_missing and only_if_missing not in secrets:
                 raise RuntimeError(f"No {only_if_missing} was found where expected"
@@ -151,13 +181,14 @@ def assumed_identity(*,
                 return  # Nothing to do after that
 
         elif require_identity:
-            raise RuntimeError(f"An identity was not defined in environment variable {identity_kind}.")
+            raise RuntimeError(f"An identity was neither supplied nor defined in environment variable {identity_kind}.")
 
     yield
 
 
 def apply_identity(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
-                   rename_keys: Optional[dict] = None, override_values: Optional[dict] = None):
+                   rename_keys: Optional[dict] = None, override_values: Optional[dict] = None,
+                   identity_name: Optional[str] = None):
     """
     Assumes an identity globally by assigning environment variables.
 
@@ -165,13 +196,13 @@ def apply_identity(identity_kind: str = GLOBAL_APPLICATION_CONFIGURATION,
     offer the only_if_missing mechanism that the assumed_identity context manager offers.
 
     """
-    if identity_is_defined(identity_kind):
-        secrets = get_identity_secrets(identity_kind=identity_kind)
+    if identity_name or identity_is_defined(identity_kind):
+        secrets = get_identity_secrets(identity_kind=identity_kind, identity_name=identity_name)
         secrets = apply_overrides(secrets=secrets, rename_keys=rename_keys, override_values=override_values)
         for var, val in secrets.items():
             os.environ[var] = val
     else:
-        raise RuntimeError(f"An identity was not defined in environment variable {identity_kind}.")
+        raise RuntimeError(f"An identity was neither supplied nor defined in environment variable {identity_kind}.")
 
 
 # Some hints about how to manipulate secrets are here:
