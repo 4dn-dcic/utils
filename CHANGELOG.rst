@@ -7,6 +7,19 @@ Change Log
 ----------
 
 
+4.6.0
+=====
+
+* In ``env_utils``:
+  * Add ``identity_name`` arguments to:
+    * ``apply_identity``
+    * ``assumed_identity_if``
+    * ``assumed_identity``
+    * ``get_identity_secrets``
+  * Remove buggy defaulting of value for ``get_identity_name``.
+  * Improve error messages in ``get_identity_secrets``.
+
+
 4.5.0
 =====
 
