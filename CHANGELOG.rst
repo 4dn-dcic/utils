@@ -7,6 +7,33 @@ Change Log
 ----------
 
 
+4.7.0
+=====
+
+* Allow ``ecr_utils.ECRUtils`` to take some additional arguments (and store them as instance variables)
+  since they are needed for ``ecr_scripts.ECRCommandContext``.
+
+* Default more arguments to ``ecr_utils.ECRUtils`` (class creation method).
+
+* Move some methods from ``ecr_scripts.ECRCommandContext`` to ``ecr_utils.ECRUtils``:
+
+  * ``get_images_descriptions``
+  * ``_apply_image_descriptions_limit``
+
+* Move some variables from toplevel of ``ecr_scripts`` to be class variables in ``ecr_utils.ECRUtils``,
+  with some renaming:
+
+  * ``ecr_scripts.DEFAULT_ECS_REPOSITORY`` became ``ecr_utils.ECRUtils.DEFAULT_ECS_REPOSITORY``.
+    The variable ``ecr_scripts.DEFAULT_ECS_REPOSITORY`` continues to exist
+    but is initialized from ``ecr_utils.ECRUtils.DEFAULT_ECS_REPOSITORY``.
+
+  * ``ecr_scripts.IMAGE_COUNT_LIMIT`` became ``ecr_utils.ECRUtils.IMAGE_LIST_DEFAULT_COUNT_LIMIT``.
+    The variable ``ecr_scripts.IMAGE_COUNT_LIMIT`` is deprecated, and may go away on dcicutils 5.0.
+
+  * ``ecr_scripts.IMAGE_LIST_CHUNK_SIZE`` became ``ECRUtils.IMAGE_LIST_CHUNK_SIZE``.
+    The variable ``ecr_scripts.IMAGE_LIST_CHUNK_SIZE`` is deprecated, and may go away on dcicutils 5.0.
+
+
 4.6.0
 =====
 

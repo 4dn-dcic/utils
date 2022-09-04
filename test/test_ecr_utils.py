@@ -27,7 +27,7 @@ def test_ecr_utils_basic():
     """ Tests something simple for now, more tests to be added later. """
     # init args no longer default. -kmp 14-Jul-2022
     cli = ECRUtils(env_name='cgap-mastertest', local_repository='cgap-wsgi')
-    with mock.patch.object(cli.client, 'describe_repositories', mocked_describe_respositories):
+    with mock.patch.object(cli.ecr_client, 'describe_repositories', mocked_describe_respositories):
         url = cli.resolve_repository_uri()
         assert url == REPO_URL
 
@@ -39,7 +39,7 @@ def test_ecr_utils_workflow():
     # init args no longer default. -kmp 14-Jul-2022
     ecr_cli = ECRUtils(env_name='cgap-mastertest', local_repository='cgap-wsgi')
     docker_cli = DockerUtils()
-    with mock.patch.object(ecr_cli.client, 'describe_repositories', mocked_describe_respositories):
+    with mock.patch.object(ecr_cli.ecr_client, 'describe_repositories', mocked_describe_respositories):
         ecr_cli.resolve_repository_uri()
         ecr_user, ecr_pass = 'dummy', 'dummy'  # XXX: integrated test for this mechanism
         with mock.patch.object(docker_cli.client, 'login', mocked_ecr_login):
