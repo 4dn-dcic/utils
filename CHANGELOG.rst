@@ -10,7 +10,36 @@ Change Log
 5.0.0
 =====
 
-**BREAKING CHANGE**: Drop support for Python 3.6
+* Drop support for Python 3.6 (**BREAKING CHANGE**)
+
+
+4.6.0
+=====
+
+* In ``env_utils``:
+  * Add ``identity_name`` arguments to:
+    * ``apply_identity``
+    * ``assumed_identity_if``
+    * ``assumed_identity``
+    * ``get_identity_secrets``
+  * Remove buggy defaulting of value for ``get_identity_name``.
+  * Improve error messages in ``get_identity_secrets``.
+
+
+4.5.0
+=====
+
+* A few other changes to ``lang_utils.string_pluralize`` to give more refined
+  control of punctuation and to allow phrases with "that is/was" or
+  "which is/was" qualifiers.
+
+
+4.4.1
+=====
+
+* In ``ff_utils``;
+
+  * add function ``get_search_facet values`` to support count from facets from any search
 
 
 4.4.0
@@ -64,7 +93,7 @@ NOTE: Due to a versioning error in beta, there was no 4.3.0. The previous releas
 * Fix various tests that had grown stale due to data changes.
   * ``test_post_delete_purge_links_metadata`` (needed to be re-recorded)
   * ``test_upsert_metadata`` (needed to be re-recorded)
-  * ``test_unified_authentication_prod_envs_integrated_only`` 
+  * ``test_unified_authentication_prod_envs_integrated_only``
     (simplified, removed bogus attempts at recording)
   * ``test_faceted_search_exp_set`` (needed many different counts)
   * ``test_some_decorated_methods_work`` (needed one different count)
@@ -465,7 +494,7 @@ these new items:
 =====
 
 * In ``ecs_utils``:
-  
+
   * No longer throw exception when listing services if <4 are returned
 
 
@@ -1408,7 +1437,7 @@ Those tests were refactored, and the following additional support was added:
 
 In ``misc_utils``:
 
-* Fix ``as_datetime`` to raise an error on bad input, allowing `raise_error=False`
+* Fix ``as_datetime`` to raise an error on bad input, allowing ``raise_error=False``
   to suppress that if needed.
 * Add ``as_ref_datetime`` to convert times to the reference timezone (US/Eastern by default).
 * Add ``as_utc_datetime`` to convert times to UTC.
