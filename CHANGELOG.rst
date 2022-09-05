@@ -14,6 +14,8 @@ Change Log
 
   * Add ``ECRTagWatcher`` class that can be used to watch for a new image with a given tag in an ECS repository.
 
+* New functionality in ``qa_utils`` to support a mock ECR client.
+
 * Refactor parts of ``ecr_utils`` and ``ecr_scripts`` to move some general-purpose parts out of
   ``ecr_scripts`` (top-level variables and class ``ECRCommandContext``)
   and into ``ecr_utils`` (class ``ECRUtils``):
@@ -48,6 +50,8 @@ Change Log
     +------------------------+------------------------+--------------------------------+------------------------+
     | RELEASED_TAG           | deprecated             | IMAGE_RELEASED_TAG             | new                    |
     +------------------------+------------------------+--------------------------------+------------------------+
+
+* Unit tests for new functionality, and backfilled unit tests for some parts of ``ecr_utils``.
 
 
 4.6.0

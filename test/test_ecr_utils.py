@@ -1,9 +1,12 @@
+import json
 import pytest
 
 from unittest import mock
-from dcicutils.ecr_utils import ECRUtils
+from dcicutils import ecr_utils as ecr_utils_module
+from dcicutils.ecr_utils import ECRUtils, ECRTagWatcher
 from dcicutils.docker_utils import DockerUtils
 from dcicutils.misc_utils import ignored, ignorable, filtered_warnings
+from dcicutils.qa_utils import MockBoto3, MockBotoECR
 from .helpers import using_fresh_cgap_state_for_testing
 
 
@@ -55,6 +58,71 @@ def test_ecr_utils_workflow():
             # XXX: integrated test the remaining?
 
 
-def test_ecr_utils_integrated():
-    """ Write me! """
-    pass
+def test_ecr_utils_get_uri():
+    print()  # start output on fresh line
+    mock_boto3 = MockBoto3()
+    with mock.patch.object(ecr_utils_module, "boto3", mock_boto3):
+        ecr_client: MockBotoECR = mock_boto3.client('ecr')
+        for repo in ['main', 'decoy-1', 'fourfront-foo', 'decoy-2']:
+            print(f"Adding image repository"
+                  f" {json.dumps(ecr_client.add_image_repository_for_testing(repo), indent=2, default=str)}")
+        print("---- Setup complete. Beginning test. ----")
+        ecr_utils = ECRUtils(env_name='fourfront-foo')
+        assert ecr_utils.url is None
+        with pytest.raises(Exception):
+            ecr_utils.get_uri()  # This intentionally raises an error if there is no URL
+        ecr_utils.resolve_repository_uri()
+        print(f"ecr_utils.url = {ecr_utils.url}")
+        assert ecr_utils.url is not None
+        print(f"ecr_utils.get_uri() = {ecr_utils.get_uri()}")
+        assert ecr_utils.get_uri() is not None
+
+
+def test_ecr_utils_resolve_repository_uri():
+    print()  # start output on fresh line
+    mock_boto3 = MockBoto3()
+    with mock.patch.object(ecr_utils_module, "boto3", mock_boto3):
+        ecr_client: MockBotoECR = mock_boto3.client('ecr')
+        for repo in ['main', 'decoy-1', 'fourfront-foo', 'decoy-2']:
+            print(f"Adding image repository"
+                  f" {json.dumps(ecr_client.add_image_repository_for_testing(repo), indent=2, default=str)}")
+        print("---- Setup complete. Beginning test. ----")
+        ecr_utils = ECRUtils(env_name='fourfront-foo')
+        print(f"ecr_utils.url = {ecr_utils.url}")
+        assert ecr_utils.url is None
+        print("resolving repository URI")
+        ecr_utils.resolve_repository_uri()
+        print(f"ecr_utils.url = {ecr_utils.url}")
+        assert ecr_utils.url is not None
+
+
+def test_ecr_tag_watcher():
+    print()  # start output on fresh line
+    mock_boto3 = MockBoto3()
+    with mock.patch.object(ecr_utils_module, "boto3", mock_boto3):
+        ecr_client: MockBotoECR = mock_boto3.client('ecr')
+        ecr_client.add_image_repository_for_testing('main')
+        for i in range(5):
+            last_from_loop = ecr_client.add_image_metadata_for_testing('main', tags=['latest'])
+        watcher = ECRTagWatcher()
+        first_found = watcher.get_current_image_digest()
+        print(f"first_found = {first_found}")
+        assert first_found == last_from_loop['imageDigest']
+        to_deploy = watcher.check_for_new_image_to_deploy()
+        assert not to_deploy
+        print(f"to_deploy =   {to_deploy}")
+        assert first_found == watcher.get_current_image_digest()
+        print(f"Simulating deploy.")
+        even_newer = ecr_client.add_image_metadata_for_testing('main', tags=['latest'])
+        next_found = watcher.get_current_image_digest()
+        print(f"next_found =  {next_found}")
+        assert next_found != first_found
+        assert next_found == even_newer['imageDigest']
+        assert next_found == watcher.get_current_image_digest()  # It stays this until next deploy
+        to_deploy = watcher.check_for_new_image_to_deploy()
+        print(f"to_deploy =   {to_deploy}")
+        assert to_deploy
+        assert to_deploy == next_found
+        to_deploy = watcher.check_for_new_image_to_deploy()
+        print(f"to_deploy =   {to_deploy}")
+        assert not to_deploy
