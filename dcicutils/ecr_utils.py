@@ -53,7 +53,7 @@ class ECRUtils:
     def resolve_repository_uri(self, url=None):
         if not self.url or url:
             # TODO: Should be a logging or debugging statement
-            PRINT('NOTE: Calling out to ECR')
+            # PRINT('NOTE: Calling out to ECR')
             try:
                 resp = self.ecr_client.describe_repositories()
                 for repo in resp.get('repositories', []):
@@ -61,7 +61,8 @@ class ECRUtils:
                         url = repo['repositoryUri']
             except Exception as e:
                 # TODO: Should be a logging or debugging statement
-                PRINT('Could not retrieve repository information from ECR: %s' % e)
+                # PRINT('Could not retrieve repository information from ECR: %s' % e)
+                pass
         self.url = url  # hang onto this
         return url
 
@@ -85,7 +86,7 @@ class ECRUtils:
             return auth_data
         except Exception as e:
             # TODO: Should be a logging or debugging statement
-            PRINT('Could not acquire ECR authorization credentials: %s' % e)
+            # PRINT('Could not acquire ECR authorization credentials: %s' % e)
             raise
 
     @staticmethod
