@@ -74,8 +74,10 @@ def test_ecr_utils_get_uri():
         ecr_utils.resolve_repository_uri()
         print(f"ecr_utils.url = {ecr_utils.url}")
         assert ecr_utils.url is not None
-        print(f"ecr_utils.get_uri() = {ecr_utils.get_uri()}")
-        assert ecr_utils.get_uri() is not None
+        uri = ecr_utils.get_uri()
+        print(f"ecr_utils.get_uri() = {uri}")
+        assert isinstance(uri, str)
+        assert uri.endswith('/fourfront-foo')
 
 
 def test_ecr_utils_resolve_repository_uri():

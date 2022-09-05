@@ -33,7 +33,7 @@ from .lang_utils import n_of, conjoined_list, there_are
 from .misc_utils import (
     PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ,
     environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name,
-    find_associations, as_seconds,
+    find_associations,
 )
 
 

@@ -7,7 +7,7 @@ from botocore.client import BaseClient
 from botocore.exceptions import ClientError
 from typing import List, Optional, Tuple, Union
 from .common import REGION as COMMON_REGION
-from .misc_utils import PRINT
+from .misc_utils import ignorable
 
 
 class ECRUtils:
@@ -53,15 +53,16 @@ class ECRUtils:
     def resolve_repository_uri(self, url=None):
         if not self.url or url:
             # TODO: Should be a logging or debugging statement
-            # PRINT('NOTE: Calling out to ECR')
+            # print('NOTE: Calling out to ECR')
             try:
                 resp = self.ecr_client.describe_repositories()
                 for repo in resp.get('repositories', []):
                     if repo['repositoryUri'].endswith(self.env):
                         url = repo['repositoryUri']
             except Exception as e:
+                ignorable(e)
                 # TODO: Should be a logging or debugging statement
-                # PRINT('Could not retrieve repository information from ECR: %s' % e)
+                # print('Could not retrieve repository information from ECR: %s' % e)
                 pass
         self.url = url  # hang onto this
         return url
@@ -85,8 +86,9 @@ class ECRUtils:
             [auth_data] = self.ecr_client.get_authorization_token()['authorizationData']
             return auth_data
         except Exception as e:
+            ignorable(e)
             # TODO: Should be a logging or debugging statement
-            # PRINT('Could not acquire ECR authorization credentials: %s' % e)
+            # print('Could not acquire ECR authorization credentials: %s' % e)
             raise
 
     @staticmethod
