@@ -7,7 +7,7 @@ Change Log
 ----------
 
 
-4.7.0
+4.8.0
 =====
 
 * New functionallity in ``ecr_utils.ECRUtils`` in support of planned changes to Foursight:
@@ -52,6 +52,18 @@ Change Log
     +------------------------+------------------------+--------------------------------+------------------------+
 
 * Unit tests for new functionality, and backfilled unit tests for some parts of ``ecr_utils``.
+
+
+4.7.0
+=====
+
+* In ``env_utils``:
+
+  * New function ``foursight_env_name``, an alias for
+    ``lambda envname: infer_foursight_from_env(envname=envname)``
+
+* Add error checking for running tests that looks to see that we're in the right account before we move ahead
+  only to find this out in a less intelligible way.
 
 
 4.6.0

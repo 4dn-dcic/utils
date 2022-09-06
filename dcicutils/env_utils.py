@@ -1015,6 +1015,17 @@ def infer_foursight_url_from_env(*, request=None, envname: Optional[EnvName] = N
     return EnvUtils.FOURSIGHT_URL_PREFIX + infer_foursight_from_env(request=request, envname=envname)
 
 
+def foursight_env_name(envname):
+    """
+    Returns the form of the given envname that foursight prefers to use.
+    The result is the public_env_name of the given envname (if there is one), or else its short_env_name otherwise.
+
+    :param envname: a valid environment name
+    :return: the form of the given envname that foursight prefers
+    """
+    return infer_foursight_from_env(envname=envname)
+
+
 @if_orchestrated
 def infer_foursight_from_env(*, request=None, envname: Optional[EnvName] = None, short: bool = True) -> EnvName:
     """
