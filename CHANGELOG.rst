@@ -7,15 +7,30 @@ Change Log
 ----------
 
 
+4.7.0
+=====
+
+* In ``env_utils``:
+
+  * New function ``foursight_env_name``, an alias for
+    ``lambda envname: infer_foursight_from_env(envname=envname)``
+
+* Add error checking for running tests that looks to see that we're in the right account before we move ahead
+  only to find this out in a less intelligible way.
+
+
 4.6.0
 =====
 
 * In ``env_utils``:
+
   * Add ``identity_name`` arguments to:
+
     * ``apply_identity``
     * ``assumed_identity_if``
     * ``assumed_identity``
     * ``get_identity_secrets``
+
   * Remove buggy defaulting of value for ``get_identity_name``.
   * Improve error messages in ``get_identity_secrets``.
 
