@@ -42,7 +42,7 @@ Change Log
     +------------------------+------------------------+--------------------------------+------------------------+
     | module variable        | module variable status | class variable                 | class variable status  |
     +========================+========================+================================+========================+
-    | DEFAULT_ECS_REPOSITORY |                        | DEFAULT_ECS_REPOSITORY         | new                    |
+    | DEFAULT_ECS_REPOSITORY | deprecated             | DEFAULT_IMAGE_REPOSITORY       | new                    |
     +------------------------+------------------------+--------------------------------+------------------------+
     |  IMAGE_COUNT_LIMIT     | deprecated             | IMAGE_LIST_DEFAULT_COUNT_LIMIT | new                    |
     +------------------------+------------------------+--------------------------------+------------------------+

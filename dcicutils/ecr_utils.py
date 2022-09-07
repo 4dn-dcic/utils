@@ -1,13 +1,17 @@
 import boto3
 import base64
 import json
+import logging
 import os
 
 from botocore.client import BaseClient
 from botocore.exceptions import ClientError
 from typing import List, Optional, Tuple, Union
 from .common import REGION as COMMON_REGION
-from .misc_utils import ignorable
+from .misc_utils import get_error_message
+
+
+logger = logging.getLogger(__name__)
 
 
 class ECRUtils:
@@ -26,7 +30,7 @@ class ECRUtils:
 
     # In many cases, the ECR repo named 'main' is where images live.
     # There could be blue/green deploys or other multi-environment account situations where others are used.
-    DEFAULT_ECS_REPOSITORY = 'main'
+    DEFAULT_IMAGE_REPOSITORY = 'main'
 
     REGION = COMMON_REGION  # this default must match what ecs_utils.ECSUtils and secrets_utils.assume_identity use
 
@@ -41,28 +45,32 @@ class ECRUtils:
     IMAGE_LIST_CHUNK_SIZE = 25
 
     # defaults were formerly env_name='cgap-mastertest', local_repository='cgap-wsgi'
-    def __init__(self, *, env_name=None, local_repository=None, region=None, ecr_client=None,
-                 ecs_repository=None):
-        """ Creates an ECR client on startup """
+    def __init__(self, *, env_name=None, local_repository=None, region=None, ecr_client=None, image_repository=None):
+        """
+        Creates an ECR client on startup/
+
+        :param env_name: the name of a CGAP or Fourfront portal environment
+        :param local_repository: deprecated, unused argument
+        :param region: the AWS region to use if an ECR client needs to be created
+        :param ecr_client: an AWS boto3 ECR client if one is already created with appropriae arguments
+        :param image_repository: the name of an ECR image repository to use.
+        """
         self.env = env_name or os.environ.get('ENV_NAME')
         self.local_repository = local_repository  # Not sure this is even used any more. Should we deprecate it?
         self.ecr_client = ecr_client or boto3.client('ecr', region_name=region or self.REGION)
-        self.ecs_repository = ecs_repository or self.DEFAULT_ECS_REPOSITORY
+        self.image_repository = image_repository or self.DEFAULT_IMAGE_REPOSITORY
         self.url = None  # set by calling the below method
 
     def resolve_repository_uri(self, url=None):
         if not self.url or url:
-            # TODO: Should be a logging or debugging statement
-            # print('NOTE: Calling out to ECR')
+            logger.info(f"Calling ECR.resolve_repository_uri, url={url!r}")
             try:
                 resp = self.ecr_client.describe_repositories()
                 for repo in resp.get('repositories', []):
                     if repo['repositoryUri'].endswith(self.env):
                         url = repo['repositoryUri']
             except Exception as e:
-                ignorable(e)
-                # TODO: Should be a logging or debugging statement
-                # print('Could not retrieve repository information from ECR: %s' % e)
+                logger.error(f"Could not retrieve repository information from ECR. {get_error_message(e)}")
                 pass
         self.url = url  # hang onto this
         return url
@@ -86,9 +94,7 @@ class ECRUtils:
             [auth_data] = self.ecr_client.get_authorization_token()['authorizationData']
             return auth_data
         except Exception as e:
-            ignorable(e)
-            # TODO: Should be a logging or debugging statement
-            # print('Could not acquire ECR authorization credentials: %s' % e)
+            logger.error(f"Could not acquire ECR authorization credentials. {get_error_message(e)}")
             raise
 
     @staticmethod
@@ -119,9 +125,9 @@ class ECRUtils:
         next_token = None
         image_descriptions = []
         # We don't know what order they are in, so we need to pull them all down,
-        # and only hen sort them before applying the limit.
+        # and only then sort them before applying the limit.
         while True:
-            options = {'repositoryName': self.ecs_repository}
+            options = {'repositoryName': self.image_repository}
             if next_token:
                 options['nextToken'] = next_token
             else:
@@ -170,7 +176,7 @@ class ECRTagWatcher:
     DEFAULT_TAG = ECRUtils.IMAGE_RELEASED_TAG
     DEFAULT_REGION = ECRUtils.REGION
 
-    def __init__(self, tag: Optional[str] = None, region: str = None, ecs_repository: Optional[str] = None,
+    def __init__(self, *, tag: Optional[str] = None, region: str = None, image_repository: Optional[str] = None,
                  ecr_client: Optional[BaseClient] = None, ecr_utils: Optional[ECRUtils] = None):
         """
 
@@ -180,15 +186,15 @@ class ECRTagWatcher:
         :param region: an AWS region, which if None or unsupplied will default
             from the class variable DEFAULT_REGION,
             which is in turn defaulted from ECRUtils.REGION
-        :param ecs_repository: an ecs repository name, which is None or unsupplied
-            will be defaulted by ECRUtils using ECRUtils.DEFAULT_ECS_REPOSITORY.
+        :param image_repository: an ECR repository name, which is None or unsupplied
+            will be defaulted by ECRUtils using ECRUtils.DEFAULT_IMAGE_REPOSITORY.
         :param ecr_client: an AWS ecr client, in case you have one already.
             One will be created if you don't.
         :param ecr_utils: an ECRUtils object, in case you already have one that has been initialized appropriately.
             One will be created if you don't.
         """
         self.tag = tag or self.DEFAULT_TAG
-        self.ecr_utils = ecr_utils or ECRUtils(ecs_repository=ecs_repository,
+        self.ecr_utils = ecr_utils or ECRUtils(image_repository=image_repository,
                                                ecr_client=(ecr_client
                                                            or boto3.client('ecr',
                                                                            region_name=(region

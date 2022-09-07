@@ -14,7 +14,8 @@ from .lang_utils import n_of
 EPILOG = __doc__
 
 
-DEFAULT_ECS_REPOSITORY = ECRUtils.DEFAULT_ECS_REPOSITORY
+DEFAULT_IMAGE_REPOSITORY = ECRUtils.DEFAULT_IMAGE_REPOSITORY
+DEFAULT_ECS_REPOSITORY = DEFAULT_IMAGE_REPOSITORY  # support for deprecated name
 
 # This is the currently selected environment, though commands might want to require confirmation before using it.
 DEFAULT_ACCOUNT_NUMBER = os.environ.get('ACCOUNT_NUMBER')
@@ -86,7 +87,7 @@ def ecr_command_context(account_number, ecs_repository=None, ecr_client=None):
 
 class ECRCommandContext:
 
-    def __init__(self, account_number=None, ecs_repository=None, ecr_client=None):
+    def __init__(self, account_number=None, ecs_repository=None, image_repository=None, ecr_client=None):
         """
         Initializes an ECRContextText
 
@@ -96,9 +97,12 @@ class ECRCommandContext:
             ecr_client: an AWS ecr_client to use instead of having to make one.
         """
         self.account_number = account_number or DEFAULT_ACCOUNT_NUMBER
-        self.ecs_repository = ecs_repository or DEFAULT_ECS_REPOSITORY
+        self.image_repository = (image_repository
+                                 or ecs_repository  # Deprecated
+                                 or DEFAULT_IMAGE_REPOSITORY
+                                 or DEFAULT_ECS_REPOSITORY)  # Deprecated
         self.ecr_client = ecr_client or boto3.client('ecr', region_name=ECRUtils.REGION)
-        self.ecr_utils = ECRUtils(ecs_repository=self.ecs_repository, ecr_client=self.ecr_client)
+        self.ecr_utils = ECRUtils(image_repository=self.image_repository, ecr_client=self.ecr_client)
 
     def get_images_descriptions(self,
                                 digests: Optional[List[str]] = None,
@@ -171,7 +175,7 @@ class ECRCommandContext:
             image_id = {"imageDigest": digest}
         else:  # neither or both
             raise RuntimeError("Exactly one of --tag and --digest is required.")
-        options = {'repositoryName': self.ecs_repository, 'imageIds': [image_id]}
+        options = {'repositoryName': self.image_repository, 'imageIds': [image_id]}
         response = self.ecr_client.batch_get_image(**options)
         images = response.get('images')
         if not images or len(images) == 0:
@@ -229,7 +233,7 @@ class ECRCommandContext:
         PRINT("Before:")
         self.show_image_catalog(digests=relevant_digests, summarize=False)
         manifest = self.get_image_manifest(digest=digest)
-        self.ecr_client.put_image(repositoryName=self.ecs_repository, imageManifest=manifest, imageTag=tag)
+        self.ecr_client.put_image(repositoryName=self.image_repository, imageManifest=manifest, imageTag=tag)
         # This shows what changed.
         PRINT("After:")
         self.show_image_catalog(digests=relevant_digests)
@@ -259,7 +263,7 @@ class ECRCommandContext:
         """
         [most_recent, previous] = self._most_recent_two_deploys()
         if RELEASED_TAG not in most_recent.get('imageTags', []):
-            self.show_image_catalog(limit='latest')
+            self.show_image_catalog(limit=RELEASED_TAG)
             raise RuntimeError(f"Most recent deploy is NOT marked {RELEASED_TAG!r}."
                                f" You'll have to sort this out manually.")
         self.add_image_tag(digest=previous['imageDigest'], tag=RELEASED_TAG)
@@ -281,8 +285,8 @@ def show_image_catalog_main(override_args=None):
                         default=DEFAULT_ACCOUNT_NUMBER, metavar="<acct-num>",
                         help=f"AWS account number containing repository (default: {DEFAULT_ACCOUNT_NUMBER})")
     parser.add_argument('--ecs-repository', dest='ecs_repository',
-                        default=DEFAULT_ECS_REPOSITORY, metavar="<repo-name>",
-                        help=f"repository name to show images for (default: {DEFAULT_ECS_REPOSITORY})")
+                        default=DEFAULT_IMAGE_REPOSITORY, metavar="<repo-name>",
+                        help=f"repository name to show images for (default: {DEFAULT_IMAGE_REPOSITORY})")
     parser.add_argument('--limit', default=ECRUtils.IMAGE_LIST_DEFAULT_COUNT_LIMIT, metavar="<n>", type=int,
                         help=f"maximum number of images to describe"
                              f" (default: {ECRUtils.IMAGE_LIST_DEFAULT_COUNT_LIMIT})")
@@ -312,8 +316,8 @@ def show_image_manifest_main(override_args=None):
                         default=DEFAULT_ACCOUNT_NUMBER, metavar="<acct-num>",
                         help=f"AWS account number containing repository (default: {DEFAULT_ACCOUNT_NUMBER})")
     parser.add_argument('--ecs-repository', dest='ecs_repository',
-                        default=DEFAULT_ECS_REPOSITORY, metavar="<repo-name>",
-                        help=f"repository name to show images for (default: {DEFAULT_ECS_REPOSITORY})")
+                        default=DEFAULT_IMAGE_REPOSITORY, metavar="<repo-name>",
+                        help=f"repository name to show images for (default: {DEFAULT_IMAGE_REPOSITORY})")
     parser.add_argument('--digest', default=None, metavar="<sha>",
                         help=f"digest (sha) to look for (required unless --tag is given)")
     parser.add_argument('--tag', default=None, metavar="<tag>",
@@ -341,8 +345,8 @@ def add_image_tag_main(override_args=None):
                         help=f"AWS account number containing repository"
                              f" (default: {DEFAULT_ACCOUNT_NUMBER}, requires interactive confirmation if unsupplied)")
     parser.add_argument('--ecs-repository', dest='ecs_repository',
-                        default=DEFAULT_ECS_REPOSITORY, metavar="<repo-name>",
-                        help=f"repository name to show images for (default: {DEFAULT_ECS_REPOSITORY})")
+                        default=DEFAULT_IMAGE_REPOSITORY, metavar="<repo-name>",
+                        help=f"repository name to show images for (default: {DEFAULT_IMAGE_REPOSITORY})")
     parser.add_argument('digest', metavar="<sha>",
                         help="digest (sha) of image to add tag to (REQUIRED)")
     parser.add_argument('tag', metavar="<tag>",
@@ -370,8 +374,8 @@ def unrelease_most_recent_image_main(override_args=None):
                         help=f"AWS account number containing repository"
                              f" (default: {DEFAULT_ACCOUNT_NUMBER}, requires interactive confirmation if unsupplied)")
     parser.add_argument('--ecs-repository', dest='ecs_repository',
-                        default=DEFAULT_ECS_REPOSITORY, metavar="<repo-name>",
-                        help=f"repository name to show images for (default: {DEFAULT_ECS_REPOSITORY})")
+                        default=DEFAULT_IMAGE_REPOSITORY, metavar="<repo-name>",
+                        help=f"repository name to show images for (default: {DEFAULT_IMAGE_REPOSITORY})")
     parsed = parser.parse_args(args=override_args)
 
     with ecr_command_context(account_number=parsed.account_number,
