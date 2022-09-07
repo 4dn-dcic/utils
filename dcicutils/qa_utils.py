@@ -1372,6 +1372,169 @@ class MockBoto3Lambda(MockBoto3Client):
         return result
 
 
+@MockBoto3.register_client(kind='ecr')
+class MockBotoECR(MockBoto3Client):
+
+    # Our mock acts as if this is the current account number
+    _MOCK_ACCOUNT_NUMBER = '111222333444'
+
+    # Our mocked image creation times are this plus a small number of days
+    _MOCK_PUSH_TIME_BASE = datetime.datetime(2020, 1, 1)   # arbitrary
+
+    # Our mocked image sizes are this plus a small amount
+    _MOCK_IMAGE_SIZE_BASE = 900000000
+
+    # When nextToken is not in play for some operations, this can be used.
+    # It is important that it be both a string and false, hence the empty string.
+    _NO_NEXT_TOKEN = ""
+
+    def __init__(self, region_name: str = None, boto3: MockBoto3 = None) -> None:
+        self.region_name = region_name
+        self.account_number = self._MOCK_ACCOUNT_NUMBER
+        self.boto3 = boto3 or MockBoto3()
+        self.images = None
+        self.digest_counter = 0
+        reality = self.boto3.shared_reality
+        if 'ecs_repositories' in reality:
+            self.ecs_repositories = reality['ecs_repositories']
+        else:
+            reality['ecs_repositories'] = repositories = {}
+            self.ecs_repositories = repositories
+
+    def describe_repositories(self):
+        return {
+            "repositories": [
+                repo['metadata'] for repo in self.ecs_repositories.values()
+            ],
+            "ResponseMetadata": self.compute_mock_response_metadata()
+        }
+
+    def add_image_repository_for_testing(self, repository):
+        # A sample of a result from boto3.client('ecr').describe_repositories() might return.
+        # {
+        #     "repositories":
+        #         {
+        #             "repositoryArn": "arn:aws:ecr:us-east-1:643366669028:repository/fourfront-mastertest",
+        #             "registryId": "643366669028",
+        #             "repositoryName": "fourfront-mastertest",
+        #             "repositoryUri": "643366669028.dkr.ecr.us-east-1.amazonaws.com/fourfront-mastertest",
+        #             "createdAt": "2021-10-07 14:57:06-04:00",
+        #             "imageTagMutability": "MUTABLE",
+        #             "imageScanningConfiguration": {
+        #             "scanOnPush": true
+        #         },
+        #         "encryptionConfiguration": {
+        #             "encryptionType": "AES256"
+        #         }
+        #     },
+        #     "ResponseMetadata": {...}
+        # }
+        entry = {
+            "metadata": {
+                "repositoryName": repository,
+                "repositoryUri": f"{self.account_number}.dkr.ecr.{self.region_name}.amazonaws.com/{repository}",
+            },
+            "images": [],  # not something AWS keeps track of
+        }
+        self.ecs_repositories[repository] = entry
+        return entry
+
+    def get_repository_for_testing(self, repository):
+        try:
+            return self.ecs_repositories[repository]
+        except Exception:
+            raise AssertionError(f"Undefined mock ECS repository {repository}."
+                                 f" You may need to add_image_repository_for_testing.")
+
+    def get_repository_images_for_testing(self, repository) -> List[dict]:
+        return self.get_repository_for_testing(repository)['images']
+
+    def get_image_repository_metadata_for_testing(self, repository) -> List[dict]:
+        return self.get_repository_for_testing(repository)['metadata']
+
+    def add_image_metadata_for_testing(self, repository, image_digest=None, pushed_at=None, tags=None):
+        # Typical image restriction from AWS...
+        # {
+        #     "registryId": "262461168236",
+        #     "repositoryName": "main",
+        #     "imageDigest": "sha256:177aa1b7188e9eb81b0a8405653c2e0131119c74b04d8a70ed3ec5cedc833ab2",
+        #     "imageTags": ["latest"],
+        #     "imageSizeInBytes": 975668379,
+        #     "imagePushedAt": "2022-08-29 10:46:49-04:00",
+        #     "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+        #     "artifactMediaType": "application/vnd.docker.container.image.v1+json",
+        #     "lastRecordedPullTime": "2022-09-01 14:20:08.711000-04:00"
+        # }
+        self.digest_counter += 1
+        tag_set = set(tags) if tags else set()
+        entry = {
+            "_mock_digest_counter": self.digest_counter,
+            "imageDigest": image_digest or f"sha256:{str(self.digest_counter).rjust(64, '0')}",
+            # Note that mock won't error-check duplication, but tags are supposed to be unique
+            "imageTags": tag_set,
+            "imageManifestMediateType": "application/vnd.docker.distribution.manifest.v2+json",
+            "artifactMediaType": "application/vnd.docker.container.image.v1+json",
+            "imageSizeInBytes": self._MOCK_IMAGE_SIZE_BASE + self.digest_counter,  # make all have different sizes
+            "imagePushedAt": pushed_at or self._MOCK_PUSH_TIME_BASE + datetime.timedelta(days=self.digest_counter),
+            "lastRecordedPullTime": None,
+        }
+        images = self.get_repository_images_for_testing(repository)
+        for image in images:
+            image['imageTags'] = image['imageTags'] - tag_set
+        images.append(entry)
+        return entry
+
+    def describe_images(self, repositoryName, imageIds=None, maxResults=None, nextToken=_NO_NEXT_TOKEN):  # noQA - AWS choices
+        if maxResults is None:
+            maxResults = 100
+        assert isinstance(maxResults, int) and 1 <= maxResults <= 1000, "maxResults must be an integer from 1 to 1000."
+        images = self.get_repository_images_for_testing(repositoryName)
+        new_next_token = None
+        if nextToken:
+            startpos = int(nextToken)
+            endpos = startpos + maxResults
+            new_next_token = str(endpos + 1) if len(images) > endpos else self._NO_NEXT_TOKEN
+            found_images = images[startpos:endpos]
+        elif imageIds:
+            image_digests_to_find = set()
+            image_tags_to_find = set()
+            for entry in imageIds:
+                digest = entry.get('imageDigest')
+                if digest:
+                    image_digests_to_find.add(digest)
+                else:
+                    tag = entry.get('imageTag')
+                    image_tags_to_find.add(tag)
+            found_images = []
+            for image in images:
+                digest = image['imageDigest']
+                # print(f"Searching for digest={digest!r} in {image_digests_to_find!r}...")
+                # print(f"Then searching image_tags_to_find={image_tags_to_find!r} & tags={image['imageTags']}")
+                if digest in image_digests_to_find:
+                    # print("Found digest")
+                    found_images.append(image)
+                elif image_tags_to_find & image['imageTags']:
+                    # print("Found tags")
+                    found_images.append(image)
+                else:
+                    # print("Neither found")
+                    pass
+        else:
+            found_images = images[:maxResults]
+            new_next_token = str(maxResults + 1) if len(images) > maxResults else self._NO_NEXT_TOKEN
+        found_images = [dict(image,
+                             imageTags=sorted(list(image['imageTags'])),
+                             registryId=self.account_number,
+                             repositoryName=repositoryName)
+                        for image in found_images]
+        result = {
+            'imageDetails': found_images,
+        }
+        if new_next_token:
+            result['nextToken'] = new_next_token
+        return result
+
+
 # This MockBoto3Ec2 class is a minimal implementation, just enough to support the
 # original usage by 4dn-cloud-infra/update-sentieon-security unit tests (July 2022).
 @MockBoto3.register_client(kind='ec2')

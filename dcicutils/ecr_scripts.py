@@ -5,8 +5,8 @@ import contextlib
 import os
 
 from typing import Optional, Union, List
-from .common import REGION
 from .command_utils import yes_or_no
+from .ecr_utils import ECRUtils
 from .misc_utils import PRINT, full_class_name
 from .lang_utils import n_of
 
@@ -14,9 +14,8 @@ from .lang_utils import n_of
 EPILOG = __doc__
 
 
-# In many cases, the ECR repo named 'main' is where images live.
-# There could be blue/green deploys or other multi-environment account situations where others are used.
-DEFAULT_ECS_REPOSITORY = 'main'
+DEFAULT_IMAGE_REPOSITORY = ECRUtils.DEFAULT_IMAGE_REPOSITORY
+DEFAULT_ECS_REPOSITORY = DEFAULT_IMAGE_REPOSITORY  # support for deprecated name
 
 # This is the currently selected environment, though commands might want to require confirmation before using it.
 DEFAULT_ACCOUNT_NUMBER = os.environ.get('ACCOUNT_NUMBER')
@@ -24,20 +23,9 @@ DEFAULT_ACCOUNT_NUMBER = os.environ.get('ACCOUNT_NUMBER')
 # Use if an unsupplied value requires interactive confirmation before defaulting
 CONFIRM_DEFAULT_ACCOUNT_NUMBER = 'confirm-default-account-number'
 
-# Typically only the recent images are what needs to be seen when doing things like adding or removing labels.
-# But this number is quite arbitrary. Since the command to show a list will summarize how many were not shown,
-# it should be easy to ask for a wider window.
-IMAGE_COUNT_LIMIT = 10
-
-# This is extremely arbitrary. It shouldn't be a major efficiency matter since this is rarely used.
-# A small number means the feature of managing multiple chunks is regularly tested and less likely to have
-# weird bugs creep in that we don't notice until later.
-IMAGE_LIST_CHUNK_SIZE = 25
-
-# This tag is presently called "latest", but I'd like to call it "released". -kmp 12-Mar-2022
-# For now refer to it indirectly through a variable.
-
-RELEASED_TAG = 'latest'
+IMAGE_COUNT_LIMIT = ECRUtils.IMAGE_LIST_DEFAULT_COUNT_LIMIT  # Deprecated (to remove in release 5.0) -kmp 4-Sep-2022
+IMAGE_LIST_CHUNK_SIZE = ECRUtils.IMAGE_LIST_CHUNK_SIZE  # Deprecated (to remove in release 5.0) -kmp 4-Sep-2022
+RELEASED_TAG = ECRUtils.IMAGE_RELEASED_TAG  # Deprecated (to remove in release 5.0) -kmp 4-Sep-2022
 
 
 def make_sorted_string_list(elements, separator=","):
@@ -99,7 +87,7 @@ def ecr_command_context(account_number, ecs_repository=None, ecr_client=None):
 
 class ECRCommandContext:
 
-    def __init__(self, account_number, ecs_repository=None, ecr_client=None):
+    def __init__(self, account_number=None, ecs_repository=None, image_repository=None, ecr_client=None):
         """
         Initializes an ECRContextText
 
@@ -108,14 +96,18 @@ class ECRCommandContext:
             ecs_repository: The name of an ecs_repository, such as 'main'.
             ecr_client: an AWS ecr_client to use instead of having to make one.
         """
-        self.account_number = account_number
-        self.ecs_repository = ecs_repository or DEFAULT_ECS_REPOSITORY
-        self.ecr_client = ecr_client or boto3.client('ecr', region_name=REGION)
+        self.account_number = account_number or DEFAULT_ACCOUNT_NUMBER
+        self.image_repository = (image_repository
+                                 or ecs_repository  # Deprecated
+                                 or DEFAULT_IMAGE_REPOSITORY
+                                 or DEFAULT_ECS_REPOSITORY)  # Deprecated
+        self.ecr_client = ecr_client or boto3.client('ecr', region_name=ECRUtils.REGION)
+        self.ecr_utils = ECRUtils(image_repository=self.image_repository, ecr_client=self.ecr_client)
 
     def get_images_descriptions(self,
                                 digests: Optional[List[str]] = None,
                                 tags: Optional[List[str]] = None,
-                                limit: Optional[Union[int, str]] = IMAGE_COUNT_LIMIT):
+                                limit: Optional[Union[int, str]] = ECRUtils.IMAGE_LIST_DEFAULT_COUNT_LIMIT):
         """
         Args:
             digests: a list of image digests (each represented as a string in sha256 format)
@@ -130,55 +122,12 @@ class ECRCommandContext:
             The descriptions are a list of individual dictionaries with keys that include, at least,
             'imagePushedAt', 'imageTags', and 'imageDigest'.
         """
-        next_token = None
-        image_descriptions = []
-        # We don't know what order they are in, so we need to pull them all down,
-        # and only hen sort them before applying the limit.
-        while True:
-            options = {'repositoryName': self.ecs_repository}
-            if next_token:
-                options['nextToken'] = next_token
-            else:
-                ids = []
-                if digests:
-                    # We may only provide this option on the first call, and only if it's non-null.
-                    ids.extend([{'imageDigest': digest} for digest in digests])
-                if tags:
-                    ids.extend([{'imageTag': tag} for tag in tags])
-                if ids:
-                    options['imageIds'] = ids
-                else:
-                    options['maxResults'] = IMAGE_LIST_CHUNK_SIZE  # can only be provided on the first call
-            response = self.ecr_client.describe_images(**options)
-            image_descriptions.extend(response['imageDetails'])
-            next_token = response.get('nextToken')
-            if not next_token:
-                break
-        image_descriptions = sorted(image_descriptions, key=lambda x: x['imagePushedAt'], reverse=True)
-        total = len(image_descriptions)
-        image_descriptions = self._apply_image_descriptions_limit(image_descriptions=image_descriptions, limit=limit)
-        return {'descriptions': image_descriptions, 'count': len(image_descriptions), 'total': total}
-
-    @classmethod
-    def _apply_image_descriptions_limit(cls, image_descriptions, limit):
-        if not limit:
-            return image_descriptions
-        elif isinstance(limit, int):
-            return image_descriptions[:limit]
-        elif isinstance(limit, str):
-            new_image_descriptions = []
-            for image_description in image_descriptions:
-                new_image_descriptions.append(image_description)
-                if limit in image_description.get('imageTags', []):
-                    break
-            return new_image_descriptions
-        else:
-            raise ValueError("A limit must be an integer position, a string tag, or None.")
+        return self.ecr_utils.get_images_descriptions(digests=digests, tags=tags, limit=limit)
 
     def show_image_catalog(self,
                            digests: Optional[List[str]] = None,
                            tags: Optional[List[str]] = None,
-                           limit: Optional[Union[int, str]] = IMAGE_COUNT_LIMIT,
+                           limit: Optional[Union[int, str]] = ECRUtils.IMAGE_LIST_DEFAULT_COUNT_LIMIT,
                            summarize: bool = True):
         """
         Shows a list of tabular information about images in the given account number and ECS respository.
@@ -200,11 +149,12 @@ class ECRCommandContext:
         n = info['count']
         total = info['total']
         if summarize:
+            current_account = f"account {self.account_number}" if self.account_number else "current account"
             if digests or tags:
-                PRINT(f"Only {n_of(n, 'relevant image')} in account {self.account_number} shown.")
+                PRINT(f"Only {n_of(n, 'relevant image')} in {current_account} shown.")
             else:
                 PRINT(f"{'All' if n == total else 'Most recent'} {info['count']} of {info['total']} images"
-                      f" in account {self.account_number} shown.")
+                      f" in {current_account} shown.")
 
     def get_image_manifest(self, tag=None, digest=None) -> str:
         """
@@ -225,7 +175,7 @@ class ECRCommandContext:
             image_id = {"imageDigest": digest}
         else:  # neither or both
             raise RuntimeError("Exactly one of --tag and --digest is required.")
-        options = {'repositoryName': self.ecs_repository, 'imageIds': [image_id]}
+        options = {'repositoryName': self.image_repository, 'imageIds': [image_id]}
         response = self.ecr_client.batch_get_image(**options)
         images = response.get('images')
         if not images or len(images) == 0:
@@ -283,7 +233,7 @@ class ECRCommandContext:
         PRINT("Before:")
         self.show_image_catalog(digests=relevant_digests, summarize=False)
         manifest = self.get_image_manifest(digest=digest)
-        self.ecr_client.put_image(repositoryName=self.ecs_repository, imageManifest=manifest, imageTag=tag)
+        self.ecr_client.put_image(repositoryName=self.image_repository, imageManifest=manifest, imageTag=tag)
         # This shows what changed.
         PRINT("After:")
         self.show_image_catalog(digests=relevant_digests)
@@ -313,7 +263,7 @@ class ECRCommandContext:
         """
         [most_recent, previous] = self._most_recent_two_deploys()
         if RELEASED_TAG not in most_recent.get('imageTags', []):
-            self.show_image_catalog(limit='latest')
+            self.show_image_catalog(limit=RELEASED_TAG)
             raise RuntimeError(f"Most recent deploy is NOT marked {RELEASED_TAG!r}."
                                f" You'll have to sort this out manually.")
         self.add_image_tag(digest=previous['imageDigest'], tag=RELEASED_TAG)
@@ -335,10 +285,11 @@ def show_image_catalog_main(override_args=None):
                         default=DEFAULT_ACCOUNT_NUMBER, metavar="<acct-num>",
                         help=f"AWS account number containing repository (default: {DEFAULT_ACCOUNT_NUMBER})")
     parser.add_argument('--ecs-repository', dest='ecs_repository',
-                        default=DEFAULT_ECS_REPOSITORY, metavar="<repo-name>",
-                        help=f"repository name to show images for (default: {DEFAULT_ECS_REPOSITORY})")
-    parser.add_argument('--limit', default=IMAGE_COUNT_LIMIT, metavar="<n>", type=int,
-                        help=f"maximum number of images to describe (default: {IMAGE_COUNT_LIMIT})")
+                        default=DEFAULT_IMAGE_REPOSITORY, metavar="<repo-name>",
+                        help=f"repository name to show images for (default: {DEFAULT_IMAGE_REPOSITORY})")
+    parser.add_argument('--limit', default=ECRUtils.IMAGE_LIST_DEFAULT_COUNT_LIMIT, metavar="<n>", type=int,
+                        help=f"maximum number of images to describe"
+                             f" (default: {ECRUtils.IMAGE_LIST_DEFAULT_COUNT_LIMIT})")
     parsed = parser.parse_args(args=override_args)
 
     with ecr_command_context(account_number=parsed.account_number,
@@ -365,8 +316,8 @@ def show_image_manifest_main(override_args=None):
                         default=DEFAULT_ACCOUNT_NUMBER, metavar="<acct-num>",
                         help=f"AWS account number containing repository (default: {DEFAULT_ACCOUNT_NUMBER})")
     parser.add_argument('--ecs-repository', dest='ecs_repository',
-                        default=DEFAULT_ECS_REPOSITORY, metavar="<repo-name>",
-                        help=f"repository name to show images for (default: {DEFAULT_ECS_REPOSITORY})")
+                        default=DEFAULT_IMAGE_REPOSITORY, metavar="<repo-name>",
+                        help=f"repository name to show images for (default: {DEFAULT_IMAGE_REPOSITORY})")
     parser.add_argument('--digest', default=None, metavar="<sha>",
                         help=f"digest (sha) to look for (required unless --tag is given)")
     parser.add_argument('--tag', default=None, metavar="<tag>",
@@ -394,8 +345,8 @@ def add_image_tag_main(override_args=None):
                         help=f"AWS account number containing repository"
                              f" (default: {DEFAULT_ACCOUNT_NUMBER}, requires interactive confirmation if unsupplied)")
     parser.add_argument('--ecs-repository', dest='ecs_repository',
-                        default=DEFAULT_ECS_REPOSITORY, metavar="<repo-name>",
-                        help=f"repository name to show images for (default: {DEFAULT_ECS_REPOSITORY})")
+                        default=DEFAULT_IMAGE_REPOSITORY, metavar="<repo-name>",
+                        help=f"repository name to show images for (default: {DEFAULT_IMAGE_REPOSITORY})")
     parser.add_argument('digest', metavar="<sha>",
                         help="digest (sha) of image to add tag to (REQUIRED)")
     parser.add_argument('tag', metavar="<tag>",
@@ -423,8 +374,8 @@ def unrelease_most_recent_image_main(override_args=None):
                         help=f"AWS account number containing repository"
                              f" (default: {DEFAULT_ACCOUNT_NUMBER}, requires interactive confirmation if unsupplied)")
     parser.add_argument('--ecs-repository', dest='ecs_repository',
-                        default=DEFAULT_ECS_REPOSITORY, metavar="<repo-name>",
-                        help=f"repository name to show images for (default: {DEFAULT_ECS_REPOSITORY})")
+                        default=DEFAULT_IMAGE_REPOSITORY, metavar="<repo-name>",
+                        help=f"repository name to show images for (default: {DEFAULT_IMAGE_REPOSITORY})")
     parsed = parser.parse_args(args=override_args)
 
     with ecr_command_context(account_number=parsed.account_number,
