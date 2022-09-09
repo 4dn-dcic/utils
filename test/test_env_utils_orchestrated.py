@@ -10,7 +10,7 @@ from dcicutils.env_utils import (
     is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env,
     get_mirror_env_from_context, is_test_env, is_hotseat_env, get_standard_mirror_env,
     prod_bucket_env, prod_bucket_env_for_app, public_url_mappings, public_url_for_app, permit_load_data,
-    default_workflow_env, infer_foursight_url_from_env,
+    default_workflow_env, infer_foursight_url_from_env, foursight_env_name,
     infer_repo_from_env, data_set_for_env, get_bucket_env, infer_foursight_from_env,
     is_indexer_env, indexer_env_for_env, classify_server_url,
     short_env_name, full_env_name, full_cgap_env_name, full_fourfront_env_name, is_cgap_server, is_fourfront_server,
@@ -1033,6 +1033,23 @@ FOURFRONT_SETTINGS_FOR_TESTING = dict(
         }
     ]
 )
+
+
+@using_orchestrated_behavior()
+def test_orchestrated_foursight_env_name():
+
+    assert foursight_env_name('acme-prd') == 'cgap'  # this is in our test ecosystem's public_urL_table
+    assert foursight_env_name('acme-mastertest') == 'mastertest'  # the rest of these are short names
+    assert foursight_env_name('acme-webdev') == 'webdev'
+    assert foursight_env_name('acme-hotseat') == 'hotseat'
+
+    with stage_mirroring(enabled=True):
+        with local_attrs(EnvUtils, **FOURFRONT_SETTINGS_FOR_TESTING):  # PRD = fourfront-blue, STG = fourfront-green
+
+            assert foursight_env_name('fourfront-blue') == 'data'  # this is in the public_url_table
+            assert foursight_env_name('fourfront-green') == 'staging'  # this is, too
+            assert foursight_env_name('fourfront-mastertest') == 'mastertest'  # these are short names
+            assert foursight_env_name('fourfront-hotseat') == 'hotseat'
 
 
 @using_orchestrated_behavior()

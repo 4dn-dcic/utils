@@ -13,15 +13,77 @@ Change Log
 * Drop support for Python 3.6 (**BREAKING CHANGE**)
 
 
+4.8.0
+=====
+
+* New functionallity in ``ecr_utils.ECRUtils`` in support of planned changes to Foursight:
+
+  * Add ``ECRTagWatcher`` class that can be used to watch for a new image with a given tag in an ECS repository.
+
+* New functionality in ``qa_utils`` to support a mock ECR client.
+
+* Refactor parts of ``ecr_utils`` and ``ecr_scripts`` to move some general-purpose parts out of
+  ``ecr_scripts`` (top-level variables and class ``ECRCommandContext``)
+  and into ``ecr_utils`` (class ``ECRUtils``):
+
+  * Changes to arguments for ``ECRUtils`` constructor:
+
+    * Allow additional arguments needed for moved methods.
+    * Default more arguments so that only relevant ones need be passed.
+
+  * Move some methods from ``ECRCommandContext`` to ``ECRUtils``:
+
+    * ``get_images_descriptions``
+    * ``_apply_image_descriptions_limit``
+
+  * Certain variables at ``ecr_scripts`` top-level became class variables in ``ecr_utils.ECRUtils``
+    (some with some renaming):
+
+
+    +------------------------+------------------------+--------------------------------+------------------------+
+    | .. raw:: html                                   | .. raw:: html                                           |
+    |                                                 |                                                         |
+    |    <center><tt>ecr_scripts</code></tt>          |    <center><tt>ecr_utils.ECRUtils</tt></center>         |
+    |                                                 |                                                         |
+    +------------------------+------------------------+--------------------------------+------------------------+
+    | module variable        | module variable status | class variable                 | class variable status  |
+    +========================+========================+================================+========================+
+    | DEFAULT_ECS_REPOSITORY | deprecated             | DEFAULT_IMAGE_REPOSITORY       | new                    |
+    +------------------------+------------------------+--------------------------------+------------------------+
+    |  IMAGE_COUNT_LIMIT     | deprecated             | IMAGE_LIST_DEFAULT_COUNT_LIMIT | new                    |
+    +------------------------+------------------------+--------------------------------+------------------------+
+    | IMAGE_LIST_CHUNK_SIZE  | deprecated             | IMAGE_LIST_CHUNK_SIZE          | new                    |
+    +------------------------+------------------------+--------------------------------+------------------------+
+    | RELEASED_TAG           | deprecated             | IMAGE_RELEASED_TAG             | new                    |
+    +------------------------+------------------------+--------------------------------+------------------------+
+
+* Unit tests for new functionality, and backfilled unit tests for some parts of ``ecr_utils``.
+
+
+4.7.0
+=====
+
+* In ``env_utils``:
+
+  * New function ``foursight_env_name``, an alias for
+    ``lambda envname: infer_foursight_from_env(envname=envname)``
+
+* Add error checking for running tests that looks to see that we're in the right account before we move ahead
+  only to find this out in a less intelligible way.
+
+
 4.6.0
 =====
 
 * In ``env_utils``:
+
   * Add ``identity_name`` arguments to:
+
     * ``apply_identity``
     * ``assumed_identity_if``
     * ``assumed_identity``
     * ``get_identity_secrets``
+
   * Remove buggy defaulting of value for ``get_identity_name``.
   * Improve error messages in ``get_identity_secrets``.
 
@@ -91,6 +153,7 @@ NOTE: Due to a versioning error in beta, there was no 4.3.0. The previous releas
 * Fix test recording capability. Add (though unused) ability to record at
   the abstraction level of ``authorized_request``.
 * Fix various tests that had grown stale due to data changes.
+
   * ``test_post_delete_purge_links_metadata`` (needed to be re-recorded)
   * ``test_upsert_metadata`` (needed to be re-recorded)
   * ``test_unified_authentication_prod_envs_integrated_only``
@@ -99,11 +162,15 @@ NOTE: Due to a versioning error in beta, there was no 4.3.0. The previous releas
   * ``test_some_decorated_methods_work`` (needed one different count)
   * ``test_faceted_search_exp_set`` (newly recorded)
   * ``test_faceted_search_users`` (newly recorded)
+
 * Specify pytest options in pyproject.toml instead of a separate file.
 * In ``env_utils``:
+
   * Added ``EnvUtils.app_name`` to get the orchestrated app name.
   * Added ``EnvUtils.app_case`` to conditionalize on ``if_cgap=`` and ``if_fourfront=``.
+
 * In ``qa_utils``:
+
   * Added an ``input_mocked`` context manager.
   * Added ``MockLog`` and a ``logged_messages`` context manager.
 
@@ -112,16 +179,21 @@ NOTE: Due to a versioning error in beta, there was no 4.3.0. The previous releas
 =====
 
 * In ``cloudformation_utils``:
+
   * New function ``find_lambda_function_names`` in ``AbstractOrchestrationManager`` which
     factors out the lookup part from the ``discover_foursight_check_runner_name`` function.
+
 * In ``obfuscation_utils``:
+
   * Changed ``should_obfuscate`` to include "session" related keys.
 
 
 4.0.1
 =====
 * In ``qa_utils``:
+
   * New class ``MockBoto3Ec2`` geared toward security group rules related unit testing.
+
 * New ``obfuscation_utils`` module.
 
 
@@ -222,7 +294,7 @@ these new items:
     * ``LEGACY_CGAP_GLOBAL_ENV_BUCKET``
     * ``LEGACY_GLOBAL_ENV_BUCKET``
 
- * New type hint (variable):
+  * New type hint (variable):
 
     * ``ChaliceStage``
 
@@ -458,22 +530,33 @@ these new items:
 ======
 
 * In ``docker_utils.py``:
+
   * Add ``docker_is_running`` predicate (used by the fix to ``test_ecr_utils_workflow`` to skip that test
     if docker is not running.
+
 * In ``test_ecr_utils.py``:
+
   * Fix ``test_ecr_utils_workflow`` to skip if docker is not enabled.
+
 * In ``test_s3_utils.py``:
+
   * Remove ``test_s3utils_creation_cgap_ordinary`` because there are no more CGAP beanstalks.
   * Revise ``test_regression_s3_utils_short_name_c4_706`` to use ``fourfront-mastertest``
     rather than a CGAP env, since the CGAP beanstalk envs have gone away.
+
 * In ``qa_utils.py``:
+
   * ``MockBoto3Session``.
   * ``MockBoto3SecretsManager`` and support for ``MockBoto3`` to make it.
+
 * In ``secrets_utils.py`` and ``test_secrets_utils.py``:
+
   * Add support for ``SecretsTable``.
   * Add unit tests for existing ``secrets_utils.assume_identity`` and for new ``SecretsTable`` functionality.
+
 * Small cosmetic adjustments to ``Makefile`` to show a timestamp and info about current branch state
   when ``make test`` starts and again when it ends.
+
 * A name containing an underscore will not be shortened by ``short_env_name`` nor lengthened by
   ``full_env_name`` (nor ``full_cgap_env_name`` nor ``full_fourfront_env_name``).
 
@@ -1031,52 +1114,52 @@ that big change happened.
 
 * In ``deployment_utils``:
 
-   * Add environment variables that can be set per stack/instance:
+  * Add environment variables that can be set per stack/instance:
 
-     * ``ENCODED_S3_BUCKET_ORG`` - a unique token for your organization to be used in auto-generating S3 bucket orgs.
-       The defaulted value (which includes possible override by a ``--s3_bucket_org`` argument in the generator command)
-       will be usable as ``${S3_BUCKET_ORG}`` in ``.ini`` file templates.
+    * ``ENCODED_S3_BUCKET_ORG`` - a unique token for your organization to be used in auto-generating S3 bucket orgs.
+      The defaulted value (which includes possible override by a ``--s3_bucket_org`` argument in the generator command)
+      will be usable as ``${S3_BUCKET_ORG}`` in ``.ini`` file templates.
 
-     * ``ENCODED_S3_BUCKET_ENV`` - a unique token for your organization to be used in auto-generating S3 bucket names.
-       The defaulted value (which includes possible override by a ``--s3_bucket_env`` argument in the generator command)
-       will be usable as ``${S3_BUCKET_ENV}`` in ``.ini`` file templates.
+    * ``ENCODED_S3_BUCKET_ENV`` - a unique token for your organization to be used in auto-generating S3 bucket names.
+      The defaulted value (which includes possible override by a ``--s3_bucket_env`` argument in the generator command)
+      will be usable as ``${S3_BUCKET_ENV}`` in ``.ini`` file templates.
 
-     * ``ENCODED_FILE_UPLOAD_BUCKET`` - the name of the file upload bucket to use if a ``--file_upload_bucket`` argument
-       is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-files``
-       is not desired. This fully defaulted value will be available as ``${FILE_UPLOAD_BUCKET}`` in ``.ini`` file
-       templates, and is the recommended way to compute the proper value for the ``file_upload_bucket`` configuration
-       parameter.
+    * ``ENCODED_FILE_UPLOAD_BUCKET`` - the name of the file upload bucket to use if a ``--file_upload_bucket`` argument
+      is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-files``
+      is not desired. This fully defaulted value will be available as ``${FILE_UPLOAD_BUCKET}`` in ``.ini`` file
+      templates, and is the recommended way to compute the proper value for the ``file_upload_bucket`` configuration
+      parameter.
 
-     * ``ENCODED_FILE_WFOUT_BUCKET`` - the name of the file wfout bucket to use if a ``--file_wfout_bucket`` argument
+    * ``ENCODED_FILE_WFOUT_BUCKET`` - the name of the file wfout bucket to use if a ``--file_wfout_bucket`` argument
       is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-wfoutput``
       is not desired. This fully defaulted value will be available as ``${FILE_WFOUT_BUCKET}`` in ``.ini`` file
-       templates, and is the recommended way to compute the proper value for the ``file_wfout_bucket`` configuration
-       parameter.
+      templates, and is the recommended way to compute the proper value for the ``file_wfout_bucket`` configuration
+      parameter.
 
-     * ``ENCODED_BLOB_BUCKET`` - the name of the blob bucket to use if a ``--blob_bucket`` argument
-       is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-blobs``
-       is not desired. This fully defaulted value will be available as ``${BLOB_BUCKET}`` in ``.ini`` file
-       templates, and is the recommended way to compute the proper value for the ``blob_bucket`` configuration
-       parameter.
+    * ``ENCODED_BLOB_BUCKET`` - the name of the blob bucket to use if a ``--blob_bucket`` argument
+      is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-blobs``
+      is not desired. This fully defaulted value will be available as ``${BLOB_BUCKET}`` in ``.ini`` file
+      templates, and is the recommended way to compute the proper value for the ``blob_bucket`` configuration
+      parameter.
 
-     * ``ENCODED_SYSTEM_BUCKET`` - the name of the system bucket to use if a ``--system_bucket`` argument
-       is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-system``
-       is not desired. This fully defaulted value will be available as ``${SYSTEM_BUCKET}`` in ``.ini`` file
-       templates, and is the recommended way to compute the proper value for the ``system_bucket`` configuration
-       parameter.
+    * ``ENCODED_SYSTEM_BUCKET`` - the name of the system bucket to use if a ``--system_bucket`` argument
+      is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-system``
+      is not desired. This fully defaulted value will be available as ``${SYSTEM_BUCKET}`` in ``.ini`` file
+      templates, and is the recommended way to compute the proper value for the ``system_bucket`` configuration
+      parameter.
 
-     * ``ENCODED_METADATA_BUNDLES_BUCKET`` - the name of the metadata bundles bucket to use if a
-       ``--metadata_bundles_bucket`` argument is not given in the generator command, and the default of
-       ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-metadata-bundles`` is not desired. This fully defaulted value will be
-       available as ``${METADATA_BUNDLES_BUCKET}`` in ``.ini`` file
-       templates, and is the recommended way to compute the proper value for the ``metadata_bundles_bucket`` configuration
-       parameter.
+    * ``ENCODED_METADATA_BUNDLES_BUCKET`` - the name of the metadata bundles bucket to use if a
+      ``--metadata_bundles_bucket`` argument is not given in the generator command, and the default of
+      ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-metadata-bundles`` is not desired. This fully defaulted value will be
+      available as ``${METADATA_BUNDLES_BUCKET}`` in ``.ini`` file
+      templates, and is the recommended way to compute the proper value for the ``metadata_bundles_bucket`` configuration
+      parameter.
 
-     * Fixed a bug that the index_server argument was not being correctly passed into lower level functions when
-       ``--index_server`` was specified on the command line.
+    * Fixed a bug that the index_server argument was not being correctly passed into lower level functions when
+      ``--index_server`` was specified on the command line.
 
-     * Fixed a bug where passing no ``--encoded_data_set`` but an explicit null-string value of the environment variable
-       ``ENCODED_DATA_SET`` did not lead to further defaulting in some circumstances.
+    * Fixed a bug where passing no ``--encoded_data_set`` but an explicit null-string value of the environment variable
+      ``ENCODED_DATA_SET`` did not lead to further defaulting in some circumstances.
 
   * In ``ff_utils``:
 
