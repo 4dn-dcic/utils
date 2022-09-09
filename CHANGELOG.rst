@@ -7,6 +7,12 @@ Change Log
 ----------
 
 
+5.0.0
+=====
+
+* Drop support for Python 3.6 (**BREAKING CHANGE**)
+
+
 4.8.0
 =====
 
@@ -1673,5 +1679,6 @@ the ``poetry.app`` section of ``pyproject.toml`` for the corresponding change, a
    name = "dcicutils"
    version = "100.200.300"
    ...etc.
+
 
 This would correspond with ``dcicutils 100.200.300``.
