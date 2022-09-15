@@ -2339,21 +2339,28 @@ class MockBotoSQSClient(MockBoto3Client):
         }
 
 
-class VersionChecker:
+class ChangeLogChecker:
 
     """
     Given appropriate customizations, this allows cross-checking of pyproject.toml and a changelog for consistency.
+
+    By default, it will raise an error if the CHANGELOG is specified and is not consistent with the version
+    (unless that version is a beta).
+
+    If the class variable RAISE_ERROR_IF_CHANGELOG_MISMATCH is set to False, as is the case in
+    subclass VersionChecker, only a warning (of a kind given by WARNING_CATEGORY) will be generated,
+    not an error, so use that subclass if you don't want hard errors for version inconsistency.
 
     You must subclass this class, specifying both the pyproject filename and the changelog filename as
     class variables PYPROJECT and CHANGELOG, respectively.
 
     def test_version():
 
-        class MyAppVersionChecker(VersionChecker):
+        class MyAppChangeLogChecker(ChangeLogChecker):
             PYPROJECT = os.path.join(ROOT_DIR, "pyproject.toml")
             CHANGELOG = os.path.join(ROOT_DIR, "CHANGELOG.rst")
 
-        MyAppVersionChecker.check_version()
+        MyAppChangeLogChecker.check_version()
 
     """
 
@@ -2384,6 +2391,8 @@ class VersionChecker:
         assert version, "Missing version in %s." % pyproject_file
         PRINT("Version = %s" % version)
         return version
+
+    RAISE_ERROR_IF_CHANGELOG_MISMATCH = True
 
     VERSION_LINE_PATTERN = re.compile("^[#* ]*([0-9]+[.][^ \t\n]*)([ \t\n].*)?$")
     VERSION_IS_BETA_PATTERN = re.compile("^.*[0-9][Bb][0-9]+$")
@@ -2417,9 +2426,36 @@ class VersionChecker:
 
         # Might be sorted top to bottom or bottom to top, but ultimately the current version should be first or last.
         if versions[0] != version and versions[-1] != version:
-            warnings.warn("Missing entry for version %s in %s." % (version, changelog_file),
-                          category=cls.WARNING_CATEGORY, stacklevel=2)
+            message = "Missing entry for version %s in %s." % (version, changelog_file)
+            if cls.RAISE_ERROR_IF_CHANGELOG_MISMATCH:
+                raise AssertionError(message)
+            else:
+                warnings.warn(message, category=cls.WARNING_CATEGORY, stacklevel=2)
             return
+
+
+class VersionChecker(ChangeLogChecker):
+
+    """
+    Given appropriate customizations, this allows cross-checking of pyproject.toml and a changelog for consistency.
+
+    By default, a warning (of a kind given by WARNING_CATEGORY) will be generated, not an error, if the change
+    log is not consistent. If you want a hard error, use the superclass ChangeLogChecker.
+
+    You must subclass this class, specifying both the pyproject filename and the changelog filename as
+    class variables PYPROJECT and CHANGELOG, respectively.
+
+    def test_version():
+
+        class MyAppVersionChecker(VersionChecker):
+            PYPROJECT = os.path.join(ROOT_DIR, "pyproject.toml")
+            CHANGELOG = os.path.join(ROOT_DIR, "CHANGELOG.rst")
+
+        MyAppVersionChecker.check_version()
+
+    """
+
+    RAISE_ERROR_IF_CHANGELOG_MISMATCH = False
 
 
 def raises_regexp(error_class, pattern):

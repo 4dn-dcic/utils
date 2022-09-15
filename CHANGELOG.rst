@@ -7,6 +7,15 @@ Change Log
 ----------
 
 
+5.1.0
+=====
+
+* In ``qa_utils``:
+
+  * New class ChangeLogChecker, like VersionChecker, but it raises an error
+    if there's a change log inconsistency.
+
+
 5.0.0
 =====
 

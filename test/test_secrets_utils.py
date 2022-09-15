@@ -530,3 +530,19 @@ def test_find_application_secrets_table():
             # There is no thing called DecoyApplicationConfiguration
             found = SecretsTable.find_application_secrets_table(application_configuration_pattern='Decoy')
             ignored(found)  # Shouldn't reach here
+
+
+def test_is_placeholder_value():
+
+    assert SecretsTable.is_placeholder_value(None) is False
+    assert SecretsTable.is_placeholder_value('') is False
+    assert SecretsTable.is_placeholder_value('foo') is False
+    assert SecretsTable.is_placeholder_value(SecretsTable.PLACEHOLDER_VALUE) is True
+
+
+def test_is_empty_value():
+
+    assert SecretsTable.is_empty_value(None) is True
+    assert SecretsTable.is_empty_value('') is True
+    assert SecretsTable.is_empty_value('foo') is False
+    assert SecretsTable.is_empty_value(SecretsTable.PLACEHOLDER_VALUE) is True
