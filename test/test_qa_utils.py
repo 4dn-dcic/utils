@@ -21,7 +21,7 @@ from dcicutils.qa_utils import (
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
-    find_uses, confirm_no_uses, logged_messages, input_mocked
+    find_uses, confirm_no_uses, logged_messages, input_mocked, ChangeLogChecker,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -1350,6 +1350,12 @@ def test_version_checker_no_changelog():
 
     MyVersionChecker.check_version()
 
+    class MyChangeLogChecker(ChangeLogChecker):
+        PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+        CHANGELOG = None
+
+    MyChangeLogChecker.check_version()
+
 
 def test_version_checker_use_dcicutils_changelog():
 
@@ -1358,6 +1364,12 @@ def test_version_checker_use_dcicutils_changelog():
         CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
 
     MyVersionChecker.check_version()
+
+    class MyChangeLogChecker(ChangeLogChecker):
+        PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+        CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+
+    MyChangeLogChecker.check_version()
 
 
 def test_version_checker_with_missing_changelog():
@@ -1373,6 +1385,14 @@ def test_version_checker_with_missing_changelog():
 
         with pytest.raises(AssertionError):
             MyVersionChecker.check_version()  # The version history will be missing because of mocking.
+
+        class MyChangeLogChecker(ChangeLogChecker):
+
+            PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+            CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+
+        with pytest.raises(AssertionError):
+            MyChangeLogChecker.check_version()  # The version history will be missing because of mocking.
 
 
 def test_version_checker_with_proper_changelog():
@@ -1404,6 +1424,14 @@ def test_version_checker_with_proper_changelog():
             # The CHANGELOG is present and with the right data.
             MyVersionChecker.check_version()
 
+            class MyChangeLogChecker(ChangeLogChecker):
+
+                PYPROJECT = pyproject_filename
+                CHANGELOG = changelog_filename
+
+            # The CHANGELOG is present and with the right data.
+            MyChangeLogChecker.check_version()
+
 
 def test_version_checker_with_insufficient_changelog():
 
@@ -1430,6 +1458,15 @@ def test_version_checker_with_insufficient_changelog():
             with pytest.warns(VersionChecker.WARNING_CATEGORY):
                 # The CHANGELOG won't have the right data, so we should see a warning.
                 MyVersionChecker.check_version()
+
+            class MyChangeLogChecker(ChangeLogChecker):
+
+                PYPROJECT = pyproject_filename
+                CHANGELOG = changelog_filename
+
+            with pytest.raises(AssertionError):
+                # The CHANGELOG won't have the right data, so we should see a warning.
+                MyChangeLogChecker.check_version()
 
 
 def test_check_duplicated_items_by_key():

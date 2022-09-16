@@ -419,3 +419,17 @@ class SecretsTable:
                                  secretsmanager_client=secretsmanager_client)
         secret_name = secret['Name']
         return SecretsTable(name=secret_name, secretsmanager_client=secretsmanager_client)
+
+    # This value is used by various DCIC tools as a placeholder for GAC values that may
+    # need to be supplied by the user. It is often treated as "empty" even though it is not false.
+    PLACEHOLDER_VALUE = 'XXX: ENTER VALUE'
+
+    @classmethod
+    def is_placeholder_value(cls, value):
+        """Returns True if its argument is the GAC placeholder value, and returns False otherwise."""
+        return value == cls.PLACEHOLDER_VALUE
+
+    @classmethod
+    def is_empty_value(cls, value):
+        """Returns True if its argument is null or is the GAC placeholder value, and returns False otherwise."""
+        return not value or cls.is_placeholder_value(value)
