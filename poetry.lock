@@ -466,17 +466,20 @@ python-versions = "*"
 
 [[package]]
 name = "elasticsearch"
-version = "6.8.1"
+version = "7.13.4"
 description = "Python client for Elasticsearch"
 category = "main"
 optional = false
-python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*, <4"
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, <4"
 
 [package.dependencies]
-urllib3 = ">=1.21.1"
+certifi = "*"
+urllib3 = ">=1.21.1,<2"
 
 [package.extras]
-develop = ["requests (>=2.0.0,<3.0.0)", "nose", "coverage", "mock", "pyyaml", "nosexcover", "numpy", "pandas", "sphinx (<1.7)", "sphinx-rtd-theme"]
+async = ["aiohttp (>=3,<4)"]
+develop = ["requests (>=2.0.0,<3.0.0)", "coverage", "mock", "pyyaml", "pytest", "pytest-cov", "sphinx (<1.7)", "sphinx-rtd-theme", "black", "jinja2"]
+docs = ["sphinx (<1.7)", "sphinx-rtd-theme"]
 requests = ["requests (>=2.4.0,<3.0.0)"]
 
 [[package]]
@@ -922,7 +925,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.7,<3.10"
-content-hash = "7dc70bacccfee09d43af039ec491580586ffacd67c7c4d84b6838dc1c6dc3946"
+content-hash = "040ff3f3b682ff3b1cec6ad6ac52a06342baa4f2920fbc371a3aab9a935fba22"
 
 [metadata.files]
 atomicwrites = [
@@ -1029,8 +1032,8 @@ docopt = [
     {file = "docopt-0.6.2.tar.gz", hash = "sha256:49b3a825280bd66b3aa83585ef59c4a8c82f2c8a522dbe754a8bc8d08c85c491"},
 ]
 elasticsearch = [
-    {file = "elasticsearch-6.8.1-py2.py3-none-any.whl", hash = "sha256:540d633afcc0a32972e4b489c4559c9a96e294850853238f7a18b1cbd267c2ed"},
-    {file = "elasticsearch-6.8.1.tar.gz", hash = "sha256:a8062a00b61bc7babeea028530667583a68ecb1a9f59ab0b22ff7feaf70d3564"},
+    {file = "elasticsearch-7.13.4-py2.py3-none-any.whl", hash = "sha256:5920df0ab2630778680376d86bea349dc99860977eec9b6d2bd0860f337313f2"},
+    {file = "elasticsearch-7.13.4.tar.gz", hash = "sha256:52dda85f76eeb85ec873bf9ffe0ba6849e544e591f66d4048a5e48016de268e0"},
 ]
 flake8 = [
     {file = "flake8-5.0.4-py2.py3-none-any.whl", hash = "sha256:7a1cf6b73744f5806ab95e526f6f0d8c01c66d7bbe349562d22dfca20610b248"},
