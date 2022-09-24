@@ -7,19 +7,15 @@ import contextlib
 import copy
 import datetime
 import dateutil.tz as dateutil_tz
-import glob
 import hashlib
 import io
 import logging
 import os
 import pytest
 import pytz
-import re
 import sys
 import time
-import toml
 import uuid
-import warnings
 
 from botocore.credentials import Credentials as Boto3Credentials
 from botocore.exceptions import ClientError
@@ -29,12 +25,18 @@ from typing import Any, Optional, List, DefaultDict
 from unittest import mock
 from .env_utils import short_env_name
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
-from .lang_utils import n_of, conjoined_list, there_are
+from .lang_utils import there_are
 from .misc_utils import (
-    PRINT, ignored, Retry, CustomizableProperty, getattr_customized, remove_prefix, REF_TZ,
+    PRINT, ignored, Retry, remove_prefix, REF_TZ,
     environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name,
     find_associations,
 )
+from .qa_checkers import QA_EXCEPTION_PATTERN, find_uses, confirm_no_uses, VersionChecker, ChangeLogChecker
+
+
+# Using these names via qa_utils is deprecated. Their proper, supported home is now in qa_checkers.
+# Please rewrite imports to get them from qa_checkers, not qa_utils. -kmp 21-Sep-2022
+exported(QA_EXCEPTION_PATTERN, find_uses, confirm_no_uses, VersionChecker, ChangeLogChecker)
 
 
 def show_elapsed_time(start, end):
@@ -2339,125 +2341,6 @@ class MockBotoSQSClient(MockBoto3Client):
         }
 
 
-class ChangeLogChecker:
-
-    """
-    Given appropriate customizations, this allows cross-checking of pyproject.toml and a changelog for consistency.
-
-    By default, it will raise an error if the CHANGELOG is specified and is not consistent with the version
-    (unless that version is a beta).
-
-    If the class variable RAISE_ERROR_IF_CHANGELOG_MISMATCH is set to False, as is the case in
-    subclass VersionChecker, only a warning (of a kind given by WARNING_CATEGORY) will be generated,
-    not an error, so use that subclass if you don't want hard errors for version inconsistency.
-
-    You must subclass this class, specifying both the pyproject filename and the changelog filename as
-    class variables PYPROJECT and CHANGELOG, respectively.
-
-    def test_version():
-
-        class MyAppChangeLogChecker(ChangeLogChecker):
-            PYPROJECT = os.path.join(ROOT_DIR, "pyproject.toml")
-            CHANGELOG = os.path.join(ROOT_DIR, "CHANGELOG.rst")
-
-        MyAppChangeLogChecker.check_version()
-
-    """
-
-    PYPROJECT = CustomizableProperty('PYPROJECT', description="The repository-relative name of the pyproject file.")
-    CHANGELOG = CustomizableProperty('CHANGELOG', description="The repository-relative name of the change log.")
-
-    # I wanted to use pytest.PytestConfigWarning, but that creates a dependency
-    # on particular versions of pytest, and we don't export a delivery
-    # constraint of a particular pytest version. So RuntimeWarning is a
-    # safer setting for now. -kmp 14-Jan-2021
-    WARNING_CATEGORY = RuntimeWarning
-
-    @classmethod
-    def check_version(cls):
-        version = cls._check_version()
-        if getattr_customized(cls, "CHANGELOG"):
-            cls._check_change_history(version)
-
-    @classmethod
-    def _check_version(cls):
-
-        __tracebackhide__ = True
-
-        pyproject_file = getattr_customized(cls, 'PYPROJECT')
-        assert os.path.exists(pyproject_file), "Missing pyproject file: %s" % pyproject_file
-        pyproject = toml.load(pyproject_file)
-        version = pyproject.get('tool', {}).get('poetry', {}).get('version', None)
-        assert version, "Missing version in %s." % pyproject_file
-        PRINT("Version = %s" % version)
-        return version
-
-    RAISE_ERROR_IF_CHANGELOG_MISMATCH = True
-
-    VERSION_LINE_PATTERN = re.compile("^[#* ]*([0-9]+[.][^ \t\n]*)([ \t\n].*)?$")
-    VERSION_IS_BETA_PATTERN = re.compile("^.*[0-9][Bb][0-9]+$")
-
-    @classmethod
-    def _check_change_history(cls, version=None):
-
-        if version and cls.VERSION_IS_BETA_PATTERN.match(version):
-            # Don't require beta versions to match up in change log.
-            # We don't just strip the version and look at that because sometimes we use other numbers on betas.
-            # Better to just not do it at all.
-            return
-
-        changelog_file = getattr_customized(cls, "CHANGELOG")
-
-        if not changelog_file:
-            if version:
-                raise AssertionError("Cannot check version without declaring a CHANGELOG file.")
-            return
-
-        assert os.path.exists(changelog_file), "Missing changelog file: %s" % changelog_file
-
-        with io.open(changelog_file) as fp:
-            versions = []
-            for line in fp:
-                m = cls.VERSION_LINE_PATTERN.match(line)
-                if m:
-                    versions.append(m.group(1))
-
-        assert versions, "No version info was parsed from %s" % changelog_file
-
-        # Might be sorted top to bottom or bottom to top, but ultimately the current version should be first or last.
-        if versions[0] != version and versions[-1] != version:
-            message = "Missing entry for version %s in %s." % (version, changelog_file)
-            if cls.RAISE_ERROR_IF_CHANGELOG_MISMATCH:
-                raise AssertionError(message)
-            else:
-                warnings.warn(message, category=cls.WARNING_CATEGORY, stacklevel=2)
-            return
-
-
-class VersionChecker(ChangeLogChecker):
-
-    """
-    Given appropriate customizations, this allows cross-checking of pyproject.toml and a changelog for consistency.
-
-    By default, a warning (of a kind given by WARNING_CATEGORY) will be generated, not an error, if the change
-    log is not consistent. If you want a hard error, use the superclass ChangeLogChecker.
-
-    You must subclass this class, specifying both the pyproject filename and the changelog filename as
-    class variables PYPROJECT and CHANGELOG, respectively.
-
-    def test_version():
-
-        class MyAppVersionChecker(VersionChecker):
-            PYPROJECT = os.path.join(ROOT_DIR, "pyproject.toml")
-            CHANGELOG = os.path.join(ROOT_DIR, "CHANGELOG.rst")
-
-        MyAppVersionChecker.check_version()
-
-    """
-
-    RAISE_ERROR_IF_CHANGELOG_MISMATCH = False
-
-
 def raises_regexp(error_class, pattern):
     """
     A context manager that works like pytest.raises but allows a required error message pattern to be specified as well.
@@ -2671,61 +2554,6 @@ class MockedCommandArgs:
         for arg, v in args.items():
             assert arg in self.VALID_ARGS
             setattr(self, arg, v)
-
-
-QA_EXCEPTION_PATTERN = re.compile(r"[#].*\b[N][O][Q][A]\b", re.IGNORECASE)
-
-
-def find_uses(*, where, patterns):
-    """
-    In the files specified by where (a glob pattern), finds uses of pattern (a regular expression).
-
-    :param where: a glob pattern
-    :param patterns: a dictionary mapping problem summaries to regular expressions
-    """
-
-    checks = []
-    for summary, pattern in patterns.items():
-        checks.append((re.compile(pattern), summary))
-    uses = defaultdict(lambda: [])
-    files = glob.glob(where)
-    for file in files:
-        with io.open(file, 'r') as fp:
-            line_number = 0
-            for line in fp:
-                line_number += 1
-                for matcher, summary in checks:
-                    if matcher.search(line):
-                        problem_ignorable = QA_EXCEPTION_PATTERN.search(line)
-                        if not problem_ignorable:
-                            uses[file].append({"line_number": line_number, "line": line.rstrip('\n'),
-                                               "summary": summary})
-    return uses
-
-
-def confirm_no_uses(*, where, patterns):
-    """
-    In the files specified by where (a glob pattern), finds uses of pattern (a regular expression).
-
-    :param where: a glob pattern
-    :param patterns: dicionary mapping summaries to regular expressions
-    """
-
-    def summarize(problems):
-        categories = defaultdict(lambda: 0)
-        for problem in problems:
-            categories[problem['summary']] += 1
-        return conjoined_list([n_of(count, category) for category, count in categories.items()])
-
-    uses = find_uses(patterns=patterns, where=where)
-    if uses:
-        detail = ""
-        n = 0
-        for file, matches in uses.items():
-            n += len(matches)
-            detail += f"\n In {file}, {summarize(matches)}."
-        message = f"{n_of(n, 'problem')} detected:" + detail
-        raise AssertionError(message)
 
 
 @contextlib.contextmanager
