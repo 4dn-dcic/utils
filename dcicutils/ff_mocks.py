@@ -730,7 +730,7 @@ class AbstractIntegratedFixture:
     def initialize_class(cls):
 
         if NO_SERVER_FIXTURES:
-            return
+            return 'NO_SERVER_FIXTURES'
 
         cls.S3_CLIENT = s3_utils.s3Utils(env=cls.ENV_NAME)
         cls.ES_URL = _portal_health_get(portal_url=cls.ENV_PORTAL_URL,
@@ -750,7 +750,7 @@ class AbstractIntegratedFixture:
     @classmethod
     def verify_portal_access(cls, portal_access_key):
         if NO_SERVER_FIXTURES:
-            return
+            return 'NO_SERVER_FIXTURES'
 
         response = authorized_request(
             portal_access_key['server'],

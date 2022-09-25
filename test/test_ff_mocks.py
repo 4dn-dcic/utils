@@ -1,0 +1,13 @@
+from dcicutils import ff_mocks as ff_mocks_module
+from dcicutils.ff_mocks import AbstractIntegratedFixture
+from dcicutils.misc_utils import override_environ
+from unittest import mock
+
+
+
+
+def test_abstract_integrated_fixture_no_server_fixtures():
+
+    with mock.patch.object(ff_mocks_module, "NO_SERVER_FIXTURES"):  # too late to set env variable, but this'll do.
+        assert AbstractIntegratedFixture.initialize_class() == 'NO_SERVER_FIXTURES'
+        assert AbstractIntegratedFixture.verify_portal_access('not-a-dictionary') == 'NO_SERVER_FIXTURES'
