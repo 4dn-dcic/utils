@@ -1,9 +1,6 @@
 from dcicutils import ff_mocks as ff_mocks_module
 from dcicutils.ff_mocks import AbstractIntegratedFixture
-from dcicutils.misc_utils import override_environ
 from unittest import mock
-
-
 
 
 def test_abstract_integrated_fixture_no_server_fixtures():
