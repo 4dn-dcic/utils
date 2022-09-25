@@ -22,7 +22,9 @@ from dcicutils.env_utils import (
     _make_no_legacy,  # noQA - yes, protected, but we want to test it
     if_orchestrated, UseLegacy,
 )
-from dcicutils.env_utils_legacy import FF_PRODUCTION_ECR_REPOSITORY, blue_green_mirror_env
+from dcicutils.env_utils_legacy import (
+    FF_PRODUCTION_ECR_REPOSITORY, blue_green_mirror_env as legacy_blue_green_mirror_env
+)
 from dcicutils.exceptions import (
     BeanstalkOperationNotImplemented,  # MissingFoursightBucketTable, IncompleteFoursightBucketTable,
     EnvUtilsLoadError, LegacyDispatchDisabled,
@@ -1801,14 +1803,18 @@ def test_set_declared_data_legacy():
 
 
 def test_if_orchestrated_various_legacy_errors():
+
     def foo(x):
         return ['foo', x]
+
     def bar(x):
         return ['bar', x]
+
     def baz(x):
         if x == 99:
             raise UseLegacy()
         return ['baz', x]
+
     with local_attrs(LegacyController, LEGACY_DISPATCH_ENABLED=False):
         with pytest.raises(LegacyDispatchDisabled) as exc:
             if_orchestrated(use_legacy=True)(foo)
@@ -1829,7 +1835,7 @@ def test_if_orchestrated_various_legacy_errors():
 
             with pytest.raises(NotImplementedError) as exc:
                 bar_prime(3)
-            assert str(exc.value) == ("Unimplemented: test.test_env_utils_orchestrated.bar")
+            assert str(exc.value) == "Unimplemented: test.test_env_utils_orchestrated.bar"
 
             with local_attrs(EnvUtils, ORCHESTRATED_APP='cgap'):
                 assert baz_prime(3) == ['baz', 3]
@@ -1848,11 +1854,11 @@ def test_if_orchestrated_various_legacy_errors():
                 assert 'Non-cgap applications are not supported.' in str(exc.value)
 
             with pytest.raises(LegacyDispatchDisabled) as exc:
-                if_orchestrated(use_legacy=True)(blue_green_mirror_env)
+                if_orchestrated(use_legacy=True)(legacy_blue_green_mirror_env)
             assert str(exc.value) == ("Attempt to use legacy operation blue_green_mirror_env"
                                       " with args=None kwargs=None mode=decorate.")
 
-        bg = if_orchestrated()(blue_green_mirror_env)
+        bg = if_orchestrated()(legacy_blue_green_mirror_env)
         with local_attrs(EnvUtils, IS_LEGACY=True):
             assert bg('acme-green') == 'acme-blue'
             with local_attrs(LegacyController, LEGACY_DISPATCH_ENABLED=False):
