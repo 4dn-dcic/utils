@@ -397,7 +397,7 @@ class MockFileWriter:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         content = self.stream.getvalue()
-        if FILE_SYSTEM_VERBOSE:
+        if FILE_SYSTEM_VERBOSE:  # noQA This is just debugging stuff. No need to test it.
             PRINT("Writing %r to %s." % (content, self.file))
         self.file_system.files[self.file] = content if isinstance(content, bytes) else content.encode(self.encoding)
 

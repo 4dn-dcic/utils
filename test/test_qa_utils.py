@@ -239,11 +239,37 @@ def test_controlled_time_creation():
 
 def test_controlled_time_just_now():
 
-    t = ControlledTime()
+    t = ControlledTime(tick_seconds=1)
 
     t0 = t.just_now()
     t1 = t.just_now()
     assert (t1 - t0).total_seconds() == 0
+
+    t0 = t.time()
+    t1 = t.time()  # one second should have passed
+    t2 = t.time()  # one more second should have passed
+
+    assert t1 - t0 == 1
+    assert t2 - t1 == 1
+
+
+def test_just_utcnow():
+
+    t = ControlledTime()
+    t0 = t.utcnow()
+    assert t.just_utcnow() == t0
+
+    assert ControlledTime.ProxyDatetimeClass(t).utcnow() == t0 + datetime.timedelta(seconds=1)
+
+
+def test_controlled_time_time():
+
+    t = ControlledTime()
+
+    t0 = t.time()
+    t1 = t.time()
+
+    assert t1 - t0 == 1
 
 
 def test_controlled_time_now():
