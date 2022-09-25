@@ -43,7 +43,7 @@ LegacyController.LEGACY_DISPATCH_ENABLED = True
 os.environ['GLOBAL_ENV_BUCKET'] = LEGACY_GLOBAL_ENV_BUCKET
 os.environ['ENV_NAME'] = INTEGRATED_ENV
 
-EnvUtils.init(force=True)  # This would be a good time to force EnvUtils to synchronize with the real environment
+EnvUtils.init()  # This would be a good time to get EnvUtils to synchronize with an environment if it hasn't
 
 
 @pytest.fixture(scope='session')
