@@ -4,12 +4,8 @@ import requests
 
 from dcicutils.common import LEGACY_GLOBAL_ENV_BUCKET
 from dcicutils.env_utils import LegacyController, EnvUtils
-from dcicutils.misc_utils import environ_bool, PRINT
 from dcicutils.ff_mocks import IntegratedFixture
 from .conftest_settings import TEST_DIR, INTEGRATED_ENV
-
-
-NO_SERVER_FIXTURES = environ_bool("NO_SERVER_FIXTURES")
 
 
 def _portal_health_get(namespace, portal_url, key):
@@ -109,8 +105,3 @@ def integrated_s3_info(integrated_names):
         'zip_filename': integrated_names['zip_filename'],
         'zip_filename2': integrated_names['zip_filename2'],
     }
-
-
-if NO_SERVER_FIXTURES:
-    PRINT(f"EnvUtils using sample configuration template.")
-    EnvUtils.set_declared_data(data=EnvUtils.SAMPLE_TEMPLATE_FOR_CGAP_TESTING)
