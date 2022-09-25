@@ -21,7 +21,7 @@ from dcicutils.qa_utils import (
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
-    logged_messages, input_mocked, ChangeLogChecker,
+    logged_messages, input_mocked, ChangeLogChecker, MockLog,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -1625,3 +1625,52 @@ def test_logged_messages():
         with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger'):
             # allow_warn defaults to False
             logger.warn("bar")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+
+
+def test_mock_log():
+
+    m = MockLog(allow_warn=False)
+
+    with pytest.raises(AssertionError) as exc:
+        m.warn("should fail")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+    assert "warn called. Should be 'warning'" in str(exc.value)
+
+    m = MockLog(allow_warn=True)
+
+    m.debug("a log.debug message")
+    m.info("a log.info message")
+    m.warn("a call to log.warn")
+    m.warning("a call to log.warning")
+    m.error("a call to log.error")
+    m.critical("a call to log.critical")
+
+    assert m.messages == {
+        "debug": ["a log.debug message"],
+        "info": ["a log.info message"],
+        "warning": ["a call to log.warn", "a call to log.warning"],
+        "error": ["a call to log.error"],
+        "critical": ["a call to log.critical"]
+    }
+
+    assert m.all_log_messages == [
+        "DEBUG: a log.debug message",
+        "INFO: a log.info message",
+        "WARNING: a call to log.warn",
+        "WARNING: a call to log.warning",
+        "ERROR: a call to log.error",
+        "CRITICAL: a call to log.critical",
+    ]
+
+
+def test_sqs_client_bad_region():
+
+    with pytest.raises(ValueError) as exc:
+        MockBoto3().client('sqs', region_name='some-region')
+    assert str(exc.value) == "Unexpected region: some-region"
+
+
+def test_s3_client_bad_region():
+
+    with pytest.raises(ValueError) as exc:
+        MockBoto3().client('s3', region_name='some-region')
+    assert str(exc.value) == "Unexpected region: some-region"

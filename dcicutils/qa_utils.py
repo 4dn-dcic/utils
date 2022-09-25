@@ -1943,7 +1943,7 @@ class MockBotoS3Client:
                  storage_class=None, boto3=None):
         self.boto3 = boto3 or MockBoto3()
         if region_name not in (None, 'us-east-1'):
-            raise ValueError("Unexpected region:", region_name)
+            raise ValueError(f"Unexpected region: {region_name}")
 
         files_cache_marker = '_s3_file_data'
         shared_reality = self.boto3.shared_reality
@@ -2298,7 +2298,7 @@ class MockBotoSQSClient(MockBoto3Client):
 
     def __init__(self, *, region_name=None, boto3=None):
         if region_name not in (None, 'us-east-1'):
-            raise RuntimeError("Unexpected region:", region_name)
+            raise ValueError(f"Unexpected region: {region_name}")
         self._mock_queue_name_seen = None
         self.boto3 = boto3 or MockBoto3()
 
