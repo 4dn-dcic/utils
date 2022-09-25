@@ -34,9 +34,7 @@ jobs:
           poetry install
       - name: Static Checks
         env:
-          # Some repos don't have server fixtures, but this next line is harmless there.
           NO_SERVER_FIXTURES: TRUE
-          # Anything that has dcicutils available will understand and need this to keep from talking to AWS in static testing
           USE_SAMPLE_ENVUTILS: TRUE
         run: |
           make test-static
