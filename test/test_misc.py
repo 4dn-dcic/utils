@@ -3,8 +3,7 @@ import pytest
 
 from dcicutils.qa_checkers import DocsChecker, DebuggingArtifactChecker, ChangeLogChecker
 
-
-_ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
+from .conftest_settings import REPOSITORY_ROOT_DIR
 
 
 @pytest.mark.static
@@ -31,7 +30,7 @@ def test_utils_debugging_artifacts():
 def test_changelog_consistency():
 
     class MyChangeLogChecker(ChangeLogChecker):
-        PYPROJECT = os.path.join(_ROOT_DIR, "pyproject.toml")
-        CHANGELOG = os.path.join(_ROOT_DIR, "CHANGELOG.rst")
+        PYPROJECT = os.path.join(REPOSITORY_ROOT_DIR, "pyproject.toml")
+        CHANGELOG = os.path.join(REPOSITORY_ROOT_DIR, "CHANGELOG.rst")
 
     MyChangeLogChecker.check_version()
