@@ -14,7 +14,7 @@ from .misc_utils import PRINT, remove_prefix, remove_suffix, getattr_customized,
 QA_EXCEPTION_PATTERN = re.compile(r"[#].*\b[N][O][Q][A]\b", re.IGNORECASE)
 
 
-def find_uses(*, where, patterns, recursive=False):
+def find_uses(*, where, patterns, recursive=True):
     """
     In the files specified by where (a glob pattern), finds uses of pattern (a regular expression).
 
@@ -23,13 +23,11 @@ def find_uses(*, where, patterns, recursive=False):
     :param recursive: a boolean saying whether to look recursively [UNIMPLEMENTED]
     """
 
-    assert not recursive, "The recursive option to find_uses is not yet implemented."
-
     checks = []
     for summary, pattern in patterns.items():
         checks.append((re.compile(pattern), summary))
     uses = defaultdict(lambda: [])
-    files = glob.glob(where)
+    files = glob.glob(where, recursive=recursive)
     for file in files:
         with io.open(file, 'r') as fp:
             line_number = 0
@@ -44,7 +42,7 @@ def find_uses(*, where, patterns, recursive=False):
     return uses
 
 
-def confirm_no_uses(*, where, patterns):
+def confirm_no_uses(*, where, patterns, recursive=True):
     """
     In the files specified by where (a glob pattern), finds uses of pattern (a regular expression).
 
@@ -60,7 +58,7 @@ def confirm_no_uses(*, where, patterns):
             categories[problem['summary']] += 1
         return conjoined_list([n_of(count, category) for category, count in categories.items()])
 
-    uses = find_uses(patterns=patterns, where=where)
+    uses = find_uses(patterns=patterns, where=where, recursive=recursive)
     if uses:
         detail = ""
         n = 0
@@ -208,7 +206,7 @@ class DocsChecker(StaticChecker):
 
     def __init__(self, *, sources_subdir, docs_index_file,
                  root_dir: Optional[str] = None, docs_subdir: Optional[str] = None,
-                 module_name: Optional[str] = None, skip_submodules: List[str] = None, recursive: bool = False):
+                 module_name: Optional[str] = None, skip_submodules: List[str] = None, recursive: bool = True):
         """
         A DocChecker is potentially capable of various kinds of checks of a repository's documentation.
 
@@ -234,13 +232,14 @@ class DocsChecker(StaticChecker):
         """
 
         super().__init__(sources_subdir=sources_subdir, root_dir=root_dir)
+        self.sources_subdir = sources_subdir
         self.module_name = module_name or sources_subdir.split('.')[-1]
         self.docs_dir = os.path.join(self.root_dir, docs_subdir or self.DOCS_SUBDIR)
         self.docs_index_file = os.path.join(self.docs_dir, docs_index_file)
         self.skip_submodules = set(skip_submodules or self.SKIP_SUBMODULES)
-        self.sources_files = self.compute_sources_files(recursive=recursive)
+        self.sources_files = self.compute_sources_files(where=sources_subdir, recursive=recursive)
 
-    _UNWANTED_SUBMODULE_FILTER = re.compile("(tests?/|/test_|/[^a-z])", re.IGNORECASE)
+    _UNWANTED_SUBMODULE_FILTER = re.compile("(tests?/|(^|/)test_|(^|/)[^a-z])", re.IGNORECASE)
 
     @classmethod
     def is_allowed_submodule_file(cls, submodule_file_candidate):
@@ -253,7 +252,7 @@ class DocsChecker(StaticChecker):
         """
         return not cls._UNWANTED_SUBMODULE_FILTER.search(submodule_file_candidate)
 
-    def compute_sources_files(self, recursive=False):
+    def compute_sources_files(self, *, where, recursive):
         """
         This computes the set of source files referred to.
         By default, it returns all python files in the sources directory and any of its subdirectories,
@@ -263,12 +262,11 @@ class DocsChecker(StaticChecker):
         """
         # This is all the files in the backbone of the sources subdir, but not recursively,
         # which we'll use to get a list of actual submodules we might want to autodoc.
-        glob_pattern = os.path.join(self.sources_dir, "*.py")
-        recursive_glob_pattern = os.path.join(self.sources_dir, "**/*.py")
-        all_files = glob.glob(os.path.join(self.sources_dir, glob_pattern))
-        more_files = glob.glob(os.path.join(self.sources_dir, recursive_glob_pattern)) if recursive else []
+        all_files_raw = glob.glob(os.path.join(where, "**/*.py" if recursive else "*.py"), recursive=recursive)
+        all_files = [file if recursive else remove_prefix(where, file).lstrip('/')
+                     for file in all_files_raw]
         sources_files = [
-            file for file in all_files + more_files
+            file for file in all_files
             if self.is_allowed_submodule_file(file)
         ]
         return sources_files
@@ -364,9 +362,13 @@ class DebuggingArtifactChecker(StaticChecker):
         "active use of pdb.set_trace": _TRACE_PATTERN
     }
 
-    def __init__(self, sources_subdir, root_dir=None, debugging_patterns=None):
+    def __init__(self, sources_subdir, root_dir=None, debugging_patterns=None, recursive=True):
         super().__init__(sources_subdir=sources_subdir, root_dir=root_dir)
         self.debugging_patterns = debugging_patterns or self.DEBUGGING_PATTERNS
+        self.recursive = recursive
 
-    def check_for_debugging_patterns(self):
-        confirm_no_uses(where=os.path.join(self.sources_dir, "*.py"), patterns=self.debugging_patterns)
+    def check_for_debugging_patterns(self, recursive=None):
+        confirm_no_uses(where=os.path.join(self.sources_dir, "**/*.py" if self.recursive else "*.py"),
+                        patterns=self.debugging_patterns,
+                        recursive=self.recursive)
+

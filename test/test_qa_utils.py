@@ -1381,21 +1381,6 @@ def test_version_checker_no_changelog():
     MyChangeLogChecker.check_version()
 
 
-def test_version_checker_use_dcicutils_changelog():
-
-    class MyVersionChecker(VersionChecker):
-        PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
-        CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
-
-    MyVersionChecker.check_version()
-
-    class MyChangeLogChecker(ChangeLogChecker):
-        PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
-        CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
-
-    MyChangeLogChecker.check_version()
-
-
 def test_version_checker_with_missing_changelog():
 
     mfs = MockFileSystem(files={'pyproject.toml': '[tool.poetry]\nname = "foo"\nversion = "1.2.3"'})
