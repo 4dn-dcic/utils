@@ -151,6 +151,13 @@ def test_is_allowed_submodule():
     assert DocsChecker.is_allowed_submodule_file("/foo/bar/test_files/helpers.py") is False
     assert DocsChecker.is_allowed_submodule_file("/foo/bar/test_foo.py") is False
 
+    assert DocsChecker.is_allowed_submodule_file("__init__.py") is False
+    assert DocsChecker.is_allowed_submodule_file("__foo__.py") is False
+    assert DocsChecker.is_allowed_submodule_file("_foo.py") is False
+    assert DocsChecker.is_allowed_submodule_file(".foo.py") is False
+    assert DocsChecker.is_allowed_submodule_file("-foo.py") is False
+    assert DocsChecker.is_allowed_submodule_file("4foo.py") is False
+
     assert DocsChecker.is_allowed_submodule_file("/foo/bar/__init__.py") is False
     assert DocsChecker.is_allowed_submodule_file("/foo/bar/__foo__.py") is False
     assert DocsChecker.is_allowed_submodule_file("/foo/bar/_foo.py") is False
@@ -180,7 +187,7 @@ def test_find_uses():
             {'line': '    print("third use", z)',
              'line_number': 11,
              'summary': 'call to print'},
-            {'line': '    import pdb; pdb.set_trace()',
+            {'line': '    import pdb; pdb.set_trace()',  # noQA
              'line_number': 12,
              'summary': 'active use of pdb.set_trace'}
         ],
@@ -188,10 +195,10 @@ def test_find_uses():
             {'line': '    print("third use", z)',
              'line_number': 5,
              'summary': 'call to print'},
-            {'line': '    pdb.set_trace()  # Second tallied use',
+            {'line': '    pdb.set_trace()  # Second tallied use',  # noQA
              'line_number': 13,
              'summary': 'active use of pdb.set_trace'},
-            {'line': '    pdb.set_trace()  # Third tallied use',
+            {'line': '    pdb.set_trace()  # Third tallied use',  # noQA
              'line_number': 17,
              'summary': 'active use of pdb.set_trace'}
         ]
@@ -249,7 +256,7 @@ def test_debugging_artifact_checker():
 
                 with lines_printed_to("foo/bar.py") as out:
                     out('x = 1')
-                    out('import pdb; pdb.set_trace()')
+                    out('import pdb; pdb.set_trace()')  # noQA
                 with pytest.raises(Exception) as exc:
                     dac.check_for_debugging_patterns()
                 assert isinstance(exc.value, AssertionError)
