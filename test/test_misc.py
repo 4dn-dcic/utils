@@ -22,7 +22,7 @@ def test_utils_debugging_artifacts():
     checker = DebuggingArtifactChecker(sources_subdir="dcicutils")
     checker.check_for_debugging_patterns()
 
-    checker = DebuggingArtifactChecker(sources_subdir="test", skip_files="data_files/")
+    checker = DebuggingArtifactChecker(sources_subdir="test", skip_files="data_files/", filter_patterns=['pdb'])
     checker.check_for_debugging_patterns()
 
 

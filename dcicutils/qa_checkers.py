@@ -6,69 +6,13 @@ import toml
 import warnings
 
 from collections import defaultdict
-from typing import Optional, List
+from typing import Optional, List, Dict, Type
+from typing_extensions import Literal
 from .lang_utils import conjoined_list, n_of, there_are
 from .misc_utils import PRINT, remove_prefix, remove_suffix, getattr_customized, CustomizableProperty
 
 
 QA_EXCEPTION_PATTERN = re.compile(r"[#].*\b[N][O][Q][A]\b", re.IGNORECASE)
-
-
-def find_uses(*, where, patterns, skip=None, recursive=True):
-    """
-    In the files specified by where (a glob pattern), finds uses of pattern (a regular expression).
-
-    :param where: a glob pattern
-    :param patterns: a dictionary mapping problem summaries to regular expressions
-    :param recursive: a boolean saying whether to look recursively [UNIMPLEMENTED]
-    """
-
-    checks = []
-    for summary, pattern in patterns.items():
-        checks.append((re.compile(pattern), summary))
-    uses = defaultdict(lambda: [])
-    files = glob.glob(where, recursive=recursive)
-    for file in files:
-        if skip and skip in file:
-            continue
-        with io.open(file, 'r') as fp:
-            line_number = 0
-            for line in fp:
-                line_number += 1
-                for matcher, summary in checks:
-                    if matcher.search(line):
-                        problem_ignorable = QA_EXCEPTION_PATTERN.search(line)
-                        if not problem_ignorable:
-                            uses[file].append({"line_number": line_number, "line": line.rstrip('\n'),
-                                               "summary": summary})
-    return uses
-
-
-def confirm_no_uses(*, where, patterns, skip=None, recursive=True):
-    """
-    In the files specified by where (a glob pattern), finds uses of pattern (a regular expression).
-
-    :param where: a glob pattern
-    :param patterns: dicionary mapping summaries to regular expressions
-    """
-
-    __tracebackhide__ = True
-
-    def summarize(problems):
-        categories = defaultdict(lambda: 0)
-        for problem in problems:
-            categories[problem['summary']] += 1
-        return conjoined_list([n_of(count, category) for category, count in categories.items()])
-
-    uses = find_uses(patterns=patterns, where=where, skip=skip, recursive=recursive)
-    if uses:
-        detail = ""
-        n = 0
-        for file, matches in uses.items():
-            n += len(matches)
-            detail += f"\n In {file}, {summarize(matches)}."
-        message = f"{n_of(n, 'problem')} detected:" + detail
-        raise AssertionError(message)
 
 
 class ChangeLogChecker:
@@ -194,9 +138,9 @@ class StaticChecker:
 
     ROOT_DIR = None
 
-    def __init__(self, sources_subdir, root_dir=None):
-        self.root_dir = os.path.abspath(root_dir or self.ROOT_DIR or os.curdir)
-        self.sources_dir = os.path.abspath(os.path.join(self.root_dir, sources_subdir))
+    def __init__(self, sources_subdir: str, root_dir: Optional[str] = None):
+        self.root_dir: str = os.path.abspath(root_dir or self.ROOT_DIR or os.curdir)
+        self.sources_dir: str = os.path.abspath(os.path.join(self.root_dir, sources_subdir))
         super().__init__()
 
     @classmethod
@@ -370,33 +314,118 @@ class DocsChecker(StaticChecker):
 
 class DebuggingArtifactChecker(StaticChecker):
 
-    _PRINT_PATTERN = "^[^#]*print[(]"
-    _TRACE_PATTERN = "^[^#]*pdb[.]set_trace[(][)]"
+    DEBUGGING_PATTERNS = [
+        {
+            'key': 'print',
+            'summary': "call to print",
+            'pattern': r"^[^#]*print[(]"
+        },
+        {
+            'key': 'pdb',
+            'summary': "active use of pdb.set_trace",
+            'pattern': r"^[^#]*pdb[.]set_trace[(][)]"
+        },
+    ]
 
-    DEBUGGING_PATTERNS = {
-        "call to print": _PRINT_PATTERN,
-        "active use of pdb.set_trace": _TRACE_PATTERN
-    }
-
-    TEST_DEBUGGING_PATTERNS = {
-        "active use of pdb.set_trace": _TRACE_PATTERN
-    }
-
-    def __init__(self, sources_subdir, root_dir=None, debugging_patterns=None, skip_files=None, recursive=True):
+    def __init__(self, sources_subdir: str, *,
+                 root_dir: Optional[str] = None,
+                 debugging_patterns: Optional[List[Dict[Literal['summary', 'key', 'pattern'], str]]] = None,
+                 skip_files: Optional[str] = None,
+                 filter_patterns: Optional[List[str]] = None,
+                 recursive: bool = True,
+                 if_used: Literal['error', 'warning'] = 'error'):
         super().__init__(sources_subdir=sources_subdir, root_dir=root_dir)
-        self.debugging_patterns = debugging_patterns or (
-            self.TEST_DEBUGGING_PATTERNS
-            if 'test' in sources_subdir
-            else self.DEBUGGING_PATTERNS)
-        self.skip_files = skip_files
-        self.recursive = recursive
-        self.sources_pattern = os.path.join(self.sources_dir, '**/*.py' if recursive else '*.py')
+        self._debugging_patterns: List[Dict[str, str]] = (
+            self.DEBUGGING_PATTERNS if debugging_patterns is None else debugging_patterns)
+        self.skip_files: Optional[str] = skip_files
+        self.recursive: bool = recursive
+        self.sources_pattern: str = os.path.join(self.sources_dir, '**/*.py' if recursive else '*.py')
+        self.filter_patterns: Optional[List[str]] = filter_patterns
+        self.if_used = if_used
+
+    @property
+    def debugging_patterns(self) -> Dict[str, str]:
+        return {
+            entry['summary']: entry['pattern']
+            for entry in self._debugging_patterns
+            if self.filter_patterns is None or entry['key'] in self.filter_patterns
+        }
 
     def check_for_debugging_patterns(self):
-
         __tracebackhide__ = True
-
         confirm_no_uses(where=self.sources_pattern,
                         patterns=self.debugging_patterns,
-                        skip=self.skip_files,
-                        recursive=self.recursive)
+                        skip_files=self.skip_files,
+                        recursive=self.recursive,
+                        if_used=self.if_used)
+
+
+def find_uses(*, where: str, patterns: Dict[str, str],
+              skip_files: Optional[str] = None, recursive: bool = True):
+    """
+    In the files specified by where (a glob pattern), finds uses of pattern (a regular expression).
+
+    :param where: a glob pattern
+    :param patterns: a dictionary mapping problem summaries to regular expressions
+    :param skip_files: a regular expression which if found by search in a filename causes the filename to be skipped
+    :param recursive: whether to treat the 'where' pattern as recursive.
+        So, for where='foo', recursive=False means 'foo/*.py' and recursive=True means 'foo/**/*.py'.
+    """
+
+    checks = []
+    for summary, pattern in patterns.items():
+        checks.append((re.compile(pattern), summary))
+    uses = defaultdict(lambda: [])
+    files = glob.glob(where, recursive=recursive)
+    for file in files:
+        if skip_files and re.search(skip_files, file):
+            continue
+        with io.open(file, 'r') as fp:
+            line_number = 0
+            for line in fp:
+                line_number += 1
+                for matcher, summary in checks:
+                    if matcher.search(line):
+                        problem_ignorable = QA_EXCEPTION_PATTERN.search(line)
+                        if not problem_ignorable:
+                            uses[file].append({"line_number": line_number, "line": line.rstrip('\n'),
+                                               "summary": summary})
+    return uses
+
+
+def confirm_no_uses(*, where: str, patterns: Dict[str, str],
+                    skip_files: Optional[str] = None, recursive: bool = True,
+                    if_used: Literal['error', 'warning'] = 'raise',
+                    warning_category: Type[Warning] = SyntaxWarning):
+    """
+    In the files specified by where (a glob pattern), finds uses of pattern (a regular expression).
+
+    :param where: a glob pattern
+    :param patterns: dictionary mapping summaries to regular expressions
+    :param skip_files: a regular expression which if found by search in a filename causes the filename to be skipped
+    :param recursive: whether to treat the 'where' pattern as recursive.
+        So, for where='foo', recursive=False means 'foo/*.py' and recursive=True means 'foo/**/*.py'.
+    :param if_used: either 'error' if an error should be raised, or 'warning' if a warning should be logged
+    :param warning_category: an alternate warning category to use, if if_used='warning' and SyntaxWarning is not desired
+    """
+
+    __tracebackhide__ = True
+
+    def summarize(problems):
+        categories = defaultdict(lambda: 0)
+        for problem in problems:
+            categories[problem['summary']] += 1
+        return conjoined_list([n_of(count, category) for category, count in categories.items()])
+
+    uses = find_uses(patterns=patterns, where=where, skip_files=skip_files, recursive=recursive)
+    if uses:
+        detail = ""
+        n = 0
+        for file, matches in uses.items():
+            n += len(matches)
+            detail += f"\n In {file}, {summarize(matches)}."
+        message = f"{n_of(n, 'problem')} detected:" + detail
+        if if_used == 'warning':
+            warnings.warn(message, category=warning_category, stacklevel=2)
+        else:  # if_used == 'error'
+            raise AssertionError(message)
