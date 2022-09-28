@@ -29,6 +29,8 @@ _MOCK_APPLICATION_OPTIONS_PARTIAL = (
     f"MOCK_USERNAME={_MOCK_SERVICE_USERNAME},MOCK_PASSWORD={_MOCK_SERVICE_PASSWORD},ENV_NAME="
 )
 
+NO_SERVER_FIXTURES = environ_bool("NO_SERVER_FIXTURES")
+
 
 class MockBoto4DNLegacyElasticBeanstalkClient(MockBotoElasticBeanstalkClient):  # noQA - missing some abstract methods
 
@@ -726,6 +728,10 @@ class AbstractIntegratedFixture:
 
     @classmethod
     def initialize_class(cls):
+
+        if NO_SERVER_FIXTURES:
+            return 'NO_SERVER_FIXTURES'
+
         cls.S3_CLIENT = s3_utils.s3Utils(env=cls.ENV_NAME)
         cls.ES_URL = _portal_health_get(portal_url=cls.ENV_PORTAL_URL,
                                         namespace=cls.ENV_INDEX_NAMESPACE,
@@ -743,6 +749,9 @@ class AbstractIntegratedFixture:
 
     @classmethod
     def verify_portal_access(cls, portal_access_key):
+        if NO_SERVER_FIXTURES:
+            return 'NO_SERVER_FIXTURES'
+
         response = authorized_request(
             portal_access_key['server'],
             auth=portal_access_key)

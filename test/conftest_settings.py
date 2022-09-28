@@ -9,3 +9,5 @@ INTEGRATED_ENV = IntegratedFixture.ENV_NAME
 INTEGRATED_ENV_INDEX_NAMESPACE = IntegratedFixture.ENV_INDEX_NAMESPACE
 INTEGRATED_ENV_PORTAL_URL = IntegratedFixture.ENV_PORTAL_URL
 INTEGRATED_ES = IntegratedFixture.ES_URL
+
+REPOSITORY_ROOT_DIR = os.path.dirname(os.path.dirname(__file__))

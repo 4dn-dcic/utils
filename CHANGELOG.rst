@@ -7,6 +7,40 @@ Change Log
 ----------
 
 
+5.2.0
+=====
+
+* Some functionality moved from ``qa_utils`` to ``qa_checkers``.
+  In each case, to be compatible, the ``qa_utils`` module will continue
+  to have the entity availble for import until the next major release.
+
+  * Class ``VersionChecker``
+  * Class ``ChangeLogChecker``
+  * Function ``confirm_no_uses``
+  * Function ``find_uses``
+  * Variable ``QA_EXCEPTION_PATTERN``
+
+  As an official matter, use of these moved entities from by importing
+  them from ``dcicutils.qa_utils`` is deprecated. Please update programs
+  to import these from ``dcicutils.qa_checkers`` instead.
+
+* New functionality in ``qa_checkers``:
+
+  * New class ``DocsChecker``
+  * New class ``DebuggingArtifactChecker``
+
+* In ``misc_utils``:
+
+  * New function ``lines_printed_to``.
+
+* New ``pytest`` marker ``static`` for static tests.
+
+* New ``make`` target ``test-static`` to run tests marked with
+  ``@pytest.mark.static``.
+
+* New GithubActions (GA) workflow: ``static_checks.yml``
+
+
 5.1.0
 =====
 

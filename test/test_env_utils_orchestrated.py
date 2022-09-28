@@ -4,6 +4,7 @@ import json
 import os
 import pytest
 
+from dcicutils.env_base import LegacyController
 from dcicutils.common import APP_CGAP, APP_FOURFRONT  # , LEGACY_GLOBAL_ENV_BUCKET
 from dcicutils.env_manager import EnvManager
 from dcicutils.env_utils import (
@@ -17,12 +18,16 @@ from dcicutils.env_utils import (
     # make_env_name_cfn_compatible,
     get_foursight_bucket, get_foursight_bucket_prefix, ecr_repository_for_env,
     # New support
-    EnvUtils, p, c, get_env_real_url
+    EnvUtils, p, c, get_env_real_url,
+    _make_no_legacy,  # noQA - yes, protected, but we want to test it
+    if_orchestrated, UseLegacy,
 )
-from dcicutils.env_utils_legacy import FF_PRODUCTION_ECR_REPOSITORY
+from dcicutils.env_utils_legacy import (
+    FF_PRODUCTION_ECR_REPOSITORY, blue_green_mirror_env as legacy_blue_green_mirror_env
+)
 from dcicutils.exceptions import (
     BeanstalkOperationNotImplemented,  # MissingFoursightBucketTable, IncompleteFoursightBucketTable,
-    EnvUtilsLoadError,
+    EnvUtilsLoadError, LegacyDispatchDisabled,
 )
 from dcicutils.misc_utils import decorator, local_attrs, ignorable, override_environ
 from dcicutils.qa_utils import raises_regexp
@@ -1774,3 +1779,90 @@ def test_get_config_ecosystem_from_s3():
         expected = ping_ecosystem
         actual = EnvUtils._get_config_ecosystem_from_s3(env_bucket=circular_testing_bucket, config_key='pong.ecosystem')
         assert actual == expected
+
+
+def test_make_no_legacy():
+
+    def foo(a, b, *, c):
+        return [a, b, c]
+
+    foo_prime = _make_no_legacy(foo, 'foo')
+
+    with pytest.raises(NotImplementedError) as exc:
+        foo_prime(3, 4, c=7)
+    assert str(exc.value) == ("There is only an orchestrated version of foo, not a legacy version."
+                              " args=(3, 4) kwargs={'c': 7}")
+
+
+def test_set_declared_data_legacy():
+    with local_attrs(LegacyController, LEGACY_DISPATCH_ENABLED=False):
+        with pytest.raises(LegacyDispatchDisabled) as exc:
+            EnvUtils.set_declared_data({'is_legacy': True})
+        assert str(exc.value) == ('Attempt to use legacy operation set_declared_data'
+                                  ' with args=None kwargs=None mode=load-env.')
+
+
+def test_if_orchestrated_various_legacy_errors():
+
+    def foo(x):
+        return ['foo', x]
+
+    def bar(x):
+        return ['bar', x]
+
+    def baz(x):
+        if x == 99:
+            raise UseLegacy()
+        return ['baz', x]
+
+    with local_attrs(LegacyController, LEGACY_DISPATCH_ENABLED=False):
+        with pytest.raises(LegacyDispatchDisabled) as exc:
+            if_orchestrated(use_legacy=True)(foo)
+        # This error message could be better. The args aren't really involved. But it gets its point across
+        # and anyway it should never happen. We're testing it just for coverage's sake. -kmp 25-Sep-2022
+        assert str(exc.value) == "Attempt to use legacy operation foo with args=None kwargs=None mode=decorate."
+
+    with local_attrs(LegacyController, LEGACY_DISPATCH_ENABLED=True):
+        foo_prime = if_orchestrated(use_legacy=True)(foo)
+        bar_prime = if_orchestrated(unimplemented=True)(bar)
+        baz_prime = if_orchestrated(assumes_cgap=True)(baz)
+
+        with local_attrs(LegacyController, LEGACY_DISPATCH_ENABLED=False):
+            with pytest.raises(NotImplementedError) as exc:
+                foo_prime(3)
+            assert str(exc.value) == ("There is only an orchestrated version of foo,"
+                                      " not a legacy version. args=(3,) kwargs={}")
+
+            with pytest.raises(NotImplementedError) as exc:
+                bar_prime(3)
+            assert str(exc.value) == "Unimplemented: test.test_env_utils_orchestrated.bar"
+
+            with local_attrs(EnvUtils, ORCHESTRATED_APP='cgap'):
+                assert baz_prime(3) == ['baz', 3]
+                with pytest.raises(LegacyDispatchDisabled) as exc:
+                    baz_prime(99)
+                assert str(exc.value) == "Attempt to use legacy operation baz with args=(99,) kwargs={} mode=raised."
+                with local_attrs(LegacyController, LEGACY_DISPATCH_ENABLED=True):
+                    with pytest.raises(NotImplementedError) as exc:
+                        assert baz_prime(3) == ['baz', 3]
+                        baz_prime(99)  # This will try to use the legacy version, which is enabled but doesn't exist.
+                    assert str(exc.value) == ("There is only an orchestrated version of baz,"
+                                              " not a legacy version. args=(99,) kwargs={}")
+            with local_attrs(EnvUtils, ORCHESTRATED_APP='fourfront'):
+                with pytest.raises(NotImplementedError) as exc:
+                    baz_prime(3)
+                assert 'Non-cgap applications are not supported.' in str(exc.value)
+
+            with pytest.raises(LegacyDispatchDisabled) as exc:
+                if_orchestrated(use_legacy=True)(legacy_blue_green_mirror_env)
+            assert str(exc.value) == ("Attempt to use legacy operation blue_green_mirror_env"
+                                      " with args=None kwargs=None mode=decorate.")
+
+        bg = if_orchestrated()(legacy_blue_green_mirror_env)
+        with local_attrs(EnvUtils, IS_LEGACY=True):
+            assert bg('acme-green') == 'acme-blue'
+            with local_attrs(LegacyController, LEGACY_DISPATCH_ENABLED=False):
+                with pytest.raises(LegacyDispatchDisabled) as exc:
+                    assert bg('acme-green') == 'acme-blue'
+                assert str(exc.value) == ("Attempt to use legacy operation blue_green_mirror_env"
+                                          " with args=('acme-green',) kwargs={} mode=dispatch.")
