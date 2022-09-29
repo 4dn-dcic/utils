@@ -729,7 +729,7 @@ class AbstractIntegratedFixture:
     _INITIALIZED = False
 
     @classmethod
-    def initialize_class(cls):
+    def _initialize_class(cls):
 
         if cls._INITIALIZED:
             return cls
@@ -756,10 +756,14 @@ class AbstractIntegratedFixture:
         return cls
 
     @classmethod
-    def verify_portal_access(cls, portal_access_key):
-        cls.initialize_class()
+    def verify_portal_access(cls, portal_access_key=None):
+
         if NO_SERVER_FIXTURES:
             return 'NO_SERVER_FIXTURES'
+
+        cls._initialize_class()
+
+        portal_access_key = portal_access_key or cls.PORTAL_ACCESS_KEY
 
         response = authorized_request(
             portal_access_key['server'],
@@ -769,7 +773,7 @@ class AbstractIntegratedFixture:
                             f' Requesting the homepage gave status of: {response.status_code}')
 
     def __init__(self, name):
-        self.initialize_class()
+        self._initialize_class()
         self.name = name
 
     def __str__(self):

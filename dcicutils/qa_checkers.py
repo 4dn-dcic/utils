@@ -76,6 +76,8 @@ class ChangeLogChecker:
     @classmethod
     def _check_change_history(cls, version=None):
 
+        __tracebackhide__ = True
+
         if version and cls.VERSION_IS_BETA_PATTERN.match(version):
             # Don't require beta versions to match up in change log.
             # We don't just strip the version and look at that because sometimes we use other numbers on betas.
@@ -106,7 +108,7 @@ class ChangeLogChecker:
             if cls.RAISE_ERROR_IF_CHANGELOG_MISMATCH:
                 raise AssertionError(message)
             else:
-                warnings.warn(message, category=cls.WARNING_CATEGORY, stacklevel=2)
+                warnings.warn(message, category=cls.WARNING_CATEGORY, stacklevel=3)
             return
 
 
@@ -327,6 +329,8 @@ class DebuggingArtifactChecker(StaticChecker):
         },
     ]
 
+    WARNING_CATEGORY = SyntaxWarning
+
     def __init__(self, sources_subdir: str, *,
                  root_dir: Optional[str] = None,
                  debugging_patterns: Optional[List[Dict[Literal['summary', 'key', 'pattern'], str]]] = None,
@@ -353,11 +357,16 @@ class DebuggingArtifactChecker(StaticChecker):
 
     def check_for_debugging_patterns(self):
         __tracebackhide__ = True
-        confirm_no_uses(where=self.sources_pattern,
-                        patterns=self.debugging_patterns,
-                        skip_files=self.skip_files,
-                        recursive=self.recursive,
-                        if_used=self.if_used)
+        try:
+            confirm_no_uses(where=self.sources_pattern,
+                            patterns=self.debugging_patterns,
+                            skip_files=self.skip_files,
+                            recursive=self.recursive)
+        except AssertionError as e:
+            if self.if_used == 'warning':
+                warnings.warn(str(e), category=self.WARNING_CATEGORY, stacklevel=2)
+            else:
+                raise
 
 
 def find_uses(*, where: str, patterns: Dict[str, str],
@@ -394,9 +403,7 @@ def find_uses(*, where: str, patterns: Dict[str, str],
 
 
 def confirm_no_uses(*, where: str, patterns: Dict[str, str],
-                    skip_files: Optional[str] = None, recursive: bool = True,
-                    if_used: Literal['error', 'warning'] = 'raise',
-                    warning_category: Type[Warning] = SyntaxWarning):
+                    skip_files: Optional[str] = None, recursive: bool = True):
     """
     In the files specified by where (a glob pattern), finds uses of pattern (a regular expression).
 
@@ -425,7 +432,4 @@ def confirm_no_uses(*, where: str, patterns: Dict[str, str],
             n += len(matches)
             detail += f"\n In {file}, {summarize(matches)}."
         message = f"{n_of(n, 'problem')} detected:" + detail
-        if if_used == 'warning':
-            warnings.warn(message, category=warning_category, stacklevel=2)
-        else:  # if_used == 'error'
-            raise AssertionError(message)
+        raise AssertionError(message)
