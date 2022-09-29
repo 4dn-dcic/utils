@@ -2103,7 +2103,7 @@ def test_get_error_message_and_print_error_message():
 
     empty_dict = {}
 
-    test_error(  # The empty_dict['foo'] will unconditonally err, so we don't need the value to get used
+    test_error(  # The empty_dict['foo'] will unconditionally err, so we don't need the value to get used
                error_descriptor=lambda: empty_dict['foo'],
                # There is no difference between short and long forms for primitive error classes that have no module id.
                expected="KeyError: 'foo'",

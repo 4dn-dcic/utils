@@ -433,7 +433,7 @@ class IniFileManager:
         Args:
             template_file_name (str): The name of the template file to drive the construction.
             init_file_name (str): The name of the .ini file to build.
-            env_bucket (str): The S3 bucket in which informatoin about the env_name and env_ecosystem can be obtained.
+            env_bucket (str): The S3 bucket in which information about the env_name and env_ecosystem can be obtained.
             env_ecosystem (str): The portal ecosystem in which this portal's environment collaborates.
             env_name (str): The portal environment name for which this .ini file should work.
             bs_env (str): The beanstalk environment name for which this .ini file should work. Deprecated. Use env_name.
@@ -567,7 +567,7 @@ class IniFileManager:
         Args:
             template_file_name: The template file to guide the output.
             init_file_stream: A stream to send output to.
-            env_bucket (str): The S3 bucket in which informatoin about the env_name and env_ecosystem can be obtained.
+            env_bucket (str): The S3 bucket in which information about the env_name and env_ecosystem can be obtained.
             env_ecosystem (str): The portal ecosystem in which this portal's environment collaborates.
             env_name (str): The portal environment name for which this .ini file should work.
             bs_env (str): The beanstalk environment name for which this .ini file should work. Deprecated. Use env_name.

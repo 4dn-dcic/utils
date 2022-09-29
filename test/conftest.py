@@ -8,6 +8,10 @@ from dcicutils.ff_mocks import IntegratedFixture
 from .conftest_settings import TEST_DIR, INTEGRATED_ENV
 
 
+IntegratedFixture.initialize_class()
+IntegratedFixture.verify_portal_access(IntegratedFixture.PORTAL_ACCESS_KEY)
+
+
 def _portal_health_get(namespace, portal_url, key):
     healh_json_url = f"{portal_url}/health?format=json"
     response = requests.get(healh_json_url)
