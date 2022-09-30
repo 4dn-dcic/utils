@@ -7,6 +7,20 @@ Change Log
 ----------
 
 
+5.3.0
+=====
+
+`PR 223: Refactored recording tech <https://github.com/4dn-dcic/utils/pull/223>`_
+
+* Refactor ``TestRecorder`` into an ``AbstractTestRecorder`` with two concrete classes,
+  ``RequestsTestRecorder`` and ``AuthorizedRequestsTestRecorder``. The new refactor means
+  it'll be easier to write other subclasses.
+
+  The new classes take their arguments slightly differently, but all test cases are updated,
+  and this was previously broken in (so not used in) other repositories and it can't break
+  anything elsewhere to change the conventions. We're treating this as a simple bug fix.
+
+
 5.2.1
 =====
 
