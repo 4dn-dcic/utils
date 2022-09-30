@@ -47,7 +47,7 @@ class ChangeLogChecker:
     # on particular versions of pytest, and we don't export a delivery
     # constraint of a particular pytest version. So RuntimeWarning is a
     # safer setting for now. -kmp 14-Jan-2021
-    WARNING_CATEGORY = RuntimeWarning
+    WARNING_CATEGORY: Type[Warning] = RuntimeWarning
 
     @classmethod
     def check_version(cls):
@@ -329,7 +329,7 @@ class DebuggingArtifactChecker(StaticChecker):
         },
     ]
 
-    WARNING_CATEGORY = SyntaxWarning
+    WARNING_CATEGORY: Type[Warning] = SyntaxWarning
 
     def __init__(self, sources_subdir: str, *,
                  root_dir: Optional[str] = None,
