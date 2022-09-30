@@ -9,7 +9,7 @@ import time
 
 from botocore.exceptions import ClientError
 from dcicutils import es_utils, ff_utils, s3_utils
-from dcicutils.ff_mocks import mocked_s3utils, TestScenarios, TestRecorder
+from dcicutils.ff_mocks import mocked_s3utils, TestScenarios, RequestsTestRecorder
 from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true
 from dcicutils.qa_utils import (
     check_duplicated_items_by_key, ignored, raises_regexp, MockResponse, MockBoto3, MockBotoSQSClient,
@@ -696,7 +696,7 @@ SAMPLE_RECORD = {
 @pytest.mark.integratedx
 @pytest.mark.flaky
 def test_post_delete_purge_links_metadata_integrated(integrated_ff):
-    with TestRecorder().recorded_requests('test_post_delete_purge_links_metadata', integrated_ff):
+    with RequestsTestRecorder().recorded_requests('test_post_delete_purge_links_metadata', integrated_ff):
         check_post_delete_purge_links_metadata(integrated_ff)
 
 
@@ -704,7 +704,7 @@ def test_post_delete_purge_links_metadata_integrated(integrated_ff):
 def test_post_delete_purge_links_metadata_unit():
     # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
     # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
-    with TestRecorder().replayed_requests('test_post_delete_purge_links_metadata') as mocked_integrated_ff:
+    with RequestsTestRecorder().replayed_requests('test_post_delete_purge_links_metadata') as mocked_integrated_ff:
         check_post_delete_purge_links_metadata(mocked_integrated_ff)
 
 
@@ -778,7 +778,7 @@ def check_post_delete_purge_links_metadata(integrated_ff):
 @pytest.mark.integratedx
 @pytest.mark.flaky
 def test_upsert_metadata_integrated(integrated_ff):
-    with TestRecorder().recorded_requests('test_upsert_metadata', integrated_ff):
+    with RequestsTestRecorder().recorded_requests('test_upsert_metadata', integrated_ff):
         check_upsert_metadata(integrated_ff)
 
 
@@ -786,7 +786,7 @@ def test_upsert_metadata_integrated(integrated_ff):
 def test_upsert_metadata_unit():
     # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
     # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
-    with TestRecorder().replayed_requests('test_upsert_metadata') as mocked_integrated_ff:
+    with RequestsTestRecorder().replayed_requests('test_upsert_metadata') as mocked_integrated_ff:
         check_upsert_metadata(mocked_integrated_ff)
 
 
@@ -1308,7 +1308,7 @@ def test_get_search_facet_values(integrated_ff):
 @pytest.mark.integratedx
 @pytest.mark.flaky
 def test_faceted_search_exp_set_integrated(integrated_ff):
-    with TestRecorder().recorded_requests('test_faceted_search_exp_set', integrated_ff):
+    with RequestsTestRecorder().recorded_requests('test_faceted_search_exp_set', integrated_ff):
         check_faceted_search_exp_set(integrated_ff)
 
 
@@ -1316,7 +1316,7 @@ def test_faceted_search_exp_set_integrated(integrated_ff):
 def test_faceted_search_exp_set_unit():
     # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
     # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
-    with TestRecorder().replayed_requests('test_faceted_search_exp_set') as mocked_integrated_ff:
+    with RequestsTestRecorder().replayed_requests('test_faceted_search_exp_set') as mocked_integrated_ff:
         check_faceted_search_exp_set(mocked_integrated_ff)
 
 
@@ -1442,7 +1442,7 @@ def check_faceted_search_exp_set(integrated_ff):
 @pytest.mark.integratedx
 @pytest.mark.flaky
 def test_faceted_search_users_integrated(integrated_ff):
-    with TestRecorder().recorded_requests('test_faceted_search_users', integrated_ff):
+    with RequestsTestRecorder().recorded_requests('test_faceted_search_users', integrated_ff):
         check_faceted_search_users(integrated_ff)
 
 
@@ -1450,7 +1450,7 @@ def test_faceted_search_users_integrated(integrated_ff):
 def test_faceted_search_users_unit():
     # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
     # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
-    with TestRecorder().replayed_requests('test_faceted_search_users') as mocked_integrated_ff:
+    with RequestsTestRecorder().replayed_requests('test_faceted_search_users') as mocked_integrated_ff:
         check_faceted_search_users(mocked_integrated_ff)
 
 

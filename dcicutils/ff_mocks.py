@@ -19,6 +19,7 @@ from dcicutils.qa_utils import (
     make_mock_beanstalk, make_mock_beanstalk_cname, make_mock_beanstalk_environment_variables,
 )
 from dcicutils.s3_utils import EnvManager
+from typing import Optional, TextIO
 from unittest import mock
 from . import beanstalk_utils, ff_utils, s3_utils, env_utils, env_base, env_manager
 from .common import LEGACY_GLOBAL_ENV_BUCKET
@@ -374,7 +375,7 @@ _MYDIR = os.path.dirname(__file__)
 _TEST_DIR = os.path.join(os.path.dirname(_MYDIR), "test")
 
 
-class TestRecorder:
+class AbstractTestRecorder:
     """
     This allows the web request part of an integration test to be run in a mode where it makes a recording
     that can be played back as an integration test. (Note that this does not mock other elements like s3
@@ -391,13 +392,13 @@ class TestRecorder:
         @pytest.mark.recordable
         @pytest.mark.integratedx
         def test_something_integrated(integrated_ff):
-            with TestRecorder().recorded_requests('test_something', integrated_ff):
+            with MyTestRecorder().recorded_requests('test_something', integrated_ff):
                 # Call common subroutine shared by integrated and unit test
                 check_something(integrated_ff)
 
         @pytest.mark.unit
         def test_something_unit():
-            with TestRecorder().replayed_requests('test_post_delete_purge_links_metadata') as mocked_integrated_ff:
+            with MyTestRecorder().replayed_requests('test_post_delete_purge_links_metadata') as mocked_integrated_ff:
                 # Call common subroutine shared by integrated and unit test
                 check_something(mocked_integrated_ff)
 
@@ -425,11 +426,11 @@ class TestRecorder:
     REAL_REQUEST_VERBS = ff_utils.REQUESTS_VERBS.copy()
 
     def __init__(self, recordings_dir=None):
-        self.recordings_dir = recordings_dir or self.DEFAULT_RECORDINGS_DIR
-        self.recording_enabled = self.RECORDING_ENABLED
-        self.recording_level = 0
-        self.recording_fp = None
-        self.dt = None
+        self.recordings_dir: str = recordings_dir or self.DEFAULT_RECORDINGS_DIR
+        self.recording_enabled: bool = self.RECORDING_ENABLED
+        self.recording_level: int = 0
+        self.recording_fp: Optional[TextIO] = None
+        self.dt: Optional[ControlledTime] = None
 
     @contextlib.contextmanager
     def creating_record(self):
@@ -450,10 +451,16 @@ class TestRecorder:
                                                            check_secondary=check_secondary)
         duration = (datetime.datetime.now() - start).total_seconds()
         duration = math.floor(duration * 10) / 10.0  # round to tenths of a second
-        event = {"verb": 'stuff-in-queues', "url": None,
-                 "data": {"ff_env_index_namespace": ff_env_index_namespace,
-                          "check_secondary": check_secondary},
-                 "duration": duration, "result": result}
+        event = {
+            "verb": 'stuff-in-queues',
+            "url": None,
+            "data": {
+                "ff_env_index_namespace": ff_env_index_namespace,
+                "check_secondary": check_secondary
+            },
+            "duration": duration,
+            "result": result
+        }
         if self.recording_enabled:
             PRINT(f"Recording stuff-in-queues")
             PRINT(json.dumps(event), file=self.recording_fp)
@@ -565,12 +572,19 @@ class TestRecorder:
         else:
             return MockResponse(status_code=expected_event['status'], json=expected_event['result'])
 
-    def copy_integrated_ff_masking_credentials(self, integrated_ff):
+
+class IntegratedTestRecorder(AbstractTestRecorder):
+
+    @classmethod
+    def copy_integrated_ff_masking_credentials(cls, integrated_ff):
         return {
             "ff_key": {"key": "some-key", "secret": "some-secret", "server": integrated_ff["ff_key"]["server"]},
             "ff_env": integrated_ff["ff_env"],
             "ff_env_index_namespace": integrated_ff["ff_env_index_namespace"]
         }
+
+
+class RequestsTestRecorder(IntegratedTestRecorder):
 
     @contextlib.contextmanager
     def recorded_requests(self, test_name, integrated_ff):
@@ -614,8 +628,11 @@ class TestRecorder:
                 with self.mock_replay_stuff_in_queues():
                     yield mocked_integrated_ff
 
+
+class AuthorizedRequestsTestRecorder(IntegratedTestRecorder):
+
     @contextlib.contextmanager
-    def recorded_authorized_requests(self, test_name, integrated_ff):
+    def recorded_requests(self, test_name, integrated_ff):
         with self.setup_recording(test_name=test_name,
                                   initial_context=self.copy_integrated_ff_masking_credentials(integrated_ff)):
 
@@ -631,7 +648,7 @@ class TestRecorder:
                     yield
 
     @contextlib.contextmanager
-    def replayed_authorized_requests(self, test_name, mock_time=False):
+    def replayed_requests(self, test_name, mock_time=False):
         with self.setup_replay(test_name=test_name, mock_time=mock_time) as mocked_integrated_ff:
 
             def mocked_replayed_authorized_request(url, *, verb, **kwargs):
