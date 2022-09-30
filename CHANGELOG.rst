@@ -7,6 +7,30 @@ Change Log
 ----------
 
 
+5.2.1
+=====
+
+`PR 222: Improved IntegratedFixture and static check cleanups <https://github.com/4dn-dcic/utils/pull/222>`_
+
+* Show fewer uninteresting tracebacks on static test failures.
+
+* Small incompatible changes to recently released qa-related items:
+
+  * In ``qa_checkers.confirm_no_uses``, remove the new ``if_used`` argument in favor of a simpler implementation.
+
+  * Slightly rerefactored the class hierarchy so that ``StaticChecker`` is a smaller class that doesn't have quite
+    as much functionality, and ``StaticSourcesChecker`` corresponds to what ``StaticChecker`` previously did.
+
+  Since this is all testing-only, not something used in production, and since there are believed to not yet be uses
+  outside the repo, we're treating this as a bug fix (patch version bump) not an incompatible change (which would
+  entail a major version bump and a lot of fussing for nothing).
+
+* Make class initialization of ``IntegratedFixture`` happen at instance-creation time.
+  That simplifies the loading actions needed. Those can happen in ``conftest.py`` rather than in
+  ``dcicutils.ff_mocks``, which in turn should allow ``dcicutils.ff_mocks`` to be imported without error,
+  fixing `C4-932 <https://hms-dbmi.atlassian.net/browse/C4-932>`_
+
+
 5.2.0
 =====
 
@@ -267,9 +291,11 @@ covering what changed in 4.0, which is considerably more.
   * ``test-for-ga`` is an indirect way to call ``test-units-with-coverage``, and will be what the GithubActions
     workflow calls.
 
-* Configurable environmental support for orchestrated C4 applications (Fourfront and CGAP) in ``env_utils`` (C4-689).
+* Configurable environmental support for orchestrated C4 applications (Fourfront and CGAP) in ``env_utils``
+  (`C4-689 <https://hms-dbmi.atlassian.net/browse/C4-689>`_).
 
-* Extend that support to allow mirroring to be enabled (C4-734).
+* Extend that support to allow mirroring to be enabled
+  (`C4-734 <https://hms-dbmi.atlassian.net/browse/C4-734>`_).
 
 The net result is a configurable environment in which the env descriptor in the global env bucket can contain
 these new items:
@@ -800,14 +826,16 @@ Specifics:
 
 * Removes support for previously-deprecated variable ``GOLDEN_DB`` which only ``torb`` was still using.
   ``_FF_GOLDEN_DB`` could be used as a direct replacement in an emergency,
-  but only for legacy environments. This is not a good solution for orchestrated environments (C4-689).
+  but only for legacy environments. This is not a good solution for orchestrated environments
+  (`C4-689 <https://hms-dbmi.atlassian.net/browse/C4-689>`_).
 
 * The variables ``FF_MAGIC_CNAME``, ``CGAP_MAGIC_CNAME``, ``FF_GOLDEN_DB``, and ``CGAP_GOLDEN_DB``,
   which had no uses outside of ``dcicutils`` itself,
   now have underscores ahead of their names to emphasize that they are internal to ``dcicutils`` only.
   ``_FF_MAGIC_CNAME``, ``_CGAP_MAGIC_CNAME``, ``_FF_GOLDEN_DB``, and ``_CGAP_GOLDEN_DB``, respectively,
   could be used as a direct replacement in an emergency,
-  but only for legacy environments. This is not a good solution for orchestrated environments (C4-689).
+  but only for legacy environments. This is not a good solution for orchestrated environments
+  (`C4-689 <https://hms-dbmi.atlassian.net/browse/C4-689>`_).
 
 * The function name ``use_input`` has been renamed ``prompt_for_input`` and the preferred place to
   import it from is now ``misc_utils``, not ``beanstalk_utils``. (This is just a synonym for the
@@ -868,8 +896,8 @@ Specifics:
 2.3.1
 =====
 
-* In ``s3_utils``, fix C4-706, where short names of environments were not accepted
-  as env arguments to s3Utils in legacy CGAP.
+* In ``s3_utils``, fix `C4-706 <https://hms-dbmi.atlassian.net/browse/C4-706>`_,
+  where short names of environments were not accepted as env arguments to s3Utils in legacy CGAP.
 
 
 2.3.0
@@ -1028,7 +1056,7 @@ Specifics:
 2.0.0
 =====
 
-**PR 150: Add json_leaf_subst, conjoined_list and disjoined_list**
+`PR 150: Add json_leaf_subst, conjoined_list and disjoined_list <https://github.com/4dn-dcic/utils/pull/150>`_
 
 We do not believe this is an incompatible major version, but there is a lot here, an hence some opportunity for
 difference in behavior to have crept in. As such, we opted to call this a new major version to highlight where
@@ -1127,7 +1155,7 @@ that big change happened.
 1.20.0
 ======
 
-**PR 148: Support auth0 client and secret in deployment_utils**
+`PR 148: Support auth0 client and secret in deployment_utils <https://github.com/4dn-dcic/utils/pull/148>`_
 
 * In ``deployment_utils``, add support for managing auth0 client and secret:
 
@@ -1146,8 +1174,8 @@ that big change happened.
 1.19.0
 ======
 
-**PR 147: Init s3Utils via GLOBAL_ENV_BUCKET and misc S3_BUCKET_ORG support (C4-554)**
-**PR 146: Better S3 bucket management in deployment_utils**
+`PR 147: Init s3Utils via GLOBAL_ENV_BUCKET and misc S3_BUCKET_ORG support (C4-554) <https://github.com/4dn-dcic/utils/pull/147>`_
+`PR 146: Better S3 bucket management in deployment_utils <https://github.com/4dn-dcic/utils/pull/146>`_
 
 * In ``cloudformation_utils``:
 
@@ -1231,7 +1259,7 @@ that big change happened.
 1.18.1
 ======
 
-**PR 145: Fix internal import problems**
+`PR 145: Fix internal import problems <https://github.com/4dn-dcic/utils/pull/145>`_
 
 * Make ``lang_utils`` import ``ignored`` from ``misc_utils``, not ``qa_utils``.
 * Make ``deployment_utils`` import ``override_environ`` from ``misc_utils``, not ``qa_utils``.
@@ -1242,7 +1270,7 @@ that big change happened.
 1.18.0
 ======
 
-**PR 141: Port Application Dockerization utils**
+`PR 141: Port Application Dockerization utils <https://github.com/4dn-dcic/utils/pull/141>`_
 
 * Add additional ECS related APIs needed for orchestration/deployment.
 
@@ -1250,7 +1278,7 @@ that big change happened.
 1.17.0
 ======
 
-**PR 144: Add known_bug_expected and related support**
+`PR 144: Add known_bug_expected and related support <https://github.com/4dn-dcic/utils/pull/144>`_
 
 * In ``misc_utils``:
 
@@ -1278,7 +1306,7 @@ that big change happened.
 1.16.0
 ======
 
-**PR 142: Move override_environ and override_dict to misc_utils**
+`PR 142: Move override_environ and override_dict to misc_utils <https://github.com/4dn-dcic/utils/pull/142>`_
 
 * In ``misc_utils``:
 
@@ -1299,7 +1327,7 @@ that big change happened.
 1.15.1
 ======
 
-**PR 138: JH Docker Mount Update**
+`PR 138: JH Docker Mount Update <https://github.com/4dn-dcic/utils/pull/138>`_
 
 * In ``jh_utils.find_valid_file_or_extra_file``,
   account for file metadata containing an
@@ -1309,7 +1337,7 @@ that big change happened.
 1.15.0
 ======
 
-**PR 140: Add misc_utils.is_valid_absolute_uri (C4-651)**
+`PR 140: Add misc_utils.is_valid_absolute_uri (C4-651) <https://github.com/4dn-dcic/utils/pull/140>`_
 
 * Adds ``misc_utils.is_valid_absolute_uri``
   for RFC 3986 compliance.
@@ -1318,7 +1346,7 @@ that big change happened.
 1.14.1
 ======
 
-**PR 139: Add ES cluster resize capability**
+`PR 139: Add ES cluster resize capability <https://github.com/4dn-dcic/utils/pull/139>`_
 
 * Adds ElasticSearchServiceClient, a wrapper for boto3.client('es')
 * Implements resize_elasticsearch_cluster, issuing an update to the relevant settings
@@ -1329,7 +1357,7 @@ that big change happened.
 1.14.0
 ======
 
-**PR 137: Docker, ECR, ECS Utils**
+`PR 137: Docker, ECR, ECS Utils <https://github.com/4dn-dcic/utils/pull/137>`_
 
 * Adds 3 new modules with basic functionality needed for further development on the alpha stack
 * Deprecates Python 3.4
@@ -1338,7 +1366,7 @@ that big change happened.
 1.13.0
 ======
 
-**PR 136: Support for VirtualApp.post**
+`PR 136: Support for VirtualApp.post <https://github.com/4dn-dcic/utils/pull/136>`_
 
 * Add a ``post`` method to ``VirtualApp`` for situations where ``post_json``
   is not appropriate.
@@ -1348,7 +1376,7 @@ that big change happened.
 1.12.0
 ======
 
-**PR 135: Support for ElasticSearchDataCache**
+`PR 135: Support for ElasticSearchDataCache <https://github.com/4dn-dcic/utils/pull/135>`_
 
 * Support for ``ElasticSearchDataCache`` and the ``es_data_cache`` decorator
   in the new ``snapshot_utils`` module to allow local snapshot isolation on
@@ -1377,7 +1405,7 @@ that big change happened.
 1.11.2
 ======
 
-**PR 134: Fixes to env_utils.data_set_for_env for CGAP (C4-634)**
+`PR 134: Fixes to env_utils.data_set_for_env for CGAP (C4-634) <https://github.com/4dn-dcic/utils/pull/134>`_
 
 * Fix ``env_utils.data_set_for_env`` which were returning ``'test'``
   for ``fourfront-cgapwolf`` and ``fourfront-cgaptest``.
@@ -1387,7 +1415,7 @@ that big change happened.
 1.11.1
 ======
 
-**PR 133: Fix ControlledTime.utcnow on AWS (C4-623)**
+`PR 133: Fix ControlledTime.utcnow on AWS (C4-623) <https://github.com/4dn-dcic/utils/pull/133>`_
 
 * Fix ``qa_utils.ControlledTime.utcnow`` on AWS (C4-623).
 
@@ -1395,7 +1423,7 @@ that big change happened.
 1.11.0
 ======
 
-**PR 132: Miscellaneous support for cgap-portal, and some unit testing (part of C4-601)**
+`PR 132: Miscellaneous support for cgap-portal, and some unit testing (part of C4-601) <https://github.com/4dn-dcic/utils/pull/132>`_
 
 * For ``jh_utils``:
 
@@ -1415,7 +1443,7 @@ that big change happened.
 1.10.0
 ======
 
-**PR 131: Misc functionality in service of C4-183**
+`PR 131: Misc functionality in service of C4-183 <https://github.com/4dn-dcic/utils/pull/131>`_
 
 * In ``dcicutils.misc_utils``:
 
@@ -1427,7 +1455,7 @@ that big change happened.
 
 1.9.2
 =====
-**PR 130: Fix bug that sometimes results in duplicated search results (C4-336)**
+`PR 130: Fix bug that sometimes results in duplicated search results (C4-336) <https://github.com/4dn-dcic/utils/pull/130>`_
 
 * Fixes bug C4-336, in which sometimes ``ff_utils.search_metadata``, by doing a series of
   Elastic Search calls that it pastes together into a single result,
@@ -1437,7 +1465,7 @@ that big change happened.
 1.9.1
 =====
 
-**PR 129: Fix problematic pytest dependency (C4-521)**
+`PR 129: Fix problematic pytest dependency (C4-521) <https://github.com/4dn-dcic/utils/pull/129>`_
 
 * Fix problem in 1.9.0 with unwanted dependency on
   ``pytest.PytestConfigWarning`` (C4-521).
@@ -1448,7 +1476,7 @@ that big change happened.
 1.9.0
 =====
 
-**PR 128: Changelog Warnings (C4-511) and Publish Fixes (C4-512)**
+`PR 128: Changelog Warnings (C4-511) and Publish Fixes (C4-512) <https://github.com/4dn-dcic/utils/pull/128>`_
 
 * Make changelog problems issue a warning rather than fail testing.
 * Make publication for GitHub Actions (GA) not query interactively for confirmation.
@@ -1465,52 +1493,58 @@ Those tests were refactored, and the following additional support was added:
 1.8.4
 =====
 
-**PR 127: Beanstalk Bugfix**
+`PR 127: Beanstalk Bugfix <https://github.com/4dn-dcic/utils/pull/127>`_
 
 * Parses Beanstalk API correctly and passes region.
+
 
 1.8.3
 =====
 
 **No PR: Just fixes to GA PyPi deploy**
 
+
 1.8.2
 =====
 
-**PR 126: C4-503 Grab Environment API**
+`PR 126: C4-503 Grab Environment API <https://github.com/4dn-dcic/utils/pull/126>`_
 
 * Adds get_beanstalk_environment_variables, which will return information
   necessary to simulate any application given the caller has the appropriate
   access keys.
 * Removes an obsolete tag from create_db_snapshot, which was set erroneously.
 
+
 1.8.1
 =====
 
-**PR 125: Edits to getting_started doc**
+`PR 125: Edits to getting_started doc <https://github.com/4dn-dcic/utils/pull/125>`_
 
 * Edited getting_started.rst doc to reflect updated account creation protocol.
+
 
 1.8.0
 =====
 
-**PR 124: Add url_path_join**
+`PR 124: Add url_path_join <https://github.com/4dn-dcic/utils/pull/124>`_
 
 * Add ``misc_utils.url_path_join`` for merging parts of URLs.
 * Add ``make retest`` to rerun failed tests from previous test run.
 
+
 1.7.1
 =====
 
-**PR 123: Add GA for build**
+`PR 123: Add GA for build <https://github.com/4dn-dcic/utils/pull/123>`_
 
 * Adds 3 Github Actions for building the library, building docs
   and deploying to PyPi
 
+
 1.7.0
 =====
 
-**PR 122: Speed up ff_utils unit tests, and misc small bits of functionality**
+`PR 122: Speed up ff_utils unit tests, and misc small bits of functionality <https://github.com/4dn-dcic/utils/pull/122>`_
 
 * Added an ``integratedx`` mark to possible marks in ``pytest.ini``. These
   are the same as ``integrated`` but they represent test cases that have
@@ -1559,7 +1593,7 @@ Those tests were refactored, and the following additional support was added:
 1.6.0
 =====
 
-**PR 121: More time functions**
+`PR 121: More time functions <https://github.com/4dn-dcic/utils/pull/121>`_
 
 In ``misc_utils``:
 
@@ -1578,7 +1612,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.5.1
 =====
 
-**PR 120: Update ES-py Version**
+`PR 120: Update ES-py Version <https://github.com/4dn-dcic/utils/pull/120>`_
 
 * Updates elasticsearch library to 6.8.1 to take a bug fix.
 
@@ -1586,7 +1620,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.5.0
 =====
 
-**PR 119: More env_utils support**
+`PR 119: More env_utils support** <https://github.com/4dn-dcic/utils/pull/119>`_
 
 * Add ``env_utils.classify_server_url``.
 
@@ -1594,7 +1628,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.4.0
 =====
 
-**PR 118: Various bits of functionality in support of 4dn-status (C4-363)**
+`PR 118: Various bits of functionality in support of 4dn-status (C4-363) <https://github.com/4dn-dcic/utils/pull/118>`_
 
 * New feature in ``qa_utils``:
 
@@ -1616,7 +1650,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.3.1
 =====
 
-**PR 117: Repair handling of sentry_dsn in deployment_utils (C4-361)**
+`PR 117: Repair handling of sentry_dsn in deployment_utils (C4-361) <https://github.com/4dn-dcic/utils/pull/117>`_
 
 * Fixes to ``deployment_utils``:
 
@@ -1638,7 +1672,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.3.0
 =====
 
-**PR 115: Miscellaneous fixes 2020-10-06**
+`PR 115: Miscellaneous fixes 2020-10-06 <https://github.com/4dn-dcic/utils/pull/115>`_
 
 * Fix a lurking bug in ``beanstalk_utils`` where ``delete_db`` had the wrong scope.
 * Add ``qa_utils.raises_regexp`` for conceptual compatibility with ``AssertRaises`` in ``unittest``.
@@ -1658,7 +1692,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.2.1
 =====
 
-**PR 114: Port some utility**
+`PR 114: Port some utility <https://github.com/4dn-dcic/utils/pull/114>`_
 
 * New ``ff_utils`` functions
   for common pages/info we'd like to obtain:
@@ -1672,7 +1706,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.2.0
 =====
 
-**PR 113: Deprecations, updates + CNAME swap**
+`PR 113: Deprecations, updates + CNAME swap <https://github.com/4dn-dcic/utils/pull/113>`_
 
 * Implements an ``obsolete`` decorator,
   applied to many functions in ``beanstalk_utils``.
@@ -1680,7 +1714,8 @@ The rationale for these changes is that if we deploy at other locations, it may 
   that do not work with ES6
 * Pull full ``CNAME`` swap code from ``Torb`` into ``dcicutils``.
 
-**PR 112: Miscellaneous utilities ported from cgap-portal and SubmitCGAP repos**
+
+`PR 112: Miscellaneous utilities ported from cgap-portal and SubmitCGAP repos <https://github.com/4dn-dcic/utils/pull/112>`_
 
 This still has a beta version number 1.1.0b1.
 
@@ -1695,7 +1730,8 @@ Ported functionality from ``cgap-portal`` and ``SubmitCGAP`` repos:
   argument without calling ``len``.
 * Tests for ``misc_utils.VirtualApp.put_json``.
 
-**PR 111: ES6 - Fix create_es_client**
+
+`PR 111: ES6 - Fix create_es_client <https://github.com/4dn-dcic/utils/pull/111>`_
 
 This is a major change, with beta version number 1.0.0.b1:
 
@@ -1705,7 +1741,7 @@ This is a major change, with beta version number 1.0.0.b1:
 0.41.0
 ======
 
-**PR 110: Add VirtualApp.put_json (C4-272)**
+`PR 110: Add VirtualApp.put_json (C4-272) <https://github.com/4dn-dcic/utils/pull/110>`_
 
 * Add ``misc_utils.VirtualApp.put_json``.
 

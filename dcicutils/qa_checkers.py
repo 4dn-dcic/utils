@@ -15,7 +15,23 @@ from .misc_utils import PRINT, remove_prefix, remove_suffix, getattr_customized,
 QA_EXCEPTION_PATTERN = re.compile(r"[#].*\b[N][O][Q][A]\b", re.IGNORECASE)
 
 
-class ChangeLogChecker:
+class StaticChecker:
+
+    ROOT_DIR = None
+
+    # I wanted to use pytest.PytestConfigWarning, but that creates a dependency
+    # on particular versions of pytest, and we don't export a delivery
+    # constraint of a particular pytest version. So RuntimeWarning is a
+    # safer setting for now. -kmp 14-Jan-2021
+
+    WARNING_CATEGORY: Type[Warning] = SyntaxWarning
+
+    def __init__(self, root_dir: Optional[str] = None):
+        super().__init__()
+        self.root_dir: str = os.path.abspath(root_dir or self.ROOT_DIR or os.curdir)
+
+
+class ChangeLogChecker(StaticChecker):
 
     """
     Given appropriate customizations, this allows cross-checking of pyproject.toml and a changelog for consistency.
@@ -24,7 +40,7 @@ class ChangeLogChecker:
     (unless that version is a beta).
 
     If the class variable RAISE_ERROR_IF_CHANGELOG_MISMATCH is set to False, as is the case in
-    subclass VersionChecker, only a warning (of a kind given by WARNING_CATEGORY) will be generated,
+    subclass VersionChecker, only a warning (of a kind given by cls.WARNING_CATEGORY) will be generated,
     not an error, so use that subclass if you don't want hard errors for version inconsistency.
 
     You must subclass this class, specifying both the pyproject filename and the changelog filename as
@@ -42,12 +58,6 @@ class ChangeLogChecker:
 
     PYPROJECT = CustomizableProperty('PYPROJECT', description="The repository-relative name of the pyproject file.")
     CHANGELOG = CustomizableProperty('CHANGELOG', description="The repository-relative name of the change log.")
-
-    # I wanted to use pytest.PytestConfigWarning, but that creates a dependency
-    # on particular versions of pytest, and we don't export a delivery
-    # constraint of a particular pytest version. So RuntimeWarning is a
-    # safer setting for now. -kmp 14-Jan-2021
-    WARNING_CATEGORY: Type[Warning] = RuntimeWarning
 
     @classmethod
     def check_version(cls):
@@ -117,7 +127,7 @@ class VersionChecker(ChangeLogChecker):
     """
     Given appropriate customizations, this allows cross-checking of pyproject.toml and a changelog for consistency.
 
-    By default, a warning (of a kind given by WARNING_CATEGORY) will be generated, not an error, if the change
+    By default, a warning (of a kind given by cls.WARNING_CATEGORY) will be generated, not an error, if the change
     log is not consistent. If you want a hard error, use the superclass ChangeLogChecker.
 
     You must subclass this class, specifying both the pyproject filename and the changelog filename as
@@ -136,14 +146,11 @@ class VersionChecker(ChangeLogChecker):
     RAISE_ERROR_IF_CHANGELOG_MISMATCH = False
 
 
-class StaticChecker:
-
-    ROOT_DIR = None
+class StaticSourcesChecker(StaticChecker):
 
     def __init__(self, sources_subdir: str, root_dir: Optional[str] = None):
-        self.root_dir: str = os.path.abspath(root_dir or self.ROOT_DIR or os.curdir)
+        super().__init__(root_dir=root_dir)
         self.sources_dir: str = os.path.abspath(os.path.join(self.root_dir, sources_subdir))
-        super().__init__()
 
     @classmethod
     def compute_sources_files(cls, *, where, recursive, base_only: Optional[bool] = None) -> List[str]:
@@ -163,7 +170,7 @@ class StaticChecker:
         return all_files
 
 
-class DocsChecker(StaticChecker):
+class DocsChecker(StaticSourcesChecker):
 
     SKIP_SUBMODULES: List[str] = []
 
@@ -314,7 +321,7 @@ class DocsChecker(StaticChecker):
                 raise AssertionError(message)
 
 
-class DebuggingArtifactChecker(StaticChecker):
+class DebuggingArtifactChecker(StaticSourcesChecker):
 
     DEBUGGING_PATTERNS = [
         {
@@ -328,8 +335,6 @@ class DebuggingArtifactChecker(StaticChecker):
             'pattern': r"^[^#]*pdb[.]set_trace[(][)]"
         },
     ]
-
-    WARNING_CATEGORY: Type[Warning] = SyntaxWarning
 
     def __init__(self, sources_subdir: str, *,
                  root_dir: Optional[str] = None,
@@ -412,8 +417,6 @@ def confirm_no_uses(*, where: str, patterns: Dict[str, str],
     :param skip_files: a regular expression which if found by search in a filename causes the filename to be skipped
     :param recursive: whether to treat the 'where' pattern as recursive.
         So, for where='foo', recursive=False means 'foo/*.py' and recursive=True means 'foo/**/*.py'.
-    :param if_used: either 'error' if an error should be raised, or 'warning' if a warning should be logged
-    :param warning_category: an alternate warning category to use, if if_used='warning' and SyntaxWarning is not desired
     """
 
     __tracebackhide__ = True
