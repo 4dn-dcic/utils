@@ -17,6 +17,7 @@ build:  # builds
 
 test:  # runs default tests, which are the unit tests
 	make test-units
+	make test-static
 
 test-for-ga:
 	poetry run flake8 dcicutils
@@ -72,6 +73,7 @@ test-static:
 	@git log -1 --decorate | head -1
 	@date
 	poetry run pytest -vv -r w -m "static"
+	poetry run flake8 dcicutils
 	@git log -1 --decorate | head -1
 	@date
 
