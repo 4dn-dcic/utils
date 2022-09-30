@@ -700,6 +700,7 @@ def test_post_delete_purge_links_metadata_integrated(integrated_ff):
         check_post_delete_purge_links_metadata(integrated_ff)
 
 
+@pytest.mark.recorded
 @pytest.mark.unit
 def test_post_delete_purge_links_metadata_unit():
     # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
@@ -782,6 +783,7 @@ def test_upsert_metadata_integrated(integrated_ff):
         check_upsert_metadata(integrated_ff)
 
 
+@pytest.mark.recorded
 @pytest.mark.unit
 def test_upsert_metadata_unit():
     # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
@@ -1312,6 +1314,7 @@ def test_faceted_search_exp_set_integrated(integrated_ff):
         check_faceted_search_exp_set(integrated_ff)
 
 
+@pytest.mark.recorded
 @pytest.mark.unit
 def test_faceted_search_exp_set_unit():
     # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
@@ -1446,6 +1449,7 @@ def test_faceted_search_users_integrated(integrated_ff):
         check_faceted_search_users(integrated_ff)
 
 
+@pytest.mark.recorded
 @pytest.mark.unit
 def test_faceted_search_users_unit():
     # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,

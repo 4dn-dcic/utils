@@ -393,6 +393,7 @@ class TestRecorder:
                 # Call common subroutine shared by integrated and unit test
                 check_something(integrated_ff)
 
+        @pytest.mark.recorded
         @pytest.mark.unit
         def test_something_unit():
             with TestRecorder().replayed_requests('test_post_delete_purge_links_metadata') as mocked_integrated_ff:
