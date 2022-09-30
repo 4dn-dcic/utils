@@ -393,6 +393,7 @@ class TestRecorder:
                 # Call common subroutine shared by integrated and unit test
                 check_something(integrated_ff)
 
+        @pytest.mark.recorded
         @pytest.mark.unit
         def test_something_unit():
             with TestRecorder().replayed_requests('test_post_delete_purge_links_metadata') as mocked_integrated_ff:
@@ -523,7 +524,7 @@ class TestRecorder:
                         PRINT(f"Consuming replay record {parsed_json.get('verb')} {parsed_json.get('url')}")
                     return parsed_json
 
-                # Read back initial record with sufficient integratoin context information for replaying
+                # Read back initial record with sufficient integration context information for replaying
                 mocked_integrated_ff = get_next_json()
 
                 def mock_replayed(verb):
@@ -656,7 +657,7 @@ class TestRecorder:
                         PRINT(f"Consuming replay record {parsed_json.get('verb')} {parsed_json.get('url')}")
                     return parsed_json
 
-                # Read back initial record with sufficient integratoin context information for replaying
+                # Read back initial record with sufficient integration context information for replaying
                 mocked_integrated_ff = get_next_json()
 
                 def mocked_replayed_authorized_request(url, *, verb, **kwargs):
@@ -726,10 +727,14 @@ class AbstractIntegratedFixture:
     HIGLASS_ACCESS_KEY = None
     INTEGRATED_FF_ITEMS = None
 
-    @classmethod
-    def initialize_class(cls):
+    _INITIALIZED = False
 
-        if NO_SERVER_FIXTURES:
+    @classmethod
+    def _initialize_class(cls):
+
+        if cls._INITIALIZED:
+            return cls
+        elif NO_SERVER_FIXTURES:
             return 'NO_SERVER_FIXTURES'
 
         cls.S3_CLIENT = s3_utils.s3Utils(env=cls.ENV_NAME)
@@ -747,10 +752,19 @@ class AbstractIntegratedFixture:
             'es_url': cls.ES_URL,
         }
 
+        cls._INITIALIZED = True
+
+        return cls
+
     @classmethod
-    def verify_portal_access(cls, portal_access_key):
+    def verify_portal_access(cls, portal_access_key=None):
+
         if NO_SERVER_FIXTURES:
             return 'NO_SERVER_FIXTURES'
+
+        cls._initialize_class()
+
+        portal_access_key = portal_access_key or cls.PORTAL_ACCESS_KEY
 
         response = authorized_request(
             portal_access_key['server'],
@@ -760,6 +774,7 @@ class AbstractIntegratedFixture:
                             f' Requesting the homepage gave status of: {response.status_code}')
 
     def __init__(self, name):
+        self._initialize_class()
         self.name = name
 
     def __str__(self):
@@ -800,7 +815,3 @@ class IntegratedFixture(AbstractIntegratedFixture):
     ENV_NAME = 'fourfront-mastertest'
     ENV_INDEX_NAMESPACE = 'fourfront-mastertest'
     ENV_PORTAL_URL = 'https://mastertest.4dnucleome.org'
-
-
-IntegratedFixture.initialize_class()
-IntegratedFixture.verify_portal_access(IntegratedFixture.PORTAL_ACCESS_KEY)

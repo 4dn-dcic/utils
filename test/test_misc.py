@@ -9,6 +9,8 @@ from .conftest_settings import REPOSITORY_ROOT_DIR
 @pytest.mark.static
 def test_utils_doc():
 
+    __tracebackhide__ = True
+
     class UtilsDocsChecker(DocsChecker):
         SKIP_SUBMODULES = ['jh_utils', 'env_utils_legacy']
 
@@ -19,7 +21,10 @@ def test_utils_doc():
 
 @pytest.mark.static
 def test_utils_debugging_artifacts():
-    checker = DebuggingArtifactChecker(sources_subdir="dcicutils")
+
+    __tracebackhide__ = True
+
+    checker = DebuggingArtifactChecker(sources_subdir="dcicutils", if_used='warning')
     checker.check_for_debugging_patterns()
 
     checker = DebuggingArtifactChecker(sources_subdir="test", skip_files="data_files/", filter_patterns=['pdb'])
@@ -28,6 +33,8 @@ def test_utils_debugging_artifacts():
 
 @pytest.mark.static
 def test_changelog_consistency():
+
+    __tracebackhide__ = True
 
     class MyChangeLogChecker(ChangeLogChecker):
         PYPROJECT = os.path.join(REPOSITORY_ROOT_DIR, "pyproject.toml")

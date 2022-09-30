@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "5.2.0"
+version = "5.2.1"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -85,6 +85,7 @@ markers = [
   "static: mark as a test that is testing the static form of code, not its runtime functionality",
   "stg_or_prd_testing_needs_repair: some or all of a test that was failing on stg/prd has been temporarily disabled",
   "recordable: uses recording technology so that if RECORDING_ENABLED=TRUE, a new test recording is made",
+  "recorded: a test in which previously recorded values will be used in place of certain external callouts",
 ]
 norecursedirs = ["*env", "site-packages", ".cache", ".git", ".idea", "*.egg-info"]
 # We don't use pytest-pep8, but if we ever did, its pep8xxx options could be specified here, as in:
