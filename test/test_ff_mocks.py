@@ -2,8 +2,8 @@ import pytest
 
 from dcicutils import ff_mocks as ff_mocks_module
 from dcicutils.ff_mocks import AbstractIntegratedFixture, AbstractTestRecorder
-from dcicutils.misc_utils import ignored
-from dcicutils.qa_utils import MockResponse
+from dcicutils.misc_utils import ignored, local_attrs
+from dcicutils.qa_utils import MockResponse, MockFileSystem, ControlledTime
 # from dcicutils.s3_utils import s3Utils
 from unittest import mock
 
@@ -62,7 +62,7 @@ def test_abstract_integrated_fixture_misc():
         assert repr(MyIntegratedFixture('bar')) == "MyIntegratedFixture(name='bar')"
 
 
-def test_abstract_test_recorder_misc():
+def test_abstract_test_recorder_context_managers():
 
     r = AbstractTestRecorder()
 
@@ -73,3 +73,49 @@ def test_abstract_test_recorder_misc():
     with pytest.raises(NotImplementedError):
         with r.replayed_requests('foo', None):
             pass
+
+
+def test_abstract_test_recorder_recording_enabled_and_recording_level():
+
+    r = AbstractTestRecorder()
+
+    assert r.recording_level == 0
+    assert not r.recording_enabled
+    with r.creating_record():
+        assert r.recording_level == 1
+        assert not r.recording_enabled
+    assert r.recording_level == 0
+    assert not r.recording_enabled
+
+    with local_attrs(r, recording_enabled=True):
+        assert r.recording_level == 0
+        assert r.recording_enabled
+        with r.creating_record():
+            assert r.recording_level == 1
+            assert not r.recording_enabled
+        assert r.recording_level == 0
+        assert r.recording_enabled
+
+    assert r.recording_level == 0
+    assert not r.recording_enabled
+
+
+def test_abstract_test_recorder_playback():
+
+    r = AbstractTestRecorder('foo')
+    r.dt = ControlledTime()
+
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove():
+
+        with mock.patch.object(r, "get_next_json") as mock_get_next_json:
+            datum2, datum1 = data_stack = [{'verb': 'GET', 'url': 'http://foo', 'duration': 10,
+                                            'status': 200, 'result': "some-result"},
+                                           {'verb': 'GET', 'url': 'http://bar', 'duration': 20,
+                                            'status': 200, 'result': "another-result"}]
+            mock_get_next_json.side_effect = lambda: data_stack.pop()
+            r.do_mocked_replay(datum1['verb'], datum1['url'])
+            r.do_mocked_replay(datum2['verb'], datum2['url'])
+
+        assert mfs.files == {}
