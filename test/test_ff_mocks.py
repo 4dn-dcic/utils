@@ -110,12 +110,25 @@ def test_abstract_test_recorder_playback():
     with mfs.mock_exists_open_remove():
 
         with mock.patch.object(r, "get_next_json") as mock_get_next_json:
-            datum2, datum1 = data_stack = [{'verb': 'GET', 'url': 'http://foo', 'duration': 10,
-                                            'status': 200, 'result': "some-result"},
-                                           {'verb': 'GET', 'url': 'http://bar', 'duration': 20,
-                                            'status': 200, 'result': "another-result"}]
+            datum3, datum2, datum1 = data_stack = [
+                {'verb': 'GET', 'url': 'http://baz', 'duration': 15, 'status': 400,
+                 'error_type': 'Exception', 'error_message': 'ouch'},
+                {'verb': 'GET', 'url': 'http://foo', 'duration': 10, 'status': 200, 'result': "omega"},
+                {'verb': 'GET', 'url': 'http://bar', 'duration': 20, 'status': 200, 'result': 'alpha'},
+            ]
             mock_get_next_json.side_effect = lambda: data_stack.pop()
-            r.do_mocked_replay(datum1['verb'], datum1['url'])
-            r.do_mocked_replay(datum2['verb'], datum2['url'])
+
+            response = r.do_mocked_replay(datum1['verb'], datum1['url'])
+            assert response.status_code == 200
+            assert response.json() == 'alpha'
+
+            response = r.do_mocked_replay(datum2['verb'], datum2['url'])
+            assert response.status_code == 200
+            assert response.json() == 'omega'
+
+            with pytest.raises(Exception) as exc:
+                r.do_mocked_replay(datum3['verb'], datum3['url'])
+                raise AssertionError("Should not get here.")
+            assert str(exc.value) == 'ouch'
 
         assert mfs.files == {}
