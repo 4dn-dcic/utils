@@ -577,13 +577,13 @@ class AbstractTestRecorder:
     def recorded_requests(self, test_name, initial_context):
         ignored(test_name, initial_context)
         raise NotImplementedError("AbstractTestRecorder.recorded_requests needs to be customized in a subclass.")
-        yield  # noQA - Yes, it's not reachable, but the function still needs to yield
+        yield  # noQA - Yes, it's not reachable, but the function still needs to yield. Also: # pragma: no cover
 
     @contextlib.contextmanager
     def replayed_requests(self, test_name, mock_time=False):
         ignored(test_name, mock_time)
         raise NotImplementedError("AbstractTestRecorder.replayed_requests needs to be customized in a subclass.")
-        yield  # noQA - Yes, it's not reachable, but the function still needs to yield
+        yield  # noQA - Yes, it's not reachable, but the function still needs to yield. Also: # pragma: no cover
 
 
 class IntegratedTestRecorder(AbstractTestRecorder):

@@ -92,6 +92,12 @@ norecursedirs = ["*env", "site-packages", ".cache", ".git", ".idea", "*.egg-info
 # pep8maxlinelength = 120
 testpaths = ["test"]
 
+[tool.coverage.report]
+# https://coverage.readthedocs.io/en/latest/config.html
+exclude_lines = [
+  "if __name__ == .__main__.:",
+  "pragma: no cover"
+]
 
 [build-system]
 requires = ["poetry_core>=1.0.0"]
