@@ -49,4 +49,3 @@ def test_abstract_integrated_fixture_misc():
             pass
 
         assert repr(MyIntegratedFixture('bar')) == "MyIntegratedFixture(name='bar')"
-

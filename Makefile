@@ -74,6 +74,7 @@ test-static:
 	@date
 	poetry run pytest -vv -r w -m "static"
 	poetry run flake8 dcicutils
+	poetry run flake8 test --exclude=data_files
 	@git log -1 --decorate | head -1
 	@date
 
