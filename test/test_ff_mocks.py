@@ -1,9 +1,11 @@
+import io
+import json
 import pytest
 
 from dcicutils import ff_mocks as ff_mocks_module
 from dcicutils.ff_mocks import AbstractIntegratedFixture, AbstractTestRecorder
 from dcicutils.misc_utils import ignored, local_attrs
-from dcicutils.qa_utils import MockResponse, MockFileSystem, ControlledTime
+from dcicutils.qa_utils import MockResponse, MockFileSystem, ControlledTime, printed_output
 # from dcicutils.s3_utils import s3Utils
 from unittest import mock
 
@@ -100,6 +102,93 @@ def test_abstract_test_recorder_recording_enabled_and_recording_level():
     assert not r.recording_enabled
 
 
+@pytest.mark.parametrize("recording_enabled", [False, True])
+def test_abstract_test_recorder_recording(recording_enabled):
+
+    recordings_dir = 'my_recordings'
+    test_name = 'foo'
+    r = AbstractTestRecorder(recordings_dir=recordings_dir)
+    output_stream = io.StringIO()
+    r.recording_fp = output_stream
+    r.recording_enabled = recording_enabled
+    r.recording_level = 0
+
+    dt = ControlledTime()
+
+    initial_data = {'initial': 'data'}
+
+    mfs = MockFileSystem()
+
+    with printed_output() as printed:
+        with mfs.mock_exists_open_remove():
+            with r.setup_recording(test_name, initial_data):
+                with mock.patch.object(ff_mocks_module, "datetime", dt):
+
+                    datum4, datum3, datum2, datum1 = data_server_stack = [
+                        {'verb': 'GET', 'url': 'http://any', 'data': None, 'duration': 17.0,
+                         'error_type': RuntimeError, 'error_message': 'yikes'},
+                        {'verb': 'GET', 'url': 'http://baz', 'data': None, 'duration': 15.0, 'status': 400,
+                         'result': 'sorry'},
+                        {'verb': 'GET', 'url': 'http://bar', 'data': None, 'duration': 20.0, 'status': 200,
+                         'result': 'omega'},
+                        {'verb': 'GET', 'url': 'http://foo', 'data': None, 'duration': 10.0, 'status': 200,
+                         'result': "alpha"},
+                    ]
+
+                    def simulate_actual_server():
+                        start_time = dt.just_now() - dt._tick_timedelta
+                        info = data_server_stack.pop()
+                        duration = info.get('duration')
+                        if duration:
+                            # We subtract 1 from the duration because 'just_now()' occurs
+                            # after the first measuring of time that will already have been done
+                            dt.set_datetime(start_time + dt._tick_timedelta * duration)
+                        if info.get('error_message'):
+                            error_type = info.get('error_type')
+                            raise error_type(info.get('error_message'))
+                        return MockResponse(status_code=info['status'], json=info['result'])
+
+                    response = r.do_mocked_record(action=simulate_actual_server, verb=datum1['verb'], url=datum1['url'])
+                    assert response.status_code == 200
+                    assert response.json() == datum1['result']  # 'alpha'
+
+                    response = r.do_mocked_record(action=simulate_actual_server, verb=datum2['verb'], url=datum2['url'])
+                    assert response.status_code == 200
+                    assert response.json() == datum2['result']  # 'omega'
+
+                    response = r.do_mocked_record(action=simulate_actual_server, verb=datum3['verb'], url=datum3['url'])
+                    assert response.status_code == 400
+                    assert response.json() == datum3['result']  # 'sorry'
+
+                    with pytest.raises(RuntimeError) as exc:
+                        r.do_mocked_record(action=simulate_actual_server, verb=datum4['verb'], url=datum4['url'])
+                        raise AssertionError("Should not get here.")
+                    assert str(exc.value) == datum4['error_message']  # 'yikes'
+
+            if recording_enabled:
+
+                expected = {
+                    f"{recordings_dir}/{test_name}":
+                        f'{json.dumps(initial_data)}\n'
+                        f'{json.dumps(datum1)}\n'
+                        f'{json.dumps(datum2)}\n'
+                        f'{json.dumps(datum3)}\n'
+                        f'{json.dumps(datum4, default=lambda x: x.__name__)}\n'.encode('utf-8')
+                }
+            else:
+                expected = {f"{recordings_dir}/{test_name}": f"{json.dumps(initial_data)}\n".encode('utf-8')}
+
+            assert mfs.files == expected
+
+        recording = "Recording" if recording_enabled else "NOT recording"
+        assert printed.lines == [
+            f'{recording} GET http://foo normal result',
+            f'{recording} GET http://bar normal result',
+            f'{recording} GET http://baz normal result',
+            f'{recording} GET http://any error result'
+        ]
+
+
 def test_abstract_test_recorder_playback():
 
     r = AbstractTestRecorder('foo')
@@ -107,28 +196,48 @@ def test_abstract_test_recorder_playback():
 
     mfs = MockFileSystem()
 
-    with mfs.mock_exists_open_remove():
+    with printed_output() as printed:
+        with mfs.mock_exists_open_remove():
 
-        with mock.patch.object(r, "get_next_json") as mock_get_next_json:
-            datum3, datum2, datum1 = data_stack = [
-                {'verb': 'GET', 'url': 'http://baz', 'duration': 15, 'status': 400,
-                 'error_type': 'Exception', 'error_message': 'ouch'},
-                {'verb': 'GET', 'url': 'http://foo', 'duration': 10, 'status': 200, 'result': "omega"},
-                {'verb': 'GET', 'url': 'http://bar', 'duration': 20, 'status': 200, 'result': 'alpha'},
-            ]
-            mock_get_next_json.side_effect = lambda: data_stack.pop()
+            with mock.patch.object(r, "get_next_json") as mock_get_next_json:
+                datum4, datum3, datum2, datum1 = data_stack = [
+                    {'verb': 'GET', 'url': 'http://any', 'data': None, 'duration': 17.0,
+                     'error_type': RuntimeError, 'error_message': 'yikes'},
+                    {'verb': 'GET', 'url': 'http://baz', 'data': None, 'duration': 15.0, 'status': 400,
+                     'result': 'sorry'},
+                    {'verb': 'GET', 'url': 'http://bar', 'data': None, 'duration': 20.0, 'status': 200,
+                     'result': 'omega'},
+                    {'verb': 'GET', 'url': 'http://foo', 'data': None, 'duration': 10.0, 'status': 200,
+                     'result': "alpha"},
+                ]
+                mock_get_next_json.side_effect = lambda: data_stack.pop()
 
-            response = r.do_mocked_replay(datum1['verb'], datum1['url'])
-            assert response.status_code == 200
-            assert response.json() == 'alpha'
+                response = r.do_mocked_replay(datum1['verb'], datum1['url'])
+                assert response.status_code == 200
+                assert response.json() == datum1['result']  # 'alpha'
 
-            response = r.do_mocked_replay(datum2['verb'], datum2['url'])
-            assert response.status_code == 200
-            assert response.json() == 'omega'
+                response = r.do_mocked_replay(datum2['verb'], datum2['url'])
+                assert response.status_code == 200
+                assert response.json() == datum2['result']  # 'omega'
 
-            with pytest.raises(Exception) as exc:
-                r.do_mocked_replay(datum3['verb'], datum3['url'])
-                raise AssertionError("Should not get here.")
-            assert str(exc.value) == 'ouch'
+                response = r.do_mocked_replay(datum3['verb'], datum3['url'])
+                assert response.status_code == 400
+                assert response.json() == datum3['result']  # 'sorry'
 
-        assert mfs.files == {}
+                with pytest.raises(Exception) as exc:
+                    r.do_mocked_replay(datum4['verb'], datum4['url'])
+                    raise AssertionError("Should not get here.")
+                assert str(exc.value) == datum4['error_message']  # 'yikes'
+
+            assert mfs.files == {}  # no files created on playback
+
+        assert printed.lines == [
+            f"Replaying GET {datum1['url']}",  # http://foo
+            f" from recording of normal result for GET {datum1['url']}",
+            f"Replaying GET {datum2['url']}",  # http://bar
+            f" from recording of normal result for GET {datum2['url']}",
+            f"Replaying GET {datum3['url']}",  # http://baz
+            f" from recording of normal result for GET {datum3['url']}",
+            f"Replaying GET {datum4['url']}",  # http://any
+            f" from recording of error result for GET {datum4['url']}",
+        ]

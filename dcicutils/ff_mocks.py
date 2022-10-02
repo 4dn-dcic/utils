@@ -517,6 +517,7 @@ class AbstractTestRecorder:
     def do_mocked_record(self, action, verb, url, **kwargs):
         start = datetime.datetime.now()
         data = kwargs.get('data')
+        prefix = f"{self.recording_level * '>'} " if self.recording_level else ""
         try:
             with self.creating_record():
                 response = action()
@@ -527,22 +528,23 @@ class AbstractTestRecorder:
             event = {"verb": verb, "url": url, "data": data,
                      "duration": duration, "status": status, "result": result}
             if self.recording_enabled:
-                PRINT(f"Recording {verb} {url}")
+                PRINT(f"{prefix}Recording {verb} {url} normal result")
                 PRINT(json.dumps(event), file=self.recording_fp)
             else:
-                PRINT(f"{'>' * self.recording_level} NOT recording authorized {verb} {url}")
+                PRINT(f"{prefix}NOT recording {verb} {url} normal result")
             return response
         except Exception as e:
             error_type = full_class_name(e)
             error_message = str(e)
             duration = (datetime.datetime.now() - start).total_seconds()
+            duration = math.floor(duration * 10) / 10.0  # round to tenths of a second
             event = {"verb": verb, "url": url, "data": data,
                      "duration": duration, "error_type": error_type, "error_message": error_message}
             if self.recording_enabled:
-                PRINT(f"Recording authorized {verb} {url} error result")
+                PRINT(f"{prefix}Recording {verb} {url} error result")
                 PRINT(json.dumps(event), file=self.recording_fp)
             else:
-                PRINT(f"{'>' * self.recording_level} NOT recording authorized {verb} {url} error result")
+                PRINT(f"{prefix}NOT recording {verb} {url} error result")
             raise
 
     @contextlib.contextmanager
@@ -561,6 +563,8 @@ class AbstractTestRecorder:
         expected_event = self.get_next_json()
         expected_verb = expected_event['verb']
         expected_url = expected_event['url']
+        kind = "error" if expected_event.get('error_message') else "normal"
+        PRINT(f" from recording of {kind} result for {expected_verb} {expected_url}")
         if verb != expected_verb or url != expected_url:
             raise AssertionError(f"Actual call {verb} {url} does not match"
                                  f" expected call {expected_verb} {expected_url}")
