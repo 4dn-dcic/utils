@@ -412,4 +412,47 @@ def test_mocked_replaying_stuff_in_queues():
 
     with pytest.raises(AssertionError) as exc:
         r.mocked_replaying_stuff_in_queues('any-env', check_secondary=True)
-    assert str(exc.value) == "Actual call stuff-in-queues does not match expected call GET"
+    assert str(exc.value) == "Actual call stuff-in-queues does not match expected call GET http://any"
+
+
+def test_mocked_replay():
+
+    r = AbstractTestRecorder()
+    r.dt = ControlledTime()
+
+    # Test normal result
+    stream = io.StringIO()
+    r.recording_fp = stream
+    PRINT(json.dumps({'verb': 'GET', 'url': "http://foo", 'data': None, 'duration': 10.0, 'status': 200,
+                      'result': {"some": "result"}}),
+          file=stream)
+    stream.seek(0)
+
+    response = r.do_mocked_replay(verb='GET', url="http://foo")
+    assert response.status_code == 200
+    assert response.json() == {"some": "result"}
+
+    # Test error result
+    stream = io.StringIO()
+    r.recording_fp = stream
+    PRINT(json.dumps({'verb': 'GET', 'url': "http://foo", 'data': None, 'duration': 10.0, 'status': 200,
+                      'error_type': 'RuntimeError', 'error_message': 'yikes'}),
+          file=stream)
+    stream.seek(0)
+
+    with pytest.raises(Exception) as exc:
+        r.do_mocked_replay(verb='GET', url="http://foo")
+    assert not isinstance(exc, AssertionError)
+    assert str(exc.value) == "yikes"
+
+    # Test mismatched recording data
+    stream = io.StringIO()
+    r.recording_fp = stream
+    PRINT(json.dumps({'verb': 'POST', 'url': 'http://any', 'data': None, 'duration': 17.0,
+                      'error_type': 'RuntimeError', 'error_message': 'yikes'}),
+          file=stream)
+    stream.seek(0)
+
+    with pytest.raises(AssertionError) as exc:
+        r.do_mocked_replay(verb='GET', url="http://foo")
+    assert str(exc.value) == "Actual call GET http://foo does not match expected call POST http://any"

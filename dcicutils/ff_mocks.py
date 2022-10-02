@@ -481,8 +481,9 @@ class AbstractTestRecorder:
         verb = 'stuff-in-queues'
         expected_event = self.get_next_json()
         expected_verb = expected_event['verb']
+        expected_url = expected_event.get('url')
         if verb != expected_verb:
-            raise AssertionError(f"Actual call {verb} does not match expected call {expected_verb}")
+            raise AssertionError(f"Actual call {verb} does not match expected call {expected_verb} {expected_url}")
         self.dt.sleep(expected_event['duration'])
         error_message = expected_event.get('error_message')
         if error_message:
