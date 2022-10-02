@@ -445,14 +445,26 @@ def test_mocked_replay():
     assert not isinstance(exc, AssertionError)
     assert str(exc.value) == "yikes"
 
-    # Test mismatched recording data
+    # Test mismatched recording call
     stream = io.StringIO()
     r.recording_fp = stream
     PRINT(json.dumps({'verb': 'POST', 'url': 'http://any', 'data': None, 'duration': 17.0,
-                      'error_type': 'RuntimeError', 'error_message': 'yikes'}),
+                      'result': 'ignored-result'}),
           file=stream)
     stream.seek(0)
 
     with pytest.raises(AssertionError) as exc:
         r.do_mocked_replay(verb='GET', url="http://foo")
     assert str(exc.value) == "Actual call GET http://foo does not match expected call POST http://any"
+
+    # Test mismatched recording data
+    stream = io.StringIO()
+    r.recording_fp = stream
+    PRINT(json.dumps({'verb': 'POST', 'url': 'http://foo', 'data': 'something', 'duration': 17.0,
+                      'result': 'ignored-result'}),
+          file=stream)
+    stream.seek(0)
+
+    with pytest.raises(AssertionError) as exc:
+        r.do_mocked_replay(verb='POST', url="http://foo", data='something-else')
+    assert str(exc.value) == "Data mismatch on call POST http://foo."

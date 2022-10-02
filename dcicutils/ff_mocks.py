@@ -487,9 +487,12 @@ class AbstractTestRecorder:
         self.dt.sleep(expected_event['duration'])
         error_message = expected_event.get('error_message')
         if error_message:
+            PRINT(f" simulating error {error_message!r}")
             raise Exception(error_message)
         else:
-            return expected_event['result']
+            result = expected_event['result']
+            PRINT(f" => {result}")
+            return result
 
     @contextlib.contextmanager
     def mock_replay_stuff_in_queues(self):
