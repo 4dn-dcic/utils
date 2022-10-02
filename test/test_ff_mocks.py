@@ -371,3 +371,45 @@ def test_controlled_time_mocking(enabled):
     # Test that whether enabled is true or false, we still get a ControlledTime back as dt
     with controlled_time_mocking(enabled=enabled) as dt:
         assert isinstance(dt, ControlledTime)
+
+
+def test_mocked_replaying_stuff_in_queues():
+
+    r = AbstractTestRecorder()
+    r.dt = ControlledTime()
+
+    # Test normal result
+    stream = io.StringIO()
+    r.recording_fp = stream
+    PRINT(json.dumps({'verb': 'stuff-in-queues', 'url': None, 'data': None, 'duration': 10.0, 'status': 200,
+                      'result': True}),
+          file=stream)
+    stream.seek(0)
+
+    result = r.mocked_replaying_stuff_in_queues('any-env', check_secondary=True)
+    assert result is True
+
+    # Test error result
+    stream = io.StringIO()
+    r.recording_fp = stream
+    PRINT(json.dumps({'verb': 'stuff-in-queues', 'url': None, 'data': None, 'duration': 10.0, 'status': 200,
+                      'error_type': 'RuntimeError', 'error_message': 'yikes'}),
+          file=stream)
+    stream.seek(0)
+
+    with pytest.raises(Exception) as exc:
+        r.mocked_replaying_stuff_in_queues('any-env', check_secondary=True)
+    assert not isinstance(exc, AssertionError)
+    assert str(exc.value) == "yikes"
+
+    # Test mismatched recording data
+    stream = io.StringIO()
+    r.recording_fp = stream
+    PRINT(json.dumps({'verb': 'GET', 'url': 'http://any', 'data': None, 'duration': 17.0,
+                      'error_type': 'RuntimeError', 'error_message': 'yikes'}),
+          file=stream)
+    stream.seek(0)
+
+    with pytest.raises(AssertionError) as exc:
+        r.mocked_replaying_stuff_in_queues('any-env', check_secondary=True)
+    assert str(exc.value) == "Actual call stuff-in-queues does not match expected call GET"
