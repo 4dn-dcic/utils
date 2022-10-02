@@ -462,11 +462,12 @@ class AbstractTestRecorder:
             "duration": duration,
             "result": result
         }
+        prefix = f"{self.recording_level * '>'} " if self.recording_level else ""
         if self.recording_enabled:
-            PRINT(f"Recording stuff-in-queues")
+            PRINT(f"{prefix}Recording stuff-in-queues")
             PRINT(json.dumps(event), file=self.recording_fp)
         else:
-            PRINT(f"{'>' * self.recording_level} NOT recording stuff-in-queues")
+            PRINT(f"{prefix}NOT recording stuff-in-queues")
         return result
 
     @contextlib.contextmanager

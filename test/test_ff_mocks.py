@@ -2,9 +2,9 @@ import io
 import json
 import pytest
 
-from dcicutils import ff_mocks as ff_mocks_module
+from dcicutils import ff_mocks as ff_mocks_module, ff_utils as ff_utils_module
 from dcicutils.ff_mocks import AbstractIntegratedFixture, AbstractTestRecorder
-from dcicutils.misc_utils import ignored, local_attrs
+from dcicutils.misc_utils import ignored, local_attrs, PRINT
 from dcicutils.qa_utils import MockResponse, MockFileSystem, ControlledTime, printed_output
 # from dcicutils.s3_utils import s3Utils
 from unittest import mock
@@ -241,3 +241,51 @@ def test_abstract_test_recorder_playback():
             f"Replaying GET {datum4['url']}",  # http://any
             f" from recording of error result for GET {datum4['url']}",
         ]
+
+
+@pytest.mark.parametrize("recording_enabled", [False, True])
+@pytest.mark.parametrize("sample_result", [False, True])
+@pytest.mark.parametrize("check_secondary", [False, True])
+def test_mocked_recording_stuff_in_queues(recording_enabled, sample_result, check_secondary):
+
+    dt = ControlledTime()
+    r = AbstractTestRecorder('foo')
+    r.recording_enabled = recording_enabled
+    r.dt = dt
+    output_stream = io.StringIO()
+    r.recording_fp = output_stream
+    namespace = "some_namespace"
+    with mock.patch.object(ff_mocks_module, "datetime", dt):
+        with mock.patch.object(ff_utils_module, "internal_compute_stuff_in_queues") as mock_compute_stuff_in_queues:
+            mock_compute_stuff_in_queues.return_value = sample_result
+            r.mocked_recording_stuff_in_queues(ff_env_index_namespace='some_namespace', check_secondary=check_secondary)
+            if recording_enabled:
+                expected_result = {
+                    'verb': 'stuff-in-queues',
+                    'url': None,
+                    'data': {'ff_env_index_namespace': namespace, "check_secondary": check_secondary},
+                    'duration': 1.0,
+                    'result': sample_result
+                }
+                assert output_stream.getvalue() == json.dumps(expected_result) + '\n'
+            else:
+                assert output_stream.getvalue() == ""
+
+
+def test_get_next_json():
+
+    item1, item2 = [{"item": 1}, {"item": 2}]
+
+    stream = io.StringIO()
+    PRINT(json.dumps(item1), file=stream)
+    PRINT(json.dumps(item2), file=stream)
+    stream.seek(0)
+
+    r = AbstractTestRecorder('foo')
+    r.recording_fp = stream
+
+    assert r.get_next_json() == item1
+    assert r.get_next_json() == item2
+    with pytest.raises(AssertionError) as exc:
+        r.get_next_json()
+    assert str(exc.value) == "Out of replayable records."
