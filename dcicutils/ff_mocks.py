@@ -445,7 +445,7 @@ class AbstractTestRecorder:
             self.recording_enabled = old_enabled
             self.recording_level = old_level
 
-    def mocked_recorded_stuff_in_queues(self, ff_env_index_namespace, check_secondary):
+    def mocked_recording_stuff_in_queues(self, ff_env_index_namespace, check_secondary):
         # This mock assumes the queue checks don't err. If we find they do, it needs to be a bit more elaborate.
         start = datetime.datetime.now()
         result = ff_utils.internal_compute_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace,
@@ -471,11 +471,11 @@ class AbstractTestRecorder:
 
     @contextlib.contextmanager
     def mock_record_stuff_in_queues(self):
-        with mock.patch.object(ff_utils, "mockable_stuff_in_queues") as mock_stuff_in_queues:
-            mock_stuff_in_queues.side_effect = self.mocked_recorded_stuff_in_queues
+        with mock.patch.object(ff_utils, "mockable_stuff_in_queues") as mock_recording_stuff_in_queues:
+            mock_recording_stuff_in_queues.side_effect = self.mocked_recording_stuff_in_queues
             yield
 
-    def mocked_replayed_stuff_in_queues(self, ff_env_index_namespace, check_secondary):
+    def mocked_replaying_stuff_in_queues(self, ff_env_index_namespace, check_secondary):
         PRINT(f"Replaying stuff-in-queues {ff_env_index_namespace} {check_secondary}")
         verb = 'stuff-in-queues'
         expected_event = self.get_next_json()
@@ -491,8 +491,8 @@ class AbstractTestRecorder:
 
     @contextlib.contextmanager
     def mock_replay_stuff_in_queues(self):
-        with mock.patch.object(ff_utils, "mockable_stuff_in_queues") as mock_replayed_stuff_in_queues:
-            mock_replayed_stuff_in_queues.side_effect = self.mocked_replayed_stuff_in_queues
+        with mock.patch.object(ff_utils, "mockable_stuff_in_queues") as mock_replaying_stuff_in_queues:
+            mock_replaying_stuff_in_queues.side_effect = self.mocked_replaying_stuff_in_queues
             yield
 
     def get_next_json(self):
