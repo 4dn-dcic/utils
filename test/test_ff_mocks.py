@@ -5,7 +5,10 @@ import pytest
 
 from dcicutils import ff_mocks as ff_mocks_module, ff_utils as ff_utils_module
 from dcicutils.ff_utils import stuff_in_queues
-from dcicutils.ff_mocks import AbstractIntegratedFixture, AbstractTestRecorder, IntegratedTestRecorder
+from dcicutils.ff_mocks import (
+    AbstractIntegratedFixture, AbstractTestRecorder, IntegratedTestRecorder,
+    mocked_authorized_request_verbs, controlled_time_mocking,
+)
 from dcicutils.misc_utils import ignored, local_attrs, PRINT
 from dcicutils.qa_utils import MockResponse, MockFileSystem, ControlledTime, printed_output
 from unittest import mock
@@ -328,3 +331,43 @@ def test_mock_record_stuff_in_queues():
 
     with r.mock_record_stuff_in_queues():
         assert stuff_in_queues('example-namespace', check_secondary=True) == result_for_testing
+
+
+def test_mocked_authorized_request_verbs():
+    n_verbs = 0
+    with mocked_authorized_request_verbs():
+        for verb in ff_utils_module.REQUESTS_VERBS:
+            n_verbs += 1
+            with pytest.raises(AssertionError):
+                ff_utils_module.REQUESTS_VERBS[verb]('anything')
+    assert n_verbs == 5  # GET, POST, PATCH, PUT, DELETE
+
+    def explicitly_mocked(*args, **kwargs):
+        ignored(args, kwargs)
+        return "whatever"
+
+    to_mock = {
+        'GET': explicitly_mocked,
+        'DELETE': explicitly_mocked,
+    }
+    n_disabled = 0
+    n_mocked = 0
+    with mocked_authorized_request_verbs(**to_mock):
+        for verb in ff_utils_module.REQUESTS_VERBS:
+            if verb in to_mock:
+                n_mocked += 1
+                assert ff_utils_module.REQUESTS_VERBS[verb]('anything') == "whatever"
+            else:
+                n_disabled += 1
+                with pytest.raises(AssertionError):
+                    ff_utils_module.REQUESTS_VERBS[verb]('anything')
+    assert n_mocked == len(to_mock)
+    assert n_disabled == n_verbs - n_mocked
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_controlled_time_mocking(enabled):
+
+    # Test that whether enabled is true or false, we still get a ControlledTime back as dt
+    with controlled_time_mocking(enabled=enabled) as dt:
+        assert isinstance(dt, ControlledTime)
