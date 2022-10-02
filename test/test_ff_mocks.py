@@ -1,12 +1,13 @@
+import copy
 import io
 import json
 import pytest
 
 from dcicutils import ff_mocks as ff_mocks_module, ff_utils as ff_utils_module
-from dcicutils.ff_mocks import AbstractIntegratedFixture, AbstractTestRecorder
+from dcicutils.ff_utils import stuff_in_queues
+from dcicutils.ff_mocks import AbstractIntegratedFixture, AbstractTestRecorder, IntegratedTestRecorder
 from dcicutils.misc_utils import ignored, local_attrs, PRINT
 from dcicutils.qa_utils import MockResponse, MockFileSystem, ControlledTime, printed_output
-# from dcicutils.s3_utils import s3Utils
 from unittest import mock
 
 
@@ -191,7 +192,7 @@ def test_abstract_test_recorder_recording(recording_enabled):
 
 def test_abstract_test_recorder_playback():
 
-    r = AbstractTestRecorder('foo')
+    r = AbstractTestRecorder()
     r.dt = ControlledTime()
 
     mfs = MockFileSystem()
@@ -249,7 +250,7 @@ def test_abstract_test_recorder_playback():
 def test_mocked_recording_stuff_in_queues(recording_enabled, sample_result, check_secondary):
 
     dt = ControlledTime()
-    r = AbstractTestRecorder('foo')
+    r = AbstractTestRecorder()
     r.recording_enabled = recording_enabled
     r.dt = dt
     output_stream = io.StringIO()
@@ -281,7 +282,7 @@ def test_get_next_json():
     PRINT(json.dumps(item2), file=stream)
     stream.seek(0)
 
-    r = AbstractTestRecorder('foo')
+    r = AbstractTestRecorder()
     r.recording_fp = stream
 
     assert r.get_next_json() == item1
@@ -289,3 +290,41 @@ def test_get_next_json():
     with pytest.raises(AssertionError) as exc:
         r.get_next_json()
     assert str(exc.value) == "Out of replayable records."
+
+
+def test_copy_integrated_ff_masking_credentials():
+
+    orig = {
+        "ff_key": {"key": "test-key", "secret": "test-secret", "server": "http://whatever"},
+        "ff_env": "test_env",
+        "ff_env_index_namespace": "test_namespace",
+    }
+    copy1 = IntegratedTestRecorder.copy_integrated_ff_masking_credentials(orig)
+
+    # Check that these two items were NOT copied
+    assert copy1['ff_key']['key'] != orig['ff_key']['key']
+    assert copy1['ff_key']['secret'] != orig['ff_key']['secret']
+
+    # Check that the rest of the items WERE copied
+    copy2 = copy.deepcopy(orig)
+    del copy1['ff_key']['key']
+    del copy2['ff_key']['key']
+    del copy1['ff_key']['secret']
+    del copy2['ff_key']['secret']
+    assert copy1 == copy2
+
+
+def test_mock_record_stuff_in_queues():
+
+    result_for_testing = "any-bool-for-testing"
+
+    class MyTestRecorder(AbstractTestRecorder):
+
+        def mocked_recording_stuff_in_queues(self, ff_env_index_namespace, check_secondary):
+            ignored(ff_env_index_namespace, check_secondary)
+            return result_for_testing
+
+    r = MyTestRecorder()
+
+    with r.mock_record_stuff_in_queues():
+        assert stuff_in_queues('example-namespace', check_secondary=True) == result_for_testing
