@@ -35,7 +35,9 @@ _MOCK_APPLICATION_OPTIONS_PARTIAL = (
 NO_SERVER_FIXTURES = environ_bool("NO_SERVER_FIXTURES")
 
 
+# TODO: I don't think anything is using this class. -kmp 2-Oct-2022
 class MockBoto4DNLegacyElasticBeanstalkClient(MockBotoElasticBeanstalkClient):  # noQA - missing some abstract methods
+    """Deprecated test class. This will go away in the future. If you're using that, make sure the dev team knows."""
 
     DEFAULT_MOCKED_BEANSTALKS = [
         make_mock_beanstalk("fourfront-cgapdev"),

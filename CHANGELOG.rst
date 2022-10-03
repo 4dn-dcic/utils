@@ -20,6 +20,8 @@ Change Log
   and this was previously broken in (so not used in) other repositories and it can't break
   anything elsewhere to change the conventions. We're treating this as a simple bug fix.
 
+* Deprecated unused class ``MockBoto4DNLegacyElasticBeanstalkClient``.
+
 
 5.2.1
 =====

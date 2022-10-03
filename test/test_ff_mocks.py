@@ -6,12 +6,13 @@ import pytest
 from dcicutils import ff_mocks as ff_mocks_module, ff_utils as ff_utils_module
 from dcicutils.ff_utils import stuff_in_queues
 from dcicutils.ff_mocks import (
-    AbstractIntegratedFixture, AbstractTestRecorder, IntegratedTestRecorder,
+    AbstractIntegratedFixture, AbstractTestRecorder, IntegratedTestRecorder, TestScenarios,
     mocked_authorized_request_verbs, controlled_time_mocking,
 )
 from dcicutils.misc_utils import ignored, local_attrs, PRINT
 from dcicutils.qa_utils import MockResponse, MockFileSystem, ControlledTime, printed_output
 from unittest import mock
+from .helpers import using_fresh_legacy_state_for_testing
 
 
 def test_abstract_integrated_fixture_no_server_fixtures():
@@ -468,3 +469,48 @@ def test_mocked_replay():
     with pytest.raises(AssertionError) as exc:
         r.do_mocked_replay(verb='POST', url="http://foo", data='something-else')
     assert str(exc.value) == "Data mismatch on call POST http://foo."
+
+
+@using_fresh_legacy_state_for_testing()
+def test_test_scenario_methods():
+
+    assert TestScenarios.mocked_auth_key('foo') == 'fookey'
+    assert TestScenarios.mocked_auth_key('fourfront-foo') == 'fookey'
+    assert TestScenarios.mocked_auth_key('fourfront-cgapfoo') == 'cgapfookey'
+    assert TestScenarios.mocked_auth_key('cgap-foo') == 'cgap-fookey'
+
+    assert TestScenarios.mocked_auth_secret('foo') == 'foosecret'
+    assert TestScenarios.mocked_auth_secret('fourfront-foo') == 'foosecret'
+    assert TestScenarios.mocked_auth_secret('fourfront-cgapfoo') == 'cgapfoosecret'
+    assert TestScenarios.mocked_auth_secret('cgap-foo') == 'cgap-foosecret'
+
+    assert TestScenarios.mocked_auth_server('foo') == 'http://foo.4dnucleome.org/'
+    assert TestScenarios.mocked_auth_server('fourfront-foo') == 'http://foo.4dnucleome.org/'
+    assert TestScenarios.mocked_auth_server('fourfront-cgapfoo') == 'http://cgapfoo.4dnucleome.org/'
+    assert TestScenarios.mocked_auth_server('cgap-foo') == 'http://cgap-foo.4dnucleome.org/'
+
+    assert TestScenarios.mocked_auth_key_secret_tuple('foo') == ('fookey', 'foosecret')
+    assert TestScenarios.mocked_auth_key_secret_tuple('fourfront-foo') == ('fookey', 'foosecret')
+    assert TestScenarios.mocked_auth_key_secret_tuple('fourfront-cgapfoo') == ('cgapfookey', 'cgapfoosecret')
+    assert TestScenarios.mocked_auth_key_secret_tuple('cgap-foo') == ('cgap-fookey', 'cgap-foosecret')
+
+    assert TestScenarios.mocked_auth_key_secret_server_dict('foo') == {
+        'key': 'fookey',
+        'secret': 'foosecret',
+        'server': 'http://foo.4dnucleome.org/',
+    }
+    assert TestScenarios.mocked_auth_key_secret_server_dict('fourfront-foo') == {
+        'key': 'fookey',
+        'secret': 'foosecret',
+        'server': 'http://foo.4dnucleome.org/',
+    }
+    assert TestScenarios.mocked_auth_key_secret_server_dict('fourfront-cgapfoo') == {
+        'key': 'cgapfookey',
+        'secret': 'cgapfoosecret',
+        'server': 'http://cgapfoo.4dnucleome.org/',
+    }
+    assert TestScenarios.mocked_auth_key_secret_server_dict('cgap-foo') == {
+        'key': 'cgap-fookey',
+        'secret': 'cgap-foosecret',
+        'server': 'http://cgap-foo.4dnucleome.org/',
+    }
