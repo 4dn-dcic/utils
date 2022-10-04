@@ -2265,13 +2265,8 @@ class MockBotoS3Bucket:
 
     def _all(self):
         """A callback for <bucket>.objects.all()"""
-<<<<<<< HEAD
-        return [self.s3.head_object(Bucket=self.name, Key=key)
-                for key in self._keys(operation_name="Bucket.objects.all")]
-=======
         return [MockBotoS3ObjectSummary(attributes=self.s3.head_object(Bucket=self.name, Key=key))
                 for key in self._keys()]
->>>>>>> master
 
 
 class MockBotoS3ObjectSummary:
