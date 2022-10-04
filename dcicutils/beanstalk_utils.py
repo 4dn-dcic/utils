@@ -15,11 +15,12 @@ from datetime import datetime
 from . import ff_utils
 from botocore.exceptions import ClientError
 from .base import (
-    REGION, FOURSIGHT_URL,  # _FF_MAGIC_CNAME, _CGAP_MAGIC_CNAME, _FF_GOLDEN_DB, _CGAP_GOLDEN_DB,
+    FOURSIGHT_URL,  # _FF_MAGIC_CNAME, _CGAP_MAGIC_CNAME, _FF_GOLDEN_DB, _CGAP_GOLDEN_DB,
     beanstalk_info, describe_beanstalk_environments, get_beanstalk_real_url,
     compute_ff_prd_env, compute_ff_stg_env, compute_cgap_prd_env, compute_cgap_stg_env, compute_prd_env_for_env,
 )
-from .env_utils import is_stg_or_prd_env
+from .common import REGION
+from .env_utils import is_stg_or_prd_env, is_orchestrated
 from .misc_utils import PRINT, exported, obsolete, remove_suffix, prompt_for_input
 
 
@@ -248,6 +249,11 @@ def _create_foursight_new(dest_env):
     fs['fs_url'] = get_foursight_env(dest_env, fs['bs_url'])
     fs['es_url'] = ff_utils.get_health_page(ff_env=dest_env)['elasticsearch']
     fs['foursight'] = create_foursight(**fs)
+    if is_orchestrated():
+        # TODO: Probably want to inherit some values from the old file in this case, since not all of those change.
+        raise NotImplementedError("Need to add orchestration support here.")
+    else:
+        fs['is_legacy'] = True
 
     # delete initial checks (? not clear why this was happening before)
     if fs['foursight'].get('initial_checks'):
@@ -256,17 +262,20 @@ def _create_foursight_new(dest_env):
     return fs
 
 
-def swap_cname(src, dest):
-    """ Does a CNAME swap and foursight configuration (pulled in from Torb)
-        NOTE: this is the mechanism by which CNAME swaps must occur as of 9/15/2020
-    """
-    _swap_cname(src, dest)
-    res_data = _create_foursight_new(src)
-    print('Updated foursight %s environment to use %s. Foursight response: %s'
-          % (res_data['fs_url'], res_data['dest_env'], res_data['foursight']))
-    res_stag = _create_foursight_new(dest)
-    print('Updated foursight %s environment to use %s. Foursight response: %s'
-          % (res_stag['fs_url'], res_stag['dest_env'], res_stag['foursight']))
+# This function has been removed on a major version boundary. This is no longer the way to swap staging
+# and data identies.
+#
+# def swap_cname(src, dest):
+#     """ Does a CNAME swap and foursight configuration (pulled in from Torb)
+#         NOTE: this is the mechanism by which CNAME swaps must occur as of 9/15/2020
+#     """
+#     _swap_cname(src, dest)
+#     res_data = _create_foursight_new(src)
+#     print('Updated foursight %s environment to use %s. Foursight response: %s'
+#           % (res_data['fs_url'], res_data['dest_env'], res_data['foursight']))
+#     res_stag = _create_foursight_new(dest)
+#     print('Updated foursight %s environment to use %s. Foursight response: %s'
+#           % (res_stag['fs_url'], res_stag['dest_env'], res_stag['foursight']))
 
 
 def _get_beanstalk_configuration_settings(env):

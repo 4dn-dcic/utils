@@ -5,10 +5,10 @@ import os
 import requests
 import subprocess
 
-from dcicutils.exceptions import InvalidParameterError
-from dcicutils.lang_utils import there_are
 from typing import Optional
-from .misc_utils import PRINT
+from .exceptions import InvalidParameterError
+from .lang_utils import there_are
+from .misc_utils import PRINT, environ_bool, print_error_message
 
 
 def _ask_boolean_question(question, quick=None, default=None):
@@ -256,7 +256,7 @@ def setup_subrepo(subrepo_name, subrepo_git_url=None, parent_root=None,
     venv_name = subrepo_name + "_env"
 
     if not os.path.exists(all_subrepos_path):
-        print(f"Creating {all_subrepos_path}...")
+        PRINT(f"Creating {all_subrepos_path}...")
         os.mkdir(all_subrepos_path)
 
     if not os.path.exists(subrepo_path):
@@ -308,3 +308,23 @@ def script_assure_venv(repo_path, script, default_venv_name, method='poetry'):
         script.do(f'source {venv_name}/bin/activate')
     else:
         raise RuntimeError(there_are(venv_names, kind="virtual environment"))
+
+
+DEBUG_SCRIPT = environ_bool("DEBUG_SCRIPT")
+
+SCRIPT_ERROR_HERALD = "Command exited in an unusual way. Please feel free to report this, citing the following message."
+
+
+@contextlib.contextmanager
+def script_catch_errors():
+    try:
+        yield
+        exit(0)
+    except Exception as e:
+        if DEBUG_SCRIPT:
+            # If debugging, let the error propagate, do not trap it.
+            raise
+        else:
+            PRINT(SCRIPT_ERROR_HERALD)
+            print_error_message(e)
+            exit(1)

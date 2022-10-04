@@ -129,7 +129,7 @@ class MissingGlobalEnv(ConfigurationError):
         self.global_bucket = global_bucket
         self.keys = keys
         self.env = env
-        super().__init__("No matches for global env bucket: {global_bucket}; keys: {keys}; desired env: {env}"
+        super().__init__("No matches for env {env} in bucket {global_bucket}; keys: {keys}"
                          .format(global_bucket=global_bucket, keys=keys, env=env))
 
 
@@ -140,6 +140,14 @@ class GlobalBucketAccessError(ConfigurationError):
         self.status = status
         super().__init__("Could not access global env bucket {global_bucket}: status: {status}"
                          .format(global_bucket=global_bucket, status=status))
+
+
+class MissingFoursightBucketTable(ConfigurationError):
+    pass
+
+
+class IncompleteFoursightBucketTable(ConfigurationError):
+    pass
 
 
 class InvalidParameterError(ValueError):
@@ -182,6 +190,15 @@ class InvalidParameterError(ValueError):
         super().__init__(message)
 
 
+class EnvUtilsLoadError(ValueError):
+
+    def __init__(self, msg, *, env_bucket, config_key, encapsulated_error):
+        self.env_bucket = env_bucket
+        self.config_key = config_key
+        self.encapsulated_error = encapsulated_error
+        super().__init__(f"{msg} (env_bucket={env_bucket}, config={config_key})")
+
+
 class AppKeyMissing(RuntimeError):
 
     def __init__(self, context, key_manager):
@@ -204,3 +221,32 @@ class AppServerKeyMissing(AppKeyMissing):
         self.server = server
         super().__init__(context=f"{key_manager.APP_NAME} server {server}",
                          key_manager=key_manager)
+
+
+class NotUsingBeanstalksAnyMore(Exception):
+    pass
+
+
+class NotBeanstalkEnvironment(Exception):
+
+    def __init__(self, message=None, *, envname):
+        self.envname = envname
+        super().__init__(message or f"Not a beanstalk environment: {envname}")
+
+
+class BeanstalkOperationNotImplemented(NotImplementedError):
+    def __init__(self, operation, message=None):
+        self.operation = operation
+        super().__init__(message
+                         or f"Attempt to use an obsolete beanstalk operation {operation} in a container environment.")
+
+
+class LegacyDispatchDisabled(Exception):
+    def __init__(self, operation, call_args=None, call_kwargs=None, mode='dispatch', message=None):
+        self.operation = operation
+        self.call_args = call_args
+        self.call_kwargs = call_kwargs
+        self.mode = mode
+        super().__init__(message
+                         or f"Attempt to use legacy operation {operation}"
+                            f" with args={call_args} kwargs={call_kwargs} mode={mode}.")

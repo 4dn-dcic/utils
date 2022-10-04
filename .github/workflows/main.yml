@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
-        python_version: [3.6, 3.7, 3.8, 3.9]
+        python_version: [3.7, 3.8, 3.9]
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -36,13 +36,22 @@ jobs:
       - name: Install Deps
         run: |
           pip install poetry
+          # show loaded versions of various poetry-related libraries
+          pip freeze --all | egrep '(pip|poetry(.[a-z]+)?|tomlkit)=='
 
       - name: QA
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           S3_ENCRYPT_KEY: ${{ secrets.S3_ENCRYPT_KEY }}
+          GLOBAL_ENV_BUCKET: foursight-envs
         run: |
           poetry install
-          poetry run flake8 dcicutils
-          make test
+          make test-for-ga
+
+      - name: Coveralls
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: ${{ matrix.python_version == '3.9' }}
+        run: |
+          poetry run coveralls --service=github

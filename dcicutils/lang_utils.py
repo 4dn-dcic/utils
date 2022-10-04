@@ -52,7 +52,9 @@ class EnglishUtils:
     def _adjust_ending(cls, word, strip_chars, add_suffix):
         return (word[:-strip_chars] if strip_chars else word) + add_suffix
 
-    _COMPOUND_PLURAL_SIMPLE_PREPOSITIONS = ['about', 'at', 'by', 'for', 'in', 'of', 'on', 'to', 'with']
+    _COMPOUND_PLURAL_SIMPLE_PREPOSITIONS = [
+        'about', 'at', 'between', 'by', 'for', 'from', 'in', 'of', 'on', 'to', 'with'
+    ]
 
     # Phrases like 'using', 'used by', 'used in', etc. function similarly to prepositions when doing pluralization
     # in that the plural of 'a variant referencing a gene' would be 'variants referencing genes', just as
@@ -100,6 +102,9 @@ class EnglishUtils:
         f"^an?[ -]+([^ -].*)$",
         re.IGNORECASE)
 
+    _NOUN_WITH_THAT_OR_WHICH_QUALIFIER = re.compile("^(.*[^,])(,|)[ ]+(that|which)[ ]+(.*)$", re.IGNORECASE)
+    _IS_QUALIFIER = re.compile("^(is|was|has)[ ]+(.*)$", re.IGNORECASE)
+
     @classmethod
     def string_pluralize(cls, word: str, allow_some=False) -> str:
         """
@@ -109,9 +114,29 @@ class EnglishUtils:
               string_pluralize('community') => 'communities'
         """
 
+        qualifier_suffix = ""
+
         charn = word[-1]
         capitalize = word[0].isupper()
         upcase = word.isupper()  # capitalize and not any(ch.islower() for ch in word)
+
+        qual_matched = cls._NOUN_WITH_THAT_OR_WHICH_QUALIFIER.match(word)
+        if qual_matched:
+            qualified, comma, connective, qualifier = qual_matched.groups()
+            word = qualified
+            is_matched = cls._IS_QUALIFIER.match(qualifier)
+            if is_matched:
+                verb, qualifying_adj = is_matched.groups()
+                orig_verb = verb
+                verb = {'is': 'are', 'was': 'were', 'has': 'have'}.get(verb.lower(), verb)
+                if orig_verb[0].isupper():
+                    if orig_verb[-1].isupper():
+                        verb = verb.upper()
+                    else:
+                        verb = verb.capitalize()
+                qualifier = f"{verb} {qualifying_adj}"
+            # Continue to other things after making a verb adjustment
+            qualifier_suffix = f"{comma} {connective} {qualifier}"
 
         # Convert 'a foo' to just 'foo' prior to pluralization. It's pointless to return 'a apples' or 'an apples'.
         # Arguably, we _could_ return 'some apples'
@@ -120,7 +145,7 @@ class EnglishUtils:
             word = indef_matched.group(1)
             if allow_some:
                 prefix = "SOME " if upcase else ("Some " if capitalize else "some ")
-                return prefix + cls.string_pluralize(word)
+                return prefix + cls.string_pluralize(word) + qualifier_suffix
 
         prep_matched = cls._NOUN_WITH_PREPOSITIONAL_ATTACHMENT.match(word)
         if prep_matched:
@@ -131,11 +156,11 @@ class EnglishUtils:
                 # It's important to do this before calling ourselves recursively to avoid getting 'some' in prep phrases
                 prep_obj = indef_matched.group(1)
                 prep_obj = cls.string_pluralize(prep_obj)
-            return cls.string_pluralize(word) + prep_spacing1 + prep + prep_spacing2 + prep_obj
+            return cls.string_pluralize(word) + prep_spacing1 + prep + prep_spacing2 + prep_obj + qualifier_suffix
 
         result = cls._special_case_plural(word)
         if result:
-            return result
+            return result + qualifier_suffix
 
         if cls._ENDS_IN_FE.match(word):
             result = cls._adjust_ending(word, 2, "ves")
@@ -155,11 +180,11 @@ class EnglishUtils:
             result = cls._adjust_ending(word, 0, "s")
 
         if upcase:
-            return result.upper()
+            return result.upper() + qualifier_suffix
         elif capitalize:
-            return result.capitalize()
+            return result.capitalize() + qualifier_suffix
         else:
-            return result
+            return result + qualifier_suffix
 
     _USE_AN = {}
 
@@ -318,8 +343,8 @@ class EnglishUtils:
 
     @classmethod
     def there_are(cls, items, *, kind: str = "thing", count: Optional[int] = None, there: str = "there",
-                  capitalize=True, joiner=None, zero: object = "no", punctuate=False, use_article=False,
-                  show=True, context=None, tense='present',
+                  capitalize=True, joiner=None, zero: object = "no", punctuate=None, punctuate_none=None,
+                  use_article=False, show=True, context=None, tense='present',
                   **joiner_options) -> str:
         """
         Constructs a sentence that enumerates a set of things.
@@ -358,6 +383,12 @@ class EnglishUtils:
 
         """
 
+        if punctuate is None:
+            punctuate = False if show else True
+
+        if punctuate_none is None:
+            punctuate_none = True if show else punctuate
+
         there = capitalize1(there) if capitalize else there
         n = len(items) if count is None else count
         # If the items is not in the tenses table, it's assumed to be a modal like 'might', 'may', 'must', 'can' etc.
@@ -366,7 +397,8 @@ class EnglishUtils:
         if context:
             part1 += f" {context}"
         if n == 0 or not show:
-            return part1 + "."
+            punctuation = "." if punctuate_none else ""
+            return part1 + punctuation
         else:
             if use_article:
                 items = [a_or_an(str(item)) for item in items]
@@ -478,7 +510,9 @@ class EnglishUtils:
         >>> conjoined_list(['up', 'down', 'all around'], comma=False)
         'up and down and all around'
 
-        :param items: a list of items
+        :param items: a list of items.
+            If a dictionary is given, a list of its keys will be used.
+            If a set is used, it will be converted to a sorted list.
         :param conjunction: a string (default 'and') to be used before the last item if there's more than one
         :param comma: a string (default ',') to use as a comma. Semicolon (';') is the most obvious other choice,
                       or False to indicate that the conjunction should be used between all elements.
@@ -507,6 +541,11 @@ class EnglishUtils:
         else:
             assert isinstance(oxford_comma, str), "The 'oxford_comma' argument must a string or boolean."
             final_sep = oxford_comma + whitespace
+
+        if isinstance(items, dict):
+            items = list(items.keys())
+        elif isinstance(items, set):
+            items = sorted(items)
 
         n = len(items)
 

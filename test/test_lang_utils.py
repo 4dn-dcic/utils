@@ -53,6 +53,8 @@ def test_string_pluralize():
     assert string_pluralize("ox") == "oxen"
 
     assert string_pluralize("file to show") == "files to show"
+    assert string_pluralize("change from point X to point Y") == "changes from point X to point Y"
+    assert string_pluralize("change between date X and date Y") == "changes between date X and date Y"
     assert string_pluralize("bucket to delete") == "buckets to delete"
     assert string_pluralize("a book about a gene") == "books about genes"
     assert string_pluralize("a good book about the defective gene") == "good books about the defective gene"
@@ -112,6 +114,23 @@ def test_string_pluralize():
     assert string_pluralize("AN APPLE") == "APPLES"
     assert string_pluralize("AN APPLE", allow_some=True) == "SOME APPLES"
     assert string_pluralize("THE APPLE") == "THE APPLES"
+
+    assert string_pluralize("file that has to be closed") == "files that have to be closed"
+    assert string_pluralize("file that will have to be closed") == "files that will have to be closed"
+    assert string_pluralize("file that will be opened") == "files that will be opened"
+    assert string_pluralize("file that is still open") == "files that are still open"
+    assert string_pluralize("file that was still open") == "files that were still open"
+
+    assert string_pluralize("file, which has to be closed") == "files, which have to be closed"
+    assert string_pluralize("file, which is what we searched for") == "files, which are what we searched for"
+
+    assert string_pluralize("a name of a file that has to be closed") == "names of files that have to be closed"
+    assert string_pluralize("a name of a file that is open") == "names of files that are open"
+    assert string_pluralize("a name of a file that was open") == "names of files that were open"
+
+    assert string_pluralize("A NAME OF A FILE THAT IS OPEN") == "NAMES OF FILES THAT ARE OPEN"
+    assert string_pluralize("a NAME of a File that is open") == "NAMES of Files that are open"
+    assert string_pluralize("a NAME of a File that IS open") == "NAMES of Files that ARE open"
 
 
 def test_n_of():
@@ -347,6 +366,12 @@ def test_conjoined_list():
     assert EnglishUtils.conjoined_list(['a', 'b', 'c']) == 'a, b and c'
     assert EnglishUtils.conjoined_list(['a', 'b', 'c', 'd']) == 'a, b, c and d'
 
+    # For a set, we use the elements sorted.
+    assert conjoined_list({'apple', 'lemon', 'grape'}) == 'apple, grape and lemon'
+
+    # For dictionary, we use the keys in the order they occur.
+    assert conjoined_list({'apple': 'delicious', 'lemon': 'meyer', 'grape': 'seedless'}) == 'apple, lemon and grape'
+
 
 def test_disjoined_list():
 
@@ -359,6 +384,12 @@ def test_disjoined_list():
     assert disjoined_list(['a', 'b'], oxford_comma=True) == 'a or b'
     assert disjoined_list(['a', 'b', 'c'], oxford_comma=True) == 'a, b, or c'
     assert disjoined_list(['a', 'b', 'c', 'd'], oxford_comma=True) == 'a, b, c, or d'
+
+    # For a set, we use the elements sorted.
+    assert disjoined_list({'apple', 'lemon', 'grape'}) == 'apple, grape or lemon'
+
+    # For dictionary, we use the keys in the order they occur.
+    assert disjoined_list({'apple': 'delicious', 'lemon': 'meyer', 'grape': 'seedless'}) == 'apple, lemon or grape'
 
 
 def test_there_are():
@@ -399,6 +430,36 @@ def test_there_are():
                      ) == "There are 2 users: Joe and Sally."
     assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=True) == "There is 1 user: Joe."
     assert there_are([], kind="user", joiner=conjoined_list, punctuate=True) == "There are no users."
+
+    assert there_are([], kind="user", joiner=conjoined_list) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, punctuate=True) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, punctuate=None) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, punctuate=False) == "There are no users."
+
+    assert there_are([], kind="user", joiner=conjoined_list, show=False) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate=True) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate=None) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate=False) == "There are no users"
+
+    assert there_are([], kind="user", joiner=conjoined_list, show=False) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate_none=True) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate_none=None) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate_none=False) == "There are no users"
+
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list) == "There is 1 user: Joe"
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=True) == "There is 1 user: Joe."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=None) == "There is 1 user: Joe"
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=False) == "There is 1 user: Joe"
+
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate=True) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate=None) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate=False) == "There is 1 user"
+
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate_none=True) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate_none=None) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate_none=False) == "There is 1 user"
 
     def check_tense(tense, if0, if1, if2):
         assert there_are([], tense=tense, show=False, kind="foo") == if0

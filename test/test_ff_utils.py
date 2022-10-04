@@ -1,22 +1,24 @@
 import contextlib
 import copy
-import pytest
 import json
 import os
+import pytest
 import requests
 import shutil
 import time
 
 from botocore.exceptions import ClientError
 from dcicutils import es_utils, ff_utils, s3_utils
+from dcicutils.ff_mocks import mocked_s3utils, TestScenarios, TestRecorder
 from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true
-from dcicutils.ff_mocks import mocked_s3utils, TestScenarios
 from dcicutils.qa_utils import (
     check_duplicated_items_by_key, ignored, raises_regexp, MockResponse, MockBoto3, MockBotoSQSClient,
+    MockBotoS3Client,
 )
 from types import GeneratorType
 from unittest import mock
 from urllib.parse import urlsplit, parse_qsl
+from .helpers import using_fresh_ff_state_for_testing, using_fresh_ff_deployed_state_for_testing
 
 
 pytestmark = pytest.mark.working
@@ -96,15 +98,18 @@ def profiles():
     }
 
 
+_DATA_DIR = os.path.join(os.path.dirname(__file__), 'data_files')
+
+
 @pytest.fixture
 def mocked_replicate_experiment():
-    with open('./test/data_files/test_experiment_set.json') as opf:
+    with open(os.path.join(_DATA_DIR, 'test_items/431106bc-8535-4448-903e-854af460b260.json')) as opf:
         return json.load(opf)
 
 
 @pytest.fixture
 def qc_metrics():
-    with open('./test/data_files/qc_metrics.json') as opf:
+    with open(os.path.join(_DATA_DIR, 'test_qc_metrics/431106bc-8535-4448-903e-854af460b260.json')) as opf:
         return json.load(opf)
 
 
@@ -236,16 +241,21 @@ def test_unified_authentication_decoding(integrated_ff):
 
 
 @contextlib.contextmanager
-def mocked_s3utils_with_sse():
-    with mocked_s3utils(beanstalks=['fourfront-foo', 'fourfront-bar'], require_sse=True):
-        yield
+def mocked_s3utils_with_sse(beanstalks=None, require_sse=True, files=None):
+    with mocked_s3utils(environments=beanstalks or ['fourfront-foo', 'fourfront-bar'],
+                        require_sse=require_sse) as mock_boto3:
+        s3 = mock_boto3.client('s3')
+        assert isinstance(s3, MockBotoS3Client)
+        for filename, string in (files or {}).items():
+            s3.s3_files.files[filename] = string.encode('utf-8')
+        yield mock_boto3
 
 
 def test_unified_authentication_unit():
 
     ts = TestScenarios
 
-    with mocked_s3utils_with_sse():
+    with mocked_s3utils_with_sse(beanstalks=['fourfront-mastertest', ts.foo_env, ts.bar_env]):
 
         # When supplied a basic auth tuple, (key, secret), and a fourfront environment, the tuple is returned.
         auth1 = ff_utils.unified_authentication(ts.some_auth_tuple, ts.foo_env)
@@ -301,7 +311,10 @@ def test_unified_authentication_integrated(integrated_ff):
     assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
 
+@pytest.mark.stg_or_prd_testing_needs_repair
 @pytest.mark.integrated
+@pytest.mark.flaky
+@using_fresh_ff_deployed_state_for_testing()
 def test_unified_authentication_prod_envs_integrated_only():
     # This is ONLY an integration test. There is no unit test functionality tested here.
     # All of the functionality used here is already tested elsewhere.
@@ -311,22 +324,6 @@ def test_unified_authentication_prod_envs_integrated_only():
     assert len(ff_prod_auth) == 2
     staging_auth = ff_utils.unified_authentication(ff_env="staging")
     assert staging_auth == ff_prod_auth
-    green_auth = ff_utils.unified_authentication(ff_env="fourfront-green")
-    assert green_auth == ff_prod_auth
-    blue_auth = ff_utils.unified_authentication(ff_env="fourfront-blue")
-    assert blue_auth == ff_prod_auth
-
-    # CGAP prod
-    cgap_prod_auth = ff_utils.unified_authentication(ff_env="fourfront-cgap")
-    assert len(cgap_prod_auth) == 2
-
-    # Assure CGAP and Fourfront don't share auth
-    auth_is_shared = cgap_prod_auth == ff_prod_auth
-    assert not auth_is_shared
-
-    with raises_regexp(ClientError, "does not exist"):
-        # There is no such environment as 'fourfront-data'
-        ff_utils.unified_authentication(ff_env="fourfront-data")
 
 
 def test_get_authentication_with_server_unit():
@@ -411,7 +408,8 @@ def test_stuff_in_queues_unit():
     class MockBotoSQSClientErring(MockBotoSQSClient):
         def compute_mock_queue_attribute(self, QueueUrl, Attribute):  # noQA - Amazon AWS chose the argument names
             print("Simulating a boto3 error.")
-            raise ClientError(500, "get_queue_attributes")
+            raise ClientError({"Error": {"Code": 500, "Message": "Simulated Boto3 Error"}},  # noQA
+                              "get_queue_attributes")
 
     # If there is difficulty getting to the queue, it behaves as if there's stuff in the queue.
     with mock.patch.object(ff_utils, "boto3", MockBoto3(sqs=MockBotoSQSClientErring)):
@@ -430,11 +428,36 @@ def test_stuff_in_queues_integrated(integrated_ff):
     for item in search_res[:8]:
         ff_utils.patch_metadata({}, obj_id=item['uuid'], key=integrated_ff['ff_key'])
     time.sleep(3)  # let queues catch up
-    stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env'], check_secondary=True)
+    stuff_in_queue = ff_utils.stuff_in_queues(integrated_ff['ff_env_index_namespace'], check_secondary=True)
     assert stuff_in_queue
     with pytest.raises(Exception) as exec_info:
         ff_utils.stuff_in_queues(None, check_secondary=True)  # fail if no env specified
     assert 'Must provide a full fourfront environment name' in str(exec_info.value)
+
+
+@pytest.mark.unit
+def test_is_bodyless():
+
+    for http_method in ['get', 'delete', 'trace', 'options', 'head']:
+        print(f"Testing {http_method}...")
+        assert ff_utils.is_bodyless(http_method) is True
+        assert ff_utils.is_bodyless(http_method.upper()) is True
+        assert ff_utils.is_bodyless(http_method.capitalize()) is True
+        print(f"OK: {http_method}")
+
+    for http_method in ['post', 'patch', 'put']:
+        print(f"Testing {http_method}...")
+        assert ff_utils.is_bodyless(http_method) is False
+        assert ff_utils.is_bodyless(http_method.upper()) is False
+        assert ff_utils.is_bodyless(http_method.capitalize()) is False
+        print(f"OK: {http_method}")
+
+    for http_method in ['anythingelse']:
+        print(f"Testing {http_method}...")
+        assert ff_utils.is_bodyless(http_method) is False
+        assert ff_utils.is_bodyless(http_method.upper()) is False
+        assert ff_utils.is_bodyless(http_method.capitalize()) is False
+        print(f"OK: {http_method}")
 
 
 @pytest.mark.integrated
@@ -594,6 +617,18 @@ def test_get_metadata_unit():
         assert ff_utils.get_metadata(test_item, key=ts.bar_env_auth_dict, check_queue=False) == error_message_json
 
 
+def test_sls():
+    in_and_out = {
+        'my_id/': 'my_id/',
+        '/my_id/': 'my_id/',
+        '//my_id': 'my_id',
+        'my/id': 'my/id',
+        '/my/id': 'my/id',
+    }
+    for i, o in in_and_out.items():
+        assert ff_utils._sls(i) == o
+
+
 @pytest.mark.integratedx
 @pytest.mark.flaky(max_runs=3)  # very flaky for some reason
 def test_get_metadata_integrated(integrated_ff):
@@ -634,7 +669,7 @@ def test_get_metadata_integrated(integrated_ff):
 
 @pytest.mark.integrated
 @pytest.mark.flaky
-def test_patch_metadata(integrated_ff):
+def test_patch_metadata_integrated(integrated_ff):
     test_item = '331111bc-8535-4448-903e-854af460a254'
     original_res = ff_utils.get_metadata(test_item, key=integrated_ff['ff_key'])
     res = ff_utils.patch_metadata({'description': 'patch test'},
@@ -649,14 +684,40 @@ def test_patch_metadata(integrated_ff):
     assert 'ERROR getting id' in str(exec_info.value)
 
 
-@pytest.mark.integrated
+SAMPLE_RECORD = {
+    'description': 'patch test original value',
+    '@id': '/biosources/4DNSRJFD3WGN/',
+    '@type': ['Biosource', 'Item'],
+    'uuid': '331111bc-8535-4448-903e-854af460a254'
+}
+
+
+@pytest.mark.recordable
+@pytest.mark.integratedx
 @pytest.mark.flaky
-def test_post_delete_purge_links_metadata(integrated_ff):
+def test_post_delete_purge_links_metadata_integrated(integrated_ff):
+    with TestRecorder().recorded_requests('test_post_delete_purge_links_metadata', integrated_ff):
+        check_post_delete_purge_links_metadata(integrated_ff)
+
+
+@pytest.mark.recorded
+@pytest.mark.unit
+def test_post_delete_purge_links_metadata_unit():
+    # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
+    # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
+    with TestRecorder().replayed_requests('test_post_delete_purge_links_metadata') as mocked_integrated_ff:
+        check_post_delete_purge_links_metadata(mocked_integrated_ff)
+
+
+def check_post_delete_purge_links_metadata(integrated_ff):
     """
     Combine all of these tests because they logically fit
     """
-    post_data = {'biosource_type': 'immortalized cell line', 'award': '1U01CA200059-01',
-                 'lab': '4dn-dcic-lab'}
+    post_data = {
+        'biosource_type': 'immortalized cell line',
+        'award': '1U01CA200059-01',
+        'lab': '4dn-dcic-lab'
+    }
     post_res = ff_utils.post_metadata(post_data, 'biosource', key=integrated_ff['ff_key'])
     post_item = post_res['@graph'][0]
     assert 'uuid' in post_item
@@ -714,9 +775,24 @@ def test_post_delete_purge_links_metadata(integrated_ff):
     assert 'The resource could not be found' in str(exec_info.value)
 
 
-@pytest.mark.integrated
+@pytest.mark.recordable
+@pytest.mark.integratedx
 @pytest.mark.flaky
-def test_upsert_metadata(integrated_ff):
+def test_upsert_metadata_integrated(integrated_ff):
+    with TestRecorder().recorded_requests('test_upsert_metadata', integrated_ff):
+        check_upsert_metadata(integrated_ff)
+
+
+@pytest.mark.recorded
+@pytest.mark.unit
+def test_upsert_metadata_unit():
+    # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
+    # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
+    with TestRecorder().replayed_requests('test_upsert_metadata') as mocked_integrated_ff:
+        check_upsert_metadata(mocked_integrated_ff)
+
+
+def check_upsert_metadata(integrated_ff):
     test_data = {'biosource_type': 'immortalized cell line',
                  'award': '1U01CA200059-01', 'lab': '4dn-dcic-lab'}
     upsert_res = ff_utils.upsert_metadata(test_data, 'biosource', key=integrated_ff['ff_key'])
@@ -960,6 +1036,7 @@ def test_search_metadata_with_generator(integrated_ff):
     validate_gen(search_gen, 3)
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 def test_get_es_metadata_with_generator(integrated_ff):
     """ Tests using get_es_metadata with the generator option """
@@ -975,6 +1052,7 @@ def test_get_es_metadata_with_generator(integrated_ff):
     assert found == 15
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_get_search_generator(integrated_ff):
@@ -1005,6 +1083,7 @@ def test_get_search_generator(integrated_ff):
     assert len(all_gen3_uuids) == len(all_gen3)
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_get_es_metadata(integrated_ff):
@@ -1113,6 +1192,7 @@ def test_get_es_metadata(integrated_ff):
     assert 'Invalid sources for get_es_metadata' in str(exec_info2.value)
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_get_es_search_generator(integrated_ff):
@@ -1142,12 +1222,13 @@ def test_get_es_search_generator(integrated_ff):
 
 @pytest.mark.integrated
 @pytest.mark.flaky
+@using_fresh_ff_state_for_testing()
 def test_get_health_page(integrated_ff):
     health_res = ff_utils.get_health_page(key=integrated_ff['ff_key'])
     assert health_res and 'error' not in health_res
     assert 'elasticsearch' in health_res
     assert 'database' in health_res
-    assert health_res['beanstalk_env'] == integrated_ff['ff_env']
+    assert health_res['beanstalk_env'] == integrated_ff['ff_env_index_namespace']
     # try with ff_env instead of key
     health_res2 = ff_utils.get_health_page(ff_env=integrated_ff['ff_env'])
     assert health_res2 and 'error' not in health_res2
@@ -1168,6 +1249,7 @@ def test_get_schema_names(integrated_ff):
     assert schema_names['ExperimentSetReplicate'] == 'experiment_set_replicate'
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_expand_es_metadata(integrated_ff):
@@ -1200,7 +1282,7 @@ def test_get_item_facets(integrated_ff):
 def test_get_item_facet_values(integrated_ff):
     """ Tests that we correctly grab facets and all their possible values """
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
-    item_type = 'experiment_set_replicate'
+    item_type = 'ExperimentSetReplicate'
     facets = ff_utils.get_item_facet_values(item_type, key=key, ff_env=ff_env)
     assert 'Project' in facets
     assert '4DN' in facets['Project']
@@ -1210,7 +1292,38 @@ def test_get_item_facet_values(integrated_ff):
 
 
 @pytest.mark.integrated
-def test_faceted_search_exp_set(integrated_ff):
+def test_get_search_facet_values(integrated_ff):
+    """ Tests that we correctly grab facets and all their possible values
+    from a search query result """
+    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
+    query = 'search/?lab.display_title=4DN+DCIC%2C+HMS&type=Biosource'
+    facets = ff_utils.get_search_facet_values(query, key=key, ff_env=ff_env)
+    print(facets)
+    assert 'Project' in facets
+    assert '4DN' in facets['Project']
+    assert 'Tissue' in facets
+    assert 'brain' in facets['Tissue']
+    assert 'Status' in facets
+
+
+@pytest.mark.recordable
+@pytest.mark.integratedx
+@pytest.mark.flaky
+def test_faceted_search_exp_set_integrated(integrated_ff):
+    with TestRecorder().recorded_requests('test_faceted_search_exp_set', integrated_ff):
+        check_faceted_search_exp_set(integrated_ff)
+
+
+@pytest.mark.recorded
+@pytest.mark.unit
+def test_faceted_search_exp_set_unit():
+    # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
+    # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
+    with TestRecorder().replayed_requests('test_faceted_search_exp_set') as mocked_integrated_ff:
+        check_faceted_search_exp_set(mocked_integrated_ff)
+
+
+def check_faceted_search_exp_set(integrated_ff):
     """ Tests the experiment set search features using mastertest """
     key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
     all_facets = ff_utils.get_item_facets('experiment_set_replicate', key=key, ff_env=ff_env)
@@ -1250,7 +1363,7 @@ def test_faceted_search_exp_set(integrated_ff):
     sample_type = {'Sample Type': 'immortalized cells'}
     sample_type.update(for_all)
     resp = ff_utils.faceted_search(**sample_type)
-    assert len(resp) == 13
+    assert len(resp) == 12
     sample_cat = {'Sample Category': 'In vitro Differentiation'}
     sample_cat.update(for_all)
     resp = ff_utils.faceted_search(**sample_cat)
@@ -1258,7 +1371,7 @@ def test_faceted_search_exp_set(integrated_ff):
     sample = {'Sample': 'GM12878'}
     sample.update(for_all)
     resp = ff_utils.faceted_search(**sample)
-    assert len(resp) == 13
+    assert len(resp) == 12
     tissue_src = {'Tissue Source': 'endoderm'}
     tissue_src.update(for_all)
     resp = ff_utils.faceted_search(**tissue_src)
@@ -1270,11 +1383,11 @@ def test_faceted_search_exp_set(integrated_ff):
     mods = {'Modifications': 'Stable Transfection'}
     mods.update(for_all)
     resp = ff_utils.faceted_search(**mods)
-    assert len(resp) == 7
+    assert len(resp) == 6
     treats = {'Treatments': 'RNAi'}
     treats.update(for_all)
     resp = ff_utils.faceted_search(**treats)
-    assert len(resp) == 7
+    assert len(resp) == 6
     assay_details = {'Assay Details': 'No value'}
     assay_details.update(for_all)
     resp = ff_utils.faceted_search(**assay_details)
@@ -1286,7 +1399,7 @@ def test_faceted_search_exp_set(integrated_ff):
     warnings = {'Warnings': 'No value'}
     warnings.update(for_all)
     resp = ff_utils.faceted_search(**warnings)
-    assert len(resp) == 4
+    assert len(resp) == 5
     both_projects = {'Project': '4DN|External'}
     both_projects.update(for_all)
     resp = ff_utils.faceted_search(**both_projects)
@@ -1309,10 +1422,18 @@ def test_faceted_search_exp_set(integrated_ff):
     proj_exp_sam.update(for_all)
     resp = ff_utils.faceted_search(**proj_exp_sam)
     assert len(resp) == 1
-    exp_sam = {'Experiment Type': 'ATAC-seq', 'Sample': 'GM12878'}
+    exp_sam = {'Experiment Type': 'ATAC-seq'}
     exp_sam.update(for_all)
     resp = ff_utils.faceted_search(**exp_sam)
     assert len(resp) == 1
+    exp_sam = {'Experiment Type': 'ATAC-seq', 'Sample': 'primary cell'}
+    exp_sam.update(for_all)
+    resp = ff_utils.faceted_search(**exp_sam)
+    assert len(resp) == 1
+    exp_sam = {'Experiment Type': 'ATAC-seq', 'Sample': 'GM12878'}
+    exp_sam.update(for_all)
+    resp = ff_utils.faceted_search(**exp_sam)
+    assert len(resp) == 0
     exp_sam_data = {'Experiment Category': 'Sequencing', 'Sample': 'GM12878',
                     'Dataset': 'Z et al. 2-Stage Repliseq'}
     exp_sam_data.update(for_all)
@@ -1320,8 +1441,24 @@ def test_faceted_search_exp_set(integrated_ff):
     assert len(resp) == 2
 
 
-@pytest.mark.integrated
-def test_faceted_search_users(integrated_ff):
+@pytest.mark.recordable
+@pytest.mark.integratedx
+@pytest.mark.flaky
+def test_faceted_search_users_integrated(integrated_ff):
+    with TestRecorder().recorded_requests('test_faceted_search_users', integrated_ff):
+        check_faceted_search_users(integrated_ff)
+
+
+@pytest.mark.recorded
+@pytest.mark.unit
+def test_faceted_search_users_unit():
+    # This test is quite time-dependent, and using ControlledTime does not seem to sufficiently mock that,
+    # so it's best to just let it run at the rate it wants to run at. That seems to make it pass. -kmp 15-May-2022
+    with TestRecorder().replayed_requests('test_faceted_search_users') as mocked_integrated_ff:
+        check_faceted_search_users(mocked_integrated_ff)
+
+
+def check_faceted_search_users(integrated_ff):
     """
     Tests faceted_search with users intead of experiment set
     Tests a negative search as well
@@ -1363,31 +1500,65 @@ def test_faceted_search_users(integrated_ff):
     assert len(resp) == 10
 
 
-def test_fetch_qc_metrics_logic(mocked_replicate_experiment):
+@pytest.mark.unit
+def test_fetch_qc_metrics_logic_unit(mocked_replicate_experiment):
     """
     Tests that the fetch_qc_metrics function is being used correctly inside the get_associated_qc_metrics function
     """
     with mock.patch("dcicutils.ff_utils.get_metadata") as mock_get_metadata:
-        mock_get_metadata.return_value = {
-            "uuid": "7a2d8f3d-2108-4b81-a09e-fdcf622a0392",
-            "display_title": "QualityMetricPairsqc from 2018-04-27"
-        }
-        result = ff_utils.fetch_files_qc_metrics(mocked_replicate_experiment, ['processed_files'])
-        assert "7a2d8f3d-2108-4b81-a09e-fdcf622a0392" in result
+        mock_get_metadata.side_effect = mocked_get_metadata_from_data_files
+        result = ff_utils.fetch_files_qc_metrics(
+            mocked_get_metadata_from_data_files("331106bc-8535-3338-903e-854af460b544"),
+            associated_files=['other_processed_files'],
+            ignore_typical_fields=False)
+        assert '131106bc-8535-4448-903e-854af460b000' in result
+        assert '131106bc-8535-4448-903e-854abbbbbbbb' in result
 
 
-def test_get_qc_metrics_logic(mocked_replicate_experiment, qc_metrics):
+@pytest.mark.integratedx
+def test_fetch_qc_metrics_logic_integrated(mocked_replicate_experiment):
+    """
+    Tests that the fetch_qc_metrics function is being used correctly inside the get_associated_qc_metrics function
+    """
+    result = ff_utils.fetch_files_qc_metrics(
+        ff_utils.get_metadata("331106bc-8535-3338-903e-854af460b544", ff_env='fourfront-mastertest'),
+        ff_env='fourfront-mastertest',
+        associated_files=['other_processed_files'],
+        ignore_typical_fields=False)
+    assert '131106bc-8535-4448-903e-854af460b000' in result
+    assert '131106bc-8535-4448-903e-854abbbbbbbb' in result
+
+
+def mocked_get_metadata_from_data_files(uuid, **kwargs):
+    result = get_mocked_result(kind='mocked metadata', dirname='test_items', uuid=uuid, ignored_kwargs=kwargs)
+    # Guard against bad mocks.
+    assert 'uuid' in result, f"The result of a mocked get_metadata call for {uuid} has no 'uuid' key."
+    assert result['uuid'] == uuid, f"Result of a mocked get_metadata({uuid!r}) call has wrong uuid {result['uuid']!r}."
+    return result
+
+
+def get_mocked_result(*, kind, dirname, uuid, ignored_kwargs=None):
+    data_file = os.path.join(_DATA_DIR, dirname, uuid + '.json')
+    print(f"Getting {kind} for {uuid} ignoring kwargs={ignored_kwargs} from {data_file}")
+    with open(data_file, 'r') as fp:
+        return json.load(fp)
+
+
+@pytest.mark.unit
+def test_get_qc_metrics_logic_unit():
     """
     End to end test on 'get_associated_qc_metrics' to check the logic of the fuction to make sure
     it is getting the qc metrics.
     """
     with mock.patch("dcicutils.ff_utils.get_metadata") as mock_get_metadata:
-        mock_get_metadata.return_value = mocked_replicate_experiment
-        with mock.patch("dcicutils.ff_utils.fetch_files_qc_metrics") as mock_fetch_qc:
-            mock_fetch_qc.return_value = qc_metrics
-            result = ff_utils.get_associated_qc_metrics("6ba6a5df-dac5-4111-b5f0-299b6bee0f38")
-            assert "762d3cc0-fcd4-4c1a-a99f-124b0f371690" in result
-            assert "9b0b1733-0f17-420e-9e38-1f58ba993c54" in result
+        mock_get_metadata.side_effect = mocked_get_metadata_from_data_files
+        print()  # start output on a fresh line
+        input_uuid = "431106bc-8535-4448-903e-854af460b260"
+        result = ff_utils.get_associated_qc_metrics(input_uuid)
+        assert "131106bc-8535-4448-903e-854abbbbbbbb" in result  # quick pre-test
+        assert result == get_mocked_result(kind='QC metrics',
+                                           dirname='test_qc_metrics',
+                                           uuid=input_uuid)
 
 
 @pytest.mark.integrated
@@ -1424,6 +1595,7 @@ def test_get_qc_metrics(integrated_ff):
     assert 'QualityMetric' in qc_metrics['4c9dabc6-61d6-4054-a951-c4fdd0023800']['values']['@type']
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_expand_es_metadata_frame_object_embedded(integrated_ff):
@@ -1443,6 +1615,7 @@ def test_expand_es_metadata_frame_object_embedded(integrated_ff):
     assert set(uuids_obj) == set(uuids_emb)
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_expand_es_metadata_add_wfrs(integrated_ff):
@@ -1465,6 +1638,7 @@ def test_expand_es_metadata_complain_wrong_frame(integrated_ff):
     assert str(exec_info.value) == """Invalid frame name "embroiled", please use one of ['raw', 'object', 'embedded']"""
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_expand_es_metadata_ignore_fields(integrated_ff):
@@ -1493,6 +1667,8 @@ def test_delete_field(integrated_ff):
     assert "Bad status code" in str(exec_info.value)
 
 
+@pytest.mark.direct_es_query
+@pytest.mark.integrated
 @pytest.mark.file_operation
 @pytest.mark.flaky
 def test_dump_results_to_json(integrated_ff):
@@ -1516,6 +1692,7 @@ def test_dump_results_to_json(integrated_ff):
     clear_folder(test_folder)
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 def test_search_es_metadata(integrated_ff):
     """ Tests search_es_metadata on mastertest """
@@ -1547,6 +1724,7 @@ def test_search_es_metadata(integrated_ff):
     assert res[0]["_source"]["embedded"]["groups"] == ["admin"]
 
 
+@pytest.mark.direct_es_query
 @pytest.mark.integrated
 def test_search_es_metadata_generator(integrated_ff):
     """ Tests SearchESMetadataHandler both normally and with a generator, verifies consistent results """
@@ -1572,10 +1750,12 @@ def test_convert_param():
 
 
 @pytest.mark.integrated
+@using_fresh_ff_state_for_testing()
 def test_get_page(integrated_ff):
     ff_env = integrated_ff['ff_env']
+    ff_env_index_namespace = integrated_ff['ff_env_index_namespace']
     health_res = ff_utils.get_health_page(ff_env=ff_env)
-    assert health_res['namespace'] == ff_env
+    assert health_res['namespace'] == ff_env_index_namespace
     counts_res = ff_utils.get_counts_page(ff_env=ff_env)['db_es_total']
     assert 'DB' in counts_res
     assert 'ES' in counts_res

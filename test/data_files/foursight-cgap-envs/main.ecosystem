@@ -1,0 +1,19 @@
+{
+    "dev_env_domain_suffix": ".hms.harvard.edu",
+    "full_env_prefix": "cgap-",
+    "foursight_url_prefix": "https://cgap.hms.harvard.edu/view/",
+    "orchestrated_app": "cgap",
+    "prd_env_name": "cgap-prd",
+    "test_envs": ["cgap-mastertest", "cgap-dev", "cgap-test", "cgap-wolf"],
+    "hotseat_envs": ["cgap-wolf"],
+    "public_url_table": [
+        {
+            "name": "cgap",
+	        "url": "https://cgap.hms.harvard.edu",
+            "host": "cgap.hms.harvard.edu",
+            "environment": "cgap-prd"
+        }
+    ],
+    "foursight_bucket_prefix": "foursight",
+    "default_workflow_env": "cgap-wolf"
+}

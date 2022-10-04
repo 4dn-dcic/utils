@@ -1,3 +1,5 @@
+import logging
+
 import boto3
 import datetime
 import io
@@ -16,9 +18,10 @@ from dcicutils.exceptions import ExpectedErrorNotSeen, WrongErrorSeen, Unexpecte
 from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ
 from dcicutils.qa_utils import (
     mock_not_called, override_environ, override_dict, show_elapsed_time, timed,
-    ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule,
+    ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
+    logged_messages, input_mocked, ChangeLogChecker, MockLog,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -27,6 +30,9 @@ from .fixtures.sample_fixtures import MockMathError, MockMath, math_enabled
 
 
 notice_pytest_fixtures(math_enabled)   # Use care if editing this line. It is PART OF A TEST.
+
+
+logger = logging.getLogger(__name__)
 
 
 def test_mock_not_called():
@@ -233,11 +239,37 @@ def test_controlled_time_creation():
 
 def test_controlled_time_just_now():
 
-    t = ControlledTime()
+    t = ControlledTime(tick_seconds=1)
 
     t0 = t.just_now()
     t1 = t.just_now()
     assert (t1 - t0).total_seconds() == 0
+
+    t0 = t.time()
+    t1 = t.time()  # one second should have passed
+    t2 = t.time()  # one more second should have passed
+
+    assert t1 - t0 == 1
+    assert t2 - t1 == 1
+
+
+def test_just_utcnow():
+
+    t = ControlledTime()
+    t0 = t.utcnow()
+    assert t.just_utcnow() == t0
+
+    assert ControlledTime.ProxyDatetimeClass(t).utcnow() == t0 + datetime.timedelta(seconds=1)
+
+
+def test_controlled_time_time():
+
+    t = ControlledTime()
+
+    t0 = t.time()
+    t1 = t.time()
+
+    assert t1 - t0 == 1
 
 
 def test_controlled_time_now():
@@ -977,6 +1009,58 @@ def test_uppercase_print_with_printed_output():
         assert printed.lines == ["foo", "bar"]
         assert printed.last == "bar"
 
+        printed.reset()
+
+        mfs = MockFileSystem()
+        with mfs.mock_exists_open_remove():
+
+            with io.open("some-file.txt", 'w') as fp:
+                PRINT("stuff to file", file=fp)
+                PRINT("stuff to console")
+                PRINT("more stuff to file", file=fp)
+                PRINT("more stuff to console")
+
+            assert printed.lines == ["stuff to console", "more stuff to console"]
+            assert printed.last == "more stuff to console"
+            assert printed.lines == printed.file_lines[None]
+            assert printed.last == printed.file_last[None]
+            assert printed.file_lines[None] == ["stuff to console", "more stuff to console"]
+            assert printed.file_last[None] == "more stuff to console"
+            assert printed.file_lines[fp] == ["stuff to file", "more stuff to file"]
+            assert printed.file_last[fp] == "more stuff to file"
+
+            PRINT("Done.")
+            assert printed.last == "Done."
+            assert printed.file_last[None] == "Done."
+            assert printed.lines == ["stuff to console", "more stuff to console", "Done."]
+            assert printed.file_lines[None] == ["stuff to console", "more stuff to console", "Done."]
+
+            PRINT("Done, too.", file=fp)
+            assert printed.file_last[fp] == "Done, too."
+            assert printed.file_lines[fp] == ["stuff to file", "more stuff to file", "Done, too."]
+
+            printed.reset()
+
+            with io.open("another-file.txt", 'w') as fp2:
+
+                assert printed.last is None
+                assert printed.file_last[None] is None
+                assert printed.file_last[sys.stdout] is None
+
+                assert printed.lines == []
+                assert printed.file_lines[None] == []
+                assert printed.file_lines[sys.stdout] == []
+
+                assert printed.file_last[fp2] is None
+                assert printed.file_lines[fp2] == []
+
+                PRINT("foo", file=fp2)
+
+                assert printed.last is None
+                assert printed.lines == []
+                assert printed.file_last[fp2] == "foo"
+                assert printed.file_lines[fp2] == ["foo"]
+
 
 def test_uppercase_print_with_time():
 
@@ -1290,14 +1374,11 @@ def test_version_checker_no_changelog():
 
     MyVersionChecker.check_version()
 
-
-def test_version_checker_use_dcicutils_changelog():
-
-    class MyVersionChecker(VersionChecker):
+    class MyChangeLogChecker(ChangeLogChecker):
         PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
-        CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+        CHANGELOG = None
 
-    MyVersionChecker.check_version()
+    MyChangeLogChecker.check_version()
 
 
 def test_version_checker_with_missing_changelog():
@@ -1313,6 +1394,14 @@ def test_version_checker_with_missing_changelog():
 
         with pytest.raises(AssertionError):
             MyVersionChecker.check_version()  # The version history will be missing because of mocking.
+
+        class MyChangeLogChecker(ChangeLogChecker):
+
+            PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+            CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+
+        with pytest.raises(AssertionError):
+            MyChangeLogChecker.check_version()  # The version history will be missing because of mocking.
 
 
 def test_version_checker_with_proper_changelog():
@@ -1344,6 +1433,14 @@ def test_version_checker_with_proper_changelog():
             # The CHANGELOG is present and with the right data.
             MyVersionChecker.check_version()
 
+            class MyChangeLogChecker(ChangeLogChecker):
+
+                PYPROJECT = pyproject_filename
+                CHANGELOG = changelog_filename
+
+            # The CHANGELOG is present and with the right data.
+            MyChangeLogChecker.check_version()
+
 
 def test_version_checker_with_insufficient_changelog():
 
@@ -1370,6 +1467,15 @@ def test_version_checker_with_insufficient_changelog():
             with pytest.warns(VersionChecker.WARNING_CATEGORY):
                 # The CHANGELOG won't have the right data, so we should see a warning.
                 MyVersionChecker.check_version()
+
+            class MyChangeLogChecker(ChangeLogChecker):
+
+                PYPROJECT = pyproject_filename
+                CHANGELOG = changelog_filename
+
+            with pytest.raises(AssertionError):
+                # The CHANGELOG won't have the right data, so we should see a warning.
+                MyChangeLogChecker.check_version()
 
 
 def test_check_duplicated_items_by_key():
@@ -1430,3 +1536,126 @@ def test_known_bug_expected_regression_2():
     with known_bug_expected(jira_ticket="TST-00002", error_class=UnexpectedErrorAfterFix):
         with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError, fixed=True):
             raise RuntimeError("foo")
+
+
+def test_mocked_command_args():
+    with pytest.raises(AssertionError):
+        MockedCommandArgs(foo='x')
+
+    class MockedFooBarArgs(MockedCommandArgs):
+        VALID_ARGS = ['foo', 'bar', 'foobar']
+
+    args = MockedFooBarArgs(foo='x', bar='y', foobar='xy')
+    assert args.foo == 'x'      # noQA - PyCharm can't see we declared this arg
+    assert args.bar == 'y'      # noQA - PyCharm can't see we declared this arg
+    assert args.foobar == 'xy'  # noQA - PyCharm can't see we declared this arg
+
+
+MY_MODULE = sys.modules['test.test_qa_utils']
+
+
+def test_input_mocked():
+
+    def some_function_with_input():
+        return input("input something:")
+
+    with input_mocked("x", "y", module=MY_MODULE):
+        assert some_function_with_input() == "x"
+        assert some_function_with_input() == "y"
+        with pytest.raises(AssertionError) as exc_info:
+            some_function_with_input()
+        assert str(exc_info.value) == "There are not enough mock inputs."
+
+    with pytest.raises(AssertionError) as exc_info:
+        with input_mocked("x", "y", module=sys.modules['test.test_qa_utils']):
+            assert some_function_with_input() == "x"
+    assert str(exc_info.value) == "There is 1 unused mock input."
+
+
+def test_logged_messages():
+
+    with logged_messages("INFO: foo", module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+
+    with pytest.raises(AssertionError):
+        with logged_messages("INFO: foo", module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.info("bar")
+
+    with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+
+    with logged_messages(info=["foo"], warning=["bar"], module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+        logger.warning("bar")
+
+    with pytest.raises(AssertionError):
+        with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.info("bar")
+
+    with pytest.raises(AssertionError):
+        with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.warning("bar")
+
+    with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger', allow_warn=True):
+        logger.warn("bar")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+
+    with pytest.raises(AssertionError):
+        with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger', allow_warn=False):
+            logger.warn("bar")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+
+    with pytest.raises(AssertionError):
+        with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger'):
+            # allow_warn defaults to False
+            logger.warn("bar")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+
+
+def test_mock_log():
+
+    m = MockLog(allow_warn=False)
+
+    with pytest.raises(AssertionError) as exc:
+        m.warn("should fail")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+    assert "warn called. Should be 'warning'" in str(exc.value)
+
+    m = MockLog(allow_warn=True)
+
+    m.debug("a log.debug message")
+    m.info("a log.info message")
+    m.warn("a call to log.warn")
+    m.warning("a call to log.warning")
+    m.error("a call to log.error")
+    m.critical("a call to log.critical")
+
+    assert m.messages == {
+        "debug": ["a log.debug message"],
+        "info": ["a log.info message"],
+        "warning": ["a call to log.warn", "a call to log.warning"],
+        "error": ["a call to log.error"],
+        "critical": ["a call to log.critical"]
+    }
+
+    assert m.all_log_messages == [
+        "DEBUG: a log.debug message",
+        "INFO: a log.info message",
+        "WARNING: a call to log.warn",
+        "WARNING: a call to log.warning",
+        "ERROR: a call to log.error",
+        "CRITICAL: a call to log.critical",
+    ]
+
+
+def test_sqs_client_bad_region():
+
+    with pytest.raises(ValueError) as exc:
+        MockBoto3().client('sqs', region_name='some-region')
+    assert str(exc.value) == "Unexpected region: some-region"
+
+
+def test_s3_client_bad_region():
+
+    with pytest.raises(ValueError) as exc:
+        MockBoto3().client('s3', region_name='some-region')
+    assert str(exc.value) == "Unexpected region: some-region"

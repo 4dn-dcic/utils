@@ -59,7 +59,7 @@ class DiffManager:
 
     CONSTANTS_MAP = {None: 'null', True: 'true', False: 'false'}
 
-    def unroll(self, item, _omit_subscripts=False):
+    def unroll(self, item, normalizer=None, _omit_subscripts=False, _omit_empty_containers=True):
         """
         Unrolls a JSON structure (a multi-level Python dictionary) into a (flat) dictionary of dotted keys.
         The keys in the dictionary depend on the DiffManager's style attribute.
@@ -72,10 +72,12 @@ class DiffManager:
         result = {}
 
         def traverse(item, result, label):
-            if isinstance(item, dict):
+            if normalizer:
+                item = normalizer(label=label, item=item)
+            if (item or _omit_empty_containers) and isinstance(item, dict):
                 for k, v in item.items():
                     traverse(v, result, self._merge_label_key(label=label, key=k))
-            elif isinstance(item, list):
+            elif (item or _omit_empty_containers) and isinstance(item, list):
                 for i, elem in enumerate(item):
                     # TODO: Would it be simpler to just omit subscripts here?
                     traverse(elem, result,
@@ -87,22 +89,29 @@ class DiffManager:
 
         return result
 
-    def diffs(self, item1, item2, _omit_subscripts=False):
+    def diffs(self, item1, item2, include_mappings=False, normalizer=None,
+              _omit_subscripts=False, _omit_empty_containers=True):
         """
         Args:
             item1: a python dictionary (representing its JSON equivalent)
             item2: a python dictionary (representing its JSON equivalent)
+            include_mappings (bool): a boolean indicating whether old/new mappings should be returned
+            normalizer: an optional function that normalizes the object before comparison
             _omit_subscripts: Used INTERNALLY ONLY by .patch_diffs to cause some detail to be elided.
+            _omit_empty_containers: whether to treat "foo": [] or "foo": {} the same as if it were missing
         Returns:
             a dictionary of with keys "added", "changed", "same", and "removed" containing names of keys of each kind.
+            If include_mappings=True, then "old" and "new" will be among the keys.
         """
 
-        d1 = self.unroll(item1, _omit_subscripts=_omit_subscripts)
-        d2 = self.unroll(item2, _omit_subscripts=_omit_subscripts)
-        return self._diffs(d1, d2)
+        d1 = self.unroll(item1, normalizer=normalizer,
+                         _omit_subscripts=_omit_subscripts, _omit_empty_containers=_omit_empty_containers)
+        d2 = self.unroll(item2, normalizer=normalizer,
+                         _omit_subscripts=_omit_subscripts, _omit_empty_containers=_omit_empty_containers)
+        return self._diffs(d1, d2, include_mappings=include_mappings)
 
     @classmethod
-    def _diffs(cls, d1, d2):
+    def _diffs(cls, d1, d2, include_mappings=False):
         removed = []
         added = []
         same = []
@@ -127,13 +136,16 @@ class DiffManager:
             res['same'] = same
         if added:
             res['added'] = added
+        if include_mappings:
+            res['old'] = d1
+            res['new'] = d2
         return res
 
     def patch_diffs(self, item):
         """
         Returns a list of keys for would-be-affected properties if item were a patch request for a piece of JSON.
         """
-        result = self.diffs({}, item, _omit_subscripts=True)
+        result = self.diffs({}, item, _omit_subscripts=True, _omit_empty_containers=False)
         return sorted(result.get('added', []))
 
     def _maybe_sorted(self, items, for_change_type):
@@ -142,7 +154,7 @@ class DiffManager:
         else:
             return items if for_change_type else sorted(items)
 
-    def comparison(self, item1, item2):
+    def comparison(self, item1, item2, normalizer=None):
         """
         Returns a description of the changes between two JSON items (represented as Python dictionaries).
         Each line is a string of the form "<key-path>: <old> => <new>".
@@ -150,8 +162,8 @@ class DiffManager:
         For removals, the <new> will be absent.
         Items remaining the same will not be listed.
         """
-        d1 = self.unroll(item1)
-        d2 = self.unroll(item2)
+        d1 = self.unroll(item1, normalizer=normalizer)
+        d2 = self.unroll(item2, normalizer=normalizer)
         diffs = self._diffs(d1, d2)
         result = []
 

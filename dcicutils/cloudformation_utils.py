@@ -1,8 +1,16 @@
 import boto3
+import logging
+import os
 import re
 
+from .common import DEFAULT_ECOSYSTEM
+from .lang_utils import conjoined_list
 from .misc_utils import PRINT, find_associations, find_association, snake_case_to_camel_case, ignored
-from .env_utils import prod_bucket_env, is_stg_or_prd_env
+from .env_utils import is_stg_or_prd_env, ecr_repository_for_env
+
+
+logging.basicConfig()
+logger = logging.getLogger(__name__)
 
 
 def camelize(snake_name):
@@ -22,6 +30,11 @@ def dehyphenate(s):
 def hyphenify(s):
     """Turns the underscore form of snake_case into the hyphenated form."""
     return s.replace('_', '-')
+
+
+def tokenify(s):
+    """Strip out everything but alphanumerics from a given token"""
+    return ''.join([ch for ch in s if ch.isalpha() or ch.isdigit()])
 
 
 def make_required_key_for_ecs_application_url(env_name):
@@ -63,9 +76,6 @@ def get_ecs_real_url(env):
 #
 # * Shared use of common repos between various platforms without repeated uploads.
 
-DEFAULT_ECOSYSTEM = 'main'
-
-
 def get_ecr_repo_url(env_name=None, *, ecosystem=DEFAULT_ECOSYSTEM, from_stack_output_key=None):
     """
     Gets the ECR repository URL of the repository from which ECS pulls application image runtimes from.
@@ -89,9 +99,10 @@ def get_ecr_repo_url(env_name=None, *, ecosystem=DEFAULT_ECOSYSTEM, from_stack_o
 
     # If there was not repo called 'fourfront-blue' or 'fourfront-green',
     # but there is a 'fourfront-webprod' use that. This could be helpful
-    # some day if there is an orchestrated cgap.
+    # some day if there is an orchestrated cgap, but in the interim it can
+    # still be used to find the fourfront-production ecr repo for fourfront.
     if is_stg_or_prd_env:
-        prod_bucket_suffix = f"/{prod_bucket_env(env_name)}"
+        prod_bucket_suffix = f"/{ecr_repository_for_env(env_name)}"
         for url in found:
             if url.endswith(prod_bucket_suffix):
                 return url
@@ -220,6 +231,66 @@ class AbstractOrchestrationManager:
                 else:
                     return getattr(summary, attr, default)
         return default
+
+    @classmethod
+    def find_lambda_function_names(cls, name_pattern) -> list:
+        """
+        Returns a list of AWS lambda function names which match the given regular expression,
+        which may be a regular expression string or a compiled one (i.e. of type re.Pattern);
+        returns an empty list if no matches.
+
+        :param name_pattern: Regex pattern to match AWS lambda function name; string or re.Pattern.
+        :return: List of matching AWS lambda function names, or empty list if none.
+        """
+        if not name_pattern:
+            return []
+        elif isinstance(name_pattern, str):
+            name_pattern = re.compile(name_pattern)
+        matching_function_names = []
+        lambda_client = boto3.client('lambda')
+        lambda_response = lambda_client.list_functions()
+        while True:
+            functions = lambda_response['Functions']
+            for function in functions:
+                function_name = function['FunctionName']
+                if name_pattern.match(function_name):
+                    matching_function_names.append(function_name)
+            lambda_response_next_marker = lambda_response.get('NextMarker')
+            if not lambda_response_next_marker:
+                break
+            lambda_response = lambda_client.list_functions(Marker=lambda_response_next_marker)
+        return matching_function_names
+
+    CHECK_RUNNER_DEV_PATTERN = re.compile(".*foursight.*development.*CheckRunner.*")
+    CHECK_RUNNER_PROD_PATTERN = re.compile(".*foursight.*production.*CheckRunner.*")
+
+    ENCACHE_RUNNER_NAME = True
+
+    @classmethod
+    def discover_foursight_check_runner_name(cls, stage, encache=ENCACHE_RUNNER_NAME):
+
+        check_runner = os.environ.get('CHECK_RUNNER')
+
+        if check_runner:
+            return check_runner
+
+        # Prod has its own check runner, distinct from dev and test, though .get_stage() will have converted
+        # 'test' to 'dev' by this point anyway. Still, this code is tolerant of not doing that...
+        name_pattern = cls.CHECK_RUNNER_PROD_PATTERN if stage == 'prod' else cls.CHECK_RUNNER_DEV_PATTERN
+        candidates = cls.find_lambda_function_names(name_pattern)
+        if len(candidates) == 1:
+            check_runner = candidates[0]
+            logger.warning(f"CHECK_RUNNER inferred to be {check_runner}")
+        else:
+            logger.error(f"CHECK_RUNNER cannot be inferred"
+                         f" from {conjoined_list(candidates, nothing='no matches')}.")
+
+        if encache:
+            # Discovery is slow. We could encache this value so it's faster next time. I defaulted this to off for now.
+            logger.warning(f"Setting environment variable CHECK_RUNNER={check_runner}.")
+            os.environ['CHECK_RUNNER'] = check_runner
+
+        return check_runner
 
 
 class C4OrchestrationManager(AbstractOrchestrationManager):

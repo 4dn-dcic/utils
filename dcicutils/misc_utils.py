@@ -54,6 +54,41 @@ PRINT = _PRINT()
 PRINT.__name__ = 'PRINT'
 
 
+@contextlib.contextmanager
+def lines_printed_to(file):
+    """
+    This context manager opens a file and returns a function that can be called repeatedly during the body context
+    to do do line-by-line output to that file. It uses PRINT to do that output, so the unit test tools for PRINT
+    can be used to test this.
+    """
+    with io.open(file, 'w') as fp:
+        def write_line(s=""):
+            PRINT(s, file=fp)
+        yield write_line
+
+
+def print_error_message(exception, full=False):
+    """
+    Prints an error message (using dcicutils.misc_utils.PRINT) in the conventional way, as:
+      <error-type>: <error-message>
+    With full=True, the error-type can be made to use dcicutils.misc_utils.full_class_name to get a module name, so:
+      <module-qualified-error-type>: <error-message>
+    """
+    PRINT(get_error_message(exception, full=full))
+
+
+def get_error_message(exception, full=False):
+    """
+    Returns an error message (using dcicutils.misc_utils.PRINT) formatted in the conventional way, as:
+      "<error-type>: <error-message>"
+    With full=True, the error-type can be made to use dcicutils.misc_utils.full_class_name to get a module name, so:
+      "<module-qualified-error-type>: <error-message>"
+    """
+    exception_type_name = full_class_name(exception) if full else exception.__class__.__name__
+    error_message = f"{exception_type_name}: {exception}"
+    return error_message
+
+
 absolute_uri_validator = (
     rfc3986.validators.Validator()
     # Validation qualifiers
@@ -260,7 +295,7 @@ def exported(*variables):
     ---file3.py---
     # This file has not been updated to realize that file1.py is the new home of identity.
     from .file2 import identity
-    print("one=", identity(1))
+    print("one=", identity(1))  # noQA - code example
     """
     ignored(variables)
 
@@ -999,7 +1034,7 @@ def remove_element(elem, lst, raise_error=True):
     return result
 
 
-def remove_prefix(prefix, text, required=False):
+def remove_prefix(prefix: str, text: str, required: bool = False):
     if not text.startswith(prefix):
         if required:
             raise ValueError('Prefix %s is not the initial substring of %s' % (prefix, text))
@@ -1008,7 +1043,7 @@ def remove_prefix(prefix, text, required=False):
     return text[len(prefix):]
 
 
-def remove_suffix(suffix, text, required=False):
+def remove_suffix(suffix: str, text: str, required: bool = False):
     if not text.endswith(suffix):
         if required:
             raise ValueError('Suffix %s is not the final substring of %s' % (suffix, text))
@@ -1506,6 +1541,25 @@ def json_leaf_subst(exp, substitutions):
     return exp
 
 
+class SingletonManager:
+
+    def __init__(self, singleton_class, *singleton_args, **singleton_kwargs):
+        self._singleton = None
+        self._singleton_class = singleton_class
+        self._singleton_args = singleton_args
+        self._singleton_kwargs = singleton_kwargs
+
+    @property
+    def singleton(self):
+        if not self._singleton:
+            self._singleton = self._singleton_class(*self._singleton_args or (), **self._singleton_kwargs or {})
+        return self._singleton
+
+    @property
+    def singleton_class(self):
+        return self._singleton_class
+
+
 class NamedObject(object):
 
     def __init__(self, name):
@@ -1518,6 +1572,24 @@ class NamedObject(object):
         return f"<{self.name}@{id(self):x}>"
 
 
-# The names HMS_TZ and hms_now were deprecated for a while and are removed in dcicutils 3.0
-# HMS_TZ = REF_TZ
-# hms_now = ref_now
+def key_value_dict(key, value):
+    """
+    Given a key k and a value v, returns the dictionary {"Key": k, "Value": v}, which is a format AWS is fond of.
+    """
+    return {'Key': key, 'Value': value}
+
+
+def merge_key_value_dict_lists(x, y):
+    """
+    Merges two lists of the form [{"Key": k1, "Value": v1}, {"Key": k2, "Value": v2}].
+    It is assumed that neither list has repeated keys, and that the resulting list also should not.
+    Entries in the resulting list will be in the same order as the original two lists except when both
+    lists contain entries that share a key. In that case, the two entries will be merged
+    into a single entry with the position of the first such entry and value of the second.
+    """
+    merged = {}
+    for pair in x:
+        merged[pair['Key']] = pair['Value']
+    for pair in y:
+        merged[pair['Key']] = pair['Value']
+    return [key_value_dict(k, v) for k, v in merged.items()]

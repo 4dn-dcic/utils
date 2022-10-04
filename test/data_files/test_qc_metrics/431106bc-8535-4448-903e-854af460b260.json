@@ -1,0 +1,55 @@
+{
+  "131106bc-8535-4448-903e-854abbbbbbbb": {
+    "values": {
+      "url": "https://s3.amazonaws.com/elasticbeanstalk-fourfront-webprod-wfoutput/4DNFIX4AIQHN/pairsqc_report.html",
+      "Total reads": 651962,
+      "Trans reads": 154534,
+      "Cis/Trans ratio": 64.141,
+      "Cis reads (>20kb)": 276411,
+      "overall_quality_status": "PASS",
+      "Short cis reads (<20kb)": 221017,
+      "% Long-range intrachromosomal reads": 42.397,
+      "@type": [
+        "QualityMetricPairsqc",
+        "QualityMetric",
+        "Item"
+      ],
+      "display_title": "QualityMetricPairsqc from 2022-04-19",
+      "quality_metric_summary": [
+        {
+          "title": "Filtered Reads",
+          "value": "651962",
+          "numberType": "integer"
+        },
+        {
+          "title": "Cis reads (>20kb)",
+          "value": "42.397",
+          "tooltip": "Percent of filtered reads (=0.28m)",
+          "numberType": "percent"
+        },
+        {
+          "title": "Short cis reads",
+          "value": "33.9",
+          "tooltip": "Percent of filtered reads (=0.22m)",
+          "numberType": "percent"
+        },
+        {
+          "title": "Trans Reads",
+          "value": "23.703",
+          "tooltip": "Percent of filtered reads (=0.15m)",
+          "numberType": "percent"
+        }
+      ]
+    },
+    "source_file_association": "processed_files",
+    "source_file": "4DNFIAAAAAA3",
+    "source_file_type": "File (pairs)",
+    "experiment_description": "Dilution Hi-C on GM12878 with DNaseI - 4DNEXO67APV1",
+    "organism": "human",
+    "experiment_type": "Dilution Hi-C",
+    "experiment_subclass": "Hi-C",
+    "source_experiment": "4DNEXO67APV1",
+    "source_experimentSet": "4DNESAAAAAA1",
+    "biosource_summary": "GM12878"
+  }
+}

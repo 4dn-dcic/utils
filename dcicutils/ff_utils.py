@@ -7,6 +7,7 @@ import time
 
 from collections import namedtuple
 from elasticsearch.exceptions import AuthorizationException
+from typing import Dict, List
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from . import (
     s3_utils,
@@ -184,6 +185,22 @@ def purge_request_with_retries(request_fxn, url, auth, verb, **kwargs):
     return final_res
 
 
+# Per https://specs.openstack.org/openstack/api-wg/guidelines/http/methods.html
+# although TRACE is the only method that actively disallows a body,
+# in normal practice GET, DELETE, TRACE, OPTIONS and HEAD methods are not expected to have a body.
+
+BODYLESS_REQUEST_METHODS = {'GET', 'DELETE', 'TRACE', 'OPTIONS', 'HEAD'}
+
+
+def is_bodyless(request_method):
+    """
+    Tests the given HTTP request method name to see if it needs a body in its http(s) request.
+    """
+    u = request_method.upper()
+    res = u in BODYLESS_REQUEST_METHODS
+    return res
+
+
 REQUESTS_VERBS = {
     'GET': requests.get,
     'POST': requests.post,
@@ -195,6 +212,15 @@ REQUESTS_VERBS = {
 
 def authorized_request(url, auth=None, ff_env=None, verb='GET',
                        retry_fxn=standard_request_with_retries, **kwargs):
+    return mockable_authorized_request(url=url, auth=auth, ff_env=ff_env, verb=verb, retry_fxn=retry_fxn, **kwargs)
+
+
+def mockable_authorized_request(url, *, auth, ff_env, verb, retry_fxn, **kwargs):
+    return internal_compute_authorized_request(url=url, auth=auth, ff_env=ff_env, verb=verb, retry_fxn=retry_fxn,
+                                               **kwargs)
+
+
+def internal_compute_authorized_request(url, *, auth, ff_env, verb, retry_fxn, **kwargs):
     """
     Generalized function that handles authentication for any type of request to FF.
     Takes a required url, request verb, auth, fourfront environment, and optional
@@ -223,7 +249,7 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     try:
         the_verb = REQUESTS_VERBS[verb.upper()]
     except KeyError:
-        raise ValueError("Provided verb %s is not valid. Must one of: %s"
+        raise ValueError("Provided verb %s is not valid. Must be one of: %s"
                          % (verb.upper(), ', '.join(REQUESTS_VERBS.keys())))
     # automatically detect a search and overwrite the retry if it is standard
     if '/search/' in url and retry_fxn == standard_request_with_retries:
@@ -233,6 +259,12 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     # Save to uncomment if debugging unit tests...
     # print("authorized_request result=", json.dumps(result.json(), indent=2))
     return result
+
+
+def _sls(val):
+    """general helper to check for and strip leading slashes on ids in API fxns
+    """
+    return val.lstrip('/')
 
 
 def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
@@ -251,7 +283,7 @@ def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
     auth = get_authentication_with_server(key, ff_env)
     if check_queue and stuff_in_queues(ff_env, check_secondary=False):
         add_on += '&datastore=database'
-    get_url = '/'.join([auth['server'], obj_id]) + process_add_on(add_on)
+    get_url = '/'.join([auth['server'], _sls(obj_id)]) + process_add_on(add_on)
     # check the queues if check_queue is True
     response = authorized_request(get_url, auth=auth, verb='GET')
     return get_response_json(response)
@@ -269,7 +301,7 @@ def patch_metadata(patch_item, obj_id='', key=None, ff_env=None, add_on=''):
     if not obj_id:
         raise Exception("ERROR getting id from given object %s for the request to"
                         " patch item. Supply a uuid or accession." % obj_id)
-    patch_url = '/'.join([auth['server'], obj_id]) + process_add_on(add_on)
+    patch_url = '/'.join([auth['server'], _sls(obj_id)]) + process_add_on(add_on)
     # format item to json
     patch_item = json.dumps(patch_item)
     response = authorized_request(patch_url, auth=auth, verb='PATCH', data=patch_item)
@@ -353,8 +385,8 @@ def get_search_generator(search_url, auth=None, ff_env=None, page_limit=50):
         try:
             search_res = get_response_json(response)['@graph']
         except KeyError:
-            raise('Cannot get "@graph" from the search request for %s. Response '
-                  'status code is %s.' % (search_url, response.status_code))
+            raise Exception(f'Cannot get "@graph" from the search request for {search_url}.'
+                            f' Response status code is {response.status_code}.')
         last_total = len(search_res)
         curr_from += last_total
         if search_limit != 'all' and curr_from - initial_from > search_limit:
@@ -442,7 +474,7 @@ def get_item_facets(item_type, key=None, ff_env=None):
     """
     Gets facet query string information ie: mapping from facet to query string
     """
-    resp = get_metadata('/profiles/' + item_type + '.json', key=key, ff_env=ff_env)
+    resp = get_metadata('profiles/' + item_type + '.json', key=key, ff_env=ff_env)
     facets = {}
     for query_url, info in resp.get('facets', {}).items():
         facets[info['title']] = query_url
@@ -453,14 +485,15 @@ def get_item_facets(item_type, key=None, ff_env=None):
     return facets
 
 
-def get_item_facet_values(item_type, key=None, ff_env=None):
+def get_search_facet_values(search_query, key=None, ff_env=None):
     """
-    Gets all facets and returns all possible values for each one with counts
-    ie: dictionary of facets mapping to a dictionary containing all possible values
+    Gets all facets available from a provided search and returns all possible values for
+    each with counts - query should begin 'search/...'
+    ie: returns dictionary of facets mapping to a dictionary containing all possible values
     for that facet mapping to the count for that value
     format: {'Project': {'4DN': 2, 'Other': 6}, 'Lab': {...}}
     """
-    resp = get_metadata('/search/?type=' + item_type, key=key, ff_env=ff_env)['facets']
+    resp = get_metadata(search_query, key=key, ff_env=ff_env)['facets']
     facets = {}
     for facet in resp:
         name = facet['title']
@@ -468,6 +501,15 @@ def get_item_facet_values(item_type, key=None, ff_env=None):
         for term in facet['terms']:
             facets[name][term['key']] = term['doc_count']
     return facets
+
+
+def get_item_facet_values(item_type, key=None, ff_env=None):
+    """
+    More specific version of the above function with passed item_type
+    used in faceted_search
+    """
+    query = 'search/?type=' + item_type
+    return get_search_facet_values(query, key=key, ff_env=ff_env)
 
 
 def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
@@ -493,7 +535,7 @@ def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
     """
     item_facets = kwargs.get('item_facets', None)
     item_type = 'ExperimentSetReplicate' if item_type is None else item_type
-    search = '/search/?type=' + item_type
+    search = 'search/?type=' + item_type
     if item_facets is None:
         item_facets = get_item_facets(item_type, key=key, ff_env=ff_env)
     for facet, values in kwargs.items():
@@ -512,7 +554,7 @@ def fetch_files_qc_metrics(data, associated_files=None,
                            ignore_typical_fields=True,
                            key=None, ff_env=None):
     """
-    Utility function to grap all the qc metrics from associated types of file such as:
+    Utility function to grab all the qc metrics from associated types of file such as:
     'proccessed_files', 'other_processed_files', 'files'
     Args:
         data: the metadata of a ExperimentSet or Experiment
@@ -553,7 +595,8 @@ def fetch_files_qc_metrics(data, associated_files=None,
                 if entry.get('quality_metric'):
                     # check if it is a list of qc metrics
                     if entry['quality_metric']['display_title'].startswith('QualityMetricQclist'):
-                        qc_metric_list = get_metadata(entry['quality_metric']['uuid'], key=key, ff_env=ff_env)
+                        qc_metric_list_uuid = entry['quality_metric']['uuid']
+                        qc_metric_list = get_metadata(qc_metric_list_uuid, key=key, ff_env=ff_env)
                         if not qc_metric_list.get('qc_list'):
                             continue
                         for qc in qc_metric_list['qc_list']:
@@ -569,7 +612,7 @@ def fetch_files_qc_metrics(data, associated_files=None,
                                           'source_file': source_file,
                                           'source_file_type': source_file_type
                                           }
-                                        }
+                            }
                             qc_metrics.update(qc_info)
 
                     else:
@@ -585,7 +628,7 @@ def fetch_files_qc_metrics(data, associated_files=None,
                                       'source_file': source_file,
                                       'source_file_type': source_file_type
                                       }
-                                    }
+                        }
                         qc_metrics.update(qc_info)
     return qc_metrics
 
@@ -652,7 +695,8 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
 
     # If it is an experimentset, get qc_metrics for the experiments in the experiment set
     if resp.get('experiments_in_set'):
-        organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['individual']['organism']['name']
+        organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['organism']['name']
+        # organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['individual']['organism']['name']
         experiment_type = resp['experiments_in_set'][0]['experiment_type']['display_title']
         experiment_subclass = resp['experiments_in_set'][0]['experiment_type']['assay_subclass_short']
         biosource_summary = resp['experiments_in_set'][0]['biosample']['biosource_summary']
@@ -696,8 +740,8 @@ def get_metadata_links(obj_id, key=None, ff_env=None):
     Given standard key/ff_env authentication, return result for @@links view
     """
     auth = get_authentication_with_server(key, ff_env)
-    purge_url = '/'.join([auth['server'], obj_id, '@@links'])
-    response = authorized_request(purge_url, auth=auth, verb='GET')
+    links_url = '/'.join([auth['server'], obj_id, '@@links'])
+    response = authorized_request(links_url, auth=auth, verb='GET')
     return get_response_json(response)
 
 
@@ -902,7 +946,7 @@ def get_schema_names(key=None, ff_env=None):
     """
     auth = get_authentication_with_server(key, ff_env)
     schema_name = {}
-    profiles = get_metadata('/profiles/', key=auth, add_on='frame=raw')
+    profiles = get_metadata('profiles/', key=auth, add_on='frame=raw')
     for key, value in profiles.items():
         # skip abstract types
         if value.get('isAbstract') is True:
@@ -1221,16 +1265,24 @@ def get_authentication_with_server(auth=None, ff_env=None):
     return auth
 
 
-def stuff_in_queues(ff_env, check_secondary=False):
+def stuff_in_queues(ff_env_index_namespace, check_secondary=False):
     """
     Used to guarantee up-to-date metadata by checking the contents of the indexer queues.
     If items are currently waiting in the primary queue, return False.
     If check_secondary is True, will also check the secondary queue.
     """
-    if not ff_env:
-        raise ValueError("Must provide a full fourfront environment name to "
-                         "this function (such as 'fourfront-webdev'). You gave: "
-                         "%s" % ff_env)
+    return mockable_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace, check_secondary=check_secondary)
+
+
+def mockable_stuff_in_queues(ff_env_index_namespace, check_secondary):
+    return internal_compute_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace,
+                                            check_secondary=check_secondary)
+
+
+def internal_compute_stuff_in_queues(ff_env_index_namespace, check_secondary):
+    if not ff_env_index_namespace:
+        raise ValueError(f"Must provide a full fourfront environment name to this function"
+                         f" (such as 'fourfront-webdev'). You gave: {ff_env_index_namespace!r}")
     stuff_in_queue = False
     client = boto3.client('sqs', region_name='us-east-1')
     queue_names = ['-indexer-queue']
@@ -1239,14 +1291,14 @@ def stuff_in_queues(ff_env, check_secondary=False):
     for queue_name in queue_names:
         try:
             queue_url = client.get_queue_url(
-                QueueName=ff_env + queue_name
+                QueueName=ff_env_index_namespace + queue_name
             ).get('QueueUrl')
             queue_attrs = client.get_queue_attributes(
                 QueueUrl=queue_url,
                 AttributeNames=['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible']
             ).get('Attributes', {})
         except Exception:
-            PRINT('Error finding queue or its attributes: %s' % ff_env + queue_name)
+            PRINT('Error finding queue or its attributes: %s' % ff_env_index_namespace + queue_name)
             stuff_in_queue = True  # queue not found. use datastore=database
             break
         else:
@@ -1264,7 +1316,7 @@ def fetch_network_ids(subnet_names, security_group_names):
     subnet_ids = []
     security_group_ids = []
     for i in subnet_names:
-        response = ec2_client.describe_subnets()
+        # response = ec2_client.describe_subnets()
         subnet_id = i
         subnet_ids.append(subnet_id)
     for i in security_group_names:
@@ -1303,14 +1355,15 @@ def process_add_on(add_on):
     return add_on
 
 
-def get_url_params(url):
+def get_url_params(url) -> Dict[str, List[str]]:
     """
     Returns a dictionary of url params using parse_qs.
     Example: get_url_params('<server>/search/?type=Biosample&limit=5') returns
     {'type': ['Biosample'], 'limit': '5'}
     """
     parsed_url = urlparse(url)
-    return parse_qs(parsed_url.query)
+    query_string: str = parsed_url.query
+    return parse_qs(query_string)
 
 
 def update_url_params_and_unparse(url, url_params):
