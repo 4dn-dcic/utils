@@ -6,6 +6,15 @@ dcicutils
 Change Log
 ----------
 
+6.0.0
+=====
+
+`PR 224: ElasticSearch 7 <https://github.com/4dn-dcic/utils/pull/224>`_
+
+* Updates ElasticSearch to version 7.13.4, the highest version we can tolerate
+  of this library. This utils version is a requirement for using ES7 or 
+  OpenSearch 1.3 in production.
+
 
 5.3.0
 =====
