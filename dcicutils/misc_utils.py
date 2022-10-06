@@ -54,6 +54,19 @@ PRINT = _PRINT()
 PRINT.__name__ = 'PRINT'
 
 
+@contextlib.contextmanager
+def lines_printed_to(file):
+    """
+    This context manager opens a file and returns a function that can be called repeatedly during the body context
+    to do do line-by-line output to that file. It uses PRINT to do that output, so the unit test tools for PRINT
+    can be used to test this.
+    """
+    with io.open(file, 'w') as fp:
+        def write_line(s=""):
+            PRINT(s, file=fp)
+        yield write_line
+
+
 def print_error_message(exception, full=False):
     """
     Prints an error message (using dcicutils.misc_utils.PRINT) in the conventional way, as:

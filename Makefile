@@ -17,6 +17,7 @@ build:  # builds
 
 test:  # runs default tests, which are the unit tests
 	make test-units
+	make test-static
 
 test-for-ga:
 	poetry run flake8 dcicutils
@@ -36,28 +37,28 @@ test-all:  # you have to be really brave to want this. a lot of things will err
 test-most:  # leaves out things that will probably err but runs unit tests and both kinds of integrations
 	@git log -1 --decorate | head -1
 	@date
-	poetry run pytest -vv -r w -m "not beanstalk_failure and not direct_es_query"
+	poetry run pytest -vv -r w -m "not static and not beanstalk_failure and not direct_es_query"
 	@git log -1 --decorate | head -1
 	@date
 
 test-units-with-coverage:
 	@git log -1 --decorate | head -1
 	@date
-	poetry run coverage run --source dcicutils -m pytest -vv -r w -m "not integratedx and not beanstalk_failure and not direct_es_query"
+	poetry run coverage run --source dcicutils -m pytest -vv -r w -m "not static and not integratedx and not beanstalk_failure and not direct_es_query"
 	@git log -1 --decorate | head -1
 	@date
 
 test-units:  # runs unit tests (and integration tests not backed by a unit test)
 	@git log -1 --decorate | head -1
 	@date
-	poetry run pytest -vv -r w -m "not integratedx and not beanstalk_failure and not direct_es_query"
+	poetry run pytest -vv -r w -m "not static and not integratedx and not beanstalk_failure and not direct_es_query"
 	@git log -1 --decorate | head -1
 	@date
 
 test-integrations:  # runs integration tests
 	@git log -1 --decorate | head -1
 	@date
-	poetry run pytest -vv -r w -m "(integrated or integratedx) and not beanstalk_failure and not direct_es_query"
+	poetry run pytest -vv -r w -m "not static and (integrated or integratedx) and not beanstalk_failure and not direct_es_query"
 	@git log -1 --decorate | head -1
 	@date
 
@@ -65,6 +66,15 @@ test-direct-es-query:  # must be called inside VPC (e.g., from foursight after c
 	@git log -1 --decorate | head -1
 	@date
 	poetry run pytest -vv -r w -m "direct_es_query"
+	@git log -1 --decorate | head -1
+	@date
+
+test-static:
+	@git log -1 --decorate | head -1
+	@date
+	poetry run pytest -vv -r w -m "static"
+	poetry run flake8 dcicutils
+	poetry run flake8 test --exclude=data_files
 	@git log -1 --decorate | head -1
 	@date
 

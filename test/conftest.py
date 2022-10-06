@@ -8,6 +8,9 @@ from dcicutils.ff_mocks import IntegratedFixture
 from .conftest_settings import TEST_DIR, INTEGRATED_ENV
 
 
+IntegratedFixture.verify_portal_access()
+
+
 def _portal_health_get(namespace, portal_url, key):
     healh_json_url = f"{portal_url}/health?format=json"
     response = requests.get(healh_json_url)
@@ -43,7 +46,7 @@ LegacyController.LEGACY_DISPATCH_ENABLED = True
 os.environ['GLOBAL_ENV_BUCKET'] = LEGACY_GLOBAL_ENV_BUCKET
 os.environ['ENV_NAME'] = INTEGRATED_ENV
 
-EnvUtils.init(force=True)  # This would be a good time to force EnvUtils to synchronize with the real environment
+EnvUtils.init()  # This would be a good time to get EnvUtils to synchronize with an environment if it hasn't
 
 
 @pytest.fixture(scope='session')
@@ -86,7 +89,7 @@ def integrated_s3_info(integrated_names):
 
     test_filename = integrated_names['filename']
 
-    s3_obj = IntegratedFixture.S3_CLIENT
+    s3_obj = IntegratedFixture('integrated_ff').S3_CLIENT
     # for now, always upload these files
     s3_obj.s3.put_object(Bucket=s3_obj.outfile_bucket, Key=test_filename,
                          Body=str.encode('thisisatest'))

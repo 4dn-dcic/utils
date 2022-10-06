@@ -15,20 +15,18 @@ import uuid
 
 from dcicutils import qa_utils
 from dcicutils.exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix
-from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ, remove_prefix
+from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ
 from dcicutils.qa_utils import (
     mock_not_called, override_environ, override_dict, show_elapsed_time, timed,
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
-    find_uses, confirm_no_uses, logged_messages, input_mocked, ChangeLogChecker,
+    logged_messages, input_mocked, ChangeLogChecker, MockLog,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
 from unittest import mock
-from .conftest_settings import TEST_DIR
 from .fixtures.sample_fixtures import MockMathError, MockMath, math_enabled
-from .test_misc import DEBUGGING_PATTERNS
 
 
 notice_pytest_fixtures(math_enabled)   # Use care if editing this line. It is PART OF A TEST.
@@ -241,11 +239,37 @@ def test_controlled_time_creation():
 
 def test_controlled_time_just_now():
 
-    t = ControlledTime()
+    t = ControlledTime(tick_seconds=1)
 
     t0 = t.just_now()
     t1 = t.just_now()
     assert (t1 - t0).total_seconds() == 0
+
+    t0 = t.time()
+    t1 = t.time()  # one second should have passed
+    t2 = t.time()  # one more second should have passed
+
+    assert t1 - t0 == 1
+    assert t2 - t1 == 1
+
+
+def test_just_utcnow():
+
+    t = ControlledTime()
+    t0 = t.utcnow()
+    assert t.just_utcnow() == t0
+
+    assert ControlledTime.ProxyDatetimeClass(t).utcnow() == t0 + datetime.timedelta(seconds=1)
+
+
+def test_controlled_time_time():
+
+    t = ControlledTime()
+
+    t0 = t.time()
+    t1 = t.time()
+
+    assert t1 - t0 == 1
 
 
 def test_controlled_time_now():
@@ -1357,21 +1381,6 @@ def test_version_checker_no_changelog():
     MyChangeLogChecker.check_version()
 
 
-def test_version_checker_use_dcicutils_changelog():
-
-    class MyVersionChecker(VersionChecker):
-        PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
-        CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
-
-    MyVersionChecker.check_version()
-
-    class MyChangeLogChecker(ChangeLogChecker):
-        PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
-        CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
-
-    MyChangeLogChecker.check_version()
-
-
 def test_version_checker_with_missing_changelog():
 
     mfs = MockFileSystem(files={'pyproject.toml': '[tool.poetry]\nname = "foo"\nversion = "1.2.3"'})
@@ -1542,60 +1551,6 @@ def test_mocked_command_args():
     assert args.foobar == 'xy'  # noQA - PyCharm can't see we declared this arg
 
 
-def test_find_uses():
-
-    glob_pattern = os.path.join(TEST_DIR, 'data_files/sample_source_files/*.py')
-    raw = find_uses(where=glob_pattern,
-                    patterns=DEBUGGING_PATTERNS)
-    output = {remove_prefix(TEST_DIR + os.sep, file): problems for file, problems in raw.items()}
-    assert output == {
-        'data_files/sample_source_files/file1.py': [
-            {'line': '    print("first use")',
-             'line_number': 2,
-             'summary': 'call to print'},
-            {'line': '    print("second use")',
-             'line_number': 3,
-             'summary': 'call to print'},
-            {'line': '    print("third use", z)',
-             'line_number': 11,
-             'summary': 'call to print'},
-            {'line': '    import pdb; pdb.set_trace()',
-             'line_number': 12,
-             'summary': 'active use of pdb.set_trace'}
-        ],
-        'data_files/sample_source_files/file2.py': [
-            {'line': '    print("third use", z)',
-             'line_number': 5,
-             'summary': 'call to print'},
-            {'line': '    pdb.set_trace()  # Second tallied use',
-             'line_number': 13,
-             'summary': 'active use of pdb.set_trace'},
-            {'line': '    pdb.set_trace()  # Third tallied use',
-             'line_number': 17,
-             'summary': 'active use of pdb.set_trace'}
-        ]
-    }
-
-
-def test_confirm_no_uses():
-
-    with pytest.raises(AssertionError) as exc_info:
-
-        glob_pattern = os.path.join(TEST_DIR, 'data_files/sample_source_files/*.py')
-        confirm_no_uses(where=glob_pattern,
-                        patterns=DEBUGGING_PATTERNS)
-
-    lines = str(exc_info.value).split('\n')
-    assert len(lines) == 3
-    assert lines[0] == "7 problems detected:"
-
-    prefix = f" In {TEST_DIR}/data_files/sample_source_files/"
-    lines = [remove_prefix(prefix, line) for line in sorted(lines[1:])]
-
-    assert lines[0] == "file1.py, 3 calls to print and 1 active use of pdb.set_trace."
-    assert lines[1] == "file2.py, 1 call to print and 2 active uses of pdb.set_trace."
-
-
 MY_MODULE = sys.modules['test.test_qa_utils']
 
 
@@ -1645,13 +1600,62 @@ def test_logged_messages():
             logger.warning("bar")
 
     with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger', allow_warn=True):
-        logger.warn("bar")
+        logger.warn("bar")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
 
     with pytest.raises(AssertionError):
         with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger', allow_warn=False):
-            logger.warn("bar")
+            logger.warn("bar")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
 
     with pytest.raises(AssertionError):
         with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger'):
             # allow_warn defaults to False
-            logger.warn("bar")
+            logger.warn("bar")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+
+
+def test_mock_log():
+
+    m = MockLog(allow_warn=False)
+
+    with pytest.raises(AssertionError) as exc:
+        m.warn("should fail")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+    assert "warn called. Should be 'warning'" in str(exc.value)
+
+    m = MockLog(allow_warn=True)
+
+    m.debug("a log.debug message")
+    m.info("a log.info message")
+    m.warn("a call to log.warn")
+    m.warning("a call to log.warning")
+    m.error("a call to log.error")
+    m.critical("a call to log.critical")
+
+    assert m.messages == {
+        "debug": ["a log.debug message"],
+        "info": ["a log.info message"],
+        "warning": ["a call to log.warn", "a call to log.warning"],
+        "error": ["a call to log.error"],
+        "critical": ["a call to log.critical"]
+    }
+
+    assert m.all_log_messages == [
+        "DEBUG: a log.debug message",
+        "INFO: a log.info message",
+        "WARNING: a call to log.warn",
+        "WARNING: a call to log.warning",
+        "ERROR: a call to log.error",
+        "CRITICAL: a call to log.critical",
+    ]
+
+
+def test_sqs_client_bad_region():
+
+    with pytest.raises(ValueError) as exc:
+        MockBoto3().client('sqs', region_name='some-region')
+    assert str(exc.value) == "Unexpected region: some-region"
+
+
+def test_s3_client_bad_region():
+
+    with pytest.raises(ValueError) as exc:
+        MockBoto3().client('s3', region_name='some-region')
+    assert str(exc.value) == "Unexpected region: some-region"

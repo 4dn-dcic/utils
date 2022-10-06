@@ -25,7 +25,7 @@ from dcicutils.misc_utils import (
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
     capitalize1, local_attrs, dict_zip, json_leaf_subst, print_error_message, get_error_message,
     _is_function_of_exactly_one_required_arg,  # noQA
-    string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists,
+    string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, lines_printed_to,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -2103,7 +2103,7 @@ def test_get_error_message_and_print_error_message():
 
     empty_dict = {}
 
-    test_error(  # The empty_dict['foo'] will unconditonally err, so we don't need the value to get used
+    test_error(  # The empty_dict['foo'] will unconditionally err, so we don't need the value to get used
                error_descriptor=lambda: empty_dict['foo'],
                # There is no difference between short and long forms for primitive error classes that have no module id.
                expected="KeyError: 'foo'",
@@ -2689,3 +2689,15 @@ def test_merge_key_value_dict_lists():
     actual = merge_key_value_dict_lists(old, new)
     expected = [{'Key': 'a', 'Value': '7'}, {'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
     assert actual == expected
+
+
+def test_lines_printed_to():
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove():
+        with lines_printed_to("foo.text") as out:
+
+            out("This is line 1.")
+            out("This is line 2.")
+
+        assert file_contents("foo.text") == "This is line 1.\nThis is line 2.\n"
