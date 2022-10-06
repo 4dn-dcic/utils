@@ -1265,7 +1265,7 @@ def get_authentication_with_server(auth=None, ff_env=None):
     return auth
 
 
-def stuff_in_queues(ff_env_index_namespace, check_secondary=False):
+def stuff_in_queues(ff_env_index_namespace, check_secondary=False) -> bool:
     """
     Used to guarantee up-to-date metadata by checking the contents of the indexer queues.
     If items are currently waiting in the primary queue, return False.
@@ -1274,12 +1274,12 @@ def stuff_in_queues(ff_env_index_namespace, check_secondary=False):
     return mockable_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace, check_secondary=check_secondary)
 
 
-def mockable_stuff_in_queues(ff_env_index_namespace, check_secondary):
+def mockable_stuff_in_queues(ff_env_index_namespace, check_secondary) -> bool:
     return internal_compute_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace,
                                             check_secondary=check_secondary)
 
 
-def internal_compute_stuff_in_queues(ff_env_index_namespace, check_secondary):
+def internal_compute_stuff_in_queues(ff_env_index_namespace, check_secondary) -> bool:
     if not ff_env_index_namespace:
         raise ValueError(f"Must provide a full fourfront environment name to this function"
                          f" (such as 'fourfront-webdev'). You gave: {ff_env_index_namespace!r}")
