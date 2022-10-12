@@ -26,6 +26,7 @@ from dcicutils.misc_utils import (
     capitalize1, local_attrs, dict_zip, json_leaf_subst, print_error_message, get_error_message,
     _is_function_of_exactly_one_required_arg,  # noQA
     string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, lines_printed_to,
+    classproperty, classproperty_cached, Singleton,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
@@ -2658,6 +2659,90 @@ def test_singleton_manager():
     assert foo3_manager.singleton.secret_token == foo3_manager.singleton.secret_token
     assert foo3_manager.singleton.secret_token2 is not None
     assert foo3_manager.singleton.secret_token2 == foo3_manager.singleton.secret_token2
+
+
+def test_classproperty():
+
+    t = ControlledTime()
+
+    class Clock:
+        @classproperty
+        def sample(cls):
+            return t.now()
+
+    class SubClock(Clock):
+        pass
+
+    t0 = Clock.sample
+    t1 = Clock.sample
+    t2 = Clock.sample
+
+    assert t2 > t1 > t0
+
+    t3 = SubClock.sample
+    t4 = SubClock.sample
+
+    assert t4 > t3 > t2
+
+    t5 = Clock.sample
+
+    assert t5 > t4
+
+
+def test_classproperty_cached():
+
+    t = ControlledTime()
+
+    class Clock:
+        @classproperty_cached
+        def sample(cls):
+            return t.now()
+
+    class SubClock(Clock):
+        pass
+
+    t0 = Clock.sample
+    t1 = Clock.sample
+    t2 = Clock.sample
+
+    assert t2 == t1 == t0
+
+    t3 = SubClock.sample
+    t4 = SubClock.sample
+
+    assert t4 == t3
+    assert t3 > t2
+
+    t5 = Clock.sample
+
+    assert t5 == t0
+
+
+def test_singleton():
+
+    assert Singleton() != Singleton()
+    assert Singleton.singleton != Singleton()
+    assert Singleton.singleton == Singleton.singleton
+    assert Singleton.singleton is Singleton.singleton
+
+    assert type(Singleton.singleton) is Singleton
+
+    assert isinstance(Singleton.singleton, Singleton)
+
+    class Foo(Singleton):
+        pass
+
+    assert Foo() != Foo()
+    assert Foo.singleton != Foo()
+    assert Foo.singleton == Foo.singleton
+    assert Foo.singleton is Foo.singleton
+
+    assert Foo.singleton != Singleton.singleton
+
+    assert type(Foo.singleton) is Foo
+
+    assert isinstance(Foo.singleton, Singleton)
+    assert isinstance(Foo.singleton, Foo)
 
 
 def test_key_value_dict():

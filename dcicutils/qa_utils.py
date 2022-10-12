@@ -2307,7 +2307,7 @@ class MockBotoSQSClient(MockBoto3Client):
         if self._mock_queue_name_seen:
             assert self._mock_queue_name_seen in queue_url, "This mock only supports one queue at a time."
 
-    MOCK_QUEUE_URL_PREFIX = 'https://queue.amazonaws.com.mock/12345/'  # just something to make it look like a URL
+    MOCK_QUEUE_URL_PREFIX = 'https://sqs.us-east-1.amazonaws.com.mock/12345/'  # just something to look like a URL
 
     def compute_mock_queue_url(self, queue_name):
         return self.MOCK_QUEUE_URL_PREFIX + queue_name

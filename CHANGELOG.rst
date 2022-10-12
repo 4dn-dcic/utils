@@ -6,6 +6,25 @@ dcicutils
 Change Log
 ----------
 
+6.1.0
+=====
+
+* In ``misc_utils``:
+
+  * New decorator ``@classproperty``
+
+  * New decorator ``@classproperty_cached``
+
+  * New class ``Singleton``. Users of ``SingletonManager`` might prefer this,
+    but we'll continue to support both. (No deprecation for now.)
+
+* In ``qa_utils``:
+
+  * Adjust ``MOCK_QUEUE_URL_PREFIX`` to use a mocked URL that looks more
+    like modern AWS url, where ``queue.amazonaws.com`` has been replaced by
+    ``sqs.us-east-1.amazonaws.com``.
+
+
 6.0.0
 =====
 

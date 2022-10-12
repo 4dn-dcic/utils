@@ -1560,6 +1560,110 @@ class SingletonManager:
         return self._singleton_class
 
 
+class classproperty(object):
+    """
+    This decorator is like 'classproperty', but the function is run only on first use, not every time, and then cached.
+
+    Example:
+
+        import time
+        class Clock:
+            @classproperty
+            def sample():
+                return time.time()
+
+        # Different results each time, just like an instance method, but without having to instantiate the class.
+        Clock.sample
+        1665600812.008385
+        Clock.sample
+        1665600812.760394
+    """
+
+    def __init__(self, getter):
+        self.getter = getter
+
+    def __get__(self, instance, instance_class):
+        ignored(instance)
+        return self.getter(instance_class)
+
+
+class classproperty_cached(object):
+    """
+    This decorator is like 'classproperty', but the function is run only on first use, not every time, and then cached.
+
+    Such a property returns the same value each time, just like any class property,
+    but initialization is delayed until first use and might be the result of
+    a multi-line computation whose temporary variables don't persist past the initialization.
+
+    Example:
+
+        import time
+        class Freeze:
+            @classproperty_cached
+            def sample():
+                return time.time()
+
+        Freeze.sample
+        1665600374.4801269
+        Freeze.sample
+        1665600374.4801269
+
+        class SubFreeze(Freeze):
+            pass
+
+        SubFreeze.sample
+        1665600540.1467211
+        SubFreeze.sample
+        1665600540.1467211
+
+        Freeze.sample
+        1665600374.4801269
+
+        SubFreeze.sample
+        1665600540.1467211
+    """
+
+    def __init__(self, initializer):
+        self.initializer = initializer
+        self.attribute_name = '_cached_' + initializer.__name__
+
+    def __get__(self, instance, instance_class):
+        ignored(instance)
+        if self.attribute_name not in instance_class.__dict__:
+            initial_value = self.initializer(instance_class)
+            setattr(instance_class, self.attribute_name, initial_value)
+        return getattr(instance_class, self.attribute_name)
+
+
+class Singleton:
+    """
+    A class witn a cached class property 'singleton' that holds an instance of the class (created with no arguments).
+
+    The .singleton instance is created on demand (so will not be created at all if .singleton is never accessed).
+
+    Example:
+
+        class Foo(Singleton):
+            pass
+
+        # Regular instantiation of the class works like normal, giving a new class each time.
+        Foo()
+        <__main__.Foo object at 0x10e8aed90>
+        Foo()
+        <__main__.Foo object at 0x10e8b0150>
+
+        # The .singleton property gives the same instance every time.
+        Foo.singleton
+        <__main__.Foo object at 0x10e8aefd0>
+        Foo.singleton
+        <__main__.Foo object at 0x10e8aefd0>
+    """
+
+    @classproperty_cached
+    def singleton(cls):
+        return cls()  # noQA - PyCharm flags a bogus warning for this
+
+
 class NamedObject(object):
 
     def __init__(self, name):
