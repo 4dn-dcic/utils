@@ -4,10 +4,12 @@ import hashlib
 
 from botocore.exceptions import ClientError
 from unittest import mock
-from dcicutils.aws_utils import (
-    delete_mark_s3_object, delete_s3_object_completely, delete_s3_object_version,
-    s3_bucket_exists, s3_bucket_head, s3_bucket_object_count,
-    s3_object_exists, s3_object_head, s3_put_object,
+from dcicutils.bucket_utils import (
+    s3_bucket_head, s3_bucket_exists,
+    s3_bucket_object_count, s3_object_head,
+    s3_object_exists, s3_put_object,
+    s3_object_delete_mark, s3_object_delete_version,
+    s3_object_delete_completely,
 )
 from dcicutils.misc_utils import ignored
 from dcicutils.ff_mocks import (
@@ -65,8 +67,8 @@ def test_s3_bucket_exists():
         # which might have some associated expense.
         s3 = mocked_boto3.client('s3')
 
-        assert s3_bucket_exists(bucket_name='foo', s3=s3)
-        assert not s3_bucket_exists(bucket_name='no-such-bucket', s3=s3)
+        assert s3_bucket_exists(bucket_name='foo', s3_client=s3)
+        assert not s3_bucket_exists(bucket_name='no-such-bucket', s3_client=s3)
 
 
 def test_s3_bucket_object_count():
@@ -112,7 +114,7 @@ def test_s3_object_head():
         # We don't have to pass an s3 argument, but it will have to create a client on each call,
         # which might have some associated expense.
         s3 = mocked_boto3.client('s3')
-        res = s3_object_head(object_key='bar', bucket_name='foo', s3=s3)
+        res = s3_object_head(object_key='bar', bucket_name='foo', s3_client=s3)
         for k, v in expected_res.items():
             assert res.get(k) == v
 
@@ -126,7 +128,7 @@ def test_s3_object_exists():
         # We don't have to pass an s3 argument, but it will have to create a client on each call,
         # which might have some associated expense.
         s3 = mocked_boto3.client('s3')
-        assert s3_object_exists(object_key='bar', bucket_name='foo', s3=s3)
+        assert s3_object_exists(object_key='bar', bucket_name='foo', s3_client=s3)
 
 
 @pytest.mark.skip()  # So that running this empty test won't make it look like we did actual testing.
@@ -159,24 +161,32 @@ def test_s3_put_object():
 
 
 @pytest.mark.skip()  # So that running this empty test won't make it look like we did actual testing.
-def test_delete_mark_s3_object():
-    ignored(delete_mark_s3_object)
+def test_s3_object_delete_mark():
+    ignored(s3_object_delete_mark)
     # TODO: Again the business with bucket versioning is not implemented. Whether you want to implement
     #       that depends on the depth of what you're wanting to test. -kmp 15-Sep-2021
     pass
 
 
 @pytest.mark.skip()  # So that running this empty test won't make it look like we did actual testing.
-def test_delete_s3_object_completely():
-    ignored(delete_s3_object_completely)
+def test_s3_object_delete_version():
+    ignored(s3_object_delete_version)
     # TODO: Again the business with bucket versioning is not implemented. Whether you want to implement
     #       that depends on the depth of what you're wanting to test. -kmp 15-Sep-2021
     pass
 
 
 @pytest.mark.skip()  # So that running this empty test won't make it look like we did actual testing.
-def test_delete_s3_object_version():
-    ignored(delete_s3_object_version)
+def test_s3_object_delete_completely():
+    ignored(s3_object_delete_completely)
+    # TODO: Again the business with bucket versioning is not implemented. Whether you want to implement
+    #       that depends on the depth of what you're wanting to test. -kmp 15-Sep-2021
+    pass
+
+
+@pytest.mark.skip()  # So that running this empty test won't make it look like we did actual testing.
+def test_s3_object_delete_version():
+    ignored(s3_object_delete_version)
     # TODO: Again the business with bucket versioning is not implemented. Whether you want to implement
     #       that depends on the depth of what you're wanting to test. -kmp 15-Sep-2021
     pass

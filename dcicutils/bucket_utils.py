@@ -172,7 +172,7 @@ def s3_object_delete_mark(*, s3_client=None, object_key, bucket_name):
         return None
 
 
-def delete_s3_object_version(*, object_key, bucket_name, version_id=None, s3=None):
+def s3_object_delete_version(*, object_key, bucket_name, version_id=None, s3=None):
     """ Delete the version of an object in the given bucket if the bucket is version enabled
         Or delete the object if is in an unversioned bucket.  If you do not provide a
         version_id and a version enabled bucket an Exception is raised.  'null' is returned
@@ -227,7 +227,7 @@ def delete_s3_object_version(*, object_key, bucket_name, version_id=None, s3=Non
         return None
 
 
-def delete_s3_object_completely(*, object_key, bucket_name, s3):
+def s3_object_delete_completely(*, object_key, bucket_name, s3):
     """ Delete all the versions of an object in the given bucket
 
     :param s3_client: AWS s3 client - default None
