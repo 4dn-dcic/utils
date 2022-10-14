@@ -178,7 +178,7 @@ def s3_object_delete_mark(*, s3_client=None, object_key, bucket_name):
 
 
 def s3_object_delete_version(*, object_key, bucket_name,
-        version_id=None, s3_client=None):
+                             version_id=None, s3_client=None):
     """ Delete the version of an object in the given bucket if the bucket is
         version enabled or delete the object if is in an unversioned bucket.
         If you do not provide a version_id and a version enabled bucket an
