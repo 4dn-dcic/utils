@@ -9,12 +9,6 @@ internals for the implementation of ``dcicutils`` and should not be relied upon 
 that scope.
 
 
-aws_utils
-^^^^^^^^^
-
-.. automodule:: dcicutils.aws_utils
-   :members:
-
 base
 ^^^^
 
@@ -28,6 +22,11 @@ beanstalk_utils
 .. automodule:: dcicutils.beanstalk_utils
    :members:
 
+bucket_utils
+^^^^^^^^^
+
+.. automodule:: dcicutils.bucket_utils
+   :members:
 
 codebuild_utils
 ^^^^^^^^^^^^^^^
