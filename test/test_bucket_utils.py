@@ -44,12 +44,12 @@ def test_s3_bucket_head():
         # which might have some associated expense.
         s3 = mocked_boto3.client('s3')
 
-        res = s3_bucket_head(bucket_name='foo', s3=s3)
+        res = s3_bucket_head(bucket_name='foo', s3_client=s3)
         print(f"res={res}")
         assert isinstance(res, dict)
         assert res['ResponseMetadata']['HTTPStatusCode'] == 200
 
-        res = s3_bucket_head(bucket_name='no-such-bucket', s3=s3)
+        res = s3_bucket_head(bucket_name='no-such-bucket', s3_client=s3)
         print(f"res={res}")
         assert res is None
 
