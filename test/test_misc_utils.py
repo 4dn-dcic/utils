@@ -13,6 +13,7 @@ import uuid
 import warnings
 import webtest
 
+from dcicutils import misc_utils as misc_utils_module
 from dcicutils.misc_utils import (
     PRINT, ignored, ignorable, filtered_warnings, get_setting_from_context, TestApp, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
@@ -24,12 +25,13 @@ from dcicutils.misc_utils import (
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
     capitalize1, local_attrs, dict_zip, json_leaf_subst, print_error_message, get_error_message,
-    _is_function_of_exactly_one_required_arg,  # noQA
+    _is_function_of_exactly_one_required_arg, _apply_decorator,  # noQA
     string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, lines_printed_to,
-    classproperty, classproperty_cached, Singleton,
+    classproperty, classproperty_cached, Singleton, NamedObject, obsolete, ObsoleteError,
 )
 from dcicutils.qa_utils import (
-    Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
+    Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
+    raises_regexp, MockId, MockLog,
 )
 from unittest import mock
 
@@ -495,6 +497,9 @@ def test_virtual_app_crud_failure():
         def get(self, url, **kwargs):
             raise webtest.AppError(simulated_error_message)
 
+        def post(self, url, object, **kwargs):  # noqa - the name of this argument is not chosen by us here
+            raise webtest.AppError(simulated_error_message)
+
         def post_json(self, url, object, **kwargs):  # noqa - the name of this argument is not chosen by us here
             raise webtest.AppError(simulated_error_message)
 
@@ -515,6 +520,7 @@ def test_virtual_app_crud_failure():
 
         operations = [
             lambda: vapp.get(some_url),
+            lambda: vapp.post(some_url, "stuff"),
             lambda: vapp.post_json(some_url, {'a': 1, 'b': 2, 'c': 3}),
             lambda: vapp.put_json(some_url, {'a': 1, 'b': 2, 'c': 3}),
             lambda: vapp.patch_json(some_url, {'b': 5})
@@ -1511,6 +1517,82 @@ def test_is_function_of_exactly_one_required_arg():
     assert _is_function_of_exactly_one_required_arg(f0_2) is False
     assert _is_function_of_exactly_one_required_arg(f0_k0_1) is False
 
+    assert _is_function_of_exactly_one_required_arg(17) is False
+
+
+def test_apply_decorator():
+
+    print()
+
+    def foo(outer1=None, outer2=None, inner1=None, inner2=None):
+        return {'outer1': outer1, 'outer2': outer2, 'inner1': inner1, 'inner2': inner2}
+
+    def foo_positional(inner1):
+        return {'inner1': inner1}
+
+    def curryize(outer1=None, outer2=None):
+        def _curried(fn):
+            @functools.wraps(fn)
+            def _foo(*args, **kwargs):
+                if outer1 is not None:
+                    kwargs['outer1'] = outer1
+                if outer2 is not None:
+                    kwargs['outer2'] = outer2
+                return {'wrapped': fn(*args, **kwargs)}
+            return _foo
+        return _curried
+
+    def never_called(*args, **kwargs):
+        ignored(args, kwargs)
+        raise NotImplementedError("this should never be called")
+
+    print("Testing case 1")
+
+    # Case 1: Mixing positionals and keys is not allowed.
+    with pytest.raises(SyntaxError):
+        _apply_decorator(never_called, 17, somekey=1)
+
+    # Case1: More than one positional is not allowed
+    # Two or more arguments is ambiguous and not allowed.
+    with pytest.raises(SyntaxError):
+        _apply_decorator(never_called, 17, 18)
+
+    print("Testing case 2A")
+
+    assert _apply_decorator(curryize(outer1=1, outer2=2), foo)(inner1=3, inner2=4) == {
+        'wrapped': {
+            'outer1': 1,
+            'outer2': 2,
+            'inner1': 3,
+            'inner2': 4
+        }
+    }
+
+    print("Testing case 2B")
+
+    assert _apply_decorator(curryize, foo_positional)(3) == {
+        'wrapped': {
+            'inner1': 3,
+        }
+    }
+
+    print("Testing case 3")
+
+    # Zero arguments means give back a wrapped function
+    # Corresponds to
+    #   @my_decorator
+    #   def foo_curried(y, z): ...
+    #  so there is no opportunity to supply w and x early.
+
+    assert _apply_decorator(curryize)(foo)(inner1=3, inner2=4) == {
+        'wrapped': {
+            'outer1': None,
+            'outer2': None,
+            'inner1': 3,
+            'inner2': 4
+        }
+    }
+
 
 def test_is_proper_subclass():
 
@@ -1700,6 +1782,8 @@ class TestCachedField:
         with mock.patch.object(datetime_module, "datetime", dt):
             field = CachedField('simple1', update_function=make_counter())
 
+            last_known_time_of_next_update = field.time_of_next_update
+
             assert field.value is not None
 
             # Get a value, which should not be changing over short periods of time.
@@ -1713,6 +1797,8 @@ class TestCachedField:
 
             # Forcing an update even though not much time has passed. Field value should be updated.
             val2 = field.get_updated()
+
+            assert field.time_of_next_update == last_known_time_of_next_update
 
             assert val2 != val1
             assert field.value != val1
@@ -1729,6 +1815,8 @@ class TestCachedField:
             dt.sleep(self.DEFAULT_TIMEOUT / 2)
             val4 = field.get()
 
+            assert field.time_of_next_update == last_known_time_of_next_update
+
             assert val2 == val4
             assert val2 == field.value
             assert val4 == field.value
@@ -1737,6 +1825,9 @@ class TestCachedField:
 
             dt.sleep(self.DEFAULT_TIMEOUT / 2)  # This should push us into the cache refill time
             val5 = field.get()
+
+            assert field.time_of_next_update != last_known_time_of_next_update
+            last_known_time_of_next_update = field.time_of_next_update
 
             assert val2 != val5
             assert field.value != val2
@@ -1748,7 +1839,25 @@ class TestCachedField:
             assert field.get() == val5
 
             dt.sleep(self.DEFAULT_TIMEOUT)  # Fast forward to where we're going to refill again
-            assert field.get() != val5
+            val6 = field.get()
+            assert val6 != val5
+
+            assert field.time_of_next_update != last_known_time_of_next_update
+            last_known_time_of_next_update = field.time_of_next_update
+
+            val7 = field.get_updated()
+            assert val6 != val7
+
+            assert field.time_of_next_update == last_known_time_of_next_update
+
+            val8 = field.get_updated(push_ttl=True)
+            assert val8 == val7 + 1
+            assert field.time_of_next_update != last_known_time_of_next_update
+            last_known_time_of_next_update = field.time_of_next_update
+
+            val9 = field.get_updated(push_ttl=False)
+            assert val9 == val8 + 1
+            assert field.time_of_next_update == last_known_time_of_next_update
 
     def test_cached_field_timeout(self):
         field = CachedField('simple1', update_function=make_counter())
@@ -1756,6 +1865,12 @@ class TestCachedField:
         assert field.timeout == self.DEFAULT_TIMEOUT
         field.set_timeout(30)
         assert field.timeout == 30
+
+    def test_cached_field_str_and_str(self):
+        def constant_17():
+            return 17
+        f = CachedField(name='foo', update_function=constant_17, timeout=1234)
+        assert str(f) == repr(f) == "CachedField(name='foo',update_function=constant_17,timeout=1234)"
 
 
 @pytest.mark.parametrize('token, expected', [
@@ -1839,6 +1954,10 @@ def test_string_list():
     assert string_list(' ') == []
     assert string_list('  foo   ') == ['foo']
     assert string_list('  foo   ,,bar ,  ') == ['foo', 'bar']
+
+    with pytest.raises(ValueError) as exc:
+        string_list(17)
+    assert str(exc.value) == "Not a string: 17"
 
 
 def test_string_md5():
@@ -2270,6 +2389,8 @@ def test_is_valid_absolute_uri():
     # through improperly. Really the colon check was supposed to be checking for a scheme, but colons can
     # happen in other places and that was a lousy check. -kmp 20-Apr-2021
 
+    assert is_valid_absolute_uri(3) is False
+
     assert is_valid_absolute_uri("foo") is False
 
     assert is_valid_absolute_uri("/foo") is False
@@ -2667,7 +2788,7 @@ def test_classproperty():
 
     class Clock:
         @classproperty
-        def sample(cls):
+        def sample(cls):  # noQA - PyCharm wrongly thinks the argname should be 'self'
             return t.now()
 
     class SubClock(Clock):
@@ -2695,7 +2816,7 @@ def test_classproperty_cached():
 
     class Clock:
         @classproperty_cached
-        def sample(cls):
+        def sample(cls):  # noQA - PyCharm wrongly thinks the argname should be 'self'
             return t.now()
 
     class SubClock(Clock):
@@ -2745,6 +2866,21 @@ def test_singleton():
     assert isinstance(Foo.singleton, Foo)
 
 
+def test_named_object():
+
+    with mock.patch.object(misc_utils_module, 'id', MockId(counter_base=0x10001)):
+
+        eof = NamedObject('eof')
+
+        assert str(eof) == '<eof>'
+        assert repr(eof) == '<eof@10001>'
+
+        missing = NamedObject('missing')
+
+        assert str(missing) == '<missing>'
+        assert repr(missing) == '<missing@10002>'
+
+
 def test_key_value_dict():
 
     assert key_value_dict('a', 'b') == {'Key': 'a', 'Value': 'b'}
@@ -2786,3 +2922,31 @@ def test_lines_printed_to():
             out("This is line 2.")
 
         assert file_contents("foo.text") == "This is line 1.\nThis is line 2.\n"
+
+
+def test_obsolete():
+
+    def foo(x):
+        return x + 17
+
+    assert foo(10) == 27
+
+    foo = obsolete(foo)
+    with pytest.raises(ObsoleteError):
+        foo(10)
+
+    def bar(x):
+        return x + 17
+    bar_name = bar.__name__
+
+    assert bar(10) == 27
+
+    mock_logging = MockLog()
+    with mock.patch.object(misc_utils_module, "logging", mock_logging):
+        bar = obsolete(bar, fail=False)
+
+        assert bar(10) == 27
+
+    assert mock_logging.all_log_messages == [
+        f"ERROR: Called obsolete function {bar_name}"
+    ]

@@ -118,7 +118,7 @@ def is_valid_absolute_uri(text):
     # -kmp 21-Apr-2021
     try:
         uri_ref = rfc3986.uri_reference(text)
-    except ValueError:
+    except Exception:
         return False
     try:
         absolute_uri_validator.validate(uri_ref)
@@ -1282,9 +1282,11 @@ class CachedField:
         self._update_timestamp()
 
     def __repr__(self):
-        return 'CachedField %s with update function %s on timeout %s' % (
-            self.name, self._update_function, self.timeout
-        )
+        return str(self)
+
+    def __str__(self):
+        updater_name = self._update_function.__name__
+        return f"CachedField(name={self.name!r},update_function={updater_name},timeout={self.timeout!r})"
 
 
 def make_counter(start=0, step=1):
@@ -1434,13 +1436,15 @@ def _apply_decorator(fn, *args, **kwargs):
     The price to be paid is you can't use it for decorators that take positional arguments.
     """
     if args and (kwargs or len(args) > 1):
+        # Case 1
         # If both args and kwargs are in play, they have to have been passed explicitly like @foo(a1, k2=v2).
         # If more than one positional is given, that has to be something like @foo(a1, a2, ...)
         # Decorators using this function need to agree to only accept keyword arguments, so those cases can't happen.
         # They can do this by using an optional first positional argument, as in 'def foo(x=3):',
         # or they can do it by using a * as in 'def foo(*, x)' or if no arguments are desired, obviously, 'def foo():'.
         raise SyntaxError("Positional arguments to decorator (@%s) not allowed here." % fn.__name__)
-    elif args:
+    elif args:  # i.e., there is 1 positional arg (an no keys)
+        # Case 2
         arg0 = args[0]  # At this point, we know there is a single positional argument.
         #
         # Here there are two cases.
@@ -1457,13 +1461,16 @@ def _apply_decorator(fn, *args, **kwargs):
         # we know that it's really case (a) and that we need to call fn once with no arguments
         # before retrying on arg0.
         if _is_function_of_exactly_one_required_arg(fn):
+            # Case 2A
             # We are ready to wrap the function or class in arg0
             return fn(arg0)
         else:
+            # Case 2B
             # We are ALMOST ready to wrap the function or class in arg0,
             # but first we have to call ourselves with no arguments as in case (a) described above.
             return fn()(arg0)
     else:
+        # Case 3
         # Here we have kwargs = {...} from @foo(x=3, y=4, ...) or maybe no kwargs either @foo().
         # Either way, we've already evaluated the foo(...) call, so all that remains is to call on our kwargs.
         # (There are no args to call it on because we tested that above.)

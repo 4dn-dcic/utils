@@ -18,7 +18,19 @@ Change Log
   * New class ``Singleton``. Users of ``SingletonManager`` might prefer this,
     but we'll continue to support both. (No deprecation for now.)
 
+  * In function ``is_valid_absolute_uri``, better handling of argument type errors.
+
+  * For ``CachedField``:
+
+    * Added a handler for ``__str__`` that returns useful information, which can also be used for ``__repr__``.
+
+    * Fixed handler for ``__repr__`` to return a properly executable expression (shared with ``__str__``).
+
+  * Improved test coverage by adding tests for some parts of the code that were not previously tested.
+
 * In ``qa_utils``:
+
+  * New class ``MockId`` for mocking the ``id`` function in a predictable way.
 
   * Adjust ``MOCK_QUEUE_URL_PREFIX`` to use a mocked URL that looks more
     like modern AWS url, where ``queue.amazonaws.com`` has been replaced by
