@@ -14,7 +14,8 @@ from dcicutils.bucket_utils import (
 from dcicutils.misc_utils import ignored
 from dcicutils.ff_mocks import (
     mocked_boto3_object,
-    # For now, no need to explicitly use these now because the mocked_boto3_object hides them. -kmp 15-Sep-2021
+    # For now, no need to explicitly use these now because the
+    # mocked_boto3_object hides them. -kmp 15-Sep-2021
     # MockBoto3, MockBotoS3Client
 )
 
@@ -25,8 +26,8 @@ def typical_boto3_mocking(s3_files=None, **override_mappings):
     # Might have to add more utils library mocks if we end up callig those, but this will do for now.
     with mocked_boto3_object(s3_files=s3_files, **override_mappings) as mocked_boto3:
         with mock.patch("dcicutils.bucket_utils.boto3", mocked_boto3):
-            #with mock.patch("dcicutils.s3_utils.boto3", mocked_boto3):
-                yield mocked_boto3
+            # with mock.patch("dcicutils.s3_utils.boto3", mocked_boto3):
+            yield mocked_boto3
 
 
 def test_s3_bucket_head():
@@ -96,16 +97,17 @@ def test_s3_bucket_object_count():
         assert s3_bucket_object_count(bucket_name='bar') == 3
 
 
-
 def test_s3_object_head():
-    expected_res = {'Bucket': 'foo', 'Key': 'bar', 'ETag': '437b930db84b8079c2dd804a71936b5f', 'ContentLength': 9}
+    expected_res = {'Bucket': 'foo', 'Key': 'bar',
+                    'ETag': '437b930db84b8079c2dd804a71936b5f',
+                    'ContentLength': 9}
     with typical_boto3_mocking(s3_files={'foo/bar': 'something'}) as mocked_boto3:
         res = s3_object_head(object_key='bar', bucket_name='foo')
         for k, v in expected_res.items():
             assert res.get(k) == v
-        # the assertions below fail because of an Exception raised in the mocked s3_file 
+        # the assertions below fail because of an Exception raised in the mocked s3_file
         # that may need to be updated to allow these type of assertions based on what is
-        # expected in the function 
+        # expected in the function
         # assert not s3_object_head(object_key='no-such-object', bucket_name='foo')
         # assert not s3_object_head(object_key='bar', bucket_name='no-such-bucket')
         # assert not s3_object_head(object_key='no-such-bucket', bucket_name='no-such-bucket')
@@ -121,13 +123,12 @@ def test_s3_object_head():
 def test_s3_object_exists():
     with typical_boto3_mocking(s3_files={'foo/bar': 'something'}) as mocked_boto3:
         assert s3_object_exists(object_key='bar', bucket_name='foo')
-        # the assertions below fail because of an Exception raised in the mocked s3_file 
+        # the assertions below fail because of an Exception raised in the mocked s3_file
         # that may need to be updated to allow these type of assertions based on what is
-        # expected in the function 
+        # expected in the function
         # assert not s3_object_exists(object_key='no-such-object', bucket_name='foo')
         # assert not s3_object_exists(object_key='bar', bucket_name='no-such-bucket')
         # assert not s3_object_exists(object_key='no-such-bucket', bucket_name='no-such-bucket')
-       
         # We don't have to pass an s3 argument, but it will have to create a client on each call,
         # which might have some associated expense.
         s3 = mocked_boto3.client('s3')
@@ -141,7 +142,7 @@ def test_s3_put_object():
     keys_to_test = ['tester.txt', 'test_uuid_1/test.txt']
     obj_content = 'teststring'.encode()
     bucket = 'foo'
-    with typical_boto3_mocking(s3_files={'foo': None}) as mocked_boto3:
+    with typical_boto3_mocking(s3_files={'foo': None}):
         for obj_key in keys_to_test:
             res = s3_put_object(object_key=obj_key, obj=obj_content, bucket_name=bucket)
             assert res.get('ETag') == hashlib.md5(obj_content).hexdigest()
@@ -182,14 +183,6 @@ def test_s3_object_delete_version():
 @pytest.mark.skip()  # So that running this empty test won't make it look like we did actual testing.
 def test_s3_object_delete_completely():
     ignored(s3_object_delete_completely)
-    # TODO: Again the business with bucket versioning is not implemented. Whether you want to implement
-    #       that depends on the depth of what you're wanting to test. -kmp 15-Sep-2021
-    pass
-
-
-@pytest.mark.skip()  # So that running this empty test won't make it look like we did actual testing.
-def test_s3_object_delete_version():
-    ignored(s3_object_delete_version)
     # TODO: Again the business with bucket versioning is not implemented. Whether you want to implement
     #       that depends on the depth of what you're wanting to test. -kmp 15-Sep-2021
     pass
