@@ -1,23 +1,19 @@
 import contextlib
-import pytest
 import hashlib
-
-from botocore.exceptions import ClientError
 from unittest import mock
-from dcicutils.bucket_utils import (
-    s3_bucket_head, s3_bucket_exists,
-    s3_bucket_object_count, s3_object_head,
-    s3_object_exists, s3_put_object,
-    s3_object_delete_mark, s3_object_delete_version,
-    s3_object_delete_completely,
-)
+
+import pytest
+from botocore.exceptions import ClientError
+from dcicutils.bucket_utils import (s3_bucket_exists, s3_bucket_head,
+                                    s3_bucket_object_count,
+                                    s3_object_delete_completely,
+                                    s3_object_delete_mark,
+                                    s3_object_delete_version, s3_object_exists,
+                                    s3_object_head, s3_put_object)
+from dcicutils.ff_mocks import mocked_boto3_object
+# For now, no need to explicitly use these now because the;
+# mocked_boto3_object hides them.-kmp 15-Sep-2021; MockBoto3, MockBotoS3Client
 from dcicutils.misc_utils import ignored
-from dcicutils.ff_mocks import (
-    mocked_boto3_object,
-    # For now, no need to explicitly use these now because the
-    # mocked_boto3_object hides them. -kmp 15-Sep-2021
-    # MockBoto3, MockBotoS3Client
-)
 
 
 @contextlib.contextmanager
