@@ -2243,7 +2243,8 @@ class MockBotoS3Bucket:
             files[prefix] = b''
         # TODO: Does anything need to be returned here?
 
-    def _keys(self):
+    def _keys(self, operation_name="_keys"):
+        fail = client_failer(operation_name, code=404)
         found = False
         keys = set()  # In real S3, this would be cached info, but for testing we just create it on demand
         prefix = self.name + "/"
@@ -2256,7 +2257,7 @@ class MockBotoS3Bucket:
         if not keys:
             if not found:
                 # It's OK if we only found "<bucketname>/", which is an empty, but not missing bucket
-                raise Exception("NoSuchBucket")
+                fail("NoSuchBucket")
         return sorted(keys)
 
     def delete(self):

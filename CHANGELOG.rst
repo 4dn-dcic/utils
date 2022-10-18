@@ -6,6 +6,12 @@ dcicutils
 Change Log
 ----------
 
+6.1.0
+=====
+
+* adding new file for s3 bucket utility functions
+
+
 6.0.0
 =====
 

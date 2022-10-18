@@ -22,6 +22,11 @@ beanstalk_utils
 .. automodule:: dcicutils.beanstalk_utils
    :members:
 
+bucket_utils
+^^^^^^^^^
+
+.. automodule:: dcicutils.bucket_utils
+   :members:
 
 codebuild_utils
 ^^^^^^^^^^^^^^^
