@@ -27,7 +27,8 @@ from dcicutils.misc_utils import (
     capitalize1, local_attrs, dict_zip, json_leaf_subst, print_error_message, get_error_message,
     _is_function_of_exactly_one_required_arg, _apply_decorator,  # noQA
     string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, lines_printed_to,
-    classproperty, classproperty_cached, Singleton, NamedObject, obsolete, ObsoleteError,
+    classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
+    ObsoleteError,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -2812,6 +2813,8 @@ def test_classproperty():
 
 def test_classproperty_cached():
 
+    print()
+
     t = ControlledTime()
 
     class Clock:
@@ -2822,21 +2825,130 @@ def test_classproperty_cached():
     class SubClock(Clock):
         pass
 
-    t0 = Clock.sample
-    t1 = Clock.sample
-    t2 = Clock.sample
+    c_t1 = Clock.sample
+    c_t2 = Clock.sample
+    c_t3 = Clock.sample
 
-    assert t2 == t1 == t0
+    assert c_t3 == c_t2 == c_t1  # Cached value
 
-    t3 = SubClock.sample
-    t4 = SubClock.sample
+    s_t1 = SubClock.sample
+    s_t2 = SubClock.sample
 
-    assert t4 == t3
-    assert t3 > t2
+    assert s_t2 == s_t1 == c_t3 == c_t2 == c_t1  # Cached value and cache is shared with the parent class
 
-    t5 = Clock.sample
+    with pytest.raises(ValueError):
+        classproperty_cached.reset(instance_class=SubClock, attribute_name='sample', subclasses=False)
 
-    assert t5 == t0
+    # This will clear SubClock cache, bu that's shared with the Clock cache, so both will clear.
+    assert classproperty_cached.reset(instance_class=SubClock, attribute_name='sample') is True
+
+    c_t5 = Clock.sample     # This should recompute Clock.sample cache, which is shared by SubCLock
+    assert c_t5 > c_t1
+
+    s_t3 = SubClock.sample  # This will access the Clock.sample cache indirectly
+    assert s_t3 > s_t1
+
+    assert s_t3 == c_t5     # This shows they are the same cache
+
+    # Again, this will clear Clock and SubClock caches
+    classproperty_cached.reset(instance_class=Clock, attribute_name='sample')
+
+    c_t6 = Clock.sample     # This should recompute Clock.sample cached value
+    s_t4 = SubClock.sample  # This should recompute SubClock.sample cached value
+    assert c_t6 > c_t5
+    assert s_t4 > c_t3
+    assert s_t4 == c_t6  # They share a cache
+
+    # Again, both are cleared. This isn't needed but is useful to retain parallel with test
+    # for classproperty_cached_each_subclass
+    classproperty_cached.reset(instance_class=SubClock, attribute_name='sample')
+
+    c_t7 = Clock.sample
+    assert c_t7 > c_t6
+
+    s_t5 = SubClock.sample
+    assert s_t5 > s_t4
+
+    assert s_t5 == c_t7  # They share a cache
+
+    # Finally, this is just an error. Since this cache cleare won't happen, the remaining cache value accesses
+    # will show no change.
+    with pytest.raises(ValueError):
+        classproperty_cached.reset(instance_class=Clock, attribute_name='sample', subclasses=False)
+
+    c_t8 = Clock.sample
+    assert c_t8 == c_t7
+
+    s_t6 = SubClock.sample
+    assert s_t6 == s_t5
+
+
+def test_classproperty_cached_each_subclass():
+
+    print()
+
+    t = ControlledTime()
+
+    class Clock:
+        @classproperty_cached_each_subclass
+        def sample(cls):  # noQA - PyCharm wrongly thinks the argname should be 'self'
+            return t.now()
+
+    class SubClock(Clock):
+        pass
+
+    c_t1 = Clock.sample
+    c_t2 = Clock.sample
+    c_t3 = Clock.sample
+
+    assert c_t3 == c_t2 == c_t1
+
+    s_t1 = SubClock.sample
+    s_t2 = SubClock.sample
+
+    assert s_t2 == s_t1
+    assert s_t1 > c_t3
+
+    c_t4 = Clock.sample
+
+    assert c_t4 == c_t1
+
+    # This will clear SubClock cache only
+    classproperty_cached_each_subclass.reset(instance_class=SubClock, attribute_name='sample')
+
+    c_t5 = Clock.sample
+    assert c_t5 == c_t1
+
+    s_t3 = SubClock.sample  # This should recompute SubClock.sample cached value
+    assert s_t3 > s_t1
+
+    # This will clear Clock and SubClock caches
+    classproperty_cached_each_subclass.reset(instance_class=Clock, attribute_name='sample')
+
+    c_t6 = Clock.sample     # This should recompute Clock.sample cached value
+    s_t4 = SubClock.sample  # This should recompute SubClock.sample cached value
+    assert c_t6 > c_t5
+    assert s_t4 > c_t6
+    assert c_t6 > s_t3
+    assert s_t3 > c_t5
+
+    # This will clear the SubClock cache only
+    classproperty_cached_each_subclass.reset(instance_class=SubClock, attribute_name='sample')
+
+    c_t7 = Clock.sample
+    assert c_t7 == c_t6
+
+    s_t5 = SubClock.sample
+    assert s_t5 > s_t4
+
+    # This will clear Clock cache ONLY, not disturbing SubClock
+    classproperty_cached_each_subclass.reset(instance_class=Clock, attribute_name='sample', subclasses=False)
+
+    c_t8 = Clock.sample
+    assert c_t8 > c_t7
+
+    s_t6 = SubClock.sample
+    assert s_t6 == s_t5
 
 
 def test_singleton():
