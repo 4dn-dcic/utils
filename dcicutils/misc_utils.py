@@ -1600,8 +1600,7 @@ class classproperty_cached(object):
     This decorator is like 'classproperty', but the function is run only on first use, not every time, and then cached.
 
     Such a property returns the same value each time, just like any class property,
-    but initialization is delayed until first use and might be the result of
-    a multi-line computation whose temporary variables don't persist past the initialization.
+    but initialization is delayed until first use and determined by a call to the decorated function.
 
     Example:
 
@@ -1723,11 +1722,10 @@ class classproperty_cached(object):
 
 class classproperty_cached_each_subclass(classproperty_cached):
     """
-    This decorator is like 'classproperty', but the function is run only on first use, not every time, and then cached.
+    This decorator is like 'classproperty_cached', but a separate cache is maintained per-subclass.
 
     Such a property returns the same value each time, just like any class property,
-    but initialization is delayed until first use and might be the result of
-    a multi-line computation whose temporary variables don't persist past the initialization.
+    but initialization is delayed until first use and determined by a call to the decorated function.
 
     Example:
 
