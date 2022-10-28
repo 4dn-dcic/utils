@@ -2836,8 +2836,10 @@ def test_classproperty_cached():
 
     assert s_t2 == s_t1 == c_t3 == c_t2 == c_t1  # Cached value and cache is shared with the parent class
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as exc:
         classproperty_cached.reset(instance_class=SubClock, attribute_name='sample', subclasses=False)
+    assert str(exc.value) == ("The subclasses= argument to classproperty_cached.reset must not be False"
+                              " because classproperty_cached does not use per-subclass caches.")
 
     # This will clear SubClock cache, bu that's shared with the Clock cache, so both will clear.
     assert classproperty_cached.reset(instance_class=SubClock, attribute_name='sample') is True
@@ -2873,14 +2875,31 @@ def test_classproperty_cached():
 
     # Finally, this is just an error. Since this cache cleare won't happen, the remaining cache value accesses
     # will show no change.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as exc:
         classproperty_cached.reset(instance_class=Clock, attribute_name='sample', subclasses=False)
+    assert str(exc.value) == ("The subclasses= argument to classproperty_cached.reset must not be False"
+                              " because classproperty_cached does not use per-subclass caches.")
 
     c_t8 = Clock.sample
     assert c_t8 == c_t7
 
     s_t6 = SubClock.sample
     assert s_t6 == s_t5
+
+    with pytest.raises(ValueError) as exc:
+        classproperty_cached.reset(instance_class='not-a-class', attribute_name='sample')
+    assert str(exc.value) == 'The instance_class= argument to classproperty_cached.reset must be a class.'
+
+    with pytest.raises(ValueError) as exc:
+        classproperty_cached.reset(instance_class=Clock, attribute_name='not_sample')
+    assert str(exc.value) == "The slot Clock.not_sample is not defined."
+
+    class NotClock(Clock):
+        sample = 17  # noQA - This overrides a previous slot and we expect it will break things.
+
+    with pytest.raises(ValueError) as exc:
+        classproperty_cached.reset(instance_class=NotClock, attribute_name='sample')
+    assert str(exc.value) == "The slot NotClock.sample does not contain a cached value."
 
 
 def test_classproperty_cached_each_subclass():
@@ -2949,6 +2968,21 @@ def test_classproperty_cached_each_subclass():
 
     s_t6 = SubClock.sample
     assert s_t6 == s_t5
+
+    with pytest.raises(ValueError) as exc:
+        classproperty_cached_each_subclass.reset(instance_class='not-a-class', attribute_name='sample')
+    assert str(exc.value) == 'The instance_class= argument to classproperty_cached_each_subclass.reset must be a class.'
+
+    with pytest.raises(ValueError) as exc:
+        classproperty_cached_each_subclass.reset(instance_class=Clock, attribute_name='not_sample')
+    assert str(exc.value) == "The slot Clock.not_sample is not defined."
+
+    class NotClock(Clock):
+        sample = 17  # noQA - This overrides a previous slot and we expect it will break things.
+
+    with pytest.raises(ValueError) as exc:
+        classproperty_cached_each_subclass.reset(instance_class=NotClock, attribute_name='sample')
+    assert str(exc.value) == "The slot NotClock.sample does not contain a cached value."
 
 
 def test_singleton():

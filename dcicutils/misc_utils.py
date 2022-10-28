@@ -1663,9 +1663,9 @@ class classproperty_cached(object):
                 attribute_value = superclass_attributes[attribute_name]
                 if isinstance(attribute_value, cls):
                     return superclass, attribute_value
-                raise ValueError(f"The slot {full_class_name(instance_class)}.{attribute_name}"
+                raise ValueError(f"The slot {instance_class.__name__}.{attribute_name}"
                                  f" does not contain a cached value.")
-        raise ValueError(f"The slot {full_class_name(instance_class)}.{attribute_name} is not defined.")
+        raise ValueError(f"The slot {instance_class.__name__}.{attribute_name} is not defined.")
 
     @classmethod
     def _find_cache_class(cls, instance_class, attribute_name):
@@ -1705,11 +1705,10 @@ class classproperty_cached(object):
         """
 
         if not cls._USES_PER_SUBCLASS_CACHES and not subclasses:
-            my_class = full_class_name(cls)
-            raise ValueError(f"The subclasses= argument to {my_class}.reset must not be False"
-                             f" because {my_class} does not use per-subclass caches.")
+            raise ValueError(f"The subclasses= argument to {cls.__name__}.reset must not be False"
+                             f" because {cls.__name__} does not use per-subclass caches.")
         if not isinstance(instance_class, type):
-            raise ValueError(f"The instance_class= argument to {full_class_name(cls)}.reset must be a class.")
+            raise ValueError(f"The instance_class= argument to {cls.__name__}.reset must be a class.")
         reference_class = cls._find_reference_class(instance_class, attribute_name)
         attribute_cache = cls._find_cache_map(reference_class, attribute_name)
         keys_to_remove = []
