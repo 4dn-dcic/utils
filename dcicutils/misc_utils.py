@@ -958,7 +958,7 @@ def override_dict(d, **overrides):
             else:
                 # If the value is not a string and the target dictionary is os.environ
                 # then cast the value to a string as os.environ values can only be strings.
-                if not isinstance(v, str) and d == os.environ:
+                if not isinstance(v, str) and d is os.environ:
                     v = str(v)
                 d[k] = v
         yield
