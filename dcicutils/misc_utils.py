@@ -956,6 +956,10 @@ def override_dict(d, **overrides):
             if v is None:
                 d.pop(k, None)  # Delete key k, tolerating it being already gone
             else:
+                # If the value is not a string and the target dictionary is os.environ
+                # then cast the value to a string as os.environ values can only be strings.
+                if not isinstance(v, str) and d == os.environ:
+                    v = str(v)
                 d[k] = v
         yield
     finally:
