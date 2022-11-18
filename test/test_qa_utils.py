@@ -21,7 +21,7 @@ from dcicutils.qa_utils import (
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
-    logged_messages, input_mocked, ChangeLogChecker, MockLog,
+    logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -1659,3 +1659,32 @@ def test_s3_client_bad_region():
     with pytest.raises(ValueError) as exc:
         MockBoto3().client('s3', region_name='some-region')
     assert str(exc.value) == "Unexpected region: some-region"
+
+
+def test_mock_id():
+
+    mock_id = MockId()
+
+    w = 3
+    x = object()
+    y = 'foo'
+    z = None
+
+    w_id = mock_id(w)
+    x_id = mock_id(x)
+    y_id = mock_id(y)
+    z_id = mock_id(z)
+
+    assert w_id + 1 == x_id
+    assert x_id + 1 == y_id
+    assert y_id + 1 == z_id
+
+    assert mock_id(w) == w_id
+    assert mock_id(x) == x_id
+    assert mock_id(y) == y_id
+    assert mock_id(z) == z_id
+
+    mock_id = MockId(counter_base=25)
+    assert mock_id('something') == 25
+    assert mock_id('something-else') == 26
+    assert mock_id('something') == 25

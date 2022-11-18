@@ -18,6 +18,7 @@ import time
 import warnings
 import webtest  # importing the library makes it easier to mock testing
 
+from collections import defaultdict
 from dateutil.parser import parse as dateutil_parse
 from datetime import datetime as datetime_type
 
@@ -118,7 +119,7 @@ def is_valid_absolute_uri(text):
     # -kmp 21-Apr-2021
     try:
         uri_ref = rfc3986.uri_reference(text)
-    except ValueError:
+    except Exception:
         return False
     try:
         absolute_uri_validator.validate(uri_ref)
@@ -1282,9 +1283,11 @@ class CachedField:
         self._update_timestamp()
 
     def __repr__(self):
-        return 'CachedField %s with update function %s on timeout %s' % (
-            self.name, self._update_function, self.timeout
-        )
+        return str(self)
+
+    def __str__(self):
+        updater_name = self._update_function.__name__
+        return f"CachedField(name={self.name!r},update_function={updater_name},timeout={self.timeout!r})"
 
 
 def make_counter(start=0, step=1):
@@ -1434,13 +1437,15 @@ def _apply_decorator(fn, *args, **kwargs):
     The price to be paid is you can't use it for decorators that take positional arguments.
     """
     if args and (kwargs or len(args) > 1):
+        # Case 1
         # If both args and kwargs are in play, they have to have been passed explicitly like @foo(a1, k2=v2).
         # If more than one positional is given, that has to be something like @foo(a1, a2, ...)
         # Decorators using this function need to agree to only accept keyword arguments, so those cases can't happen.
         # They can do this by using an optional first positional argument, as in 'def foo(x=3):',
         # or they can do it by using a * as in 'def foo(*, x)' or if no arguments are desired, obviously, 'def foo():'.
         raise SyntaxError("Positional arguments to decorator (@%s) not allowed here." % fn.__name__)
-    elif args:
+    elif args:  # i.e., there is 1 positional arg (an no keys)
+        # Case 2
         arg0 = args[0]  # At this point, we know there is a single positional argument.
         #
         # Here there are two cases.
@@ -1457,13 +1462,16 @@ def _apply_decorator(fn, *args, **kwargs):
         # we know that it's really case (a) and that we need to call fn once with no arguments
         # before retrying on arg0.
         if _is_function_of_exactly_one_required_arg(fn):
+            # Case 2A
             # We are ready to wrap the function or class in arg0
             return fn(arg0)
         else:
+            # Case 2B
             # We are ALMOST ready to wrap the function or class in arg0,
             # but first we have to call ourselves with no arguments as in case (a) described above.
             return fn()(arg0)
     else:
+        # Case 3
         # Here we have kwargs = {...} from @foo(x=3, y=4, ...) or maybe no kwargs either @foo().
         # Either way, we've already evaluated the foo(...) call, so all that remains is to call on our kwargs.
         # (There are no args to call it on because we tested that above.)
@@ -1558,6 +1566,232 @@ class SingletonManager:
     @property
     def singleton_class(self):
         return self._singleton_class
+
+
+class classproperty(object):
+    """
+    This decorator is like 'classproperty', but the function is run only on first use, not every time, and then cached.
+
+    Example:
+
+        import time
+        class Clock:
+            @classproperty
+            def sample():
+                return time.time()
+
+        # Different results each time, just like an instance method, but without having to instantiate the class.
+        Clock.sample
+        1665600812.008385
+        Clock.sample
+        1665600812.760394
+    """
+
+    def __init__(self, getter):
+        self.getter = getter
+
+    def __get__(self, instance, instance_class):
+        ignored(instance)
+        return self.getter(instance_class)
+
+
+class classproperty_cached(object):
+    """
+    This decorator is like 'classproperty', but the function is run only on first use, not every time, and then cached.
+
+    Such a property returns the same value each time, just like any class property,
+    but initialization is delayed until first use and determined by a call to the decorated function.
+
+    Example:
+
+        import time
+        class Freeze:
+            @classproperty_cached
+            def sample():
+                return time.time()
+
+        Freeze.sample
+        1665600374.4801269
+        Freeze.sample
+        1665600374.4801269
+
+        class SubFreeze(Freeze):
+            pass
+
+        SubFreeze.sample
+        1665600540.1467211
+        SubFreeze.sample
+        1665600540.1467211
+
+        Freeze.sample
+        1665600374.4801269
+
+        SubFreeze.sample
+        1665600540.1467211
+    """
+
+    ATTRIBUTE_CACHE_MAP = defaultdict(lambda: {})
+
+    _USES_PER_SUBCLASS_CACHES = False
+
+    def __init__(self, initializer):
+        self.initializer = initializer
+        self.name = initializer.__name__
+        self.attribute_cache = {}
+
+    def __get__(self, instance, instance_class):
+        ignored(instance)
+        reference_class = self._find_reference_class(instance_class, self.name)
+        if reference_class not in self.attribute_cache:  # If there is no exact class matching, init it.
+            initial_value = self.initializer(reference_class)
+            self.attribute_cache[reference_class] = initial_value
+        return self.attribute_cache[reference_class]
+
+    @classmethod
+    def _find_reference_class(cls, instance_class, attribute_name):
+        if cls._USES_PER_SUBCLASS_CACHES:
+            return instance_class
+        else:
+            return cls._find_cache_class(instance_class, attribute_name)
+
+    @classmethod
+    def _find_cache_class_and_attribute(cls, instance_class, attribute_name):
+        for superclass in instance_class.__mro__:
+            superclass_attributes = superclass.__dict__
+            if attribute_name in superclass_attributes:
+                attribute_value = superclass_attributes[attribute_name]
+                if isinstance(attribute_value, cls):
+                    return superclass, attribute_value
+                raise ValueError(f"The slot {instance_class.__name__}.{attribute_name}"
+                                 f" does not contain a cached value.")
+        raise ValueError(f"The slot {instance_class.__name__}.{attribute_name} is not defined.")
+
+    @classmethod
+    def _find_cache_class(cls, instance_class, attribute_name):
+        return cls._find_cache_class_and_attribute(instance_class, attribute_name)[0]
+
+    @classmethod
+    def _find_cache_attribute(cls, instance_class, attribute_name):
+        return cls._find_cache_class_and_attribute(instance_class, attribute_name)[1]
+
+    @classmethod
+    def _find_cache_map(cls, instance_class, attribute_name) -> dict:
+        attribute = cls._find_cache_attribute(instance_class, attribute_name)
+        return attribute.attribute_cache
+
+    @classmethod
+    def reset(cls, *, instance_class, attribute_name, subclasses=True):
+        """
+        Clears the cache for the given attribute name on the given instance_class.
+
+        Having done:
+
+            import random
+            class Foo:
+                @classproperty_cached
+                def something(cls):
+                    return random.randint(100)
+
+        one can clear the cache by doing:
+
+            classproperty_cached.reset(instance_class=Foo, attribute_name='something')
+
+        :param instance_class: a class with an attribute whose value is managed by '@classproperty_cached'.
+        :param attribute_name: the name of the attribute that has a cached value.
+        :param subclasses: a bool indicating whether the cache reset requests applies to
+             all subclasses (subclasses=True) or only the exact class given (subclasses=False).
+             Using subclasses=False is not allowed if CACHE_EACH_SUBCLASS is False.
+        """
+
+        if not cls._USES_PER_SUBCLASS_CACHES and not subclasses:
+            raise ValueError(f"The subclasses= argument to {cls.__name__}.reset must not be False"
+                             f" because {cls.__name__} does not use per-subclass caches.")
+        if not isinstance(instance_class, type):
+            raise ValueError(f"The instance_class= argument to {cls.__name__}.reset must be a class.")
+        reference_class = cls._find_reference_class(instance_class, attribute_name)
+        attribute_cache = cls._find_cache_map(reference_class, attribute_name)
+        keys_to_remove = []
+        predicate = issubclass if subclasses else equals
+        for cache_class, cache_value in attribute_cache.items():
+            if predicate(cache_class, reference_class):
+                keys_to_remove.append(cache_class)
+        for cache_class in keys_to_remove:
+            del attribute_cache[cache_class]
+        return bool(keys_to_remove)
+
+
+class classproperty_cached_each_subclass(classproperty_cached):
+    """
+    This decorator is like 'classproperty_cached', but a separate cache is maintained per-subclass.
+
+    Such a property returns the same value each time, just like any class property,
+    but initialization is delayed until first use and determined by a call to the decorated function.
+
+    Example:
+
+        import time
+        class Freeze:
+            @classproperty_cached
+            def sample():
+                return time.time()
+
+        Freeze.sample
+        1665600374.4801269
+        Freeze.sample
+        1665600374.4801269
+
+        class SubFreeze(Freeze):
+            pass
+
+        SubFreeze.sample
+        1665600540.1467211
+        SubFreeze.sample
+        1665600540.1467211
+
+        Freeze.sample
+        1665600374.4801269
+
+        SubFreeze.sample
+        1665600540.1467211
+    """
+
+    _USES_PER_SUBCLASS_CACHES = True
+
+
+def equals(x, y):
+    """
+    A functional form of the '==' equality predicate so that it can be handled as a functional value.
+    """
+    return x == y
+
+
+class Singleton:
+    """
+    A class witn a cached class property 'singleton' that holds an instance of the class (created with no arguments).
+
+    The .singleton instance is created on demand (so will not be created at all if .singleton is never accessed).
+
+    Example:
+
+        class Foo(Singleton):
+            pass
+
+        # Regular instantiation of the class works like normal, giving a new class each time.
+        Foo()
+        <__main__.Foo object at 0x10e8aed90>
+        Foo()
+        <__main__.Foo object at 0x10e8b0150>
+
+        # The .singleton property gives the same instance every time.
+        Foo.singleton
+        <__main__.Foo object at 0x10e8aefd0>
+        Foo.singleton
+        <__main__.Foo object at 0x10e8aefd0>
+    """
+
+    @classproperty_cached_each_subclass
+    def singleton(cls):  # noQA - PyCharm wrongly thinks the argname should be 'self'
+        return cls()     # noQA - PyCharm flags a bogus warning for this
 
 
 class NamedObject(object):

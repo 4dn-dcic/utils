@@ -2307,7 +2307,7 @@ class MockBotoSQSClient(MockBoto3Client):
         if self._mock_queue_name_seen:
             assert self._mock_queue_name_seen in queue_url, "This mock only supports one queue at a time."
 
-    MOCK_QUEUE_URL_PREFIX = 'https://queue.amazonaws.com.mock/12345/'  # just something to make it look like a URL
+    MOCK_QUEUE_URL_PREFIX = 'https://sqs.us-east-1.amazonaws.com.mock/12345/'  # just something to look like a URL
 
     def compute_mock_queue_url(self, queue_name):
         return self.MOCK_QUEUE_URL_PREFIX + queue_name
@@ -2629,3 +2629,20 @@ def logged_messages(*args, module,  # module is a required keyword arg (only a s
             assert mocked_log.messages == expected, (
                 f"Expected {logvar}.all_log_messages = {expected}, but got {mocked_log.messages}"
             )
+
+
+class MockId:
+
+    COUNTER_BASE = 0x1000
+
+    def __init__(self, counter_base: Optional[int] = None):
+        self.counter_base = self.COUNTER_BASE if counter_base is None else counter_base
+        self.seen = {}
+
+    def __call__(self, object):
+        if object in self.seen:
+            return self.seen[object]
+        else:
+            n = self.counter_base + len(self.seen)
+            self.seen[object] = n
+            return n
