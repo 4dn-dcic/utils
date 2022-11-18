@@ -18,6 +18,7 @@ import time
 import warnings
 import webtest  # importing the library makes it easier to mock testing
 
+from collections import defaultdict
 from dateutil.parser import parse as dateutil_parse
 from datetime import datetime as datetime_type
 
@@ -1599,8 +1600,7 @@ class classproperty_cached(object):
     This decorator is like 'classproperty', but the function is run only on first use, not every time, and then cached.
 
     Such a property returns the same value each time, just like any class property,
-    but initialization is delayed until first use and might be the result of
-    a multi-line computation whose temporary variables don't persist past the initialization.
+    but initialization is delayed until first use and determined by a call to the decorated function.
 
     Example:
 
@@ -1630,16 +1630,139 @@ class classproperty_cached(object):
         1665600540.1467211
     """
 
+    ATTRIBUTE_CACHE_MAP = defaultdict(lambda: {})
+
+    _USES_PER_SUBCLASS_CACHES = False
+
     def __init__(self, initializer):
         self.initializer = initializer
-        self.attribute_name = '_cached_' + initializer.__name__
+        self.name = initializer.__name__
+        self.attribute_cache = {}
 
     def __get__(self, instance, instance_class):
         ignored(instance)
-        if self.attribute_name not in instance_class.__dict__:
-            initial_value = self.initializer(instance_class)
-            setattr(instance_class, self.attribute_name, initial_value)
-        return getattr(instance_class, self.attribute_name)
+        reference_class = self._find_reference_class(instance_class, self.name)
+        if reference_class not in self.attribute_cache:  # If there is no exact class matching, init it.
+            initial_value = self.initializer(reference_class)
+            self.attribute_cache[reference_class] = initial_value
+        return self.attribute_cache[reference_class]
+
+    @classmethod
+    def _find_reference_class(cls, instance_class, attribute_name):
+        if cls._USES_PER_SUBCLASS_CACHES:
+            return instance_class
+        else:
+            return cls._find_cache_class(instance_class, attribute_name)
+
+    @classmethod
+    def _find_cache_class_and_attribute(cls, instance_class, attribute_name):
+        for superclass in instance_class.__mro__:
+            superclass_attributes = superclass.__dict__
+            if attribute_name in superclass_attributes:
+                attribute_value = superclass_attributes[attribute_name]
+                if isinstance(attribute_value, cls):
+                    return superclass, attribute_value
+                raise ValueError(f"The slot {instance_class.__name__}.{attribute_name}"
+                                 f" does not contain a cached value.")
+        raise ValueError(f"The slot {instance_class.__name__}.{attribute_name} is not defined.")
+
+    @classmethod
+    def _find_cache_class(cls, instance_class, attribute_name):
+        return cls._find_cache_class_and_attribute(instance_class, attribute_name)[0]
+
+    @classmethod
+    def _find_cache_attribute(cls, instance_class, attribute_name):
+        return cls._find_cache_class_and_attribute(instance_class, attribute_name)[1]
+
+    @classmethod
+    def _find_cache_map(cls, instance_class, attribute_name) -> dict:
+        attribute = cls._find_cache_attribute(instance_class, attribute_name)
+        return attribute.attribute_cache
+
+    @classmethod
+    def reset(cls, *, instance_class, attribute_name, subclasses=True):
+        """
+        Clears the cache for the given attribute name on the given instance_class.
+
+        Having done:
+
+            import random
+            class Foo:
+                @classproperty_cached
+                def something(cls):
+                    return random.randint(100)
+
+        one can clear the cache by doing:
+
+            classproperty_cached.reset(instance_class=Foo, attribute_name='something')
+
+        :param instance_class: a class with an attribute whose value is managed by '@classproperty_cached'.
+        :param attribute_name: the name of the attribute that has a cached value.
+        :param subclasses: a bool indicating whether the cache reset requests applies to
+             all subclasses (subclasses=True) or only the exact class given (subclasses=False).
+             Using subclasses=False is not allowed if CACHE_EACH_SUBCLASS is False.
+        """
+
+        if not cls._USES_PER_SUBCLASS_CACHES and not subclasses:
+            raise ValueError(f"The subclasses= argument to {cls.__name__}.reset must not be False"
+                             f" because {cls.__name__} does not use per-subclass caches.")
+        if not isinstance(instance_class, type):
+            raise ValueError(f"The instance_class= argument to {cls.__name__}.reset must be a class.")
+        reference_class = cls._find_reference_class(instance_class, attribute_name)
+        attribute_cache = cls._find_cache_map(reference_class, attribute_name)
+        keys_to_remove = []
+        predicate = issubclass if subclasses else equals
+        for cache_class, cache_value in attribute_cache.items():
+            if predicate(cache_class, reference_class):
+                keys_to_remove.append(cache_class)
+        for cache_class in keys_to_remove:
+            del attribute_cache[cache_class]
+        return bool(keys_to_remove)
+
+
+class classproperty_cached_each_subclass(classproperty_cached):
+    """
+    This decorator is like 'classproperty_cached', but a separate cache is maintained per-subclass.
+
+    Such a property returns the same value each time, just like any class property,
+    but initialization is delayed until first use and determined by a call to the decorated function.
+
+    Example:
+
+        import time
+        class Freeze:
+            @classproperty_cached
+            def sample():
+                return time.time()
+
+        Freeze.sample
+        1665600374.4801269
+        Freeze.sample
+        1665600374.4801269
+
+        class SubFreeze(Freeze):
+            pass
+
+        SubFreeze.sample
+        1665600540.1467211
+        SubFreeze.sample
+        1665600540.1467211
+
+        Freeze.sample
+        1665600374.4801269
+
+        SubFreeze.sample
+        1665600540.1467211
+    """
+
+    _USES_PER_SUBCLASS_CACHES = True
+
+
+def equals(x, y):
+    """
+    A functional form of the '==' equality predicate so that it can be handled as a functional value.
+    """
+    return x == y
 
 
 class Singleton:
@@ -1666,9 +1789,9 @@ class Singleton:
         <__main__.Foo object at 0x10e8aefd0>
     """
 
-    @classproperty_cached
-    def singleton(cls):
-        return cls()  # noQA - PyCharm flags a bogus warning for this
+    @classproperty_cached_each_subclass
+    def singleton(cls):  # noQA - PyCharm wrongly thinks the argname should be 'self'
+        return cls()     # noQA - PyCharm flags a bogus warning for this
 
 
 class NamedObject(object):
