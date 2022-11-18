@@ -15,6 +15,8 @@ Change Log
 
   * New decorator ``@classproperty_cached``
 
+  * New decorator ``@classproperty_cached_each_subclass``
+
   * New class ``Singleton``. Users of ``SingletonManager`` might prefer this,
     but we'll continue to support both. (No deprecation for now.)
 
