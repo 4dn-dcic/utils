@@ -206,6 +206,15 @@ def test_parse_relative_time_string():
     assert unparse(parse("1 hour")) == '1 hour'
     assert unparse(parse("1.5 hours")) == '1 hour, 30 minutes'
 
+    with pytest.raises(ValueError) as exc:
+        parse("1 half hour")
+    assert str(exc.value) == ("Relative time strings are an even number of tokens"
+                              " of the form '<n1> <unit1> <n2> <unit2>...': '1 half hour'")
+
+    with pytest.raises(ValueError) as exc:
+        parse("1 year")
+    assert str(exc.value) == "Bad relative time string: '1 year'"
+
     def check_roundtrip(**keys):
         original = datetime.timedelta(**keys)
         print(f" original={original} unparsing...")

@@ -470,7 +470,10 @@ class EnglishUtils:
             value = float(parts[2 * i])
             units = parts[2 * i + 1].rstrip(',s') + "s"
             kwargs[units] = value
-        return datetime.timedelta(**kwargs)
+        try:
+            return datetime.timedelta(**kwargs)
+        except Exception:
+            raise ValueError(f"Bad relative time string: {s!r}")
 
     @classmethod
     def disjoined_list(cls, items, conjunction: str = 'or', comma: Union[bool, str] = ",",
