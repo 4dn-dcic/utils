@@ -21,6 +21,8 @@ import webtest  # importing the library makes it easier to mock testing
 from collections import defaultdict
 from dateutil.parser import parse as dateutil_parse
 from datetime import datetime as datetime_type
+from typing import Optional
+
 
 # Is this the right place for this? I feel like this should be done in an application, not a library.
 # -kmp 27-Apr-2020
@@ -921,7 +923,16 @@ def environ_bool(var, default=False):
     if var not in os.environ:
         return default
     else:
-        return os.environ[var].lower() == "true"
+        return str_to_bool(os.environ[var])
+
+
+def str_to_bool(x: Optional[str]) -> Optional[bool]:
+    if x is None:
+        return None
+    elif isinstance(x, str):
+        return x.lower() == "true"
+    else:
+        raise ValueError(f"An argument to str_or_bool must be a string or None: {x!r}")
 
 
 @contextlib.contextmanager

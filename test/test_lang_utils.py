@@ -4,7 +4,7 @@ import re
 
 from dcicutils.lang_utils import (
     EnglishUtils, a_or_an, select_a_or_an, string_pluralize, conjoined_list, disjoined_list,
-    there_are, must_be_one_of, maybe_pluralize,
+    there_are, must_be_one_of, maybe_pluralize, relative_time_string, parse_relative_time_string,
 )
 
 
@@ -149,6 +149,10 @@ def test_n_of():
 
 def test_relative_time_string():
 
+    assert EnglishUtils.relative_time_string == relative_time_string
+
+    assert relative_time_string(datetime.timedelta(minutes=10, seconds=1)) == "10 minutes, 1 second"
+
     def test(seconds, long_string, short_string):
         assert EnglishUtils.relative_time_string(seconds) == long_string
         assert EnglishUtils.relative_time_string(seconds, detailed=False) == short_string
@@ -188,6 +192,50 @@ def test_relative_time_string():
     t1 = datetime.datetime.now()
     t2 = t1 + relative_time
     test(t2 - t1, "1 hour, 3 seconds", "1 hour")
+
+
+def test_parse_relative_time_string():
+
+    assert EnglishUtils.parse_relative_time_string == parse_relative_time_string
+
+    assert parse_relative_time_string("10 minutes, 1 second") == datetime.timedelta(minutes=10, seconds=1)
+
+    parse = EnglishUtils.parse_relative_time_string
+    unparse = EnglishUtils.relative_time_string
+
+    assert unparse(parse("1 hour")) == '1 hour'
+    assert unparse(parse("1.5 hours")) == '1 hour, 30 minutes'
+
+    def check_roundtrip(**keys):
+        original = datetime.timedelta(**keys)
+        print(f" original={original} unparsing...")
+        unparsed = unparse(original)
+        print(f" unparsed={unparsed!r} parsing...")
+        parsed = parse(unparsed)
+        print(f" parsed={parsed!r}")
+        assert original == parsed
+
+    check_roundtrip(hours=1)
+    check_roundtrip(hours=1.5)
+    check_roundtrip(hours=3, minutes=7, seconds=23)
+    check_roundtrip(weeks=7, days=3, minutes=17)
+    check_roundtrip(seconds=0)
+    check_roundtrip()
+
+    def check_parse_unparse(relative_time_string):
+        parsed = parse(relative_time_string)
+        print(f" parsed={parsed} unparsing...")
+        unparsed = unparse(parsed)
+        print(f" unparsed={unparsed} reparsing...")
+        reparsed = parse(unparsed)
+        print(f" reparsed={reparsed}")
+        assert parsed == reparsed
+
+    check_parse_unparse("1 hour, 30 minutes")
+    check_parse_unparse("3 hours, 1 minute")
+    check_parse_unparse("7 weeks, 6 days, 5 hours, 4 minutes, 3 seconds")
+    check_parse_unparse("1 week, 1 day, 1 hour, 1 minute, 1 second")
+    check_parse_unparse("")
 
 
 def test_time_count_formatter():

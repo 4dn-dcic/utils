@@ -17,7 +17,7 @@ from dcicutils import misc_utils as misc_utils_module
 from dcicutils.misc_utils import (
     PRINT, ignored, ignorable, filtered_warnings, get_setting_from_context, TestApp, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
-    Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool,
+    Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool, str_to_bool,
     LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
     keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
     CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json, url_path_join,
@@ -1387,6 +1387,28 @@ def test_environ_bool():
         assert environ_bool("FOO") is False
         assert environ_bool("FOO", default=None) is False
         assert environ_bool("FOO", None) is False
+
+
+def test_str_to_bool():
+
+    assert str_to_bool(None) is None
+
+    assert str_to_bool("TRUE") is True
+    assert str_to_bool("True") is True
+    assert str_to_bool("trUe") is True
+    assert str_to_bool("TrUe") is True
+
+    assert str_to_bool("FALSE") is False
+    assert str_to_bool("False") is False
+    assert str_to_bool("false") is False
+    assert str_to_bool("FaLsE") is False
+
+    assert str_to_bool("") is False
+    assert str_to_bool("anything") is False
+
+    for x in [0, 1, -1, 17, True, False, [], [17], {}, {"some": "thing"}]:
+        with pytest.raises(ValueError):
+            str_to_bool(x)
 
 
 def test_check_true():
