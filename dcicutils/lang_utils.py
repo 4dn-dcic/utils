@@ -357,6 +357,8 @@ class EnglishUtils:
         :param joiner: the joining function to join the items (default if None is just a commas-separated list)
         :param zero: the value to print instead of a numeric zero (default "no")
         :param punctuate: in the case of one or more values (not zero), whether to end with a period (default False)
+        :param punctuate_none: in the case of no values or not showing values, whether to end with a period
+               (default True if show is True, and otherwise is the same as the value of punctuate)
         :param use_article: whether to put 'a' or 'an' in front of each option (default False)
         :param joiner_options: additional (keyword) options to be used with a joiner function if one is supplied
         :param show: whether to show the items if there are any (default True)
@@ -454,6 +456,24 @@ class EnglishUtils:
                   if isinstance(item, str)]
         result = ", ".join(result)
         return result
+
+    @classmethod
+    def parse_relative_time_string(cls, s):
+        parts = [x for x in s.split(' ') if x != '']
+        if len(parts) % 2 != 0:
+            raise ValueError(f"Relative time strings are an even number of tokens"
+                             f" of the form '<n1> <unit1> <n2> <unit2>...': {s!r}")
+        kwargs = {}
+        for i in range(len(parts) // 2):
+            # Canonicalize "1 week" or "1 weeks" to "weeks": 1.0 for inclusion as kwarg to to timedelta
+            # Uses specialized knowledge that all time units don't end in "s" but pluralize with "+s"
+            value = float(parts[2 * i])
+            units = parts[2 * i + 1].rstrip(',s') + "s"
+            kwargs[units] = value
+        try:
+            return datetime.timedelta(**kwargs)
+        except Exception:
+            raise ValueError(f"Bad relative time string: {s!r}")
 
     @classmethod
     def disjoined_list(cls, items, conjunction: str = 'or', comma: Union[bool, str] = ",",
@@ -574,6 +594,7 @@ conjoined_list = EnglishUtils.conjoined_list
 disjoined_list = EnglishUtils.disjoined_list
 
 relative_time_string = EnglishUtils.relative_time_string
+parse_relative_time_string = EnglishUtils.parse_relative_time_string
 
 select_a_or_an = EnglishUtils.select_a_or_an
 

@@ -6,6 +6,18 @@ dcicutils
 Change Log
 ----------
 
+6.2.0
+=====
+
+* In ``lang_utils``:
+
+  * New method EnglishUtils.parse_relative_time_string
+
+* In ``misc_utils``:
+
+  * New function ``str_to_bool``
+
+
 6.1.0
 =====
 
