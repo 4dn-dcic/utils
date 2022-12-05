@@ -191,6 +191,13 @@ obfuscation_utils
    :members:
 
 
+opensearch_utils
+^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.opensearch_utils
+   :members:
+
+
 qa_checkers
 ^^^^^^^^^^^
 
