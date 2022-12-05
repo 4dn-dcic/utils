@@ -6,6 +6,15 @@ dcicutils
 Change Log
 ----------
 
+6.3.0
+=====
+
+* Add ``opensearch_utils``, a forward-compatible OpenSearch client we should migrate to over time
+
+* In ``codebuild_utils``:
+
+  * New method ``run_project_build_with_overrides`` to allow running builds changing the build branch and environment variables
+
 6.2.0
 =====
 
@@ -57,7 +66,7 @@ Change Log
 `PR 224: ElasticSearch 7 <https://github.com/4dn-dcic/utils/pull/224>`_
 
 * Updates ElasticSearch to version 7.13.4, the highest version we can tolerate
-  of this library. This utils version is a requirement for using ES7 or 
+  of this library. This utils version is a requirement for using ES7 or
   OpenSearch 1.3 in production.
 
 

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "6.2.0"
+version = "6.3.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -55,6 +55,7 @@ toml = ">=0.10.1,<1"
 typing-extensions = ">=3.8"  # Fourfront uses 3.8
 urllib3 = "^1.26.6"
 webtest = "^2.0.34"
+opensearch-py = "^2.0.1"
 
 
 [tool.poetry.dev-dependencies]
