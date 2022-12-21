@@ -2651,7 +2651,8 @@ class MockId:
 class Eventually:
 
     @classmethod
-    def call_assertion(cls, assertion_function, error_message=None, *, threshold_seconds=10, error_class=AssertionError):
+    def call_assertion(cls, assertion_function, error_message=None, *,
+                       threshold_seconds=10, error_class=AssertionError):
 
         # Try once a second
         errors = []
