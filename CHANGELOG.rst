@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+6.4.0
+=====
+
+* In `dcicutils.qa_utils`:
+
+  * Add `Eventually.call_assertion`.
+
 6.3.0
 =====
 

@@ -21,7 +21,7 @@ from dcicutils.qa_utils import (
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
-    logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId
+    logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -1688,3 +1688,21 @@ def test_mock_id():
     assert mock_id('something') == 25
     assert mock_id('something-else') == 26
     assert mock_id('something') == 25
+
+
+def test_eventually():
+
+    def foo():
+        return 17
+
+    flakey_success_frequency = 3
+
+    flakey_foo = Occasionally(foo, success_frequency=flakey_success_frequency)
+
+    def my_assertions():
+        assert flakey_foo() == 17
+
+    with pytest.raises(AssertionError):
+        Eventually.call_assertion(my_assertions, threshold_seconds=flakey_success_frequency - 1, error_class=Exception)
+
+    Eventually.call_assertion(my_assertions, threshold_seconds=flakey_success_frequency, error_class=Exception)
