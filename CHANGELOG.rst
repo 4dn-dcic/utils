@@ -6,6 +6,11 @@ dcicutils
 Change Log
 ----------
 
+6.3.1
+=====
+
+* New function ``env_equals`` in ``env_utils`` module.
+
 6.3.0
 =====
 
