@@ -28,7 +28,7 @@ from dcicutils.misc_utils import (
     _is_function_of_exactly_one_required_arg, _apply_decorator,  # noQA
     string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, lines_printed_to,
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
-    ObsoleteError,
+    ObsoleteError, CycleError, TopologicalSorter,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -3118,3 +3118,29 @@ def test_obsolete():
     assert mock_logging.all_log_messages == [
         f"ERROR: Called obsolete function {bar_name}"
     ]
+
+
+class TestTopologicalSorter:
+
+    EMPTY_GRAPH = {}
+    ACYCLIC_GRAPH = {"A": {"B"}, "B": {"C"}}
+    CYCLIC_GRAPH = {"A": {"B"}, "B": {"C", "A"}}
+
+    @pytest.mark.parametrize(
+        "graph,exception,expected",
+        [
+            (EMPTY_GRAPH, False, []),
+            (ACYCLIC_GRAPH, False, ["C", "B", "A"]),
+            (CYCLIC_GRAPH, True, None),
+        ]
+    )
+    def test_topological_sort(self, graph, exception, expected):
+        sorter = TopologicalSorter(graph=graph)
+        if exception:
+            with pytest.raises(CycleError):
+                sorted_nodes = sorter.static_order()
+                result = list(sorted_nodes)
+        else:
+            sorted_nodes = sorter.static_order()
+            result = list(sorted_nodes)
+            assert result == expected

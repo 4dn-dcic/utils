@@ -6,6 +6,14 @@ dcicutils
 Change Log
 ----------
 
+6.4.0
+=====
+
+* In ``misc_utils``:
+
+  * New class ``TopologicalSorter`` for topological sorting of graphs
+
+
 6.3.0
 =====
 
@@ -14,6 +22,7 @@ Change Log
 * In ``codebuild_utils``:
 
   * New method ``run_project_build_with_overrides`` to allow running builds changing the build branch and environment variables
+
 
 6.2.0
 =====
