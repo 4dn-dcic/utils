@@ -1842,7 +1842,8 @@ def merge_key_value_dict_lists(x, y):
 
 # Stealing topological sort classes below from python's graphlib module introduced
 # in v3.9 with minor refactoring.
-# Source: https://docs.python.org/3/library/graphlib.html
+# Source: https://github.com/python/cpython/blob/3.11/Lib/graphlib.py
+# Docs: https://docs.python.org/3.11/library/graphlib.html
 # TODO: Remove once python version >= 3.9
 
 
