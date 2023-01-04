@@ -1027,7 +1027,9 @@ def foursight_env_name(envname):
 
 
 def env_equals(envname_a: str, envname_b: str) -> bool:
-    #return foursight_env_name(envname_a) == foursight_env_name(envname_b)
+    """
+    Return True iff the given two environment names are functionally equivalent.
+    """
     return full_env_name(envname_a) == full_env_name(envname_b)
 
 
