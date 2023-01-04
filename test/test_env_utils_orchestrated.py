@@ -1870,8 +1870,19 @@ def test_if_orchestrated_various_legacy_errors():
 
 @using_orchestrated_behavior
 def test_env_equals():
-    assert env_equals('foobar', 'foobar');
+
+    assert env_equals('same', 'same');
     assert env_equals('acme-prd', 'cgap');
     assert env_equals('cgap', 'acme-prd');
+
     assert not env_equals('cgap', 'foobar');
     assert not env_equals('foobar', 'cgap');
+    assert not env_equals(None, 'cgap');
+    assert not env_equals('cgap', None);
+    assert not env_equals('', 'cgap');
+    assert not env_equals('cgap', '');
+
+    assert env_equals(None, None);
+    assert env_equals('', '');
+    assert env_equals('', None);
+    assert env_equals(None, '');
