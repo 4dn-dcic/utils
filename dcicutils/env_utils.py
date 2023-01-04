@@ -1026,6 +1026,13 @@ def foursight_env_name(envname):
     return infer_foursight_from_env(envname=envname)
 
 
+def env_equals(envname_a: str, envname_b: str) -> bool:
+    """
+    Returns True iff the given two environment names are functionally equivalent.
+    """
+    return full_env_name(envname_a) == full_env_name(envname_b)
+
+
 @if_orchestrated
 def infer_foursight_from_env(*, request=None, envname: Optional[EnvName] = None, short: bool = True) -> EnvName:
     """
