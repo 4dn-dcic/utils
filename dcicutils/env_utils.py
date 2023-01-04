@@ -1027,7 +1027,8 @@ def foursight_env_name(envname):
 
 
 def env_equals(envname_a: str, envname_b: str) -> bool:
-    return foursight_env_name(envname_a) == foursight_env_name(envname_b)
+    #return foursight_env_name(envname_a) == foursight_env_name(envname_b)
+    return full_env_name(envname_a) == full_env_name(envname_b)
 
 
 @if_orchestrated

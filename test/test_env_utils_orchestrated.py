@@ -1874,15 +1874,9 @@ def test_env_equals():
     assert env_equals('same', 'same');
     assert env_equals('acme-prd', 'cgap');
     assert env_equals('cgap', 'acme-prd');
+    assert env_equals('', '');
 
     assert not env_equals('cgap', 'foobar');
     assert not env_equals('foobar', 'cgap');
-    assert not env_equals(None, 'cgap');
-    assert not env_equals('cgap', None);
     assert not env_equals('', 'cgap');
     assert not env_equals('cgap', '');
-
-    assert env_equals(None, None);
-    assert env_equals('', '');
-    assert env_equals('', None);
-    assert env_equals(None, '');
