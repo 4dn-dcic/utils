@@ -6,6 +6,11 @@ dcicutils
 Change Log
 ----------
 
+6.4.1
+=====
+* Minor fix to ``obfuscate_dict`` in ``obfuscation_utils`` to respect passed ``obfuscated`` argument recursively.
+
+
 6.4.0
 =====
 
