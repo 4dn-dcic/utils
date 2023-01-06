@@ -1177,7 +1177,7 @@ def keys_and_values_to_dict(keys_and_values: list, key_name = "Key", value_name 
     """
     Transforms the given list of key/value objects, each containing a "Key" and "Value" property,
     or alternately named via the key_name and/or value_name arguments, into a simple
-    simple dictionary of keys/values. For example given this:
+    dictionary of keys/values and returns this value. For example, given this:
 
       [
         { "Key": "env",
