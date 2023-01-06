@@ -114,7 +114,7 @@ def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False,
             dictionary = copy.deepcopy(dictionary)
     for key, value in dictionary.items():
         if isinstance(value, dict):
-            dictionary[key] = obfuscate_dict(value, show=False, inplace=False)
+            dictionary[key] = obfuscate_dict(value, show=False, inplace=False, obfuscated=obfuscated)
         elif isinstance(value, str) and should_obfuscate(key) and not is_obfuscated(value):
             dictionary[key] = obfuscate(value, show=False, obfuscated=obfuscated)
     return dictionary

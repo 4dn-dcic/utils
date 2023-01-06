@@ -8,7 +8,7 @@ from dcicutils.env_base import LegacyController
 from dcicutils.common import APP_CGAP, APP_FOURFRONT  # , LEGACY_GLOBAL_ENV_BUCKET
 from dcicutils.env_manager import EnvManager
 from dcicutils.env_utils import (
-    is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env,
+    is_stg_or_prd_env, is_cgap_env, is_fourfront_env, blue_green_mirror_env, env_equals,
     get_mirror_env_from_context, is_test_env, is_hotseat_env, get_standard_mirror_env,
     prod_bucket_env, prod_bucket_env_for_app, public_url_mappings, public_url_for_app, permit_load_data,
     default_workflow_env, infer_foursight_url_from_env, foursight_env_name,
@@ -1866,3 +1866,17 @@ def test_if_orchestrated_various_legacy_errors():
                     assert bg('acme-green') == 'acme-blue'
                 assert str(exc.value) == ("Attempt to use legacy operation blue_green_mirror_env"
                                           " with args=('acme-green',) kwargs={} mode=dispatch.")
+
+
+@using_orchestrated_behavior
+def test_env_equals():
+
+    assert env_equals('same', 'same')
+    assert env_equals('acme-prd', 'cgap')
+    assert env_equals('cgap', 'acme-prd')
+    assert env_equals('', '')
+
+    assert not env_equals('cgap', 'foobar')
+    assert not env_equals('foobar', 'cgap')
+    assert not env_equals('', 'cgap')
+    assert not env_equals('cgap', '')
