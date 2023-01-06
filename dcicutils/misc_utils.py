@@ -1173,7 +1173,7 @@ def find_association(data, **kwargs):
         raise ValueError("Got %s results when 1 was expected." % n)
 
 
-def keys_and_values_to_dict(keys_and_values: list, key_name = "Key", value_name = "Value") -> dict:
+def keys_and_values_to_dict(keys_and_values: list, key_name: str = "Key", value_name: str = "Value") -> dict:
     """
     Transforms the given list of key/value objects, each containing a "Key" and "Value" property,
     or alternately named via the key_name and/or value_name arguments, into a simple
