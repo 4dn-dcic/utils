@@ -10,9 +10,9 @@ Change Log
 6.5.0
 =====
 
-* In `dcicutils.qa_utils`:
+* In ``dcicutils.qa_utils``:
 
-  * Add `Eventually.call_assertion`.
+  * Add ``Eventually.call_assertion``.
 
 
 6.4.1
