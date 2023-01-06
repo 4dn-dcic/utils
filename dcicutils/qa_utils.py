@@ -29,7 +29,7 @@ from .lang_utils import there_are
 from .misc_utils import (
     PRINT, ignored, Retry, remove_prefix, REF_TZ,
     environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name,
-    find_associations,
+    find_associations, get_error_message,
 )
 from .qa_checkers import QA_EXCEPTION_PATTERN, find_uses, confirm_no_uses, VersionChecker, ChangeLogChecker
 
@@ -2646,3 +2646,24 @@ class MockId:
             n = self.counter_base + len(self.seen)
             self.seen[object] = n
             return n
+
+
+class Eventually:
+
+    @classmethod
+    def call_assertion(cls, assertion_function, error_message=None, *,
+                       threshold_seconds=10, error_class=AssertionError):
+
+        # Try once a second
+        errors = []
+        for _ in range(threshold_seconds):
+            try:
+                assertion_function()
+            except error_class as e:
+                msg = get_error_message(e)
+                PRINT(msg)
+                errors.append(msg)
+            else:
+                break
+        else:
+            raise AssertionError(f"Eventual consistency not achieved after {threshold_seconds} seconds.")

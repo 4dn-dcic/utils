@@ -6,6 +6,15 @@ dcicutils
 Change Log
 ----------
 
+
+6.5.0
+=====
+
+* In ``dcicutils.qa_utils``:
+
+  * Add ``Eventually.call_assertion``.
+
+
 6.4.1
 =====
 * Minor fix to ``obfuscate_dict`` in ``obfuscation_utils`` to respect passed ``obfuscated`` argument recursively.
@@ -19,7 +28,6 @@ Change Log
   * New class ``TopologicalSorter`` for topological sorting of graphs
 
 
-=======
 6.3.1
 =====
 
