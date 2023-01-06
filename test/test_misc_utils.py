@@ -28,7 +28,7 @@ from dcicutils.misc_utils import (
     _is_function_of_exactly_one_required_arg, _apply_decorator,  # noQA
     string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, lines_printed_to,
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
-    ObsoleteError, CycleError, TopologicalSorter,
+    ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -3118,6 +3118,18 @@ def test_obsolete():
     assert mock_logging.all_log_messages == [
         f"ERROR: Called obsolete function {bar_name}"
     ]
+
+
+def test_keys_and_values_to_dict():
+    kv = [{"Key": "abc", "Value": "def"}, {"Key": "ghi", "Value": "jkl"}]
+    d = keys_and_values_to_dict(kv)
+    assert d == {"abc": "def", "ghi": "jkl"}
+
+    kv = [{"name": "abc", "value": "def"}, {"name": "ghi", "value": "jkl"}]
+    d = keys_and_values_to_dict(kv, key_name="name", value_name="value")
+    assert d == {"abc": "def", "ghi": "jkl"}
+
+    assert keys_and_values_to_dict([]) == {}
 
 
 class TestTopologicalSorter:
