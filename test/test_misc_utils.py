@@ -28,7 +28,7 @@ from dcicutils.misc_utils import (
     _is_function_of_exactly_one_required_arg, _apply_decorator,  # noQA
     string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, lines_printed_to,
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
-    ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict
+    ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -3130,6 +3130,33 @@ def test_keys_and_values_to_dict():
     assert d == {"abc": "def", "ghi": "jkl"}
 
     assert keys_and_values_to_dict([]) == {}
+
+    with pytest.raises(ValueError):
+        # Missing key (Foo).
+        kv = [{"Key": "abc", "Value": "def"}, {"Foo": "ghi", "Value": "jkl"}]
+        d = keys_and_values_to_dict(kv)
+
+    with pytest.raises(ValueError):
+        # Missing value (Foo).
+        kv = [{"Key": "abc", "Value": "def"}, {"Key": "ghi", "Foo": "jkl"}]
+        d = keys_and_values_to_dict(kv)
+
+    with pytest.raises(ValueError):
+        # Duplicate key (abc).
+        kv = [{"Key": "abc", "Value": "def"}, {"Key": "abc", "Value": "jkl"}]
+        d = keys_and_values_to_dict(kv)
+
+
+def test_dict_to_keys_and_values():
+    d = {"abc": "def", "ghi": "jkl"}
+    kv = dict_to_keys_and_values(d)
+    assert kv == [{"Key": "abc", "Value": "def"}, {"Key": "ghi", "Value": "jkl"}]
+
+    d = {"abc": "def", "ghi": "jkl"}
+    kv = dict_to_keys_and_values(d, key_name="name", value_name="value")
+    assert kv == [{"name": "abc", "value": "def"}, {"name": "ghi", "value": "jkl"}]
+
+    assert dict_to_keys_and_values({}) == []
 
 
 class TestTopologicalSorter:
