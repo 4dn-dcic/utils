@@ -1201,13 +1201,6 @@ def keys_and_values_to_dict(keys_and_values: list, key_name: str = "Key", value_
     :returns: Dictionary of keys/values from given list of key/value object as described above.
     :raises ValueError: if item in list does not contain key or value name; or on duplicate key name in list.
     """
-    # result = {}
-    # for item in keys_and_values:
-    #     key = item.get(key_name)
-    #     if key:
-    #         result[str(key)] = item.get(value_name)
-    # return result
-
     result = {}
     for item in keys_and_values:
         if key_name not in item:
@@ -1247,9 +1240,7 @@ def dict_to_keys_and_values(dictionary: dict, key_name: str = "Key", value_name:
     :param value_name: Name of the given value property in the result list of key/value objects; default to "Value".
     :returns: List of key/value objects from the given dictionary as described above.
     """
-    result = []
-    for key in dictionary:
-        result.append({key_name: key, value_name: dictionary[key]})
+    result = [{key_name: key, value_name: dictionary[key]} for key in dictionary]
     return result
 
 
