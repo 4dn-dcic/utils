@@ -1235,7 +1235,7 @@ def dict_to_keys_and_values(dictionary: dict, key_name: str = "Key", value_name:
         }
       ]
 
-    :param keys_and_values: Dictionary of keys/values described above.
+    :param dictionary: Dictionary of keys/values described above.
     :param key_name: Name of the given key property in the result list of key/value objects; default to "Key".
     :param value_name: Name of the given value property in the result list of key/value objects; default to "Value".
     :returns: List of key/value objects from the given dictionary as described above.
