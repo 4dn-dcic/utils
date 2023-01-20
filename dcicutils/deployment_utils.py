@@ -423,7 +423,8 @@ class IniFileManager:
                                      indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
                                      tibanna_output_bucket=None,
                                      application_bucket_prefix=None, foursight_bucket_prefix=None,
-                                     auth0_client=None, auth0_secret=None,
+                                     auth0_domain=None, auth0_client=None, auth0_secret=None,
+                                     auth0_allowed_connections=None,
                                      file_upload_bucket=None, file_wfout_bucket=None,
                                      blob_bucket=None, system_bucket=None, metadata_bundles_bucket=None):
 
@@ -457,8 +458,10 @@ class IniFileManager:
             tibanna_output_bucket (str): Specific name of the bucket to use on S3 for tibanna logs.
             application_bucket_prefix (str): An application bucket prefix to use, overriding the default one.
             foursight_bucket_prefix (str): A foursight bucket prefix to use, overriding the default one.
+            auth0_domain (str): A string identifying the Auth0 Domain to send auth requests to.
             auth0_client (str): A string identifying the auth0 client application.
             auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
+            auth0_allowed_connections (str): A comma separated string of allowed connections that can be used via auth0.
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
             file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
             blob_bucket (str): Specific name of the bucket to use on S3 for blob data.
@@ -488,8 +491,10 @@ class IniFileManager:
                                                tibanna_output_bucket=tibanna_output_bucket,
                                                application_bucket_prefix=application_bucket_prefix,
                                                foursight_bucket_prefix=foursight_bucket_prefix,
+                                               auth0_domain=auth0_domain,
                                                auth0_client=auth0_client,
                                                auth0_secret=auth0_secret,
+                                               auth0_allowed_connections=auth0_allowed_connections,
                                                file_upload_bucket=file_upload_bucket,
                                                file_wfout_bucket=file_wfout_bucket,
                                                blob_bucket=blob_bucket,
@@ -556,7 +561,8 @@ class IniFileManager:
                                        indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
                                        tibanna_output_bucket=None,
                                        application_bucket_prefix=None, foursight_bucket_prefix=None,
-                                       auth0_client=None, auth0_secret=None,
+                                       auth0_domain=None, auth0_client=None, auth0_secret=None,
+                                       auth0_allowed_connections=None,
                                        file_upload_bucket=None,
                                        file_wfout_bucket=None, blob_bucket=None, system_bucket=None,
                                        metadata_bundles_bucket=None):
@@ -587,8 +593,10 @@ class IniFileManager:
             tibanna_output_bucket (str): Specific name of the bucket to use on S3 for tibanna logs.
             application_bucket_prefix (str): An application bucket prefix to use, overriding the default one.
             foursight_bucket_prefix (str): A foursight bucket prefix to use, overriding the default one.
+            auth0_domain (str): A string identifying the Auth0 Domain to send auth requests to.
             auth0_client (str): A string identifying the auth0 client application.
             auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
+            auth0_allowed_connections (str): A comma separated string of allowed connections that can be used via auth0.
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
             file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
             blob_bucket (str): Specific name of the bucket to use on S3 for blob data.
@@ -653,8 +661,10 @@ class IniFileManager:
         es_namespace = es_namespace or os.environ.get("ENCODED_ES_NAMESPACE", env_name)
         identity = identity or os.environ.get("ENCODED_IDENTITY", "")
         sentry_dsn = sentry_dsn or os.environ.get("ENCODED_SENTRY_DSN", "")
+        auth0_domain = auth0_domain or os.environ.get("ENCODED_AUTH0_DOMAIN", "")
         auth0_client = auth0_client or os.environ.get("ENCODED_AUTH0_CLIENT", "")
         auth0_secret = auth0_secret or os.environ.get("ENCODED_AUTH0_SECRET", "")
+        auth0_allowed_connections = auth0_allowed_connections or os.environ.get("ENCODED_AUTH0_ALLOWED_CONNECTIONS", "")
 
         create_mapping_on_deploy_skip = os.environ.get("ENCODED_CREATE_MAPPING_SKIP",
                                                        cls.PRD_DEFAULT_CREATE_MAPPING_ON_DEPLOY_SKIP)
@@ -755,8 +765,10 @@ class IniFileManager:
             'SENTRY_DSN': sentry_dsn,
             'TIBANNA_CWLS_BUCKET': tibanna_cwls_bucket,
             'TIBANNA_OUTPUT_BUCKET': tibanna_output_bucket,
+            'AUTH0_DOMAIN': auth0_domain,
             'AUTH0_CLIENT': auth0_client,
             'AUTH0_SECRET': auth0_secret,
+            'AUTH0_ALLOWED_CONNECTIONS': auth0_allowed_connections,
             "CREATE_MAPPING_SKIP": create_mapping_on_deploy_skip,
             "CREATE_MAPPING_WIPE_ES": create_mapping_on_deploy_wipe_es,
             "CREATE_MAPPING_STRICT": create_mapping_on_deploy_strict,
@@ -916,11 +928,17 @@ class IniFileManager:
             parser.add_argument("--foursight_bucket_prefix",
                                 help="a foursight bucket prefix to use, overriding the default one",
                                 default=None)
+            parser.add_argument("--auth0_domain",
+                                help="an auth0 domain url token",
+                                default=None)
             parser.add_argument("--auth0_client",
                                 help="an auth0 client identifier token",
                                 default=None)
             parser.add_argument("--auth0_secret",
                                 help="an auth0 secret to authorize auth0_client",
+                                default=None)
+            parser.add_argument("--auth0_allowed_connections",
+                                help="a comma separated list of compatible auth0 connections to use",
                                 default=None)
             parser.add_argument("--file_upload_bucket",
                                 help="the name of the file upload bucket to use",
@@ -965,8 +983,10 @@ class IniFileManager:
                                              tibanna_output_bucket=args.tibanna_output_bucket,
                                              application_bucket_prefix=args.application_bucket_prefix,
                                              foursight_bucket_prefix=args.foursight_bucket_prefix,
+                                             auth0_domain=args.auth0_domain,
                                              auth0_client=args.auth0_client,
                                              auth0_secret=args.auth0_secret,
+                                             auth0_allowed_connections=args.auth0_allowed_connections,
                                              file_upload_bucket=args.file_upload_bucket,
                                              file_wfout_bucket=args.file_wfout_bucket,
                                              blob_bucket=args.blob_bucket, system_bucket=args.system_bucket,

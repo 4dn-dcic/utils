@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+6.6.0
+=====
+
+* In `dcicutils.deployment_utils``
+
+  * Add support for ``Auth0Domain`` and ``Auth0AllowedConnections``
+
 
 6.5.0
 =====
