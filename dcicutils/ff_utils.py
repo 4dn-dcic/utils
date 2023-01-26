@@ -897,7 +897,7 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth):
                     'must_not': []
                 }
             },
-            'sort': [{'_uid': {'order': 'desc'}}]
+            'sort': [{'_id': {'order': 'desc'}}]
         }
         if filters:
             if not isinstance(filters, dict):

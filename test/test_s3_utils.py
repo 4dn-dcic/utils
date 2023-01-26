@@ -927,7 +927,7 @@ def test_s3_utils_buckets_ff_live_ecosystem_not_production():
         es_url = s3u.env_manager.es_url
         print(f"Checking {es_url}...")
         # NOTE: The right answers differ here from production, but as long as the short name is in there, that's enough.
-        pattern = f"https://vpc-es-.*{short_env_name(env_name).replace('-', '.*')}.*[.]amazonaws[.]com:443"
+        pattern = f"https://vpc-os-.*{short_env_name(env_name).replace('-', '.*')}.*[.]amazonaws[.]com:443"
         print(f"pattern={pattern}")
         assert es_url and re.match(pattern, es_url)
         assert s3u.env_manager.env_name == full_env
