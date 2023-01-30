@@ -14,6 +14,14 @@ Change Log
   * Add support for ``Auth0Domain`` and ``Auth0AllowedConnections``
 
 
+6.6.0
+=====
+
+* In ``dcicutils.misc_utils``:
+
+  * Add ``keys_and_values_to_dict`` function (and associated unit test).
+
+
 6.5.0
 =====
 
