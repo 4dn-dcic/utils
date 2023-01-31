@@ -6,7 +6,7 @@ dcicutils
 Change Log
 ----------
 
-6.6.0
+6.7.0
 =====
 
 * In `dcicutils.deployment_utils``

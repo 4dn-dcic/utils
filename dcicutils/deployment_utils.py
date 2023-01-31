@@ -407,6 +407,9 @@ class IniFileManager:
     INI_FILE_NAME = "production.ini"
     PYPROJECT_FILE_NAME = None
 
+    # Default auth0 domain
+    DEFAULT_AUTH0_DOMAIN = 'hms-dbmi.auth0.com'
+
     # For APP, a subclass may optionally declare a value of 'cgap' or 'fourfront'
     APP_KIND = None
 
@@ -423,7 +426,7 @@ class IniFileManager:
                                      indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
                                      tibanna_output_bucket=None,
                                      application_bucket_prefix=None, foursight_bucket_prefix=None,
-                                     auth0_domain=None, auth0_client=None, auth0_secret=None,
+                                     auth0_domain=DEFAULT_AUTH0_DOMAIN, auth0_client=None, auth0_secret=None,
                                      auth0_allowed_connections=None,
                                      file_upload_bucket=None, file_wfout_bucket=None,
                                      blob_bucket=None, system_bucket=None, metadata_bundles_bucket=None):
