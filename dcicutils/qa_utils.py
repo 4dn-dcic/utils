@@ -13,6 +13,7 @@ import logging
 import os
 import pytest
 import pytz
+import re
 import sys
 import time
 import uuid
@@ -2659,11 +2660,12 @@ class Eventually:
         for _ in range(threshold_seconds):
             try:
                 assertion_function()
+                break
             except error_class as e:
                 msg = get_error_message(e)
+                if error_message and not re.search(error_message, msg):
+                    raise
                 PRINT(msg)
                 errors.append(msg)
-            else:
-                break
         else:
             raise AssertionError(f"Eventual consistency not achieved after {threshold_seconds} seconds.")

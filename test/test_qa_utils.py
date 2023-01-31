@@ -1705,4 +1705,21 @@ def test_eventually():
     with pytest.raises(AssertionError):
         Eventually.call_assertion(my_assertions, threshold_seconds=flakey_success_frequency - 1, error_class=Exception)
 
-    Eventually.call_assertion(my_assertions, threshold_seconds=flakey_success_frequency, error_class=Exception)
+    # Beyond here we're testing the error_message="something" argument,
+    # which allows us to only wait for a specific eventual message.
+
+    def test_error_message_argument(*, expected_message=None):
+        Eventually.call_assertion(my_assertions, threshold_seconds=flakey_success_frequency, error_class=Exception,
+                                  error_message=expected_message)
+
+    actual_message = "Oops. Occasionally this fails."
+
+    test_error_message_argument()
+
+    test_error_message_argument(expected_message=actual_message)
+
+    with pytest.raises(Exception) as e:
+        # If we're Eventually expecting an unrelated message,
+        # the actual error we get will just pass through and won't be retried.
+        test_error_message_argument(expected_message="SOME OTHER MESSAGE")
+    assert str(e.value) == actual_message
