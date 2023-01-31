@@ -7,6 +7,13 @@ Change Log
 ----------
 
 
+6.6.1
+=====
+
+* In ``dcicutils.qa_utils``, make the ``error_message`` argument
+  to ``Eventually.call_assertion`` actually work.
+
+
 6.6.0
 =====
 
