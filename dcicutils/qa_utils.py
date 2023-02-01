@@ -2652,9 +2652,37 @@ class MockId:
 
 class Eventually:
 
+    """
+    Intended use requires you to define a tesre for the assertions that might have to be tried more than once
+    until they eventually succeed after some number of tries:
+
+        def my_assertions():
+            assert flakey_foo() == 17
+
+    and later call it with the expected error_class and/or error_message, and information about how many times
+    to try and after what kind of wait:
+
+        Eventually.call_assertion(my_assertions, tries=3, wait_seconds=2, error_class=SomeException)
+
+    """
+
     @classmethod
     def call_assertion(cls, assertion_function, error_message=None, *,
                        error_class=AssertionError, threshold_seconds=None, tries=None, wait_seconds=None):
+
+        """
+        Calls an assertion function some number of times before giving up, waiting between calls.
+
+        :param assertion_function: The function that does the assertions, erring if they fail.
+        :param error_class: The expected error if the tests fail in the expected way (before hopefully succeeding).
+            If some other error occurs, a retry will not occur.
+        :param error_message: The expected error messsage (a regular expression) if the tests fail in the expected way.
+            If some other error message occurs (the pattern does not match), a retry will not occur.
+        :param threshold_seconds: (deprecated) the number of seconds to keep trying.
+            Please use tries or wait_seconds instead.
+        :param tries: the numbe rof times to try (one more time than the number of retries)
+        :param wait_seconds: how long (in integer or float seconds) between tries
+        """
 
         if threshold_seconds is not None:
             assert isinstance(threshold_seconds, int), "The threshold_seconds must be an integer."
@@ -2683,6 +2711,27 @@ class Eventually:
 
     @classmethod
     def consistent(cls, error_message=None, error_class=AssertionError, tries=None, wait_seconds=None):
+        """
+        A decorator for a function of zero arguments that does assertions.
+        In fact, the decorated function, once defined, CAN be called with arguments, but those are the
+        additional keyword arguments to Eventually.call_assertion and will not be passed to the decorated function.
+
+        This decoration can also have arguments, which establish defaults for the decorated function.
+
+        For example:
+
+            @Eventually.consistent(tries=5)
+            def foo():
+                assert something()
+
+        followed later by
+
+            foo(wait_seconds=2)
+
+        will call the oringally-defined no-argument function foo like this:
+
+            Eventually.call_assertion(foo, tries=5, wait_seconds=2)
+        """
 
         def _wrapper(fn):
 
