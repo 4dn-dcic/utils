@@ -21,7 +21,7 @@ Change Log
 
     * Fix a bug where it didn't wait between iterations.
 
-  * Add a method ``consistent`` that is a class method / decorator.
+  * Add a method ``consistent`` that is a class method / decorator (named ``Eventually.consistent``).
 
   * Add testing, particularly of the timing.
 
