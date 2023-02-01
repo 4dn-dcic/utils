@@ -7,6 +7,7 @@ import contextlib
 import copy
 import datetime
 import dateutil.tz as dateutil_tz
+import functools
 import hashlib
 import io
 import logging
@@ -2653,11 +2654,20 @@ class Eventually:
 
     @classmethod
     def call_assertion(cls, assertion_function, error_message=None, *,
-                       threshold_seconds=10, error_class=AssertionError):
+                       error_class=AssertionError, threshold_seconds=None, tries=None, wait_seconds=None):
+
+        if threshold_seconds is not None:
+            assert isinstance(threshold_seconds, int), "The threshold_seconds must be an integer."
+            assert tries is None and wait_seconds is None, (
+                "The threshold_seconds= argument may not be mixed with tries= or wait_seconds=.")
+            tries = threshold_seconds
+
+        tries = tries or 10
+        wait_seconds = wait_seconds or 1
 
         # Try once a second
         errors = []
-        for _ in range(threshold_seconds):
+        for _ in range(tries):
             try:
                 assertion_function()
                 break
@@ -2667,5 +2677,28 @@ class Eventually:
                     raise
                 PRINT(msg)
                 errors.append(msg)
+            time.sleep(wait_seconds)
         else:
             raise AssertionError(f"Eventual consistency not achieved after {threshold_seconds} seconds.")
+
+    @classmethod
+    def consistent(cls, error_message=None, error_class=AssertionError, tries=None, wait_seconds=None):
+
+        def _wrapper(fn):
+
+            default_error_message = error_message
+            default_error_class = error_class
+            default_tries = tries
+            default_wait_seconds = wait_seconds
+
+            @functools.wraps(fn)
+            def _wrapped(error_message=None, error_class=None, tries=None, wait_seconds=None):
+                cls.call_assertion(fn,
+                                   error_message=error_message or default_error_message,
+                                   error_class=error_class or default_error_class,
+                                   tries=tries or default_tries,
+                                   wait_seconds=wait_seconds or default_wait_seconds)
+
+            return _wrapped
+
+        return _wrapper
