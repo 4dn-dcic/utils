@@ -2697,8 +2697,7 @@ class Eventually:
         errors = []
         for _ in range(tries):
             try:
-                assertion_function()
-                break
+                return assertion_function()
             except error_class as e:
                 msg = get_error_message(e)
                 if error_message and not re.search(error_message, msg):
@@ -2742,11 +2741,11 @@ class Eventually:
 
             @functools.wraps(fn)
             def _wrapped(error_message=None, error_class=None, tries=None, wait_seconds=None):
-                cls.call_assertion(fn,
-                                   error_message=error_message or default_error_message,
-                                   error_class=error_class or default_error_class,
-                                   tries=tries or default_tries,
-                                   wait_seconds=wait_seconds or default_wait_seconds)
+                return cls.call_assertion(fn,
+                                          error_message=error_message or default_error_message,
+                                          error_class=error_class or default_error_class,
+                                          tries=tries or default_tries,
+                                          wait_seconds=wait_seconds or default_wait_seconds)
 
             return _wrapped
 

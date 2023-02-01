@@ -1779,3 +1779,13 @@ def test_eventually():
 
             delta3 = after3 - before3  # 100 tries * 0.1 sec plus 1 sec to check current time, so about 11 sec
             assert delta3 > ten_seconds
+
+            class MyStore:
+                VALUE = 0
+
+            @Eventually.consistent()
+            def foo():
+                MyStore.VALUE += 1
+                return MyStore.VALUE
+
+            assert foo(tries=3) == 1  # The value will increment exactly once because it succeeds first try.
