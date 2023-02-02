@@ -1419,7 +1419,7 @@ def test_check_true():
     msg = "x is not a list of four, five, and six."
     with pytest.raises(RuntimeError) as e:
         check_true(x == [4, 5, 6], msg)
-        assert msg in str(e)
+    assert msg in str(e.value)
 
 
 def test_remove_element():
