@@ -1316,6 +1316,16 @@ def string_list(s):
     return [p for p in [part.strip() for part in s.split(",")] if p]
 
 
+def is_c4_arn(arn: str) -> bool:
+    """
+    Returns True iff the given (presumed) AWS ARN string value looks like it
+    refers to a CGAP or Fourfront Cloudformation entity, otherwise returns False.
+    :param arn: String representing an AWS ARN.
+    :return: True if the given ARN refers to a CGAP or Fourfront Cloudformation entity, else False.
+    """
+    return arn and ("cgap" in arn or "fourfront" in arn)
+
+
 def string_md5(unicode_string):
     """
     Returns the md5 signature for the given u unicode string.
