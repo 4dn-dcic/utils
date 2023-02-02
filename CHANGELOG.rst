@@ -7,6 +7,14 @@ Change Log
 ----------
 
 
+6.7.1
+=====
+
+* In ``dcicutils.misc_utils``:
+
+  * Add method ``is_c4_arn`` to check if given ARN looks like CGAP or Fourfront entity.
+
+
 6.7.0
 =====
 
