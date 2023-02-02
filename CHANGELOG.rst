@@ -7,7 +7,7 @@ Change Log
 ----------
 
 
-6.6.1
+6.7.0
 =====
 
 * In ``dcicutils.qa_utils``:
@@ -24,6 +24,11 @@ Change Log
   * Add a method ``consistent`` that is a class method / decorator (named ``Eventually.consistent``).
 
   * Add testing, particularly of the timing.
+
+* In ``dcicutils.cloudformation_utils``:
+
+  * When searching for checkrunners, be more forgiving about abbreviations for development (dev)
+    and production (prd, prod).
 
 
 6.6.0
