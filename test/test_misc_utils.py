@@ -3160,13 +3160,13 @@ def test_dict_to_keys_and_values():
 
 
 def test_is_c4_arn():
-    assert is_c4_arn('arn:aws:ecs:us-east-1:643366669028:cluster/c4-ecs-cgap-production-stack-Productionblue-fzOm82DGZKGZ')
-    assert is_c4_arn('arn:aws:ecs:us-east-1:643366669028:cluster/c4-ecs-cgap-production-stack-CgapProductionblue-fzOm82DGZKGZ')
-    assert is_c4_arn('arn:aws:ecs:us-east-1:643366669028:cluster/c4-ecs-fourfront-hotseat-stack-Hotseat-ZnIAAAz8Apxf')
-    assert is_c4_arn('arn:aws:ecs:us-east-1:643366669028:cluster/c4-ecs-fourfront-production-stack-FourfrontProductiongreen-hU0JiwOeWfdm')
-    assert not is_c4_arn('arn:aws:ecs:us-east-1:643366669028:cluster/c4-ecs-abc-webdev-stack-CgapWebdev-rSLwZBbdVTtx')
-    assert not is_c4_arn('arn:aws:ecs:us-east-1:643366669028:cluster/default')
-    assert not is_c4_arn('arn:aws:ecs:us-east-1:643366669028:cluster/c4-ecs-def-mastertest-stack-FourfrontMastertest-O25WVcRMpExr')
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-cgap-production-stack-Productionblue-fzOm82DGZKGZ')
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-cgap-production-stack-CgapProductionblue-fzOm82DGZKGZ')
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-fourfront-hotseat-stack-Hotseat-ZnIAAAz8Apxf')
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-fourfront-production-stack-FourfrontProd-hU0JiwOeWfdm')
+    assert not is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-abc-webdev-stack-CgapWebdev-rSLwZBbdVTtx')
+    assert not is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/default')
+    assert not is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-def-mastertest-stack-FourfrontMaster-O25WVcRMpExr')
 
 
 class TestTopologicalSorter:
