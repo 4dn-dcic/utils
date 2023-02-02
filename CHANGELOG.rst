@@ -7,6 +7,30 @@ Change Log
 ----------
 
 
+6.7.0
+=====
+
+* In ``dcicutils.qa_utils``:
+
+  * For method ``Eventually_call_assertion``:
+
+    * Make the ``error_message=`` argument actually work.
+
+    * The ``threshold_seconds=`` argument is now deprecated.
+      Please prefer ``tries=`` and/or ``wait_seconds=``.
+
+    * Fix a bug where it didn't wait between iterations.
+
+  * Add a method ``consistent`` that is a class method / decorator (named ``Eventually.consistent``).
+
+  * Add testing, particularly of the timing.
+
+* In ``dcicutils.cloudformation_utils``:
+
+  * When searching for checkrunners, be more forgiving about abbreviations for development (dev)
+    and production (prd, prod).
+
+
 6.6.0
 =====
 

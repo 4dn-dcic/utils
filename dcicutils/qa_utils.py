@@ -7,12 +7,14 @@ import contextlib
 import copy
 import datetime
 import dateutil.tz as dateutil_tz
+import functools
 import hashlib
 import io
 import logging
 import os
 import pytest
 import pytz
+import re
 import sys
 import time
 import uuid
@@ -2650,20 +2652,101 @@ class MockId:
 
 class Eventually:
 
+    """
+    Intended use requires you to define a tesre for the assertions that might have to be tried more than once
+    until they eventually succeed after some number of tries:
+
+        def my_assertions():
+            assert flakey_foo() == 17
+
+    and later call it with the expected error_class and/or error_message, and information about how many times
+    to try and after what kind of wait:
+
+        Eventually.call_assertion(my_assertions, tries=3, wait_seconds=2, error_class=SomeException)
+
+    """
+
     @classmethod
     def call_assertion(cls, assertion_function, error_message=None, *,
-                       threshold_seconds=10, error_class=AssertionError):
+                       error_class=AssertionError, threshold_seconds=None, tries=None, wait_seconds=None):
+
+        """
+        Calls an assertion function some number of times before giving up, waiting between calls.
+
+        :param assertion_function: The function that does the assertions, erring if they fail.
+        :param error_class: The expected error if the tests fail in the expected way (before hopefully succeeding).
+            If some other error occurs, a retry will not occur.
+        :param error_message: The expected error messsage (a regular expression) if the tests fail in the expected way.
+            If some other error message occurs (the pattern does not match), a retry will not occur.
+        :param threshold_seconds: (deprecated) the number of seconds to keep trying.
+            Please use tries or wait_seconds instead.
+        :param tries: the numbe rof times to try (one more time than the number of retries)
+        :param wait_seconds: how long (in integer or float seconds) between tries
+        """
+
+        if threshold_seconds is not None:
+            assert isinstance(threshold_seconds, int), "The threshold_seconds must be an integer."
+            assert tries is None and wait_seconds is None, (
+                "The threshold_seconds= argument may not be mixed with tries= or wait_seconds=.")
+            tries = threshold_seconds
+
+        tries = tries or 10
+        wait_seconds = wait_seconds or 1
 
         # Try once a second
         errors = []
-        for _ in range(threshold_seconds):
+        for _ in range(tries):
             try:
-                assertion_function()
+                return assertion_function()
             except error_class as e:
                 msg = get_error_message(e)
+                if error_message and not re.search(error_message, msg):
+                    raise
                 PRINT(msg)
                 errors.append(msg)
-            else:
-                break
+            time.sleep(wait_seconds)
         else:
             raise AssertionError(f"Eventual consistency not achieved after {threshold_seconds} seconds.")
+
+    @classmethod
+    def consistent(cls, error_message=None, error_class=AssertionError, tries=None, wait_seconds=None):
+        """
+        A decorator for a function of zero arguments that does assertions.
+        In fact, the decorated function, once defined, CAN be called with arguments, but those are the
+        additional keyword arguments to Eventually.call_assertion and will not be passed to the decorated function.
+
+        This decoration can also have arguments, which establish defaults for the decorated function.
+
+        For example:
+
+            @Eventually.consistent(tries=5)
+            def foo():
+                assert something()
+
+        followed later by
+
+            foo(wait_seconds=2)
+
+        will call the oringally-defined no-argument function foo like this:
+
+            Eventually.call_assertion(foo, tries=5, wait_seconds=2)
+        """
+
+        def _wrapper(fn):
+
+            default_error_message = error_message
+            default_error_class = error_class
+            default_tries = tries
+            default_wait_seconds = wait_seconds
+
+            @functools.wraps(fn)
+            def _wrapped(error_message=None, error_class=None, tries=None, wait_seconds=None):
+                return cls.call_assertion(fn,
+                                          error_message=error_message or default_error_message,
+                                          error_class=error_class or default_error_class,
+                                          tries=tries or default_tries,
+                                          wait_seconds=wait_seconds or default_wait_seconds)
+
+            return _wrapped
+
+        return _wrapper
