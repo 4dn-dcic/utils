@@ -925,12 +925,25 @@ def test_s3_utils_buckets_ff_live_ecosystem_not_production():
         assert isinstance(s3u.env_manager, EnvManager)
         assert isinstance(s3u.env_manager.s3, botocore.client.BaseClient)  # It's hard to test for S3 specifically
         es_url = s3u.env_manager.es_url
-        print(f"Checking {es_url}...")
-        # NOTE: The right answers differ here from production, but as long as the short name is in there, that's enough.
-        pattern = f"https://vpc-os-.*{short_env_name(env_name).replace('-', '.*')}.*[.]amazonaws[.]com:443"
+        print(f"Checking {es_url} ...")
+        # NOTE: The right answers differ here from production, but as long as something approximately like
+        #       the short name is in there, that's enough.
+        names_part = _make_similar_names_alternation(env_name)
+        pattern = f"https://vpc-[eo]s-.*({names_part}).*[.]amazonaws[.]com:443"
         print(f"pattern={pattern}")
         assert es_url and re.match(pattern, es_url)
         assert s3u.env_manager.env_name == full_env
+
+
+def _make_similar_names_alternation(env_name):
+    # e.g.,
+    #  _make_similar_names_alternation('production')   # if the full_env_name is fourfront-production
+    #  returns
+    #    pro?d(uction)?.green|fourfront.pro?d(uction)?.green
+    return "|".join([(x.replace('-', '.')  # match any char where a "-" is in the env name
+                      .replace('production', 'pro?d(uction)?')  # allow abbreviating production
+                      .replace('development', 'dev(elopment)?'))  # allow abbreviating development
+                     for x in [short_env_name(env_name), full_env_name(env_name)]])
 
 
 @using_fresh_ff_deployed_state_for_testing()
@@ -972,7 +985,8 @@ def test_s3_utils_buckets_ff_live_ecosystem_production():
         es_url = s3u.env_manager.es_url
         print(f"Checking {es_url}...")
         # tokenify(full_env_name(env_name)) matches better, but as long as short env name is there, it's enough.
-        pattern = f"https://vpc-es-.*{short_env_name(env_name).replace('-', '.*')}.*[.]amazonaws[.]com:443"
+        names_part = _make_similar_names_alternation(env_name)
+        pattern = f"https://vpc-[eo]s-.*({names_part}).*[.]amazonaws[.]com:443"
         print(f"pattern={pattern}")
         assert es_url and re.match(pattern, es_url)
         assert is_stg_or_prd_env(s3u.env_manager.env_name)

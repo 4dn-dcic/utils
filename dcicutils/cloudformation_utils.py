@@ -261,8 +261,8 @@ class AbstractOrchestrationManager:
             lambda_response = lambda_client.list_functions(Marker=lambda_response_next_marker)
         return matching_function_names
 
-    CHECK_RUNNER_DEV_PATTERN = re.compile(".*foursight.*development.*CheckRunner.*")
-    CHECK_RUNNER_PROD_PATTERN = re.compile(".*foursight.*production.*CheckRunner.*")
+    CHECK_RUNNER_DEV_PATTERN = re.compile(".*foursight.*dev(elopment)?.*CheckRunner.*")   # match dev, development
+    CHECK_RUNNER_PROD_PATTERN = re.compile(".*foursight.*pro?d(uction)?.*CheckRunner.*")  # match prd, prod, production
 
     ENCACHE_RUNNER_NAME = True
 

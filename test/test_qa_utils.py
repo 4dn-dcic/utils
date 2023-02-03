@@ -1692,17 +1692,100 @@ def test_mock_id():
 
 def test_eventually():
 
-    def foo():
-        return 17
+    dt = ControlledTime()
+    with mock.patch("datetime.datetime", dt):
+        with mock.patch("time.sleep", dt.sleep):
 
-    flakey_success_frequency = 3
+            def foo():
+                return 17
 
-    flakey_foo = Occasionally(foo, success_frequency=flakey_success_frequency)
+            flakey_success_frequency = 3
 
-    def my_assertions():
-        assert flakey_foo() == 17
+            flakey_foo = Occasionally(foo, success_frequency=flakey_success_frequency)
 
-    with pytest.raises(AssertionError):
-        Eventually.call_assertion(my_assertions, threshold_seconds=flakey_success_frequency - 1, error_class=Exception)
+            def my_assertions():
+                assert flakey_foo() == 17
 
-    Eventually.call_assertion(my_assertions, threshold_seconds=flakey_success_frequency, error_class=Exception)
+            with pytest.raises(AssertionError):
+                Eventually.call_assertion(my_assertions, threshold_seconds=flakey_success_frequency - 1,
+                                          error_class=Exception)
+
+            # Beyond here we're testing the error_message="something" argument,
+            # which allows us to only wait for a specific eventual message.
+
+            def test_error_message_argument(*, expected_message=None):
+                Eventually.call_assertion(my_assertions, threshold_seconds=flakey_success_frequency,
+                                          error_class=Exception,
+                                          error_message=expected_message)
+
+            actual_message = "Oops. Occasionally this fails."
+
+            test_error_message_argument()
+
+            test_error_message_argument(expected_message=actual_message)
+
+            with pytest.raises(Exception) as e:
+                # If we're Eventually expecting an unrelated message,
+                # the actual error we get will just pass through and won't be retried.
+                test_error_message_argument(expected_message="SOME OTHER MESSAGE")
+            assert str(e.value) == actual_message
+
+            # Here we want to test how much time passes if all tests are tried.
+            # The default is 10 tries at 1-second intervals, so should be at least 10 seconds.
+
+            one_second = dt.timedelta(seconds=1)
+            five_seconds = dt.timedelta(seconds=5)
+            ten_seconds = dt.timedelta(seconds=10)
+            before = dt.now()
+
+            def always_failing():
+                raise AssertionError("Failed.")
+
+            with pytest.raises(Exception):
+                Eventually.call_assertion(always_failing)
+
+            after = dt.now()
+            delta = after - before
+            assert delta >= ten_seconds
+
+            @Eventually.consistent()
+            def also_failing():
+                raise AssertionError("Also failed.")
+
+            before = dt.now()
+            with pytest.raises(AssertionError):
+                also_failing()
+            after = dt.now()
+            delta = after - before  # 10 secs for the computation plus 1 sec to check current time, so about 11 secs
+            assert delta > ten_seconds
+
+            @Eventually.consistent(wait_seconds=0.1)
+            def quickly_failing():
+                raise AssertionError("Also failed.")
+
+            before2 = dt.now()
+            with pytest.raises(AssertionError):
+                quickly_failing()
+            after2 = dt.now()
+
+            delta2 = after2 - before2  # 1 sec for the computation plus 1 sec to check current time, so about 2 sec
+            assert delta2 > one_second
+            assert delta2 < five_seconds
+
+            before3 = dt.now()
+            with pytest.raises(AssertionError):
+                quickly_failing(tries=100)
+            after3 = dt.now()
+
+            delta3 = after3 - before3  # 100 tries * 0.1 sec plus 1 sec to check current time, so about 11 sec
+            assert delta3 > ten_seconds
+
+            class MyStore:
+                VALUE = 0
+
+            @Eventually.consistent()
+            def foo():
+                MyStore.VALUE += 1
+                return MyStore.VALUE
+
+            assert foo(tries=3) == 1  # The value will increment exactly once because it succeeds first try.
