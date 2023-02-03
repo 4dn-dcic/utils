@@ -799,7 +799,7 @@ def get_es_search_generator(es_client, index, body, page_size=200):
     while search_total is None or covered < search_total:
         es_res = es_client.search(index=index, body=body, size=page_size, from_=covered)
         if search_total is None:
-            search_total = es_res['hits']['total']
+            search_total = es_res['hits']['total']['value']
         es_hits = es_res['hits']['hits']
         covered += len(es_hits)
         yield es_hits
@@ -897,7 +897,7 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth):
                     'must_not': []
                 }
             },
-            'sort': [{'_uid': {'order': 'desc'}}]
+            'sort': [{'_id': {'order': 'desc'}}]
         }
         if filters:
             if not isinstance(filters, dict):
