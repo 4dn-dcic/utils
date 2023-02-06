@@ -6,6 +6,15 @@ dcicutils
 Change Log
 ----------
 
+
+6.9.0
+=====
+
+* In ``dcicutils.misc_utils``:
+
+  * Add method ``is_c4_arn`` to check if given ARN looks like CGAP or Fourfront entity.
+
+
 6.8.0
 =====
 
@@ -13,13 +22,6 @@ Change Log
 
   * Add support for ``Auth0Domain`` and ``Auth0AllowedConnections``
 
-
-6.7.1
-=====
-
-* In ``dcicutils.misc_utils``:
-
-  * Add method ``is_c4_arn`` to check if given ARN looks like CGAP or Fourfront entity.
 
 
 6.7.0
