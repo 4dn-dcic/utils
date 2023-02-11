@@ -6,6 +6,12 @@ dcicutils
 Change Log
 ----------
 
+6.9.0
+=====
+
+* Move ``mocked_s3utils_with_sse`` from ``test_ff_utils.py`` to ``ff_mocks.py``.
+
+
 6.8.0
 =====
 
