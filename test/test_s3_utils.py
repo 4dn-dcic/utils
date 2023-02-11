@@ -24,7 +24,7 @@ from dcicutils.env_utils_legacy import (
 )
 from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs
 from dcicutils.ff_mocks import make_mock_es_url, make_mock_portal_url
-from dcicutils.misc_utils import ignored, ignorable, override_environ
+from dcicutils.misc_utils import ignored, ignorable, override_environ, exported
 from dcicutils.qa_utils import MockBoto3, MockResponse, known_bug_expected
 from dcicutils.s3_utils import s3Utils, HealthPageKey
 from requests.exceptions import ConnectionError
@@ -33,6 +33,14 @@ from .helpers import (
     using_fresh_ff_state_for_testing, using_fresh_cgap_state_for_testing, using_fresh_ff_deployed_state_for_testing,
 )
 from .test_ff_utils import mocked_s3utils_with_sse
+
+
+# This was moved to ff_mocks.py, but some things may still import from here.
+# Importing from here is deprecated. It should be imported from ff_Mocks going forward.
+# Minimally this exported marker should be retained until major version 7 of dcicutils,
+# though as a practical matter because we have to import that context manager here for testing,
+# it's unlikely to break even after we remove this marker. -kmp 10-Feb-2023
+exported(mocked_s3utils_with_sse)
 
 
 @contextlib.contextmanager
