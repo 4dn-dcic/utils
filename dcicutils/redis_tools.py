@@ -77,7 +77,9 @@ class RedisSessionToken:
         if not redis_token:
             return False
         token_is_valid = (redis_token[self.SESSION] == token)
-        timestamp_is_valid = (datetime.datetime.fromisoformat(redis_token[self.EXPIRATION]) > datetime.datetime.utcnow())
+        timestamp_is_valid = (datetime.datetime.fromisoformat(
+            redis_token[self.EXPIRATION]) > datetime.datetime.utcnow()
+        )
         return token_is_valid and timestamp_is_valid
 
     def update_session_token(self, *, redis_handler: RedisBase, jwt) -> bool:
