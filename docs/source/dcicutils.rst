@@ -198,6 +198,20 @@ opensearch_utils
    :members:
 
 
+redis_utils
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.redis_utils
+   :members:
+
+
+redis_tools
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.redis_tools
+   :members:
+
+
 qa_checkers
 ^^^^^^^^^^^
 
