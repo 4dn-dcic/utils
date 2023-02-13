@@ -6,6 +6,12 @@ dcicutils
 Change Log
 ----------
 
+6.9.9.0b0
+=========
+
+* To become 7.0.0
+* Adds Redis functionality
+
 6.8.0
 =====
 
