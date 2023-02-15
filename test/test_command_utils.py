@@ -8,6 +8,7 @@ from dcicutils import command_utils as command_utils_module
 from dcicutils.command_utils import (
     _ask_boolean_question,  # noQA - access to internal function is so we can test it
     yes_or_no, y_or_n, ShellScript, shell_script, script_catch_errors, DEBUG_SCRIPT, SCRIPT_ERROR_HERALD,
+    pip_command_for_preinstall, compute_pip_command_for_preinstall
 )
 from dcicutils.misc_utils import ignored, file_contents, PRINT
 from dcicutils.qa_utils import printed_output
@@ -355,3 +356,50 @@ def test_script_catch_errors():
             assert isinstance(non_exit_exception, ValueError)
             assert str(non_exit_exception) == raw_error_message
             assert printed.lines == [normal_output]  # Any more output would be from Python itself reporting ValueError
+
+
+def test_pip_command_for_preinstall():
+
+    with mock.patch("toml.load") as mock_toml_load:
+
+        mock_toml_load.return_value = {}
+        assert compute_pip_command_for_preinstall('foo') == 'pip install foo'
+        with printed_output() as printed:
+            pip_command_for_preinstall(['foo'])
+            assert printed.last == 'pip install foo'
+
+        mock_toml_load.return_value = {'tool': {'poetry': {'dependencies': {'foo': '1.3'}}}}
+        assert compute_pip_command_for_preinstall('foo') == 'pip install foo==1.3'
+        with printed_output() as printed:
+            pip_command_for_preinstall(['foo'])
+            assert printed.last == 'pip install foo==1.3'
+
+        mock_toml_load.return_value = {'tool': {'poetry': {'dependencies': {'foo': '^1.3'}}}}
+        assert compute_pip_command_for_preinstall('foo') == 'pip install foo>=1.3'
+        with printed_output() as printed:
+            pip_command_for_preinstall(['foo'])
+            assert printed.last == 'pip install foo>=1.3'
+
+        mock_toml_load.return_value = {'tool': {'poetry': {'dependencies': {'foo': '>=1.3'}}}}
+        assert compute_pip_command_for_preinstall('foo') == 'pip install foo>=1.3'
+        with printed_output() as printed:
+            pip_command_for_preinstall(['foo'])
+            assert printed.last == 'pip install foo>=1.3'
+
+        mock_toml_load.return_value = {'tool': {'poetry': {'dev-dependencies': {'foo': '1.3'}}}}
+        assert compute_pip_command_for_preinstall('foo') == 'pip install foo==1.3'
+        with printed_output() as printed:
+            pip_command_for_preinstall(['foo'])
+            assert printed.last == 'pip install foo==1.3'
+
+        # This is arbitrary, preferring dev dependencies, but if there are two conflicting entries, hard to know.
+        mock_toml_load.return_value = {'tool': {'poetry':
+                                                    {'dependencies': {'foo': '1.3'},
+                                                     'dev-dependencies': {'foo': '1.4'}}}}
+        assert compute_pip_command_for_preinstall('foo') == 'pip install foo==1.4'
+        with printed_output() as printed:
+            pip_command_for_preinstall(['foo'])
+            assert printed.last == 'pip install foo==1.4'
+
+
+

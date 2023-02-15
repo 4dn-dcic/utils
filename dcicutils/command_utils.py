@@ -1,14 +1,19 @@
+import argparse
 import contextlib
 import glob
 import logging
 import os
 import requests
 import subprocess
+import toml
 
 from typing import Optional
 from .exceptions import InvalidParameterError
 from .lang_utils import there_are
 from .misc_utils import PRINT, environ_bool, print_error_message
+
+
+EPILOG = __doc__
 
 
 def _ask_boolean_question(question, quick=None, default=None):
@@ -328,3 +333,34 @@ def script_catch_errors():
             PRINT(SCRIPT_ERROR_HERALD)
             print_error_message(e)
             exit(1)
+
+
+def compute_pip_command_for_preinstall(library):
+    data = toml.load("pyproject.toml")
+    poetry = data.get('tool', {}).get('poetry', {})
+    dependencies = poetry.get('dependencies', {})
+    dev_dependencies = poetry.get('dev-dependencies', {})
+    all_dependencies = dict(dependencies, **dev_dependencies)  # Lets the dev-dependencies override dev dependencies
+    lower_lib = library.lower()
+    version = None
+    for lib, vers in all_dependencies.items():
+        if lib.lower() == lower_lib:
+            version = vers
+            break
+    if not version:
+        version = ""
+    elif version.startswith("^"):
+        version = f">={version[1:]}"
+    elif version[0].isdigit():
+        version = f"=={version}"
+    return f"pip install {library}{version}"
+
+
+def pip_command_for_preinstall(override_args=None):
+    parser = argparse.ArgumentParser(  # noqa - PyCharm wrongly thinks the formatter_class is specified wrong here.
+        description="Computes a pip command to preinstall a library", epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument('library', help="The library to use")
+    args = parser.parse_args(override_args)
+    PRINT(compute_pip_command_for_preinstall(library=args.library))

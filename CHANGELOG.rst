@@ -6,10 +6,17 @@ dcicutils
 Change Log
 ----------
 
+6.9.0
+=====
+
+* Add new command ``pip-command-for-preinstall`` to compute a pip command and output it to ``stdout``
+  for pre-loading what the ``pyproject.toml`` will request.
+
+
 6.8.0
 =====
 
-* In `dcicutils.deployment_utils``
+* In ``dcicutils.deployment_utils``
 
   * Add support for ``Auth0Domain`` and ``Auth0AllowedConnections``
 
