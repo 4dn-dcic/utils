@@ -8,7 +8,7 @@ from dcicutils import command_utils as command_utils_module
 from dcicutils.command_utils import (
     _ask_boolean_question,  # noQA - access to internal function is so we can test it
     yes_or_no, y_or_n, ShellScript, shell_script, script_catch_errors, DEBUG_SCRIPT, SCRIPT_ERROR_HERALD,
-    pip_command_for_preinstall, compute_pip_command_for_preinstall
+    pip_command_for_preinstall, compute_pip_command_for_preinstall, poetry_version_to_pip_version,
 )
 from dcicutils.misc_utils import ignored, file_contents, PRINT
 from dcicutils.qa_utils import printed_output
@@ -368,38 +368,111 @@ def test_pip_command_for_preinstall():
             pip_command_for_preinstall(['foo'])
             assert printed.last == 'pip install foo'
 
-        mock_toml_load.return_value = {'tool': {'poetry': {'dependencies': {'foo': '1.3'}}}}
+        # [tool.poetry.dependencies]
+        # foo = "1.3"
+        mock_toml_load.return_value = {
+            'tool': {
+                'poetry': {
+                    'dependencies': {'foo': '1.3'}
+                }
+            }
+        }
         assert compute_pip_command_for_preinstall('foo') == 'pip install foo==1.3'
         with printed_output() as printed:
             pip_command_for_preinstall(['foo'])
             assert printed.last == 'pip install foo==1.3'
 
-        mock_toml_load.return_value = {'tool': {'poetry': {'dependencies': {'foo': '^1.3'}}}}
+        # [tool.poetry.dependencies]
+        # foo = "^1.3.7"
+        mock_toml_load.return_value = {
+            'tool': {
+                'poetry': {
+                    'dependencies': {'foo': '^1.3.7'}
+                }
+            }
+        }
+        assert compute_pip_command_for_preinstall('foo') == 'pip install foo>=1.3.7,<2'
+        with printed_output() as printed:
+            pip_command_for_preinstall(['foo'])
+            assert printed.last == 'pip install foo>=1.3.7,<2'
+
+        # [tool.poetry.dependencies]
+        # foo = "^0.3.7"
+        mock_toml_load.return_value = {
+            'tool': {
+                'poetry': {
+                    'dependencies': {'foo': '^0.3.7'}
+                }
+            }
+        }
+        assert compute_pip_command_for_preinstall('foo') == 'pip install foo>=0.3.7,<0.4'
+        with printed_output() as printed:
+            pip_command_for_preinstall(['foo'])
+            assert printed.last == 'pip install foo>=0.3.7,<0.4'
+
+        # [tool.poetry.dependencies]
+        # foo = ">=1.3"
+        mock_toml_load.return_value = {
+            'tool': {
+                'poetry': {
+                    'dependencies': {'foo': '>=1.3'}
+                }
+            }
+        }
         assert compute_pip_command_for_preinstall('foo') == 'pip install foo>=1.3'
         with printed_output() as printed:
             pip_command_for_preinstall(['foo'])
             assert printed.last == 'pip install foo>=1.3'
 
-        mock_toml_load.return_value = {'tool': {'poetry': {'dependencies': {'foo': '>=1.3'}}}}
-        assert compute_pip_command_for_preinstall('foo') == 'pip install foo>=1.3'
-        with printed_output() as printed:
-            pip_command_for_preinstall(['foo'])
-            assert printed.last == 'pip install foo>=1.3'
-
-        mock_toml_load.return_value = {'tool': {'poetry': {'dev-dependencies': {'foo': '1.3'}}}}
+        # [tool.poetry.dev-dependencies]
+        # foo = "1.3"
+        mock_toml_load.return_value = {
+            'tool': {
+                'poetry': {
+                    'dev-dependencies': {'foo': '1.3'}
+                }
+            }
+        }
         assert compute_pip_command_for_preinstall('foo') == 'pip install foo==1.3'
         with printed_output() as printed:
             pip_command_for_preinstall(['foo'])
             assert printed.last == 'pip install foo==1.3'
 
         # This is arbitrary, preferring dev dependencies, but if there are two conflicting entries, hard to know.
-        mock_toml_load.return_value = {'tool': {'poetry':
-                                                    {'dependencies': {'foo': '1.3'},
-                                                     'dev-dependencies': {'foo': '1.4'}}}}
+        #
+        # [tool.poetry.dependencies]
+        # foo = "1.3"
+        # [tool.poetry.dev-dependencies]
+        # foo = "1.4"
+        mock_toml_load.return_value = {
+            'tool': {
+                'poetry': {
+                    'dependencies': {'foo': '1.3'},
+                    'dev-dependencies': {'foo': '1.4'}
+                }
+            }
+        }
         assert compute_pip_command_for_preinstall('foo') == 'pip install foo==1.4'
         with printed_output() as printed:
             pip_command_for_preinstall(['foo'])
             assert printed.last == 'pip install foo==1.4'
 
 
+def test_poetry_version_to_pip_version():
 
+    assert poetry_version_to_pip_version("1.2.3") == "==1.2.3"
+    assert poetry_version_to_pip_version("^1.2.3") == ">=1.2.3,<2"
+    assert poetry_version_to_pip_version("^1.2.") == ">=1.2.,<2"
+    assert poetry_version_to_pip_version("^1.2") == ">=1.2,<2"
+    assert poetry_version_to_pip_version("^1.") == ">=1.,<2"
+    assert poetry_version_to_pip_version("^1") == ">=1,<2"
+    assert poetry_version_to_pip_version("^0.2.3") == ">=0.2.3,<0.3"
+    assert poetry_version_to_pip_version("^0.2") == ">=0.2,<0.3"
+    assert poetry_version_to_pip_version("^0") == ">=0,<0.1"
+    assert poetry_version_to_pip_version(">=1.2.3") == ">=1.2.3"
+    assert poetry_version_to_pip_version("") == ""
+    assert poetry_version_to_pip_version(None) == ""
+    assert poetry_version_to_pip_version(False) == ""
+
+    with pytest.raises(ValueError):
+        poetry_version_to_pip_version("^x.y.z")

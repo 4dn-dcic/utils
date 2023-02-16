@@ -335,25 +335,65 @@ def script_catch_errors():
             exit(1)
 
 
+def poetry_version_to_pip_version(version):
+    """
+    Given a version spec that would go in a pyproject.toml for poetry, returns a version spec pip would like.
+
+    If the argument is false (None or False or the empty string), the empty string is returned.
+
+    In general, this argument is a suitable suffix to a library name. e.g., if the argument "1.2.3" represents
+    the version of some library foo, the result will be "==1.2.3", which can be appended to "foo" to get
+    "foo==1.2.3", which can be used with "pip install".  If the result is the empty string, no version is specified
+    so that when appendeed to the library, the library name itself will be returned.
+
+    >>> poetry_version_to_pip_version("1.2.3")
+    ==1.2.3
+    >>> poetry_version_to_pip_version("^1.2.3")
+    >=1.2.3,<2
+    >>> poetry_version_to_pip_version("^0.2.3")
+    >=0.2.3,<0.3
+    >>> poetry_version_to_pip_version(">=1.2.3")
+    >=1.2.3
+    """
+
+    try:
+        if not version:
+            version = ""
+        elif version.startswith("^"):
+            version = version[1:]
+            parts = version.split('.')
+            major = int(parts[0])
+            minor = int(parts[1]) if len(parts) > 1 and parts[1] else 0
+            next_boundary = f"{major + 1}" if major > 0 else f"{major}.{minor + 1}"
+            version = f">={version},<{next_boundary}"
+        elif version[0].isdigit():
+            version = f"=={version}"
+    except Exception:
+        raise ValueError(f"Unable to convert to pip version: {version!r}")
+    return version
+
+
 def compute_pip_command_for_preinstall(library):
+    """
+    Peeks into the pyproject.toml file to figure out what the right version would be to use for 'pip install'.
+    This is intended to help preload support for things like 'wheel' or 'setuptools' when a specific version
+    is needed. The result is a full pip command that could be executed by the shell. If there is no version spec
+    in pyprojet.toml, the pip command will not load a specific version.
+    """
+
     data = toml.load("pyproject.toml")
     poetry = data.get('tool', {}).get('poetry', {})
     dependencies = poetry.get('dependencies', {})
     dev_dependencies = poetry.get('dev-dependencies', {})
     all_dependencies = dict(dependencies, **dev_dependencies)  # Lets the dev-dependencies override dev dependencies
     lower_lib = library.lower()
-    version = None
+    version = ""
     for lib, vers in all_dependencies.items():
         if lib.lower() == lower_lib:
             version = vers
             break
-    if not version:
-        version = ""
-    elif version.startswith("^"):
-        version = f">={version[1:]}"
-    elif version[0].isdigit():
-        version = f"=={version}"
-    return f"pip install {library}{version}"
+    pip_version = poetry_version_to_pip_version(version) if version else ""
+    return f"pip install {library}{pip_version}"
 
 
 def pip_command_for_preinstall(override_args=None):
