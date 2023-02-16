@@ -83,6 +83,10 @@ class RedisSessionToken:
         """ Returns the key under which the Redis hset is stored - note that this contains the token! """
         return self.redis_key
 
+    def get_expiration(self) -> str:
+        """ Returns the expiration date stored in the session hset locally """
+        return self.session_hset[self.EXPIRATION]
+
     @classmethod
     def from_redis(cls, *, redis_handler: RedisBase, namespace: str, token: str):
         """ Builds a RedisSessionToken from an existing record - allows extracting JWT
@@ -94,8 +98,9 @@ class RedisSessionToken:
         """
         redis_key = f'{namespace}:session:{token}'
         redis_entry = redis_handler.hgetall(redis_key)
-        return cls(namespace=namespace, jwt=redis_entry[cls.JWT],
-                   token=token, expiration=redis_entry[cls.EXPIRATION])
+        if redis_entry:
+            return cls(namespace=namespace, jwt=redis_entry[cls.JWT],
+                       token=token, expiration=redis_entry[cls.EXPIRATION])
 
     def decode_jwt(self, audience: str, secret: str, leeway: int = 30) -> dict:
         """ Decodes JWT to grab info such as the email
