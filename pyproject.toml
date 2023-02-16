@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "6.9.9.0b1"  # to become 7.0.0
+version = "6.9.9.0b2"  # to become 7.0.0
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -57,6 +57,7 @@ urllib3 = "^1.26.6"
 webtest = "^2.0.34"
 opensearch-py = "^2.0.1"
 redis = "^4.5.1"
+PyJWT = "^2.6.0"
 
 
 [tool.poetry.dev-dependencies]
