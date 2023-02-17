@@ -52,6 +52,7 @@ class HealthPageKey:  # This is moving here from cgap-portal.
     PROCESSED_FILE_BUCKET = 'processed_file_bucket'          # = s3Utils.OUTFILE_BUCKET_HEALTH_PAGE_KEY
     PROJECT_VERSION = 'project_version'
     PYTHON_VERSION = 'python_version'
+    REDIS = 'redis'
     S3_ENCRYPT_KEY_ID = 's3_encrypt_key_id'
     SNOVAULT_VERSION = 'snovault_version'
     SYSTEM_BUCKET = 'system_bucket'                          # = s3Utils.SYS_BUCKET_HEALTH_PAGE_KEY
@@ -235,10 +236,13 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
         if not es_url.startswith('http'):  # skips on both http:// and https://
             es_url = ('https://' if es_url.endswith(":443") else 'http://') + es_url
 
+        redis_url = s3u.health_page_get(HealthPageKey.REDIS)
+
         env_info = {
             'ff_env': env_full_name,
             'fourfront': portal_url,
-            'es': es_url
+            'es': es_url,
+            'redis': redis_url  # default to None
         }
 
         return env_info
