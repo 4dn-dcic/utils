@@ -8,6 +8,9 @@ from dcicutils.redis_utils import RedisBase, RedisException
 log = structlog.getLogger(__name__)
 
 
+SESSION_TOKEN_COOKIE = 'c4_st'
+
+
 def make_session_token(n_bytes: int = 32) -> str:
     """ Uses the secrets module to create a cryptographically secure and URL safe string
     :param n_bytes: number of bytes to use, default 32
