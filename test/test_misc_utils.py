@@ -13,21 +13,26 @@ import uuid
 import warnings
 import webtest
 
+from dcicutils import misc_utils as misc_utils_module
 from dcicutils.misc_utils import (
     PRINT, ignored, ignorable, filtered_warnings, get_setting_from_context, TestApp, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
-    Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool,
+    Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool, str_to_bool,
     LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
     keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
     CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json, url_path_join,
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ,
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
-    capitalize1, local_attrs, dict_zip, json_leaf_subst, _is_function_of_exactly_one_required_arg, string_list,
-    string_md5,
+    capitalize1, local_attrs, dict_zip, json_leaf_subst, print_error_message, get_error_message,
+    _is_function_of_exactly_one_required_arg, _apply_decorator,  # noQA
+    string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, lines_printed_to,
+    classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
+    ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn
 )
 from dcicutils.qa_utils import (
-    Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output, raises_regexp
+    Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
+    raises_regexp, MockId, MockLog,
 )
 from unittest import mock
 
@@ -493,6 +498,9 @@ def test_virtual_app_crud_failure():
         def get(self, url, **kwargs):
             raise webtest.AppError(simulated_error_message)
 
+        def post(self, url, object, **kwargs):  # noqa - the name of this argument is not chosen by us here
+            raise webtest.AppError(simulated_error_message)
+
         def post_json(self, url, object, **kwargs):  # noqa - the name of this argument is not chosen by us here
             raise webtest.AppError(simulated_error_message)
 
@@ -513,6 +521,7 @@ def test_virtual_app_crud_failure():
 
         operations = [
             lambda: vapp.get(some_url),
+            lambda: vapp.post(some_url, "stuff"),
             lambda: vapp.post_json(some_url, {'a': 1, 'b': 2, 'c': 3}),
             lambda: vapp.put_json(some_url, {'a': 1, 'b': 2, 'c': 3}),
             lambda: vapp.patch_json(some_url, {'b': 5})
@@ -532,7 +541,7 @@ def test_filtered_warnings():
     def expect_warnings(pairs):
         with warnings.catch_warnings(record=True) as w:
             # Trigger a warning.
-            warnings.warn("oh, this is deprecated for sure", DeprecationWarning)  # noqa
+            warnings.warn("oh, what a bad user you are", RuntimeWarning)  # noqa
             warnings.warn("tsk, tsk, tsk, what ugly code", SyntaxWarning)  # noqa
             # Verify some things
             for expected_count, expected_type in pairs:
@@ -540,21 +549,23 @@ def test_filtered_warnings():
                 for warning in w:
                     if issubclass(warning.category, expected_type):
                         count += 1
-                assert count == expected_count
+                assert count == expected_count, (
+                    f"Warnings: {[e.message for e in w]} (count={count} expected{expected_count})"
+                )
 
-    expect_warnings([(2, Warning), (1, DeprecationWarning), (1, SyntaxWarning)])
+    expect_warnings([(2, Warning), (1, RuntimeWarning), (1, SyntaxWarning)])
 
     with filtered_warnings("ignore"):
-        expect_warnings([(0, Warning), (0, DeprecationWarning), (0, SyntaxWarning)])
+        expect_warnings([(0, Warning), (0, RuntimeWarning), (0, SyntaxWarning)])
 
     with filtered_warnings("ignore", category=Warning):
-        expect_warnings([(0, Warning), (0, DeprecationWarning), (0, SyntaxWarning)])
+        expect_warnings([(0, Warning), (0, RuntimeWarning), (0, SyntaxWarning)])
 
-    with filtered_warnings("ignore", category=DeprecationWarning):
-        expect_warnings([(1, Warning), (0, DeprecationWarning), (1, SyntaxWarning)])
+    with filtered_warnings("ignore", category=RuntimeWarning):
+        expect_warnings([(1, Warning), (0, RuntimeWarning), (1, SyntaxWarning)])
 
     with filtered_warnings("ignore", category=SyntaxWarning):
-        expect_warnings([(1, Warning), (1, DeprecationWarning), (0, SyntaxWarning)])
+        expect_warnings([(1, Warning), (1, RuntimeWarning), (0, SyntaxWarning)])
 
 
 def _adder(n):
@@ -1378,6 +1389,28 @@ def test_environ_bool():
         assert environ_bool("FOO", None) is False
 
 
+def test_str_to_bool():
+
+    assert str_to_bool(None) is None
+
+    assert str_to_bool("TRUE") is True
+    assert str_to_bool("True") is True
+    assert str_to_bool("trUe") is True
+    assert str_to_bool("TrUe") is True
+
+    assert str_to_bool("FALSE") is False
+    assert str_to_bool("False") is False
+    assert str_to_bool("false") is False
+    assert str_to_bool("FaLsE") is False
+
+    assert str_to_bool("") is False
+    assert str_to_bool("anything") is False
+
+    for x in [0, 1, -1, 17, True, False, [], [17], {}, {"some": "thing"}]:
+        with pytest.raises(ValueError):
+            str_to_bool(x)
+
+
 def test_check_true():
 
     x = [1, 2, 3]
@@ -1386,7 +1419,7 @@ def test_check_true():
     msg = "x is not a list of four, five, and six."
     with pytest.raises(RuntimeError) as e:
         check_true(x == [4, 5, 6], msg)
-    assert msg in str(e)
+    assert msg in str(e.value)
 
 
 def test_remove_element():
@@ -1464,27 +1497,35 @@ def test_is_function_of_exactly_one_required_arg():
         return ['n_args', 0]
 
     def f1(x):
+        ignored(x)
         return ['n_args', 1]
 
     def f2(x, y):
+        ignored(x, y)
         return ['n_args', 2]
 
     def f0_k1(*, k):
+        ignored(k)
         return ['n_args', 0, 'n_kwargs', 1]
 
     def f1_k1(*, k):
+        ignored(k)
         return ['n_args', 1, 'n_kwargs', 1]
 
     def f2_k1(*, k):
+        ignored(k)
         return ['n_args', 2, 'n_kwargs', 1]
 
     def f0_1(x=0):
+        ignored(x)
         return ['n_args_min', 0, 'n_args_max', 1]
 
     def f0_2(x=0, y=0):
+        ignored(x, y)
         return ['n_args_min', 0, 'n_args_max', 1]
 
     def f0_k0_1(*, k=0):
+        ignored(k)
         return ['n_args', 0, 'n_kwargs_min', 0, 'n_kwargs_max', 1]
 
     assert _is_function_of_exactly_one_required_arg(f0) is False
@@ -1498,6 +1539,82 @@ def test_is_function_of_exactly_one_required_arg():
     assert _is_function_of_exactly_one_required_arg(f0_1) is False
     assert _is_function_of_exactly_one_required_arg(f0_2) is False
     assert _is_function_of_exactly_one_required_arg(f0_k0_1) is False
+
+    assert _is_function_of_exactly_one_required_arg(17) is False
+
+
+def test_apply_decorator():
+
+    print()
+
+    def foo(outer1=None, outer2=None, inner1=None, inner2=None):
+        return {'outer1': outer1, 'outer2': outer2, 'inner1': inner1, 'inner2': inner2}
+
+    def foo_positional(inner1):
+        return {'inner1': inner1}
+
+    def curryize(outer1=None, outer2=None):
+        def _curried(fn):
+            @functools.wraps(fn)
+            def _foo(*args, **kwargs):
+                if outer1 is not None:
+                    kwargs['outer1'] = outer1
+                if outer2 is not None:
+                    kwargs['outer2'] = outer2
+                return {'wrapped': fn(*args, **kwargs)}
+            return _foo
+        return _curried
+
+    def never_called(*args, **kwargs):
+        ignored(args, kwargs)
+        raise NotImplementedError("this should never be called")
+
+    print("Testing case 1")
+
+    # Case 1: Mixing positionals and keys is not allowed.
+    with pytest.raises(SyntaxError):
+        _apply_decorator(never_called, 17, somekey=1)
+
+    # Case1: More than one positional is not allowed
+    # Two or more arguments is ambiguous and not allowed.
+    with pytest.raises(SyntaxError):
+        _apply_decorator(never_called, 17, 18)
+
+    print("Testing case 2A")
+
+    assert _apply_decorator(curryize(outer1=1, outer2=2), foo)(inner1=3, inner2=4) == {
+        'wrapped': {
+            'outer1': 1,
+            'outer2': 2,
+            'inner1': 3,
+            'inner2': 4
+        }
+    }
+
+    print("Testing case 2B")
+
+    assert _apply_decorator(curryize, foo_positional)(3) == {
+        'wrapped': {
+            'inner1': 3,
+        }
+    }
+
+    print("Testing case 3")
+
+    # Zero arguments means give back a wrapped function
+    # Corresponds to
+    #   @my_decorator
+    #   def foo_curried(y, z): ...
+    #  so there is no opportunity to supply w and x early.
+
+    assert _apply_decorator(curryize)(foo)(inner1=3, inner2=4) == {
+        'wrapped': {
+            'outer1': None,
+            'outer2': None,
+            'inner1': 3,
+            'inner2': 4
+        }
+    }
 
 
 def test_is_proper_subclass():
@@ -1688,6 +1805,8 @@ class TestCachedField:
         with mock.patch.object(datetime_module, "datetime", dt):
             field = CachedField('simple1', update_function=make_counter())
 
+            last_known_time_of_next_update = field.time_of_next_update
+
             assert field.value is not None
 
             # Get a value, which should not be changing over short periods of time.
@@ -1701,6 +1820,8 @@ class TestCachedField:
 
             # Forcing an update even though not much time has passed. Field value should be updated.
             val2 = field.get_updated()
+
+            assert field.time_of_next_update == last_known_time_of_next_update
 
             assert val2 != val1
             assert field.value != val1
@@ -1717,6 +1838,8 @@ class TestCachedField:
             dt.sleep(self.DEFAULT_TIMEOUT / 2)
             val4 = field.get()
 
+            assert field.time_of_next_update == last_known_time_of_next_update
+
             assert val2 == val4
             assert val2 == field.value
             assert val4 == field.value
@@ -1725,6 +1848,9 @@ class TestCachedField:
 
             dt.sleep(self.DEFAULT_TIMEOUT / 2)  # This should push us into the cache refill time
             val5 = field.get()
+
+            assert field.time_of_next_update != last_known_time_of_next_update
+            last_known_time_of_next_update = field.time_of_next_update
 
             assert val2 != val5
             assert field.value != val2
@@ -1736,7 +1862,25 @@ class TestCachedField:
             assert field.get() == val5
 
             dt.sleep(self.DEFAULT_TIMEOUT)  # Fast forward to where we're going to refill again
-            assert field.get() != val5
+            val6 = field.get()
+            assert val6 != val5
+
+            assert field.time_of_next_update != last_known_time_of_next_update
+            last_known_time_of_next_update = field.time_of_next_update
+
+            val7 = field.get_updated()
+            assert val6 != val7
+
+            assert field.time_of_next_update == last_known_time_of_next_update
+
+            val8 = field.get_updated(push_ttl=True)
+            assert val8 == val7 + 1
+            assert field.time_of_next_update != last_known_time_of_next_update
+            last_known_time_of_next_update = field.time_of_next_update
+
+            val9 = field.get_updated(push_ttl=False)
+            assert val9 == val8 + 1
+            assert field.time_of_next_update == last_known_time_of_next_update
 
     def test_cached_field_timeout(self):
         field = CachedField('simple1', update_function=make_counter())
@@ -1744,6 +1888,12 @@ class TestCachedField:
         assert field.timeout == self.DEFAULT_TIMEOUT
         field.set_timeout(30)
         assert field.timeout == 30
+
+    def test_cached_field_str_and_str(self):
+        def constant_17():
+            return 17
+        f = CachedField(name='foo', update_function=constant_17, timeout=1234)
+        assert str(f) == repr(f) == "CachedField(name='foo',update_function=constant_17,timeout=1234)"
 
 
 @pytest.mark.parametrize('token, expected', [
@@ -1827,6 +1977,10 @@ def test_string_list():
     assert string_list(' ') == []
     assert string_list('  foo   ') == ['foo']
     assert string_list('  foo   ,,bar ,  ') == ['foo', 'bar']
+
+    with pytest.raises(ValueError) as exc:
+        string_list(17)
+    assert str(exc.value) == "Not a string: 17"
 
 
 def test_string_md5():
@@ -2055,6 +2209,54 @@ def test_customized_class():
         assert printed.last is None
 
 
+class SampleException(Exception):  # Used for testing print_error_message
+    pass
+
+
+def test_get_error_message_and_print_error_message():
+
+    print()  # Start test output on a fresh line
+
+    def test_error(error_descriptor, expected, expected_full):
+
+        try:
+            # Allow either of two different ways to describe an error: as an exception or a function that raises one.
+            if isinstance(error_descriptor, Exception):
+                raise error_descriptor
+            else:
+                error_descriptor()
+
+        except Exception as exception:
+
+            # Test the ability to get or print the error message.
+
+            with printed_output() as printed:
+
+                assert get_error_message(exception, full=False) == expected
+                print_error_message(exception, full=False)
+                assert printed.last == expected
+
+                assert get_error_message(exception, full=True) == expected_full
+                print_error_message(exception, full=True)
+                assert printed.last == expected_full
+
+            return
+
+        raise AssertionError("The exception_amker did not raise an error.")
+
+    empty_dict = {}
+
+    test_error(  # The empty_dict['foo'] will unconditionally err, so we don't need the value to get used
+               error_descriptor=lambda: empty_dict['foo'],
+               # There is no difference between short and long forms for primitive error classes that have no module id.
+               expected="KeyError: 'foo'",
+               expected_full="KeyError: 'foo'")
+
+    test_error(error_descriptor=SampleException("Something happened."),
+               expected="SampleException: Something happened.",
+               expected_full="test.test_misc_utils.SampleException: Something happened.")
+
+
 def test_url_path_join():
 
     assert url_path_join('foo', 'bar') == 'foo/bar'
@@ -2209,6 +2411,8 @@ def test_is_valid_absolute_uri():
     # most of these were only screened out for lack of a colon (:) and those occasional cases were let
     # through improperly. Really the colon check was supposed to be checking for a scheme, but colons can
     # happen in other places and that was a lousy check. -kmp 20-Apr-2021
+
+    assert is_valid_absolute_uri(3) is False
 
     assert is_valid_absolute_uri("foo") is False
 
@@ -2566,3 +2770,430 @@ def test_json_leaf_subst():
     assert json_leaf_subst("x", subs) == "ex"
     assert json_leaf_subst(["x", "y"], subs) == ["ex", "why"]
     assert json_leaf_subst({"x": "y", "y": "x"}, subs) == {"ex": "why", "why": "ex"}
+
+
+def test_singleton_manager():
+
+    class Foo:
+        def __init__(self, token2=None):
+            self.secret_token = uuid.uuid4()
+            self.secret_token2 = token2
+
+    foo1_manager = SingletonManager(Foo)
+
+    assert foo1_manager.singleton_class is Foo
+    assert isinstance(foo1_manager.singleton, Foo)
+    assert foo1_manager.singleton is foo1_manager.singleton
+    assert foo1_manager.singleton.secret_token == foo1_manager.singleton.secret_token
+    assert foo1_manager.singleton.secret_token2 is None
+
+    foo2_manager = SingletonManager(Foo, str(uuid.uuid4()))
+
+    assert foo2_manager.singleton_class is Foo
+    assert isinstance(foo2_manager.singleton, Foo)
+    assert foo2_manager.singleton is foo2_manager.singleton
+    assert foo2_manager.singleton.secret_token == foo2_manager.singleton.secret_token
+    assert foo2_manager.singleton.secret_token2 == foo2_manager.singleton.secret_token2
+
+    foo3_manager = SingletonManager(Foo, token2=str(uuid.uuid4()))
+
+    assert foo3_manager.singleton_class is Foo
+    assert isinstance(foo3_manager.singleton, Foo)
+    assert foo3_manager.singleton is foo3_manager.singleton
+    assert foo3_manager.singleton.secret_token == foo3_manager.singleton.secret_token
+    assert foo3_manager.singleton.secret_token2 is not None
+    assert foo3_manager.singleton.secret_token2 == foo3_manager.singleton.secret_token2
+
+
+def test_classproperty():
+
+    t = ControlledTime()
+
+    class Clock:
+        @classproperty
+        def sample(cls):  # noQA - PyCharm wrongly thinks the argname should be 'self'
+            return t.now()
+
+    class SubClock(Clock):
+        pass
+
+    t0 = Clock.sample
+    t1 = Clock.sample
+    t2 = Clock.sample
+
+    assert t2 > t1 > t0
+
+    t3 = SubClock.sample
+    t4 = SubClock.sample
+
+    assert t4 > t3 > t2
+
+    t5 = Clock.sample
+
+    assert t5 > t4
+
+
+def test_classproperty_cached():
+
+    print()
+
+    t = ControlledTime()
+
+    class Clock:
+        @classproperty_cached
+        def sample(cls):  # noQA - PyCharm wrongly thinks the argname should be 'self'
+            return t.now()
+
+    class SubClock(Clock):
+        pass
+
+    c_t1 = Clock.sample
+    c_t2 = Clock.sample
+    c_t3 = Clock.sample
+
+    assert c_t3 == c_t2 == c_t1  # Cached value
+
+    s_t1 = SubClock.sample
+    s_t2 = SubClock.sample
+
+    assert s_t2 == s_t1 == c_t3 == c_t2 == c_t1  # Cached value and cache is shared with the parent class
+
+    with pytest.raises(ValueError) as exc:
+        classproperty_cached.reset(instance_class=SubClock, attribute_name='sample', subclasses=False)
+    assert str(exc.value) == ("The subclasses= argument to classproperty_cached.reset must not be False"
+                              " because classproperty_cached does not use per-subclass caches.")
+
+    # This will clear SubClock cache, bu that's shared with the Clock cache, so both will clear.
+    assert classproperty_cached.reset(instance_class=SubClock, attribute_name='sample') is True
+
+    c_t5 = Clock.sample     # This should recompute Clock.sample cache, which is shared by SubCLock
+    assert c_t5 > c_t1
+
+    s_t3 = SubClock.sample  # This will access the Clock.sample cache indirectly
+    assert s_t3 > s_t1
+
+    assert s_t3 == c_t5     # This shows they are the same cache
+
+    # Again, this will clear Clock and SubClock caches
+    classproperty_cached.reset(instance_class=Clock, attribute_name='sample')
+
+    c_t6 = Clock.sample     # This should recompute Clock.sample cached value
+    s_t4 = SubClock.sample  # This should recompute SubClock.sample cached value
+    assert c_t6 > c_t5
+    assert s_t4 > c_t3
+    assert s_t4 == c_t6  # They share a cache
+
+    # Again, both are cleared. This isn't needed but is useful to retain parallel with test
+    # for classproperty_cached_each_subclass
+    classproperty_cached.reset(instance_class=SubClock, attribute_name='sample')
+
+    c_t7 = Clock.sample
+    assert c_t7 > c_t6
+
+    s_t5 = SubClock.sample
+    assert s_t5 > s_t4
+
+    assert s_t5 == c_t7  # They share a cache
+
+    # Finally, this is just an error. Since this cache cleare won't happen, the remaining cache value accesses
+    # will show no change.
+    with pytest.raises(ValueError) as exc:
+        classproperty_cached.reset(instance_class=Clock, attribute_name='sample', subclasses=False)
+    assert str(exc.value) == ("The subclasses= argument to classproperty_cached.reset must not be False"
+                              " because classproperty_cached does not use per-subclass caches.")
+
+    c_t8 = Clock.sample
+    assert c_t8 == c_t7
+
+    s_t6 = SubClock.sample
+    assert s_t6 == s_t5
+
+    with pytest.raises(ValueError) as exc:
+        classproperty_cached.reset(instance_class='not-a-class', attribute_name='sample')
+    assert str(exc.value) == 'The instance_class= argument to classproperty_cached.reset must be a class.'
+
+    with pytest.raises(ValueError) as exc:
+        classproperty_cached.reset(instance_class=Clock, attribute_name='not_sample')
+    assert str(exc.value) == "The slot Clock.not_sample is not defined."
+
+    class NotClock(Clock):
+        sample = 17  # noQA - This overrides a previous slot and we expect it will break things.
+
+    with pytest.raises(ValueError) as exc:
+        classproperty_cached.reset(instance_class=NotClock, attribute_name='sample')
+    assert str(exc.value) == "The slot NotClock.sample does not contain a cached value."
+
+
+def test_classproperty_cached_each_subclass():
+
+    print()
+
+    t = ControlledTime()
+
+    class Clock:
+        @classproperty_cached_each_subclass
+        def sample(cls):  # noQA - PyCharm wrongly thinks the argname should be 'self'
+            return t.now()
+
+    class SubClock(Clock):
+        pass
+
+    c_t1 = Clock.sample
+    c_t2 = Clock.sample
+    c_t3 = Clock.sample
+
+    assert c_t3 == c_t2 == c_t1
+
+    s_t1 = SubClock.sample
+    s_t2 = SubClock.sample
+
+    assert s_t2 == s_t1
+    assert s_t1 > c_t3
+
+    c_t4 = Clock.sample
+
+    assert c_t4 == c_t1
+
+    # This will clear SubClock cache only
+    classproperty_cached_each_subclass.reset(instance_class=SubClock, attribute_name='sample')
+
+    c_t5 = Clock.sample
+    assert c_t5 == c_t1
+
+    s_t3 = SubClock.sample  # This should recompute SubClock.sample cached value
+    assert s_t3 > s_t1
+
+    # This will clear Clock and SubClock caches
+    classproperty_cached_each_subclass.reset(instance_class=Clock, attribute_name='sample')
+
+    c_t6 = Clock.sample     # This should recompute Clock.sample cached value
+    s_t4 = SubClock.sample  # This should recompute SubClock.sample cached value
+    assert c_t6 > c_t5
+    assert s_t4 > c_t6
+    assert c_t6 > s_t3
+    assert s_t3 > c_t5
+
+    # This will clear the SubClock cache only
+    classproperty_cached_each_subclass.reset(instance_class=SubClock, attribute_name='sample')
+
+    c_t7 = Clock.sample
+    assert c_t7 == c_t6
+
+    s_t5 = SubClock.sample
+    assert s_t5 > s_t4
+
+    # This will clear Clock cache ONLY, not disturbing SubClock
+    classproperty_cached_each_subclass.reset(instance_class=Clock, attribute_name='sample', subclasses=False)
+
+    c_t8 = Clock.sample
+    assert c_t8 > c_t7
+
+    s_t6 = SubClock.sample
+    assert s_t6 == s_t5
+
+    with pytest.raises(ValueError) as exc:
+        classproperty_cached_each_subclass.reset(instance_class='not-a-class', attribute_name='sample')
+    assert str(exc.value) == 'The instance_class= argument to classproperty_cached_each_subclass.reset must be a class.'
+
+    with pytest.raises(ValueError) as exc:
+        classproperty_cached_each_subclass.reset(instance_class=Clock, attribute_name='not_sample')
+    assert str(exc.value) == "The slot Clock.not_sample is not defined."
+
+    class NotClock(Clock):
+        sample = 17  # noQA - This overrides a previous slot and we expect it will break things.
+
+    with pytest.raises(ValueError) as exc:
+        classproperty_cached_each_subclass.reset(instance_class=NotClock, attribute_name='sample')
+    assert str(exc.value) == "The slot NotClock.sample does not contain a cached value."
+
+
+def test_singleton():
+
+    assert Singleton() != Singleton()
+    assert Singleton.singleton != Singleton()
+    assert Singleton.singleton == Singleton.singleton
+    assert Singleton.singleton is Singleton.singleton
+
+    assert type(Singleton.singleton) is Singleton
+
+    assert isinstance(Singleton.singleton, Singleton)
+
+    class Foo(Singleton):
+        pass
+
+    assert Foo() != Foo()
+    assert Foo.singleton != Foo()
+    assert Foo.singleton == Foo.singleton
+    assert Foo.singleton is Foo.singleton
+
+    assert Foo.singleton != Singleton.singleton
+
+    assert type(Foo.singleton) is Foo
+
+    assert isinstance(Foo.singleton, Singleton)
+    assert isinstance(Foo.singleton, Foo)
+
+
+def test_named_object():
+
+    with mock.patch.object(misc_utils_module, 'id', MockId(counter_base=0x10001)):
+
+        eof = NamedObject('eof')
+
+        assert str(eof) == '<eof>'
+        assert repr(eof) == '<eof@10001>'
+
+        missing = NamedObject('missing')
+
+        assert str(missing) == '<missing>'
+        assert repr(missing) == '<missing@10002>'
+
+
+def test_key_value_dict():
+
+    assert key_value_dict('a', 'b') == {'Key': 'a', 'Value': 'b'}
+
+
+def test_merge_key_value_dict_lists():
+
+    old = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '2'}]
+    new = [{'Key': 'c', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
+    actual = merge_key_value_dict_lists(old, new)
+    expected = [
+        {'Key': 'a', 'Value': '1'},
+        {'Key': 'b', 'Value': '2'},
+        {'Key': 'c', 'Value': '3'},
+        {'Key': 'd', 'Value': '4'}
+    ]
+    assert actual == expected
+
+    old = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '2'}]
+    new = [{'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
+    actual = merge_key_value_dict_lists(old, new)
+    expected = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
+    assert actual == expected
+
+    old = [{'Key': 'a', 'Value': '1'}, {'Key': 'b', 'Value': '2'}]
+    new = [{'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}, {'Key': 'a', 'Value': '7'}]
+    actual = merge_key_value_dict_lists(old, new)
+    expected = [{'Key': 'a', 'Value': '7'}, {'Key': 'b', 'Value': '3'}, {'Key': 'd', 'Value': '4'}]
+    assert actual == expected
+
+
+def test_lines_printed_to():
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove():
+        with lines_printed_to("foo.text") as out:
+
+            out("This is line 1.")
+            out("This is line 2.")
+
+        assert file_contents("foo.text") == "This is line 1.\nThis is line 2.\n"
+
+
+def test_obsolete():
+
+    def foo(x):
+        return x + 17
+
+    assert foo(10) == 27
+
+    foo = obsolete(foo)
+    with pytest.raises(ObsoleteError):
+        foo(10)
+
+    def bar(x):
+        return x + 17
+    bar_name = bar.__name__
+
+    assert bar(10) == 27
+
+    mock_logging = MockLog()
+    with mock.patch.object(misc_utils_module, "logging", mock_logging):
+        bar = obsolete(bar, fail=False)
+
+        assert bar(10) == 27
+
+    assert mock_logging.all_log_messages == [
+        f"ERROR: Called obsolete function {bar_name}"
+    ]
+
+
+def test_keys_and_values_to_dict():
+    kv = [{"Key": "abc", "Value": "def"}, {"Key": "ghi", "Value": "jkl"}]
+    d = keys_and_values_to_dict(kv)
+    assert d == {"abc": "def", "ghi": "jkl"}
+
+    kv = [{"name": "abc", "value": "def"}, {"name": "ghi", "value": "jkl"}]
+    d = keys_and_values_to_dict(kv, key_name="name", value_name="value")
+    assert d == {"abc": "def", "ghi": "jkl"}
+
+    assert keys_and_values_to_dict([]) == {}
+
+    with pytest.raises(ValueError):
+        # Missing key (Foo).
+        kv = [{"Key": "abc", "Value": "def"}, {"Foo": "ghi", "Value": "jkl"}]
+        d = keys_and_values_to_dict(kv)
+
+    with pytest.raises(ValueError):
+        # Missing value (Foo).
+        kv = [{"Key": "abc", "Value": "def"}, {"Key": "ghi", "Foo": "jkl"}]
+        d = keys_and_values_to_dict(kv)
+
+    with pytest.raises(ValueError):
+        # Duplicate key (abc).
+        kv = [{"Key": "abc", "Value": "def"}, {"Key": "abc", "Value": "jkl"}]
+        d = keys_and_values_to_dict(kv)
+
+
+def test_dict_to_keys_and_values():
+    d = {"abc": "def", "ghi": "jkl"}
+    kv = dict_to_keys_and_values(d)
+    assert kv == [{"Key": "abc", "Value": "def"}, {"Key": "ghi", "Value": "jkl"}]
+
+    d = {"abc": "def", "ghi": "jkl"}
+    kv = dict_to_keys_and_values(d, key_name="name", value_name="value")
+    assert kv == [{"name": "abc", "value": "def"}, {"name": "ghi", "value": "jkl"}]
+
+    assert dict_to_keys_and_values({}) == []
+
+
+def test_is_c4_arn():
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-cgap-production-stack-Productionblue-fzOm82DGZKGZ')
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-cgap-production-stack-CgapProductionblue-fzOm82DGZKGZ')
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-fourfront-hotseat-stack-Hotseat-ZnIAAAz8Apxf')
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-fourfront-production-stack-FourfrontProd-hU0JiwOeWfdm')
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-abc-webdev-stack-CgapWebdev-rSLwZBbdVTtx')
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster:c4-ecs-def-mastertest-stack-FourfrontMaster-O25WVcRMpExr')
+    assert not is_c4_arn('arn:aws:ecs:us-east-1:643:cluster-c4-ecs-def-mastertest-stack-FourfrontMaster-O25WVcRMpExr')
+    assert not is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/default')
+    assert not is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/xyzzy-c4-default')
+    assert not is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/xyzzyasdfc4-default')
+    assert not is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/xyzzy:-c4-default')
+
+
+class TestTopologicalSorter:
+
+    EMPTY_GRAPH = {}
+    ACYCLIC_GRAPH = {"A": {"B"}, "B": {"C"}}
+    CYCLIC_GRAPH = {"A": {"B"}, "B": {"C", "A"}}
+
+    @pytest.mark.parametrize(
+        "graph,exception,expected",
+        [
+            (EMPTY_GRAPH, False, []),
+            (ACYCLIC_GRAPH, False, ["C", "B", "A"]),
+            (CYCLIC_GRAPH, True, None),
+        ]
+    )
+    def test_topological_sort(self, graph, exception, expected):
+        sorter = TopologicalSorter(graph=graph)
+        if exception:
+            with pytest.raises(CycleError):
+                sorted_nodes = sorter.static_order()
+                result = list(sorted_nodes)
+        else:
+            sorted_nodes = sorter.static_order()
+            result = list(sorted_nodes)
+            assert result == expected

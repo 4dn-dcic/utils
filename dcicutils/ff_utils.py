@@ -6,12 +6,11 @@ import requests
 import time
 
 from collections import namedtuple
+from dcicutils.lang_utils import disjoined_list
 from elasticsearch.exceptions import AuthorizationException
+from typing import Dict, List
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
-from . import (
-    s3_utils,
-    es_utils,
-)
+from . import s3_utils, es_utils
 from .misc_utils import PRINT
 
 
@@ -106,8 +105,6 @@ def search_request_with_retries(request_fxn, url, auth, verb, **kwargs):
         try:
             res_json = res.json()
         except ValueError:
-            # PyCharm notes this is unused. -kmp 17-Jul-2020
-            # res_json = {}
             try:
                 res.raise_for_status()
             except Exception as e:
@@ -184,6 +181,22 @@ def purge_request_with_retries(request_fxn, url, auth, verb, **kwargs):
     return final_res
 
 
+# Per https://specs.openstack.org/openstack/api-wg/guidelines/http/methods.html
+# although TRACE is the only method that actively disallows a body,
+# in normal practice GET, DELETE, TRACE, OPTIONS and HEAD methods are not expected to have a body.
+
+BODYLESS_REQUEST_METHODS = {'GET', 'DELETE', 'TRACE', 'OPTIONS', 'HEAD'}
+
+
+def is_bodyless(request_method):
+    """
+    Tests the given HTTP request method name to see if it needs a body in its http(s) request.
+    """
+    u = request_method.upper()
+    res = u in BODYLESS_REQUEST_METHODS
+    return res
+
+
 REQUESTS_VERBS = {
     'GET': requests.get,
     'POST': requests.post,
@@ -195,6 +208,15 @@ REQUESTS_VERBS = {
 
 def authorized_request(url, auth=None, ff_env=None, verb='GET',
                        retry_fxn=standard_request_with_retries, **kwargs):
+    return mockable_authorized_request(url=url, auth=auth, ff_env=ff_env, verb=verb, retry_fxn=retry_fxn, **kwargs)
+
+
+def mockable_authorized_request(url, *, auth, ff_env, verb, retry_fxn, **kwargs):
+    return internal_compute_authorized_request(url=url, auth=auth, ff_env=ff_env, verb=verb, retry_fxn=retry_fxn,
+                                               **kwargs)
+
+
+def internal_compute_authorized_request(url, *, auth, ff_env, verb, retry_fxn, **kwargs):
     """
     Generalized function that handles authentication for any type of request to FF.
     Takes a required url, request verb, auth, fourfront environment, and optional
@@ -212,7 +234,7 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     authorized_request('https://data.4dnucleome.org/<some path>', ff_env='fourfront-webprod')
     """
     # Save to uncomment if debugging unit tests...
-    # print("authorized_request\n URL=%s\n auth=%s\n ff_env=%s\n verb=%s\n" % (url, auth, ff_env, verb))
+    # print(f"authorized_request\n URL={url}\n auth={auth}\n ff_env={ff_env}\n verb={verb}\n")
     use_auth = unified_authentication(auth, ff_env)
     headers = kwargs.get('headers')
     if not headers:
@@ -220,11 +242,12 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     if 'timeout' not in kwargs:
         kwargs['timeout'] = 60  # default timeout
 
+    verb_upper = verb
     try:
-        the_verb = REQUESTS_VERBS[verb.upper()]
+        verb_upper = verb.upper()
+        the_verb = REQUESTS_VERBS[verb_upper]
     except KeyError:
-        raise ValueError("Provided verb %s is not valid. Must one of: %s"
-                         % (verb.upper(), ', '.join(REQUESTS_VERBS.keys())))
+        raise ValueError(f"Provided verb {verb} is not valid. Must be one of {disjoined_list(REQUESTS_VERBS)}.")
     # automatically detect a search and overwrite the retry if it is standard
     if '/search/' in url and retry_fxn == standard_request_with_retries:
         retry_fxn = search_request_with_retries
@@ -236,7 +259,15 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
 
 
 def _sls(val):
-    """general helper to check for and strip leading slashes on ids in API fxns
+    """
+    Helper to strip any leading slashes on ids in API functions.
+    Examples:
+        >>> _sls('foo')
+        foo
+        >>> _sls('/foo')
+        foo
+        >>> _sls('/foo/bar/baz/')
+        foo/bar/baz/
     """
     return val.lstrip('/')
 
@@ -359,8 +390,8 @@ def get_search_generator(search_url, auth=None, ff_env=None, page_limit=50):
         try:
             search_res = get_response_json(response)['@graph']
         except KeyError:
-            raise('Cannot get "@graph" from the search request for %s. Response '
-                  'status code is %s.' % (search_url, response.status_code))
+            raise Exception(f'Cannot get "@graph" from the search request for {search_url}.'
+                            f' Response status code is {response.status_code}.')
         last_total = len(search_res)
         curr_from += last_total
         if search_limit != 'all' and curr_from - initial_from > search_limit:
@@ -459,14 +490,15 @@ def get_item_facets(item_type, key=None, ff_env=None):
     return facets
 
 
-def get_item_facet_values(item_type, key=None, ff_env=None):
+def get_search_facet_values(search_query, key=None, ff_env=None):
     """
-    Gets all facets and returns all possible values for each one with counts
-    ie: dictionary of facets mapping to a dictionary containing all possible values
+    Gets all facets available from a provided search and returns all possible values for
+    each with counts - query should begin 'search/...'
+    ie: returns dictionary of facets mapping to a dictionary containing all possible values
     for that facet mapping to the count for that value
     format: {'Project': {'4DN': 2, 'Other': 6}, 'Lab': {...}}
     """
-    resp = get_metadata('search/?type=' + item_type, key=key, ff_env=ff_env)['facets']
+    resp = get_metadata(search_query, key=key, ff_env=ff_env)['facets']
     facets = {}
     for facet in resp:
         name = facet['title']
@@ -474,6 +506,15 @@ def get_item_facet_values(item_type, key=None, ff_env=None):
         for term in facet['terms']:
             facets[name][term['key']] = term['doc_count']
     return facets
+
+
+def get_item_facet_values(item_type, key=None, ff_env=None):
+    """
+    More specific version of the above function with passed item_type
+    used in faceted_search
+    """
+    query = 'search/?type=' + item_type
+    return get_search_facet_values(query, key=key, ff_env=ff_env)
 
 
 def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
@@ -704,8 +745,8 @@ def get_metadata_links(obj_id, key=None, ff_env=None):
     Given standard key/ff_env authentication, return result for @@links view
     """
     auth = get_authentication_with_server(key, ff_env)
-    purge_url = '/'.join([auth['server'], obj_id, '@@links'])
-    response = authorized_request(purge_url, auth=auth, verb='GET')
+    links_url = '/'.join([auth['server'], obj_id, '@@links'])
+    response = authorized_request(links_url, auth=auth, verb='GET')
     return get_response_json(response)
 
 
@@ -763,7 +804,7 @@ def get_es_search_generator(es_client, index, body, page_size=200):
     while search_total is None or covered < search_total:
         es_res = es_client.search(index=index, body=body, size=page_size, from_=covered)
         if search_total is None:
-            search_total = es_res['hits']['total']
+            search_total = es_res['hits']['total']['value']
         es_hits = es_res['hits']['hits']
         covered += len(es_hits)
         yield es_hits
@@ -861,7 +902,7 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth):
                     'must_not': []
                 }
             },
-            'sort': [{'_uid': {'order': 'desc'}}]
+            'sort': [{'_id': {'order': 'desc'}}]
         }
         if filters:
             if not isinstance(filters, dict):
@@ -1229,16 +1270,24 @@ def get_authentication_with_server(auth=None, ff_env=None):
     return auth
 
 
-def stuff_in_queues(ff_env, check_secondary=False):
+def stuff_in_queues(ff_env_index_namespace, check_secondary=False) -> bool:
     """
     Used to guarantee up-to-date metadata by checking the contents of the indexer queues.
     If items are currently waiting in the primary queue, return False.
     If check_secondary is True, will also check the secondary queue.
     """
-    if not ff_env:
-        raise ValueError("Must provide a full fourfront environment name to "
-                         "this function (such as 'fourfront-webdev'). You gave: "
-                         "%s" % ff_env)
+    return mockable_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace, check_secondary=check_secondary)
+
+
+def mockable_stuff_in_queues(ff_env_index_namespace, check_secondary) -> bool:
+    return internal_compute_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace,
+                                            check_secondary=check_secondary)
+
+
+def internal_compute_stuff_in_queues(ff_env_index_namespace, check_secondary) -> bool:
+    if not ff_env_index_namespace:
+        raise ValueError(f"Must provide a full fourfront environment name to this function"
+                         f" (such as 'fourfront-webdev'). You gave: {ff_env_index_namespace!r}")
     stuff_in_queue = False
     client = boto3.client('sqs', region_name='us-east-1')
     queue_names = ['-indexer-queue']
@@ -1247,14 +1296,14 @@ def stuff_in_queues(ff_env, check_secondary=False):
     for queue_name in queue_names:
         try:
             queue_url = client.get_queue_url(
-                QueueName=ff_env + queue_name
+                QueueName=ff_env_index_namespace + queue_name
             ).get('QueueUrl')
             queue_attrs = client.get_queue_attributes(
                 QueueUrl=queue_url,
                 AttributeNames=['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible']
             ).get('Attributes', {})
         except Exception:
-            PRINT('Error finding queue or its attributes: %s' % ff_env + queue_name)
+            PRINT('Error finding queue or its attributes: %s' % ff_env_index_namespace + queue_name)
             stuff_in_queue = True  # queue not found. use datastore=database
             break
         else:
@@ -1272,7 +1321,7 @@ def fetch_network_ids(subnet_names, security_group_names):
     subnet_ids = []
     security_group_ids = []
     for i in subnet_names:
-        response = ec2_client.describe_subnets()
+        # response = ec2_client.describe_subnets()
         subnet_id = i
         subnet_ids.append(subnet_id)
     for i in security_group_names:
@@ -1311,14 +1360,15 @@ def process_add_on(add_on):
     return add_on
 
 
-def get_url_params(url):
+def get_url_params(url) -> Dict[str, List[str]]:
     """
     Returns a dictionary of url params using parse_qs.
     Example: get_url_params('<server>/search/?type=Biosample&limit=5') returns
     {'type': ['Biosample'], 'limit': '5'}
     """
     parsed_url = urlparse(url)
-    return parse_qs(parsed_url.query)
+    query_string: str = parsed_url.query
+    return parse_qs(query_string)
 
 
 def update_url_params_and_unparse(url, url_params):

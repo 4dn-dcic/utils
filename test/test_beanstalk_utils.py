@@ -5,12 +5,11 @@ import os
 from dcicutils import beanstalk_utils
 from dcicutils.beanstalk_utils import (
     ENV_VARIABLE_NAMESPACE,
-    compute_ff_prd_env, get_beanstalk_environment_variables, source_beanstalk_env_vars,
+    get_beanstalk_environment_variables, source_beanstalk_env_vars,
 )
 from dcicutils.qa_utils import mock_not_called
 from dcicutils.misc_utils import ignored
 from unittest import mock
-from .test_base import _ff_production_env_for_testing
 
 
 def test_source_beanstalk_env_vars_no_config_file():
@@ -62,10 +61,6 @@ def test_source_beanstalk_env_vars_normal():
                     'AWS_ACCESS_KEY_ID': '12345',
                     'AWS_FAKE_SECRET': 'amazon'
                 }
-
-
-def test_compute_ff_prd_env_by_alternate_computation():
-    assert compute_ff_prd_env() == _ff_production_env_for_testing()
 
 
 @pytest.mark.parametrize('options, expected', [

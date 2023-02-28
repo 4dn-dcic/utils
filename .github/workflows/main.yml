@@ -2,7 +2,7 @@
 
 name: CI
 
-# Controls when the action will run. 
+# Controls when the action will run.
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
@@ -18,17 +18,17 @@ jobs:
   # This workflow contains a single job called "build"
   build:
     name: Test dcicutils with Python ${{ matrix.python_version }}
-    
+
     # The type of runner that the job will run on
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
-        python_version: [3.6, 3.7, 3.8, 3.9]
+        python_version: [3.7, 3.8, 3.9]
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python_version }}
@@ -36,13 +36,22 @@ jobs:
       - name: Install Deps
         run: |
           pip install poetry
+          # show loaded versions of various poetry-related libraries
+          pip freeze --all | egrep '(pip|poetry(.[a-z]+)?|tomlkit)=='
 
       - name: QA
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           S3_ENCRYPT_KEY: ${{ secrets.S3_ENCRYPT_KEY }}
+          GLOBAL_ENV_BUCKET: foursight-envs
         run: |
           poetry install
-          poetry run flake8 dcicutils
-          make test
+          make test-for-ga
+
+      - name: Coveralls
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: ${{ matrix.python_version == '3.9' }}
+        run: |
+          poetry run coveralls --service=github

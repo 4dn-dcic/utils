@@ -4,6 +4,10 @@ API Documentation
 
 Note that JH utils is excluded due to side-effects of importing the module. See the source file for details.
 
+Note also that although the modules named ``base`` and ``env_base`` are documented here, they are considered
+internals for the implementation of ``dcicutils`` and should not be relied upon by other libraries outside of
+that scope.
+
 
 base
 ^^^^
@@ -82,6 +86,13 @@ docker_utils
    :members:
 
 
+ecr_scripts
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.ecr_scripts
+  :members:
+
+
 ecr_utils
 ^^^^^^^^^
 
@@ -93,6 +104,27 @@ ecs_utils
 ^^^^^^^^^
 
 .. automodule:: dcicutils.ecs_utils
+  :members:
+
+
+env_base
+^^^^^^^^
+
+.. automodule:: dcicutils.env_base
+  :members:
+
+
+env_manager
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.env_manager
+  :members:
+
+
+env_scripts
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.env_scripts
   :members:
 
 
@@ -149,6 +181,27 @@ misc_utils
 ^^^^^^^^^^
 
 .. automodule:: dcicutils.misc_utils
+   :members:
+
+
+obfuscation_utils
+^^^^^^^^
+
+.. automodule:: dcicutils.obfuscation_utils
+   :members:
+
+
+opensearch_utils
+^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.opensearch_utils
+   :members:
+
+
+qa_checkers
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.qa_checkers
    :members:
 
 

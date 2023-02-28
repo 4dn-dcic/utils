@@ -177,7 +177,7 @@ class KeyManager:
     @classmethod
     def _init_class_variables(cls):
         class_name = cls.__name__
-        print(f"cls={cls!r}, name={class_name!r}")
+        # print(f"cls={cls!r}, name={class_name!r}")
         suffix = "KeyManager"
         if not class_name.endswith(suffix):
             raise ValueError(f"The name, {class_name!r}, of a KeyManager class to be registered"
@@ -261,10 +261,9 @@ class KeyManager:
         ('my-key', 'abra-cadabra')
 
         Args:
-            auth_tuple (tuple): an auth tuple of the form (key, secret)
-            server (str): a server name, such as "https://cgap.hms.harvard.edu" or "http://localhost:8000"
+            auth_dict (dict): a dictionary with entries for 'key' and 'secret'; any 'server' will be ignored
         Returns:
-            a keydict of the form {"key": ..., "secret": ..., "server": ...}
+            a keypair of the form (key, secret)
 
         """
         return (

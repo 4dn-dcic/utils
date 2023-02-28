@@ -1,14 +1,13 @@
-import boto3
 import time
+import urllib.parse
 
 from botocore.exceptions import ClientError
-from .common import REGION
-from .misc_utils import PRINT
+from .common import APP_CGAP, APP_FOURFRONT
 from .env_utils import (
-    is_cgap_env, is_fourfront_env, is_stg_or_prd_env, public_url_mappings,
-    blue_green_mirror_env, get_standard_mirror_env, is_beanstalk_env,
+    is_cgap_env, is_fourfront_env, get_standard_mirror_env,
+    compute_prd_env_for_project, get_env_real_url,
 )
-from .exceptions import NotBeanstalkEnvironment
+from .misc_utils import PRINT
 
 
 FOURSIGHT_URL = 'https://foursight.4dnucleome.org/'
@@ -56,7 +55,11 @@ def describe_beanstalk_environments(client, **kwargs):
 
 def beanstalk_info(env):
     """
-    Describe a ElasticBeanstalk environment given an environment name
+    This doesn't actually talk to a beanstalk any more, but now returns a subset of the information
+    that a beanstalk info query would have returned, specifically:
+
+      {"EnvironmentName": <env>, "CNAME": <portal-url-hostname>}
+
 
     Args:
         env (str): ElasticBeanstalk environment name
@@ -64,23 +67,39 @@ def beanstalk_info(env):
     Returns:
         dict: Environments result from describe_beanstalk_environments
     """
-    client = boto3.client('elasticbeanstalk', region_name=REGION)
-    res = describe_beanstalk_environments(client, EnvironmentNames=[env])
-    envs = res['Environments']
-    if not envs:
-        # Raise an error that will be meaningful to the caller, rather than just getting an index out of range error.
-        raise ClientError({"Error": {"Code": 404, "Message": f"Environment does not exist: {env}"}},  # noQA
-                          # Properly speaking, this error does not come from .describe_environments(), so we kind of
-                          # have to make up an operation that's failing, even though it's not a boto3 operation.
-                          operation_name="beanstalk_info")
-    else:
-        return envs[0]
+    return get_env_info(env)
+
+
+def get_env_info(env):
+    """
+    This returns some information about the given environment in a format similar to what beanstalk_info used to
+    return. (If there are other elements of that function's return value that are needed, this is the function to
+    extend.) The return value for now is:
+
+    Args:
+        env (str): ElasticBeanstalk environment name
+
+    Returns:
+        a dictionary of the form {"EnvironmentName": <env>, "CNAME": <portal-url-hostname>}
+    """
+    url = get_env_real_url(env)
+    parsed_url = urllib.parse.urlparse(url)
+
+    return {
+        'EnvironmentName': env,
+        'CNAME': parsed_url.hostname,
+    }
 
 
 def get_beanstalk_real_url(env):
     """
-    Return the real url for the elasticbeanstalk with given environment name.
-    Name can be 'cgap', 'data', 'staging', or an actual environment.
+    Return the real url for the portal with given environment name.
+    Name can be a special name (like 'cgap', 'data', 'staging'),
+    or an actual environment.
+
+    Note that because we are all-containerized now, this is now table-driven and does not actually do a beanstalk
+    call. We left the name for now, to not break things, but you should consider it deprecated and
+    use get_env_real_url instead.
 
     Args:
         env (str): ElasticBeanstalk environment name
@@ -88,47 +107,13 @@ def get_beanstalk_real_url(env):
     Returns:
         str: url of the ElasticBeanstalk environment
     """
-    urls = public_url_mappings(env)
 
-    if env in urls:  # Special case handling of 'cgap', 'data', or 'staging' as an argument.
-        return urls[env]
-
-    if is_stg_or_prd_env(env):
-        # What counts as staging/prod depends on whether we're in the CGAP or Fourfront space.
-        data_env = compute_cgap_prd_env() if is_cgap_env(env) else compute_ff_prd_env()
-        # There is only one production environment. Everything else is staging, but everything
-        # else is not staging.4dnucleome.org. Only one is that.
-        if env == data_env:
-            return urls['data']
-        elif env == blue_green_mirror_env(data_env):
-            # Mirror env might be None, in which case this clause will not be entered
-            return urls['staging']
-
-    bs_info = beanstalk_info(env)
-    url = "http://" + bs_info['CNAME']
-    return url
-
-
-def _compute_prd_env_for_project(project):
-    """
-    Determines which ElasticBeanstalk environment is currently hosting
-    data.4dnucleome.org. Requires IAM permissions for EB!
-
-    Returns:
-        str: EB environment name hosting data.4dnucleome
-    """
-    magic_cname = _CGAP_MAGIC_CNAME if project == 'cgap' else _FF_MAGIC_CNAME
-    client = boto3.client('elasticbeanstalk', region_name=REGION)
-    res = describe_beanstalk_environments(client, ApplicationName="4dn-web")
-    for env in res['Environments']:
-        if env.get('CNAME') == magic_cname:
-            # we found data
-            return env.get('EnvironmentName')
+    return get_env_real_url(env)
 
 
 def compute_ff_prd_env():  # a.k.a. "whodaman" (its historical name, which has gone away)
     """Returns the name of the current Fourfront production environment."""
-    return _compute_prd_env_for_project('fourfront')
+    return compute_prd_env_for_project(APP_FOURFRONT)
 
 
 def compute_ff_stg_env():
@@ -138,7 +123,7 @@ def compute_ff_stg_env():
 
 def compute_cgap_prd_env():
     """Returns the name of the current CGAP production environment."""
-    return _compute_prd_env_for_project('cgap')
+    return compute_prd_env_for_project(APP_CGAP)
 
 
 def compute_cgap_stg_env():
@@ -148,11 +133,13 @@ def compute_cgap_stg_env():
 
 def compute_prd_env_for_env(envname):
     """Given an environment, returns the name of the prod environment for its owning project."""
-    if not is_beanstalk_env(envname):  # Doing this might catch some errors
-        raise NotBeanstalkEnvironment(envname=envname)
-    elif is_cgap_env(envname):
+    if is_cgap_env(envname):
         return compute_cgap_prd_env()
     elif is_fourfront_env(envname):
         return compute_ff_prd_env()
     else:
         raise ValueError("Unknown environment: %s" % envname)
+
+
+def compute_stg_env_for_env(envname):
+    return get_standard_mirror_env(compute_prd_env_for_env(envname))

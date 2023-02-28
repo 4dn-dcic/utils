@@ -68,6 +68,30 @@ class ElasticSearchServiceClient:
         return False
 
 
+def prepare_es_options(url, use_aws_auth=True, **options):
+    # default options
+    es_options = {'retry_on_timeout': True,
+                  'maxsize': 50,  # parallellism...
+                  'connection_class': RequestsHttpConnection}
+
+    # build http_auth kwarg
+    if use_aws_auth:
+        host = url.split('//')  # remove schema from url
+        host = host[-1].split(":")
+        auth = BotoAWSRequestsAuth(aws_host=host[0].rstrip('/'),
+                                   aws_region='us-east-1',
+                                   aws_service='es')
+        es_options['http_auth'] = auth
+
+    # use SSL if port 443 is specified (REQUIRED on new clusters)
+    port = url[-3:]  # last 3 characters must be 443 if HTTPS is desired!
+    if port == '443':
+        es_options['use_ssl'] = True
+
+    es_options.update(**options)
+    return es_options
+
+
 def create_es_client(es_url, use_aws_auth=True, **options):
     """
     Use to create a ES that supports the signature version 4 signing process.
@@ -80,25 +104,7 @@ def create_es_client(es_url, use_aws_auth=True, **options):
     if isinstance(es_url, (list, tuple)):
         es_url = es_url[0]
 
-    # default options
-    es_options = {'retry_on_timeout': True,
-                  'maxsize': 50,  # parallellism...
-                  'connection_class': RequestsHttpConnection}
-
-    # build http_auth kwarg
-    if use_aws_auth:
-        host = es_url.split('//')  # remove schema from url
-        host = host[-1].split(":")
-        auth = BotoAWSRequestsAuth(aws_host=host[0].rstrip('/'),
-                                   aws_region='us-east-1',
-                                   aws_service='es')
-        es_options['http_auth'] = auth
-
-    # use SSL if port 443 is specified (REQUIRED on new clusters)
-    port = es_url[-3:]  # last 3 characters must be 443 if HTTPS is desired!
-    if port == '443':
-        es_options['use_ssl'] = True
-
+    es_options = prepare_es_options(es_url, use_aws_auth, **options)
     es_options.update(**options)  # add any given keyword options at the end
     return Elasticsearch(es_url, **es_options)
 

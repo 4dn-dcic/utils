@@ -5,7 +5,8 @@ import pytest
 
 from dcicutils.creds_utils import KeyManager, CGAPKeyManager, FourfrontKeyManager
 from dcicutils.exceptions import AppEnvKeyMissing, AppServerKeyMissing  # , AppKeyMissing
-from dcicutils.qa_utils import override_environ, MockFileSystem
+from dcicutils.misc_utils import override_environ
+from dcicutils.qa_utils import MockFileSystem
 
 
 SAMPLE_CGAP_DEFAULT_ENV = 'cgap-sample'

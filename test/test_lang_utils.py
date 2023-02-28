@@ -4,7 +4,7 @@ import re
 
 from dcicutils.lang_utils import (
     EnglishUtils, a_or_an, select_a_or_an, string_pluralize, conjoined_list, disjoined_list,
-    there_are, must_be_one_of, maybe_pluralize,
+    there_are, must_be_one_of, maybe_pluralize, relative_time_string, parse_relative_time_string,
 )
 
 
@@ -53,6 +53,8 @@ def test_string_pluralize():
     assert string_pluralize("ox") == "oxen"
 
     assert string_pluralize("file to show") == "files to show"
+    assert string_pluralize("change from point X to point Y") == "changes from point X to point Y"
+    assert string_pluralize("change between date X and date Y") == "changes between date X and date Y"
     assert string_pluralize("bucket to delete") == "buckets to delete"
     assert string_pluralize("a book about a gene") == "books about genes"
     assert string_pluralize("a good book about the defective gene") == "good books about the defective gene"
@@ -113,6 +115,23 @@ def test_string_pluralize():
     assert string_pluralize("AN APPLE", allow_some=True) == "SOME APPLES"
     assert string_pluralize("THE APPLE") == "THE APPLES"
 
+    assert string_pluralize("file that has to be closed") == "files that have to be closed"
+    assert string_pluralize("file that will have to be closed") == "files that will have to be closed"
+    assert string_pluralize("file that will be opened") == "files that will be opened"
+    assert string_pluralize("file that is still open") == "files that are still open"
+    assert string_pluralize("file that was still open") == "files that were still open"
+
+    assert string_pluralize("file, which has to be closed") == "files, which have to be closed"
+    assert string_pluralize("file, which is what we searched for") == "files, which are what we searched for"
+
+    assert string_pluralize("a name of a file that has to be closed") == "names of files that have to be closed"
+    assert string_pluralize("a name of a file that is open") == "names of files that are open"
+    assert string_pluralize("a name of a file that was open") == "names of files that were open"
+
+    assert string_pluralize("A NAME OF A FILE THAT IS OPEN") == "NAMES OF FILES THAT ARE OPEN"
+    assert string_pluralize("a NAME of a File that is open") == "NAMES of Files that are open"
+    assert string_pluralize("a NAME of a File that IS open") == "NAMES of Files that ARE open"
+
 
 def test_n_of():
     assert EnglishUtils.n_of(-1, "day") == "-1 days"  # This could go either way, but it's easiest just to do this.
@@ -129,6 +148,10 @@ def test_n_of():
 
 
 def test_relative_time_string():
+
+    assert EnglishUtils.relative_time_string == relative_time_string
+
+    assert relative_time_string(datetime.timedelta(minutes=10, seconds=1)) == "10 minutes, 1 second"
 
     def test(seconds, long_string, short_string):
         assert EnglishUtils.relative_time_string(seconds) == long_string
@@ -169,6 +192,59 @@ def test_relative_time_string():
     t1 = datetime.datetime.now()
     t2 = t1 + relative_time
     test(t2 - t1, "1 hour, 3 seconds", "1 hour")
+
+
+def test_parse_relative_time_string():
+
+    assert EnglishUtils.parse_relative_time_string == parse_relative_time_string
+
+    assert parse_relative_time_string("10 minutes, 1 second") == datetime.timedelta(minutes=10, seconds=1)
+
+    parse = EnglishUtils.parse_relative_time_string
+    unparse = EnglishUtils.relative_time_string
+
+    assert unparse(parse("1 hour")) == '1 hour'
+    assert unparse(parse("1.5 hours")) == '1 hour, 30 minutes'
+
+    with pytest.raises(ValueError) as exc:
+        parse("1 half hour")
+    assert str(exc.value) == ("Relative time strings are an even number of tokens"
+                              " of the form '<n1> <unit1> <n2> <unit2>...': '1 half hour'")
+
+    with pytest.raises(ValueError) as exc:
+        parse("1 year")
+    assert str(exc.value) == "Bad relative time string: '1 year'"
+
+    def check_roundtrip(**keys):
+        original = datetime.timedelta(**keys)
+        print(f" original={original} unparsing...")
+        unparsed = unparse(original)
+        print(f" unparsed={unparsed!r} parsing...")
+        parsed = parse(unparsed)
+        print(f" parsed={parsed!r}")
+        assert original == parsed
+
+    check_roundtrip(hours=1)
+    check_roundtrip(hours=1.5)
+    check_roundtrip(hours=3, minutes=7, seconds=23)
+    check_roundtrip(weeks=7, days=3, minutes=17)
+    check_roundtrip(seconds=0)
+    check_roundtrip()
+
+    def check_parse_unparse(relative_time_string):
+        parsed = parse(relative_time_string)
+        print(f" parsed={parsed} unparsing...")
+        unparsed = unparse(parsed)
+        print(f" unparsed={unparsed} reparsing...")
+        reparsed = parse(unparsed)
+        print(f" reparsed={reparsed}")
+        assert parsed == reparsed
+
+    check_parse_unparse("1 hour, 30 minutes")
+    check_parse_unparse("3 hours, 1 minute")
+    check_parse_unparse("7 weeks, 6 days, 5 hours, 4 minutes, 3 seconds")
+    check_parse_unparse("1 week, 1 day, 1 hour, 1 minute, 1 second")
+    check_parse_unparse("")
 
 
 def test_time_count_formatter():
@@ -347,6 +423,12 @@ def test_conjoined_list():
     assert EnglishUtils.conjoined_list(['a', 'b', 'c']) == 'a, b and c'
     assert EnglishUtils.conjoined_list(['a', 'b', 'c', 'd']) == 'a, b, c and d'
 
+    # For a set, we use the elements sorted.
+    assert conjoined_list({'apple', 'lemon', 'grape'}) == 'apple, grape and lemon'
+
+    # For dictionary, we use the keys in the order they occur.
+    assert conjoined_list({'apple': 'delicious', 'lemon': 'meyer', 'grape': 'seedless'}) == 'apple, lemon and grape'
+
 
 def test_disjoined_list():
 
@@ -359,6 +441,12 @@ def test_disjoined_list():
     assert disjoined_list(['a', 'b'], oxford_comma=True) == 'a or b'
     assert disjoined_list(['a', 'b', 'c'], oxford_comma=True) == 'a, b, or c'
     assert disjoined_list(['a', 'b', 'c', 'd'], oxford_comma=True) == 'a, b, c, or d'
+
+    # For a set, we use the elements sorted.
+    assert disjoined_list({'apple', 'lemon', 'grape'}) == 'apple, grape or lemon'
+
+    # For dictionary, we use the keys in the order they occur.
+    assert disjoined_list({'apple': 'delicious', 'lemon': 'meyer', 'grape': 'seedless'}) == 'apple, lemon or grape'
 
 
 def test_there_are():
@@ -399,6 +487,36 @@ def test_there_are():
                      ) == "There are 2 users: Joe and Sally."
     assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=True) == "There is 1 user: Joe."
     assert there_are([], kind="user", joiner=conjoined_list, punctuate=True) == "There are no users."
+
+    assert there_are([], kind="user", joiner=conjoined_list) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, punctuate=True) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, punctuate=None) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, punctuate=False) == "There are no users."
+
+    assert there_are([], kind="user", joiner=conjoined_list, show=False) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate=True) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate=None) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate=False) == "There are no users"
+
+    assert there_are([], kind="user", joiner=conjoined_list, show=False) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate_none=True) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate_none=None) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate_none=False) == "There are no users"
+
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list) == "There is 1 user: Joe"
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=True) == "There is 1 user: Joe."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=None) == "There is 1 user: Joe"
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=False) == "There is 1 user: Joe"
+
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate=True) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate=None) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate=False) == "There is 1 user"
+
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate_none=True) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate_none=None) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate_none=False) == "There is 1 user"
 
     def check_tense(tense, if0, if1, if2):
         assert there_are([], tense=tense, show=False, kind="foo") == if0

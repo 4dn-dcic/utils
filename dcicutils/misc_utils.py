@@ -12,14 +12,18 @@ import io
 import os
 import logging
 import pytz
+import re
 import rfc3986.validators
 import rfc3986.exceptions
 import time
 import warnings
 import webtest  # importing the library makes it easier to mock testing
 
+from collections import defaultdict
 from dateutil.parser import parse as dateutil_parse
 from datetime import datetime as datetime_type
+from typing import Optional
+
 
 # Is this the right place for this? I feel like this should be done in an application, not a library.
 # -kmp 27-Apr-2020
@@ -54,6 +58,41 @@ PRINT = _PRINT()
 PRINT.__name__ = 'PRINT'
 
 
+@contextlib.contextmanager
+def lines_printed_to(file):
+    """
+    This context manager opens a file and returns a function that can be called repeatedly during the body context
+    to do do line-by-line output to that file. It uses PRINT to do that output, so the unit test tools for PRINT
+    can be used to test this.
+    """
+    with io.open(file, 'w') as fp:
+        def write_line(s=""):
+            PRINT(s, file=fp)
+        yield write_line
+
+
+def print_error_message(exception, full=False):
+    """
+    Prints an error message (using dcicutils.misc_utils.PRINT) in the conventional way, as:
+      <error-type>: <error-message>
+    With full=True, the error-type can be made to use dcicutils.misc_utils.full_class_name to get a module name, so:
+      <module-qualified-error-type>: <error-message>
+    """
+    PRINT(get_error_message(exception, full=full))
+
+
+def get_error_message(exception, full=False):
+    """
+    Returns an error message (using dcicutils.misc_utils.PRINT) formatted in the conventional way, as:
+      "<error-type>: <error-message>"
+    With full=True, the error-type can be made to use dcicutils.misc_utils.full_class_name to get a module name, so:
+      "<module-qualified-error-type>: <error-message>"
+    """
+    exception_type_name = full_class_name(exception) if full else exception.__class__.__name__
+    error_message = f"{exception_type_name}: {exception}"
+    return error_message
+
+
 absolute_uri_validator = (
     rfc3986.validators.Validator()
     # Validation qualifiers
@@ -83,7 +122,7 @@ def is_valid_absolute_uri(text):
     # -kmp 21-Apr-2021
     try:
         uri_ref = rfc3986.uri_reference(text)
-    except ValueError:
+    except Exception:
         return False
     try:
         absolute_uri_validator.validate(uri_ref)
@@ -260,7 +299,7 @@ def exported(*variables):
     ---file3.py---
     # This file has not been updated to realize that file1.py is the new home of identity.
     from .file2 import identity
-    print("one=", identity(1))
+    print("one=", identity(1))  # noQA - code example
     """
     ignored(variables)
 
@@ -885,7 +924,16 @@ def environ_bool(var, default=False):
     if var not in os.environ:
         return default
     else:
-        return os.environ[var].lower() == "true"
+        return str_to_bool(os.environ[var])
+
+
+def str_to_bool(x: Optional[str]) -> Optional[bool]:
+    if x is None:
+        return None
+    elif isinstance(x, str):
+        return x.lower() == "true"
+    else:
+        raise ValueError(f"An argument to str_or_bool must be a string or None: {x!r}")
 
 
 @contextlib.contextmanager
@@ -999,7 +1047,7 @@ def remove_element(elem, lst, raise_error=True):
     return result
 
 
-def remove_prefix(prefix, text, required=False):
+def remove_prefix(prefix: str, text: str, required: bool = False):
     if not text.startswith(prefix):
         if required:
             raise ValueError('Prefix %s is not the initial substring of %s' % (prefix, text))
@@ -1008,7 +1056,7 @@ def remove_prefix(prefix, text, required=False):
     return text[len(prefix):]
 
 
-def remove_suffix(suffix, text, required=False):
+def remove_suffix(suffix: str, text: str, required: bool = False):
     if not text.endswith(suffix):
         if required:
             raise ValueError('Suffix %s is not the final substring of %s' % (suffix, text))
@@ -1126,6 +1174,77 @@ def find_association(data, **kwargs):
         raise ValueError("Got %s results when 1 was expected." % n)
 
 
+def keys_and_values_to_dict(keys_and_values: list, key_name: str = "Key", value_name: str = "Value") -> dict:
+    """
+    Transforms the given list of key/value objects, each containing a "Key" and "Value" property,
+    or alternately named via the key_name and/or value_name arguments, into a simple
+    dictionary of keys/values, and returns this value. For example, given this:
+
+      [
+        { "Key": "env",
+          "Value": "prod"
+        },
+        { "Key": "aws:cloudformation:stack-name",
+          "Value": "c4-network-main-stack"
+        }
+      ]
+
+    This function would return this:
+
+      {
+        "env": "prod",
+        "aws:cloudformation:stack-name": "c4-network-main-stack"
+      }
+
+    :param keys_and_values: List of key/value objects as described above.
+    :param key_name: Name of the given key property in the given list of key/value objects; default to "Key".
+    :param value_name: Name of the given value property in the given list of key/value objects; default to "Value".
+    :returns: Dictionary of keys/values from given list of key/value object as described above.
+    :raises ValueError: if item in list does not contain key or value name; or on duplicate key name in list.
+    """
+    result = {}
+    for item in keys_and_values:
+        if key_name not in item:
+            raise ValueError(f"Key {key_name} is not in {item}.")
+        if value_name not in item:
+            raise ValueError(f"Key {value_name} is not in {item}.")
+        if item[key_name] in result:
+            raise ValueError(f"Key {key_name} is duplicated in {keys_and_values}.")
+        result[item[key_name]] = item[value_name]
+    return result
+
+
+def dict_to_keys_and_values(dictionary: dict, key_name: str = "Key", value_name: str = "Value") -> list:
+    """
+    Transforms the keys/values in the given dictionary to a list of key/value objects, each containing
+    a "Key" and "Value" property, or alternately named via the key_name and/or value_name arguments,
+    and returns this value. For example, given this:
+
+      {
+        "env": "prod",
+        "aws:cloudformation:stack-name": "c4-network-main-stack"
+      }
+
+    This function would return this:
+
+      [
+        { "Key": "env",
+          "Value": "prod"
+        },
+        { "Key": "aws:cloudformation:stack-name",
+          "Value": "c4-network-main-stack"
+        }
+      ]
+
+    :param dictionary: Dictionary of keys/values described above.
+    :param key_name: Name of the given key property in the result list of key/value objects; default to "Key".
+    :param value_name: Name of the given value property in the result list of key/value objects; default to "Value".
+    :returns: List of key/value objects from the given dictionary as described above.
+    """
+    result = [{key_name: key, value_name: dictionary[key]} for key in dictionary]
+    return result
+
+
 def keyword_as_title(keyword):
     """
     Given a dictionary key or other token-like keyword, return a prettier form of it use as a display title.
@@ -1198,6 +1317,17 @@ def string_list(s):
     return [p for p in [part.strip() for part in s.split(",")] if p]
 
 
+def is_c4_arn(arn: str) -> bool:
+    """
+    Returns True iff the given (presumed) AWS ARN string value looks like it
+    refers to a CGAP or Fourfront Cloudformation entity, otherwise returns False.
+    :param arn: String representing an AWS ARN.
+    :return: True if the given ARN refers to a CGAP or Fourfront Cloudformation entity, else False.
+    """
+    pattern = r"(fourfront|cgap|[:/]c4-)"
+    return True if re.search(pattern, arn) else False
+
+
 def string_md5(unicode_string):
     """
     Returns the md5 signature for the given u unicode string.
@@ -1247,9 +1377,11 @@ class CachedField:
         self._update_timestamp()
 
     def __repr__(self):
-        return 'CachedField %s with update function %s on timeout %s' % (
-            self.name, self._update_function, self.timeout
-        )
+        return str(self)
+
+    def __str__(self):
+        updater_name = self._update_function.__name__
+        return f"CachedField(name={self.name!r},update_function={updater_name},timeout={self.timeout!r})"
 
 
 def make_counter(start=0, step=1):
@@ -1399,13 +1531,15 @@ def _apply_decorator(fn, *args, **kwargs):
     The price to be paid is you can't use it for decorators that take positional arguments.
     """
     if args and (kwargs or len(args) > 1):
+        # Case 1
         # If both args and kwargs are in play, they have to have been passed explicitly like @foo(a1, k2=v2).
         # If more than one positional is given, that has to be something like @foo(a1, a2, ...)
         # Decorators using this function need to agree to only accept keyword arguments, so those cases can't happen.
         # They can do this by using an optional first positional argument, as in 'def foo(x=3):',
         # or they can do it by using a * as in 'def foo(*, x)' or if no arguments are desired, obviously, 'def foo():'.
         raise SyntaxError("Positional arguments to decorator (@%s) not allowed here." % fn.__name__)
-    elif args:
+    elif args:  # i.e., there is 1 positional arg (an no keys)
+        # Case 2
         arg0 = args[0]  # At this point, we know there is a single positional argument.
         #
         # Here there are two cases.
@@ -1422,13 +1556,16 @@ def _apply_decorator(fn, *args, **kwargs):
         # we know that it's really case (a) and that we need to call fn once with no arguments
         # before retrying on arg0.
         if _is_function_of_exactly_one_required_arg(fn):
+            # Case 2A
             # We are ready to wrap the function or class in arg0
             return fn(arg0)
         else:
+            # Case 2B
             # We are ALMOST ready to wrap the function or class in arg0,
             # but first we have to call ourselves with no arguments as in case (a) described above.
             return fn()(arg0)
     else:
+        # Case 3
         # Here we have kwargs = {...} from @foo(x=3, y=4, ...) or maybe no kwargs either @foo().
         # Either way, we've already evaluated the foo(...) call, so all that remains is to call on our kwargs.
         # (There are no args to call it on because we tested that above.)
@@ -1506,6 +1643,251 @@ def json_leaf_subst(exp, substitutions):
     return exp
 
 
+class SingletonManager:
+
+    def __init__(self, singleton_class, *singleton_args, **singleton_kwargs):
+        self._singleton = None
+        self._singleton_class = singleton_class
+        self._singleton_args = singleton_args
+        self._singleton_kwargs = singleton_kwargs
+
+    @property
+    def singleton(self):
+        if not self._singleton:
+            self._singleton = self._singleton_class(*self._singleton_args or (), **self._singleton_kwargs or {})
+        return self._singleton
+
+    @property
+    def singleton_class(self):
+        return self._singleton_class
+
+
+class classproperty(object):
+    """
+    This decorator is like 'classproperty', but the function is run only on first use, not every time, and then cached.
+
+    Example:
+
+        import time
+        class Clock:
+            @classproperty
+            def sample():
+                return time.time()
+
+        # Different results each time, just like an instance method, but without having to instantiate the class.
+        Clock.sample
+        1665600812.008385
+        Clock.sample
+        1665600812.760394
+    """
+
+    def __init__(self, getter):
+        self.getter = getter
+
+    def __get__(self, instance, instance_class):
+        ignored(instance)
+        return self.getter(instance_class)
+
+
+class classproperty_cached(object):
+    """
+    This decorator is like 'classproperty', but the function is run only on first use, not every time, and then cached.
+
+    Such a property returns the same value each time, just like any class property,
+    but initialization is delayed until first use and determined by a call to the decorated function.
+
+    Example:
+
+        import time
+        class Freeze:
+            @classproperty_cached
+            def sample():
+                return time.time()
+
+        Freeze.sample
+        1665600374.4801269
+        Freeze.sample
+        1665600374.4801269
+
+        class SubFreeze(Freeze):
+            pass
+
+        SubFreeze.sample
+        1665600540.1467211
+        SubFreeze.sample
+        1665600540.1467211
+
+        Freeze.sample
+        1665600374.4801269
+
+        SubFreeze.sample
+        1665600540.1467211
+    """
+
+    ATTRIBUTE_CACHE_MAP = defaultdict(lambda: {})
+
+    _USES_PER_SUBCLASS_CACHES = False
+
+    def __init__(self, initializer):
+        self.initializer = initializer
+        self.name = initializer.__name__
+        self.attribute_cache = {}
+
+    def __get__(self, instance, instance_class):
+        ignored(instance)
+        reference_class = self._find_reference_class(instance_class, self.name)
+        if reference_class not in self.attribute_cache:  # If there is no exact class matching, init it.
+            initial_value = self.initializer(reference_class)
+            self.attribute_cache[reference_class] = initial_value
+        return self.attribute_cache[reference_class]
+
+    @classmethod
+    def _find_reference_class(cls, instance_class, attribute_name):
+        if cls._USES_PER_SUBCLASS_CACHES:
+            return instance_class
+        else:
+            return cls._find_cache_class(instance_class, attribute_name)
+
+    @classmethod
+    def _find_cache_class_and_attribute(cls, instance_class, attribute_name):
+        for superclass in instance_class.__mro__:
+            superclass_attributes = superclass.__dict__
+            if attribute_name in superclass_attributes:
+                attribute_value = superclass_attributes[attribute_name]
+                if isinstance(attribute_value, cls):
+                    return superclass, attribute_value
+                raise ValueError(f"The slot {instance_class.__name__}.{attribute_name}"
+                                 f" does not contain a cached value.")
+        raise ValueError(f"The slot {instance_class.__name__}.{attribute_name} is not defined.")
+
+    @classmethod
+    def _find_cache_class(cls, instance_class, attribute_name):
+        return cls._find_cache_class_and_attribute(instance_class, attribute_name)[0]
+
+    @classmethod
+    def _find_cache_attribute(cls, instance_class, attribute_name):
+        return cls._find_cache_class_and_attribute(instance_class, attribute_name)[1]
+
+    @classmethod
+    def _find_cache_map(cls, instance_class, attribute_name) -> dict:
+        attribute = cls._find_cache_attribute(instance_class, attribute_name)
+        return attribute.attribute_cache
+
+    @classmethod
+    def reset(cls, *, instance_class, attribute_name, subclasses=True):
+        """
+        Clears the cache for the given attribute name on the given instance_class.
+
+        Having done:
+
+            import random
+            class Foo:
+                @classproperty_cached
+                def something(cls):
+                    return random.randint(100)
+
+        one can clear the cache by doing:
+
+            classproperty_cached.reset(instance_class=Foo, attribute_name='something')
+
+        :param instance_class: a class with an attribute whose value is managed by '@classproperty_cached'.
+        :param attribute_name: the name of the attribute that has a cached value.
+        :param subclasses: a bool indicating whether the cache reset requests applies to
+             all subclasses (subclasses=True) or only the exact class given (subclasses=False).
+             Using subclasses=False is not allowed if CACHE_EACH_SUBCLASS is False.
+        """
+
+        if not cls._USES_PER_SUBCLASS_CACHES and not subclasses:
+            raise ValueError(f"The subclasses= argument to {cls.__name__}.reset must not be False"
+                             f" because {cls.__name__} does not use per-subclass caches.")
+        if not isinstance(instance_class, type):
+            raise ValueError(f"The instance_class= argument to {cls.__name__}.reset must be a class.")
+        reference_class = cls._find_reference_class(instance_class, attribute_name)
+        attribute_cache = cls._find_cache_map(reference_class, attribute_name)
+        keys_to_remove = []
+        predicate = issubclass if subclasses else equals
+        for cache_class, cache_value in attribute_cache.items():
+            if predicate(cache_class, reference_class):
+                keys_to_remove.append(cache_class)
+        for cache_class in keys_to_remove:
+            del attribute_cache[cache_class]
+        return bool(keys_to_remove)
+
+
+class classproperty_cached_each_subclass(classproperty_cached):
+    """
+    This decorator is like 'classproperty_cached', but a separate cache is maintained per-subclass.
+
+    Such a property returns the same value each time, just like any class property,
+    but initialization is delayed until first use and determined by a call to the decorated function.
+
+    Example:
+
+        import time
+        class Freeze:
+            @classproperty_cached
+            def sample():
+                return time.time()
+
+        Freeze.sample
+        1665600374.4801269
+        Freeze.sample
+        1665600374.4801269
+
+        class SubFreeze(Freeze):
+            pass
+
+        SubFreeze.sample
+        1665600540.1467211
+        SubFreeze.sample
+        1665600540.1467211
+
+        Freeze.sample
+        1665600374.4801269
+
+        SubFreeze.sample
+        1665600540.1467211
+    """
+
+    _USES_PER_SUBCLASS_CACHES = True
+
+
+def equals(x, y):
+    """
+    A functional form of the '==' equality predicate so that it can be handled as a functional value.
+    """
+    return x == y
+
+
+class Singleton:
+    """
+    A class witn a cached class property 'singleton' that holds an instance of the class (created with no arguments).
+
+    The .singleton instance is created on demand (so will not be created at all if .singleton is never accessed).
+
+    Example:
+
+        class Foo(Singleton):
+            pass
+
+        # Regular instantiation of the class works like normal, giving a new class each time.
+        Foo()
+        <__main__.Foo object at 0x10e8aed90>
+        Foo()
+        <__main__.Foo object at 0x10e8b0150>
+
+        # The .singleton property gives the same instance every time.
+        Foo.singleton
+        <__main__.Foo object at 0x10e8aefd0>
+        Foo.singleton
+        <__main__.Foo object at 0x10e8aefd0>
+    """
+
+    @classproperty_cached_each_subclass
+    def singleton(cls):  # noQA - PyCharm wrongly thinks the argname should be 'self'
+        return cls()     # noQA - PyCharm flags a bogus warning for this
+
+
 class NamedObject(object):
 
     def __init__(self, name):
@@ -1518,6 +1900,263 @@ class NamedObject(object):
         return f"<{self.name}@{id(self):x}>"
 
 
-# The names HMS_TZ and hms_now were deprecated for a while and are removed in dcicutils 3.0
-# HMS_TZ = REF_TZ
-# hms_now = ref_now
+def key_value_dict(key, value):
+    """
+    Given a key k and a value v, returns the dictionary {"Key": k, "Value": v}, which is a format AWS is fond of.
+    """
+    return {'Key': key, 'Value': value}
+
+
+def merge_key_value_dict_lists(x, y):
+    """
+    Merges two lists of the form [{"Key": k1, "Value": v1}, {"Key": k2, "Value": v2}].
+    It is assumed that neither list has repeated keys, and that the resulting list also should not.
+    Entries in the resulting list will be in the same order as the original two lists except when both
+    lists contain entries that share a key. In that case, the two entries will be merged
+    into a single entry with the position of the first such entry and value of the second.
+    """
+    merged = {}
+    for pair in x:
+        merged[pair['Key']] = pair['Value']
+    for pair in y:
+        merged[pair['Key']] = pair['Value']
+    return [key_value_dict(k, v) for k, v in merged.items()]
+
+
+# Stealing topological sort classes below from python's graphlib module introduced
+# in v3.9 with minor refactoring.
+# Source: https://github.com/python/cpython/blob/3.11/Lib/graphlib.py
+# Docs: https://docs.python.org/3.11/library/graphlib.html
+# TODO: Remove once python version >= 3.9
+
+
+class _NodeInfo:
+    __slots__ = "node", "npredecessors", "successors"
+
+    def __init__(self, node):
+        # The node this class is augmenting.
+        self.node = node
+
+        # Number of predecessors, generally >= 0. When this value falls to 0,
+        # and is returned by get_ready(), this is set to _NODE_OUT and when the
+        # node is marked done by a call to done(), set to _NODE_DONE.
+        self.npredecessors = 0
+
+        # List of successor nodes. The list can contain duplicated elements as
+        # long as they're all reflected in the successor's npredecessors attribute.
+        self.successors = []
+
+
+class CycleError(ValueError):
+    """Subclass of ValueError raised by TopologicalSorter.prepare if cycles
+    exist in the working graph.
+    If multiple cycles exist, only one undefined choice among them will be reported
+    and included in the exception. The detected cycle can be accessed via the second
+    element in the *args* attribute of the exception instance and consists in a list
+    of nodes, such that each node is, in the graph, an immediate predecessor of the
+    next node in the list. In the reported list, the first and the last node will be
+    the same, to make it clear that it is cyclic.
+    """
+    pass
+
+
+class TopologicalSorter:
+    """Provides functionality to topologically sort a graph of hashable nodes"""
+
+    _NODE_OUT = -1
+    _NODE_DONE = -2
+
+    def __init__(self, graph=None):
+        self._node2info = {}
+        self._ready_nodes = None
+        self._npassedout = 0
+        self._nfinished = 0
+
+        if graph is not None:
+            for node, predecessors in graph.items():
+                self.add(node, *predecessors)
+
+    def _get_nodeinfo(self, node):
+        result = self._node2info.get(node)
+        if result is None:
+            self._node2info[node] = result = _NodeInfo(node)
+        return result
+
+    def add(self, node, *predecessors):
+        """Add a new node and its predecessors to the graph.
+        Both the *node* and all elements in *predecessors* must be hashable.
+        If called multiple times with the same node argument, the set of dependencies
+        will be the union of all dependencies passed in.
+        It is possible to add a node with no dependencies (*predecessors* is not provided)
+        as well as provide a dependency twice. If a node that has not been provided before
+        is included among *predecessors* it will be automatically added to the graph with
+        no predecessors of its own.
+        Raises ValueError if called after "prepare".
+        """
+        if self._ready_nodes is not None:
+            raise ValueError("Nodes cannot be added after a call to prepare()")
+
+        # Create the node -> predecessor edges
+        nodeinfo = self._get_nodeinfo(node)
+        nodeinfo.npredecessors += len(predecessors)
+
+        # Create the predecessor -> node edges
+        for pred in predecessors:
+            pred_info = self._get_nodeinfo(pred)
+            pred_info.successors.append(node)
+
+    def prepare(self):
+        """Mark the graph as finished and check for cycles in the graph.
+        If any cycle is detected, "CycleError" will be raised, but "get_ready" can
+        still be used to obtain as many nodes as possible until cycles block more
+        progress. After a call to this function, the graph cannot be modified and
+        therefore no more nodes can be added using "add".
+        """
+        if self._ready_nodes is not None:
+            raise ValueError("cannot prepare() more than once")
+
+        self._ready_nodes = [
+            i.node for i in self._node2info.values() if i.npredecessors == 0
+        ]
+        # ready_nodes is set before we look for cycles on purpose:
+        # if the user wants to catch the CycleError, that's fine,
+        # they can continue using the instance to grab as many
+        # nodes as possible before cycles block more progress
+        cycle = self._find_cycle()
+        if cycle:
+            raise CycleError(f"nodes are in a cycle", cycle)
+
+    def get_ready(self):
+        """Return a tuple of all the nodes that are ready.
+        Initially it returns all nodes with no predecessors; once those are marked
+        as processed by calling "done", further calls will return all new nodes that
+        have all their predecessors already processed. Once no more progress can be made,
+        empty tuples are returned.
+        Raises ValueError if called without calling "prepare" previously.
+        """
+        if self._ready_nodes is None:
+            raise ValueError("prepare() must be called first")
+
+        # Get the nodes that are ready and mark them
+        result = tuple(self._ready_nodes)
+        n2i = self._node2info
+        for node in result:
+            n2i[node].npredecessors = self._NODE_OUT
+
+        # Clean the list of nodes that are ready and update
+        # the counter of nodes that we have returned.
+        self._ready_nodes.clear()
+        self._npassedout += len(result)
+
+        return result
+
+    def is_active(self):
+        """Return ``True`` if more progress can be made and ``False`` otherwise.
+        Progress can be made if cycles do not block the resolution and either there
+        are still nodes ready that haven't yet been returned by "get_ready" or the
+        number of nodes marked "done" is less than the number that have been returned
+        by "get_ready".
+        Raises ValueError if called without calling "prepare" previously.
+        """
+        if self._ready_nodes is None:
+            raise ValueError("prepare() must be called first")
+        return self._nfinished < self._npassedout or bool(self._ready_nodes)
+
+    def __bool__(self):
+        return self.is_active()
+
+    def done(self, *nodes):
+        """Marks a set of nodes returned by "get_ready" as processed.
+        This method unblocks any successor of each node in *nodes* for being returned
+        in the future by a call to "get_ready".
+        Raises :exec:`ValueError` if any node in *nodes* has already been marked as
+        processed by a previous call to this method, if a node was not added to the
+        graph by using "add" or if called without calling "prepare" previously or if
+        node has not yet been returned by "get_ready".
+        """
+
+        if self._ready_nodes is None:
+            raise ValueError("prepare() must be called first")
+
+        n2i = self._node2info
+
+        for node in nodes:
+
+            # Check if we know about this node (it was added previously using add()
+            nodeinfo = n2i.get(node)
+            if nodeinfo is None:
+                raise ValueError(f"node {node!r} was not added using add()")
+
+            # If the node has not being returned (marked as ready) previously, inform the user.
+            stat = nodeinfo.npredecessors
+            if stat != self._NODE_OUT:
+                if stat >= 0:
+                    raise ValueError(
+                        f"node {node!r} was not passed out (still not ready)"
+                    )
+                elif stat == self._NODE_DONE:
+                    raise ValueError(f"node {node!r} was already marked done")
+                else:
+                    assert False, f"node {node!r}: unknown status {stat}"
+
+            # Mark the node as processed
+            nodeinfo.npredecessors = self._NODE_DONE
+
+            # Go to all the successors and reduce the number of predecessors, collecting all the ones
+            # that are ready to be returned in the next get_ready() call.
+            for successor in nodeinfo.successors:
+                successor_info = n2i[successor]
+                successor_info.npredecessors -= 1
+                if successor_info.npredecessors == 0:
+                    self._ready_nodes.append(successor)
+            self._nfinished += 1
+
+    def _find_cycle(self):
+        n2i = self._node2info
+        stack = []
+        itstack = []
+        seen = set()
+        node2stacki = {}
+
+        for node in n2i:
+            if node in seen:
+                continue
+
+            while True:
+                if node in seen:
+                    # If we have seen already the node and is in the
+                    # current stack we have found a cycle.
+                    if node in node2stacki:
+                        return stack[node2stacki[node]:] + [node]
+                    # else go on to get next successor
+                else:
+                    seen.add(node)
+                    itstack.append(iter(n2i[node].successors).__next__)
+                    node2stacki[node] = len(stack)
+                    stack.append(node)
+
+                # Backtrack to the topmost stack entry with
+                # at least another successor.
+                while stack:
+                    try:
+                        node = itstack[-1]()
+                        break
+                    except StopIteration:
+                        del node2stacki[stack.pop()]
+                        itstack.pop()
+                else:
+                    break
+        return None
+
+    def static_order(self):
+        """Returns an iterable of nodes in a topological order.
+        The particular order that is returned may depend on the specific
+        order in which the items were inserted in the graph.
+        Using this method does not require to call "prepare" or "done". If any
+        cycle is detected, :exc:`CycleError` will be raised.
+        """
+        self.prepare()
+        while self.is_active():
+            node_group = self.get_ready()
+            yield from node_group
+            self.done(*node_group)

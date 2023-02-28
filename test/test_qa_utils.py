@@ -1,3 +1,5 @@
+import logging
+
 import boto3
 import datetime
 import io
@@ -19,6 +21,7 @@ from dcicutils.qa_utils import (
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
+    logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -27,6 +30,9 @@ from .fixtures.sample_fixtures import MockMathError, MockMath, math_enabled
 
 
 notice_pytest_fixtures(math_enabled)   # Use care if editing this line. It is PART OF A TEST.
+
+
+logger = logging.getLogger(__name__)
 
 
 def test_mock_not_called():
@@ -233,11 +239,37 @@ def test_controlled_time_creation():
 
 def test_controlled_time_just_now():
 
-    t = ControlledTime()
+    t = ControlledTime(tick_seconds=1)
 
     t0 = t.just_now()
     t1 = t.just_now()
     assert (t1 - t0).total_seconds() == 0
+
+    t0 = t.time()
+    t1 = t.time()  # one second should have passed
+    t2 = t.time()  # one more second should have passed
+
+    assert t1 - t0 == 1
+    assert t2 - t1 == 1
+
+
+def test_just_utcnow():
+
+    t = ControlledTime()
+    t0 = t.utcnow()
+    assert t.just_utcnow() == t0
+
+    assert ControlledTime.ProxyDatetimeClass(t).utcnow() == t0 + datetime.timedelta(seconds=1)
+
+
+def test_controlled_time_time():
+
+    t = ControlledTime()
+
+    t0 = t.time()
+    t1 = t.time()
+
+    assert t1 - t0 == 1
 
 
 def test_controlled_time_now():
@@ -1007,15 +1039,27 @@ def test_uppercase_print_with_printed_output():
             assert printed.file_last[fp] == "Done, too."
             assert printed.file_lines[fp] == ["stuff to file", "more stuff to file", "Done, too."]
 
+            printed.reset()
+
             with io.open("another-file.txt", 'w') as fp2:
 
-                assert printed.file_last == None
+                assert printed.last is None
+                assert printed.file_last[None] is None
+                assert printed.file_last[sys.stdout] is None
+
+                assert printed.lines == []
+                assert printed.file_lines[None] == []
+                assert printed.file_lines[sys.stdout] == []
+
+                assert printed.file_last[fp2] is None
                 assert printed.file_lines[fp2] == []
-                assert printed.file_last[fp2] == None
-                print("foo", file=fp2)
-                assert printed.file_last == None
-                assert printed.file_lines[fp2] == ["foo"]
+
+                PRINT("foo", file=fp2)
+
+                assert printed.last is None
+                assert printed.lines == []
                 assert printed.file_last[fp2] == "foo"
+                assert printed.file_lines[fp2] == ["foo"]
 
 
 def test_uppercase_print_with_time():
@@ -1330,14 +1374,11 @@ def test_version_checker_no_changelog():
 
     MyVersionChecker.check_version()
 
-
-def test_version_checker_use_dcicutils_changelog():
-
-    class MyVersionChecker(VersionChecker):
+    class MyChangeLogChecker(ChangeLogChecker):
         PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
-        CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+        CHANGELOG = None
 
-    MyVersionChecker.check_version()
+    MyChangeLogChecker.check_version()
 
 
 def test_version_checker_with_missing_changelog():
@@ -1353,6 +1394,14 @@ def test_version_checker_with_missing_changelog():
 
         with pytest.raises(AssertionError):
             MyVersionChecker.check_version()  # The version history will be missing because of mocking.
+
+        class MyChangeLogChecker(ChangeLogChecker):
+
+            PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+            CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+
+        with pytest.raises(AssertionError):
+            MyChangeLogChecker.check_version()  # The version history will be missing because of mocking.
 
 
 def test_version_checker_with_proper_changelog():
@@ -1384,6 +1433,14 @@ def test_version_checker_with_proper_changelog():
             # The CHANGELOG is present and with the right data.
             MyVersionChecker.check_version()
 
+            class MyChangeLogChecker(ChangeLogChecker):
+
+                PYPROJECT = pyproject_filename
+                CHANGELOG = changelog_filename
+
+            # The CHANGELOG is present and with the right data.
+            MyChangeLogChecker.check_version()
+
 
 def test_version_checker_with_insufficient_changelog():
 
@@ -1410,6 +1467,15 @@ def test_version_checker_with_insufficient_changelog():
             with pytest.warns(VersionChecker.WARNING_CATEGORY):
                 # The CHANGELOG won't have the right data, so we should see a warning.
                 MyVersionChecker.check_version()
+
+            class MyChangeLogChecker(ChangeLogChecker):
+
+                PYPROJECT = pyproject_filename
+                CHANGELOG = changelog_filename
+
+            with pytest.raises(AssertionError):
+                # The CHANGELOG won't have the right data, so we should see a warning.
+                MyChangeLogChecker.check_version()
 
 
 def test_check_duplicated_items_by_key():
@@ -1483,3 +1549,243 @@ def test_mocked_command_args():
     assert args.foo == 'x'      # noQA - PyCharm can't see we declared this arg
     assert args.bar == 'y'      # noQA - PyCharm can't see we declared this arg
     assert args.foobar == 'xy'  # noQA - PyCharm can't see we declared this arg
+
+
+MY_MODULE = sys.modules['test.test_qa_utils']
+
+
+def test_input_mocked():
+
+    def some_function_with_input():
+        return input("input something:")
+
+    with input_mocked("x", "y", module=MY_MODULE):
+        assert some_function_with_input() == "x"
+        assert some_function_with_input() == "y"
+        with pytest.raises(AssertionError) as exc_info:
+            some_function_with_input()
+        assert str(exc_info.value) == "There are not enough mock inputs."
+
+    with pytest.raises(AssertionError) as exc_info:
+        with input_mocked("x", "y", module=sys.modules['test.test_qa_utils']):
+            assert some_function_with_input() == "x"
+    assert str(exc_info.value) == "There is 1 unused mock input."
+
+
+def test_logged_messages():
+
+    with logged_messages("INFO: foo", module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+
+    with pytest.raises(AssertionError):
+        with logged_messages("INFO: foo", module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.info("bar")
+
+    with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+
+    with logged_messages(info=["foo"], warning=["bar"], module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+        logger.warning("bar")
+
+    with pytest.raises(AssertionError):
+        with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.info("bar")
+
+    with pytest.raises(AssertionError):
+        with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.warning("bar")
+
+    with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger', allow_warn=True):
+        logger.warn("bar")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+
+    with pytest.raises(AssertionError):
+        with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger', allow_warn=False):
+            logger.warn("bar")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+
+    with pytest.raises(AssertionError):
+        with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger'):
+            # allow_warn defaults to False
+            logger.warn("bar")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+
+
+def test_mock_log():
+
+    m = MockLog(allow_warn=False)
+
+    with pytest.raises(AssertionError) as exc:
+        m.warn("should fail")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+    assert "warn called. Should be 'warning'" in str(exc.value)
+
+    m = MockLog(allow_warn=True)
+
+    m.debug("a log.debug message")
+    m.info("a log.info message")
+    m.warn("a call to log.warn")
+    m.warning("a call to log.warning")
+    m.error("a call to log.error")
+    m.critical("a call to log.critical")
+
+    assert m.messages == {
+        "debug": ["a log.debug message"],
+        "info": ["a log.info message"],
+        "warning": ["a call to log.warn", "a call to log.warning"],
+        "error": ["a call to log.error"],
+        "critical": ["a call to log.critical"]
+    }
+
+    assert m.all_log_messages == [
+        "DEBUG: a log.debug message",
+        "INFO: a log.info message",
+        "WARNING: a call to log.warn",
+        "WARNING: a call to log.warning",
+        "ERROR: a call to log.error",
+        "CRITICAL: a call to log.critical",
+    ]
+
+
+def test_sqs_client_bad_region():
+
+    with pytest.raises(ValueError) as exc:
+        MockBoto3().client('sqs', region_name='some-region')
+    assert str(exc.value) == "Unexpected region: some-region"
+
+
+def test_s3_client_bad_region():
+
+    with pytest.raises(ValueError) as exc:
+        MockBoto3().client('s3', region_name='some-region')
+    assert str(exc.value) == "Unexpected region: some-region"
+
+
+def test_mock_id():
+
+    mock_id = MockId()
+
+    w = 3
+    x = object()
+    y = 'foo'
+    z = None
+
+    w_id = mock_id(w)
+    x_id = mock_id(x)
+    y_id = mock_id(y)
+    z_id = mock_id(z)
+
+    assert w_id + 1 == x_id
+    assert x_id + 1 == y_id
+    assert y_id + 1 == z_id
+
+    assert mock_id(w) == w_id
+    assert mock_id(x) == x_id
+    assert mock_id(y) == y_id
+    assert mock_id(z) == z_id
+
+    mock_id = MockId(counter_base=25)
+    assert mock_id('something') == 25
+    assert mock_id('something-else') == 26
+    assert mock_id('something') == 25
+
+
+def test_eventually():
+
+    dt = ControlledTime()
+    with mock.patch("datetime.datetime", dt):
+        with mock.patch("time.sleep", dt.sleep):
+
+            def foo():
+                return 17
+
+            flakey_success_frequency = 3
+
+            flakey_foo = Occasionally(foo, success_frequency=flakey_success_frequency)
+
+            def my_assertions():
+                assert flakey_foo() == 17
+
+            with pytest.raises(AssertionError):
+                Eventually.call_assertion(my_assertions, threshold_seconds=flakey_success_frequency - 1,
+                                          error_class=Exception)
+
+            # Beyond here we're testing the error_message="something" argument,
+            # which allows us to only wait for a specific eventual message.
+
+            def test_error_message_argument(*, expected_message=None):
+                Eventually.call_assertion(my_assertions, threshold_seconds=flakey_success_frequency,
+                                          error_class=Exception,
+                                          error_message=expected_message)
+
+            actual_message = "Oops. Occasionally this fails."
+
+            test_error_message_argument()
+
+            test_error_message_argument(expected_message=actual_message)
+
+            with pytest.raises(Exception) as e:
+                # If we're Eventually expecting an unrelated message,
+                # the actual error we get will just pass through and won't be retried.
+                test_error_message_argument(expected_message="SOME OTHER MESSAGE")
+            assert str(e.value) == actual_message
+
+            # Here we want to test how much time passes if all tests are tried.
+            # The default is 10 tries at 1-second intervals, so should be at least 10 seconds.
+
+            one_second = dt.timedelta(seconds=1)
+            five_seconds = dt.timedelta(seconds=5)
+            ten_seconds = dt.timedelta(seconds=10)
+            before = dt.now()
+
+            def always_failing():
+                raise AssertionError("Failed.")
+
+            with pytest.raises(Exception):
+                Eventually.call_assertion(always_failing)
+
+            after = dt.now()
+            delta = after - before
+            assert delta >= ten_seconds
+
+            @Eventually.consistent()
+            def also_failing():
+                raise AssertionError("Also failed.")
+
+            before = dt.now()
+            with pytest.raises(AssertionError):
+                also_failing()
+            after = dt.now()
+            delta = after - before  # 10 secs for the computation plus 1 sec to check current time, so about 11 secs
+            assert delta > ten_seconds
+
+            @Eventually.consistent(wait_seconds=0.1)
+            def quickly_failing():
+                raise AssertionError("Also failed.")
+
+            before2 = dt.now()
+            with pytest.raises(AssertionError):
+                quickly_failing()
+            after2 = dt.now()
+
+            delta2 = after2 - before2  # 1 sec for the computation plus 1 sec to check current time, so about 2 sec
+            assert delta2 > one_second
+            assert delta2 < five_seconds
+
+            before3 = dt.now()
+            with pytest.raises(AssertionError):
+                quickly_failing(tries=100)
+            after3 = dt.now()
+
+            delta3 = after3 - before3  # 100 tries * 0.1 sec plus 1 sec to check current time, so about 11 sec
+            assert delta3 > ten_seconds
+
+            class MyStore:
+                VALUE = 0
+
+            @Eventually.consistent()
+            def foo():
+                MyStore.VALUE += 1
+                return MyStore.VALUE
+
+            assert foo(tries=3) == 1  # The value will increment exactly once because it succeeds first try.

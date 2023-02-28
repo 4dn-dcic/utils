@@ -7,6 +7,681 @@ Change Log
 ----------
 
 
+6.10.0
+=====
+
+* Move ``mocked_s3utils_with_sse`` from ``test_ff_utils.py`` to ``ff_mocks.py``.
+
+
+6.9.0
+=====
+
+* In ``dcicutils.misc_utils``:
+
+  * Add method ``is_c4_arn`` to check if given ARN looks like CGAP or Fourfront entity.
+
+
+6.8.0
+=====
+
+* In `dcicutils.deployment_utils``
+
+  * Add support for ``Auth0Domain`` and ``Auth0AllowedConnections``
+
+
+
+6.7.0
+=====
+
+* In ``dcicutils.qa_utils``:
+
+  * For method ``Eventually_call_assertion``:
+
+    * Make the ``error_message=`` argument actually work.
+
+    * The ``threshold_seconds=`` argument is now deprecated.
+      Please prefer ``tries=`` and/or ``wait_seconds=``.
+
+    * Fix a bug where it didn't wait between iterations.
+
+  * Add a method ``consistent`` that is a class method / decorator (named ``Eventually.consistent``).
+
+  * Add testing, particularly of the timing.
+
+* In ``dcicutils.cloudformation_utils``:
+
+  * When searching for checkrunners, be more forgiving about abbreviations for development (dev)
+    and production (prd, prod).
+
+
+6.6.0
+=====
+
+* In ``dcicutils.misc_utils``:
+
+  * Add ``keys_and_values_to_dict`` function (and associated unit test).
+
+
+6.5.0
+=====
+
+* In ``dcicutils.qa_utils``:
+
+  * Add ``Eventually.call_assertion``.
+
+
+6.4.1
+=====
+* Minor fix to ``obfuscate_dict`` in ``obfuscation_utils`` to respect passed ``obfuscated`` argument recursively.
+
+
+6.4.0
+=====
+
+* In ``misc_utils``:
+
+  * New class ``TopologicalSorter`` for topological sorting of graphs
+
+
+6.3.1
+=====
+
+* New function ``env_equals`` in ``env_utils`` module.
+
+
+6.3.0
+=====
+
+* Add ``opensearch_utils``, a forward-compatible OpenSearch client we should migrate to over time
+
+* In ``codebuild_utils``:
+
+  * New method ``run_project_build_with_overrides`` to allow running builds changing the build branch and environment variables
+
+
+6.2.0
+=====
+
+* In ``lang_utils``:
+
+  * New method EnglishUtils.parse_relative_time_string
+
+* In ``misc_utils``:
+
+  * New function ``str_to_bool``
+
+
+6.1.0
+=====
+
+* In ``misc_utils``:
+
+  * New decorator ``@classproperty``
+
+  * New decorator ``@classproperty_cached``
+
+  * New decorator ``@classproperty_cached_each_subclass``
+
+  * New class ``Singleton``. Users of ``SingletonManager`` might prefer this,
+    but we'll continue to support both. (No deprecation for now.)
+
+  * In function ``is_valid_absolute_uri``, better handling of argument type errors.
+
+  * For ``CachedField``:
+
+    * Added a handler for ``__str__`` that returns useful information, which can also be used for ``__repr__``.
+
+    * Fixed handler for ``__repr__`` to return a properly executable expression (shared with ``__str__``).
+
+  * Improved test coverage by adding tests for some parts of the code that were not previously tested.
+
+* In ``qa_utils``:
+
+  * New class ``MockId`` for mocking the ``id`` function in a predictable way.
+
+  * Adjust ``MOCK_QUEUE_URL_PREFIX`` to use a mocked URL that looks more
+    like modern AWS url, where ``queue.amazonaws.com`` has been replaced by
+    ``sqs.us-east-1.amazonaws.com``.
+
+
+6.0.0
+=====
+
+`PR 224: ElasticSearch 7 <https://github.com/4dn-dcic/utils/pull/224>`_
+
+* Updates ElasticSearch to version 7.13.4, the highest version we can tolerate
+  of this library. This utils version is a requirement for using ES7 or
+  OpenSearch 1.3 in production.
+
+
+5.3.0
+=====
+
+`PR 223: Refactored recording tech <https://github.com/4dn-dcic/utils/pull/223>`_
+
+* Refactor ``TestRecorder`` into an ``AbstractTestRecorder`` with two concrete classes,
+  ``RequestsTestRecorder`` and ``AuthorizedRequestsTestRecorder``. The new refactor means
+  it'll be easier to write other subclasses.
+
+  The new classes take their arguments slightly differently, but all test cases are updated,
+  and this was previously broken in (so not used in) other repositories and it can't break
+  anything elsewhere to change the conventions. We're treating this as a simple bug fix.
+
+* Deprecated unused class ``MockBoto4DNLegacyElasticBeanstalkClient``.
+
+
+5.2.1
+=====
+
+`PR 222: Improved IntegratedFixture and static check cleanups <https://github.com/4dn-dcic/utils/pull/222>`_
+
+* Show fewer uninteresting tracebacks on static test failures.
+
+* Small incompatible changes to recently released qa-related items:
+
+  * In ``qa_checkers.confirm_no_uses``, remove the new ``if_used`` argument in favor of a simpler implementation.
+
+  * Slightly rerefactored the class hierarchy so that ``StaticChecker`` is a smaller class that doesn't have quite
+    as much functionality, and ``StaticSourcesChecker`` corresponds to what ``StaticChecker`` previously did.
+
+  Since this is all testing-only, not something used in production, and since there are believed to not yet be uses
+  outside the repo, we're treating this as a bug fix (patch version bump) not an incompatible change (which would
+  entail a major version bump and a lot of fussing for nothing).
+
+* Make class initialization of ``IntegratedFixture`` happen at instance-creation time.
+  That simplifies the loading actions needed. Those can happen in ``conftest.py`` rather than in
+  ``dcicutils.ff_mocks``, which in turn should allow ``dcicutils.ff_mocks`` to be imported without error,
+  fixing `C4-932 <https://hms-dbmi.atlassian.net/browse/C4-932>`_
+
+
+5.2.0
+=====
+
+* Some functionality moved from ``qa_utils`` to ``qa_checkers``.
+  In each case, to be compatible, the ``qa_utils`` module will continue
+  to have the entity availble for import until the next major release.
+
+  * Class ``VersionChecker``
+  * Class ``ChangeLogChecker``
+  * Function ``confirm_no_uses``
+  * Function ``find_uses``
+  * Variable ``QA_EXCEPTION_PATTERN``
+
+  As an official matter, use of these moved entities from by importing
+  them from ``dcicutils.qa_utils`` is deprecated. Please update programs
+  to import these from ``dcicutils.qa_checkers`` instead.
+
+* New functionality in ``qa_checkers``:
+
+  * New class ``DocsChecker``
+  * New class ``DebuggingArtifactChecker``
+
+* In ``misc_utils``:
+
+  * New function ``lines_printed_to``.
+
+* New ``pytest`` marker ``static`` for static tests.
+
+* New ``make`` target ``test-static`` to run tests marked with
+  ``@pytest.mark.static``.
+
+* New GithubActions (GA) workflow: ``static_checks.yml``
+
+
+5.1.0
+=====
+
+* In ``qa_utils``:
+
+  * New class ChangeLogChecker, like VersionChecker, but it raises an error
+    if there's a change log inconsistency.
+
+
+5.0.0
+=====
+
+* Drop support for Python 3.6 (**BREAKING CHANGE**)
+
+
+4.8.0
+=====
+
+* New functionallity in ``ecr_utils.ECRUtils`` in support of planned changes to Foursight:
+
+  * Add ``ECRTagWatcher`` class that can be used to watch for a new image with a given tag in an ECS repository.
+
+* New functionality in ``qa_utils`` to support a mock ECR client.
+
+* Refactor parts of ``ecr_utils`` and ``ecr_scripts`` to move some general-purpose parts out of
+  ``ecr_scripts`` (top-level variables and class ``ECRCommandContext``)
+  and into ``ecr_utils`` (class ``ECRUtils``):
+
+  * Changes to arguments for ``ECRUtils`` constructor:
+
+    * Allow additional arguments needed for moved methods.
+    * Default more arguments so that only relevant ones need be passed.
+
+  * Move some methods from ``ECRCommandContext`` to ``ECRUtils``:
+
+    * ``get_images_descriptions``
+    * ``_apply_image_descriptions_limit``
+
+  * Certain variables at ``ecr_scripts`` top-level became class variables in ``ecr_utils.ECRUtils``
+    (some with some renaming):
+
+
+    +------------------------+------------------------+--------------------------------+------------------------+
+    | .. raw:: html                                   | .. raw:: html                                           |
+    |                                                 |                                                         |
+    |    <center><tt>ecr_scripts</code></tt>          |    <center><tt>ecr_utils.ECRUtils</tt></center>         |
+    |                                                 |                                                         |
+    +------------------------+------------------------+--------------------------------+------------------------+
+    | module variable        | module variable status | class variable                 | class variable status  |
+    +========================+========================+================================+========================+
+    | DEFAULT_ECS_REPOSITORY | deprecated             | DEFAULT_IMAGE_REPOSITORY       | new                    |
+    +------------------------+------------------------+--------------------------------+------------------------+
+    |  IMAGE_COUNT_LIMIT     | deprecated             | IMAGE_LIST_DEFAULT_COUNT_LIMIT | new                    |
+    +------------------------+------------------------+--------------------------------+------------------------+
+    | IMAGE_LIST_CHUNK_SIZE  | deprecated             | IMAGE_LIST_CHUNK_SIZE          | new                    |
+    +------------------------+------------------------+--------------------------------+------------------------+
+    | RELEASED_TAG           | deprecated             | IMAGE_RELEASED_TAG             | new                    |
+    +------------------------+------------------------+--------------------------------+------------------------+
+
+* Unit tests for new functionality, and backfilled unit tests for some parts of ``ecr_utils``.
+
+
+4.7.0
+=====
+
+* In ``env_utils``:
+
+  * New function ``foursight_env_name``, an alias for
+    ``lambda envname: infer_foursight_from_env(envname=envname)``
+
+* Add error checking for running tests that looks to see that we're in the right account before we move ahead
+  only to find this out in a less intelligible way.
+
+
+4.6.0
+=====
+
+* In ``env_utils``:
+
+  * Add ``identity_name`` arguments to:
+
+    * ``apply_identity``
+    * ``assumed_identity_if``
+    * ``assumed_identity``
+    * ``get_identity_secrets``
+
+  * Remove buggy defaulting of value for ``get_identity_name``.
+  * Improve error messages in ``get_identity_secrets``.
+
+
+4.5.0
+=====
+
+* A few other changes to ``lang_utils.string_pluralize`` to give more refined
+  control of punctuation and to allow phrases with "that is/was" or
+  "which is/was" qualifiers.
+
+
+4.4.1
+=====
+
+* In ``ff_utils``;
+
+  * add function ``get_search_facet values`` to support count from facets from any search
+
+
+4.4.0
+=====
+
+* In ``lang_utils``:
+
+  * Add ```"from"`` and ``"between"`` to the list of prepositions that the pluralizer understands.
+
+* In ``obfuscation_utils``:
+
+  * Add ``is_obfuscated`` to predicate whether something is in obfuscated
+    form. Among other things, this enables better testing.
+
+  * Add an ``obfuscated=`` argument to ``obfuscate`` and ``obfuscate_dict``,
+    allowing the choice of what obfuscated value to use. The argument must
+    be something for which ``is_obfuscated`` returns True.
+
+NOTE: Due to a versioning error in beta, there was no 4.3.0. The previous released version was 4.2.0.
+
+
+4.2.0
+=====
+
+* In ``command_utils``:
+
+  * Add ``script_catch_errors`` context manager, borrowed from ``SubmitCGAP``.
+
+* In ``ff_utils``:
+
+  * Add ``is_bodyless`` predicate on http methods (verbs) to say if they want a data arg.
+
+* In ``env_base``:
+
+  * Add ``EnvBase.set_global_env_bucket`` to avoid setting ``os.environ['GLOBAL_ENV_BUCKET']`` directly.
+
+
+4.1.0
+=====
+
+* Add better ``CHANGELOG.rst`` for the changes that happened in 4.0.0.
+* Add unit testing for stray ``print(...)`` or ``pdb.set_trace()``
+* Support for ``ENCODED_CREATE_MAPPING_SKIP``, ``ENCODED_CREATE_MAPPING_WIPE_ES``,
+  and ``ENCODED_CREATE_MAPPING_STRICT`` in GAC to allow ``$CREATE_MAPPING_SKIP,``
+  ``$CREATE_MAPPING_WIPE_ES``, and ``$CREATE_MAPPING_STRICT`` in ``.ini`` files.
+* Allow ``get_foursight_bucket`` to infer a bucket prefix if one is not
+  explicitly supplied. (The heuristic removes ``-envs`` from the global env bucket
+  name and uses what remains.)
+* Fix test recording capability. Add (though unused) ability to record at
+  the abstraction level of ``authorized_request``.
+* Fix various tests that had grown stale due to data changes.
+
+  * ``test_post_delete_purge_links_metadata`` (needed to be re-recorded)
+  * ``test_upsert_metadata`` (needed to be re-recorded)
+  * ``test_unified_authentication_prod_envs_integrated_only``
+    (simplified, removed bogus attempts at recording)
+  * ``test_faceted_search_exp_set`` (needed many different counts)
+  * ``test_some_decorated_methods_work`` (needed one different count)
+  * ``test_faceted_search_exp_set`` (newly recorded)
+  * ``test_faceted_search_users`` (newly recorded)
+
+* Specify pytest options in pyproject.toml instead of a separate file.
+* In ``env_utils``:
+
+  * Added ``EnvUtils.app_name`` to get the orchestrated app name.
+  * Added ``EnvUtils.app_case`` to conditionalize on ``if_cgap=`` and ``if_fourfront=``.
+
+* In ``qa_utils``:
+
+  * Added an ``input_mocked`` context manager.
+  * Added ``MockLog`` and a ``logged_messages`` context manager.
+
+
+4.0.2
+=====
+
+* In ``cloudformation_utils``:
+
+  * New function ``find_lambda_function_names`` in ``AbstractOrchestrationManager`` which
+    factors out the lookup part from the ``discover_foursight_check_runner_name`` function.
+
+* In ``obfuscation_utils``:
+
+  * Changed ``should_obfuscate`` to include "session" related keys.
+
+
+4.0.1
+=====
+* In ``qa_utils``:
+
+  * New class ``MockBoto3Ec2`` geared toward security group rules related unit testing.
+
+* New ``obfuscation_utils`` module.
+
+
+4.0.0
+=====
+
+The following change list is only interim. A followup change will revise this entry with better information
+covering what changed in 4.0, which is considerably more.
+
+* Some new modules. The scripts modules came from other repositories, for centralization reasons. The other modules
+  are originally refactorings to make functionality more broadly available at various stages of bootstrapping
+  this library.
+
+  * ``ecr_scripts`` has support for command line scripts related to ECR repositories.
+  * ``env_base`` has support for bits of environmental foothold needed before ``env_utils`` or ``s3_utils`` are ready.
+  * ``env_manager`` is a higher-level environmental abstraction built after ``env_utils`` is available.
+  * ``env_scripts`` has support for command line scripts related to configurable environments and the global env bucket.
+
+* New ``make`` targets:
+
+  * ``make test-all`` runs all tests
+  * ``make test-most`` runs all unit and integration tests (marked ``unit``, ``integration`` or ``integrationx``),
+    but not things likely to fail (marked ``beanstalk failure`` or ``direct_es_query``).
+  * ``make test-integrations`` runs all integration tests (marked ``integration`` or ``integrationx``),
+    but not things likely to fail (marked ``beanstalk failure`` or ``direct_es_query``).
+  * ``make test-direct-es-query`` runs any test marked ``direct_es_query```.
+  * ``test-units-with-coverage`` runs unit tests with the ``coverage`` feature.
+  * ``test-for-ga`` is an indirect way to call ``test-units-with-coverage``, and will be what the GithubActions
+    workflow calls.
+
+* Configurable environmental support for orchestrated C4 applications (Fourfront and CGAP) in ``env_utils``
+  (`C4-689 <https://hms-dbmi.atlassian.net/browse/C4-689>`_).
+
+* Extend that support to allow mirroring to be enabled
+  (`C4-734 <https://hms-dbmi.atlassian.net/browse/C4-734>`_).
+
+The net result is a configurable environment in which the env descriptor in the global env bucket can contain
+these new items:
+
+===============================  ===============================================================================
+    Key                              Notes
+===============================  ===============================================================================
+``"dev_data_set_table"``         Dictionary mapping envnames to their preferred data set
+``"dev_env_domain_suffix"``      e.g., .abc123def456ghi789.us-east-1.rds.amazonaws.com
+``"foursight_bucket_table"``     A table mapping environments to another table mapping chalice stages to buckets
+``"foursight_url_prefix"``       A prefix string for use by foursight.
+``"full_env_prefix"``            A string like "cgap-" that precedes all env names
+``"hotseat_envs"``               A list of environments that are for testing with hot data
+``"indexer_env_name"``           The environment name used for indexing (being phased out)
+``"is_legacy"``                  Should be ``"true"`` if legacy effect is desired, otherwise omitted.
+``"stage_mirroring_enabled"``    Should be ``"true"`` if mirroring is desired, otherwise omitted.
+``"orchestrated_app"``           This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
+``"prd_env_name"``               The name of the prod env
+``"public_url_table"``           Dictionary mapping envnames & pseudo_envnames to public urls
+``"stg_env_name"``               The name of the stage env (or None)
+``"test_envs"``                  A list of environments that are for testing
+``"webprod_pseudo_env"``         The pseudo-env that is a token name to use in place of the prd env for shared
+                                 stg/prd situations, replacing ``fourfront-webprod`` in the legacy system.
+                                 (In orchestrations, this should usually be the same as the ``prd_env_name``.
+                                 It may or may not need to be different if we orchestrate the legacy system.)
+===============================  ===============================================================================
+
+* In ``base``:
+
+  * ``compute_prd_env_for_project``
+  * ``compute_stg_env_for_project``
+  * ``get_env_info`` (replaces ``beanstalk_utils.get_beanstalk_info``)
+  * ``get_env_real_url`` (replaces ``beanstalk_utils.get_beanstalk_real_url``)
+
+* In ``beanstalk_utils``:
+
+  * Removed:
+
+    * ``swap_cname``
+
+    NOTE: This was never invoked by automatic programs, so we didn't do a deprecation stage.
+
+  * Deprecated:
+
+    * ``get_beanstalk_info`` is deprecated. Use ``beanstalk_utils.get_env_info``.
+    * ``get_beanstalk_real_url`` is deprecated. Use ``env_utils.get_env_real_url``.
+
+    NOTE: These continue to work for now, but will be removed in the future.
+    Please update code to use recommended replacement.
+
+* In ``cloudformation_utils``:
+
+  * Added function``discover_foursight_check_runner_name``.
+  * Added function ``tokenify``.
+  * Moved ``DEFAULT_ECOSYSTEM`` to ``cloudformation_utils``. Importing it from this library is now deprecated.
+
+* In ``common``:
+
+  * New variables:
+
+    * ``CHALICE_STAGE_DEV``
+    * ``CHALICE_STAGE_PROD``
+    * ``CHALICE_STAGES``
+    * ``DEFAULT_ECOSYSTEM`` (moved from ``cloudformation_utils``)
+    * ``LEGACY_CGAP_GLOBAL_ENV_BUCKET``
+    * ``LEGACY_GLOBAL_ENV_BUCKET``
+
+  * New type hint (variable):
+
+    * ``ChaliceStage``
+
+* In ``ecr_utils``:
+
+  * Removed ``CGAP_ECR_LAYOUT``.  Use ``ECRUtils.ECR_LAYOUT`` instead.
+  * Deprecated ``CGAP_ECR_REGION``. Use ``ECRUtils.REGION`` or ``common.REGION`` instead.
+
+* In ``ecs_utils``:
+
+  * Added ``ECSUtils.REGION``.
+
+* In ``env_base``:
+
+  * Moved ``EnvBase`` to here from ``s3_utils``.
+  * Added ``s3_utils.s3Base`` (factored out of ``s3_utils.s3Utils``)
+
+* In ``env_utils``:
+
+  * Removed:
+
+    * ``guess_mirror_env``
+    * ``make_env_name_cfn_compatible``
+
+    NOTE: This was not believed to be used anywhere so is presumably no great hardship.
+    (Kent also didn't like the naming, which used a confusing abbreviation.)
+
+  * New functions:
+
+    * ``blue_green_mirror_env``
+    * ``compute_prd_env_for_project``
+    * ``data_set_for_env``
+    * ``ecr_repository_for_env``
+    * ``full_cgap_env_name``
+    * ``full_fourfront_env_name``
+    * ``get_env_from_context``
+    * ``get_env_real_url`` (replaces ``beanstalk_utils.get_beanstalk_real_url``)
+    * ``get_foursight_bucket``
+    * ``get_foursight_bucket_prefix``
+    * ``get_standard_mirror_env``
+    * ``has_declared_stg_env``
+    * ``indexer_env_for_env`` (introduced _and_ deprecated during beta)
+    * ``infer_foursight_from_env``
+    * ``infer_foursight_url_from_env``
+    * ``is_indexer_env`` (introduced _and_ deprecated during beta)
+    * ``is_orchestrated``
+    * ``maybe_get_declared_prd_env_name``
+    * ``permit_load_data``
+
+  * New classes:
+
+    * ``ClassificationParts``
+    * ``EnvNames``
+    * ``EnvUtils``
+    * ``PublicUrlParts``
+
+  * Always erring:
+
+    * ``indexer_env_for_env``
+    * ``is_indexer_env``
+
+    NOTE: These functions unconditionally raise an error indicating that the functionality is no longer available.
+          Their callers must be rewritten, probably in a way that is not a simple substitution.
+
+  * Removed all top-level variables from ``env_utils`` variables, moving them to ``env_utils_legacy``.
+    This includes but is not limited to variables with names starting with ``CGAP_``, ``FF_`` or ``BEANSTALK_``.
+    These are deprecated and should not be used outside of ``dcicutils``.
+    Within ``dcicutils``, they may be used only for testing.
+    All ``env_utils`` functionality should be accessed through functions, not variables.
+
+* In ``exceptions``:
+
+  * ``BeanstalkOperationNotImplemented``
+  * ``EnvUtilsLoadError``
+  * ``IncompleteFoursightBucketTable``
+  * ``LegacyDispatchDisabled``
+  * ``MissingFoursightBucketTable``
+  * ``NotUsingBeanstalksAnyMore``
+
+* Added tech debt by disabling certain tests or marking them for later scrutiny.
+
+  Three new pytest markers were added in ``pytest.ini``:
+
+  * ``beanstalk_failure`` - An obsolete beanstalk-related test that needs fixing
+  * ``direct_es_query`` - A test of direct ES _search that is disabled for now
+    and needs to move inside the firewall
+  * ``stg_or_prd_testing_needs_repair`` - Some or all of a test that was failing on stg/prd
+    has been temporarily disabled
+  * ``recordable`` declares a test to use "recorded" technology so that if ``RECORDING_ENABLED=TRUE``,
+    a new test recording is made
+
+
+3.16.0
+======
+
+* In ``qa_utils``:
+
+  * Extend the mocking so that output to files by ``PRINT`` can be tested
+    by ``with printed_output as printed`` using ``printed.file_last[fp]``
+    and ``printed.file_lines[fp]``.
+
+
+3.15.0
+======
+
+* In ``ecs_utils``:
+  * Adds the ``service_has_active_deployment`` method.
+
+
+3.14.2
+======
+* In ``qa_utils``:
+  * Minor updates related PEP8.
+
+
+3.14.1
+======
+* In ``qa_utils``:
+
+  * New class ``MockBotoS3Iam``.
+  * New class ``MockBotoS3Kms``.
+  * New class ``MockBotoS3OpenSearch``.
+  * New class ``MockBotoS3Sts``.
+  * New method  ``MockBotoS3Session.get_credentials``.
+  * New method ``MockBotoS3Session.put_credentials_for_testing``.
+  * New property ``MockBotoS3Session.region_name``.
+  * New method ``MockBotoS3Session.unset_environ_credentials_for_testing``.
+
+
+3.14.0
+======
+
+* In ``misc_utils``:
+
+  * New function ``key_value_dict``.
+  * New function ``merge_key_value_dict_lists``.
+
+* In ``qa_utils``:
+
+  * Add ``MockBotoS3Client.get_object_tagging``.
+  * Add ``MockBotoS3Client.put_object_tagging``.
+
+* In ``s3_utils``:
+
+  * Add ``s3Utils.get_object_tags``
+  * Add ``s3Utils.set_object_tags``
+  * Add ``s3Utils.set_object_tag``
+
+
+3.13.1
+======
+
+* Fix a bug in ``diff_utils``.
+
+
 3.13.0
 ======
 
@@ -87,22 +762,33 @@ Change Log
 ======
 
 * In ``docker_utils.py``:
+
   * Add ``docker_is_running`` predicate (used by the fix to ``test_ecr_utils_workflow`` to skip that test
     if docker is not running.
+
 * In ``test_ecr_utils.py``:
+
   * Fix ``test_ecr_utils_workflow`` to skip if docker is not enabled.
+
 * In ``test_s3_utils.py``:
+
   * Remove ``test_s3utils_creation_cgap_ordinary`` because there are no more CGAP beanstalks.
   * Revise ``test_regression_s3_utils_short_name_c4_706`` to use ``fourfront-mastertest``
     rather than a CGAP env, since the CGAP beanstalk envs have gone away.
+
 * In ``qa_utils.py``:
+
   * ``MockBoto3Session``.
   * ``MockBoto3SecretsManager`` and support for ``MockBoto3`` to make it.
+
 * In ``secrets_utils.py`` and ``test_secrets_utils.py``:
+
   * Add support for ``SecretsTable``.
   * Add unit tests for existing ``secrets_utils.assume_identity`` and for new ``SecretsTable`` functionality.
+
 * Small cosmetic adjustments to ``Makefile`` to show a timestamp and info about current branch state
   when ``make test`` starts and again when it ends.
+
 * A name containing an underscore will not be shortened by ``short_env_name`` nor lengthened by
   ``full_env_name`` (nor ``full_cgap_env_name`` nor ``full_fourfront_env_name``).
 
@@ -123,7 +809,7 @@ Change Log
 =====
 
 * In ``ecs_utils``:
-  
+
   * No longer throw exception when listing services if <4 are returned
 
 
@@ -303,14 +989,16 @@ Specifics:
 
 * Removes support for previously-deprecated variable ``GOLDEN_DB`` which only ``torb`` was still using.
   ``_FF_GOLDEN_DB`` could be used as a direct replacement in an emergency,
-  but only for legacy environments. This is not a good solution for orchestrated environments (C4-689).
+  but only for legacy environments. This is not a good solution for orchestrated environments
+  (`C4-689 <https://hms-dbmi.atlassian.net/browse/C4-689>`_).
 
 * The variables ``FF_MAGIC_CNAME``, ``CGAP_MAGIC_CNAME``, ``FF_GOLDEN_DB``, and ``CGAP_GOLDEN_DB``,
   which had no uses outside of ``dcicutils`` itself,
   now have underscores ahead of their names to emphasize that they are internal to ``dcicutils`` only.
   ``_FF_MAGIC_CNAME``, ``_CGAP_MAGIC_CNAME``, ``_FF_GOLDEN_DB``, and ``_CGAP_GOLDEN_DB``, respectively,
   could be used as a direct replacement in an emergency,
-  but only for legacy environments. This is not a good solution for orchestrated environments (C4-689).
+  but only for legacy environments. This is not a good solution for orchestrated environments
+  (`C4-689 <https://hms-dbmi.atlassian.net/browse/C4-689>`_).
 
 * The function name ``use_input`` has been renamed ``prompt_for_input`` and the preferred place to
   import it from is now ``misc_utils``, not ``beanstalk_utils``. (This is just a synonym for the
@@ -371,8 +1059,8 @@ Specifics:
 2.3.1
 =====
 
-* In ``s3_utils``, fix C4-706, where short names of environments were not accepted
-  as env arguments to s3Utils in legacy CGAP.
+* In ``s3_utils``, fix `C4-706 <https://hms-dbmi.atlassian.net/browse/C4-706>`_,
+  where short names of environments were not accepted as env arguments to s3Utils in legacy CGAP.
 
 
 2.3.0
@@ -531,7 +1219,7 @@ Specifics:
 2.0.0
 =====
 
-**PR 150: Add json_leaf_subst, conjoined_list and disjoined_list**
+`PR 150: Add json_leaf_subst, conjoined_list and disjoined_list <https://github.com/4dn-dcic/utils/pull/150>`_
 
 We do not believe this is an incompatible major version, but there is a lot here, an hence some opportunity for
 difference in behavior to have crept in. As such, we opted to call this a new major version to highlight where
@@ -630,7 +1318,7 @@ that big change happened.
 1.20.0
 ======
 
-**PR 148: Support auth0 client and secret in deployment_utils**
+`PR 148: Support auth0 client and secret in deployment_utils <https://github.com/4dn-dcic/utils/pull/148>`_
 
 * In ``deployment_utils``, add support for managing auth0 client and secret:
 
@@ -649,8 +1337,8 @@ that big change happened.
 1.19.0
 ======
 
-**PR 147: Init s3Utils via GLOBAL_ENV_BUCKET and misc S3_BUCKET_ORG support (C4-554)**
-**PR 146: Better S3 bucket management in deployment_utils**
+`PR 147: Init s3Utils via GLOBAL_ENV_BUCKET and misc S3_BUCKET_ORG support (C4-554) <https://github.com/4dn-dcic/utils/pull/147>`_
+`PR 146: Better S3 bucket management in deployment_utils <https://github.com/4dn-dcic/utils/pull/146>`_
 
 * In ``cloudformation_utils``:
 
@@ -660,52 +1348,52 @@ that big change happened.
 
 * In ``deployment_utils``:
 
-   * Add environment variables that can be set per stack/instance:
+  * Add environment variables that can be set per stack/instance:
 
-     * ``ENCODED_S3_BUCKET_ORG`` - a unique token for your organization to be used in auto-generating S3 bucket orgs.
-       The defaulted value (which includes possible override by a ``--s3_bucket_org`` argument in the generator command)
-       will be usable as ``${S3_BUCKET_ORG}`` in ``.ini`` file templates.
+    * ``ENCODED_S3_BUCKET_ORG`` - a unique token for your organization to be used in auto-generating S3 bucket orgs.
+      The defaulted value (which includes possible override by a ``--s3_bucket_org`` argument in the generator command)
+      will be usable as ``${S3_BUCKET_ORG}`` in ``.ini`` file templates.
 
-     * ``ENCODED_S3_BUCKET_ENV`` - a unique token for your organization to be used in auto-generating S3 bucket names.
-       The defaulted value (which includes possible override by a ``--s3_bucket_env`` argument in the generator command)
-       will be usable as ``${S3_BUCKET_ENV}`` in ``.ini`` file templates.
+    * ``ENCODED_S3_BUCKET_ENV`` - a unique token for your organization to be used in auto-generating S3 bucket names.
+      The defaulted value (which includes possible override by a ``--s3_bucket_env`` argument in the generator command)
+      will be usable as ``${S3_BUCKET_ENV}`` in ``.ini`` file templates.
 
-     * ``ENCODED_FILE_UPLOAD_BUCKET`` - the name of the file upload bucket to use if a ``--file_upload_bucket`` argument
-       is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-files``
-       is not desired. This fully defaulted value will be available as ``${FILE_UPLOAD_BUCKET}`` in ``.ini`` file
-       templates, and is the recommended way to compute the proper value for the ``file_upload_bucket`` configuration
-       parameter.
+    * ``ENCODED_FILE_UPLOAD_BUCKET`` - the name of the file upload bucket to use if a ``--file_upload_bucket`` argument
+      is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-files``
+      is not desired. This fully defaulted value will be available as ``${FILE_UPLOAD_BUCKET}`` in ``.ini`` file
+      templates, and is the recommended way to compute the proper value for the ``file_upload_bucket`` configuration
+      parameter.
 
-     * ``ENCODED_FILE_WFOUT_BUCKET`` - the name of the file wfout bucket to use if a ``--file_wfout_bucket`` argument
+    * ``ENCODED_FILE_WFOUT_BUCKET`` - the name of the file wfout bucket to use if a ``--file_wfout_bucket`` argument
       is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-wfoutput``
       is not desired. This fully defaulted value will be available as ``${FILE_WFOUT_BUCKET}`` in ``.ini`` file
-       templates, and is the recommended way to compute the proper value for the ``file_wfout_bucket`` configuration
-       parameter.
+      templates, and is the recommended way to compute the proper value for the ``file_wfout_bucket`` configuration
+      parameter.
 
-     * ``ENCODED_BLOB_BUCKET`` - the name of the blob bucket to use if a ``--blob_bucket`` argument
-       is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-blobs``
-       is not desired. This fully defaulted value will be available as ``${BLOB_BUCKET}`` in ``.ini`` file
-       templates, and is the recommended way to compute the proper value for the ``blob_bucket`` configuration
-       parameter.
+    * ``ENCODED_BLOB_BUCKET`` - the name of the blob bucket to use if a ``--blob_bucket`` argument
+      is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-blobs``
+      is not desired. This fully defaulted value will be available as ``${BLOB_BUCKET}`` in ``.ini`` file
+      templates, and is the recommended way to compute the proper value for the ``blob_bucket`` configuration
+      parameter.
 
-     * ``ENCODED_SYSTEM_BUCKET`` - the name of the system bucket to use if a ``--system_bucket`` argument
-       is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-system``
-       is not desired. This fully defaulted value will be available as ``${SYSTEM_BUCKET}`` in ``.ini`` file
-       templates, and is the recommended way to compute the proper value for the ``system_bucket`` configuration
-       parameter.
+    * ``ENCODED_SYSTEM_BUCKET`` - the name of the system bucket to use if a ``--system_bucket`` argument
+      is not given in the generator command, and the default of ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-system``
+      is not desired. This fully defaulted value will be available as ``${SYSTEM_BUCKET}`` in ``.ini`` file
+      templates, and is the recommended way to compute the proper value for the ``system_bucket`` configuration
+      parameter.
 
-     * ``ENCODED_METADATA_BUNDLES_BUCKET`` - the name of the metadata bundles bucket to use if a
-       ``--metadata_bundles_bucket`` argument is not given in the generator command, and the default of
-       ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-metadata-bundles`` is not desired. This fully defaulted value will be
-       available as ``${METADATA_BUNDLES_BUCKET}`` in ``.ini`` file
-       templates, and is the recommended way to compute the proper value for the ``metadata_bundles_bucket`` configuration
-       parameter.
+    * ``ENCODED_METADATA_BUNDLES_BUCKET`` - the name of the metadata bundles bucket to use if a
+      ``--metadata_bundles_bucket`` argument is not given in the generator command, and the default of
+      ``${S3_BUCKET_ORG}-${S3_BUCKET_ENV}-metadata-bundles`` is not desired. This fully defaulted value will be
+      available as ``${METADATA_BUNDLES_BUCKET}`` in ``.ini`` file
+      templates, and is the recommended way to compute the proper value for the ``metadata_bundles_bucket`` configuration
+      parameter.
 
-     * Fixed a bug that the index_server argument was not being correctly passed into lower level functions when
-       ``--index_server`` was specified on the command line.
+    * Fixed a bug that the index_server argument was not being correctly passed into lower level functions when
+      ``--index_server`` was specified on the command line.
 
-     * Fixed a bug where passing no ``--encoded_data_set`` but an explicit null-string value of the environment variable
-       ``ENCODED_DATA_SET`` did not lead to further defaulting in some circumstances.
+    * Fixed a bug where passing no ``--encoded_data_set`` but an explicit null-string value of the environment variable
+      ``ENCODED_DATA_SET`` did not lead to further defaulting in some circumstances.
 
   * In ``ff_utils``:
 
@@ -734,7 +1422,7 @@ that big change happened.
 1.18.1
 ======
 
-**PR 145: Fix internal import problems**
+`PR 145: Fix internal import problems <https://github.com/4dn-dcic/utils/pull/145>`_
 
 * Make ``lang_utils`` import ``ignored`` from ``misc_utils``, not ``qa_utils``.
 * Make ``deployment_utils`` import ``override_environ`` from ``misc_utils``, not ``qa_utils``.
@@ -745,7 +1433,7 @@ that big change happened.
 1.18.0
 ======
 
-**PR 141: Port Application Dockerization utils**
+`PR 141: Port Application Dockerization utils <https://github.com/4dn-dcic/utils/pull/141>`_
 
 * Add additional ECS related APIs needed for orchestration/deployment.
 
@@ -753,7 +1441,7 @@ that big change happened.
 1.17.0
 ======
 
-**PR 144: Add known_bug_expected and related support**
+`PR 144: Add known_bug_expected and related support <https://github.com/4dn-dcic/utils/pull/144>`_
 
 * In ``misc_utils``:
 
@@ -781,7 +1469,7 @@ that big change happened.
 1.16.0
 ======
 
-**PR 142: Move override_environ and override_dict to misc_utils**
+`PR 142: Move override_environ and override_dict to misc_utils <https://github.com/4dn-dcic/utils/pull/142>`_
 
 * In ``misc_utils``:
 
@@ -802,7 +1490,7 @@ that big change happened.
 1.15.1
 ======
 
-**PR 138: JH Docker Mount Update**
+`PR 138: JH Docker Mount Update <https://github.com/4dn-dcic/utils/pull/138>`_
 
 * In ``jh_utils.find_valid_file_or_extra_file``,
   account for file metadata containing an
@@ -812,7 +1500,7 @@ that big change happened.
 1.15.0
 ======
 
-**PR 140: Add misc_utils.is_valid_absolute_uri (C4-651)**
+`PR 140: Add misc_utils.is_valid_absolute_uri (C4-651) <https://github.com/4dn-dcic/utils/pull/140>`_
 
 * Adds ``misc_utils.is_valid_absolute_uri``
   for RFC 3986 compliance.
@@ -821,7 +1509,7 @@ that big change happened.
 1.14.1
 ======
 
-**PR 139: Add ES cluster resize capability**
+`PR 139: Add ES cluster resize capability <https://github.com/4dn-dcic/utils/pull/139>`_
 
 * Adds ElasticSearchServiceClient, a wrapper for boto3.client('es')
 * Implements resize_elasticsearch_cluster, issuing an update to the relevant settings
@@ -832,7 +1520,7 @@ that big change happened.
 1.14.0
 ======
 
-**PR 137: Docker, ECR, ECS Utils**
+`PR 137: Docker, ECR, ECS Utils <https://github.com/4dn-dcic/utils/pull/137>`_
 
 * Adds 3 new modules with basic functionality needed for further development on the alpha stack
 * Deprecates Python 3.4
@@ -841,7 +1529,7 @@ that big change happened.
 1.13.0
 ======
 
-**PR 136: Support for VirtualApp.post**
+`PR 136: Support for VirtualApp.post <https://github.com/4dn-dcic/utils/pull/136>`_
 
 * Add a ``post`` method to ``VirtualApp`` for situations where ``post_json``
   is not appropriate.
@@ -851,7 +1539,7 @@ that big change happened.
 1.12.0
 ======
 
-**PR 135: Support for ElasticSearchDataCache**
+`PR 135: Support for ElasticSearchDataCache <https://github.com/4dn-dcic/utils/pull/135>`_
 
 * Support for ``ElasticSearchDataCache`` and the ``es_data_cache`` decorator
   in the new ``snapshot_utils`` module to allow local snapshot isolation on
@@ -880,7 +1568,7 @@ that big change happened.
 1.11.2
 ======
 
-**PR 134: Fixes to env_utils.data_set_for_env for CGAP (C4-634)**
+`PR 134: Fixes to env_utils.data_set_for_env for CGAP (C4-634) <https://github.com/4dn-dcic/utils/pull/134>`_
 
 * Fix ``env_utils.data_set_for_env`` which were returning ``'test'``
   for ``fourfront-cgapwolf`` and ``fourfront-cgaptest``.
@@ -890,7 +1578,7 @@ that big change happened.
 1.11.1
 ======
 
-**PR 133: Fix ControlledTime.utcnow on AWS (C4-623)**
+`PR 133: Fix ControlledTime.utcnow on AWS (C4-623) <https://github.com/4dn-dcic/utils/pull/133>`_
 
 * Fix ``qa_utils.ControlledTime.utcnow`` on AWS (C4-623).
 
@@ -898,7 +1586,7 @@ that big change happened.
 1.11.0
 ======
 
-**PR 132: Miscellaneous support for cgap-portal, and some unit testing (part of C4-601)**
+`PR 132: Miscellaneous support for cgap-portal, and some unit testing (part of C4-601) <https://github.com/4dn-dcic/utils/pull/132>`_
 
 * For ``jh_utils``:
 
@@ -918,7 +1606,7 @@ that big change happened.
 1.10.0
 ======
 
-**PR 131: Misc functionality in service of C4-183**
+`PR 131: Misc functionality in service of C4-183 <https://github.com/4dn-dcic/utils/pull/131>`_
 
 * In ``dcicutils.misc_utils``:
 
@@ -930,7 +1618,7 @@ that big change happened.
 
 1.9.2
 =====
-**PR 130: Fix bug that sometimes results in duplicated search results (C4-336)**
+`PR 130: Fix bug that sometimes results in duplicated search results (C4-336) <https://github.com/4dn-dcic/utils/pull/130>`_
 
 * Fixes bug C4-336, in which sometimes ``ff_utils.search_metadata``, by doing a series of
   Elastic Search calls that it pastes together into a single result,
@@ -940,7 +1628,7 @@ that big change happened.
 1.9.1
 =====
 
-**PR 129: Fix problematic pytest dependency (C4-521)**
+`PR 129: Fix problematic pytest dependency (C4-521) <https://github.com/4dn-dcic/utils/pull/129>`_
 
 * Fix problem in 1.9.0 with unwanted dependency on
   ``pytest.PytestConfigWarning`` (C4-521).
@@ -951,7 +1639,7 @@ that big change happened.
 1.9.0
 =====
 
-**PR 128: Changelog Warnings (C4-511) and Publish Fixes (C4-512)**
+`PR 128: Changelog Warnings (C4-511) and Publish Fixes (C4-512) <https://github.com/4dn-dcic/utils/pull/128>`_
 
 * Make changelog problems issue a warning rather than fail testing.
 * Make publication for GitHub Actions (GA) not query interactively for confirmation.
@@ -968,52 +1656,58 @@ Those tests were refactored, and the following additional support was added:
 1.8.4
 =====
 
-**PR 127: Beanstalk Bugfix**
+`PR 127: Beanstalk Bugfix <https://github.com/4dn-dcic/utils/pull/127>`_
 
 * Parses Beanstalk API correctly and passes region.
+
 
 1.8.3
 =====
 
 **No PR: Just fixes to GA PyPi deploy**
 
+
 1.8.2
 =====
 
-**PR 126: C4-503 Grab Environment API**
+`PR 126: C4-503 Grab Environment API <https://github.com/4dn-dcic/utils/pull/126>`_
 
 * Adds get_beanstalk_environment_variables, which will return information
   necessary to simulate any application given the caller has the appropriate
   access keys.
 * Removes an obsolete tag from create_db_snapshot, which was set erroneously.
 
+
 1.8.1
 =====
 
-**PR 125: Edits to getting_started doc**
+`PR 125: Edits to getting_started doc <https://github.com/4dn-dcic/utils/pull/125>`_
 
 * Edited getting_started.rst doc to reflect updated account creation protocol.
+
 
 1.8.0
 =====
 
-**PR 124: Add url_path_join**
+`PR 124: Add url_path_join <https://github.com/4dn-dcic/utils/pull/124>`_
 
 * Add ``misc_utils.url_path_join`` for merging parts of URLs.
 * Add ``make retest`` to rerun failed tests from previous test run.
 
+
 1.7.1
 =====
 
-**PR 123: Add GA for build**
+`PR 123: Add GA for build <https://github.com/4dn-dcic/utils/pull/123>`_
 
 * Adds 3 Github Actions for building the library, building docs
   and deploying to PyPi
 
+
 1.7.0
 =====
 
-**PR 122: Speed up ff_utils unit tests, and misc small bits of functionality**
+`PR 122: Speed up ff_utils unit tests, and misc small bits of functionality <https://github.com/4dn-dcic/utils/pull/122>`_
 
 * Added an ``integratedx`` mark to possible marks in ``pytest.ini``. These
   are the same as ``integrated`` but they represent test cases that have
@@ -1062,11 +1756,11 @@ Those tests were refactored, and the following additional support was added:
 1.6.0
 =====
 
-**PR 121: More time functions**
+`PR 121: More time functions <https://github.com/4dn-dcic/utils/pull/121>`_
 
 In ``misc_utils``:
 
-* Fix ``as_datetime`` to raise an error on bad input, allowing `raise_error=False`
+* Fix ``as_datetime`` to raise an error on bad input, allowing ``raise_error=False``
   to suppress that if needed.
 * Add ``as_ref_datetime`` to convert times to the reference timezone (US/Eastern by default).
 * Add ``as_utc_datetime`` to convert times to UTC.
@@ -1081,7 +1775,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.5.1
 =====
 
-**PR 120: Update ES-py Version**
+`PR 120: Update ES-py Version <https://github.com/4dn-dcic/utils/pull/120>`_
 
 * Updates elasticsearch library to 6.8.1 to take a bug fix.
 
@@ -1089,7 +1783,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.5.0
 =====
 
-**PR 119: More env_utils support**
+`PR 119: More env_utils support** <https://github.com/4dn-dcic/utils/pull/119>`_
 
 * Add ``env_utils.classify_server_url``.
 
@@ -1097,7 +1791,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.4.0
 =====
 
-**PR 118: Various bits of functionality in support of 4dn-status (C4-363)**
+`PR 118: Various bits of functionality in support of 4dn-status (C4-363) <https://github.com/4dn-dcic/utils/pull/118>`_
 
 * New feature in ``qa_utils``:
 
@@ -1119,7 +1813,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.3.1
 =====
 
-**PR 117: Repair handling of sentry_dsn in deployment_utils (C4-361)**
+`PR 117: Repair handling of sentry_dsn in deployment_utils (C4-361) <https://github.com/4dn-dcic/utils/pull/117>`_
 
 * Fixes to ``deployment_utils``:
 
@@ -1141,7 +1835,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.3.0
 =====
 
-**PR 115: Miscellaneous fixes 2020-10-06**
+`PR 115: Miscellaneous fixes 2020-10-06 <https://github.com/4dn-dcic/utils/pull/115>`_
 
 * Fix a lurking bug in ``beanstalk_utils`` where ``delete_db`` had the wrong scope.
 * Add ``qa_utils.raises_regexp`` for conceptual compatibility with ``AssertRaises`` in ``unittest``.
@@ -1161,7 +1855,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.2.1
 =====
 
-**PR 114: Port some utility**
+`PR 114: Port some utility <https://github.com/4dn-dcic/utils/pull/114>`_
 
 * New ``ff_utils`` functions
   for common pages/info we'd like to obtain:
@@ -1175,7 +1869,7 @@ The rationale for these changes is that if we deploy at other locations, it may 
 1.2.0
 =====
 
-**PR 113: Deprecations, updates + CNAME swap**
+`PR 113: Deprecations, updates + CNAME swap <https://github.com/4dn-dcic/utils/pull/113>`_
 
 * Implements an ``obsolete`` decorator,
   applied to many functions in ``beanstalk_utils``.
@@ -1183,7 +1877,8 @@ The rationale for these changes is that if we deploy at other locations, it may 
   that do not work with ES6
 * Pull full ``CNAME`` swap code from ``Torb`` into ``dcicutils``.
 
-**PR 112: Miscellaneous utilities ported from cgap-portal and SubmitCGAP repos**
+
+`PR 112: Miscellaneous utilities ported from cgap-portal and SubmitCGAP repos <https://github.com/4dn-dcic/utils/pull/112>`_
 
 This still has a beta version number 1.1.0b1.
 
@@ -1198,7 +1893,8 @@ Ported functionality from ``cgap-portal`` and ``SubmitCGAP`` repos:
   argument without calling ``len``.
 * Tests for ``misc_utils.VirtualApp.put_json``.
 
-**PR 111: ES6 - Fix create_es_client**
+
+`PR 111: ES6 - Fix create_es_client <https://github.com/4dn-dcic/utils/pull/111>`_
 
 This is a major change, with beta version number 1.0.0.b1:
 
@@ -1208,7 +1904,7 @@ This is a major change, with beta version number 1.0.0.b1:
 0.41.0
 ======
 
-**PR 110: Add VirtualApp.put_json (C4-272)**
+`PR 110: Add VirtualApp.put_json (C4-272) <https://github.com/4dn-dcic/utils/pull/110>`_
 
 * Add ``misc_utils.VirtualApp.put_json``.
 
@@ -1219,10 +1915,12 @@ Older Versions
 A record of older changes can be found
 `in GitHub <https://github.com/4dn-dcic/utils/pulls?q=is%3Apr+is%3Aclosed>`_.
 To find the specific version numbers, see the ``version`` value in
-the ``poetry.app`` section of ``pyproject.toml``, as in::
+the ``poetry.app`` section of ``pyproject.toml`` for the corresponding change, as in::
 
    [poetry.app]
    name = "dcicutils"
    version = "100.200.300"
    ...etc.
 
+
+This would correspond with ``dcicutils 100.200.300``.
