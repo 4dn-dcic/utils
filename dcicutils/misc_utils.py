@@ -569,6 +569,11 @@ def apply_dict_overrides(dictionary: dict, **overrides) -> dict:
     return dictionary
 
 
+def utc_now_str():
+    # from jsonschema_serialize_fork date-time format requires a timezone
+    return datetime.datetime.utcnow().isoformat() + '+00:00'
+
+
 def utc_today_str():
     """Returns a YYYY-mm-dd date string, relative to the UTC timezone."""
     return datetime.datetime.strftime(datetime.datetime.utcnow(), "%Y-%m-%d")
