@@ -12,6 +12,7 @@ import io
 import os
 import logging
 import pytz
+import re
 import rfc3986.validators
 import rfc3986.exceptions
 import time
@@ -1314,6 +1315,17 @@ def string_list(s):
     if not isinstance(s, str):
         raise ValueError(f"Not a string: {s!r}")
     return [p for p in [part.strip() for part in s.split(",")] if p]
+
+
+def is_c4_arn(arn: str) -> bool:
+    """
+    Returns True iff the given (presumed) AWS ARN string value looks like it
+    refers to a CGAP or Fourfront Cloudformation entity, otherwise returns False.
+    :param arn: String representing an AWS ARN.
+    :return: True if the given ARN refers to a CGAP or Fourfront Cloudformation entity, else False.
+    """
+    pattern = r"(fourfront|cgap|[:/]c4-)"
+    return True if re.search(pattern, arn) else False
 
 
 def string_md5(unicode_string):

@@ -28,7 +28,7 @@ from dcicutils.misc_utils import (
     _is_function_of_exactly_one_required_arg, _apply_decorator,  # noQA
     string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, lines_printed_to,
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
-    ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values
+    ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -1419,7 +1419,7 @@ def test_check_true():
     msg = "x is not a list of four, five, and six."
     with pytest.raises(RuntimeError) as e:
         check_true(x == [4, 5, 6], msg)
-    assert msg in str(e)
+    assert msg in str(e.value)
 
 
 def test_remove_element():
@@ -3157,6 +3157,20 @@ def test_dict_to_keys_and_values():
     assert kv == [{"name": "abc", "value": "def"}, {"name": "ghi", "value": "jkl"}]
 
     assert dict_to_keys_and_values({}) == []
+
+
+def test_is_c4_arn():
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-cgap-production-stack-Productionblue-fzOm82DGZKGZ')
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-cgap-production-stack-CgapProductionblue-fzOm82DGZKGZ')
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-fourfront-hotseat-stack-Hotseat-ZnIAAAz8Apxf')
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-fourfront-production-stack-FourfrontProd-hU0JiwOeWfdm')
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/c4-ecs-abc-webdev-stack-CgapWebdev-rSLwZBbdVTtx')
+    assert is_c4_arn('arn:aws:ecs:us-east-1:643:cluster:c4-ecs-def-mastertest-stack-FourfrontMaster-O25WVcRMpExr')
+    assert not is_c4_arn('arn:aws:ecs:us-east-1:643:cluster-c4-ecs-def-mastertest-stack-FourfrontMaster-O25WVcRMpExr')
+    assert not is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/default')
+    assert not is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/xyzzy-c4-default')
+    assert not is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/xyzzyasdfc4-default')
+    assert not is_c4_arn('arn:aws:ecs:us-east-1:643:cluster/xyzzy:-c4-default')
 
 
 class TestTopologicalSorter:
