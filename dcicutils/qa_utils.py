@@ -585,14 +585,17 @@ class _PrintCapturer:
     """
 
     def __init__(self):
-        self.reset()
+        self.lines: List[str] = []
+        self.last: Optional[str] = None
+        self.file_lines: DefaultDict[Optional[str], List[str]] = self._file_lines_dict()
+        self.file_last: DefaultDict[Optional[str], Optional[str]] = self._file_last_dict()
 
     @classmethod
-    def _file_lines_dict(cls) -> DefaultDict[str, List[str]]:
+    def _file_lines_dict(cls) -> DefaultDict[Optional[str], List[str]]:
         return defaultdict(lambda: [])
 
     @classmethod
-    def _file_last_dict(cls) -> DefaultDict[str, Optional[str]]:
+    def _file_last_dict(cls) -> DefaultDict[Optional[str], Optional[str]]:
         return defaultdict(lambda: None)
 
     def mock_print_handler(self, *args, **kwargs):
@@ -622,11 +625,10 @@ class _PrintCapturer:
         self.file_last[file] = text
 
     def reset(self):
-        self.lines: List[str] = []
-        self.last: Optional[str] = None
-        self.file_lines: DefaultDict[str, List[str]] = self._file_lines_dict()
-        self.file_last: DefaultDict[str, Optional[str]] = self._file_last_dict()
-
+        self.lines = []
+        self.last = None
+        self.file_lines = self._file_lines_dict()
+        self.file_last = self._file_last_dict()
 
 
 @contextlib.contextmanager
