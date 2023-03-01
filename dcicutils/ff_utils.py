@@ -242,9 +242,8 @@ def internal_compute_authorized_request(url, *, auth, ff_env, verb, retry_fxn, *
     if 'timeout' not in kwargs:
         kwargs['timeout'] = 60  # default timeout
 
-    verb_upper = verb
+    verb_upper = verb.upper()
     try:
-        verb_upper = verb.upper()
         the_verb = REQUESTS_VERBS[verb_upper]
     except KeyError:
         raise ValueError(f"Provided verb {verb} is not valid. Must be one of {disjoined_list(REQUESTS_VERBS)}.")
@@ -1272,7 +1271,8 @@ class UnifiedAuthenticator:
     @classmethod
     def normalize_auth(cls, auth):
         if isinstance(auth, dict) and 'key' in auth and 'secret' in auth:
-            return (auth['key'], auth['secret'])
+            return (auth['key'],
+                    auth['secret'])
         elif isinstance(auth, tuple) and len(auth) == 2:
             return auth
         else:
@@ -1280,7 +1280,6 @@ class UnifiedAuthenticator:
 
 
 unified_authentication = UnifiedAuthenticator.unified_authentication
-
 
 
 def get_authentication_with_server(auth=None, ff_env=None):

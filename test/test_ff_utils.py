@@ -265,7 +265,7 @@ def test_unified_authenticator_normalize_auth():
     assert ff_utils.UnifiedAuthenticator.normalize_auth(key_dict) == key_tuple
 
     # Things that don't match the format just cause None to be returned.
-    assert ff_utils.UnifiedAuthenticator.normalize_auth(666) == None
+    assert ff_utils.UnifiedAuthenticator.normalize_auth(666) is None
 
 # moved to ff_mocks.py
 #
@@ -309,15 +309,19 @@ def test_unified_authentication_unit():
         # Check that the auth dict fetched from server is canonicalized to an auth tuple...
         assert auth5 == ts.bar_env_auth_tuple
 
-        with raises_regexp(ValueError, "Must provide a valid authorization key or ff environment."):
+        with raises_regexp(ff_utils.UnifiedAuthenticator.AuthenticationError,
+                           "Must provide a valid authorization key or ff environment."):
             # The .unified_authentication operation checks that an auth given as a tuple has length 2.
             ff_utils.unified_authentication(ts.some_badly_formed_auth_tuple, ts.foo_env)
 
-        with raises_regexp(ValueError, "Must provide a valid authorization key or ff environment."):
+        with raises_regexp(ff_utils.UnifiedAuthenticator.AuthenticationError,
+                           "Must provide a valid authorization key or ff environment."):
             # The .unified_authentication operation checks that an auth given as a dict has keys 'key' and 'secret'.
             ff_utils.unified_authentication(ts.some_badly_formed_auth_dict, ts.foo_env)
 
-        with raises_regexp(ValueError, "Must provide a valid authorization key or ff environment."):
+        with raises_regexp(ff_utils.UnifiedAuthenticator.AuthenticationError,
+                           "unified_authentication requires either auth or an ff_env."
+                           " You gave auth=None, ff_env=None"):
             # If the first arg (auth) is None, the second arg (ff_env) must not be.
             ff_utils.unified_authentication(None, None)
 
