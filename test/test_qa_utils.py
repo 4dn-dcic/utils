@@ -1,20 +1,27 @@
+import logging
+
+import boto3
 import datetime
 import io
 import os
+import platform
 import pytest
 import pytz
 import re
 import subprocess
+import sys
 import time
 import uuid
 
 from dcicutils import qa_utils
-from dcicutils.misc_utils import Retry, PRINT, file_contents
+from dcicutils.exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix
+from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ
 from dcicutils.qa_utils import (
-    mock_not_called, local_attrs, override_environ, override_dict, show_elapsed_time, timed,
-    ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule,
-    MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3,
-    raises_regexp, VersionChecker, check_duplicated_items_by_key,
+    mock_not_called, override_environ, override_dict, show_elapsed_time, timed,
+    ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
+    MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
+    raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
+    logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -23,6 +30,9 @@ from .fixtures.sample_fixtures import MockMathError, MockMath, math_enabled
 
 
 notice_pytest_fixtures(math_enabled)   # Use care if editing this line. It is PART OF A TEST.
+
+
+logger = logging.getLogger(__name__)
 
 
 def test_mock_not_called():
@@ -35,123 +45,6 @@ def test_mock_not_called():
         assert m, "Expected assertion text did not appear."
     else:
         raise AssertionError("An AssertionError was not raised.")
-
-
-NORMAL_ATTR0 = 16
-NORMAL_ATTR1 = 17
-NORMAL_ATTR2 = 'foo'
-NORMAL_ATTR3 = 'bar'
-
-OVERRIDDEN_ATTR0 = 61
-OVERRIDDEN_ATTR1 = 71
-OVERRIDDEN_ATTR2 = 'oof'
-OVERRIDDEN_ATTR3 = 'rab'
-
-
-def test_dynamic_properties():
-
-    def test_thing(test_obj):
-
-        assert test_obj.attr0 == NORMAL_ATTR0
-        assert test_obj.attr1 == NORMAL_ATTR1
-        assert test_obj.attr2 == NORMAL_ATTR2
-        assert test_obj.attr3 == NORMAL_ATTR3
-
-        # attrs = ['attr0', 'attr1', 'attr2', 'attr3']
-
-        # If this were done wrong, we'd bind an inherited attribute
-        # and then when we put things back it would become an instance
-        # attribute, so we remember what things were originally
-        # instance attributes so that we can check later.
-        old_attr_dict = test_obj.__dict__.copy()
-
-        # Test of the ordinary case.
-        with local_attrs(test_obj, attr0=OVERRIDDEN_ATTR0, attr2=OVERRIDDEN_ATTR2):
-            assert test_obj.attr0 == OVERRIDDEN_ATTR0
-            assert test_obj.attr1 == NORMAL_ATTR1
-            assert test_obj.attr2 == OVERRIDDEN_ATTR2
-            assert test_obj.attr3 == NORMAL_ATTR3
-        assert test_obj.attr0 == NORMAL_ATTR0
-        assert test_obj.attr1 == NORMAL_ATTR1
-        assert test_obj.attr2 == NORMAL_ATTR2
-        assert test_obj.attr3 == NORMAL_ATTR3
-
-        assert test_obj.__dict__ == old_attr_dict
-
-        # Another test of the ordinary case.
-        with local_attrs(test_obj, attr0=OVERRIDDEN_ATTR0, attr1=OVERRIDDEN_ATTR1,
-                         attr2=OVERRIDDEN_ATTR2, attr3=OVERRIDDEN_ATTR3):
-            assert test_obj.attr0 == OVERRIDDEN_ATTR0
-            assert test_obj.attr1 == OVERRIDDEN_ATTR1
-            assert test_obj.attr2 == OVERRIDDEN_ATTR2
-            assert test_obj.attr3 == OVERRIDDEN_ATTR3
-        assert test_obj.attr0 == NORMAL_ATTR0
-        assert test_obj.attr1 == NORMAL_ATTR1
-        assert test_obj.attr2 == NORMAL_ATTR2
-        assert test_obj.attr3 == NORMAL_ATTR3
-
-        # Test case of raising an error and assuring things are still set to normal
-        try:
-            with local_attrs(test_obj, attr0=OVERRIDDEN_ATTR0, attr2=OVERRIDDEN_ATTR2):
-                assert test_obj.attr0 == NORMAL_ATTR0
-                assert test_obj.attr1 == NORMAL_ATTR1
-                assert test_obj.attr2 == NORMAL_ATTR2
-                assert test_obj.attr3 == NORMAL_ATTR3
-                raise Exception("This is expected to be caught.")
-        except Exception:
-            pass
-        assert test_obj.attr0 == NORMAL_ATTR0
-        assert test_obj.attr1 == NORMAL_ATTR1
-        assert test_obj.attr2 == NORMAL_ATTR2
-        assert test_obj.attr3 == NORMAL_ATTR3
-
-        # Test case of no attributes set at all
-        with local_attrs(object):
-            assert test_obj.attr0 == NORMAL_ATTR0
-            assert test_obj.attr1 == NORMAL_ATTR1
-            assert test_obj.attr2 == NORMAL_ATTR2
-            assert test_obj.attr3 == NORMAL_ATTR3
-        assert test_obj.attr0 == NORMAL_ATTR0
-        assert test_obj.attr1 == NORMAL_ATTR1
-        assert test_obj.attr2 == NORMAL_ATTR2
-        assert test_obj.attr3 == NORMAL_ATTR3
-
-    class Foo:
-        attr0 = NORMAL_ATTR0
-        attr1 = NORMAL_ATTR1
-
-        def __init__(self):
-            self.attr2 = NORMAL_ATTR2
-            self.attr3 = NORMAL_ATTR3
-
-    with pytest.raises(ValueError):
-        # Binding attr1 would affect other instances.
-        test_thing(Foo())
-
-    class Bar:
-        def __init__(self):
-            self.attr0 = NORMAL_ATTR0
-            self.attr1 = NORMAL_ATTR1
-            self.attr2 = NORMAL_ATTR2
-            self.attr3 = NORMAL_ATTR3
-
-    test_thing(Bar())
-
-    class Baz:
-        attr0 = NORMAL_ATTR0
-        attr1 = NORMAL_ATTR1
-        attr2 = NORMAL_ATTR2
-        attr3 = NORMAL_ATTR3
-
-    test_thing(Baz)
-
-    with pytest.raises(ValueError):
-        # Binding attr1 would affect other instances.
-        test_thing(Baz())
-
-    for thing in [3, "foo", None]:
-        with local_attrs(thing):
-            pass  # Just make sure no error occurs when no attributes given
 
 
 def test_override_dict():
@@ -279,6 +172,55 @@ def test_override_environ():
     assert unique_prop3 not in os.environ
 
 
+class MockLocalTimezone:  # Technically should return pytz.tzinfo but doesn't
+
+    def __init__(self, summer_tz, winter_tz):
+        self._summer_tz = summer_tz
+        self._winter_tz = winter_tz
+
+    def tzname(self, dt: datetime.datetime):
+        # The exact time that daylight time runs varies from year to year. For testing we'll say that
+        # daylight time is April 1 to Oct 31.  In practice, we recommend times close to Dec 31 for winter
+        # and Jun 30 for summer, so the precise transition date doesn't matter. -kmp 9-Mar-2021
+        if 3 < dt.month < 11:
+            return self._summer_tz
+        else:
+            return self._winter_tz
+
+
+def test_guess_local_timezone_for_testing_contextually():
+
+    if platform.system() == 'Darwin':
+        assert guess_local_timezone_for_testing() == REF_TZ
+    else:
+        assert guess_local_timezone_for_testing() == pytz.UTC
+
+
+def test_guess_local_timezone_for_testing():
+
+    with mock.patch.object(qa_utils.dateutil_tz, "tzlocal") as mock_tzlocal:  # noQA
+
+        mock_tzlocal.side_effect = lambda: MockLocalTimezone(summer_tz='GMT', winter_tz='GMT')
+        assert guess_local_timezone_for_testing() == pytz.UTC
+
+        mock_tzlocal.side_effect = lambda: MockLocalTimezone(summer_tz='EDT', winter_tz='EST')
+        guess = guess_local_timezone_for_testing()
+        assert guess == pytz.timezone("US/Eastern")
+
+        mock_tzlocal.side_effect = lambda: MockLocalTimezone(summer_tz='MST', winter_tz='MST')
+        guess = guess_local_timezone_for_testing()
+        assert guess == pytz.timezone("MST")
+
+        mock_tzlocal.side_effect = lambda: MockLocalTimezone(summer_tz='CEST', winter_tz='CET')
+        guess = guess_local_timezone_for_testing()
+        assert guess == pytz.timezone("CET")
+
+        with pytest.raises(Exception):
+            # Unknown times that disagree will fail.
+            mock_tzlocal.side_effect = lambda: MockLocalTimezone(summer_tz='GMT', winter_tz='BST')
+            guess_local_timezone_for_testing()
+
+
 def test_controlled_time_creation():
 
     t = ControlledTime()
@@ -297,11 +239,37 @@ def test_controlled_time_creation():
 
 def test_controlled_time_just_now():
 
-    t = ControlledTime()
+    t = ControlledTime(tick_seconds=1)
 
     t0 = t.just_now()
     t1 = t.just_now()
     assert (t1 - t0).total_seconds() == 0
+
+    t0 = t.time()
+    t1 = t.time()  # one second should have passed
+    t2 = t.time()  # one more second should have passed
+
+    assert t1 - t0 == 1
+    assert t2 - t1 == 1
+
+
+def test_just_utcnow():
+
+    t = ControlledTime()
+    t0 = t.utcnow()
+    assert t.just_utcnow() == t0
+
+    assert ControlledTime.ProxyDatetimeClass(t).utcnow() == t0 + datetime.timedelta(seconds=1)
+
+
+def test_controlled_time_time():
+
+    t = ControlledTime()
+
+    t0 = t.time()
+    t1 = t.time()
+
+    assert t1 - t0 == 1
 
 
 def test_controlled_time_now():
@@ -318,10 +286,12 @@ def test_controlled_time_now():
     assert (t3 - t0).total_seconds() == 3
 
 
-def test_controlled_time_utcnow():
+def test_controlled_time_utcnow_with_tz():
 
     hour = 60 * 60  # 60 seconds * 60 minutes
 
+    # This doesn't test that we resolve the timezone correclty, just that if we use a given timezone, it works.
+    # We've picked a timezone where daylight time is not likely to be in play.
     eastern_time = pytz.timezone("US/Eastern")
     t0 = datetime.datetime(2020, 1, 1, 0, 0, 0)
     t = ControlledTime(initial_time=t0, local_timezone=eastern_time)
@@ -331,6 +301,22 @@ def test_controlled_time_utcnow():
     t2 = t.utcnow()  # initial time UTC + 1 second
     # US/Eastern on 2020-01-01 is not daylight time, so EST (-0500) not EDT (-0400).
     assert (t2 - t1).total_seconds() == 5 * hour
+    assert (t2 - t1).total_seconds() == abs(eastern_time.utcoffset(t0).total_seconds())
+
+
+def test_controlled_time_utcnow():
+
+    # This doesn't test that we resolve the timezone correclty, just that if we use a given timezone, it works.
+    # We've picked a timezone where daylight time is not likely to be in play.
+    local_time = guess_local_timezone_for_testing()
+    t0 = datetime.datetime(2020, 1, 1, 0, 0, 0)
+    t = ControlledTime(initial_time=t0)
+
+    t1 = t.now()     # initial time + 1 second
+    t.set_datetime(t0)
+    t2 = t.utcnow()  # initial time UTC + 1 second
+    # This might be 5 hours in US/Eastern at HMS or it might be 0 hours in UTC on AWS or GitHub Actions.
+    assert (t2 - t1).total_seconds() == abs(local_time.utcoffset(t0).total_seconds())
 
 
 def test_controlled_time_reset_datetime():
@@ -370,6 +356,30 @@ def test_controlled_time_sleep():
     t.sleep(10)
 
     assert (t.just_now() - t0).total_seconds() == 10
+
+
+def test_controlled_time_datetime():
+
+    module_type = type(sys.modules['builtins'])
+
+    dt_args = (2016, 1, 1, 12, 34, 56)
+
+    t = ControlledTime(datetime.datetime(*dt_args), tick_seconds=1)
+    t0 = t.just_now()
+
+    # At this point, datetime is still the imported datetime module.
+    assert isinstance(datetime, module_type)
+
+    # This is like using mock.patch on our own datetime
+    with override_dict(globals(), datetime=t):
+
+        # At this point, we've installed a ControlledTime instance as our datetime module.
+        assert not isinstance(datetime, module_type)
+        assert isinstance(datetime, ControlledTime)
+        assert isinstance(datetime.datetime, ControlledTime.ProxyDatetimeClass)
+        # Make sure we can make a datetime.datetime object even with the mock
+        assert datetime.datetime(*dt_args) == t0
+        assert datetime.datetime.now() == t0 + datetime.timedelta(seconds=1)
 
 
 def test_controlled_time_documentation_scenario():
@@ -767,6 +777,90 @@ def test_mock_file_system():
                 assert not os.path.exists(filename)
 
 
+def test_mock_file_system_simple():
+
+    mfs = MockFileSystem(files={"pre-existing-file.txt": "stuff from yesterday"})
+
+    with mock.patch("io.open", mfs.open):
+        with mock.patch("os.path.exists", mfs.exists):
+            with mock.patch("os.remove", mfs.remove):
+
+                filename = "no.such.file"
+                assert os.path.exists(filename) is False
+
+                filename2 = "pre-existing-file.txt"
+                assert os.path.exists(filename2)
+
+                assert len(mfs.files) == 1
+
+                with io.open(filename, 'w') as fp:
+                    fp.write("foo")
+                    fp.writelines(["bar\n", "baz\n"])
+
+                assert os.path.exists(filename) is True
+
+                with io.open(filename, 'r') as fp:
+                    assert fp.read() == 'foobar\nbaz\n'
+
+                assert len(mfs.files) == 2
+
+                with io.open(filename2, 'r') as fp:
+                    assert fp.read() == "stuff from yesterday"
+
+                assert sorted(mfs.files.keys()) == ['no.such.file', 'pre-existing-file.txt']
+
+                assert mfs.files == {
+                    'no.such.file': b'foobar\nbaz\n',
+                    'pre-existing-file.txt': b'stuff from yesterday'
+                }
+
+
+def test_mock_file_system_auto():
+
+    temp_filename = "IF_YOU_SEE_THIS_FILE_DELETE_IT.txt"
+
+    temp_file_text = ("This file is used only temporarily by dcicutils.qa_utils.test_mock_file_system_auto.\n"
+                      "It is safe and encouraged to to delete it.\n"
+                      "This token is unique: %s.\n"
+                      % uuid.uuid4())
+
+    try:
+
+        # We're writing this before turning on the mock, to see if the mock can see it.
+        with open(temp_filename, 'w') as outfile:
+            outfile.write(temp_file_text)
+
+        with MockFileSystem(auto_mirror_files_for_read=True).mock_exists_open_remove() as mfs:
+
+            assert len(mfs.files) == 0
+
+            assert os.path.exists(temp_filename)
+
+            assert len(mfs.files) == 1
+
+            with open(temp_filename) as infile:
+                content = infile.read()
+
+            assert content == temp_file_text
+
+            os.remove(temp_filename)
+
+            assert len(mfs.files) == 0
+
+            # Removing the file in the mock does not cause us to auto-mirror anew.
+            assert not os.path.exists(temp_filename)
+
+            # This is just confirmation
+            assert len(mfs.files) == 0
+
+        # But now we are outside the mock again, so the file should be visible.
+        assert os.path.exists(temp_filename)
+
+    finally:
+
+        os.remove(temp_filename)
+
+
 class _MockPrinter:
 
     def __init__(self):
@@ -915,6 +1009,58 @@ def test_uppercase_print_with_printed_output():
         assert printed.lines == ["foo", "bar"]
         assert printed.last == "bar"
 
+        printed.reset()
+
+        mfs = MockFileSystem()
+        with mfs.mock_exists_open_remove():
+
+            with io.open("some-file.txt", 'w') as fp:
+                PRINT("stuff to file", file=fp)
+                PRINT("stuff to console")
+                PRINT("more stuff to file", file=fp)
+                PRINT("more stuff to console")
+
+            assert printed.lines == ["stuff to console", "more stuff to console"]
+            assert printed.last == "more stuff to console"
+            assert printed.lines == printed.file_lines[None]
+            assert printed.last == printed.file_last[None]
+            assert printed.file_lines[None] == ["stuff to console", "more stuff to console"]
+            assert printed.file_last[None] == "more stuff to console"
+            assert printed.file_lines[fp] == ["stuff to file", "more stuff to file"]
+            assert printed.file_last[fp] == "more stuff to file"
+
+            PRINT("Done.")
+            assert printed.last == "Done."
+            assert printed.file_last[None] == "Done."
+            assert printed.lines == ["stuff to console", "more stuff to console", "Done."]
+            assert printed.file_lines[None] == ["stuff to console", "more stuff to console", "Done."]
+
+            PRINT("Done, too.", file=fp)
+            assert printed.file_last[fp] == "Done, too."
+            assert printed.file_lines[fp] == ["stuff to file", "more stuff to file", "Done, too."]
+
+            printed.reset()
+
+            with io.open("another-file.txt", 'w') as fp2:
+
+                assert printed.last is None
+                assert printed.file_last[None] is None
+                assert printed.file_last[sys.stdout] is None
+
+                assert printed.lines == []
+                assert printed.file_lines[None] == []
+                assert printed.file_lines[sys.stdout] == []
+
+                assert printed.file_last[fp2] is None
+                assert printed.file_lines[fp2] == []
+
+                PRINT("foo", file=fp2)
+
+                assert printed.last is None
+                assert printed.lines == []
+                assert printed.file_last[fp2] == "foo"
+                assert printed.file_lines[fp2] == ["foo"]
+
 
 def test_uppercase_print_with_time():
 
@@ -973,6 +1119,48 @@ def test_mock_boto3_client():
 
     with pytest.raises(NotImplementedError):
         mock_boto3.client('some_other_kind')
+
+
+def test_mock_boto3_client_use():
+
+    mock_boto3 = MockBoto3()
+    mfs = MockFileSystem(files={"myfile": "some content"})
+
+    with mock.patch("io.open", mfs.open):
+        with mock.patch("os.path.exists", mfs.exists):
+            with mock.patch.object(boto3, "client", mock_boto3.client):
+
+                s3 = boto3.client('s3')  # noQA - PyCharm wrongly sees a syntax error
+                assert isinstance(s3, MockBotoS3Client)
+                s3.upload_file(Filename="myfile", Bucket="foo", Key="bar")
+                s3.download_file(Filename="myfile2", Bucket="foo", Key="bar")
+                myfile_content = file_contents("myfile")
+                myfile_content2 = file_contents("myfile2")
+                assert myfile_content == myfile_content2 == "some content"
+
+    s3 = mock_boto3.client('s3')
+
+    # No matter what clients you get, they all share the same MockFileSystem, which we can get from s3_files
+    s3fs = s3.s3_files
+    # We saved an s3 file to bucket "foo" and key "bar", so it will be in the s3fs as "foo/bar"
+    assert sorted(s3fs.files.keys()) == ['foo/bar']
+    # The content is stored in binary format
+    assert s3fs.files['foo/bar'] == b'some content'
+
+    assert isinstance(s3, MockBotoS3Client)
+
+    assert s3._object_storage_class('foo/bar') == s3.DEFAULT_STORAGE_CLASS
+    s3._set_object_storage_class('foo/bar', 'DEEP_ARCHIVE')
+    assert s3._object_storage_class('foo/bar') == 'DEEP_ARCHIVE'
+    assert s3._object_storage_class('foo/baz') == 'STANDARD'
+
+    # Because of shared reality in our mock_boto3, we'll see those same results with a new client.
+    s3_client2 = mock_boto3.client('s3')
+    assert s3_client2._object_storage_class('foo/bar') == 'DEEP_ARCHIVE'
+    assert s3_client2._object_storage_class('foo/baz') == 'STANDARD'
+
+    # Creating a new boto3 and asking for a client will see a different reality and get a different value.
+    assert MockBoto3().client('s3')._object_storage_class('foo/bar') == 'STANDARD'
 
 
 def test_mock_uuid_module_documentation_example():
@@ -1186,28 +1374,18 @@ def test_version_checker_no_changelog():
 
     MyVersionChecker.check_version()
 
-
-def test_version_checker_use_dcicutils_changelog():
-
-    class MyVersionChecker(VersionChecker):
+    class MyChangeLogChecker(ChangeLogChecker):
         PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
-        CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+        CHANGELOG = None
 
-    MyVersionChecker.check_version()
+    MyChangeLogChecker.check_version()
 
 
 def test_version_checker_with_missing_changelog():
 
-    path_exists = os.path.exists
+    mfs = MockFileSystem(files={'pyproject.toml': '[tool.poetry]\nname = "foo"\nversion = "1.2.3"'})
 
-    def mocked_exists(filename):
-        if filename.endswith("CHANGELOG.rst"):
-            print("Faking that %s does not exist." % filename)
-            return False
-        else:
-            return path_exists(filename)
-
-    with mock.patch("os.path.exists", mocked_exists):
+    with mock.patch("os.path.exists", mfs.exists):
 
         class MyVersionChecker(VersionChecker):
 
@@ -1216,6 +1394,88 @@ def test_version_checker_with_missing_changelog():
 
         with pytest.raises(AssertionError):
             MyVersionChecker.check_version()  # The version history will be missing because of mocking.
+
+        class MyChangeLogChecker(ChangeLogChecker):
+
+            PYPROJECT = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+            CHANGELOG = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+
+        with pytest.raises(AssertionError):
+            MyChangeLogChecker.check_version()  # The version history will be missing because of mocking.
+
+
+def test_version_checker_with_proper_changelog():
+
+    pyproject_filename = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+    changelog_filename = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+
+    mfs = MockFileSystem(files={
+        pyproject_filename: '[tool.poetry]\nname = "foo"\nversion = "1.2.3"',
+        changelog_filename:
+            '1.2.0\n'
+            'Some new feature.\n'
+            '1.2.1\n'
+            'A bug fix.\n'
+            '1.2.2\n'
+            'A second bug fix.\n'
+            '1.2.3\n'
+            'A third bug fix.\n'
+    })
+
+    with mock.patch("io.open", mfs.open):
+        with mock.patch("os.path.exists", mfs.exists):
+
+            class MyVersionChecker(VersionChecker):
+
+                PYPROJECT = pyproject_filename
+                CHANGELOG = changelog_filename
+
+            # The CHANGELOG is present and with the right data.
+            MyVersionChecker.check_version()
+
+            class MyChangeLogChecker(ChangeLogChecker):
+
+                PYPROJECT = pyproject_filename
+                CHANGELOG = changelog_filename
+
+            # The CHANGELOG is present and with the right data.
+            MyChangeLogChecker.check_version()
+
+
+def test_version_checker_with_insufficient_changelog():
+
+    pyproject_filename = os.path.join(os.path.dirname(__file__), "../pyproject.toml")
+    changelog_filename = os.path.join(os.path.dirname(__file__), "../CHANGELOG.rst")
+
+    mfs = MockFileSystem(files={
+        pyproject_filename: '[tool.poetry]\nname = "foo"\nversion = "1.2.3"',
+        changelog_filename:
+            '1.2.0\n'
+            'Some new feature.\n'
+            '1.2.1\n'
+            'A bug fix.\n'
+    })
+
+    with mock.patch("io.open", mfs.open):
+        with mock.patch("os.path.exists", mfs.exists):
+
+            class MyVersionChecker(VersionChecker):
+
+                PYPROJECT = pyproject_filename
+                CHANGELOG = changelog_filename
+
+            with pytest.warns(VersionChecker.WARNING_CATEGORY):
+                # The CHANGELOG won't have the right data, so we should see a warning.
+                MyVersionChecker.check_version()
+
+            class MyChangeLogChecker(ChangeLogChecker):
+
+                PYPROJECT = pyproject_filename
+                CHANGELOG = changelog_filename
+
+            with pytest.raises(AssertionError):
+                # The CHANGELOG won't have the right data, so we should see a warning.
+                MyChangeLogChecker.check_version()
 
 
 def test_check_duplicated_items_by_key():
@@ -1230,3 +1490,302 @@ def test_check_duplicated_items_by_key():
                 {'uuid': '123', 'foo': 'c'},
             ]
         )
+
+
+def test_known_bug_expected_and_found():
+    with known_bug_expected(jira_ticket="TST-00001"):
+        raise ValueError("Foo")
+
+
+def test_known_bug_expected_but_wrong_class_1():
+    with pytest.raises(WrongErrorSeen):
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError):
+            raise ValueError("Foo")
+
+
+def test_known_bug_expected_but_wrong_class_2():
+    with known_bug_expected(jira_ticket="TST-00002", error_class=WrongErrorSeen):
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError):
+            raise ValueError("Foo")
+
+
+def test_known_bug_expected_but_no_error_1():
+    with pytest.raises(ExpectedErrorNotSeen):
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError):
+            pass
+
+
+def test_known_bug_expected_but_no_error_2():
+    with known_bug_expected(jira_ticket="TST-00002", error_class=ExpectedErrorNotSeen):
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError):
+            pass
+
+
+def test_known_bug_expected_fixed():
+    with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError, fixed=True):
+        pass
+
+
+def test_known_bug_expected_regression_1():
+    with pytest.raises(UnexpectedErrorAfterFix):
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError, fixed=True):
+            raise RuntimeError("foo")
+
+
+def test_known_bug_expected_regression_2():
+    with known_bug_expected(jira_ticket="TST-00002", error_class=UnexpectedErrorAfterFix):
+        with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError, fixed=True):
+            raise RuntimeError("foo")
+
+
+def test_mocked_command_args():
+    with pytest.raises(AssertionError):
+        MockedCommandArgs(foo='x')
+
+    class MockedFooBarArgs(MockedCommandArgs):
+        VALID_ARGS = ['foo', 'bar', 'foobar']
+
+    args = MockedFooBarArgs(foo='x', bar='y', foobar='xy')
+    assert args.foo == 'x'      # noQA - PyCharm can't see we declared this arg
+    assert args.bar == 'y'      # noQA - PyCharm can't see we declared this arg
+    assert args.foobar == 'xy'  # noQA - PyCharm can't see we declared this arg
+
+
+MY_MODULE = sys.modules['test.test_qa_utils']
+
+
+def test_input_mocked():
+
+    def some_function_with_input():
+        return input("input something:")
+
+    with input_mocked("x", "y", module=MY_MODULE):
+        assert some_function_with_input() == "x"
+        assert some_function_with_input() == "y"
+        with pytest.raises(AssertionError) as exc_info:
+            some_function_with_input()
+        assert str(exc_info.value) == "There are not enough mock inputs."
+
+    with pytest.raises(AssertionError) as exc_info:
+        with input_mocked("x", "y", module=sys.modules['test.test_qa_utils']):
+            assert some_function_with_input() == "x"
+    assert str(exc_info.value) == "There is 1 unused mock input."
+
+
+def test_logged_messages():
+
+    with logged_messages("INFO: foo", module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+
+    with pytest.raises(AssertionError):
+        with logged_messages("INFO: foo", module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.info("bar")
+
+    with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+
+    with logged_messages(info=["foo"], warning=["bar"], module=MY_MODULE, logvar='logger'):
+        logger.info("foo")
+        logger.warning("bar")
+
+    with pytest.raises(AssertionError):
+        with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.info("bar")
+
+    with pytest.raises(AssertionError):
+        with logged_messages(info=["foo"], module=MY_MODULE, logvar='logger'):
+            logger.info("foo")
+            logger.warning("bar")
+
+    with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger', allow_warn=True):
+        logger.warn("bar")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+
+    with pytest.raises(AssertionError):
+        with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger', allow_warn=False):
+            logger.warn("bar")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+
+    with pytest.raises(AssertionError):
+        with logged_messages(warning=["bar"], module=MY_MODULE, logvar='logger'):
+            # allow_warn defaults to False
+            logger.warn("bar")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+
+
+def test_mock_log():
+
+    m = MockLog(allow_warn=False)
+
+    with pytest.raises(AssertionError) as exc:
+        m.warn("should fail")  # noQA - yes, code should use .warning() not .warn(), but we're testing a check for that
+    assert "warn called. Should be 'warning'" in str(exc.value)
+
+    m = MockLog(allow_warn=True)
+
+    m.debug("a log.debug message")
+    m.info("a log.info message")
+    m.warn("a call to log.warn")
+    m.warning("a call to log.warning")
+    m.error("a call to log.error")
+    m.critical("a call to log.critical")
+
+    assert m.messages == {
+        "debug": ["a log.debug message"],
+        "info": ["a log.info message"],
+        "warning": ["a call to log.warn", "a call to log.warning"],
+        "error": ["a call to log.error"],
+        "critical": ["a call to log.critical"]
+    }
+
+    assert m.all_log_messages == [
+        "DEBUG: a log.debug message",
+        "INFO: a log.info message",
+        "WARNING: a call to log.warn",
+        "WARNING: a call to log.warning",
+        "ERROR: a call to log.error",
+        "CRITICAL: a call to log.critical",
+    ]
+
+
+def test_sqs_client_bad_region():
+
+    with pytest.raises(ValueError) as exc:
+        MockBoto3().client('sqs', region_name='some-region')
+    assert str(exc.value) == "Unexpected region: some-region"
+
+
+def test_s3_client_bad_region():
+
+    with pytest.raises(ValueError) as exc:
+        MockBoto3().client('s3', region_name='some-region')
+    assert str(exc.value) == "Unexpected region: some-region"
+
+
+def test_mock_id():
+
+    mock_id = MockId()
+
+    w = 3
+    x = object()
+    y = 'foo'
+    z = None
+
+    w_id = mock_id(w)
+    x_id = mock_id(x)
+    y_id = mock_id(y)
+    z_id = mock_id(z)
+
+    assert w_id + 1 == x_id
+    assert x_id + 1 == y_id
+    assert y_id + 1 == z_id
+
+    assert mock_id(w) == w_id
+    assert mock_id(x) == x_id
+    assert mock_id(y) == y_id
+    assert mock_id(z) == z_id
+
+    mock_id = MockId(counter_base=25)
+    assert mock_id('something') == 25
+    assert mock_id('something-else') == 26
+    assert mock_id('something') == 25
+
+
+def test_eventually():
+
+    dt = ControlledTime()
+    with mock.patch("datetime.datetime", dt):
+        with mock.patch("time.sleep", dt.sleep):
+
+            def foo():
+                return 17
+
+            flakey_success_frequency = 3
+
+            flakey_foo = Occasionally(foo, success_frequency=flakey_success_frequency)
+
+            def my_assertions():
+                assert flakey_foo() == 17
+
+            with pytest.raises(AssertionError):
+                Eventually.call_assertion(my_assertions, threshold_seconds=flakey_success_frequency - 1,
+                                          error_class=Exception)
+
+            # Beyond here we're testing the error_message="something" argument,
+            # which allows us to only wait for a specific eventual message.
+
+            def test_error_message_argument(*, expected_message=None):
+                Eventually.call_assertion(my_assertions, threshold_seconds=flakey_success_frequency,
+                                          error_class=Exception,
+                                          error_message=expected_message)
+
+            actual_message = "Oops. Occasionally this fails."
+
+            test_error_message_argument()
+
+            test_error_message_argument(expected_message=actual_message)
+
+            with pytest.raises(Exception) as e:
+                # If we're Eventually expecting an unrelated message,
+                # the actual error we get will just pass through and won't be retried.
+                test_error_message_argument(expected_message="SOME OTHER MESSAGE")
+            assert str(e.value) == actual_message
+
+            # Here we want to test how much time passes if all tests are tried.
+            # The default is 10 tries at 1-second intervals, so should be at least 10 seconds.
+
+            one_second = dt.timedelta(seconds=1)
+            five_seconds = dt.timedelta(seconds=5)
+            ten_seconds = dt.timedelta(seconds=10)
+            before = dt.now()
+
+            def always_failing():
+                raise AssertionError("Failed.")
+
+            with pytest.raises(Exception):
+                Eventually.call_assertion(always_failing)
+
+            after = dt.now()
+            delta = after - before
+            assert delta >= ten_seconds
+
+            @Eventually.consistent()
+            def also_failing():
+                raise AssertionError("Also failed.")
+
+            before = dt.now()
+            with pytest.raises(AssertionError):
+                also_failing()
+            after = dt.now()
+            delta = after - before  # 10 secs for the computation plus 1 sec to check current time, so about 11 secs
+            assert delta > ten_seconds
+
+            @Eventually.consistent(wait_seconds=0.1)
+            def quickly_failing():
+                raise AssertionError("Also failed.")
+
+            before2 = dt.now()
+            with pytest.raises(AssertionError):
+                quickly_failing()
+            after2 = dt.now()
+
+            delta2 = after2 - before2  # 1 sec for the computation plus 1 sec to check current time, so about 2 sec
+            assert delta2 > one_second
+            assert delta2 < five_seconds
+
+            before3 = dt.now()
+            with pytest.raises(AssertionError):
+                quickly_failing(tries=100)
+            after3 = dt.now()
+
+            delta3 = after3 - before3  # 100 tries * 0.1 sec plus 1 sec to check current time, so about 11 sec
+            assert delta3 > ten_seconds
+
+            class MyStore:
+                VALUE = 0
+
+            @Eventually.consistent()
+            def foo():
+                MyStore.VALUE += 1
+                return MyStore.VALUE
+
+            assert foo(tries=3) == 1  # The value will increment exactly once because it succeeds first try.

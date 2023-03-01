@@ -1,20 +1,16 @@
-from __future__ import print_function
-
 import boto3
 import json
 import os
 import random
 import requests
 import time
-import urllib.parse as urlparse
 
 from collections import namedtuple
+from dcicutils.lang_utils import disjoined_list
 from elasticsearch.exceptions import AuthorizationException
-from urllib.parse import urlencode
-from . import (
-    s3_utils,
-    es_utils,
-)
+from typing import Dict, List
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+from . import s3_utils, es_utils
 from .misc_utils import PRINT
 
 
@@ -26,6 +22,9 @@ HIGLASS_BUCKETS = ['elasticbeanstalk-fourfront-webprod-wfoutput',
 # TODO (C4-92): Centralize this information, it is repeated in other repos
 # TODO (C4-102): Does this need to include CGAP envs? As part of the same list, or as a separate list?
 PRODUCTION_ENVS = ['fourfront-blue', 'fourfront-green']
+
+# S3 URL identifier
+S3_BUCKET_DOMAIN_SUFFIX = '.s3.amazonaws.com'
 
 
 ##################################
@@ -106,8 +105,6 @@ def search_request_with_retries(request_fxn, url, auth, verb, **kwargs):
         try:
             res_json = res.json()
         except ValueError:
-            # PyCharm notes this is unused. -kmp 17-Jul-2020
-            # res_json = {}
             try:
                 res.raise_for_status()
             except Exception as e:
@@ -184,8 +181,42 @@ def purge_request_with_retries(request_fxn, url, auth, verb, **kwargs):
     return final_res
 
 
+# Per https://specs.openstack.org/openstack/api-wg/guidelines/http/methods.html
+# although TRACE is the only method that actively disallows a body,
+# in normal practice GET, DELETE, TRACE, OPTIONS and HEAD methods are not expected to have a body.
+
+BODYLESS_REQUEST_METHODS = {'GET', 'DELETE', 'TRACE', 'OPTIONS', 'HEAD'}
+
+
+def is_bodyless(request_method):
+    """
+    Tests the given HTTP request method name to see if it needs a body in its http(s) request.
+    """
+    u = request_method.upper()
+    res = u in BODYLESS_REQUEST_METHODS
+    return res
+
+
+REQUESTS_VERBS = {
+    'GET': requests.get,
+    'POST': requests.post,
+    'PATCH': requests.patch,
+    'PUT': requests.put,
+    'DELETE': requests.delete,
+}
+
+
 def authorized_request(url, auth=None, ff_env=None, verb='GET',
                        retry_fxn=standard_request_with_retries, **kwargs):
+    return mockable_authorized_request(url=url, auth=auth, ff_env=ff_env, verb=verb, retry_fxn=retry_fxn, **kwargs)
+
+
+def mockable_authorized_request(url, *, auth, ff_env, verb, retry_fxn, **kwargs):
+    return internal_compute_authorized_request(url=url, auth=auth, ff_env=ff_env, verb=verb, retry_fxn=retry_fxn,
+                                               **kwargs)
+
+
+def internal_compute_authorized_request(url, *, auth, ff_env, verb, retry_fxn, **kwargs):
     """
     Generalized function that handles authentication for any type of request to FF.
     Takes a required url, request verb, auth, fourfront environment, and optional
@@ -202,6 +233,8 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     OR
     authorized_request('https://data.4dnucleome.org/<some path>', ff_env='fourfront-webprod')
     """
+    # Save to uncomment if debugging unit tests...
+    # print(f"authorized_request\n URL={url}\n auth={auth}\n ff_env={ff_env}\n verb={verb}\n")
     use_auth = unified_authentication(auth, ff_env)
     headers = kwargs.get('headers')
     if not headers:
@@ -209,21 +242,34 @@ def authorized_request(url, auth=None, ff_env=None, verb='GET',
     if 'timeout' not in kwargs:
         kwargs['timeout'] = 60  # default timeout
 
-    verbs = {'GET': requests.get,
-             'POST': requests.post,
-             'PATCH': requests.patch,
-             'PUT': requests.put,
-             'DELETE': requests.delete,
-             }
+    verb_upper = verb
     try:
-        the_verb = verbs[verb.upper()]
+        verb_upper = verb.upper()
+        the_verb = REQUESTS_VERBS[verb_upper]
     except KeyError:
-        raise Exception("Provided verb %s is not valid. Must one of: %s" % (verb.upper(), ', '.join(verbs.keys())))
+        raise ValueError(f"Provided verb {verb} is not valid. Must be one of {disjoined_list(REQUESTS_VERBS)}.")
     # automatically detect a search and overwrite the retry if it is standard
     if '/search/' in url and retry_fxn == standard_request_with_retries:
         retry_fxn = search_request_with_retries
     # use the given retry function. MUST TAKE THESE PARAMS!
-    return retry_fxn(the_verb, url, use_auth, verb, **kwargs)
+    result = retry_fxn(the_verb, url, use_auth, verb, **kwargs)
+    # Save to uncomment if debugging unit tests...
+    # print("authorized_request result=", json.dumps(result.json(), indent=2))
+    return result
+
+
+def _sls(val):
+    """
+    Helper to strip any leading slashes on ids in API functions.
+    Examples:
+        >>> _sls('foo')
+        foo
+        >>> _sls('/foo')
+        foo
+        >>> _sls('/foo/bar/baz/')
+        foo/bar/baz/
+    """
+    return val.lstrip('/')
 
 
 def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
@@ -242,7 +288,7 @@ def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
     auth = get_authentication_with_server(key, ff_env)
     if check_queue and stuff_in_queues(ff_env, check_secondary=False):
         add_on += '&datastore=database'
-    get_url = '/'.join([auth['server'], obj_id]) + process_add_on(add_on)
+    get_url = '/'.join([auth['server'], _sls(obj_id)]) + process_add_on(add_on)
     # check the queues if check_queue is True
     response = authorized_request(get_url, auth=auth, verb='GET')
     return get_response_json(response)
@@ -260,7 +306,7 @@ def patch_metadata(patch_item, obj_id='', key=None, ff_env=None, add_on=''):
     if not obj_id:
         raise Exception("ERROR getting id from given object %s for the request to"
                         " patch item. Supply a uuid or accession." % obj_id)
-    patch_url = '/'.join([auth['server'], obj_id]) + process_add_on(add_on)
+    patch_url = '/'.join([auth['server'], _sls(obj_id)]) + process_add_on(add_on)
     # format item to json
     patch_item = json.dumps(patch_item)
     response = authorized_request(patch_url, auth=auth, verb='PATCH', data=patch_item)
@@ -344,8 +390,8 @@ def get_search_generator(search_url, auth=None, ff_env=None, page_limit=50):
         try:
             search_res = get_response_json(response)['@graph']
         except KeyError:
-            raise('Cannot get "@graph" from the search request for %s. Response '
-                  'status code is %s.' % (search_url, response.status_code))
+            raise Exception(f'Cannot get "@graph" from the search request for {search_url}.'
+                            f' Response status code is {response.status_code}.')
         last_total = len(search_res)
         curr_from += last_total
         if search_limit != 'all' and curr_from - initial_from > search_limit:
@@ -359,10 +405,37 @@ def search_result_generator(page_generator):
     """
     Simple wrapper function to return a generator to iterate through item
     results on the search page
+
+    NOTE: Depending on the nature of the page generator, which may involve separate external calls
+    to a resource like elastic search that is not transactionally managed, the data being queried
+    may change between those calls, usually to add (though theoretically even to remove) an element.
+
+    Consider a case where the data to be queried is indexed in elastic search as A,C,E,G,I,K,M.
+    but where a page size of 3 is used with start position 0. That call will return A,C,E. The
+    user may expect G,I on the second page, but before it can be done, suppose an element D is
+    indexed and that the stored data is A,C,D,E,G,I,K,M. Requesting data from start position 0 would
+    now return A,C,D but we already had the first page, so we request data starting at position 3
+    for the second page and get E,G,I.  That means our sequence of return values would be A,C,E,E,G,I,K,M,
+    or, in other words, showing a duplication. To avoid this, we keep track of the IDs we've seen
+    and show only the first case of each element, so A,C,E,G,I,K,M. (We won't see the D but we weren't
+    going to see it anyway, and it wasn't available the time we started, so the timing was already close.)
+
+    Unfortunately, we aren't so lucky for deletion, though that happens more rarely. That will cause
+    an element to fall out. So if we have A,C,E,G,I,K,M and C is deleted between the first and second call,
+    getting us A,C,E first, and then on the second call when the data is A,E,G,I,K,M we get I,K,M, we'll
+    get the sequence A,C,E,I,K,M and will have missed legitimate element G. There is little to do with this
+    without restarting (which might not terminate or might be O(n^2) in worst case). But deletion is unusual.
     """
+    items_seen = set()
     for page in page_generator:
-        for res in page:
-            yield res
+        for item in page:
+            if isinstance(item, dict):
+                item_uuid = item.get('uuid')
+                if item_uuid:
+                    if item_uuid in items_seen:
+                        continue
+                    items_seen.add(item_uuid)
+            yield item
 
 
 def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=False):
@@ -374,7 +447,6 @@ def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=F
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
     """
-    from urllib.parse import urlparse
     auth = get_authentication_with_server(key, ff_env)
     if search.startswith('/'):
         search = search[1:]
@@ -383,15 +455,23 @@ def search_metadata(search, key=None, ff_env=None, page_limit=50, is_generator=F
         search_url = '/'.join([auth['server'], search])
     else:
         search_url = search  # assume full url is correct
-    search_generator = get_search_generator(search_url, auth=auth, page_limit=page_limit)
+    page_generator = get_search_generator(search_url, auth=auth, page_limit=page_limit)
     if is_generator:
         # yields individual items from search result
-        return search_result_generator(search_generator)
+        return search_result_generator(page_generator)
     else:
         # return a list of all search results
         search_res = []
-        for page in search_generator:
-            search_res.extend(page)
+        items_seen = set()
+        for page in page_generator:
+            for item in page:
+                if isinstance(item, dict):
+                    item_uuid = item.get('uuid')
+                    if item_uuid:
+                        if item_uuid in items_seen:
+                            continue
+                        items_seen.add(item_uuid)
+                search_res.append(item)
         return search_res
 
 
@@ -399,7 +479,7 @@ def get_item_facets(item_type, key=None, ff_env=None):
     """
     Gets facet query string information ie: mapping from facet to query string
     """
-    resp = get_metadata('/profiles/' + item_type + '.json', key=key, ff_env=ff_env)
+    resp = get_metadata('profiles/' + item_type + '.json', key=key, ff_env=ff_env)
     facets = {}
     for query_url, info in resp.get('facets', {}).items():
         facets[info['title']] = query_url
@@ -410,14 +490,15 @@ def get_item_facets(item_type, key=None, ff_env=None):
     return facets
 
 
-def get_item_facet_values(item_type, key=None, ff_env=None):
+def get_search_facet_values(search_query, key=None, ff_env=None):
     """
-    Gets all facets and returns all possible values for each one with counts
-    ie: dictionary of facets mapping to a dictionary containing all possible values
+    Gets all facets available from a provided search and returns all possible values for
+    each with counts - query should begin 'search/...'
+    ie: returns dictionary of facets mapping to a dictionary containing all possible values
     for that facet mapping to the count for that value
     format: {'Project': {'4DN': 2, 'Other': 6}, 'Lab': {...}}
     """
-    resp = get_metadata('/search/?type=' + item_type, key=key, ff_env=ff_env)['facets']
+    resp = get_metadata(search_query, key=key, ff_env=ff_env)['facets']
     facets = {}
     for facet in resp:
         name = facet['title']
@@ -425,6 +506,15 @@ def get_item_facet_values(item_type, key=None, ff_env=None):
         for term in facet['terms']:
             facets[name][term['key']] = term['doc_count']
     return facets
+
+
+def get_item_facet_values(item_type, key=None, ff_env=None):
+    """
+    More specific version of the above function with passed item_type
+    used in faceted_search
+    """
+    query = 'search/?type=' + item_type
+    return get_search_facet_values(query, key=key, ff_env=ff_env)
 
 
 def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
@@ -450,7 +540,7 @@ def faceted_search(key=None, ff_env=None, item_type=None, **kwargs):
     """
     item_facets = kwargs.get('item_facets', None)
     item_type = 'ExperimentSetReplicate' if item_type is None else item_type
-    search = '/search/?type=' + item_type
+    search = 'search/?type=' + item_type
     if item_facets is None:
         item_facets = get_item_facets(item_type, key=key, ff_env=ff_env)
     for facet, values in kwargs.items():
@@ -469,7 +559,7 @@ def fetch_files_qc_metrics(data, associated_files=None,
                            ignore_typical_fields=True,
                            key=None, ff_env=None):
     """
-    Utility function to grap all the qc metrics from associated types of file such as:
+    Utility function to grab all the qc metrics from associated types of file such as:
     'proccessed_files', 'other_processed_files', 'files'
     Args:
         data: the metadata of a ExperimentSet or Experiment
@@ -510,7 +600,8 @@ def fetch_files_qc_metrics(data, associated_files=None,
                 if entry.get('quality_metric'):
                     # check if it is a list of qc metrics
                     if entry['quality_metric']['display_title'].startswith('QualityMetricQclist'):
-                        qc_metric_list = get_metadata(entry['quality_metric']['uuid'], key=key, ff_env=ff_env)
+                        qc_metric_list_uuid = entry['quality_metric']['uuid']
+                        qc_metric_list = get_metadata(qc_metric_list_uuid, key=key, ff_env=ff_env)
                         if not qc_metric_list.get('qc_list'):
                             continue
                         for qc in qc_metric_list['qc_list']:
@@ -526,7 +617,7 @@ def fetch_files_qc_metrics(data, associated_files=None,
                                           'source_file': source_file,
                                           'source_file_type': source_file_type
                                           }
-                                        }
+                            }
                             qc_metrics.update(qc_info)
 
                     else:
@@ -542,7 +633,7 @@ def fetch_files_qc_metrics(data, associated_files=None,
                                       'source_file': source_file,
                                       'source_file_type': source_file_type
                                       }
-                                    }
+                        }
                         qc_metrics.update(qc_info)
     return qc_metrics
 
@@ -609,7 +700,8 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
 
     # If it is an experimentset, get qc_metrics for the experiments in the experiment set
     if resp.get('experiments_in_set'):
-        organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['individual']['organism']['name']
+        organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['organism']['name']
+        # organism = resp['experiments_in_set'][0]['biosample']['biosource'][0]['individual']['organism']['name']
         experiment_type = resp['experiments_in_set'][0]['experiment_type']['display_title']
         experiment_subclass = resp['experiments_in_set'][0]['experiment_type']['assay_subclass_short']
         biosource_summary = resp['experiments_in_set'][0]['biosample']['biosource_summary']
@@ -653,8 +745,8 @@ def get_metadata_links(obj_id, key=None, ff_env=None):
     Given standard key/ff_env authentication, return result for @@links view
     """
     auth = get_authentication_with_server(key, ff_env)
-    purge_url = '/'.join([auth['server'], obj_id, '@@links'])
-    response = authorized_request(purge_url, auth=auth, verb='GET')
+    links_url = '/'.join([auth['server'], obj_id, '@@links'])
+    response = authorized_request(links_url, auth=auth, verb='GET')
     return get_response_json(response)
 
 
@@ -712,7 +804,7 @@ def get_es_search_generator(es_client, index, body, page_size=200):
     while search_total is None or covered < search_total:
         es_res = es_client.search(index=index, body=body, size=page_size, from_=covered)
         if search_total is None:
-            search_total = es_res['hits']['total']
+            search_total = es_res['hits']['total']['value']
         es_hits = es_res['hits']['hits']
         covered += len(es_hits)
         yield es_hits
@@ -810,7 +902,7 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth):
                     'must_not': []
                 }
             },
-            'sort': [{'_uid': {'order': 'desc'}}]
+            'sort': [{'_id': {'order': 'desc'}}]
         }
         if filters:
             if not isinstance(filters, dict):
@@ -859,7 +951,7 @@ def get_schema_names(key=None, ff_env=None):
     """
     auth = get_authentication_with_server(key, ff_env)
     schema_name = {}
-    profiles = get_metadata('/profiles/', key=auth, add_on='frame=raw')
+    profiles = get_metadata('profiles/', key=auth, add_on='frame=raw')
     for key, value in profiles.items():
         # skip abstract types
         if value.get('isAbstract') is True:
@@ -1016,8 +1108,8 @@ def _get_page(*, page, key=None, ff_env=None):
         exception if this fails, since this function should tolerate failure """
     try:
         auth = get_authentication_with_server(key, ff_env)
-        health_res = authorized_request(auth['server'] + page, auth=auth, verb='GET')
-        ret = get_response_json(health_res)
+        page_res = authorized_request(auth['server'] + page, auth=auth, verb='GET')
+        ret = get_response_json(page_res)
     except Exception as exc:
         ret = {'error': str(exc)}
     return ret
@@ -1120,6 +1212,7 @@ def search_es_metadata(index, query, key=None, ff_env=None, is_generator=False):
 # Utility functions #
 #####################
 
+
 class UnifiedAuthenticator:
 
     class AuthenticationError(Exception):
@@ -1189,6 +1282,7 @@ class UnifiedAuthenticator:
 unified_authentication = UnifiedAuthenticator.unified_authentication
 
 
+
 def get_authentication_with_server(auth=None, ff_env=None):
     """
     Pass in authentication information and ff_env and attempts to either
@@ -1201,30 +1295,40 @@ def get_authentication_with_server(auth=None, ff_env=None):
     if not isinstance(auth, dict) or not {'key', 'secret', 'server'} <= set(auth.keys()):
         # must have ff_env if we want to get the key
         if not ff_env:
-            raise Exception("ERROR GETTING SERVER!\nMust provide dictionary auth with"
-                            " 'server' or ff environment. You gave: %s (auth), %s (ff_env)"
-                            % (auth, ff_env))
+            # TODO: Refactor these ValueErrors to do messaging in an error class where it doesn't clutter functionality.
+            raise ValueError("ERROR GETTING SERVER!"
+                             "\nMust provide dictionary auth with 'server' or ff environment."
+                             " You gave: %s (auth), %s (ff_env)"
+                             % (auth, ff_env))
         auth = s3_utils.s3Utils(env=ff_env).get_access_keys()
         if 'server' not in auth:
-            raise Exception("ERROR GETTING SERVER!\nAuthentication retrieved using "
-                            " ff environment does not have server information. Found: %s (auth)"
-                            ", %s (ff_env)" % (auth, ff_env))
+            raise ValueError("ERROR GETTING SERVER!"
+                             "\nAuthentication retrieved using ff environment does not have server information."
+                             " Found: %s (auth), %s (ff_env)" % (auth, ff_env))
     # ensure that the server does not end with '/'
     if auth['server'].endswith('/'):
         auth['server'] = auth['server'][:-1]
     return auth
 
 
-def stuff_in_queues(ff_env, check_secondary=False):
+def stuff_in_queues(ff_env_index_namespace, check_secondary=False) -> bool:
     """
     Used to guarantee up-to-date metadata by checking the contents of the indexer queues.
     If items are currently waiting in the primary queue, return False.
     If check_secondary is True, will also check the secondary queue.
     """
-    if not ff_env:
-        raise Exception("Must provide a full fourfront environment name to "
-                        "this function (such as 'fourfront-webdev'). You gave: "
-                        "%s" % ff_env)
+    return mockable_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace, check_secondary=check_secondary)
+
+
+def mockable_stuff_in_queues(ff_env_index_namespace, check_secondary) -> bool:
+    return internal_compute_stuff_in_queues(ff_env_index_namespace=ff_env_index_namespace,
+                                            check_secondary=check_secondary)
+
+
+def internal_compute_stuff_in_queues(ff_env_index_namespace, check_secondary) -> bool:
+    if not ff_env_index_namespace:
+        raise ValueError(f"Must provide a full fourfront environment name to this function"
+                         f" (such as 'fourfront-webdev'). You gave: {ff_env_index_namespace!r}")
     stuff_in_queue = False
     client = boto3.client('sqs', region_name='us-east-1')
     queue_names = ['-indexer-queue']
@@ -1233,14 +1337,14 @@ def stuff_in_queues(ff_env, check_secondary=False):
     for queue_name in queue_names:
         try:
             queue_url = client.get_queue_url(
-                QueueName=ff_env + queue_name
+                QueueName=ff_env_index_namespace + queue_name
             ).get('QueueUrl')
             queue_attrs = client.get_queue_attributes(
                 QueueUrl=queue_url,
                 AttributeNames=['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible']
             ).get('Attributes', {})
         except Exception:
-            PRINT('Error finding queue or its attributes: %s' % ff_env + queue_name)
+            PRINT('Error finding queue or its attributes: %s' % ff_env_index_namespace + queue_name)
             stuff_in_queue = True  # queue not found. use datastore=database
             break
         else:
@@ -1250,6 +1354,26 @@ def stuff_in_queues(ff_env, check_secondary=False):
                 stuff_in_queue = True
                 break
     return stuff_in_queue
+
+
+def fetch_network_ids(subnet_names, security_group_names):
+    """ Takes lists of subnet and security group names, and fetches their corresponding ids from AWS."""
+    ec2_client = boto3.client('ec2')
+    subnet_ids = []
+    security_group_ids = []
+    for i in subnet_names:
+        # response = ec2_client.describe_subnets()
+        subnet_id = i
+        subnet_ids.append(subnet_id)
+    for i in security_group_names:
+        response = ec2_client.describe_security_groups(  # could possibly be done with just one query
+            Filters=[
+                dict(Name='group-name', Values=[i])
+            ]
+        )
+        security_group_id = response['SecurityGroups'][0]['GroupId']
+        security_group_ids.append(security_group_id)
+    return subnet_ids, security_group_ids
 
 
 def get_response_json(res):
@@ -1277,14 +1401,15 @@ def process_add_on(add_on):
     return add_on
 
 
-def get_url_params(url):
+def get_url_params(url) -> Dict[str, List[str]]:
     """
-    Returns a dictionary of url params using urlparse.parse_qs.
+    Returns a dictionary of url params using parse_qs.
     Example: get_url_params('<server>/search/?type=Biosample&limit=5') returns
     {'type': ['Biosample'], 'limit': '5'}
     """
-    parsed_url = urlparse.urlparse(url)
-    return urlparse.parse_qs(parsed_url.query)
+    parsed_url = urlparse(url)
+    query_string: str = parsed_url.query
+    return parse_qs(query_string)
 
 
 def update_url_params_and_unparse(url, url_params):
@@ -1294,8 +1419,8 @@ def update_url_params_and_unparse(url, url_params):
     """
     # Note: Although it upsets linting tools, ._replace() is an advertised interface of url.parse -kmp 17-Oct-2020
     #       See https://docs.python.org/3/library/urllib.parse.html
-    parsed_url = urlparse.urlparse(url)._replace(query=urlencode(url_params, True))  # noQA
-    return urlparse.urlunparse(parsed_url)
+    parsed_url = urlparse(url)._replace(query=urlencode(url_params, True))  # noQA
+    return urlunparse(parsed_url)
 
 
 def convert_param(parameter_dict, vals_as_string=False):
@@ -1303,8 +1428,6 @@ def convert_param(parameter_dict, vals_as_string=False):
     converts dictionary format {argument_name: value, argument_name: value, ...}
     to {'workflow_argument_name': argument_name, 'value': value}
     """
-    # Not needed? -kmp & Will 30-Mar-2020
-    # print(str(parameter_dict))
     metadata_parameters = []
     for k, v in parameter_dict.items():
         # we need this to be a float or integer if it really is, else a string
@@ -1347,3 +1470,20 @@ def dump_results_to_json(store, folder):
         filename = folder + '/' + a_type + '.json'
         with open(filename, 'w') as outfile:
             json.dump(store[a_type], outfile, indent=4)
+
+
+def parse_s3_bucket_and_key_url(url: str) -> (str, str):
+    """ Parses the given s3 URL into its pair of bucket, key
+        Note that this function works the way it does because of how these
+        urls end up in our database. Eventually we should clean this up.
+        Format:
+            https://s3.amazonaws.com/cgap-devtest-main-application-cgap-devtest-wfout/GAPFI1HVXJ5F/fastqc_report.html
+            https://cgap-devtest-main-application-tibanna-logs.s3.amazonaws.com/41c2fJDQcLk3.metrics/metrics.html
+    """
+    parsed_url = urlparse(url)
+    if parsed_url.hostname.endswith(S3_BUCKET_DOMAIN_SUFFIX):
+        bucket = parsed_url.hostname[:-len(S3_BUCKET_DOMAIN_SUFFIX)]
+        key = parsed_url.path.lstrip('/')
+    else:
+        [bucket, key] = parsed_url.path.lstrip('/').split('/', 1)
+    return bucket, key

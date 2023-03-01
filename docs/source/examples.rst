@@ -17,7 +17,7 @@ Authentication methods differ if you are an external user or an internal 4DN tea
 
 .. code-block:: python
 
-   key = {'key': YOUR_KEY, 'secret' YOUR_SECRET, 'server': 'https://data.4dnucleome.org/'}
+   key = {'key': YOUR_KEY, 'secret': YOUR_SECRET, 'server': 'https://data.4dnucleome.org/'}
 
 If you are an internal user, you may simply use the string Fourfront environment name for your metadata functions to get administrator access. For faster requests or if you want to emulate another user, you can also pass in keys manually. The examples below will use ``key``\ , but could also use ``ff_env``. It assumes you want to use the data Fourfront environment.
 

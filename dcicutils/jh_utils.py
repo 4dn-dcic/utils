@@ -6,11 +6,7 @@ import sys
 from contextlib import contextmanager
 from .ff_utils import *  # NOQA
 from .misc_utils import PRINT
-# urllib is different between python2 and 3
-if sys.version_info[0] == 3:
-    import urllib.request as use_urllib
-else:
-    import urllib2 as use_urllib
+import urllib.request
 
 # do some top level stuff when the module is imported
 if 'FF_ACCESS_KEY' not in os.environ or 'FF_ACCESS_SECRET' not in os.environ:
@@ -42,7 +38,7 @@ HANDLED_FUNCTIONS = [
 ]
 
 
-class HTTPBasic403AuthHandler(use_urllib.HTTPBasicAuthHandler):
+class HTTPBasic403AuthHandler(urllib.request.HTTPBasicAuthHandler):
     """
     See: https://gist.github.com/dnozay/194d816aa6517dc67ca1
     retry with basic auth when facing a 403 forbidden
@@ -65,8 +61,8 @@ def install_auth_opener():
     # create opener / 403 error handler
     auth_handler = HTTPBasic403AuthHandler()
     # install it.
-    opener = use_urllib.build_opener(auth_handler)
-    use_urllib.install_opener(opener)
+    opener = urllib.request.build_opener(auth_handler)
+    urllib.request.install_opener(opener)
     return auth_handler
 
 
@@ -153,11 +149,19 @@ def find_valid_file_or_extra_file(obj_id, format):
     home_dir = '/home/jovyan'
     # hardcoded so that we can find which volume to look in by file type
     # will need to be updated if more File types are added to proc file bucket
-    if 'FileVistrack' in file_meta['@type'] or 'FileProcessed' in file_meta['@type']:
+    if file_meta.get('open_data_url', None):
+        data_dir = 'open_data'
+        if 'FileVistrack' in file_meta['@type'] or 'FileProcessed' in file_meta['@type']:
+            open_data_prefix = 'wfoutput'
+        else:
+            open_data_prefix = 'files'
+        full_path = '/'.join([home_dir, data_dir, 'fourfront-webprod', open_data_prefix, all_ffs[use_ff]['uk']])
+    elif 'FileVistrack' in file_meta['@type'] or 'FileProcessed' in file_meta['@type']:
         data_dir = 'proc_data'
+        full_path = '/'.join([home_dir, data_dir, all_ffs[use_ff]['uk']])
     else:
         data_dir = 'raw_data'
-    full_path = '/'.join([home_dir, data_dir, all_ffs[use_ff]['uk']])
+        full_path = '/'.join([home_dir, data_dir, all_ffs[use_ff]['uk']])
     return {'metadata': file_meta, 'full_href': full_href, 'full_path': full_path}
 
 
@@ -241,7 +245,7 @@ def open_4dn_file(obj_id, format=None, local=True):
     gz = False
     if not local:
         # this seems to handle both binary and non-binary files
-        ff_file = use_urllib.urlopen(file_info['full_href'])
+        ff_file = urllib.request.urlopen(file_info['full_href'])
         if file_info.get('full_href', '').endswith('.gz'):
             gz = True
     else:

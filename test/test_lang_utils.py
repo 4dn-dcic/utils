@@ -1,6 +1,11 @@
 import datetime
+import pytest
+import re
 
-from dcicutils.lang_utils import EnglishUtils, a_or_an, select_a_or_an, string_pluralize
+from dcicutils.lang_utils import (
+    EnglishUtils, a_or_an, select_a_or_an, string_pluralize, conjoined_list, disjoined_list,
+    there_are, must_be_one_of, maybe_pluralize, relative_time_string, parse_relative_time_string,
+)
 
 
 def test_string_pluralize_case():
@@ -47,6 +52,86 @@ def test_string_pluralize():
     assert string_pluralize("box") == "boxes"
     assert string_pluralize("ox") == "oxen"
 
+    assert string_pluralize("file to show") == "files to show"
+    assert string_pluralize("change from point X to point Y") == "changes from point X to point Y"
+    assert string_pluralize("change between date X and date Y") == "changes between date X and date Y"
+    assert string_pluralize("bucket to delete") == "buckets to delete"
+    assert string_pluralize("a book about a gene") == "books about genes"
+    assert string_pluralize("a good book about the defective gene") == "good books about the defective gene"
+    assert string_pluralize("a good book about a defective gene") == "good books about defective genes"
+
+    assert string_pluralize("a book about a gene", allow_some=True) == "some books about genes"
+    assert string_pluralize("a bucket of data", allow_some=True) == "some buckets of data"
+    assert string_pluralize("a good book about a defective gene", allow_some=True) == (
+        "some good books about defective genes")
+
+    assert string_pluralize("son-in-law") == "sons-in-law"
+    assert string_pluralize("son-of-a-b") == "sons-of-bs"
+    assert string_pluralize("attorney-at-law") == "attorneys-at-law"
+
+    assert string_pluralize("mother in law") == "mothers in law"
+
+    assert string_pluralize("person of interest") == "persons of interest"
+
+    assert string_pluralize("author of a document") == "authors of documents"
+    assert string_pluralize("author of the document") == "authors of the document"
+
+    assert string_pluralize("father of the author of a document") == "fathers of the author of a document"
+    assert string_pluralize("a father of the author of a document") == "fathers of the author of a document"
+    assert string_pluralize("father of an author of a document") == "fathers of authors of documents"
+    assert string_pluralize("a father of an author of a document") == "fathers of authors of documents"
+
+    assert string_pluralize("middle name of the applicant") == "middle names of the applicant"
+    assert string_pluralize("middle name of an applicant") == "middle names of applicants"
+    assert string_pluralize("son-in-law of an applicant") == "sons-in-law of applicants"
+    assert string_pluralize("son-in-law of a brother-in-law") == "sons-in-law of brothers-in-law"
+
+    assert string_pluralize("half-sister of a mother-in-law") == "half-sisters of mothers-in-law"
+
+    assert string_pluralize("report naming a gene") == "reports naming genes"
+    assert string_pluralize("gene named by a report") == "genes named by reports"
+
+    assert string_pluralize("a variant referencing a gene") == "variants referencing genes"
+    assert string_pluralize("a gene referenced by a variant") == "genes referenced by variants"
+
+    assert string_pluralize("a box") == "boxes"
+    assert string_pluralize("a box", allow_some=True) == "some boxes"
+    assert string_pluralize("the box") == "the boxes"
+    assert string_pluralize("an apple") == "apples"
+    assert string_pluralize("an apple", allow_some=True) == "some apples"
+    assert string_pluralize("the apple") == "the apples"
+
+    assert string_pluralize("A box") == "Boxes"
+    assert string_pluralize("A box", allow_some=True) == "Some boxes"
+    assert string_pluralize("The box") == "The boxes"
+    assert string_pluralize("An apple") == "Apples"
+    assert string_pluralize("An apple", allow_some=True) == "Some apples"
+    assert string_pluralize("The apple") == "The apples"
+
+    assert string_pluralize("A BOX") == "BOXES"
+    assert string_pluralize("A BOX", allow_some=True) == "SOME BOXES"
+    assert string_pluralize("THE BOX") == "THE BOXES"
+    assert string_pluralize("AN APPLE") == "APPLES"
+    assert string_pluralize("AN APPLE", allow_some=True) == "SOME APPLES"
+    assert string_pluralize("THE APPLE") == "THE APPLES"
+
+    assert string_pluralize("file that has to be closed") == "files that have to be closed"
+    assert string_pluralize("file that will have to be closed") == "files that will have to be closed"
+    assert string_pluralize("file that will be opened") == "files that will be opened"
+    assert string_pluralize("file that is still open") == "files that are still open"
+    assert string_pluralize("file that was still open") == "files that were still open"
+
+    assert string_pluralize("file, which has to be closed") == "files, which have to be closed"
+    assert string_pluralize("file, which is what we searched for") == "files, which are what we searched for"
+
+    assert string_pluralize("a name of a file that has to be closed") == "names of files that have to be closed"
+    assert string_pluralize("a name of a file that is open") == "names of files that are open"
+    assert string_pluralize("a name of a file that was open") == "names of files that were open"
+
+    assert string_pluralize("A NAME OF A FILE THAT IS OPEN") == "NAMES OF FILES THAT ARE OPEN"
+    assert string_pluralize("a NAME of a File that is open") == "NAMES of Files that are open"
+    assert string_pluralize("a NAME of a File that IS open") == "NAMES of Files that ARE open"
+
 
 def test_n_of():
     assert EnglishUtils.n_of(-1, "day") == "-1 days"  # This could go either way, but it's easiest just to do this.
@@ -63,6 +148,10 @@ def test_n_of():
 
 
 def test_relative_time_string():
+
+    assert EnglishUtils.relative_time_string == relative_time_string
+
+    assert relative_time_string(datetime.timedelta(minutes=10, seconds=1)) == "10 minutes, 1 second"
 
     def test(seconds, long_string, short_string):
         assert EnglishUtils.relative_time_string(seconds) == long_string
@@ -103,6 +192,59 @@ def test_relative_time_string():
     t1 = datetime.datetime.now()
     t2 = t1 + relative_time
     test(t2 - t1, "1 hour, 3 seconds", "1 hour")
+
+
+def test_parse_relative_time_string():
+
+    assert EnglishUtils.parse_relative_time_string == parse_relative_time_string
+
+    assert parse_relative_time_string("10 minutes, 1 second") == datetime.timedelta(minutes=10, seconds=1)
+
+    parse = EnglishUtils.parse_relative_time_string
+    unparse = EnglishUtils.relative_time_string
+
+    assert unparse(parse("1 hour")) == '1 hour'
+    assert unparse(parse("1.5 hours")) == '1 hour, 30 minutes'
+
+    with pytest.raises(ValueError) as exc:
+        parse("1 half hour")
+    assert str(exc.value) == ("Relative time strings are an even number of tokens"
+                              " of the form '<n1> <unit1> <n2> <unit2>...': '1 half hour'")
+
+    with pytest.raises(ValueError) as exc:
+        parse("1 year")
+    assert str(exc.value) == "Bad relative time string: '1 year'"
+
+    def check_roundtrip(**keys):
+        original = datetime.timedelta(**keys)
+        print(f" original={original} unparsing...")
+        unparsed = unparse(original)
+        print(f" unparsed={unparsed!r} parsing...")
+        parsed = parse(unparsed)
+        print(f" parsed={parsed!r}")
+        assert original == parsed
+
+    check_roundtrip(hours=1)
+    check_roundtrip(hours=1.5)
+    check_roundtrip(hours=3, minutes=7, seconds=23)
+    check_roundtrip(weeks=7, days=3, minutes=17)
+    check_roundtrip(seconds=0)
+    check_roundtrip()
+
+    def check_parse_unparse(relative_time_string):
+        parsed = parse(relative_time_string)
+        print(f" parsed={parsed} unparsing...")
+        unparsed = unparse(parsed)
+        print(f" unparsed={unparsed} reparsing...")
+        reparsed = parse(unparsed)
+        print(f" reparsed={reparsed}")
+        assert parsed == reparsed
+
+    check_parse_unparse("1 hour, 30 minutes")
+    check_parse_unparse("3 hours, 1 minute")
+    check_parse_unparse("7 weeks, 6 days, 5 hours, 4 minutes, 3 seconds")
+    check_parse_unparse("1 week, 1 day, 1 hour, 1 minute, 1 second")
+    check_parse_unparse("")
 
 
 def test_time_count_formatter():
@@ -230,3 +372,220 @@ def test_custom_a_or_an():
     assert EnglishUtils.n_of(0, "egg", num_format=maybe_a_or_n) == "no eggs"
     assert EnglishUtils.n_of(1, "egg", num_format=maybe_a_or_n) == "an egg"
     assert EnglishUtils.n_of(3, "egg", num_format=maybe_a_or_n) == "some eggs"
+
+
+def test_conjoined_list():
+
+    with pytest.raises(ValueError):
+        assert conjoined_list([])
+
+    assert conjoined_list([], nothing='nothing') == 'nothing'
+    assert conjoined_list(['a']) == 'a'
+    assert conjoined_list(['a', 'b']) == 'a and b'
+    assert conjoined_list(['a', 'b', 'c']) == 'a, b and c'
+    assert conjoined_list(['a', 'b', 'c'], oxford_comma=True) == 'a, b, and c'
+    assert conjoined_list(['a', 'b', 'c', 'd']) == 'a, b, c and d'
+
+    assert conjoined_list(['a'], conjunction='or') == 'a'
+    assert conjoined_list(['a', 'b'], conjunction='or') == 'a or b'
+    assert conjoined_list(['a', 'b', 'c'], conjunction='or') == 'a, b or c'
+    assert conjoined_list(['a', 'b', 'c', 'd'], conjunction='or') == 'a, b, c or d'
+    assert conjoined_list(['a', 'b', 'c', 'd'], conjunction='or', oxford_comma=True) == 'a, b, c, or d'
+
+    assert conjoined_list(['a'], conjunction='AND') == 'a'
+    assert conjoined_list(['a', 'b'], conjunction='AND') == 'a AND b'
+    assert conjoined_list(['a', 'b', 'c', 'd'], conjunction='AND') == 'a, b, c AND d'
+    assert conjoined_list(['a', 'b', 'c', 'd'], conjunction='AND', oxford_comma=True) == 'a, b, c, AND d'
+
+    assert conjoined_list(['a'], comma=';') == 'a'
+    assert conjoined_list(['a', 'b'], comma=';') == 'a and b'
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=';') == 'a; b; c and d'
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=';', oxford_comma=True) == 'a; b; c; and d'
+
+    assert conjoined_list(['a'], comma=False) == 'a'
+    assert conjoined_list(['a', 'b'], comma=False) == 'a and b'
+    assert conjoined_list(['a', 'b', 'c'], comma=False) == 'a and b and c'
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=False) == 'a and b and c and d'
+    # oxford_comma does nothing if comma is disabled.
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=False, oxford_comma=True) == 'a and b and c and d'
+
+    assert conjoined_list(['a'], comma=False, whitespace='_') == 'a'
+    assert conjoined_list(['a', 'b'], comma=False, whitespace='_') == 'a_and_b'
+    assert conjoined_list(['a', 'b', 'c'], comma=False, whitespace='_') == 'a_and_b_and_c'
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=False, whitespace='_') == 'a_and_b_and_c_and_d'
+    # oxford_comma does nothing if comma is disabled.
+    assert conjoined_list(['a', 'b', 'c', 'd'], comma=False, whitespace='_', oxford_comma=True) == 'a_and_b_and_c_and_d'
+
+    # Verify that the same function is a method
+    assert EnglishUtils.conjoined_list([], nothing='nothing') == 'nothing'
+    assert EnglishUtils.conjoined_list(['a']) == 'a'
+    assert EnglishUtils.conjoined_list(['a', 'b']) == 'a and b'
+    assert EnglishUtils.conjoined_list(['a', 'b', 'c']) == 'a, b and c'
+    assert EnglishUtils.conjoined_list(['a', 'b', 'c', 'd']) == 'a, b, c and d'
+
+    # For a set, we use the elements sorted.
+    assert conjoined_list({'apple', 'lemon', 'grape'}) == 'apple, grape and lemon'
+
+    # For dictionary, we use the keys in the order they occur.
+    assert conjoined_list({'apple': 'delicious', 'lemon': 'meyer', 'grape': 'seedless'}) == 'apple, lemon and grape'
+
+
+def test_disjoined_list():
+
+    assert disjoined_list(['a']) == 'a'
+    assert disjoined_list(['a', 'b']) == 'a or b'
+    assert disjoined_list(['a', 'b', 'c']) == 'a, b or c'
+    assert disjoined_list(['a', 'b', 'c', 'd']) == 'a, b, c or d'
+
+    assert disjoined_list(['a'], oxford_comma=True) == 'a'
+    assert disjoined_list(['a', 'b'], oxford_comma=True) == 'a or b'
+    assert disjoined_list(['a', 'b', 'c'], oxford_comma=True) == 'a, b, or c'
+    assert disjoined_list(['a', 'b', 'c', 'd'], oxford_comma=True) == 'a, b, c, or d'
+
+    # For a set, we use the elements sorted.
+    assert disjoined_list({'apple', 'lemon', 'grape'}) == 'apple, grape or lemon'
+
+    # For dictionary, we use the keys in the order they occur.
+    assert disjoined_list({'apple': 'delicious', 'lemon': 'meyer', 'grape': 'seedless'}) == 'apple, lemon or grape'
+
+
+def test_there_are():
+
+    assert there_are([]) == "There are no things."
+    assert there_are([], zero=0) == "There are 0 things."
+
+    assert there_are(['foo']) == "There is 1 thing: foo"
+    assert there_are(['foo'], punctuate=True) == "There is 1 thing: foo."
+
+    assert there_are(['box', 'bugle', 'bear']) == "There are 3 things: box, bugle, bear"
+    assert there_are(['box', 'bugle', 'bear'], joiner=conjoined_list) == "There are 3 things: box, bugle and bear"
+    assert there_are(['box', 'bugle', 'bear'],
+                     joiner=conjoined_list, oxford_comma=True) == "There are 3 things: box, bugle, and bear"
+    assert there_are(['box', 'bugle', 'bear'],
+                     joiner=conjoined_list, oxford_comma=True, kind="option", conjunction="or"
+                     ) == "There are 3 options: box, bugle, or bear"
+    assert there_are(['apple', 'egg', 'steak'], use_article=True, punctuate=True,
+                     joiner=disjoined_list, oxford_comma=True, kind="option", conjunction="or",
+                     ) == "There are 3 options: an apple, an egg, or a steak."
+    assert there_are(['apple', 'egg', 'steak'], use_article=True, joiner=conjoined_list, kind="option", punctuate=True,
+                     ) == "There are 3 options: an apple, an egg and a steak."
+
+    assert there_are([2, 3, 5, 7], kind="single-digit prime") == "There are 4 single-digit primes: 2, 3, 5, 7"
+    assert there_are([2, 3, 5, 7], kind="single-digit prime", punctuate=True, joiner=conjoined_list,
+                     ) == "There are 4 single-digit primes: 2, 3, 5 and 7."
+
+    # From the doc strings
+
+    assert there_are(['Joe', 'Sally'], kind="user") == "There are 2 users: Joe, Sally"
+    assert there_are(['Joe', 'Sally'], kind="user", show=False) == "There are 2 users."
+    assert there_are(['Joe', 'Sally'], kind="user", show=False, context="online") == "There are 2 users online."
+    assert there_are(['Joe'], kind="user") == "There is 1 user: Joe"
+    assert there_are([], kind="user") == "There are no users."
+    assert there_are([], kind="user", context="online") == "There are no users online."
+
+    assert there_are(['Joe', 'Sally'], kind="user", joiner=conjoined_list, punctuate=True
+                     ) == "There are 2 users: Joe and Sally."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=True) == "There is 1 user: Joe."
+    assert there_are([], kind="user", joiner=conjoined_list, punctuate=True) == "There are no users."
+
+    assert there_are([], kind="user", joiner=conjoined_list) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, punctuate=True) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, punctuate=None) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, punctuate=False) == "There are no users."
+
+    assert there_are([], kind="user", joiner=conjoined_list, show=False) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate=True) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate=None) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate=False) == "There are no users"
+
+    assert there_are([], kind="user", joiner=conjoined_list, show=False) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate_none=True) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate_none=None) == "There are no users."
+    assert there_are([], kind="user", joiner=conjoined_list, show=False, punctuate_none=False) == "There are no users"
+
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list) == "There is 1 user: Joe"
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=True) == "There is 1 user: Joe."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=None) == "There is 1 user: Joe"
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, punctuate=False) == "There is 1 user: Joe"
+
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate=True) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate=None) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate=False) == "There is 1 user"
+
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate_none=True) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate_none=None) == "There is 1 user."
+    assert there_are(['Joe'], kind="user", joiner=conjoined_list, show=False, punctuate_none=False) == "There is 1 user"
+
+    def check_tense(tense, if0, if1, if2):
+        assert there_are([], tense=tense, show=False, kind="foo") == if0
+        assert there_are(['x'], tense=tense, show=False, kind="foo") == if1
+        assert there_are(['x', 'y'], tense=tense, show=False, kind="foo") == if2
+
+    check_tense('past',
+                if0="There were no foos.",
+                if1="There was 1 foo.",
+                if2="There were 2 foos.")
+
+    check_tense('present',
+                if0="There are no foos.",
+                if1="There is 1 foo.",
+                if2="There are 2 foos.")
+
+    check_tense('will',
+                if0="There will be no foos.",
+                if1="There will be 1 foo.",
+                if2="There will be 2 foos.")
+
+    check_tense('would',
+                if0="There would be no foos.",
+                if1="There would be 1 foo.",
+                if2="There would be 2 foos.")
+
+    check_tense('past-perfect',
+                if0="There have been no foos.",
+                if1="There has been 1 foo.",
+                if2="There have been 2 foos.")
+
+    expected_error = ("The tense given, randomness, was"
+                      " neither a supported tense (past, past-perfect or present)"
+                      " nor a modal (can, could, may, might, must, shall, should, will or would).")
+    with pytest.raises(ValueError, match=re.escape(expected_error)):
+        there_are([], tense='randomness', show=False, kind="foo")
+
+
+def test_must_be():
+
+    assert must_be_one_of([], possible=False) == "There are no options."
+    assert must_be_one_of(['foo'], possible=False) == "The only option is foo."
+    assert must_be_one_of(['foo', 'bar'], possible=False) == "Options are foo and bar."
+    assert must_be_one_of(['foo', 'bar', 'baz'], possible=False) == "Options are foo, bar and baz."
+
+    assert must_be_one_of([]) == "There are no possible options."
+    assert must_be_one_of(['foo']) == "The only possible option is foo."
+    assert must_be_one_of(['foo', 'bar']) == "Possible options are foo and bar."
+    assert must_be_one_of(['foo', 'bar', 'baz']) == "Possible options are foo, bar and baz."
+
+    assert must_be_one_of([], quote=True) == "There are no possible options."
+    assert must_be_one_of(['foo'], quote=True) == "The only possible option is 'foo'."
+    assert must_be_one_of(['foo', 'bar'], quote=True) == "Possible options are 'foo' and 'bar'."
+    assert must_be_one_of(['foo', 'bar', 'baz'], quote=True) == "Possible options are 'foo', 'bar' and 'baz'."
+
+    assert must_be_one_of([], possible='valid', kind='argument') == "There are no valid arguments."
+    assert must_be_one_of(['A'], possible='valid', kind='argument') == "The only valid argument is A."
+    assert must_be_one_of(['A', 'B'], possible='valid', kind='argument') == "Valid arguments are A and B."
+    assert must_be_one_of(['A', 'B', 'C'], possible='valid', kind='argument') == "Valid arguments are A, B and C."
+
+
+def test_maybe_pluralize():
+
+    assert maybe_pluralize(0, 'gene') == 'genes'
+    assert maybe_pluralize(1, 'gene') == 'gene'
+    assert maybe_pluralize(2, 'gene') == 'genes'
+    assert maybe_pluralize(3, 'gene') == 'genes'
+
+    assert maybe_pluralize([], 'gene') == 'genes'
+    assert maybe_pluralize(['a'], 'gene') == 'gene'
+    assert maybe_pluralize(['a', 'b'], 'gene') == 'genes'
+    assert maybe_pluralize(['a', 'b', 'c'], 'gene') == 'genes'
