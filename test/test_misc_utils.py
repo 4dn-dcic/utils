@@ -1,3 +1,5 @@
+import datetime
+
 import botocore.exceptions
 import datetime as datetime_module
 import functools
@@ -3201,12 +3203,10 @@ class TestTopologicalSorter:
 
 def test_utc_now_str():
 
-    t0 = datetime_module.datetime(2013, 1, 1, 7, 34, 56)
-
-    dt = ControlledTime(t0)  # 2013-01-01 12:34:56
-
+    dt = ControlledTime()
     with mock.patch("dcicutils.misc_utils.datetime", dt):
-
-        # This will be one second after t0 because measuring the current time
-        # in out ControlledTime world costs 1 virtual second.
-        assert utc_now_str() == "2013-01-01T12:34:57+00:00"
+        # One cannot patch datetime.datetime directly because it's a primitive type,
+        # but patching a ControlledTime once it's installed in the same place works OK.
+        with mock.patch.object(dt.datetime, "utcnow") as mock_utcnow:
+            mock_utcnow.return_value = datetime_module.datetime(2013, 1, 1, 12, 34, 56)
+            assert utc_now_str() == "2013-01-01T12:34:56+00:00"
