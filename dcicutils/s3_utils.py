@@ -5,10 +5,17 @@ import mimetypes
 import os
 
 from io import BytesIO
-from typing import Any
+from typing import Optional, Any, Union
+from typing_extensions import Literal
 from zipfile import ZipFile
 from .base import get_beanstalk_real_url
-from .common import EnvName
+from .common import (
+    EnvName,
+    # LegacyAuthDict, AnyAuthDict, AuthDict,
+    AnyJsonData, KeyValuestringDictList,
+    # KeyValuestringDict, PortalEnvName,
+    S3KeyName, S3BucketName, ServerAuthDict
+)
 from .env_base import s3Base
 from .env_manager import EnvManager
 from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name, get_env_real_url, EnvUtils
@@ -154,6 +161,9 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
                     tibanna_output_bucket = tibanna_output_bucket_from_health_page
                 logger.warning('Buckets resolved successfully.')
             else:
+                # TODO: We require global env bucket to be set everywhere now, so can we throw an error here?
+                #       -kmp 1-Mar-2023
+
                 # raise BeanstalkOperationNotImplemented(
                 #     operation="s3Utils.__init__",
                 #     message="s3Utils bucket initialization with no global env bucket is not implemented"
@@ -198,6 +208,7 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             # those won't be needed. -kmp 23-Jun-2021
             pass
 
+        # NOTE: At this point, self.url is set to the empty string. Use this initialization sequence only for debugging.
         self.sys_bucket = sys_bucket
         self.outfile_bucket = outfile_bucket
         self.raw_file_bucket = raw_file_bucket
@@ -260,7 +271,14 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
 
     ACCESS_KEYS_S3_KEY = 'access_key_admin'
 
-    def get_access_keys(self, name=ACCESS_KEYS_S3_KEY):
+    def get_access_keys(self, name: str = ACCESS_KEYS_S3_KEY) -> ServerAuthDict:
+        # TODO: Make .get_access_keys() do better error checking?
+        #       I have marked the return value as ServerAuthDict because it's CLEAR that various callers
+        #       assume that values coming back from this function are in the right form. e.g.,
+        #       ff_utils.get_authentication_with_server will give a hard error if this ever returns
+        #       something with a server missing.  So presumably we mostly do the right thing here.
+        #       It would be much better to properly error-check the result here or even in .get_key().
+        #       -kmp 1-Mar-2023
         keys = self.get_key(keyfile_name=name)
         if not isinstance(keys, dict):
             raise ValueError("Remotely stored access keys are not in the expected form")
@@ -268,44 +286,58 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
         if isinstance(keys.get('default'), dict):
             keys = keys['default']
         if self.url:
+            # NOTE WELL: self.url might contain the empty string if S3Utils was initialized with a system bucket
+            #            instead of an ff_env. Moreover, we are overwriting whatever server was actually stored
+            #            on the server, so we might be overwriting good data with bad. We should document that in
+            #            fact self.url needs to always be set to a non-empty value by the time we reach here, and
+            #            probably raise an error otherwise. We should also raise an error if there's a server
+            #            in the data we retrieved because it's just not going to get used.  -kmp 1-Mar-2023
             keys['server'] = self.url
-        return keys
+        return keys  # Might still have no server if self.url was not a URL
 
-    def get_ff_key(self):
+    def get_ff_key(self) -> ServerAuthDict:
+        # TODO: The return value should be just AuthDict if we decide get_access_keys() can't guarantee ServerAuthDict.
         return self.get_access_keys()
 
-    def get_higlass_key(self):
+    def get_higlass_key(self) -> Union[AnyJsonData, str]:  # parsed json or string that won't parse
+        # TODO: It would be nice if this could be returning something with a better promise. -kmp 1-Mar-2023
         # higlass key corresponds to Django server super user credentials
         return self.get_key(keyfile_name='api_key_higlass')
 
-    def get_google_key(self):
+    def get_google_key(self) -> Union[AnyJsonData, str]:  # parsed json or string that won't parse
+        # TODO: It would be nice if this could be returning something with a better promise. -kmp 1-Mar-2023
         return self.get_key(keyfile_name='api_key_google')
 
-    def get_jupyterhub_key(self):
+    def get_jupyterhub_key(self) -> Union[AnyJsonData, str]:  # parsed json or string that won't parse
+        # TODO: It would be nice if this could be returning something with a better promise. -kmp 1-Mar-2023
         # jupyterhub key is a Jupyterhub API token
         return self.get_key(keyfile_name='api_key_jupyterhub')
 
-    def get_key(self, keyfile_name='access_key_admin'):
+    def get_key(self, keyfile_name: str = 'access_key_admin'
+                ) -> Union[AnyJsonData, str]:  # parsed json or string that won't parse
         # Share secret encrypted S3 File
         response = self.s3.get_object(Bucket=self.sys_bucket,
                                       Key=keyfile_name,
                                       SSECustomerKey=os.environ['S3_ENCRYPT_KEY'],
                                       SSECustomerAlgorithm='AES256')
-        akey = response['Body'].read()
+        akey: Union[bytes, str] = response['Body'].read()
         if type(akey) == bytes:
-            akey = akey.decode()
+            akey: str = akey.decode()
         try:
             return json.loads(akey)
         except (ValueError, TypeError):
+            # TODO: Is there really a use case for this returning non-JSON data? If so, can we make a different
+            #       function that does this? Because this is just going to return garbage when peopla are expecting
+            #       key dictionaries and we really should raise an error in that case. -kmp 1-Mar-2023
             # maybe its not json after all
             return akey
 
-    def read_s3(self, filename):
+    def read_s3(self, filename: str):
         response = self.s3.get_object(Bucket=self.outfile_bucket, Key=filename)
         logger.info(str(response))
         return response['Body'].read()
 
-    def does_key_exist(self, key, bucket=None, print_error=True):
+    def does_key_exist(self, key: str, bucket: str = None, print_error: bool = True) -> Union[Literal[False], dict]:
         if not bucket:
             bucket = self.outfile_bucket
         try:
@@ -317,7 +349,7 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             return False
         return file_metadata
 
-    def get_object_tags(self, *, bucket, key):
+    def get_object_tags(self, *, bucket, key) -> KeyValuestringDictList:
         """
         Get all tags of an object.
 
@@ -340,7 +372,7 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             logger.warning(f'Could not get tags for object {bucket}/{key}: {str(e)}')
             raise e
 
-    def set_object_tag(self, *, bucket, key, tag_key, tag_value):
+    def set_object_tag(self, *, bucket: str, key: str, tag_key: str, tag_value: str):
         """
         Adds (tag_key,tag_value) pair to the object. If a tag with key tag_key is already present,
         it will be overwritten.
@@ -362,7 +394,7 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             merge_existing_tags=True,
         )
 
-    def set_object_tags(self, *, bucket, key, tags, merge_existing_tags=True):
+    def set_object_tags(self, *, bucket: str, key: str, tags: KeyValuestringDictList, merge_existing_tags: bool = True):
         """
         Adds or replaces tags of an object with the ones specified in `tags`.
 
@@ -394,8 +426,8 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             logger.warning(f'{bucket}/{key} could not be tagged: {str(e)}')
             raise e
 
-    def get_file_size(self, key, bucket=None, add_bytes=0, add_gb=0,
-                      size_in_gb=False):
+    def get_file_size(self, key: S3KeyName, bucket: Optional[S3BucketName] = None,
+                      add_bytes: int = 0, add_gb: int = 0, size_in_gb: bool = False):
         """
         default returns file size in bytes,
         unless size_in_gb = True
@@ -410,15 +442,16 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             size = size / one_gb
         return size
 
-    def delete_key(self, key, bucket=None):
+    def delete_key(self, key, bucket: Optional[str] = None) -> None:
         if not bucket:
             bucket = self.outfile_bucket
         self.s3.delete_object(Bucket=bucket, Key=key)
 
     @classmethod
-    def size(cls, bucket):
+    def size(cls, bucket: str) -> int:
         sbuck = boto3.resource('s3').Bucket(bucket)
         # get only head of objects so we can count them
+        # Is there really no .count() ? -kmp 1-Mar-2023
         return sum(1 for _ in sbuck.objects.all())
 
     def s3_put(self, obj, upload_key, acl=None):

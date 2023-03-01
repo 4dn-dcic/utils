@@ -8,9 +8,14 @@ import time
 from collections import namedtuple
 from dcicutils.lang_utils import disjoined_list
 from elasticsearch.exceptions import AuthorizationException
-from typing import Dict, List
+from typing import Optional, Dict, List
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from . import s3_utils, es_utils
+from .common import (
+    # KeyValuestringDictList, KeyValuestringDict,
+    AnyAuthDict, AuthDict, SimpleAuthPair, AuthData, AnyAuthData, PortalEnvName,
+    # S3BucketName, S3KeyName,
+)
 from .misc_utils import PRINT
 
 
@@ -1216,13 +1221,14 @@ class UnifiedAuthenticator:
 
     class AuthenticationError(Exception):
 
-        def __init__(self, message, auth, ff_env):
+        def __init__(self, message: str, auth: Optional[AnyAuthData], ff_env: Optional[PortalEnvName]):
             self.auth = auth
             self.ff_env = ff_env
-            super().__init__(message + (" You gave auth=%s, ff_env=%s" % (auth, ff_env)))
+            super().__init__(f"{message} You gave auth={auth}, ff_env={ff_env}")
 
     @classmethod
-    def unified_authentication(cls, auth=None, ff_env=None):
+    def unified_authentication(cls, auth: Optional[AnyAuthDict] = None,
+                               ff_env: Optional[PortalEnvName] = None) -> SimpleAuthPair:
         """
         One authentication function to rule them all.
         Has several options for authentication, which are:
@@ -1257,11 +1263,17 @@ class UnifiedAuthenticator:
                                           auth=auth, ff_env=ff_env)
 
     @classmethod
-    def get_auth_from_s3(cls, env):
+    def get_auth_from_s3(cls, env: Optional[PortalEnvName]) -> AuthDict:
+        """
+        Returns an AuthDict found on s3.
+
+        Unwrapping any remotely stored LegacyAuthDict happens internally to this function,
+        inside the call to s3Utils.get_access_keys.
+        """
         return s3_utils.s3Utils(env=env).get_access_keys()
 
     @classmethod
-    def maybe_unwrap_legacy_auth(cls, auth):
+    def maybe_unwrap_legacy_auth(cls, auth: AnyAuthDict) -> AuthDict:
         # Compatibility with old form of auth from get_key()
         # If {"default": {...auth...}, ...} is given, peel off outer wrapper and use the inner {...auth...} part.
         if isinstance(auth, dict) and isinstance(auth.get('default'), dict):
@@ -1269,7 +1281,7 @@ class UnifiedAuthenticator:
         return auth
 
     @classmethod
-    def normalize_auth(cls, auth):
+    def normalize_auth(cls, auth: AuthData) -> Optional[SimpleAuthPair]:
         if isinstance(auth, dict) and 'key' in auth and 'secret' in auth:
             return (auth['key'],
                     auth['secret'])
@@ -1282,7 +1294,7 @@ class UnifiedAuthenticator:
 unified_authentication = UnifiedAuthenticator.unified_authentication
 
 
-def get_authentication_with_server(auth=None, ff_env=None):
+def get_authentication_with_server(auth: AnyAuthDict = None, ff_env: Optional[PortalEnvName] = None):
     """
     Pass in authentication information and ff_env and attempts to either
     retrieve the server info from the auth, or if it cannot, get the

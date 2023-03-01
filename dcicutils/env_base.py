@@ -6,8 +6,8 @@ import contextlib
 import os
 # import urllib.request
 
-# from typing import Optional
-from .common import LEGACY_GLOBAL_ENV_BUCKET
+from typing import Optional
+from .common import LEGACY_GLOBAL_ENV_BUCKET, S3BucketName
 from .exceptions import (
     # CannotInferEnvFromManyGlobalEnvs,
     # MissingGlobalEnv,
@@ -27,7 +27,7 @@ class LegacyController:
 class EnvBase:
 
     @classmethod
-    def global_env_bucket_name(cls):
+    def global_env_bucket_name(cls) -> Optional[S3BucketName]:
         """
         This class method returns the name of the current 'global env bucket', the bucket where meanings of
         environment names are looked up in orchestrated environments.
@@ -60,7 +60,7 @@ class EnvBase:
         os.environ['GLOBAL_BUCKET_ENV'] = bucket_name  # Deprecated, but set for consistency.
 
     @classmethod
-    def _legacy_global_env_bucket_for_testing(cls):
+    def _legacy_global_env_bucket_for_testing(cls) -> S3BucketName:
         if not LegacyController.LEGACY_DISPATCH_ENABLED:
             raise LegacyDispatchDisabled(operation="_legacy_global_env_bucket_for_testing", mode='setup-envbase')
         # Strictly speaking, this isn't accessing the legacy state, but it's definitely not accessin gproduction state,
