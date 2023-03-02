@@ -589,14 +589,13 @@ class _PrintCapturer:
         self.last: Optional[str] = None
         self.file_lines: DefaultDict[Optional[str], List[str]] = self._file_lines_dict()
         self.file_last: DefaultDict[Optional[str], Optional[str]] = self._file_last_dict()
-        self.reset()
 
     @classmethod
-    def _file_lines_dict(cls):
+    def _file_lines_dict(cls) -> DefaultDict[Optional[str], List[str]]:
         return defaultdict(lambda: [])
 
     @classmethod
-    def _file_last_dict(cls):
+    def _file_last_dict(cls) -> DefaultDict[Optional[str], Optional[str]]:
         return defaultdict(lambda: None)
 
     def mock_print_handler(self, *args, **kwargs):
