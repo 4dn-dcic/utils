@@ -7,6 +7,36 @@ Change Log
 ----------
 
 
+6.11.0
+======
+
+* In ``dcicutils.command_utils``:
+
+  * Make ``script_catch_errors`` context manager return a ``fail``
+    function that can be called to bypass the warning that an error
+    needs to be reported.
+
+* In ``dcicutils.common``:
+
+  * Add a number of type hints.
+
+* In ``dcicutils.ff_utils``:
+
+  * Refactor ``unified_authentication`` to be object-oriented.
+
+  * Add some type hinting.
+
+* In ``dcicutisl.env_base`` and ``dcicutils.s3_utils``:
+
+  * Add some type hinting and comments about possible future error checking.
+
+* In ``dcicutils.misc_utils``:
+
+  * New function ``utc_now_str``
+
+* Misc PEP8
+
+
 6.10.0
 =====
 
