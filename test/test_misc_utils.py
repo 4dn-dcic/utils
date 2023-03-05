@@ -1,5 +1,3 @@
-import datetime
-
 import botocore.exceptions
 import datetime as datetime_module
 import functools

@@ -1,10 +1,6 @@
 import boto3
-# import botocore.client
 import contextlib
-# import json
-# import logging
 import os
-# import urllib.request
 
 from typing import Optional
 from .common import LEGACY_GLOBAL_ENV_BUCKET, S3BucketName
