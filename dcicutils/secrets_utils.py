@@ -117,7 +117,8 @@ def apply_overrides(*, secrets: dict, rename_keys: Optional[dict] = None,
                 raise ValueError(f"Cannot rename {key} to {new_name}"
                                  f" because {a_or_an(new_name)} attribute already exists.")
             if key not in secrets:
-                raise ValueError(f"Cannot rename {key} to {new_name} because the secrets has no {key} attribute.")
+                logger.warning(f"Cannot rename {key} to {new_name} because the secrets has no {key} attribute.")
+                continue
             secrets[new_name] = secrets.pop(key)
     if override_values:
         secrets = dict(secrets, **override_values)

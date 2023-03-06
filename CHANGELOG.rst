@@ -6,7 +6,7 @@ dcicutils
 Change Log
 ----------
 
-6.9.9.0b4
+6.9.9.0b5
 =========
 
 * To become 7.0.0
