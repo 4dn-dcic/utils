@@ -12,12 +12,28 @@ Change Log
 * To become 7.0.0
 * Adds Redis functionality
 
+
+6.10.0
+=====
+
+* Move ``mocked_s3utils_with_sse`` from ``test_ff_utils.py`` to ``ff_mocks.py``.
+
+
+6.9.0
+=====
+
+* In ``dcicutils.misc_utils``:
+
+  * Add method ``is_c4_arn`` to check if given ARN looks like CGAP or Fourfront entity.
+
+
 6.8.0
 =====
 
 * In `dcicutils.deployment_utils``
 
   * Add support for ``Auth0Domain`` and ``Auth0AllowedConnections``
+
 
 
 6.7.0

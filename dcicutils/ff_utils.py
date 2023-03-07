@@ -6,13 +6,11 @@ import requests
 import time
 
 from collections import namedtuple
+from dcicutils.lang_utils import disjoined_list
 from elasticsearch.exceptions import AuthorizationException
 from typing import Dict, List
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
-from . import (
-    s3_utils,
-    es_utils,
-)
+from . import s3_utils, es_utils
 from .misc_utils import PRINT
 
 
@@ -107,8 +105,6 @@ def search_request_with_retries(request_fxn, url, auth, verb, **kwargs):
         try:
             res_json = res.json()
         except ValueError:
-            # PyCharm notes this is unused. -kmp 17-Jul-2020
-            # res_json = {}
             try:
                 res.raise_for_status()
             except Exception as e:
@@ -238,7 +234,7 @@ def internal_compute_authorized_request(url, *, auth, ff_env, verb, retry_fxn, *
     authorized_request('https://data.4dnucleome.org/<some path>', ff_env='fourfront-webprod')
     """
     # Save to uncomment if debugging unit tests...
-    # print("authorized_request\n URL=%s\n auth=%s\n ff_env=%s\n verb=%s\n" % (url, auth, ff_env, verb))
+    # print(f"authorized_request\n URL={url}\n auth={auth}\n ff_env={ff_env}\n verb={verb}\n")
     use_auth = unified_authentication(auth, ff_env)
     headers = kwargs.get('headers')
     if not headers:
@@ -246,11 +242,12 @@ def internal_compute_authorized_request(url, *, auth, ff_env, verb, retry_fxn, *
     if 'timeout' not in kwargs:
         kwargs['timeout'] = 60  # default timeout
 
+    verb_upper = verb
     try:
-        the_verb = REQUESTS_VERBS[verb.upper()]
+        verb_upper = verb.upper()
+        the_verb = REQUESTS_VERBS[verb_upper]
     except KeyError:
-        raise ValueError("Provided verb %s is not valid. Must be one of: %s"
-                         % (verb.upper(), ', '.join(REQUESTS_VERBS.keys())))
+        raise ValueError(f"Provided verb {verb} is not valid. Must be one of {disjoined_list(REQUESTS_VERBS)}.")
     # automatically detect a search and overwrite the retry if it is standard
     if '/search/' in url and retry_fxn == standard_request_with_retries:
         retry_fxn = search_request_with_retries
@@ -262,7 +259,15 @@ def internal_compute_authorized_request(url, *, auth, ff_env, verb, retry_fxn, *
 
 
 def _sls(val):
-    """general helper to check for and strip leading slashes on ids in API fxns
+    """
+    Helper to strip any leading slashes on ids in API functions.
+    Examples:
+        >>> _sls('foo')
+        foo
+        >>> _sls('/foo')
+        foo
+        >>> _sls('/foo/bar/baz/')
+        foo/bar/baz/
     """
     return val.lstrip('/')
 

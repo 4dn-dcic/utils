@@ -190,6 +190,23 @@ def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=
                                         yield mock_boto3
 
 
+DEFAULT_SSE_ENVIRONMENTS_TO_MOCK = ['fourfront-foo', 'fourfront-bar']
+
+
+@contextlib.contextmanager
+def mocked_s3utils_with_sse(beanstalks=None, environments=None, require_sse=True, files=None):
+    # beanstalks= is deprecated. Use environments= instead.
+    environments = (DEFAULT_SSE_ENVIRONMENTS_TO_MOCK
+                    if beanstalks is None and environments is None
+                    else (beanstalks or []) + (environments or []))
+    with mocked_s3utils(environments=environments, require_sse=require_sse) as mock_boto3:
+        s3 = mock_boto3.client('s3')
+        assert isinstance(s3, MockBotoS3Client)
+        for filename, string in (files or {}).items():
+            s3.s3_files.files[filename] = string.encode('utf-8')
+        yield mock_boto3
+
+
 # Here we set up some variables, auxiliary functions, and mocks containing common values needed for testing
 # of the next several functions so that the functions don't have to set them up over
 # and over again in each test.

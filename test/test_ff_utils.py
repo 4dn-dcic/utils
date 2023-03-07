@@ -1,4 +1,3 @@
-import contextlib
 import copy
 import json
 import os
@@ -9,11 +8,10 @@ import time
 
 from botocore.exceptions import ClientError
 from dcicutils import es_utils, ff_utils, s3_utils
-from dcicutils.ff_mocks import mocked_s3utils, TestScenarios, RequestsTestRecorder
+from dcicutils.ff_mocks import mocked_s3utils_with_sse, TestScenarios, RequestsTestRecorder
 from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true
 from dcicutils.qa_utils import (
     check_duplicated_items_by_key, ignored, raises_regexp, MockResponse, MockBoto3, MockBotoSQSClient,
-    MockBotoS3Client,
 )
 from types import GeneratorType
 from unittest import mock
@@ -239,16 +237,17 @@ def test_unified_authentication_decoding(integrated_ff):
                 ff_utils.unified_authentication(None, any_env)
             assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
-
-@contextlib.contextmanager
-def mocked_s3utils_with_sse(beanstalks=None, require_sse=True, files=None):
-    with mocked_s3utils(environments=beanstalks or ['fourfront-foo', 'fourfront-bar'],
-                        require_sse=require_sse) as mock_boto3:
-        s3 = mock_boto3.client('s3')
-        assert isinstance(s3, MockBotoS3Client)
-        for filename, string in (files or {}).items():
-            s3.s3_files.files[filename] = string.encode('utf-8')
-        yield mock_boto3
+# moved to ff_mocks.py
+#
+# @contextlib.contextmanager
+# def mocked_s3utils_with_sse(beanstalks=None, require_sse=True, files=None):
+#     with mocked_s3utils(environments=beanstalks or ['fourfront-foo', 'fourfront-bar'],
+#                         require_sse=require_sse) as mock_boto3:
+#         s3 = mock_boto3.client('s3')
+#         assert isinstance(s3, MockBotoS3Client)
+#         for filename, string in (files or {}).items():
+#             s3.s3_files.files[filename] = string.encode('utf-8')
+#         yield mock_boto3
 
 
 def test_unified_authentication_unit():
