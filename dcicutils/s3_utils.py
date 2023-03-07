@@ -18,8 +18,8 @@ from .common import (
 )
 from .env_base import s3Base
 from .env_manager import EnvManager
-from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name, get_env_real_url, EnvUtils
-from .exceptions import InferredBucketConflict
+from .env_utils import full_env_name, get_env_real_url, EnvUtils
+from .exceptions import InferredBucketConflict, BeanstalkOperationNotImplemented
 from .misc_utils import PRINT, exported, merge_key_value_dict_lists, key_value_dict
 
 
@@ -161,46 +161,44 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
                     tibanna_output_bucket = tibanna_output_bucket_from_health_page
                 logger.warning('Buckets resolved successfully.')
             else:
-                # TODO: We require global env bucket to be set everywhere now, so can we throw an error here?
-                #       -kmp 1-Mar-2023
-
-                # raise BeanstalkOperationNotImplemented(
-                #     operation="s3Utils.__init__",
-                #     message="s3Utils bucket initialization with no global env bucket is not implemented"
-                # )
+                raise BeanstalkOperationNotImplemented(
+                    operation="s3Utils.__init__",
+                    message="s3Utils bucket initialization with no global env bucket is no longer implemented."
+                )
                 # We believe it would do the wrong thing in several places to continue into this...
-
-                # staging and production share same buckets
-                # TODO: As noted in some of the comments on this conditional, when the new env_utils with
-                #       orchestration support is in place, this same generality needs to be done
-                #       upstream of the global env bucket branch, too. That's not needed for orchestrated cgap,
-                #       which has no stage, but it will be needed for orchestrated fourfront. -kmp 31-Aug-2021
-                if env:
-                    if is_stg_or_prd_env(env):
-                        self.url = get_beanstalk_real_url(env)  # done BEFORE prod_bucket_env blurring stg/prd
-                        # this used to return fourfront-webprod for BOTH staging and data
-                        # now in fact this doesn't even return, it throws an error.
-                        env = prod_bucket_env(env)  # noQA - raises error if called
-                    else:
-                        env = full_env_name(env)
-                        self.url = get_beanstalk_real_url(env)  # done AFTER maybe prepending cgap- or foursight-.
-
-                    es_url = self._infer_es_url()
-                    self.env_manager = EnvManager.compose(portal_url=self.url, es_url=es_url, env_name=env, s3=self.s3)
-                    self.s3_encrypt_key_id = self.health_page_get(HealthPageKey.S3_ENCRYPT_KEY_ID, default=None)
-
-                # TODO: This branch is not setting self.global_env_bucket_manager, but it _could_ do that from the
-                #       description. -kmp 21-Aug-2021
-                def apply_template(template, env):
-                    return template % env if "%s" in template else template
-                # we use standardized naming schema, so s3 buckets always have same prefix
-                sys_bucket = apply_template(self.SYS_BUCKET_TEMPLATE, env)
-                outfile_bucket = apply_template(self.OUTFILE_BUCKET_TEMPLATE, env)
-                raw_file_bucket = apply_template(self.RAW_BUCKET_TEMPLATE, env)
-                blob_bucket = apply_template(self.BLOB_BUCKET_TEMPLATE, env)
-                metadata_bucket = apply_template(self.METADATA_BUCKET_TEMPLATE, env)
-                tibanna_cwls_bucket = apply_template(self.TIBANNA_CWLS_BUCKET_TEMPLATE, env)
-                tibanna_output_bucket = apply_template(self.TIBANNA_OUTPUT_BUCKET_TEMPLATE, env)
+                #
+                # # staging and production share same buckets
+                # # TODO: As noted in some of the comments on this conditional, when the new env_utils with
+                # #       orchestration support is in place, this same generality needs to be done
+                # #       upstream of the global env bucket branch, too. That's not needed for orchestrated cgap,
+                # #       which has no stage, but it will be needed for orchestrated fourfront. -kmp 31-Aug-2021
+                # if env:
+                #     if is_stg_or_prd_env(env):
+                #         self.url = get_beanstalk_real_url(env)  # done BEFORE prod_bucket_env blurring stg/prd
+                #         # this used to return fourfront-webprod for BOTH staging and data
+                #         # now in fact this doesn't even return, it throws an error.
+                #         env = prod_bucket_env(env)  # noQA - raises error if called
+                #     else:
+                #         env = full_env_name(env)
+                #         self.url = get_beanstalk_real_url(env)  # done AFTER maybe prepending cgap- or foursight-.
+                #
+                #     es_url = self._infer_es_url()
+                #     self.env_manager = EnvManager.compose(portal_url=self.url, es_url=es_url,
+                #                                           env_name=env, s3=self.s3)
+                #     self.s3_encrypt_key_id = self.health_page_get(HealthPageKey.S3_ENCRYPT_KEY_ID, default=None)
+                #
+                # # TODO: This branch is not setting self.global_env_bucket_manager, but it _could_ do that from the
+                # #       description. -kmp 21-Aug-2021
+                # def apply_template(template, env):
+                #     return template % env if "%s" in template else template
+                # # we use standardized naming schema, so s3 buckets always have same prefix
+                # sys_bucket = apply_template(self.SYS_BUCKET_TEMPLATE, env)
+                # outfile_bucket = apply_template(self.OUTFILE_BUCKET_TEMPLATE, env)
+                # raw_file_bucket = apply_template(self.RAW_BUCKET_TEMPLATE, env)
+                # blob_bucket = apply_template(self.BLOB_BUCKET_TEMPLATE, env)
+                # metadata_bucket = apply_template(self.METADATA_BUCKET_TEMPLATE, env)
+                # tibanna_cwls_bucket = apply_template(self.TIBANNA_CWLS_BUCKET_TEMPLATE, env)
+                # tibanna_output_bucket = apply_template(self.TIBANNA_OUTPUT_BUCKET_TEMPLATE, env)
         else:
             # If at least sys_bucket was given, for legacy reasons (see https://hms-dbmi.atlassian.net/browse/C4-674)
             # we assume that the given buckets are exactly the ones we want and we don't set up any others.
@@ -271,32 +269,27 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
 
     ACCESS_KEYS_S3_KEY = 'access_key_admin'
 
-    def get_access_keys(self, name: str = ACCESS_KEYS_S3_KEY) -> ServerAuthDict:
-        # TODO: Make .get_access_keys() do better error checking?
-        #       I have marked the return value as ServerAuthDict because it's CLEAR that various callers
-        #       assume that values coming back from this function are in the right form. e.g.,
-        #       ff_utils.get_authentication_with_server will give a hard error if this ever returns
-        #       something with a server missing.  So presumably we mostly do the right thing here.
-        #       It would be much better to properly error-check the result here or even in .get_key().
-        #       -kmp 1-Mar-2023
-        keys = self.get_key(keyfile_name=name)
-        if not isinstance(keys, dict):
-            raise ValueError("Remotely stored access keys are not in the expected form")
+    def get_access_keys(self, name: str = ACCESS_KEYS_S3_KEY, require_key=True) -> ServerAuthDict:
 
-        if isinstance(keys.get('default'), dict):
+        keys = self.get_key(keyfile_name=name)
+
+        if not isinstance(keys, dict):
+            raise ValueError(f"Remotely stored {name} access keys are not in the expected form.")
+        elif 'default' in keys:
+            # If we have a LegacyAuthDict of the form {'default': <actual-auth-dict>}, peek off the wrapper.
             keys = keys['default']
+
         if self.url:
-            # NOTE WELL: self.url might contain the empty string if S3Utils was initialized with a system bucket
-            #            instead of an ff_env. Moreover, we are overwriting whatever server was actually stored
-            #            on the server, so we might be overwriting good data with bad. We should document that in
-            #            fact self.url needs to always be set to a non-empty value by the time we reach here, and
-            #            probably raise an error otherwise. We should also raise an error if there's a server
-            #            in the data we retrieved because it's just not going to get used.  -kmp 1-Mar-2023
+            if 'server' in keys and keys['server'] != self.url:
+                logger.info(f"get_access_keys is replacing server {keys['server']!r} with {self.url!r}.")
             keys['server'] = self.url
+
+        if (require_key and not keys.get('key')) or not keys.get('secret') or not keys.get('server'):
+            raise ValueError(f"After filling defaults, the {name} access keys are not in the expected form.")
+
         return keys  # Might still have no server if self.url was not a URL
 
     def get_ff_key(self) -> ServerAuthDict:
-        # TODO: The return value should be just AuthDict if we decide get_access_keys() can't guarantee ServerAuthDict.
         return self.get_access_keys()
 
     def get_higlass_key(self) -> Union[AnyJsonData, str]:  # parsed json or string that won't parse
@@ -320,17 +313,16 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
                                       Key=keyfile_name,
                                       SSECustomerKey=os.environ['S3_ENCRYPT_KEY'],
                                       SSECustomerAlgorithm='AES256')
-        akey: Union[bytes, str] = response['Body'].read()
-        if type(akey) == bytes:
-            akey: str = akey.decode()
+        body_data: Union[bytes, str] = response['Body'].read()
+        auth_text: str = body_data.decode() if type(body_data) == bytes else body_data
         try:
-            return json.loads(akey)
+            return json.loads(auth_text)
         except (ValueError, TypeError):
             # TODO: Is there really a use case for this returning non-JSON data? If so, can we make a different
             #       function that does this? Because this is just going to return garbage when peopla are expecting
             #       key dictionaries and we really should raise an error in that case. -kmp 1-Mar-2023
             # maybe its not json after all
-            return akey
+            return auth_text
 
     def read_s3(self, filename: str):
         response = self.s3.get_object(Bucket=self.outfile_bucket, Key=filename)
@@ -449,9 +441,14 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
 
     @classmethod
     def size(cls, bucket: str) -> int:
-        sbuck = boto3.resource('s3').Bucket(bucket)
-        # get only head of objects so we can count them
-        # Is there really no .count() ? -kmp 1-Mar-2023
+        """Slowly and expensively (if there are a lot of them), count the number of items in a bucket."""
+        sbuck = boto3.resource('s3').Bucket(bucket)  # get only head of objects so we can count them
+        # There is apparently no sbuck.objects.count(), so one has to enumerate them all.
+        # Although one avenue we didn't try that is mentioned in StackOverflow is to go to the billing department
+        # in the AWS console, whch knows how many objects there are.
+        # TODO: It is recommended that if there are expected to be a lot of objects, we should paginate through
+        #       them in chunks of 1000, rather than just pulling .all().
+        # Ref: https://stackoverflow.com/questions/2862617/how-can-i-tell-how-many-objects-ive-stored-in-an-s3-bucket
         return sum(1 for _ in sbuck.objects.all())
 
     def s3_put(self, obj, upload_key, acl=None):
