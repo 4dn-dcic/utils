@@ -37,6 +37,8 @@ LIBRARY_DIR = os.path.dirname(__file__)
 
 # ===== Auth Data =====
 
+AuthStr = str
+
 SimpleAuthDict = Dict[Literal['key', 'secret'], str]
 ServerAuthDict = Dict[Literal['key', 'secret', 'server'], str]
 AuthDict = Union[SimpleAuthDict, ServerAuthDict]
@@ -61,5 +63,7 @@ KeyValuestringDictList = List[KeyValuestringDict]
 
 S3KeyName = str
 S3BucketName = str
+
+UrlString = str
 
 PortalEnvName = str

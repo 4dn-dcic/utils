@@ -11,7 +11,7 @@ from typing import Optional
 from urllib.parse import urlparse
 from . import env_utils_legacy as legacy
 from .common import (
-    EnvName, OrchestratedApp, APP_FOURFRONT, APP_CGAP, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD,
+    EnvName, OrchestratedApp, APP_FOURFRONT, APP_CGAP, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD, UrlString,
 )
 from .env_base import EnvBase, LegacyController
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
@@ -691,7 +691,7 @@ def _find_public_url_entry(envname):
 
 
 @if_orchestrated
-def get_env_real_url(envname):
+def get_env_real_url(envname: EnvName) -> UrlString:
 
     entry = _find_public_url_entry(envname)
     if entry:
