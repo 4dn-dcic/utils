@@ -7,8 +7,8 @@ Change Log
 ----------
 
 
-6.11.0
-======
+7.0.0
+=====
 
 * In ``dcicutils.command_utils``:
 
@@ -28,7 +28,16 @@ Change Log
 
 * In ``dcicutisl.env_base`` and ``dcicutils.s3_utils``:
 
-  * Add some type hinting and comments about possible future error checking.
+  * Add some error checks if stored s3 credentials are not in the right form. (**BREAKING CHANGE**)
+    This is not expected to break anything, but users should be on the lookout for problems.
+
+  * Add a new argument (``require_key=``, default ``True``) to ``s3Utils.get_access_keys()`` so that checking
+    of the key name can be relaxed if only ``secret`` and ``server`` are needed, as might happen for Jupyterhub creds.
+    This is a possible way of addressing unexpected problems that could come up due to added error checks.
+
+  * Add some type hinting.
+
+  * Add comments about other possible future error checking.
 
 * In ``dcicutils.misc_utils``:
 
