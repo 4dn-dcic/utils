@@ -1,4 +1,5 @@
 import datetime
+import time
 from copy import copy
 from unittest import mock
 from dcicutils.redis_utils import RedisBase
@@ -15,7 +16,7 @@ class TestRedisSession:
     # normal method to fit the mock structure
     def mock_build_session_expiration(self):  # noQA
         """ Simulate an expired datetime when validating """
-        return str(datetime.datetime.utcnow() - datetime.timedelta(minutes=1))
+        return datetime.timedelta(seconds=1)
 
     def test_redis_session_basic(self, redisdb):
         """ Generate a session, validate it, test validation failure cases """
@@ -49,6 +50,7 @@ class TestRedisSession:
                 jwt=self.DUMMY_JWT
             )
             session_token.store_session_token(redis_handler=rd)
+            time.sleep(2)
             assert not session_token.validate_session_token(redis_handler=rd)
         # update then should validate
         session_token.update_session_token(redis_handler=rd, jwt=self.DUMMY_JWT)

@@ -1,4 +1,5 @@
 import redis
+import datetime
 from typing import Union
 # Low level utilities for working with Redis
 
@@ -59,13 +60,17 @@ class RedisBase(object):
         """
         return self.redis.info()
 
-    def set(self, key: str, value: Union[str, int, float]) -> str:
+    def set(self, key: str, value: Union[str, int, float], exp: Union[int, datetime.timedelta] = None) -> str:
         """ Sets the given key to the given value https://redis.io/commands/set/
         :param key: string to store value under
         :param value: value mapped to from key
+        :param exp: expiration time in seconds as int or datetime.timedelta (optional)
         :return: a "true" string <OK>
         """
-        return self.redis.set(self._encode_value(key), self._encode_value(value))
+        kwargs = {}
+        if exp:
+            kwargs['ex'] = exp
+        return self.redis.set(self._encode_value(key), self._encode_value(value), **kwargs)
 
     def get(self, key: str) -> str:
         """ Gets the given key from Redis https://redis.io/commands/get/
@@ -76,6 +81,21 @@ class RedisBase(object):
         if val is not None:
             val = self._decode_value(val)
         return val
+
+    def set_expiration(self, key: str, t: Union[int, datetime.time]) -> bool:
+        """ Sets the TTL of the given key manually
+        :param key: key to set TTL
+        :param t: time in seconds until expiration (datetime.timedelta or int)
+        :returns: True if successful
+        """
+        return self.redis.expire(key, t, gt=True)
+
+    def ttl(self, key: str) -> datetime.time:
+        """ Gets the TTL of the given key
+        :param key: key to get TTL for
+        :return: datetime value in seconds
+        """
+        return self.redis.ttl(key)
 
     def delete(self, key: str) -> int:
         """ Deletes the given key from Redis https://redis.io/commands/del/

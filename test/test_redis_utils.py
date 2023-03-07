@@ -1,4 +1,6 @@
 import json
+import time
+import datetime
 from dcicutils.redis_utils import RedisBase
 
 
@@ -66,3 +68,23 @@ class TestRedisBase:
         assert res['dirty'] == '0'
         assert res['item_type'] == 'Sample'
         assert json.loads(res['properties']) == obj
+
+    def test_redis_set(self, redisdb):
+        """ Tests some simple sets with expiration """
+        rd = RedisBase(redisdb)
+        my_key_meta = 'snovault:items:uuid:meta'
+        rd.set(my_key_meta, 'hello')
+        assert rd.get(my_key_meta) == 'hello'
+        rd.delete(my_key_meta)
+        # test exp with datetime
+        exp = datetime.timedelta(seconds=2)
+        rd.set(my_key_meta, 'hello', exp=exp)
+        assert rd.get(my_key_meta) == 'hello'
+        time.sleep(3)
+        assert not rd.get(my_key_meta)
+        # test exp with integer
+        exp = 2
+        rd.set(my_key_meta, 'hello', exp=exp)
+        assert rd.get(my_key_meta) == 'hello'
+        time.sleep(3)
+        assert not rd.get(my_key_meta)

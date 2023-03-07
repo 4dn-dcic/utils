@@ -24,29 +24,16 @@ class RedisSessionToken:
     Model used by Redis to store session tokens
     Keystore structure:
         <env_namespace>:session:<token>
-            -> Redis hset containing the associated JWT and expiration time (3 hours)
+            -> Redis str of JWT with automated expiration
     """
-    JWT = 'jwt'
-    EXPIRATION = 'expiration'
 
     @staticmethod
-    def _build_session_expiration(n_hours: int = 3) -> str:
+    def _build_session_expiration(n_hours: int = 3) -> datetime.timedelta:
         """ Builds a session expiration date 3 hours after generation
         :param n_hours: timestamp after which the session token is invalid
         :return: datetime string 3 hours from creation time
         """
-        return str(datetime.datetime.utcnow() + datetime.timedelta(hours=n_hours))
-
-    def _build_session_hset(self, jwt: str, expiration=None) -> dict:
-        """ Builds Redis hset record for the session token
-        :param jwt: encoded jwt value
-        :param expiration: expiration if using an existing one
-        :return: dictionary to be stored as a hash in Redis
-        """
-        return {
-            self.JWT: jwt,
-            self.EXPIRATION: self._build_session_expiration() if not expiration else expiration
-        }
+        return datetime.timedelta(hours=n_hours)
 
     @staticmethod
     def _build_redis_key(namespace: str, token: str) -> str:
@@ -72,23 +59,23 @@ class RedisSessionToken:
         self.namespace = namespace
         self.redis_key = self._build_redis_key(self.namespace, self.session_token)
         self.jwt = jwt
-        self.session_hset = self._build_session_hset(self.jwt, expiration=expiration)
+        self.expiration = expiration or self._build_session_expiration()
 
     def __eq__(self, other):
         """ Evaluates equality of two session objects based on the value of the session hset """
-        return self.session_hset == other.session_hset
+        return (self.redis_key == other.redis_key) and (self.jwt == other.jwt)
 
     def get_session_token(self) -> str:
         """ Extracts the session token stored on this object """
         return self.session_token
 
     def get_redis_key(self) -> str:
-        """ Returns the key under which the Redis hset is stored - note that this contains the token! """
+        """ Returns the key under which the Redis set is stored - note that this contains the token! """
         return self.redis_key
 
-    def get_expiration(self) -> str:
-        """ Returns the expiration date stored in the session hset locally """
-        return self.session_hset[self.EXPIRATION]
+    def get_expiration(self) -> datetime:
+        """ Returns the expiration timedelta """
+        return self.expiration
 
     @classmethod
     def from_redis(cls, *, redis_handler: RedisBase, namespace: str, token: str):
@@ -100,10 +87,11 @@ class RedisSessionToken:
         :return: A RedisSessionToken object built from an existing record in Redis
         """
         redis_key = f'{namespace}:session:{token}'
-        redis_entry = redis_handler.hgetall(redis_key)
+        redis_entry = redis_handler.get(redis_key)
         if redis_entry:
-            return cls(namespace=namespace, jwt=redis_entry[cls.JWT],
-                       token=token, expiration=redis_entry[cls.EXPIRATION])
+            expiration = redis_handler.ttl(redis_key)
+            return cls(namespace=namespace, jwt=redis_entry,
+                       token=token, expiration=expiration)
 
     def decode_jwt(self, audience: str, secret: str, leeway: int = 30) -> dict:
         """ Decodes JWT to grab info such as the email
@@ -121,7 +109,7 @@ class RedisSessionToken:
         :return: True if successful, raise Exception otherwise
         """
         try:
-            redis_handler.hset_multiple(self.redis_key, self.session_hset)
+            redis_handler.set(self.redis_key, self.jwt, exp=self.expiration)
         except Exception as e:
             log.error(str(e))
             raise RedisException()
@@ -132,15 +120,12 @@ class RedisSessionToken:
         :param redis_handler: handle to Redis API
         :return: True if token matches that in Redis and is not expired
         """
-        redis_token = redis_handler.hgetall(self.redis_key)
+        redis_token = redis_handler.get(self.redis_key)
         if not redis_token:
             return False  # if it doesn't exist it's not valid
-        timestamp_is_valid = (datetime.datetime.fromisoformat(
-            redis_token[self.EXPIRATION]) > datetime.datetime.utcnow()
-        )
-        return timestamp_is_valid
+        return True  # if it does exist it must be valid since we always send with TTL
 
-    def update_session_token(self, *, redis_handler: RedisBase, jwt) -> bool:
+    def update_session_token(self, *, redis_handler: RedisBase, jwt: str) -> bool:
         """ Refreshes the session token, jwt (if different) and expiration stored in Redis
         :param redis_handler: handle to Redis API
         :param jwt: jwt of user
@@ -151,13 +136,13 @@ class RedisSessionToken:
         # build new one
         self.session_token = make_session_token()
         self.redis_key = self._build_redis_key(self.namespace, self.session_token)
+        self.expiration = self._build_session_expiration()
         self.jwt = jwt
-        self.session_hset = self._build_session_hset(jwt)
         return self.store_session_token(redis_handler=redis_handler)
 
-    def delete_session_token(self, *, redis_handler) -> bool:
+    def delete_session_token(self, *, redis_handler: RedisBase) -> bool:
         """ Deletes the session token from redis, effectively logging out
         :param redis_handler: handle to Redis API
         :return: True if successful, False otherwise
         """
-        return redis_handler.delete(self.redis_key)
+        return 1 == redis_handler.delete(self.redis_key)
