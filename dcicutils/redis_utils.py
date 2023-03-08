@@ -9,10 +9,7 @@ def create_redis_client(*, url: str, ping=True) -> redis.Redis:
         Because this creation pings Redis should re-use this as much as possible, but
         you can skip the ping if you're confident it will come up
     """
-    kwargs = {}
-    if 'cache.amazonaws.com' in url:  # always use SSL in prod
-        kwargs['ssl'] = True
-    r = redis.from_url(url, **kwargs)
+    r = redis.from_url(url)
     if ping:
         r.ping()
     return r
