@@ -898,13 +898,13 @@ def test_s3_utils_buckets_modern():
 
 C4_853_FIX_INFO = {
     'fourfront-production-blue':
-        {'metadata_fix': True, 'tibanna_fix': False},
+        {'metadata_fix': False, 'tibanna_fix': False},
     'fourfront-production-green':
-        {'metadata_fix': True, 'tibanna_fix': False},
+        {'metadata_fix': False, 'tibanna_fix': False},
     'data':
-        {'metadata_fix': True, 'tibanna_fix': False},
+        {'metadata_fix': False, 'tibanna_fix': False},
     'staging':
-        {'metadata_fix': True, 'tibanna_fix': False},
+        {'metadata_fix': False, 'tibanna_fix': False},
 
     'fourfront-mastertest':
         {'metadata_fix': True, 'tibanna_fix': False},
