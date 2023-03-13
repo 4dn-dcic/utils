@@ -7,6 +7,13 @@ Change Log
 ----------
 
 
+6.10.1
+======
+
+* Various test adjustments to accommodate health page changes related to
+  `C4-853 <https://hms-dbmi.atlassian.net/browse/C4-853>`_.
+
+
 6.10.0
 =====
 
@@ -24,7 +31,7 @@ Change Log
 6.8.0
 =====
 
-* In `dcicutils.deployment_utils``
+* In ``dcicutils.deployment_utils``
 
   * Add support for ``Auth0Domain`` and ``Auth0AllowedConnections``
 
