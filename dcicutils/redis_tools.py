@@ -77,6 +77,10 @@ class RedisSessionToken:
         """ Returns the expiration timedelta """
         return self.expiration
 
+    def get_jwt(self) -> str:
+        """ Returns the JWT set on this session token object """
+        return self.jwt
+
     @classmethod
     def from_redis(cls, *, redis_handler: RedisBase, namespace: str, token: str):
         """ Builds a RedisSessionToken from an existing record - allows extracting JWT
