@@ -428,6 +428,7 @@ class IniFileManager:
                                      application_bucket_prefix=None, foursight_bucket_prefix=None,
                                      auth0_domain=DEFAULT_AUTH0_DOMAIN, auth0_client=None, auth0_secret=None,
                                      auth0_allowed_connections=None,
+                                     redis_server=None,
                                      file_upload_bucket=None, file_wfout_bucket=None,
                                      blob_bucket=None, system_bucket=None, metadata_bundles_bucket=None):
 
@@ -465,6 +466,7 @@ class IniFileManager:
             auth0_client (str): A string identifying the auth0 client application.
             auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
             auth0_allowed_connections (str): A comma separated string of allowed connections that can be used via auth0.
+            redis_server (str): A server URL to a Redis cluster, for use with sessions
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
             file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
             blob_bucket (str): Specific name of the bucket to use on S3 for blob data.
@@ -566,6 +568,7 @@ class IniFileManager:
                                        application_bucket_prefix=None, foursight_bucket_prefix=None,
                                        auth0_domain=None, auth0_client=None, auth0_secret=None,
                                        auth0_allowed_connections=None,
+                                       redis_server=None,
                                        file_upload_bucket=None,
                                        file_wfout_bucket=None, blob_bucket=None, system_bucket=None,
                                        metadata_bundles_bucket=None):
@@ -600,6 +603,7 @@ class IniFileManager:
             auth0_client (str): A string identifying the auth0 client application.
             auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
             auth0_allowed_connections (str): A comma separated string of allowed connections that can be used via auth0.
+            redis_server (str): A server URL to a Redis cluster, for use with sessions
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
             file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
             blob_bucket (str): Specific name of the bucket to use on S3 for blob data.
@@ -618,6 +622,7 @@ class IniFileManager:
 
         higlass_server = higlass_server or os.environ.get('ENCODED_HIGLASS_SERVER', "MISSING_ENCODED_HIGLASS_SERVER")
         es_server = es_server or os.environ.get('ENCODED_ES_SERVER', "MISSING_ENCODED_ES_SERVER")
+        redis_server = redis_server or os.environ.get('ENCODED_REDIS_SERVER', '')  # optional
         env_bucket = (env_bucket
                       or EnvBase.global_env_bucket_name()
                       or ("MISSING_GLOBAL_ENV_BUCKET"
@@ -752,6 +757,7 @@ class IniFileManager:
             'UTILS_VERSION': pkg_resources.get_distribution("dcicutils").version,
             'HIGLASS_SERVER': higlass_server,
             'ES_SERVER': es_server,
+            'REDIS_SERVER': redis_server,
             'ENV_BUCKET': env_bucket,
             'ENV_ECOSYSTEM': env_ecosystem,
             'ENV_NAME': env_name,
@@ -919,6 +925,9 @@ class IniFileManager:
             parser.add_argument("--sentry_dsn",
                                 help="a sentry DSN",
                                 default=None)
+            parser.add_argument("--redis_server",
+                                help="server URL to a Redis Cluster",
+                                default=None)
             parser.add_argument("--tibanna_cwls_bucket",
                                 help="the name of a Tibanna CWLs bucket to use",
                                 default=None)
@@ -990,6 +999,7 @@ class IniFileManager:
                                              auth0_client=args.auth0_client,
                                              auth0_secret=args.auth0_secret,
                                              auth0_allowed_connections=args.auth0_allowed_connections,
+                                             redis_server=args.redis_server,
                                              file_upload_bucket=args.file_upload_bucket,
                                              file_wfout_bucket=args.file_wfout_bucket,
                                              blob_bucket=args.blob_bucket, system_bucket=args.system_bucket,
