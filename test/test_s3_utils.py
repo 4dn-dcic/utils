@@ -896,51 +896,76 @@ def test_s3_utils_buckets_modern():
             assert e.env_name == env_name
 
 
+C4_853_FIX_INFO = {
+    'fourfront-production-blue':
+        {'metadata_fix': False, 'tibanna_fix': False},
+    'fourfront-production-green':
+        {'metadata_fix': False, 'tibanna_fix': False},
+    'data':
+        {'metadata_fix': False, 'tibanna_fix': False},
+    'staging':
+        {'metadata_fix': False, 'tibanna_fix': False},
+
+    'fourfront-mastertest':
+        {'metadata_fix': True, 'tibanna_fix': False},
+    'mastertest':
+        {'metadata_fix': True, 'tibanna_fix': False},
+
+    'fourfront-webdev':
+        {'metadata_fix': True, 'tibanna_fix': False},
+    'webdev':
+        {'metadata_fix': True, 'tibanna_fix': False},
+
+    'fourfront-hotseat':
+        {'metadata_fix': True, 'tibanna_fix': False},
+    'hotseat':
+        {'metadata_fix': True, 'tibanna_fix': False},
+}
+
+
+@pytest.mark.parametrize('env_name', [
+    'fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat', 'mastertest', 'webdev', 'hotseat'])
 @using_fresh_ff_deployed_state_for_testing()
-def test_s3_utils_buckets_ff_live_ecosystem_not_production():
+def test_s3_utils_buckets_ff_live_ecosystem_not_production(env_name):
+    fix_info = C4_853_FIX_INFO[env_name]
 
     print()  # Start on fresh line
-    for env_name in [
-        'fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat',
-        'mastertest', 'webdev', 'hotseat'
-    ]:
+    print("=" * 80)
+    print(f"env_name={env_name}")
+    print("=" * 80)
+    s3u = s3Utils(env=env_name)
 
-        print("=" * 80)
-        print(f"env_name={env_name}")
-        print("=" * 80)
-        s3u = s3Utils(env=env_name)
+    full_env = full_env_name(env_name)
 
-        full_env = full_env_name(env_name)
+    print(f"s3u.sys_bucket={s3u.sys_bucket}")
+    assert s3u.sys_bucket == f'elasticbeanstalk-{full_env}-system'
 
-        print(f"s3u.sys_bucket={s3u.sys_bucket}")
-        assert s3u.sys_bucket == f'elasticbeanstalk-{full_env}-system'
+    print(f"s3u.outfile_bucket={s3u.outfile_bucket}")
+    assert s3u.outfile_bucket == f'elasticbeanstalk-{full_env}-wfoutput'
+    print(f"s3u.raw_file_bucket={s3u.raw_file_bucket}")
+    assert s3u.raw_file_bucket == f'elasticbeanstalk-{full_env}-files'
+    print(f"s3u.blob_bucket={s3u.blob_bucket}")
+    assert s3u.blob_bucket == f'elasticbeanstalk-{full_env}-blobs'
+    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['metadata_fix'], error_class=AssertionError):
+        print(f"s3u.metadata_bucket={s3u.metadata_bucket}")
+        assert s3u.metadata_bucket == f'elasticbeanstalk-{full_env}-metadata-bundles'
 
-        print(f"s3u.outfile_bucket={s3u.outfile_bucket}")
-        assert s3u.outfile_bucket == f'elasticbeanstalk-{full_env}-wfoutput'
-        print(f"s3u.raw_file_bucket={s3u.raw_file_bucket}")
-        assert s3u.raw_file_bucket == f'elasticbeanstalk-{full_env}-files'
-        print(f"s3u.blob_bucket={s3u.blob_bucket}")
-        assert s3u.blob_bucket == f'elasticbeanstalk-{full_env}-blobs'
-        with known_bug_expected(jira_ticket="C4-853", fixed=False, error_class=AssertionError):
-            print(f"s3u.metadata_bucket={s3u.metadata_bucket}")
-            assert s3u.metadata_bucket == f'elasticbeanstalk-{full_env}-metadata-bundles'
+    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['tibanna_fix'], error_class=AssertionError):
+        assert s3u.tibanna_cwls_bucket == 'tibanna-cwls'
+    assert s3u.tibanna_output_bucket == 'tibanna-output'
 
-        with known_bug_expected(jira_ticket="C4-853", fixed=False, error_class=AssertionError):
-            assert s3u.tibanna_cwls_bucket == 'tibanna-cwls'
-        assert s3u.tibanna_output_bucket == 'tibanna-output'
-
-        assert s3u.s3_encrypt_key_id is None
-        assert isinstance(s3u.env_manager, EnvManager)
-        assert isinstance(s3u.env_manager.s3, botocore.client.BaseClient)  # It's hard to test for S3 specifically
-        es_url = s3u.env_manager.es_url
-        print(f"Checking {es_url} ...")
-        # NOTE: The right answers differ here from production, but as long as something approximately like
-        #       the short name is in there, that's enough.
-        names_part = _make_similar_names_alternation(env_name)
-        pattern = f"https://vpc-[eo]s-.*({names_part}).*[.]amazonaws[.]com:443"
-        print(f"pattern={pattern}")
-        assert es_url and re.match(pattern, es_url)
-        assert s3u.env_manager.env_name == full_env
+    assert s3u.s3_encrypt_key_id is None
+    assert isinstance(s3u.env_manager, EnvManager)
+    assert isinstance(s3u.env_manager.s3, botocore.client.BaseClient)  # It's hard to test for S3 specifically
+    es_url = s3u.env_manager.es_url
+    print(f"Checking {es_url} ...")
+    # NOTE: The right answers differ here from production, but as long as something approximately like
+    #       the short name is in there, that's enough.
+    names_part = _make_similar_names_alternation(env_name)
+    pattern = f"https://vpc-[eo]s-.*({names_part}).*[.]amazonaws[.]com:443"
+    print(f"pattern={pattern}")
+    assert es_url and re.match(pattern, es_url)
+    assert s3u.env_manager.env_name == full_env
 
 
 def _make_similar_names_alternation(env_name):
@@ -954,50 +979,51 @@ def _make_similar_names_alternation(env_name):
                      for x in [short_env_name(env_name), full_env_name(env_name)]])
 
 
+@pytest.mark.parametrize('env_name', [
+    'fourfront-production-blue', 'fourfront-production-green',
+    'data', 'staging'])
 @using_fresh_ff_deployed_state_for_testing()
-def test_s3_utils_buckets_ff_live_ecosystem_production():
+def test_s3_utils_buckets_ff_live_ecosystem_production(env_name):
+    fix_info = C4_853_FIX_INFO[env_name]
 
     print()  # Start on fresh line
-    for env_name in ['fourfront-production-blue', 'fourfront-production-green',
-                     'data', 'staging']:
+    print("=" * 80)
+    print(f"env_name={env_name}")
+    print("=" * 80)
+    s3u = s3Utils(env=env_name)
 
-        print("=" * 80)
-        print(f"env_name={env_name}")
-        print("=" * 80)
-        s3u = s3Utils(env=env_name)
+    s3_sys_env_token = 'fourfront-webprod2'  # Shared by data and staging for sys bucket
 
-        s3_sys_env_token = 'fourfront-webprod2'  # Shared by data and staging for sys bucket
+    print(f"s3u.sys_bucket={s3u.sys_bucket}")
+    assert s3u.sys_bucket == f'elasticbeanstalk-{s3_sys_env_token}-system'
 
-        print(f"s3u.sys_bucket={s3u.sys_bucket}")
-        assert s3u.sys_bucket == f'elasticbeanstalk-{s3_sys_env_token}-system'
+    s3_env_token = 'fourfront-webprod'  # Shared by data and staging for other than sys bucket
 
-        s3_env_token = 'fourfront-webprod'  # Shared by data and staging for other than sys bucket
+    print(f"s3u.outfile_bucket={s3u.outfile_bucket}")
+    assert s3u.outfile_bucket == f'elasticbeanstalk-{s3_env_token}-wfoutput'
+    print(f"s3u.raw_file_bucket={s3u.raw_file_bucket}")
+    assert s3u.raw_file_bucket == f'elasticbeanstalk-{s3_env_token}-files'
+    print(f"s3u.blob_bucket={s3u.blob_bucket}")
+    assert s3u.blob_bucket == f'elasticbeanstalk-{s3_env_token}-blobs'
+    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['metadata_fix'], error_class=AssertionError):
+        print(f"s3u.metadata_bucket={s3u.metadata_bucket}")
+        assert s3u.metadata_bucket == f'elasticbeanstalk-{s3_env_token}-metadata-bundles'
 
-        print(f"s3u.outfile_bucket={s3u.outfile_bucket}")
-        assert s3u.outfile_bucket == f'elasticbeanstalk-{s3_env_token}-wfoutput'
-        print(f"s3u.raw_file_bucket={s3u.raw_file_bucket}")
-        assert s3u.raw_file_bucket == f'elasticbeanstalk-{s3_env_token}-files'
-        print(f"s3u.blob_bucket={s3u.blob_bucket}")
-        assert s3u.blob_bucket == f'elasticbeanstalk-{s3_env_token}-blobs'
-        with known_bug_expected(jira_ticket="C4-853", fixed=False, error_class=AssertionError):
-            print(f"s3u.metadata_bucket={s3u.metadata_bucket}")
-            assert s3u.metadata_bucket == f'elasticbeanstalk-{s3_env_token}-metadata-bundles'
+    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['tibanna_fix'], error_class=AssertionError):
+        assert s3u.tibanna_cwls_bucket == 'tibanna-cwls'
+    assert s3u.tibanna_output_bucket == 'tibanna-output'
 
-        with known_bug_expected(jira_ticket="C4-853", fixed=False, error_class=AssertionError):
-            assert s3u.tibanna_cwls_bucket == 'tibanna-cwls'
-        assert s3u.tibanna_output_bucket == 'tibanna-output'
-
-        assert s3u.s3_encrypt_key_id is None
-        assert isinstance(s3u.env_manager, EnvManager)
-        assert isinstance(s3u.env_manager.s3, botocore.client.BaseClient)  # It's hard to test for S3 specifically
-        es_url = s3u.env_manager.es_url
-        print(f"Checking {es_url}...")
-        # tokenify(full_env_name(env_name)) matches better, but as long as short env name is there, it's enough.
-        names_part = _make_similar_names_alternation(env_name)
-        pattern = f"https://vpc-[eo]s-.*({names_part}).*[.]amazonaws[.]com:443"
-        print(f"pattern={pattern}")
-        assert es_url and re.match(pattern, es_url)
-        assert is_stg_or_prd_env(s3u.env_manager.env_name)
+    assert s3u.s3_encrypt_key_id is None
+    assert isinstance(s3u.env_manager, EnvManager)
+    assert isinstance(s3u.env_manager.s3, botocore.client.BaseClient)  # It's hard to test for S3 specifically
+    es_url = s3u.env_manager.es_url
+    print(f"Checking {es_url}...")
+    # tokenify(full_env_name(env_name)) matches better, but as long as short env name is there, it's enough.
+    names_part = _make_similar_names_alternation(env_name)
+    pattern = f"https://vpc-[eo]s-.*({names_part}).*[.]amazonaws[.]com:443"
+    print(f"pattern={pattern}")
+    assert es_url and re.match(pattern, es_url)
+    assert is_stg_or_prd_env(s3u.env_manager.env_name)
 
 
 @using_fresh_ff_state_for_testing()
