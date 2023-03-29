@@ -428,6 +428,7 @@ class IniFileManager:
                                      application_bucket_prefix=None, foursight_bucket_prefix=None,
                                      auth0_domain=DEFAULT_AUTH0_DOMAIN, auth0_client=None, auth0_secret=None,
                                      auth0_allowed_connections=None,
+                                     re_captcha_key=None, re_captcha_secret=None,
                                      redis_server=None,
                                      file_upload_bucket=None, file_wfout_bucket=None,
                                      blob_bucket=None, system_bucket=None, metadata_bundles_bucket=None):
@@ -466,6 +467,8 @@ class IniFileManager:
             auth0_client (str): A string identifying the auth0 client application.
             auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
             auth0_allowed_connections (str): A comma separated string of allowed connections that can be used via auth0.
+            re_captcha_key (str): key used for reCaptcha for throttling/detecting humans on login
+            re_captcha_secret (str): secret used for reCaptcha
             redis_server (str): A server URL to a Redis cluster, for use with sessions
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
             file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
@@ -500,6 +503,9 @@ class IniFileManager:
                                                auth0_client=auth0_client,
                                                auth0_secret=auth0_secret,
                                                auth0_allowed_connections=auth0_allowed_connections,
+                                               re_captcha_key=re_captcha_key,
+                                               re_captcha_secret=re_captcha_secret,
+                                               redis_server=redis_server,
                                                file_upload_bucket=file_upload_bucket,
                                                file_wfout_bucket=file_wfout_bucket,
                                                blob_bucket=blob_bucket,
@@ -568,6 +574,7 @@ class IniFileManager:
                                        application_bucket_prefix=None, foursight_bucket_prefix=None,
                                        auth0_domain=None, auth0_client=None, auth0_secret=None,
                                        auth0_allowed_connections=None,
+                                       re_captcha_key=None, re_captcha_secret=None,
                                        redis_server=None,
                                        file_upload_bucket=None,
                                        file_wfout_bucket=None, blob_bucket=None, system_bucket=None,
@@ -603,6 +610,8 @@ class IniFileManager:
             auth0_client (str): A string identifying the auth0 client application.
             auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
             auth0_allowed_connections (str): A comma separated string of allowed connections that can be used via auth0.
+            re_captcha_key (str): key used for reCaptcha for throttling/detecting humans on login
+            re_captcha_secret (str): secret used for reCaptcha
             redis_server (str): A server URL to a Redis cluster, for use with sessions
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
             file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
@@ -669,10 +678,16 @@ class IniFileManager:
         es_namespace = es_namespace or os.environ.get("ENCODED_ES_NAMESPACE", env_name)
         identity = identity or os.environ.get("ENCODED_IDENTITY", "")
         sentry_dsn = sentry_dsn or os.environ.get("ENCODED_SENTRY_DSN", "")
+
+        # Auth0 Configuration
         auth0_domain = auth0_domain or os.environ.get("ENCODED_AUTH0_DOMAIN", "")
         auth0_client = auth0_client or os.environ.get("ENCODED_AUTH0_CLIENT", "")
         auth0_secret = auth0_secret or os.environ.get("ENCODED_AUTH0_SECRET", "")
         auth0_allowed_connections = auth0_allowed_connections or os.environ.get("ENCODED_AUTH0_ALLOWED_CONNECTIONS", "")
+
+        # reCatpcha Configuration
+        re_captcha_key = re_captcha_key or os.environ.get('reCaptchaKey', '')
+        re_captcha_secret = re_captcha_secret or os.environ.get('reCaptchaSecret', '')
 
         create_mapping_on_deploy_skip = os.environ.get("ENCODED_CREATE_MAPPING_SKIP",
                                                        cls.PRD_DEFAULT_CREATE_MAPPING_ON_DEPLOY_SKIP)
@@ -778,9 +793,11 @@ class IniFileManager:
             'AUTH0_CLIENT': auth0_client,
             'AUTH0_SECRET': auth0_secret,
             'AUTH0_ALLOWED_CONNECTIONS': auth0_allowed_connections,
-            "CREATE_MAPPING_SKIP": create_mapping_on_deploy_skip,
-            "CREATE_MAPPING_WIPE_ES": create_mapping_on_deploy_wipe_es,
-            "CREATE_MAPPING_STRICT": create_mapping_on_deploy_strict,
+            'g.recaptcha.key': re_captcha_key,
+            'g.recaptcha.secret': re_captcha_secret,
+            'CREATE_MAPPING_SKIP': create_mapping_on_deploy_skip,
+            'CREATE_MAPPING_WIPE_ES': create_mapping_on_deploy_wipe_es,
+            'CREATE_MAPPING_STRICT': create_mapping_on_deploy_strict,
             'FILE_UPLOAD_BUCKET': file_upload_bucket,
             'FILE_WFOUT_BUCKET': file_wfout_bucket,
             'BLOB_BUCKET': blob_bucket,
@@ -952,6 +969,12 @@ class IniFileManager:
             parser.add_argument("--auth0_allowed_connections",
                                 help="a comma separated list of compatible auth0 connections to use",
                                 default=None)
+            parser.add_argument("--recaptcha-key",
+                                help="key for use with recaptcha",
+                                default=None)
+            parser.add_argument("--recaptcha-secret",
+                                help="secret for use with recaptcha",
+                                default=None)
             parser.add_argument("--file_upload_bucket",
                                 help="the name of the file upload bucket to use",
                                 default=None)
@@ -999,6 +1022,7 @@ class IniFileManager:
                                              auth0_client=args.auth0_client,
                                              auth0_secret=args.auth0_secret,
                                              auth0_allowed_connections=args.auth0_allowed_connections,
+                                             re_captcha_key=args.recaptcha_key, re_captcha_secret=args.recaptcha_secret,
                                              redis_server=args.redis_server,
                                              file_upload_bucket=args.file_upload_bucket,
                                              file_wfout_bucket=args.file_wfout_bucket,
