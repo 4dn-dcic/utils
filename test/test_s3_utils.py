@@ -28,6 +28,7 @@ from dcicutils.misc_utils import ignored, ignorable, override_environ, exported
 from dcicutils.qa_utils import MockBoto3, MockResponse, known_bug_expected
 from dcicutils.s3_utils import s3Utils, HealthPageKey
 from requests.exceptions import ConnectionError
+from typing import Optional, Callable, Dict
 from unittest import mock
 from .helpers import (
     using_fresh_ff_state_for_testing, using_fresh_cgap_state_for_testing, using_fresh_ff_deployed_state_for_testing,
@@ -269,66 +270,136 @@ def test_s3utils_creation_cgap_stg():
     assert compute_cgap_stg_env() is None, "There seems to be a CGAP staging environment. Tests need updating."
 
 
-@pytest.mark.integrated
-@using_fresh_ff_state_for_testing()
-def test_s3utils_get_keys_for_data():
-    with EnvManager.global_env_bucket_named(LEGACY_GLOBAL_ENV_BUCKET):
-        util = s3Utils(env='data')
-        keys = util.get_access_keys()
-        assert keys['server'] == 'https://data.4dnucleome.org'
-        # make sure we have keys for foursight and tibanna as well
-        keys_tb = util.get_access_keys('access_key_tibanna')
-        assert keys_tb['key'] != keys['key']
-        assert keys_tb['server'] == keys['server']
-        keys_fs = util.get_access_keys('access_key_foursight')
-        assert keys_fs['key'] != keys_tb['key'] != keys['key']
-        assert keys_fs['server'] == keys['server']
+def _check_portal_auth(*, portal_env: str, auth_getter: Callable, auth_kind: str, server_pattern: str,
+                       other_getters: Optional[Dict[str, Optional[Callable]]] = None, require_key=True):
+
+    print()
+
+    other_getters = other_getters or {}
+
+    def check_auth(kind, auth):
+        assert isinstance(auth, dict), f"The {kind} for {portal_env!r} is not a dict."
+        if require_key:
+            assert auth.get('key'), f"The {kind} dict for {portal_env!r} is missing 'key' part."
+        assert auth.get('secret'), f"The {kind} dict for {portal_env!r} is missing 'secret' part."
+        assert auth.get('server'), f"The {kind} dict for {portal_env!r} is missing 'server' part."
+        assert re.match(server_pattern, auth['server']), (
+            f"The {kind} dict 'server' part does not match {server_pattern!r}")
+
+    auth_kind = f"{portal_env} {auth_kind}"
+    s3u = s3Utils(env=portal_env)
+
+    auth = auth_getter(s3u)
+    check_auth(auth_kind, auth)
+
+    auth_seen = [(auth_kind, auth)]
+    for other_auth_kind, other_auth_getter in other_getters.items():
+
+        other_auth_kind = f"{portal_env} {other_auth_kind}"
+        print(f"Checking {other_auth_kind}...")
+
+        other_auth = other_auth_getter(s3u)
+        check_auth(other_auth_kind, other_auth)
+
+        for seen_auth_kind, seen_auth in auth_seen:
+
+            print(f"Checking {other_auth_kind} against {seen_auth_kind}...")
+            if 'key' in other_auth and 'key' in seen_auth:  # For some aux getters, key can be missing
+                assert other_auth['key'] != seen_auth['key'], (
+                    f"{other_auth_kind} and {seen_auth_kind} 'key' parts unexpectedly match.")
+            assert other_auth['secret'] != seen_auth['secret'], (
+                f"{other_auth_kind} and {seen_auth_kind} 'secret' parts unexpectedly match.")
+
+        auth_seen.append((other_auth_kind, other_auth))
 
 
 @pytest.mark.integrated
+@pytest.mark.parametrize('portal_env', ['staging', 'data'])
 @using_fresh_ff_state_for_testing()
-def test_s3utils_get_keys_for_staging():
-    # TODO: I'm not sure what this is testing, so it's hard to rewrite
-    #   But I fear this use of env 'staging' implies the GA test environment has overbroad privilege.
-    #   We should make this work without access to 'staging'.
-    #   -kmp 13-Jan-2021
-    util = s3Utils(env='staging')
-    keys = util.get_ff_key()
-    # This is in transition. Eventually it will reliably be https.
-    assert re.match('https?://staging.4dnucleome.org', keys['server'])
+def test_s3utils_get_access_keys(portal_env):
+    server_pattern = f"https{'?' if portal_env == 'staging' else ''}://{portal_env}[.]4dnucleome[.]org"
+    _check_portal_auth(portal_env=portal_env, auth_getter=s3Utils.get_access_keys, auth_kind="access_keys",
+                       server_pattern=server_pattern,
+                       other_getters={
+                           "access_keys for tibanna": lambda s3u: s3u.get_access_keys('access_key_tibanna'),
+                           "access keys for foursight": lambda s3u: s3u.get_access_keys('access_key_foursight'),
+                       })
+
+    # with EnvManager.global_env_bucket_named(LEGACY_GLOBAL_ENV_BUCKET):
+    #     util = s3Utils(env='data')
+    #     keys = util.get_access_keys()
+    #     assert keys['server'] == 'https://data.4dnucleome.org'
+    #     # make sure we have keys for foursight and tibanna as well
+    #     keys_tb = util.get_access_keys('access_key_tibanna')
+    #     assert keys_tb['key'] != keys['key']
+    #     assert keys_tb['server'] == keys['server']
+    #     keys_fs = util.get_access_keys('access_key_foursight')
+    #     assert keys_fs['key'] != keys_tb['key'] != keys['key']
+    #     assert keys_fs['server'] == keys['server']
 
 
 @pytest.mark.integrated
+@pytest.mark.parametrize('portal_env', ['staging', 'data'])
 @using_fresh_ff_state_for_testing()
-def test_s3utils_get_jupyterhub_key():
-    # TODO: I'm not sure what this is testing, so it's hard to rewrite
-    #   But I fear this use of env 'data' implies the GA test environment has overbroad privilege.
-    #   We should make this work without access to 'data'.
-    #   -kmp 13-Jan-2021
-    util = s3Utils(env='data')
-    key = util.get_jupyterhub_key()
-    assert 'secret' in key
-    assert key['server'] == 'https://jupyter.4dnucleome.org'
+def test_s3utils_get_ff_key(portal_env):
+    """Tests that the actual key stored on staging is in good form."""
+    server_pattern = f"https{'?' if portal_env == 'staging' else ''}://{portal_env}[.]4dnucleome[.]org"
+    _check_portal_auth(portal_env=portal_env, auth_getter=s3Utils.get_ff_key, auth_kind="ff_key",
+                       server_pattern=server_pattern)
+
+    # # TODO: I'm not sure what this is testing, so it's hard to rewrite
+    # #   But I fear this use of env 'staging' implies the GA test environment has overbroad privilege.
+    # #   We should make this work without access to 'staging'.
+    # #   -kmp 13-Jan-2021
+    # util = s3Utils(env='staging')
+    # keys = util.get_ff_key()
+    # # This is in transition. Eventually it will reliably be https.
+    # assert re.match('https?://staging.4dnucleome.org', keys['server'])
 
 
 @pytest.mark.integrated
+@pytest.mark.parametrize('portal_env', ['staging', 'data'])
 @using_fresh_ff_state_for_testing()
-def test_s3utils_get_higlass_key_integrated():
-    # TODO: I'm not sure what this is testing, so it's hard to rewrite
-    #   But I fear this use of env 'staging' implies the GA test environment has overbroad privilege.
-    #   We should make this work without access to 'staging'.
-    #   -kmp 13-Jan-2021
-    util = s3Utils(env='staging')
-    keys = util.get_higlass_key()
-    assert isinstance(keys, dict)
-    assert len(keys.keys()) == 3
+def test_s3utils_get_jupyterhub_key(portal_env):
+    _check_portal_auth(portal_env=portal_env, auth_getter=s3Utils.get_jupyterhub_key, auth_kind="jupyterhub_key",
+                       server_pattern='https://jupyter.4dnucleome.org', require_key=False)
+
+    # # TODO: I'm not sure what this is testing, so it's hard to rewrite
+    # #   But I fear this use of env 'data' implies the GA test environment has overbroad privilege.
+    # #   We should make this work without access to 'data'.
+    # #   -kmp 13-Jan-2021
+    # util = s3Utils(env='data')
+    # key = util.get_jupyterhub_key()
+    # assert 'secret' in key
+    # assert key['server'] == 'https://jupyter.4dnucleome.org'
+    # for dict_key in ['key', 'secret', 'server']:
+    #     assert key[dict_key]
+
+
+@pytest.mark.integrated
+@pytest.mark.parametrize('portal_env', ['staging', 'data'])
+@using_fresh_ff_state_for_testing()
+def test_s3utils_get_higlass_key(portal_env):
+    _check_portal_auth(portal_env=portal_env, auth_getter=s3Utils.get_higlass_key, auth_kind="higlass_key",
+                       server_pattern='https://higlass.4dnucleome.org')
+
+    # # TODO: I'm not sure what this is testing, so it's hard to rewrite
+    # #   But I fear this use of env 'staging' implies the GA test environment has overbroad privilege.
+    # #   We should make this work without access to 'staging'.
+    # #   -kmp 13-Jan-2021
+    # util = s3Utils(env='staging')
+    # key = util.get_higlass_key()
+    # assert isinstance(key, dict)
+    # assert len(key.keys()) == 3
+    # for dict_key in ['key', 'secret', 'server']:
+    #     assert key[dict_key]
 
 
 @pytest.mark.integrated
 @using_fresh_ff_state_for_testing()
 def test_s3utils_get_google_key():
-    util = s3Utils(env='staging')
-    keys = util.get_google_key()
+    s3u = s3Utils(env='staging')
+    keys = s3u.get_google_key()
     assert isinstance(keys, dict)
     assert keys['type'] == 'service_account'
     assert keys["project_id"] == "fourdn-fourfront"
@@ -339,9 +410,8 @@ def test_s3utils_get_google_key():
 @pytest.mark.unit
 @using_fresh_ff_state_for_testing()
 def test_s3utils_get_access_keys_with_old_style_default():
-    util = s3Utils(env='fourfront-mastertest')
-    with mock.patch.object(util, "get_key") as mock_get_key:
-        actual_key = {'key': 'some-key', 'server': 'some-server'}
+    s3u = s3Utils(env='fourfront-mastertest')
+    with mock.patch.object(s3u, "get_key") as mock_get_key:
 
         def mocked_get_key(keyfile_name):
             ignored(keyfile_name)
@@ -349,7 +419,23 @@ def test_s3utils_get_access_keys_with_old_style_default():
             return key_wrapper
 
         mock_get_key.side_effect = mocked_get_key
-        key = util.get_access_keys()
+
+        actual_key = {'secret': 'some-secret', 'server': 'some-server'}
+
+        with pytest.raises(ValueError):
+            s3u.get_access_keys()  # ill-formed secret is missing key. portal keys are expected to have a key.
+
+        key = s3u.get_access_keys(require_key=False)  # accesses to jupyterhub keys could need this
+        assert key == actual_key
+
+        actual_key = {'key': 'some-key', 'server': 'some-server'}
+
+        with pytest.raises(ValueError):
+            s3u.get_access_keys(require_key=False)  # require_key=False only protects against missing key, not secret
+
+        actual_key = {'key': 'some-key', 'secret': 'some-secret', 'server': 'some-server'}
+
+        key = s3u.get_access_keys()
         assert key == actual_key
 
 
@@ -357,17 +443,17 @@ def test_s3utils_get_access_keys_with_old_style_default():
 @using_fresh_ff_state_for_testing()
 def test_s3utils_get_key_non_json_data():
 
-    util = s3Utils(env='fourfront-mastertest')
+    s3u = s3Utils(env='fourfront-mastertest')
 
     non_json_string = '1 { 2 3 >'
 
-    with mock.patch.object(util.s3, "get_object") as mock_get_object:
+    with mock.patch.object(s3u.s3, "get_object") as mock_get_object:
         mock_get_object.return_value = {'Body': io.BytesIO(bytes(non_json_string, encoding='utf-8'))}
-        assert util.get_key() == non_json_string
+        assert s3u.get_key() == non_json_string
 
-    with mock.patch.object(util.s3, "get_object") as mock_get_object:
+    with mock.patch.object(s3u.s3, "get_object") as mock_get_object:
         mock_get_object.return_value = {'Body': io.StringIO(non_json_string)}
-        assert util.get_key() == non_json_string
+        assert s3u.get_key() == non_json_string
 
 
 @pytest.mark.unit

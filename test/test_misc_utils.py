@@ -24,7 +24,7 @@ from dcicutils.misc_utils import (
     as_seconds, ref_now, in_datetime_interval, as_datetime, as_ref_datetime, as_utc_datetime, REF_TZ,
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
-    capitalize1, local_attrs, dict_zip, json_leaf_subst, print_error_message, get_error_message,
+    capitalize1, local_attrs, dict_zip, json_leaf_subst, print_error_message, get_error_message, utc_now_str,
     _is_function_of_exactly_one_required_arg, _apply_decorator,  # noQA
     string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, lines_printed_to,
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
@@ -3197,3 +3197,14 @@ class TestTopologicalSorter:
             sorted_nodes = sorter.static_order()
             result = list(sorted_nodes)
             assert result == expected
+
+
+def test_utc_now_str():
+
+    dt = ControlledTime()
+    with mock.patch("dcicutils.misc_utils.datetime", dt):
+        # One cannot patch datetime.datetime directly because it's a primitive type,
+        # but patching a ControlledTime once it's installed in the same place works OK.
+        with mock.patch.object(dt.datetime, "utcnow") as mock_utcnow:
+            mock_utcnow.return_value = datetime_module.datetime(2013, 1, 1, 12, 34, 56)
+            assert utc_now_str() == "2013-01-01T12:34:56+00:00"

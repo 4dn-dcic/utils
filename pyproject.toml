@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "6.9.9.0b10"  # to become 7.0.0
+version = "7.0.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -27,8 +27,7 @@ classifiers = [
     # Relevant topics
     'Topic :: Database :: Database Engines/Servers',
 
-    # Specify the Python versions you support here. In particular, ensure
-    # that you indicate whether you support Python 2, Python 3 or both.
+    # Specify the Python versions you support here.
     'Programming Language :: Python :: 3',
     'Programming Language :: Python :: 3.7',
     'Programming Language :: Python :: 3.8',

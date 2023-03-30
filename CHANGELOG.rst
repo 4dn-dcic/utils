@@ -13,6 +13,45 @@ Change Log
 * Adds Redis functionality
 
 
+7.0.0
+=====
+
+* In ``dcicutils.command_utils``:
+
+  * Make ``script_catch_errors`` context manager return a ``fail``
+    function that can be called to bypass the warning that an error
+    needs to be reported.
+
+* In ``dcicutils.common``:
+
+  * Add a number of type hints.
+
+* In ``dcicutils.ff_utils``:
+
+  * Refactor ``unified_authentication`` to be object-oriented.
+
+  * Add some type hinting.
+
+* In ``dcicutisl.env_base`` and ``dcicutils.s3_utils``:
+
+  * Add some error checks if stored s3 credentials are not in the right form. (**BREAKING CHANGE**)
+    This is not expected to break anything, but users should be on the lookout for problems.
+
+  * Add a new argument (``require_key=``, default ``True``) to ``s3Utils.get_access_keys()`` so that checking
+    of the key name can be relaxed if only ``secret`` and ``server`` are needed, as might happen for Jupyterhub creds.
+    This is a possible way of addressing unexpected problems that could come up due to added error checks.
+
+  * Add some type hinting.
+
+  * Add comments about other possible future error checking.
+
+* In ``dcicutils.misc_utils``:
+
+  * New function ``utc_now_str``
+
+* Misc PEP8
+
+
 6.10.1
 ======
 
@@ -37,10 +76,13 @@ Change Log
 6.8.0
 =====
 
+<<<<<<< HEAD
+* In ``dcicutils.deployment_utils``:
+=======
 * In ``dcicutils.deployment_utils``
+>>>>>>> master
 
   * Add support for ``Auth0Domain`` and ``Auth0AllowedConnections``
-
 
 
 6.7.0

@@ -5,14 +5,21 @@ import mimetypes
 import os
 
 from io import BytesIO
-from typing import Any
+from typing import Optional, Any, Union
+from typing_extensions import Literal
 from zipfile import ZipFile
 from .base import get_beanstalk_real_url
-from .common import EnvName
+from .common import (
+    EnvName,
+    # LegacyAuthDict, AnyAuthDict, AuthDict,
+    AnyJsonData, KeyValuestringDictList,
+    # KeyValuestringDict, PortalEnvName,
+    S3KeyName, S3BucketName, ServerAuthDict
+)
 from .env_base import s3Base
 from .env_manager import EnvManager
-from .env_utils import is_stg_or_prd_env, prod_bucket_env, full_env_name, get_env_real_url, EnvUtils
-from .exceptions import InferredBucketConflict
+from .env_utils import full_env_name, get_env_real_url, EnvUtils
+from .exceptions import InferredBucketConflict, BeanstalkOperationNotImplemented
 from .misc_utils import PRINT, exported, merge_key_value_dict_lists, key_value_dict
 
 
@@ -155,43 +162,44 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
                     tibanna_output_bucket = tibanna_output_bucket_from_health_page
                 logger.warning('Buckets resolved successfully.')
             else:
-                # raise BeanstalkOperationNotImplemented(
-                #     operation="s3Utils.__init__",
-                #     message="s3Utils bucket initialization with no global env bucket is not implemented"
-                # )
+                raise BeanstalkOperationNotImplemented(
+                    operation="s3Utils.__init__",
+                    message="s3Utils bucket initialization with no global env bucket is no longer implemented."
+                )
                 # We believe it would do the wrong thing in several places to continue into this...
-
-                # staging and production share same buckets
-                # TODO: As noted in some of the comments on this conditional, when the new env_utils with
-                #       orchestration support is in place, this same generality needs to be done
-                #       upstream of the global env bucket branch, too. That's not needed for orchestrated cgap,
-                #       which has no stage, but it will be needed for orchestrated fourfront. -kmp 31-Aug-2021
-                if env:
-                    if is_stg_or_prd_env(env):
-                        self.url = get_beanstalk_real_url(env)  # done BEFORE prod_bucket_env blurring stg/prd
-                        # this used to return fourfront-webprod for BOTH staging and data
-                        # now in fact this doesn't even return, it throws an error.
-                        env = prod_bucket_env(env)  # noQA - raises error if called
-                    else:
-                        env = full_env_name(env)
-                        self.url = get_beanstalk_real_url(env)  # done AFTER maybe prepending cgap- or foursight-.
-
-                    es_url = self._infer_es_url()
-                    self.env_manager = EnvManager.compose(portal_url=self.url, es_url=es_url, env_name=env, s3=self.s3)
-                    self.s3_encrypt_key_id = self.health_page_get(HealthPageKey.S3_ENCRYPT_KEY_ID, default=None)
-
-                # TODO: This branch is not setting self.global_env_bucket_manager, but it _could_ do that from the
-                #       description. -kmp 21-Aug-2021
-                def apply_template(template, env):
-                    return template % env if "%s" in template else template
-                # we use standardized naming schema, so s3 buckets always have same prefix
-                sys_bucket = apply_template(self.SYS_BUCKET_TEMPLATE, env)
-                outfile_bucket = apply_template(self.OUTFILE_BUCKET_TEMPLATE, env)
-                raw_file_bucket = apply_template(self.RAW_BUCKET_TEMPLATE, env)
-                blob_bucket = apply_template(self.BLOB_BUCKET_TEMPLATE, env)
-                metadata_bucket = apply_template(self.METADATA_BUCKET_TEMPLATE, env)
-                tibanna_cwls_bucket = apply_template(self.TIBANNA_CWLS_BUCKET_TEMPLATE, env)
-                tibanna_output_bucket = apply_template(self.TIBANNA_OUTPUT_BUCKET_TEMPLATE, env)
+                #
+                # # staging and production share same buckets
+                # # TODO: As noted in some of the comments on this conditional, when the new env_utils with
+                # #       orchestration support is in place, this same generality needs to be done
+                # #       upstream of the global env bucket branch, too. That's not needed for orchestrated cgap,
+                # #       which has no stage, but it will be needed for orchestrated fourfront. -kmp 31-Aug-2021
+                # if env:
+                #     if is_stg_or_prd_env(env):
+                #         self.url = get_beanstalk_real_url(env)  # done BEFORE prod_bucket_env blurring stg/prd
+                #         # this used to return fourfront-webprod for BOTH staging and data
+                #         # now in fact this doesn't even return, it throws an error.
+                #         env = prod_bucket_env(env)  # noQA - raises error if called
+                #     else:
+                #         env = full_env_name(env)
+                #         self.url = get_beanstalk_real_url(env)  # done AFTER maybe prepending cgap- or foursight-.
+                #
+                #     es_url = self._infer_es_url()
+                #     self.env_manager = EnvManager.compose(portal_url=self.url, es_url=es_url,
+                #                                           env_name=env, s3=self.s3)
+                #     self.s3_encrypt_key_id = self.health_page_get(HealthPageKey.S3_ENCRYPT_KEY_ID, default=None)
+                #
+                # # TODO: This branch is not setting self.global_env_bucket_manager, but it _could_ do that from the
+                # #       description. -kmp 21-Aug-2021
+                # def apply_template(template, env):
+                #     return template % env if "%s" in template else template
+                # # we use standardized naming schema, so s3 buckets always have same prefix
+                # sys_bucket = apply_template(self.SYS_BUCKET_TEMPLATE, env)
+                # outfile_bucket = apply_template(self.OUTFILE_BUCKET_TEMPLATE, env)
+                # raw_file_bucket = apply_template(self.RAW_BUCKET_TEMPLATE, env)
+                # blob_bucket = apply_template(self.BLOB_BUCKET_TEMPLATE, env)
+                # metadata_bucket = apply_template(self.METADATA_BUCKET_TEMPLATE, env)
+                # tibanna_cwls_bucket = apply_template(self.TIBANNA_CWLS_BUCKET_TEMPLATE, env)
+                # tibanna_output_bucket = apply_template(self.TIBANNA_OUTPUT_BUCKET_TEMPLATE, env)
         else:
             # If at least sys_bucket was given, for legacy reasons (see https://hms-dbmi.atlassian.net/browse/C4-674)
             # we assume that the given buckets are exactly the ones we want and we don't set up any others.
@@ -199,6 +207,7 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             # those won't be needed. -kmp 23-Jun-2021
             pass
 
+        # NOTE: At this point, self.url is set to the empty string. Use this initialization sequence only for debugging.
         self.sys_bucket = sys_bucket
         self.outfile_bucket = outfile_bucket
         self.raw_file_bucket = raw_file_bucket
@@ -264,52 +273,67 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
 
     ACCESS_KEYS_S3_KEY = 'access_key_admin'
 
-    def get_access_keys(self, name=ACCESS_KEYS_S3_KEY):
+    def get_access_keys(self, name: str = ACCESS_KEYS_S3_KEY, require_key=True) -> ServerAuthDict:
+
         keys = self.get_key(keyfile_name=name)
+
         if not isinstance(keys, dict):
-            raise ValueError("Remotely stored access keys are not in the expected form")
-
-        if isinstance(keys.get('default'), dict):
+            raise ValueError(f"Remotely stored {name} access keys are not in the expected form.")
+        elif 'default' in keys:
+            # If we have a LegacyAuthDict of the form {'default': <actual-auth-dict>}, peek off the wrapper.
             keys = keys['default']
-        if self.url:
-            keys['server'] = self.url
-        return keys
 
-    def get_ff_key(self):
+        if self.url:
+            if 'server' in keys and keys['server'] != self.url:
+                logger.info(f"get_access_keys is replacing server {keys['server']!r} with {self.url!r}.")
+            keys['server'] = self.url
+
+        if (require_key and not keys.get('key')) or not keys.get('secret') or not keys.get('server'):
+            raise ValueError(f"After filling defaults, the {name} access keys are not in the expected form.")
+
+        return keys  # Might still have no server if self.url was not a URL
+
+    def get_ff_key(self) -> ServerAuthDict:
         return self.get_access_keys()
 
-    def get_higlass_key(self):
+    def get_higlass_key(self) -> Union[AnyJsonData, str]:  # parsed json or string that won't parse
+        # TODO: It would be nice if this could be returning something with a better promise. -kmp 1-Mar-2023
         # higlass key corresponds to Django server super user credentials
         return self.get_key(keyfile_name='api_key_higlass')
 
-    def get_google_key(self):
+    def get_google_key(self) -> Union[AnyJsonData, str]:  # parsed json or string that won't parse
+        # TODO: It would be nice if this could be returning something with a better promise. -kmp 1-Mar-2023
         return self.get_key(keyfile_name='api_key_google')
 
-    def get_jupyterhub_key(self):
+    def get_jupyterhub_key(self) -> Union[AnyJsonData, str]:  # parsed json or string that won't parse
+        # TODO: It would be nice if this could be returning something with a better promise. -kmp 1-Mar-2023
         # jupyterhub key is a Jupyterhub API token
         return self.get_key(keyfile_name='api_key_jupyterhub')
 
-    def get_key(self, keyfile_name='access_key_admin'):
+    def get_key(self, keyfile_name: str = 'access_key_admin'
+                ) -> Union[AnyJsonData, str]:  # parsed json or string that won't parse
         # Share secret encrypted S3 File
         response = self.s3.get_object(Bucket=self.sys_bucket,
                                       Key=keyfile_name,
                                       SSECustomerKey=os.environ['S3_ENCRYPT_KEY'],
                                       SSECustomerAlgorithm='AES256')
-        akey = response['Body'].read()
-        if type(akey) == bytes:
-            akey = akey.decode()
+        body_data: Union[bytes, str] = response['Body'].read()
+        auth_text: str = body_data.decode() if type(body_data) == bytes else body_data
         try:
-            return json.loads(akey)
+            return json.loads(auth_text)
         except (ValueError, TypeError):
+            # TODO: Is there really a use case for this returning non-JSON data? If so, can we make a different
+            #       function that does this? Because this is just going to return garbage when peopla are expecting
+            #       key dictionaries and we really should raise an error in that case. -kmp 1-Mar-2023
             # maybe its not json after all
-            return akey
+            return auth_text
 
-    def read_s3(self, filename):
+    def read_s3(self, filename: str):
         response = self.s3.get_object(Bucket=self.outfile_bucket, Key=filename)
         logger.info(str(response))
         return response['Body'].read()
 
-    def does_key_exist(self, key, bucket=None, print_error=True):
+    def does_key_exist(self, key: str, bucket: str = None, print_error: bool = True) -> Union[Literal[False], dict]:
         if not bucket:
             bucket = self.outfile_bucket
         try:
@@ -321,7 +345,7 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             return False
         return file_metadata
 
-    def get_object_tags(self, *, bucket, key):
+    def get_object_tags(self, *, bucket, key) -> KeyValuestringDictList:
         """
         Get all tags of an object.
 
@@ -344,7 +368,7 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             logger.warning(f'Could not get tags for object {bucket}/{key}: {str(e)}')
             raise e
 
-    def set_object_tag(self, *, bucket, key, tag_key, tag_value):
+    def set_object_tag(self, *, bucket: str, key: str, tag_key: str, tag_value: str):
         """
         Adds (tag_key,tag_value) pair to the object. If a tag with key tag_key is already present,
         it will be overwritten.
@@ -366,7 +390,7 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             merge_existing_tags=True,
         )
 
-    def set_object_tags(self, *, bucket, key, tags, merge_existing_tags=True):
+    def set_object_tags(self, *, bucket: str, key: str, tags: KeyValuestringDictList, merge_existing_tags: bool = True):
         """
         Adds or replaces tags of an object with the ones specified in `tags`.
 
@@ -398,8 +422,8 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             logger.warning(f'{bucket}/{key} could not be tagged: {str(e)}')
             raise e
 
-    def get_file_size(self, key, bucket=None, add_bytes=0, add_gb=0,
-                      size_in_gb=False):
+    def get_file_size(self, key: S3KeyName, bucket: Optional[S3BucketName] = None,
+                      add_bytes: int = 0, add_gb: int = 0, size_in_gb: bool = False):
         """
         default returns file size in bytes,
         unless size_in_gb = True
@@ -414,15 +438,21 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             size = size / one_gb
         return size
 
-    def delete_key(self, key, bucket=None):
+    def delete_key(self, key, bucket: Optional[str] = None) -> None:
         if not bucket:
             bucket = self.outfile_bucket
         self.s3.delete_object(Bucket=bucket, Key=key)
 
     @classmethod
-    def size(cls, bucket):
-        sbuck = boto3.resource('s3').Bucket(bucket)
-        # get only head of objects so we can count them
+    def size(cls, bucket: str) -> int:
+        """Slowly and expensively (if there are a lot of them), count the number of items in a bucket."""
+        sbuck = boto3.resource('s3').Bucket(bucket)  # get only head of objects so we can count them
+        # There is apparently no sbuck.objects.count(), so one has to enumerate them all.
+        # Although one avenue we didn't try that is mentioned in StackOverflow is to go to the billing department
+        # in the AWS console, whch knows how many objects there are.
+        # TODO: It is recommended that if there are expected to be a lot of objects, we should paginate through
+        #       them in chunks of 1000, rather than just pulling .all().
+        # Ref: https://stackoverflow.com/questions/2862617/how-can-i-tell-how-many-objects-ive-stored-in-an-s3-bucket
         return sum(1 for _ in sbuck.objects.all())
 
     def s3_put(self, obj, upload_key, acl=None):

@@ -315,16 +315,26 @@ DEBUG_SCRIPT = environ_bool("DEBUG_SCRIPT")
 SCRIPT_ERROR_HERALD = "Command exited in an unusual way. Please feel free to report this, citing the following message."
 
 
+class ScriptFailure(BaseException):
+    pass
+
+
 @contextlib.contextmanager
 def script_catch_errors():
+    def fail(*message):
+        raise ScriptFailure(' '.join(message))
     try:
-        yield
+        yield fail
         exit(0)
-    except Exception as e:
+    except (Exception, ScriptFailure) as e:
         if DEBUG_SCRIPT:
             # If debugging, let the error propagate, do not trap it.
             raise
         else:
-            PRINT(SCRIPT_ERROR_HERALD)
-            print_error_message(e)
+            if not isinstance(e, ScriptFailure):
+                PRINT(SCRIPT_ERROR_HERALD)
+                print_error_message(e)
+            else:
+                message = str(e)  # Note: We ignore the type, which isn't intended to be shown.
+                PRINT(message)
             exit(1)
