@@ -101,6 +101,10 @@ def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False,
             if isinstance(value, dict):
                 if has_values_to_obfuscate(value):
                     return True
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict) and has_values_to_obfuscate(item):
+                        return True
             elif isinstance(value, str) and should_obfuscate(key) and not is_obfuscated(value):
                 return True
         return False
@@ -115,6 +119,14 @@ def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False,
     for key, value in dictionary.items():
         if isinstance(value, dict):
             dictionary[key] = obfuscate_dict(value, show=False, inplace=False, obfuscated=obfuscated)
+        elif isinstance(value, list):
+            obfuscated_value = []
+            for item in value:
+                if isinstance(item, dict):
+                    obfuscated_value.append(obfuscate_dict(item, show=False, inplace=False, obfuscated=obfuscated))
+                else:
+                    obfuscated_value.append(item)
+            dictionary[key] = obfuscated_value
         elif isinstance(value, str) and should_obfuscate(key) and not is_obfuscated(value):
             dictionary[key] = obfuscate(value, show=False, obfuscated=obfuscated)
     return dictionary
