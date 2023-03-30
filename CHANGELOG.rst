@@ -6,15 +6,22 @@ dcicutils
 Change Log
 ----------
 
-6.9.9.0b5
-=========
-
-* To become 7.0.0
-* Adds Redis functionality
-
-
 7.0.0
 =====
+
+* New files: ``dcicutils.redis_utils`` and ``dcicutils.redis_tools`` plus associated test files
+
+* In ``dcicutils.redis_utils``:
+
+  * Implement the ``RedisBase`` object, which takes the output of ``create_redis_client`` and returns
+    an object that implements some base APIs for interacting with Redis.
+
+* In ``dcicutils.redis_tools``:
+
+  * Implement the ``RedisSessionToken`` object, which creates higher level APIs for creating session
+    tokens that are backed by Redis. This object operates on the ``RedisBase`` class.
+  * Session tokens are 32 bytes and expire automatically after 3 hours by default, but can be tuned
+    otherwise.
 
 * In ``dcicutils.command_utils``:
 
@@ -76,11 +83,7 @@ Change Log
 6.8.0
 =====
 
-<<<<<<< HEAD
 * In ``dcicutils.deployment_utils``:
-=======
-* In ``dcicutils.deployment_utils``
->>>>>>> master
 
   * Add support for ``Auth0Domain`` and ``Auth0AllowedConnections``
 
