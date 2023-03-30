@@ -31,7 +31,7 @@ from .lang_utils import there_are
 from .misc_utils import (
     PRINT, ignored, Retry, remove_prefix, REF_TZ,
     environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name,
-    find_associations, get_error_message,
+    find_associations, get_error_message, remove_suffix,
 )
 from .qa_checkers import QA_EXCEPTION_PATTERN, find_uses, confirm_no_uses, VersionChecker, ChangeLogChecker
 
@@ -592,11 +592,11 @@ class _PrintCapturer:
         self.reset()
 
     @classmethod
-    def _file_lines_dict(cls):
+    def _file_lines_dict(cls) -> DefaultDict[Optional[str], List[str]]:
         return defaultdict(lambda: [])
 
     @classmethod
-    def _file_last_dict(cls):
+    def _file_last_dict(cls) -> DefaultDict[Optional[str], Optional[str]]:
         return defaultdict(lambda: None)
 
     def mock_print_handler(self, *args, **kwargs):
@@ -609,6 +609,8 @@ class _PrintCapturer:
             * This mock ignores 'end=' and will treat all calls to PRINT as if they were separate lines.
         """
         text = " ".join(map(str, args))
+        texts = remove_suffix('\n', text).split('\n')
+        last_text = texts[-1]
         print(text, **kwargs)  # noQA - This call to print is low-level implementation
         # This only captures non-file output output.
         file = kwargs.get('file')
@@ -616,14 +618,14 @@ class _PrintCapturer:
             file = sys.stdout
         if file is sys.stdout:
             # Easy access to stdout
-            self.lines.append(text)
-            self.last = text
+            self.lines.extend(texts)
+            self.last = last_text
             # Every output to stdout is implicitly like output to no file (None)
-            self.file_lines[None].append(text)
-            self.file_last[None] = text
+            self.file_lines[None].extend(texts)
+            self.file_last[None] = last_text
         # All accesses of any file/fp, including stdout, get associated with that destination
-        self.file_lines[file].append(text)
-        self.file_last[file] = text
+        self.file_lines[file].extend(texts)
+        self.file_last[file] = last_text
 
     def reset(self):
         self.lines = []
