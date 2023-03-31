@@ -45,6 +45,14 @@ Change Log
 
 * Misc PEP8
 
+* New ``trace_utils`` module
+
+  * New decorator ``@Trace``
+
+  * New function ``make_trace_decorator`` to make similar ones.
+
+* Fix to ``obfuscation_utils`` relating to dicts containing lists.
+
 
 6.10.1
 ======
@@ -70,11 +78,7 @@ Change Log
 6.8.0
 =====
 
-<<<<<<< HEAD
 * In ``dcicutils.deployment_utils``:
-=======
-* In ``dcicutils.deployment_utils``
->>>>>>> master
 
   * Add support for ``Auth0Domain`` and ``Auth0AllowedConnections``
 

@@ -231,3 +231,10 @@ snapshot_utils
 
 .. automodule:: dcicutils.snapshot_utils
   :members:
+
+
+trace_utils
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.trace_utils
+  :members:
