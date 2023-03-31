@@ -1,3 +1,5 @@
+import copy
+
 from dcicutils.obfuscation_utils import (
     is_obfuscated, should_obfuscate, obfuscate, obfuscate_dict,
 )
@@ -115,3 +117,12 @@ def test_obfuscate_dict():
     o = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "<REDACTED>"}}
     x = obfuscate_dict(d, obfuscated="<REDACTED>")
     assert x == o
+
+def test_obfuscate_dict_with_nested_list():
+
+    d = {"abc": "123", "def": [{"ghi": "456", "jklsecret": "obfuscatethisvalue"}, 789], "jkl": "hello"}
+    o = {"abc": "123", "def": [{"ghi": "456", "jklsecret": "<REDACTED>"        }, 789], "jkl": "hello"}
+    d_copy = copy.deepcopy(d)  # to make sure the original is not inadvertantly modified
+    x = obfuscate_dict(d, obfuscated="<REDACTED>")
+    assert x == o
+    assert d == d_copy
