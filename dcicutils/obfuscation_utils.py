@@ -64,7 +64,7 @@ OBFUSCATED_VALUE_DESCRIPTION = ("a series of asterisks or a meta-identifier like
 OBFUSCATED_VALUE = re.compile(r'^([*]+|[<][a-z0-9_-]+[>])$', re.IGNORECASE)
 
 
-def is_obfuscated(value: str, obfuscated = None) -> bool:
+def is_obfuscated(value: str, obfuscated: str = None) -> bool:
     """
     Returns True if a given string is in the format we use as an obfuscated value.
     Returns False if the argument is not a string or is not in the obfuscated value format.
