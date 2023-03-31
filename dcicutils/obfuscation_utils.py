@@ -92,11 +92,13 @@ def obfuscate_dict(target: Any, inplace: bool = False, show: bool = False, obfus
 
     N.B. ACTUALLY, this ALSO works if the given target value is a LIST (in which case we look, recursively,
     for dictionary elements within to obfuscate); and actually, ANY value may be passed, which, if not
-    a dictionary or list, we just return the given value.
+    a dictionary or list, we just return the given value. So technically this function is misnamed.
+    And note that we do NOT do anything special with tuples (as this is really geared toward JSON).
 
     :param dictionary: Given dictionary whose senstive values obfuscate.
     :param inplace: If True obfuscate the given dictionary in place; else a COPY is returned, if modified.
     :param show: If True does not actually obfuscate and simply returns the given dictionary.
+    :param obfuscated: Value to use as the obfuscated string; default is string of asterisks.
     :return: Resultant dictionary.
     """
 
