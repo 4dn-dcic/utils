@@ -121,3 +121,62 @@ def test_make_trace_decorator():
                 'Entering test.test_trace_utils.beta_add_up with args=(3, 4) kwargs=dict()',
                 'Function test.test_trace_utils.beta_add_up returned 7',
             ]
+
+
+def test_trace_redact():
+
+    print()
+
+    with override_environ(TRACE_REDACT=None):
+
+        with printed_output() as printed:
+
+            @Trace(enabled=True)
+            def fn_1(x):
+                return x
+
+            d = {"AWS_ACCESS_KEY_ID": "FOO", "AWS_SECRET_KEY": "BAR"}
+            d_obfuscated = {"AWS_ACCESS_KEY_ID": "FOO", "AWS_SECRET_KEY": "<REDACTED>"}
+
+            assert fn_1(d) == d
+            assert printed.lines == [
+                f"Entering test.test_trace_utils.fn_1 with args=({d_obfuscated},) kwargs=dict()",
+                f"Function test.test_trace_utils.fn_1 returned dict(",
+                f"  AWS_ACCESS_KEY_ID={d_obfuscated['AWS_ACCESS_KEY_ID']!r},",
+                f"  AWS_SECRET_KEY={d_obfuscated['AWS_SECRET_KEY']!r},",
+                f")",
+            ]
+
+            printed.reset()
+
+            @Trace(enabled=True)
+            def fn_2(**x):
+                return x
+
+            assert fn_2(**d) == d
+            assert printed.lines == [
+                f"Entering test.test_trace_utils.fn_2 with args=() kwargs=dict(",
+                f"  AWS_ACCESS_KEY_ID={d_obfuscated['AWS_ACCESS_KEY_ID']!r},",
+                f"  AWS_SECRET_KEY={d_obfuscated['AWS_SECRET_KEY']!r},",
+                f")",
+                f"Function test.test_trace_utils.fn_2 returned dict(",
+                f"  AWS_ACCESS_KEY_ID={d_obfuscated['AWS_ACCESS_KEY_ID']!r},",
+                f"  AWS_SECRET_KEY={d_obfuscated['AWS_SECRET_KEY']!r},",
+                f")",
+            ]
+
+            printed.reset()
+
+            @Trace(enabled=True)
+            def fn_3():
+                return d
+
+            assert fn_3() == d
+            assert printed.lines == [
+                f"Entering test.test_trace_utils.fn_3 with args=() kwargs=dict()",
+                f"Function test.test_trace_utils.fn_3 returned dict(",
+                f"  AWS_ACCESS_KEY_ID={d_obfuscated['AWS_ACCESS_KEY_ID']!r},",
+                f"  AWS_SECRET_KEY={d_obfuscated['AWS_SECRET_KEY']!r},",
+                f")"
+            ]
+

@@ -11,18 +11,23 @@ from dcicutils.obfuscation_utils import obfuscate_dict
 
 TRACE_REDACT = environ_bool("TRACE_REDACT", default=True)
 
-def _expand_dict(d, indent=0):
+def _expand_if_dict(d, indent=0):
     s = io.StringIO()
-    if TRACE_REDACT:
-        d = obfuscate_dict(d, obfuscated="<REDACTED>")
-    if not d:
-        PRINT("dict()", file=s)
+    if isinstance(d, dict):
+        if not(d):
+            PRINT("dict()", file=s)
+        else:
+            PRINT("dict(", file=s)
+            for k, v in d.items():
+                PRINT(f"{' ' * (indent + 2)}{k}={v!r},", file=s)
+            PRINT(f"{' ' * indent})", file=s)
     else:
-        PRINT("dict(", file=s)
-        for k, v in d.items():
-            PRINT(f"{' ' * (indent + 2)}{k}={v!r},", file=s)
-        PRINT(f"{' ' * indent})", file=s)
+        PRINT(d)
     return s.getvalue()
+
+
+def _obfuscate(x):
+    return obfuscate_dict(x, obfuscated="<REDACTED>")
 
 
 def make_trace_decorator(enabled_by_default=False):
@@ -38,10 +43,20 @@ def make_trace_decorator(enabled_by_default=False):
 
             @functools.wraps(fn)
             def _traced(*args, **kwargs):
-                PRINT(f"Entering {trace_name} with args={args!r} kwargs={_expand_dict(kwargs)}")
+                args_for_display = args
+                kwargs_for_display = kwargs
+                if TRACE_REDACT:
+                    args_for_display = tuple(map(_obfuscate, args_for_display))
+                    kwargs_for_display = _obfuscate(kwargs)
+                PRINT(f"Entering {trace_name} with"
+                      f" args={args_for_display!r}"
+                      f" kwargs={_expand_if_dict(kwargs_for_display)}")
                 try:
                     res = fn(*args, **kwargs)
-                    PRINT(f"Function {trace_name} returned {res!r}")
+                    res_for_display = res
+                    if TRACE_REDACT and isinstance(res_for_display, dict):
+                        res_for_display = _obfuscate(res)
+                    PRINT(f"Function {trace_name} returned {_expand_if_dict(res_for_display)}")
                     return res
                 except BaseException as exc:
                     PRINT(f"Function {trace_name} raised {get_error_message(exc)}")
