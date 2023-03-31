@@ -127,6 +127,9 @@ def obfuscate_dict(target: Any, inplace: bool = False, show: bool = False, obfus
         return target
     if not isinstance(inplace, bool) or not inplace:
         if has_values_to_obfuscate(target):
+            # If we are NOT obfuscating in place (i.e. possibly obfuscating/modifying
+            # the give value directly) then we do a deep copy of it; and if this is case,
+            # or otherwise, note below we explicitly set inplace=False for recursive calls.
             target = copy.deepcopy(target)
     if isinstance(target, dict):
         for key, value in target.items():
