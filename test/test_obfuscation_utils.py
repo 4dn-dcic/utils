@@ -88,9 +88,11 @@ def test_obfuscate_dict():
     o = {"abc": "123", "def_password_ghi": "***", "secret": 789, "foo":
          {"jkl": "678", "secret": "***", "encrypt_id": "****", "encrypt_key_id": "foo"}}
 
+    copy_d = copy.deepcopy(d)
     x = obfuscate_dict(d)
     assert x == o
     assert id(x) != id(d)
+    assert d == copy_d
 
     x = obfuscate_dict(d, inplace=True)
     assert x == o
@@ -123,6 +125,16 @@ def test_obfuscate_dict_with_nested_list():
 
     d = {"abc": "123", "def": [{"ghi": "456", "jklsecret": "obfuscatethisvalue"}, 789], "jkl": "hello"}
     o = {"abc": "123", "def": [{"ghi": "456", "jklsecret": "<REDACTED>"}, 789], "jkl": "hello"}
+    d_copy = copy.deepcopy(d)  # to make sure the original is not inadvertantly modified
+    x = obfuscate_dict(d, obfuscated="<REDACTED>")
+    assert x == o
+    assert d == d_copy
+
+
+def test_obfuscate_dict_with_list():
+
+    d = [{"abc": "123", "def": [{"ghi": "456", "jklsecret": "obfuscatethisvalue"}, 789], "passwd": "hello"}]
+    o = [{"abc": "123", "def": [{"ghi": "456", "jklsecret": "<REDACTED>"}, 789], "passwd": "<REDACTED>"}]
     d_copy = copy.deepcopy(d)  # to make sure the original is not inadvertantly modified
     x = obfuscate_dict(d, obfuscated="<REDACTED>")
     assert x == o

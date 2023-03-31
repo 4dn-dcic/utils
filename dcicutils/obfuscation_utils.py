@@ -4,7 +4,7 @@ import copy
 import re
 
 from dcicutils.misc_utils import check_true
-from typing import Optional
+from typing import Any, Optional
 
 
 # The _SENSITIVE_KEY_NAMES_REGEX regex defines key names representing sensitive values, case-insensitive.
@@ -64,19 +64,22 @@ OBFUSCATED_VALUE_DESCRIPTION = ("a series of asterisks or a meta-identifier like
 OBFUSCATED_VALUE = re.compile(r'^([*]+|[<][a-z0-9_-]+[>])$', re.IGNORECASE)
 
 
-def is_obfuscated(value: str) -> bool:
+def is_obfuscated(value: str, obfuscated = None) -> bool:
     """
     Returns True if a given string is in the format we use as an obfuscated value.
     Returns False if the argument is not a string or is not in the obfuscated value format.
 
     NOTE: This is heuristic. Your password MIGHT be *** or <my-password>, but we're hoping not.
     """
+    if isinstance(value, str):
+        if isinstance(obfuscated, str):
+            return value == obfuscated
+        else:
+            return bool(OBFUSCATED_VALUE.match(value))
+    return False
 
-    return isinstance(value, str) and bool(OBFUSCATED_VALUE.match(value))
 
-
-def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False,
-                   obfuscated: Optional[str] = None) -> dict:
+def obfuscate_dict(target: Any, inplace: bool = False, show: bool = False, obfuscated: Optional[str] = None) -> Any:
     """
     Obfuscates all STRING values within the given dictionary, RECURSIVELY, for all key names which look
     as if they represent sensitive values (based on the should_obfuscate function). By default, if the
@@ -87,6 +90,10 @@ def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False,
     the given dictionary itself in place (NOT a copy). In either case the resultant dictionary is returned.
     If the show argument is True then does not actually obfuscate and simply returns the given dictionary.
 
+    N.B. ACTUALLY, this ALSO works if the given target value is a LIST (in which case we look, recursively,
+    for dictionary elements within to obfuscate); and actually, ANY value may be passed, which, if not
+    a dictionary or list, we just return the given value.
+
     :param dictionary: Given dictionary whose senstive values obfuscate.
     :param inplace: If True obfuscate the given dictionary in place; else a COPY is returned, if modified.
     :param show: If True does not actually obfuscate and simply returns the given dictionary.
@@ -96,37 +103,44 @@ def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False,
     check_true(not obfuscated or is_obfuscated(obfuscated),
                message=f"If obfuscated= is supplied, it must be {OBFUSCATED_VALUE_DESCRIPTION}.")
 
-    def has_values_to_obfuscate(dictionary: dict) -> bool:
-        for key, value in dictionary.items():
-            if isinstance(value, dict):
-                if has_values_to_obfuscate(value):
-                    return True
-            elif isinstance(value, list):
-                for item in value:
-                    if isinstance(item, dict) and has_values_to_obfuscate(item):
+    def has_values_to_obfuscate(target: Any) -> bool:
+        if isinstance(target, dict):
+            for key, value in target.items():
+                if isinstance(value, dict):
+                    if has_values_to_obfuscate(value):
                         return True
-            elif isinstance(value, str) and should_obfuscate(key) and not is_obfuscated(value):
-                return True
+                elif isinstance(value, list):
+                    for item in value:
+                        if has_values_to_obfuscate(item):
+                            return True
+                elif isinstance(value, str):
+                    if should_obfuscate(key):
+                        if not is_obfuscated(value, obfuscated=obfuscated):
+                            return True
+        elif isinstance(target, list):
+            for item in target:
+                if has_values_to_obfuscate(item):
+                    return True
         return False
 
-    if dictionary is None or not isinstance(dictionary, dict):
-        return {}
     if isinstance(show, bool) and show:
-        return dictionary
+        return target
     if not isinstance(inplace, bool) or not inplace:
-        if has_values_to_obfuscate(dictionary):
-            dictionary = copy.deepcopy(dictionary)
-    for key, value in dictionary.items():
-        if isinstance(value, dict):
-            dictionary[key] = obfuscate_dict(value, show=False, inplace=False, obfuscated=obfuscated)
-        elif isinstance(value, list):
-            obfuscated_value = []
-            for item in value:
-                if isinstance(item, dict):
-                    obfuscated_value.append(obfuscate_dict(item, show=False, inplace=False, obfuscated=obfuscated))
-                else:
-                    obfuscated_value.append(item)
-            dictionary[key] = obfuscated_value
-        elif isinstance(value, str) and should_obfuscate(key) and not is_obfuscated(value):
-            dictionary[key] = obfuscate(value, show=False, obfuscated=obfuscated)
-    return dictionary
+        if has_values_to_obfuscate(target):
+            target = copy.deepcopy(target)
+    if isinstance(target, dict):
+        for key, value in target.items():
+            if isinstance(value, dict):
+                target[key] = obfuscate_dict(value, inplace=True, show=False, obfuscated=obfuscated)
+            elif isinstance(value, list):
+                obfuscated_value = []
+                for item in value:
+                    obfuscated_value.append(obfuscate_dict(item, inplace=True, show=False, obfuscated=obfuscated))
+                target[key] = obfuscated_value
+            elif isinstance(value, str):
+                if should_obfuscate(key):
+                    if not is_obfuscated(value, obfuscated=obfuscated):
+                        target[key] = obfuscate(value, show=False, obfuscated=obfuscated)
+    elif isinstance(target, list):
+        return [obfuscate_dict(item, inplace=True, show=False, obfuscated=obfuscated) for item in target]
+    return target
