@@ -5,9 +5,12 @@ from dcicutils.misc_utils import environ_bool, full_object_name, get_error_messa
 from dcicutils.obfuscation_utils import obfuscate_dict
 
 
+TRACE_REDACT = environ_bool("TRACE_REDACT", default=True)
+
 def _expand_dict(d, indent=0):
     s = io.StringIO()
-    d = obfuscate_dict(d)
+    if TRACE_REDACT:
+        d = obfuscate_dict(d, obfuscated="<REDACTED>")
     if not d:
         PRINT("dict()", file=s)
     else:
