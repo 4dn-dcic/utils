@@ -7,6 +7,18 @@ Change Log
 ----------
 
 
+6.11.0
+======
+
+* New ``trace_utils`` module
+
+  * New decorator ``@Trace``
+
+  * New function ``make_trace_decorator`` to make similar ones.
+
+* Fix to ``obfuscation_utils`` relating to dicts containing lists.
+
+
 6.10.1
 ======
 
