@@ -162,4 +162,3 @@ def test_trace_redact():
                 f"Entering test.test_trace_utils.fn_3 with args=() kwargs={{}}",
                 f"Function test.test_trace_utils.fn_3 returned {d_obfuscated!r}"
             ]
-

@@ -1,5 +1,4 @@
 import functools
-import io
 
 from dcicutils.misc_utils import environ_bool, full_object_name, get_error_message, PRINT
 from dcicutils.obfuscation_utils import obfuscate_dict
@@ -10,6 +9,7 @@ from dcicutils.obfuscation_utils import obfuscate_dict
 # is on a separate variable that defaults to True. -kmp 30-Mar-2023
 
 TRACE_REDACT = environ_bool("TRACE_REDACT", default=True)
+
 
 def _maybe_obfuscate(x):
     if not TRACE_REDACT:
@@ -22,6 +22,7 @@ def _maybe_obfuscate(x):
         return list(map(_maybe_obfuscate, x))
     else:
         return x
+
 
 def make_trace_decorator(enabled_by_default=False):
 
