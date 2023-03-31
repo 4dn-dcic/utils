@@ -1009,6 +1009,7 @@ C4_853_FIX_INFO = {
 }
 
 
+@pytest.mark.xfail(reason="awaiting deployment transition of ecosystem software")
 @pytest.mark.parametrize('env_name', [
     'fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat', 'mastertest', 'webdev', 'hotseat'])
 @using_fresh_ff_deployed_state_for_testing()
