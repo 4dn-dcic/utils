@@ -11,24 +11,17 @@ from dcicutils.obfuscation_utils import obfuscate_dict
 
 TRACE_REDACT = environ_bool("TRACE_REDACT", default=True)
 
-def _expand_if_dict(d, indent=0):
-    s = io.StringIO()
-    if isinstance(d, dict):
-        if not(d):
-            PRINT("dict()", file=s)
-        else:
-            PRINT("dict(", file=s)
-            for k, v in d.items():
-                PRINT(f"{' ' * (indent + 2)}{k}={v!r},", file=s)
-            PRINT(f"{' ' * indent})", file=s)
+def _maybe_obfuscate(x):
+    if not TRACE_REDACT:
+        return x
+    elif isinstance(x, dict):
+        return obfuscate_dict(x, obfuscated="<REDACTED>")
+    elif isinstance(x, tuple):
+        return tuple(map(_maybe_obfuscate, x))
+    elif isinstance(x, list):
+        return list(map(_maybe_obfuscate, x))
     else:
-        PRINT(d)
-    return s.getvalue()
-
-
-def _obfuscate(x):
-    return obfuscate_dict(x, obfuscated="<REDACTED>")
-
+        return x
 
 def make_trace_decorator(enabled_by_default=False):
 
@@ -43,20 +36,10 @@ def make_trace_decorator(enabled_by_default=False):
 
             @functools.wraps(fn)
             def _traced(*args, **kwargs):
-                args_for_display = args
-                kwargs_for_display = kwargs
-                if TRACE_REDACT:
-                    args_for_display = tuple(map(_obfuscate, args_for_display))
-                    kwargs_for_display = _obfuscate(kwargs)
-                PRINT(f"Entering {trace_name} with"
-                      f" args={args_for_display!r}"
-                      f" kwargs={_expand_if_dict(kwargs_for_display)}")
+                PRINT(f"Entering {trace_name} with args={_maybe_obfuscate(args)!r} kwargs={_maybe_obfuscate(kwargs)!r}")
                 try:
                     res = fn(*args, **kwargs)
-                    res_for_display = res
-                    if TRACE_REDACT and isinstance(res_for_display, dict):
-                        res_for_display = _obfuscate(res)
-                    PRINT(f"Function {trace_name} returned {_expand_if_dict(res_for_display)}")
+                    PRINT(f"Function {trace_name} returned {_maybe_obfuscate(res)!r}")
                     return res
                 except BaseException as exc:
                     PRINT(f"Function {trace_name} raised {get_error_message(exc)}")

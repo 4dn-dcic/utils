@@ -19,7 +19,7 @@ def test_trace():
 
             assert alpha_add_up(3, 4) == 7
             assert printed.lines == [
-                'Entering test.test_trace_utils.alpha_add_up with args=(3, 4) kwargs=dict()',
+                'Entering test.test_trace_utils.alpha_add_up with args=(3, 4) kwargs={}',
                 'Function test.test_trace_utils.alpha_add_up returned 7',
             ]
 
@@ -49,8 +49,8 @@ def test_trace():
 
             assert gamma_add_up(3, 4) == 7
             assert printed.lines == [
-                'Entering test.test_trace_utils.gamma_add_up with args=(3, 4) kwargs=dict()',
-                'Function test.test_trace_utils.gamma_add_up returned 7',
+                'Entering test.test_trace_utils.gamma_add_up with args=(3, 4) kwargs={}',
+                "Function test.test_trace_utils.gamma_add_up returned 7",
             ]
 
             printed.reset()
@@ -59,21 +59,16 @@ def test_trace():
 
             assert gamma_add_up(y=3, x=4) == 7
             assert printed.lines == [
-                'Entering test.test_trace_utils.gamma_add_up with args=() kwargs=dict(',
-                '  y=3,',
-                '  x=4,',
-                ')',
-                'Function test.test_trace_utils.gamma_add_up returned 7'
+                "Entering test.test_trace_utils.gamma_add_up with args=() kwargs={'y': 3, 'x': 4}",
+                "Function test.test_trace_utils.gamma_add_up returned 7",
             ]
 
             printed.reset()
 
             assert gamma_add_up(3, y=4) == 7
             assert printed.lines == [
-                'Entering test.test_trace_utils.gamma_add_up with args=(3,) kwargs=dict(',
-                '  y=4,',
-                ')',
-                'Function test.test_trace_utils.gamma_add_up returned 7'
+                "Entering test.test_trace_utils.gamma_add_up with args=(3,) kwargs={'y': 4}",
+                "Function test.test_trace_utils.gamma_add_up returned 7",
             ]
 
 
@@ -118,7 +113,7 @@ def test_make_trace_decorator():
 
             assert beta_add_up(3, 4) == 7
             assert printed.lines == [
-                'Entering test.test_trace_utils.beta_add_up with args=(3, 4) kwargs=dict()',
+                'Entering test.test_trace_utils.beta_add_up with args=(3, 4) kwargs={}',
                 'Function test.test_trace_utils.beta_add_up returned 7',
             ]
 
@@ -140,11 +135,8 @@ def test_trace_redact():
 
             assert fn_1(d) == d
             assert printed.lines == [
-                f"Entering test.test_trace_utils.fn_1 with args=({d_obfuscated},) kwargs=dict()",
-                f"Function test.test_trace_utils.fn_1 returned dict(",
-                f"  AWS_ACCESS_KEY_ID={d_obfuscated['AWS_ACCESS_KEY_ID']!r},",
-                f"  AWS_SECRET_KEY={d_obfuscated['AWS_SECRET_KEY']!r},",
-                f")",
+                f"Entering test.test_trace_utils.fn_1 with args={(d_obfuscated,)!r} kwargs={{}}",
+                f"Function test.test_trace_utils.fn_1 returned {d_obfuscated!r}",
             ]
 
             printed.reset()
@@ -155,14 +147,8 @@ def test_trace_redact():
 
             assert fn_2(**d) == d
             assert printed.lines == [
-                f"Entering test.test_trace_utils.fn_2 with args=() kwargs=dict(",
-                f"  AWS_ACCESS_KEY_ID={d_obfuscated['AWS_ACCESS_KEY_ID']!r},",
-                f"  AWS_SECRET_KEY={d_obfuscated['AWS_SECRET_KEY']!r},",
-                f")",
-                f"Function test.test_trace_utils.fn_2 returned dict(",
-                f"  AWS_ACCESS_KEY_ID={d_obfuscated['AWS_ACCESS_KEY_ID']!r},",
-                f"  AWS_SECRET_KEY={d_obfuscated['AWS_SECRET_KEY']!r},",
-                f")",
+                f"Entering test.test_trace_utils.fn_2 with args=() kwargs={d_obfuscated!r}",
+                f"Function test.test_trace_utils.fn_2 returned {d_obfuscated!r}",
             ]
 
             printed.reset()
@@ -173,10 +159,7 @@ def test_trace_redact():
 
             assert fn_3() == d
             assert printed.lines == [
-                f"Entering test.test_trace_utils.fn_3 with args=() kwargs=dict()",
-                f"Function test.test_trace_utils.fn_3 returned dict(",
-                f"  AWS_ACCESS_KEY_ID={d_obfuscated['AWS_ACCESS_KEY_ID']!r},",
-                f"  AWS_SECRET_KEY={d_obfuscated['AWS_SECRET_KEY']!r},",
-                f")"
+                f"Entering test.test_trace_utils.fn_3 with args=() kwargs={{}}",
+                f"Function test.test_trace_utils.fn_3 returned {d_obfuscated!r}"
             ]
 
