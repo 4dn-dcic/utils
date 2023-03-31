@@ -5,6 +5,10 @@ from dcicutils.misc_utils import environ_bool, full_object_name, get_error_messa
 from dcicutils.obfuscation_utils import obfuscate_dict
 
 
+# You can use TRACE_REDACT=FALSE if tracing should show credentials,
+# but obviously this is usually not something you'd want to do, so this
+# is on a separate variable that defaults to True. -kmp 30-Mar-2023
+
 TRACE_REDACT = environ_bool("TRACE_REDACT", default=True)
 
 def _expand_dict(d, indent=0):
