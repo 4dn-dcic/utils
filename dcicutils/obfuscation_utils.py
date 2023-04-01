@@ -91,7 +91,7 @@ def obfuscate_dict(target: Any, inplace: bool = False, show: bool = False, obfus
     If the show argument is True then does not actually obfuscate and simply returns the given dictionary.
 
     N.B. ACTUALLY, this ALSO works if the given target value is a LIST (in which case we look, recursively,
-    for dictionary elements within to obfuscate); and actually, ANY value may be passed, which, if not
+    for dictionary elements within to obfuscate); ALSO actually, ANY value may be passed, which, if NOT
     a dictionary or list, we just return the given value. So technically this function is misnamed.
     And note that we do NOT do anything special with tuples (as this is really geared toward JSON).
 
@@ -105,6 +105,8 @@ def obfuscate_dict(target: Any, inplace: bool = False, show: bool = False, obfus
     check_true(not obfuscated or is_obfuscated(obfuscated),
                message=f"If obfuscated= is supplied, it must be {OBFUSCATED_VALUE_DESCRIPTION}.")
 
+    # The only purpose/use of this function is to possibly short-circuit the need do a deep copy
+    # of the given dictionary (or list) when we are NOT obfuscating the value in place (the default).
     def has_values_to_obfuscate(target: Any) -> bool:
         if isinstance(target, dict):
             for key, value in target.items():
@@ -138,10 +140,7 @@ def obfuscate_dict(target: Any, inplace: bool = False, show: bool = False, obfus
             if isinstance(value, dict):
                 target[key] = obfuscate_dict(value, inplace=True, show=False, obfuscated=obfuscated)
             elif isinstance(value, list):
-                obfuscated_value = []
-                for item in value:
-                    obfuscated_value.append(obfuscate_dict(item, inplace=True, show=False, obfuscated=obfuscated))
-                target[key] = obfuscated_value
+                target[key] = [obfuscate_dict(item, inplace=True, show=False, obfuscated=obfuscated) for item in value]
             elif isinstance(value, str):
                 if should_obfuscate(key):
                     if not is_obfuscated(value, obfuscated=obfuscated):
