@@ -90,10 +90,10 @@ def obfuscate_dict(target: Any, inplace: bool = False, show: bool = False, obfus
     the given dictionary itself in place (NOT a copy). In either case the resultant dictionary is returned.
     If the show argument is True then does not actually obfuscate and simply returns the given dictionary.
 
-    N.B. ACTUALLY, this ALSO works if the given target value is a LIST (in which case we look, recursively,
-    for dictionary elements within to obfuscate); ALSO actually, ANY value may be passed, which, if NOT
-    a dictionary or list, we just return the given value. So technically this function is misnamed.
-    And note that we do NOT do anything special with tuples (as this is really geared toward JSON).
+    N.B. ACTUALLY, this ALSO works if the given target value is a LIST of TUPLE (in which case we look,
+    recursively, for dictionary elements within to obfuscate); ALSO actually, ANY value may be passed,
+    which, if NOT a dictionary, list, or tuple, we just return the given value. We do NOT consider sets.
+    Technically, then, this function is misnamed.
 
     :param dictionary: Given dictionary whose senstive values obfuscate.
     :param inplace: If True obfuscate the given dictionary in place; else a COPY is returned, if modified.
@@ -105,15 +105,18 @@ def obfuscate_dict(target: Any, inplace: bool = False, show: bool = False, obfus
     check_true(not obfuscated or is_obfuscated(obfuscated),
                message=f"If obfuscated= is supplied, it must be {OBFUSCATED_VALUE_DESCRIPTION}.")
 
-    # The only purpose/use of this function is to possibly short-circuit the need do a deep copy
+    # The ONLY purpose/use of this function is to possibly SHORT-CIRCUIT the need do a DEEP COPY
     # of the given dictionary (or list) when we are NOT obfuscating the value in place (the default).
+    # Given the probable fact that a call to obfuscate_dict will be made only when it is likely
+    # that the given target does in fact contain values to be obfuscated, it may not be worth
+    # the extra processing time that this function would incur (TODO: consider removing this).
     def has_values_to_obfuscate(target: Any) -> bool:
         if isinstance(target, dict):
             for key, value in target.items():
                 if isinstance(value, dict):
                     if has_values_to_obfuscate(value):
                         return True
-                elif isinstance(value, list):
+                elif isinstance(value, list) or isinstance(value, tuple):
                     for item in value:
                         if has_values_to_obfuscate(item):
                             return True
@@ -121,7 +124,7 @@ def obfuscate_dict(target: Any, inplace: bool = False, show: bool = False, obfus
                     if should_obfuscate(key):
                         if not is_obfuscated(value, obfuscated=obfuscated):
                             return True
-        elif isinstance(target, list):
+        elif isinstance(target, list) or isinstance(target, tuple):
             for item in target:
                 if has_values_to_obfuscate(item):
                     return True
@@ -137,14 +140,14 @@ def obfuscate_dict(target: Any, inplace: bool = False, show: bool = False, obfus
             target = copy.deepcopy(target)
     if isinstance(target, dict):
         for key, value in target.items():
-            if isinstance(value, dict):
+            if isinstance(value, dict) or isinstance(value, list) or isinstance(value, tuple):
                 target[key] = obfuscate_dict(value, inplace=True, show=False, obfuscated=obfuscated)
-            elif isinstance(value, list):
-                target[key] = [obfuscate_dict(item, inplace=True, show=False, obfuscated=obfuscated) for item in value]
             elif isinstance(value, str):
                 if should_obfuscate(key):
                     if not is_obfuscated(value, obfuscated=obfuscated):
                         target[key] = obfuscate(value, show=False, obfuscated=obfuscated)
     elif isinstance(target, list):
         return [obfuscate_dict(item, inplace=True, show=False, obfuscated=obfuscated) for item in target]
+    elif isinstance(target, tuple):
+        return tuple(obfuscate_dict(item, inplace=True, show=False, obfuscated=obfuscated) for item in target)
     return target
