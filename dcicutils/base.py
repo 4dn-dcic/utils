@@ -2,7 +2,7 @@ import time
 import urllib.parse
 
 from botocore.exceptions import ClientError
-from .common import APP_CGAP, APP_FOURFRONT
+from .common import APP_CGAP, APP_FOURFRONT, EnvName, UrlString
 from .env_utils import (
     is_cgap_env, is_fourfront_env, get_standard_mirror_env,
     compute_prd_env_for_project, get_env_real_url,
@@ -91,7 +91,7 @@ def get_env_info(env):
     }
 
 
-def get_beanstalk_real_url(env):
+def get_beanstalk_real_url(env: EnvName) -> UrlString:
     """
     Return the real url for the portal with given environment name.
     Name can be a special name (like 'cgap', 'data', 'staging'),

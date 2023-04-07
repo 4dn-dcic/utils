@@ -355,3 +355,30 @@ def test_script_catch_errors():
             assert isinstance(non_exit_exception, ValueError)
             assert str(non_exit_exception) == raw_error_message
             assert printed.lines == [normal_output]  # Any more output would be from Python itself reporting ValueError
+
+    # Erring program explicitly fails.
+    with printed_output() as printed:
+        failure_message = "Foo! This failed."
+        failure_message_parts = failure_message.split(' ')
+        with pytest.raises(SystemExit) as exit_exc:
+            with script_catch_errors() as fail:
+                fail(*failure_message_parts)
+        sys_exit = exit_exc.value
+        assert isinstance(sys_exit, SystemExit)
+        assert sys_exit.code == 1
+        assert printed.lines == [failure_message]
+
+    # Erring program explicitly fails, bypassing regular exception catches
+    with printed_output() as printed:
+        failure_message = "Foo! This failed."
+        failure_message_parts = failure_message.split(' ')
+        with pytest.raises(SystemExit) as exit_exc:
+            with script_catch_errors() as fail:
+                try:
+                    fail(failure_message)
+                except Exception:
+                    assert "Test failure."
+        sys_exit = exit_exc.value
+        assert isinstance(sys_exit, SystemExit)
+        assert sys_exit.code == 1
+        assert printed.lines == [failure_message]

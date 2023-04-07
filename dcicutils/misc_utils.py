@@ -152,19 +152,17 @@ class VirtualAppError(Exception):
         return self.__repr__()
 
 
-class TestApp(webtest.TestApp):
-    """
-    Equivalent to webtest.TestApp, but pytest will not let the name confuse into thinking it's a test case.
+# So whether people import this from webtest or here, they will get the same object.
+TestApp = webtest.TestApp
 
-    A test case in PyTest is something that contains "test" in its name. We didn't pick the name TestApp,
-    but there may be tools that want to use TestApp for testing, and so this is a better place to inherit from,
-    since we've added an appropriate declaration to keep PyTest from confusing it with a TestCase.
-    """
+# This ("monkey patch") side-effect will affect webtest.TestApp, too, but that's OK for us.
+# https://en.wikipedia.org/wiki/Monkey_patch
+# We want any use of WebTest.TestApp to NOT be seen as a test for the purposes of PyTest.
 
-    __test__ = False  # This declaration asserts to PyTest that this is not a test case.
+TestApp.__test__ = False
 
 
-class _VirtualAppHelper(TestApp):
+class _VirtualAppHelper(webtest.TestApp):
     """
     A helper class equivalent to webtest.TestApp, except that it isn't intended for test use.
     """
@@ -567,6 +565,11 @@ def apply_dict_overrides(dictionary: dict, **overrides) -> dict:
             dictionary[k] = v
     # This function works by side effect, but getting back the changed dict may be sometimes useful.
     return dictionary
+
+
+def utc_now_str():
+    # from jsonschema_serialize_fork date-time format requires a timezone
+    return datetime.datetime.utcnow().isoformat() + '+00:00'
 
 
 def utc_today_str():

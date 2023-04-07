@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "6.10.1"
+version = "7.0.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -27,8 +27,7 @@ classifiers = [
     # Relevant topics
     'Topic :: Database :: Database Engines/Servers',
 
-    # Specify the Python versions you support here. In particular, ensure
-    # that you indicate whether you support Python 2, Python 3 or both.
+    # Specify the Python versions you support here.
     'Programming Language :: Python :: 3',
     'Programming Language :: Python :: 3.7',
     'Programming Language :: Python :: 3.8',
@@ -56,6 +55,8 @@ typing-extensions = ">=3.8"  # Fourfront uses 3.8
 urllib3 = "^1.26.6"
 webtest = "^2.0.34"
 opensearch-py = "^2.0.1"
+redis = "^4.5.1"
+PyJWT = "^2.6.0"
 
 
 [tool.poetry.dev-dependencies]
@@ -68,25 +69,28 @@ flaky = ">=3.7.0"
 pytest = ">=4.5.0"
 pytest-cov = ">=2.7.1"
 pytest-mock = ">=1.11.0"
+pytest-redis = "^2.0.0"
 pytest-runner = ">=5.1"
 
 
 [tool.pytest.ini_options]
+addopts = "--basetemp=/tmp/pytest"
+redis_exec = "/usr/local/bin/redis-server"
 filterwarnings = [
     "ignore::DeprecationWarning: distutils Version classes are deprecated. Use packaging.version instead.",
 ]
 markers = [
-  "working: test should work",
-  "integrated: an integration test",
-  "integratedx: an excludable integration test, redundantly testing functionality also covered by a unit test",
-  "unit: a proper unit test",
-  "file_operation: a test that utilizes files",
-  "beanstalk_failure: an obsolete beanstalk-related test that needs fixing",
-  "direct_es_query: a test of direct ES _search that is disabled for now and needs to move inside the firewall",
-  "static: mark as a test that is testing the static form of code, not its runtime functionality",
-  "stg_or_prd_testing_needs_repair: some or all of a test that was failing on stg/prd has been temporarily disabled",
-  "recordable: uses recording technology so that if RECORDING_ENABLED=TRUE, a new test recording is made",
-  "recorded: a test in which previously recorded values will be used in place of certain external callouts",
+    "working: test should work",
+    "integrated: an integration test",
+    "integratedx: an excludable integration test, redundantly testing functionality also covered by a unit test",
+    "unit: a proper unit test",
+    "file_operation: a test that utilizes files",
+    "beanstalk_failure: an obsolete beanstalk-related test that needs fixing",
+    "direct_es_query: a test of direct ES _search that is disabled for now and needs to move inside the firewall",
+    "static: mark as a test that is testing the static form of code, not its runtime functionality",
+    "stg_or_prd_testing_needs_repair: some or all of a test that was failing on stg/prd has been temporarily disabled",
+    "recordable: uses recording technology so that if RECORDING_ENABLED=TRUE, a new test recording is made",
+    "recorded: a test in which previously recorded values will be used in place of certain external callouts",
 ]
 norecursedirs = ["*env", "site-packages", ".cache", ".git", ".idea", "*.egg-info"]
 # We don't use pytest-pep8, but if we ever did, its pep8xxx options could be specified here, as in:

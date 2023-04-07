@@ -1,5 +1,6 @@
 import os
 
+from typing import Dict, Union, Tuple, List, Any
 from typing_extensions import Literal
 
 
@@ -33,3 +34,36 @@ ChaliceStage = Literal['dev', 'prod']
 OrchestratedApp = Literal['cgap', 'fourfront']
 
 LIBRARY_DIR = os.path.dirname(__file__)
+
+# ===== Auth Data =====
+
+AuthStr = str
+
+SimpleAuthDict = Dict[Literal['key', 'secret'], str]
+ServerAuthDict = Dict[Literal['key', 'secret', 'server'], str]
+AuthDict = Union[SimpleAuthDict, ServerAuthDict]
+
+LegacyAuthDict = Dict[Literal['default'], AuthDict]
+AnyAuthDict = Union[LegacyAuthDict, AuthDict]
+
+SimpleAuthPair = Tuple[str, str]  # key, secret
+
+AuthData = Union[AuthDict, SimpleAuthPair]
+AnyAuthData = Union[LegacyAuthDict, AuthData]
+
+# ===== JSON Data =====
+
+AnyJsonData = Union[Dict[str, 'AnyJsonData'], List['AnyJsonData'], str, bool, int, float, None]
+
+KeyValueDict = Dict[Literal['Key', 'Value'], Any]
+KeyValueDictList = List[KeyValueDict]
+
+KeyValuestringDict = Dict[Literal['Key', 'Value'], str]
+KeyValuestringDictList = List[KeyValuestringDict]
+
+S3KeyName = str
+S3BucketName = str
+
+UrlString = str
+
+PortalEnvName = str

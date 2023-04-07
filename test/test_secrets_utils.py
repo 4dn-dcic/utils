@@ -107,8 +107,14 @@ def test_apply_overrides():
     assert apply_overrides(secrets=secrets, rename_keys={'x': 'ex'}) == {'ex': 1, 'y': 2}
     assert apply_overrides(secrets=secrets, rename_keys={'x': 'ex', 'y': 'why'}) == {'ex': 1, 'why': 2}
 
-    with pytest.raises(ValueError):
-        apply_overrides(secrets=secrets, rename_keys={'z': 'zee'})
+    # New behavior: overrides that don't exist no longer throw an error, will just apply any
+    # that show up - Will March 6 2023
+    assert apply_overrides(secrets=secrets, rename_keys={'z': 'baz', 'x': 'ex'}) == {'ex': 1, 'y': 2}
+
+    # The below previously threw an error but we decided this was undesirable in case there are
+    # overrides that do not exist ie: S3_ENCRYPT_KEY_ID and ENCODED_REDIS_SERVER - Will March 6 2023
+    # with pytest.raises(ValueError):
+    #     apply_overrides(secrets=secrets, rename_keys={'z': 'zee'})
 
     with pytest.raises(ValueError):
         apply_overrides(secrets=secrets, rename_keys={'x': 'y'})
