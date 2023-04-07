@@ -6,7 +6,7 @@ dcicutils
 Change Log
 ----------
 
-6.9.9.0b11
+7.0.0
 =====
 
 * New files: ``dcicutils.redis_utils`` and ``dcicutils.redis_tools`` plus associated test files
