@@ -147,8 +147,8 @@ def test_obfuscate_json():
     check_obfuscate_json(obfuscate_json)
 
 
-def test_obfuscate_dict_already_obfuscated():
+def test_obfuscate_json_already_obfuscated():
     d = {"secret": "<my-redacted_value>"}
-    x = obfuscate_dict(d, obfuscated="<my-redacted_value>")
+    x = obfuscate_json(d, obfuscated="<my-redacted_value>")
     assert d == x
     assert d is x  # needs should_obfuscate to check if is_obfuscated
