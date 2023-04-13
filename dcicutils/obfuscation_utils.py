@@ -133,7 +133,7 @@ def is_obfuscated(value: str) -> bool:
 #     return dictionary
 
 
-def obfuscate_dict(item: AnyJsonData, inplace: bool = False, show: bool = False,
+def obfuscate_json(item: AnyJsonData, inplace: bool = False, show: bool = False,
                    obfuscated: Optional[str] = None) -> dict:
     """
     Obfuscates all STRING values within the given dictionary, RECURSIVELY, for all key names which look
@@ -164,7 +164,7 @@ def obfuscate_dict(item: AnyJsonData, inplace: bool = False, show: bool = False,
     if not inplace:
         item = copy.deepcopy(item)
 
-    def process_recursively(item):
+    def process_recursively(item: AnyJsonData):
         # We only need to process non-atomic items recursively, since they are the only things
         # that might conceivably be or contain a dictionary in need of obfuscation.
         if isinstance(item, dict):
@@ -181,3 +181,7 @@ def obfuscate_dict(item: AnyJsonData, inplace: bool = False, show: bool = False,
     process_recursively(item)
 
     return item if changed.value else orig_item
+
+
+# The function obfuscate_dict is deprecated and will go away in a future major release.
+obfuscate_dict = obfuscate_json

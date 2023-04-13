@@ -1,8 +1,7 @@
 import copy
 
-
 from dcicutils.obfuscation_utils import (
-    is_obfuscated, should_obfuscate, obfuscate, obfuscate_dict
+    is_obfuscated, should_obfuscate, obfuscate, obfuscate_json, obfuscate_dict,
 )
 
 
@@ -88,19 +87,20 @@ def test_obfuscate():
         assert not is_obfuscated(obfuscate(x))
 
 
-def test_obfuscate_dict():
+def check_obfuscate_json(obfuscator):
+
     d = {"abc": "123", "def_password_ghi": "456", "secret": 789, "foo":
          {"jkl": "678", "secret": "789", "encrypt_id": "9012", "encrypt_key_id": "foo"}}
     o = {"abc": "123", "def_password_ghi": "***", "secret": 789, "foo":
          {"jkl": "678", "secret": "***", "encrypt_id": "****", "encrypt_key_id": "foo"}}
 
-    x = obfuscate_dict(d)
+    x = obfuscator(d)
     assert x == o
     assert x is not d
     # assert id(x) != id(d)
 
     d0 = copy.deepcopy(d)
-    x = obfuscate_dict(d0, inplace=True)
+    x = obfuscator(d0, inplace=True)
     assert x == o
     assert d0 == o
     assert x is d0
@@ -108,32 +108,40 @@ def test_obfuscate_dict():
 
     d = {"abc": "123", "def": "456"}
     o = {"abc": "123", "def": "456"}
-    x = obfuscate_dict(d)
+    x = obfuscator(d)
     assert x == o
     assert x is d
     # assert id(x) == id(d)
 
     d = {"secret": "********"}
-    x = obfuscate_dict(d)
+    x = obfuscator(d)
     assert x == d
     # This may or may not get copied. It's enough that it's equal.
     # assert id(x) == id(d)
 
     d = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "789"}}
     o = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "***"}}
-    x = obfuscate_dict(d)
+    x = obfuscator(d)
     assert x == o
     assert x is not d
     # assert id(x) != id(d)
 
     d = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "789"}}
     o = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "<REDACTED>"}}
-    x = obfuscate_dict(d, obfuscated="<REDACTED>")
+    x = obfuscator(d, obfuscated="<REDACTED>")
     assert x == o
 
-    xlist = obfuscate_dict([d], obfuscated="<REDACTED>")  # NoQA - type decl on obfuscate_dict is overly restrictive
+    xlist = obfuscator([d], obfuscated="<REDACTED>")
     assert xlist == [o]
 
-    x = obfuscate_dict(d, show=True)  # When show=True, this is just an identity operation
+    x = obfuscator(d, show=True)  # When show=True, this is just an identity operation
     assert x != o
     assert x == d
+
+
+def test_obfuscate_dict():
+    check_obfuscate_json(obfuscate_dict)
+
+
+def test_obfuscate_json():
+    check_obfuscate_json(obfuscate_json)
