@@ -35,6 +35,9 @@ jobs:
 
       - name: Install Deps
         run: |
+          sudo apt install redis-server
+          sudo ln -s /usr/bin/redis-server /usr/local/bin/redis-server
+          sudo ln -s /usr/bin/redis-cli /usr/local/bin/redis-cli
           pip install poetry
           # show loaded versions of various poetry-related libraries
           pip freeze --all | egrep '(pip|poetry(.[a-z]+)?|tomlkit)=='

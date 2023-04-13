@@ -6,6 +6,58 @@ dcicutils
 Change Log
 ----------
 
+7.0.0
+=====
+
+* New files: ``dcicutils.redis_utils`` and ``dcicutils.redis_tools`` plus associated test files
+
+* In ``dcicutils.redis_utils``:
+
+  * Implement the ``RedisBase`` object, which takes the output of ``create_redis_client`` and returns
+    an object that implements some base APIs for interacting with Redis.
+
+* In ``dcicutils.redis_tools``:
+
+  * Implement the ``RedisSessionToken`` object, which creates higher level APIs for creating session
+    tokens that are backed by Redis. This object operates on the ``RedisBase`` class.
+  * Session tokens are 32 bytes and expire automatically after 3 hours by default, but can be tuned
+    otherwise.
+
+* In ``dcicutils.command_utils``:
+
+  * Make ``script_catch_errors`` context manager return a ``fail``
+    function that can be called to bypass the warning that an error
+    needs to be reported.
+
+* In ``dcicutils.common``:
+
+  * Add a number of type hints.
+
+* In ``dcicutils.ff_utils``:
+
+  * Refactor ``unified_authentication`` to be object-oriented.
+
+  * Add some type hinting.
+
+* In ``dcicutisl.env_base`` and ``dcicutils.s3_utils``:
+
+  * Add some error checks if stored s3 credentials are not in the right form. (**BREAKING CHANGE**)
+    This is not expected to break anything, but users should be on the lookout for problems.
+
+  * Add a new argument (``require_key=``, default ``True``) to ``s3Utils.get_access_keys()`` so that checking
+    of the key name can be relaxed if only ``secret`` and ``server`` are needed, as might happen for Jupyterhub creds.
+    This is a possible way of addressing unexpected problems that could come up due to added error checks.
+
+  * Add some type hinting.
+
+  * Add comments about other possible future error checking.
+
+* In ``dcicutils.misc_utils``:
+
+  * New function ``utc_now_str``
+
+* Misc PEP8
+
 
 7.0.0
 =====
