@@ -5,7 +5,7 @@ import re
 
 from .common import AnyJsonData
 from .misc_utils import check_true, StorageCell
-from typing import Optional, Any
+from typing import Optional, Any, Union
 
 
 # The _SENSITIVE_KEY_NAMES_REGEX regex defines key names representing sensitive values, case-insensitive.
@@ -77,8 +77,8 @@ def is_obfuscated(value: str) -> bool:
     return isinstance(value, str) and bool(OBFUSCATED_VALUE.match(value))
 
 
-def obfuscate_json(item: AnyJsonData, inplace: bool = False, show: bool = False,
-                   obfuscated: Optional[str] = None) -> dict:
+def obfuscate_json(item: Union[AnyJsonData, tuple], inplace: bool = False, show: bool = False,
+                   obfuscated: Optional[str] = None) -> Union[AnyJsonData, tuple]:
     """
     Obfuscates all STRING values within the given dictionary, RECURSIVELY, for all key names which look
     as if they represent sensitive values (based on the should_obfuscate function). By default, if the
@@ -109,7 +109,7 @@ def obfuscate_json(item: AnyJsonData, inplace: bool = False, show: bool = False,
     if not inplace:
         item = copy.deepcopy(item)
 
-    def process_recursively(item: AnyJsonData):
+    def process_recursively(item: Union[AnyJsonData, tuple]):
         # We only need to process non-atomic items recursively, since they are the only things
         # that might conceivably be or contain a dictionary in need of obfuscation.
         if isinstance(item, dict):

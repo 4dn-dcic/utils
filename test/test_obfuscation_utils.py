@@ -152,3 +152,23 @@ def test_obfuscate_json_already_obfuscated():
     x = obfuscate_json(d, obfuscated="<my-redacted_value>")
     assert d == x
     assert d is x  # needs should_obfuscate to check if is_obfuscated
+
+
+def test_obfuscate_json_with_nested_tuple():
+
+    d = {"abc": "123", "def": ({"ghi": "456", "jklsecret": "obfuscatethisvalue"}, 789), "jkl": "hello"}
+    o = {"abc": "123", "def": ({"ghi": "456", "jklsecret": "<REDACTED>"}, 789), "jkl": "hello"}
+    d_copy = copy.deepcopy(d)  # to make sure the original is not inadvertantly modified
+    x = obfuscate_json(d, obfuscated="<REDACTED>")
+    assert x == o
+    assert d == d_copy
+
+
+def test_obfuscate_json_with_tuple():
+
+    d = ({"abc": "123", "def": ({"ghi": "456", "jklsecret": "obfuscatethisvalue"}, 789), "passwd": "hello"}, (1, 2, 3))
+    o = ({"abc": "123", "def": ({"ghi": "456", "jklsecret": "<REDACTED>"}, 789), "passwd": "<REDACTED>"}, (1, 2, 3))
+    d_copy = copy.deepcopy(d)  # to make sure the original is not inadvertantly modified
+    x = obfuscate_json(d, obfuscated="<REDACTED>")
+    assert x == o
+    assert d == d_copy
