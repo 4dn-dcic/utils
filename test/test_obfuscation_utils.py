@@ -133,3 +133,7 @@ def test_obfuscate_dict():
 
     xlist = obfuscate_dict([d], obfuscated="<REDACTED>")  # NoQA - type decl on obfuscate_dict is overly restrictive
     assert xlist == [o]
+
+    x = obfuscate_dict(d, show=True)  # When show=True, this is just an identity operation
+    assert x != o
+    assert x == d

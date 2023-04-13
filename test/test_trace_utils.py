@@ -4,8 +4,21 @@ import pytest
 from dcicutils import trace_utils as trace_utils_module
 from dcicutils.misc_utils import override_environ, environ_bool
 from dcicutils.qa_utils import printed_output
-from dcicutils.trace_utils import make_trace_decorator, Trace
+from dcicutils.trace_utils import (
+    make_trace_decorator, Trace,
+    _maybe_obfuscate,  # noQA - testing a protected member, yes
+)
 from unittest import mock
+
+
+def test_maybe_obfuscate():
+
+    d = {'password': 'abracadabra'}
+    d_obfuscated = {'password': '<REDACTED>'}
+
+    assert _maybe_obfuscate(d) == d_obfuscated
+    assert _maybe_obfuscate([d]) == [d_obfuscated]
+    assert _maybe_obfuscate((d, d)) == (d_obfuscated, d_obfuscated)
 
 
 def test_trace():
