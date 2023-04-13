@@ -1387,16 +1387,22 @@ class CachedField:
         return f"CachedField(name={self.name!r},update_function={updater_name},timeout={self.timeout!r})"
 
 
+class StorageCell:
+
+    def __init__(self, initial_value=None):
+        self.value = initial_value
+
+
 def make_counter(start=0, step=1):
     """
     Creates a counter that generates values counting from a given start (default 0) by a given step (default 1).
     """
-    storage = [start]
+    storage = StorageCell(start)
 
     def counter():
-        value = storage[0]
-        storage[0] += step
-        return value
+        old_value = storage.value
+        storage.value += step
+        return old_value
 
     return counter
 
@@ -2163,3 +2169,15 @@ class TopologicalSorter:
             node_group = self.get_ready()
             yield from node_group
             self.done(*node_group)
+
+
+def deduplicate_list(lst):
+    """ De-duplicates the given list by converting it to a set then back to a list.
+    NOTES:
+    * The list must contain 'hashable' type elements that can be used in sets.
+    * The result list might not be ordered the same as the input list.
+    * This will also take tuples as input, though the result will be a list.
+    :param lst: list to de-duplicate
+    :return: de-duplicated list
+    """
+    return list(set(lst))

@@ -208,8 +208,8 @@ def test_shell_script_with_done_first(simulate):
                 expected = [
                     f"SIMULATED:",
                     f"================================================================================",
-                    f"echo foo >> {temp_filename};\\\n"
-                    f" echo bar >> {temp_filename};\\\n"
+                    f"echo foo >> {temp_filename};\\",
+                    f" echo bar >> {temp_filename};\\",
                     f" echo baz >> {temp_filename}",
                     f"================================================================================"
                 ]

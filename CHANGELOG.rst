@@ -6,6 +6,27 @@ dcicutils
 Change Log
 ----------
 
+
+7.1.0
+=====
+
+* New ``trace_utils`` module
+
+  * New decorator ``@Trace``
+
+  * New function ``make_trace_decorator`` to make similar ones.
+
+* Fix to ``obfuscation_utils`` relating to dicts containing lists.
+
+* In ``dcicutils.misc_utils``:
+
+  * New function ``deduplicate_list``
+
+* In ``dcicutils.qa_utils``:
+
+  * Fixes to the ``printed_output`` context manager relating to multi-line ``PRINT`` statements.
+
+
 7.0.0
 =====
 

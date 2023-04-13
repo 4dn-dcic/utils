@@ -28,7 +28,8 @@ from dcicutils.misc_utils import (
     _is_function_of_exactly_one_required_arg, _apply_decorator,  # noQA
     string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, lines_printed_to,
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
-    ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn
+    ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
+    deduplicate_list,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -163,7 +164,7 @@ class FakeApp:
 def test_test_app():
     test_app = TestApp(FakeApp(), {})
     assert isinstance(test_app, webtest.TestApp)
-    assert not test_app.__test__
+    assert not test_app.__test__  # noQA - testing that we've successfully "monkey patched" this very low-level prop
 
 
 def test_virtual_app_creation():
@@ -182,8 +183,6 @@ def test_virtual_app_creation():
         assert vapp.wrapped_app.extra_environ is environ
 
         assert vapp.app is vapp.wrapped_app.app
-
-        return vapp
 
 
 def test_virtual_app_get():
@@ -1408,7 +1407,7 @@ def test_str_to_bool():
 
     for x in [0, 1, -1, 17, True, False, [], [17], {}, {"some": "thing"}]:
         with pytest.raises(ValueError):
-            str_to_bool(x)
+            str_to_bool(x)  # NoQA - We're testing that this will err, so no need for PyCharm to do syntax warning
 
 
 def test_check_true():
@@ -3134,17 +3133,17 @@ def test_keys_and_values_to_dict():
     with pytest.raises(ValueError):
         # Missing key (Foo).
         kv = [{"Key": "abc", "Value": "def"}, {"Foo": "ghi", "Value": "jkl"}]
-        d = keys_and_values_to_dict(kv)
+        keys_and_values_to_dict(kv)
 
     with pytest.raises(ValueError):
         # Missing value (Foo).
         kv = [{"Key": "abc", "Value": "def"}, {"Key": "ghi", "Foo": "jkl"}]
-        d = keys_and_values_to_dict(kv)
+        keys_and_values_to_dict(kv)
 
     with pytest.raises(ValueError):
         # Duplicate key (abc).
         kv = [{"Key": "abc", "Value": "def"}, {"Key": "abc", "Value": "jkl"}]
-        d = keys_and_values_to_dict(kv)
+        keys_and_values_to_dict(kv)
 
 
 def test_dict_to_keys_and_values():
@@ -3192,7 +3191,8 @@ class TestTopologicalSorter:
         if exception:
             with pytest.raises(CycleError):
                 sorted_nodes = sorter.static_order()
-                result = list(sorted_nodes)
+                # The expected error occurs during this coercion:
+                list(sorted_nodes)
         else:
             sorted_nodes = sorter.static_order()
             result = list(sorted_nodes)
@@ -3208,3 +3208,27 @@ def test_utc_now_str():
         with mock.patch.object(dt.datetime, "utcnow") as mock_utcnow:
             mock_utcnow.return_value = datetime_module.datetime(2013, 1, 1, 12, 34, 56)
             assert utc_now_str() == "2013-01-01T12:34:56+00:00"
+
+
+def test_deduplicate_list():
+
+    x = ['a', 'b', 'c', 'a', 'b', 'c']
+    xlen = len(x)
+
+    assert sorted(deduplicate_list(x)) == ['a', 'b', 'c']
+    assert len(x) == xlen  # make sure there was no side-effect to the original list
+
+    y = ['a']
+    y0 = deduplicate_list(y)
+    assert y0 == y
+    assert y0 is not y
+
+    assert deduplicate_list([]) == []
+
+    # As we've implemented it, tuples can be deduplicated, too, but the result will be a list.
+    assert sorted(deduplicate_list(tuple(x))) == ['a', 'b', 'c']
+
+    with pytest.raises(Exception):
+        # Lists with elements that are mutable objects that cannot be hashed as sets can't be dedupliated.
+        # For example, a list of lists.  This is because set([['a'], ['b'], ['c']]) will fail.
+        deduplicate_list([['a'], ['b'], ['c']])
