@@ -180,6 +180,4 @@ def obfuscate_dict(item: AnyJsonData, inplace: bool = False, show: bool = False,
 
     process_recursively(item)
 
-    print(f"Changed = {changed.value}")
-
     return item if changed.value else orig_item

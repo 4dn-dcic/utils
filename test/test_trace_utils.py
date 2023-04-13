@@ -1,8 +1,11 @@
 import os
+import pytest
 
+from dcicutils import trace_utils as trace_utils_module
 from dcicutils.misc_utils import override_environ, environ_bool
 from dcicutils.qa_utils import printed_output
 from dcicutils.trace_utils import make_trace_decorator, Trace
+from unittest import mock
 
 
 def test_trace():
@@ -153,6 +156,16 @@ def test_trace_redact():
 
             printed.reset()
 
+            # Simulate what would happen if TRACE_REDACT=FALSE had been in an environment variable at module load time.
+            with mock.patch.object(trace_utils_module, "TRACE_REDACT", False):
+                assert fn_2(**d) == d
+                assert printed.lines == [
+                    f"Entering test.test_trace_utils.fn_2 with args=() kwargs={d!r}",
+                    f"Function test.test_trace_utils.fn_2 returned {d!r}",
+                ]
+
+            printed.reset()
+
             @Trace(enabled=True)
             def fn_3():
                 return d
@@ -161,4 +174,26 @@ def test_trace_redact():
             assert printed.lines == [
                 f"Entering test.test_trace_utils.fn_3 with args=() kwargs={{}}",
                 f"Function test.test_trace_utils.fn_3 returned {d_obfuscated!r}"
+            ]
+
+            printed.reset()
+
+            @Trace(enabled=False)
+            def fn_3a():
+                return d
+
+            assert fn_3a() == d
+            assert printed.lines == []
+
+            printed.reset()
+
+            @Trace(enabled=True)
+            def fn_4():
+                raise ValueError("Bad input.")
+
+            with pytest.raises(ValueError):
+                fn_4()
+            assert printed.lines == [
+                f"Entering test.test_trace_utils.fn_4 with args=() kwargs={{}}",
+                f"Function test.test_trace_utils.fn_4 raised ValueError: Bad input."
             ]
