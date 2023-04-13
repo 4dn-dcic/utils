@@ -30,6 +30,9 @@ def test_should_obfuscate() -> None:
     assert should_obfuscate(17) is False    # NoQA - ditto
     assert should_obfuscate({}) is False    # NoQA - ditto
 
+    assert should_obfuscate("my_secret") is True
+    assert should_obfuscate("my_secret", "<ALREADY-OBFUSCATED>") is False
+
 
 def assert_string_contains_only_asterisks(value: str) -> None:
     assert set(list(value)) == {"*"}
@@ -89,42 +92,39 @@ def test_obfuscate():
 
 def check_obfuscate_json(obfuscator):
 
-    d = {"abc": "123", "def_password_ghi": "456", "secret": 789, "foo":
-         {"jkl": "678", "secret": "789", "encrypt_id": "9012", "encrypt_key_id": "foo"}}
-    o = {"abc": "123", "def_password_ghi": "***", "secret": 789, "foo":
-         {"jkl": "678", "secret": "***", "encrypt_id": "****", "encrypt_key_id": "foo"}}
+    d = {"abc": "123", "def_password_ghi": "456", "secret": 789, "my_secret": "<ALREADY-HIDDEN>",
+         "foo": {"jkl": "678", "secret": "789", "encrypt_id": "9012", "encrypt_key_id": "foo"},
+         "bar": ({"jkl": "678", "secret": "789", "encrypt_id": "9012", "encrypt_key_id": "foo"},)}
+    o = {"abc": "123", "def_password_ghi": "***", "secret": 789, "my_secret": "<ALREADY-HIDDEN>",
+         "foo": {"jkl": "678", "secret": "***", "encrypt_id": "****", "encrypt_key_id": "foo"},
+         "bar": ({"jkl": "678", "secret": "***", "encrypt_id": "****", "encrypt_key_id": "foo"},)}
 
     x = obfuscator(d)
     assert x == o
     assert x is not d
-    # assert id(x) != id(d)
 
     d0 = copy.deepcopy(d)
     x = obfuscator(d0, inplace=True)
     assert x == o
     assert d0 == o
     assert x is d0
-    # assert id(x) == id(d)
 
     d = {"abc": "123", "def": "456"}
     o = {"abc": "123", "def": "456"}
     x = obfuscator(d)
     assert x == o
     assert x is d
-    # assert id(x) == id(d)
 
     d = {"secret": "********"}
     x = obfuscator(d)
     assert x == d
-    # This may or may not get copied. It's enough that it's equal.
-    # assert id(x) == id(d)
+    assert x is d
 
     d = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "789"}}
     o = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "***"}}
     x = obfuscator(d)
     assert x == o
     assert x is not d
-    # assert id(x) != id(d)
 
     d = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "789"}}
     o = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "<REDACTED>"}}
@@ -145,3 +145,10 @@ def test_obfuscate_dict():
 
 def test_obfuscate_json():
     check_obfuscate_json(obfuscate_json)
+
+
+def test_obfuscate_dict_already_obfuscated():
+    d = {"secret": "<my-redacted_value>"}
+    x = obfuscate_dict(d, obfuscated="<my-redacted_value>")
+    assert d == x
+    assert d is x  # needs should_obfuscate to check if is_obfuscated
