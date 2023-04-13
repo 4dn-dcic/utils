@@ -22,6 +22,10 @@ Change Log
 
   * New function ``deduplicate_list``
 
+* In ``dcicutils.qa_utils``:
+
+  * Fixes to the ``printed_output`` context manager relating to multi-line ``PRINT`` statements.
+
 
 7.0.0
 =====
