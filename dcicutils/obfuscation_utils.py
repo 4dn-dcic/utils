@@ -3,7 +3,8 @@
 import copy
 import re
 
-from dcicutils.misc_utils import check_true
+from .common import AnyJsonData
+from .misc_utils import check_true, StorageCell
 from typing import Optional
 
 
@@ -34,7 +35,7 @@ def should_obfuscate(key: str) -> bool:
     :param key: Key name of some property which may or may not need to be obfuscated.
     :return: True if the given key name looks as if it represents a sensitive value.
     """
-    if not key or not isinstance(key, str):
+    if not key or not isinstance(key, str):  # This is not an intended case, but we treat it gently
         return False
     return _SENSITIVE_KEY_NAMES_REGEX.match(key) is not None
 
@@ -75,7 +76,64 @@ def is_obfuscated(value: str) -> bool:
     return isinstance(value, str) and bool(OBFUSCATED_VALUE.match(value))
 
 
-def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False,
+# def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False,
+#                    obfuscated: Optional[str] = None) -> dict:
+#     """
+#     Obfuscates all STRING values within the given dictionary, RECURSIVELY, for all key names which look
+#     as if they represent sensitive values (based on the should_obfuscate function). By default, if the
+#     inplace argument is False, a COPY of the dictionary is returned, but ONLY if it actually needs to
+#     be modified (i.e. has values to obfuscate, based on key name, and which are not already obfuscated);
+#     i.e. the given dictionary is NOT modified if there are no values to obfuscate or if such values are
+#     already abfuscated. If the inplace argument is True, then any changes (value obfuscations) are made to
+#     the given dictionary itself in place (NOT a copy). In either case the resultant dictionary is returned.
+#     If the show argument is True then does not actually obfuscate and simply returns the given dictionary.
+#
+#     :param dictionary: Given dictionary whose senstive values obfuscate.
+#     :param inplace: If True obfuscate the given dictionary in place; else a COPY is returned, if modified.
+#     :param show: If True does not actually obfuscate and simply returns the given dictionary.
+#     :return: Resultant dictionary.
+#     """
+#
+#     check_true(not obfuscated or is_obfuscated(obfuscated),
+#                message=f"If obfuscated= is supplied, it must be {OBFUSCATED_VALUE_DESCRIPTION}.")
+#
+#     def has_values_to_obfuscate(dictionary: dict) -> bool:
+#         for key, value in dictionary.items():
+#             if isinstance(value, dict):
+#                 if has_values_to_obfuscate(value):
+#                     return True
+#             elif isinstance(value, list):
+#                 for item in value:
+#                     if isinstance(item, dict) and has_values_to_obfuscate(item):
+#                         return True
+#             elif isinstance(value, str) and should_obfuscate(key) and not is_obfuscated(value):
+#                 return True
+#         return False
+#
+#     if dictionary is None or not isinstance(dictionary, dict):
+#         return dictionary
+#     if show is True:  # isinstance(show, bool) and show:
+#         return dictionary
+#     if not isinstance(inplace, bool) or not inplace:
+#         if has_values_to_obfuscate(dictionary):
+#             dictionary = copy.deepcopy(dictionary)
+#     for key, value in dictionary.items():
+#         if isinstance(value, dict):
+#             dictionary[key] = obfuscate_dict(value, show=False, inplace=False, obfuscated=obfuscated)
+#         elif isinstance(value, list):
+#             obfuscated_value = []
+#             for item in value:
+#                 if isinstance(item, dict):
+#                     obfuscated_value.append(obfuscate_dict(item, show=False, inplace=False, obfuscated=obfuscated))
+#                 else:
+#                     obfuscated_value.append(item)
+#             dictionary[key] = obfuscated_value
+#         elif isinstance(value, str) and should_obfuscate(key) and not is_obfuscated(value):
+#             dictionary[key] = obfuscate(value, show=False, obfuscated=obfuscated)
+#     return dictionary
+
+
+def obfuscate_dict(item: AnyJsonData, inplace: bool = False, show: bool = False,
                    obfuscated: Optional[str] = None) -> dict:
     """
     Obfuscates all STRING values within the given dictionary, RECURSIVELY, for all key names which look
@@ -87,7 +145,7 @@ def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False,
     the given dictionary itself in place (NOT a copy). In either case the resultant dictionary is returned.
     If the show argument is True then does not actually obfuscate and simply returns the given dictionary.
 
-    :param dictionary: Given dictionary whose senstive values obfuscate.
+    :param datum: Any JSON object that might be or contain a dictionary whose senstive values are to be obfuscated.
     :param inplace: If True obfuscate the given dictionary in place; else a COPY is returned, if modified.
     :param show: If True does not actually obfuscate and simply returns the given dictionary.
     :return: Resultant dictionary.
@@ -96,37 +154,32 @@ def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False,
     check_true(not obfuscated or is_obfuscated(obfuscated),
                message=f"If obfuscated= is supplied, it must be {OBFUSCATED_VALUE_DESCRIPTION}.")
 
-    def has_values_to_obfuscate(dictionary: dict) -> bool:
-        for key, value in dictionary.items():
-            if isinstance(value, dict):
-                if has_values_to_obfuscate(value):
-                    return True
-            elif isinstance(value, list):
-                for item in value:
-                    if isinstance(item, dict) and has_values_to_obfuscate(item):
-                        return True
-            elif isinstance(value, str) and should_obfuscate(key) and not is_obfuscated(value):
-                return True
-        return False
+    if show:
+        return item
 
-    if dictionary is None or not isinstance(dictionary, dict):
-        return {}
-    if isinstance(show, bool) and show:
-        return dictionary
-    if not isinstance(inplace, bool) or not inplace:
-        if has_values_to_obfuscate(dictionary):
-            dictionary = copy.deepcopy(dictionary)
-    for key, value in dictionary.items():
-        if isinstance(value, dict):
-            dictionary[key] = obfuscate_dict(value, show=False, inplace=False, obfuscated=obfuscated)
-        elif isinstance(value, list):
-            obfuscated_value = []
-            for item in value:
-                if isinstance(item, dict):
-                    obfuscated_value.append(obfuscate_dict(item, show=False, inplace=False, obfuscated=obfuscated))
+    orig_item = item
+
+    changed = StorageCell(False)
+
+    if not inplace:
+        item = copy.deepcopy(item)
+
+    def process_recursively(item):
+        # We only need to process non-atomic items recursively, since they are the only things
+        # that might conceivably be or contain a dictionary in need of obfuscation.
+        if isinstance(item, dict):
+            for key, value in item.items():
+                if should_obfuscate(key):
+                    changed.value = True
+                    item[key] = obfuscate(value, obfuscated=obfuscated)
                 else:
-                    obfuscated_value.append(item)
-            dictionary[key] = obfuscated_value
-        elif isinstance(value, str) and should_obfuscate(key) and not is_obfuscated(value):
-            dictionary[key] = obfuscate(value, show=False, obfuscated=obfuscated)
-    return dictionary
+                    process_recursively(value)
+        elif isinstance(item, list):
+            for element in item:
+                process_recursively(element)
+
+    process_recursively(item)
+
+    print(f"Changed = {changed.value}")
+
+    return item if changed.value else orig_item

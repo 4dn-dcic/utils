@@ -1387,16 +1387,22 @@ class CachedField:
         return f"CachedField(name={self.name!r},update_function={updater_name},timeout={self.timeout!r})"
 
 
+class StorageCell:
+
+    def __init__(self, initial_value=None):
+        self.value = initial_value
+
+
 def make_counter(start=0, step=1):
     """
     Creates a counter that generates values counting from a given start (default 0) by a given step (default 1).
     """
-    storage = [start]
+    storage = StorageCell(start)
 
     def counter():
-        value = storage[0]
-        storage[0] += step
-        return value
+        old_value = storage.value
+        storage.value += step
+        return old_value
 
     return counter
 

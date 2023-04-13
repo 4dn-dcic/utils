@@ -1,5 +1,8 @@
+import copy
+
+
 from dcicutils.obfuscation_utils import (
-    is_obfuscated, should_obfuscate, obfuscate, obfuscate_dict,
+    is_obfuscated, should_obfuscate, obfuscate, obfuscate_dict
 )
 
 
@@ -22,6 +25,11 @@ def test_should_obfuscate() -> None:
     assert_should_obfuscate_with_different_cases("foo_crypt_key_id_bar", True)
     assert_should_obfuscate_with_different_cases("crypt_key_id", False)
     assert_should_obfuscate_with_different_cases("not_a_s3cret_foo", False)
+
+    # Edge cases that are really soft errors...
+    assert should_obfuscate(None) is False  # NoQA - Argument is not intended, but function returns False
+    assert should_obfuscate(17) is False    # NoQA - ditto
+    assert should_obfuscate({}) is False    # NoQA - ditto
 
 
 def assert_string_contains_only_asterisks(value: str) -> None:
@@ -88,30 +96,40 @@ def test_obfuscate_dict():
 
     x = obfuscate_dict(d)
     assert x == o
-    assert id(x) != id(d)
+    assert x is not d
+    # assert id(x) != id(d)
 
-    x = obfuscate_dict(d, inplace=True)
+    d0 = copy.deepcopy(d)
+    x = obfuscate_dict(d0, inplace=True)
     assert x == o
-    assert id(x) == id(d)
+    assert d0 == o
+    assert x is d0
+    # assert id(x) == id(d)
 
     d = {"abc": "123", "def": "456"}
     o = {"abc": "123", "def": "456"}
     x = obfuscate_dict(d)
     assert x == o
-    assert id(x) == id(d)
+    assert x is d
+    # assert id(x) == id(d)
 
     d = {"secret": "********"}
     x = obfuscate_dict(d)
     assert x == d
-    assert id(x) == id(d)
+    # This may or may not get copied. It's enough that it's equal.
+    # assert id(x) == id(d)
 
     d = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "789"}}
     o = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "***"}}
     x = obfuscate_dict(d)
     assert x == o
-    assert id(x) != id(d)
+    assert x is not d
+    # assert id(x) != id(d)
 
     d = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "789"}}
     o = {"abc": "123", "def": {"ghi": "456"}, "jkl": {"secret": "<REDACTED>"}}
     x = obfuscate_dict(d, obfuscated="<REDACTED>")
     assert x == o
+
+    xlist = obfuscate_dict([d], obfuscated="<REDACTED>")  # NoQA - type decl on obfuscate_dict is overly restrictive
+    assert xlist == [o]
