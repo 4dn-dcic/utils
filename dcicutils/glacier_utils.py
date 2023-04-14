@@ -173,10 +173,10 @@ class GlacierUtils:
                         Key=key,
                         VersionId=v.get('VersionId')
                     )
-                    PRINT(f"Object {key} Glacier version {v.get('VersionId')} deleted:\n{response}")
+                    PRINT(f'Object {key} Glacier version {v.get("VersionId")} deleted:\n{response}')
                 # no Glacier versions were found
                 if not glacier_versions:
-                    PRINT(f"No Glacier versions found for object {key}")
+                    PRINT(f'No Glacier versions found for object {bucket}/{key}')
                     return False
                 else:
                     return True
@@ -189,13 +189,13 @@ class GlacierUtils:
                             Key=key,
                             VersionId=v.get('VersionId')
                         )
-                        PRINT(f"Object {key} Glacier version {v.get('VersionId')} deleted:\n{response}")
+                        PRINT(f'Object {key} Glacier version {v.get("VersionId")} deleted:\n{response}')
                         break
                 else:
-                    PRINT(f"No Glacier version found for object {key}")
+                    PRINT(f'No Glacier version found for object {key}')
 
         except Exception as e:
-            PRINT(f"Error deleting Glacier versions of object {key}: {str(e)}")
+            PRINT(f'Error deleting Glacier versions of object {key}: {str(e)}')
             return False
 
     def copy_object_back_to_original_location(self, bucket: str, key: str,
@@ -299,7 +299,7 @@ class GlacierUtils:
         return success, errors
 
     def restore_glacier_phase_four_cleanup(self, atid_list: List[str],
-                                            delete_all_versions: bool = False) -> (List[str], List[str]):
+                                           delete_all_versions: bool = False) -> (List[str], List[str]):
         """ Triggers delete requests for all @ids for the glacierized objects, since they are in standard
 
         :param atid_list: list of @ids to delete from glacier
