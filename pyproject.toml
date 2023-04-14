@@ -57,6 +57,7 @@ webtest = "^2.0.34"
 opensearch-py = "^2.0.1"
 redis = "^4.5.1"
 PyJWT = "^2.6.0"
+tqdm = "^4.65.0"
 
 
 [tool.poetry.dev-dependencies]

@@ -38,7 +38,7 @@ jobs:
           sudo apt install redis-server
           sudo ln -s /usr/bin/redis-server /usr/local/bin/redis-server
           sudo ln -s /usr/bin/redis-cli /usr/local/bin/redis-cli
-          pip install poetry
+          make build
           # show loaded versions of various poetry-related libraries
           pip freeze --all | egrep '(pip|poetry(.[a-z]+)?|tomlkit)=='
 
@@ -49,7 +49,6 @@ jobs:
           S3_ENCRYPT_KEY: ${{ secrets.S3_ENCRYPT_KEY }}
           GLOBAL_ENV_BUCKET: foursight-envs
         run: |
-          poetry install
           make test-for-ga
 
       - name: Coveralls
