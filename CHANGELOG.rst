@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+7.2.0
+=====
+
+* New ``glacier_utils`` module
+
+    * Class for interacting with/restoring files from Glacier
+
 
 7.1.0
 =====
