@@ -11,7 +11,7 @@ from dcicutils.misc_utils import check_true, environ_bool, PRINT
 PMAP_VERBOSE = environ_bool("PMAP_VERBOSE")
 
 
-class _Task:
+class Task:
     def __init__(self, *, manager, thread=None, position, function, arg1, more_args=None):
         self.position = position
         self.thread = thread
@@ -42,6 +42,8 @@ class _Task:
 
 
 class TaskManager:
+
+    TASK_CLASS = Task
 
     MAX_CONCURRENT_THREADS = 10
 
@@ -79,8 +81,8 @@ class TaskManager:
                    error_class=ValueError)
         n = len(seq1)
         check_true(all(len(seq) == n for seq in more_seqs), self._ARG_LEN_ERROR_MESSAGE, error_class=ValueError)
-        records = [_Task(manager=self, position=i, function=fn, arg1=seq1[i],
-                         more_args=[seq[i] for seq in more_seqs])
+        records = [Task(manager=self, position=i, function=fn, arg1=seq1[i],
+                        more_args=[seq[i] for seq in more_seqs])
                    for i in range(n)]
         for record in records:
             record.thread = threading.Thread(target=lambda x: x.call(), args=(record,))
