@@ -217,7 +217,7 @@ def test_pmap_parallelism():
         # Allow for float round-off error on low side and additional computational overhead in the loop on high side
         lo_factor = 0.8
         expected_lo = expected * lo_factor
-        hi_factor = (margin_of_error ** chunk_size) # with k items per chunk, margin of error multiplies k times
+        hi_factor = (margin_of_error ** chunk_size)  # with k items per chunk, margin of error multiplies k times
         expected_hi = expected * hi_factor
         print(f"Total seconds ({chunk_size:2d} at a time): {n_secs:.6f},"
               f" expected e={expected:.3f}"
