@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 from .misc_utils import PRINT
 from .ff_utils import get_metadata, get_health_page, patch_metadata
-from .creds_utils import KeyManager
+from .creds_utils import CGAPKeyManager
 
 
 GLACIER_CLASSES = [
@@ -34,7 +34,7 @@ class GlacierUtils:
         """
         self.s3 = boto3.client('s3')
         self.env_name = env_name
-        self.key_manager = KeyManager()
+        self.key_manager = CGAPKeyManager()
         self.env_key = self.key_manager.get_keydict_for_env(env_name)
         self.health_page = get_health_page(key=self.env_key, ff_env=env_name)
 
@@ -239,7 +239,7 @@ class GlacierUtils:
                 success.append(atid)
             else:
                 errors.append(atid)
-        if len(errors) == 0:
+        if len(errors) != 0:
             PRINT(f'Errors encountered restoring @ids: {errors}')
         else:
             PRINT(f'Successfully triggered restore requests for all @ids passed {success}')
@@ -276,7 +276,7 @@ class GlacierUtils:
                     success.append(atid)
                 else:
                     errors.append(atid)
-        if len(errors) == 0:
+        if len(errors) != 0:
             PRINT(f'Errors encountered copying @ids: {errors}')
         else:
             PRINT(f'Successfully triggered copy for all @ids passed {success}')
@@ -314,7 +314,7 @@ class GlacierUtils:
                 success.append(atid)
             else:
                 errors.append(atid)
-        if len(errors) == 0:
+        if len(errors) != 0:
             PRINT(f'Errors encountered deleting glaciered @ids: {errors}')
         else:
             PRINT(f'Successfully triggered delete for all @ids passed {success}')
