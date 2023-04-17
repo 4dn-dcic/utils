@@ -8,9 +8,6 @@ from dcicutils.misc_utils import chunked, environ_bool, PRINT
 #  * timeoouts
 #  * does not kill threads on abort. they have to run their course.
 
-PMAP_VERBOSE = environ_bool("PMAP_VERBOSE")
-
-
 class Task:
     def __init__(self, *, manager, thread=None, position, function, arg1, more_args=None):
         self.position = position
@@ -46,6 +43,8 @@ class TaskManager:
     TASK_CLASS = Task
 
     DEFAULT_CHUNK_SIZE = 10
+
+    VERBOSE = environ_bool("TASK_MANAGER_VERBOSE")
 
     def __init__(self, fail_fast=True, raise_error=True, chunk_size=None):
         if fail_fast and not raise_error:
@@ -100,34 +99,34 @@ class TaskManager:
             for record in records:
                 record.thread = threading.Thread(target=lambda x: x.call(), args=(record,))
             for record in records:
-                if PMAP_VERBOSE:  # pragma: no cover
+                if self.VERBOSE:  # pragma: no cover
                     PRINT(f"Starting {record.thread} for arg {record.position}...")
                 record.thread.start()  # make sure they all start
             for record in records:
-                if PMAP_VERBOSE:
+                if self.VERBOSE:  # pragma: no cover
                     PRINT(f"Joining {record.thread} for arg {record.position}...")
                 record.thread.join()
                 if record.error and self.fail_fast:
-                    if PMAP_VERBOSE:
+                    if self.VERBOSE:  # pragma: no cover
                         PRINT(f"While accumulating records, an error was found and is being raised due to fail_fast.")
                     raise record.error
             if not self.raise_error:
-                if PMAP_VERBOSE:
+                if self.VERBOSE:  # pragma: no cover
                     PRINT(f"Because fail_fast is false, returning list of {n_of(n, 'error or result')}"
                           f" for chunk {chunk}.")
                 yield list(map(lambda record: record.error or record.result, records))
             else:
                 errors = [record.error for record in records if record.ready and record.error]
                 if not errors:
-                    if PMAP_VERBOSE:
+                    if self.VERBOSE:  # pragma: no cover
                         PRINT(f"No errors to raise in chunk {chunk}.")
                     yield [record.result for record in records]
                 elif len(errors) == 1:
-                    if PMAP_VERBOSE:
+                    if self.VERBOSE:  # pragma: no cover
                         PRINT(f"Just one error to raise in chunk {chunk}.")
                     raise errors[0]
                 else:
-                    if PMAP_VERBOSE:
+                    if self.VERBOSE:  # pragma: no cover
                         PRINT(f"Multiple errors to raise as a MultiError in chunk {chunk}.")
                     raise MultiError(*errors)
             chunk_post += n
