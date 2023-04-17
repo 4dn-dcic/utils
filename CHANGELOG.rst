@@ -6,7 +6,7 @@ dcicutils
 Change Log
 ----------
 
-7.2.0
+7.3.0
 =====
 
 * New ``glacier_utils`` module
