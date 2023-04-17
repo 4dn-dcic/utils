@@ -126,7 +126,7 @@ class GlacierUtils:
             if restore_path is None:
                 PRINT(f'Error: Could not determine the temporary location of restored object {bucket}/{key}')
                 return None
-            return restore
+            return response['RestoreOutputPath']
         except Exception as e:
             PRINT(f'Error copying object {bucket}/{key} back to its original location in S3: {str(e)}')
             return None
