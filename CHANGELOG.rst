@@ -10,6 +10,16 @@ Change Log
 7.1.0
 =====
 
+* In ``dcicutils.env_utils`` added function ``get_portal_url``;
+  first usage of which was in foursight-core. 2023-04-16.
+
+* Added ``dcicutils.ssl_certificate_utils``;
+  first usage of which was in foursight-core. 2023-04-16.
+
+
+7.1.0
+=====
+
 * New ``trace_utils`` module
 
   * New decorator ``@Trace``
