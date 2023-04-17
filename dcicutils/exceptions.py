@@ -1,7 +1,9 @@
 # Exceptions can be put here to get them out of the way of the main flow of things,
 # and because once in a while we may want them to be shared or to have shared parents.
 
-from .misc_utils import full_object_name, full_class_name, capitalize1, NamedObject
+import io
+
+from .misc_utils import full_object_name, full_class_name, capitalize1, NamedObject, get_error_message
 from .lang_utils import must_be_one_of
 
 
@@ -250,3 +252,25 @@ class LegacyDispatchDisabled(Exception):
         super().__init__(message
                          or f"Attempt to use legacy operation {operation}"
                             f" with args={call_args} kwargs={call_kwargs} mode={mode}.")
+
+
+class MultiError(Exception):
+
+    def __init__(self, *errors, flatten=True):
+        self.errors = []
+        for error in errors:
+            if flatten and isinstance(error, MultiError):
+                self.errors.extend(error.errors)
+            else:
+                self.errors.append(error)
+        s = io.StringIO()
+        s.write("Multiple errors:")
+        for error in self.errors:
+            s.write(f"\n  {get_error_message(error)}")
+        self.message = s.getvalue()
+
+    def __str__(self):
+        return self.message
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({','.join(map(repr, self.errors))})"

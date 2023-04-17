@@ -2181,3 +2181,18 @@ def deduplicate_list(lst):
     :return: de-duplicated list
     """
     return list(set(lst))
+
+
+def chunked(seq, chunk_size=1):
+    if not isinstance(chunk_size, int) or chunk_size < 1:
+        raise ValueError(f"The chunk_size, {chunk_size}, must be a positive integer.")
+    chunk = []
+    i = 0
+    for item in seq:
+        chunk.append(item)
+        i = (i + 1) % chunk_size
+        if i == 0:
+            yield chunk
+            chunk = []
+    if chunk:
+        yield chunk
