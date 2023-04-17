@@ -1,7 +1,9 @@
 import pytest
+import time
 
 from dcicutils.exceptions import MultiError
 from dcicutils.misc_utils import print_error_message
+from dcicutils.qa_utils import Timer
 from dcicutils.task_utils import Task, TaskManager, map_chunks, pmap, pmap_list
 
 
@@ -26,8 +28,11 @@ def test_Task():
 
     manager = TaskManager()
 
-    task = Task(position=0, function=_add1, arg1=7, manager=manager)
+    some_call_id = 99999
+    task = Task(position=0, function=_add1, arg1=7, manager=manager, call_id=some_call_id)
+    print(task)
 
+    assert task.call_id == some_call_id
     assert task.position == 0
     assert task.function == _add1
     assert task.arg1 == 7
@@ -59,7 +64,7 @@ def test_map_chunks_simple():
 
 def test_pmap_simple():
 
-    print()
+    print()  # start on a fresh line
     res = pmap(_add1, [1, 2, 3])
     print(f"res={res}")
     assert not isinstance(res, list)
@@ -157,8 +162,58 @@ def test_pmap_list_raise_slow_chunked():
 
 def test_pmap_list_fail_fast():
 
+    print()  # start on a fresh line
     with pytest.raises(_BadArgument) as exc:
         pmap_list(_add1, ['a', 'b'], fail_fast=True)  # just reports the first error it finds
     e = exc.value
     print_error_message(e)
     assert isinstance(e, _BadArgument)  # Note that we did not wait for a MultiError
+
+
+def test_pmap_parallelism():
+
+    # For example, a sample test run with
+    #    pytest -s -vv -k test_pmap_parallelism
+    # showed:
+    # Total seconds (serial): 1.180179, average 0.012 sec/call
+    # Total seconds ( 2 at a time): 0.609771, expected range 0.531 < t < 0.885
+    # Total seconds ( 5 at a time): 0.252411, expected range 0.212 < t < 0.354
+    # Total seconds (10 at a time): 0.131777, expected range 0.106 < t < 0.177
+    # Total seconds (20 at a time): 0.072549, expected range 0.053 < t < 0.089
+
+    print()  # start on a fresh line
+
+    slowness = 0.01  # With parallelism, hard to use ControlledTime so make sure slowness isn't VERY slow. :)
+
+    def slow_add1(x):
+        time.sleep(slowness)
+        return x + 1
+
+    n_tries = 100
+
+    def the_input():
+        return range(n_tries)
+
+    def expected_output():
+        return range(1, n_tries + 1)
+
+    with Timer() as timer:
+        assert list(map(slow_add1, the_input())) == list(expected_output())
+    n_secs = timer.duration_seconds()
+    measured_slowness = n_secs / n_tries
+    print(f"Total seconds (serial): {n_secs}, average {measured_slowness:.3f} sec/call")
+    assert 0.9 < n_secs  # allow for floating roundoff error, though really we expect n_secs > 1
+
+    for chunk_size in [2, 5, 10, 20]:
+
+        with Timer() as timer:
+            assert list(pmap(slow_add1, the_input(), chunk_size=chunk_size)) == list(expected_output())
+        n_secs = timer.duration_seconds()
+        n_chunks = n_tries / chunk_size
+        expected = measured_slowness * n_chunks
+        # Allow for float round-off error on low side and additional computational overhead in the loop on high side
+        expected_lo = expected * 0.9
+        expected_hi = expected * 1.5
+        print(f"Total seconds ({chunk_size:2d} at a time): {n_secs},"
+              f" expected range {expected_lo:.3f} < t < {expected_hi:.3f}")
+        assert expected_lo < n_secs < expected_hi

@@ -21,7 +21,7 @@ from dcicutils.qa_utils import (
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
-    logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually,
+    logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually, Timer
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -1789,3 +1789,52 @@ def test_eventually():
                 return MyStore.VALUE
 
             assert foo(tries=3) == 1  # The value will increment exactly once because it succeeds first try.
+
+
+def test_timer():
+
+    print()  # start on a fresh line
+
+    dt = ControlledTime(tick_seconds=0.1)
+    with mock.patch("datetime.datetime", dt):
+
+        with Timer() as t1:
+            dt.sleep(20)
+
+        s1 = t1.duration_seconds()
+        print(f"Seconds elapsed: {s1}")
+        # floating point compares are tricky, but approximately s1 = 20.1
+        # clock checks cost us 1 tick (0.1 sec)
+        assert 20.05 < s1 < 20.15
+
+        t2 = Timer()
+        t2.start_timer()
+        dt.sleep(20)
+        t2.stop_timer()
+
+        s2 = t2.duration_seconds()
+        print(f"Seconds elapsed: {s2}")
+        assert 20.05 < s2 < 20.15  # see explanation above
+
+        t2.start_timer()  # start timer with no intent to stop it
+        dt.sleep(100)     # wait a good while
+
+        check_time = dt.now()
+
+        t2.start_timer()  # reuse same timer, but it will be reset by this
+        dt.sleep(10)
+        interim_seconds = t2.duration_seconds()
+        print(f"Seconds elapsed: {interim_seconds}  # interim, timer not stopped")
+        assert 10.05 < interim_seconds < 10.15  # approximately equal to 10.1 (clock check costs 1 tick = 0.1)
+        dt.sleep(5)
+        interim_seconds = t2.duration_seconds()
+        print(f"Seconds elapsed: {interim_seconds}  # interim, timer not stopped")
+        assert 15.15 < interim_seconds < 15.25  # approximately equal to 15.2 (another clock check costs 1 more tick)
+        dt.sleep(5)
+        t2.stop_timer()
+
+        s2a = t2.duration_seconds()
+        print(f"Seconds elapsed: {s2a}")
+        assert 20.25 < s2a < 20.35  # see explanation above
+
+        assert t2.start > check_time

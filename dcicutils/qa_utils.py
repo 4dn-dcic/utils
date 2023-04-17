@@ -2751,3 +2751,35 @@ class Eventually:
             return _wrapped
 
         return _wrapper
+
+
+class Timer:
+
+    def __init__(self):
+        self.start = None
+        self.end = None
+
+    def start_timer(self):
+        # Resets it even if it was already set.
+        self.end = None
+        self.start = datetime.datetime.now()
+
+    def stop_timer(self):
+        # Does not move the time if already stopped. Safe to call twice.
+        if self.end is None:
+            self.end = datetime.datetime.now()
+
+    def __enter__(self):
+        self.start_timer()
+        return self
+
+    def __exit__(self, *exc):
+        ignored(exc)
+        self.stop_timer()
+        return False
+
+    def duration_seconds(self):
+        if self.start is None:
+            return None
+        end = datetime.datetime.now() if self.end is None else self.end
+        return (end - self.start).total_seconds()

@@ -4,12 +4,38 @@ from dcicutils.exceptions import MultiError
 from dcicutils.lang_utils import n_of
 from dcicutils.misc_utils import chunked, environ_bool, PRINT
 
-# TODO:
-#  * timeoouts
-#  * does not kill threads on abort. they have to run their course.
+# Intended use (see tests for more examples):
+#
+# Either of:
+#
+#     list(pmap(lambda x: x + 1, range(100)))
+#
+# or
+#
+#     pmap_list(lambda x: x + 1, range(100))
+#
+# is like
+#
+#     list(map(lambda x: x + 1, range(100)))
+#
+# except that the mapping has parallelism (chunk size 10 by default, managed by keyword arguments).
+#
+# To use the chunking, you might instead have written
+#
+#    result = []
+#    for chunk in map_chunks(lambda x: x + 1, range(100)):
+#      result += chunk
+#
+# Caveats:
+#
+#  * This does not manage timeouts or other forms of abort, abandoned threads must still run to completion,
+#    so all functions mapped must arrange for their own timeouts.
+
 
 class Task:
-    def __init__(self, *, manager, thread=None, position, function, arg1, more_args=None):
+
+    def __init__(self, *, manager, thread=None, call_id, position, function, arg1, more_args=None):
+        self.call_id = call_id
         self.position = position
         self.thread = thread
         self.function = function
@@ -20,13 +46,22 @@ class Task:
         self.error = None
         self.manager: TaskManager = manager
 
-    def set_result(self, result):
+    def __str__(self):
+        return f"<{self.__class__.__name__} {self.manager} call {self.call_id} arg {self.position}>"
+
+    def set_result(self, result):  # If this is called, it should be the last thing the tread does
         self.result = result
         self.ready = True
 
-    def set_error(self, error):
+    def set_error(self, error):  # If this is called, it should be the last thing the thread does
         self.error = error
         self.ready = True
+
+    def init(self):
+        self.thread = threading.Thread(target=lambda x: x.call(), args=(self,))
+
+    def start(self):
+        self.thread.start()
 
     def call(self):
         if self.ready:
@@ -37,14 +72,23 @@ class Task:
             except Exception as e:
                 self.set_error(e)
 
+    def finish(self):
+        self.thread.join()
+
+    def kill(self):
+        # We don't have a way to do this for now, so just leave it orphaned rather than blocking,
+        # but this class can subclassed with something having such a method
+        # if someone wants to add a method to do it.
+        pass
+
 
 class TaskManager:
 
-    TASK_CLASS = Task
-
     DEFAULT_CHUNK_SIZE = 10
-
+    TASK_CLASS = Task
     VERBOSE = environ_bool("TASK_MANAGER_VERBOSE")
+    _COUNTER_LOCK = threading.Lock()
+    _ID_COUNTER = 0
 
     def __init__(self, fail_fast=True, raise_error=True, chunk_size=None):
         if fail_fast and not raise_error:
@@ -52,6 +96,22 @@ class TaskManager:
         self.fail_fast = fail_fast
         self.raise_error = raise_error
         self.chunk_size = chunk_size or self.DEFAULT_CHUNK_SIZE
+        self.manager_id = self.new_manager_id()
+        self._call_id = 0
+
+    def __str__(self):
+        return f"<{self.__class__.__name__} {self.manager_id}>"
+
+    @classmethod
+    def new_manager_id(cls):
+        with cls._COUNTER_LOCK:
+            cls._ID_COUNTER = id_counter = cls._ID_COUNTER + 1
+            return id_counter
+
+    def new_call_id(self):
+        with self._COUNTER_LOCK:
+            self._call_id = call_id = self._call_id + 1
+            return call_id
 
     @classmethod
     def pmap(cls, fn, seq, *more_seqs, fail_fast=True, raise_error=True, chunk_size=None):
@@ -89,46 +149,52 @@ class TaskManager:
         return manager._map_chunks(fn, seq, *more_seqs)
 
     def _map_chunks(self, fn, seq1, *more_seqs):
+        call_id = self.new_call_id()
         chunk_post = 0
         more_seq_generators = [(x for x in seq) for seq in more_seqs]
         for chunk in chunked(seq1, chunk_size=self.chunk_size):
             n = len(chunk)
-            records = [Task(manager=self, position=chunk_post + i, function=fn, arg1=chunk_element,
-                            more_args=[next(seq_generator) for seq_generator in more_seq_generators])
-                       for i, chunk_element in enumerate(chunk)]
-            for record in records:
-                record.thread = threading.Thread(target=lambda x: x.call(), args=(record,))
-            for record in records:
-                if self.VERBOSE:  # pragma: no cover
-                    PRINT(f"Starting {record.thread} for arg {record.position}...")
-                record.thread.start()  # make sure they all start
-            for record in records:
-                if self.VERBOSE:  # pragma: no cover
-                    PRINT(f"Joining {record.thread} for arg {record.position}...")
-                record.thread.join()
-                if record.error and self.fail_fast:
+            tasks = [Task(manager=self, call_id=call_id, position=chunk_post + i,
+                          function=fn, arg1=chunk_element,
+                          more_args=[next(seq_generator) for seq_generator in more_seq_generators])
+                     for i, chunk_element in enumerate(chunk)]
+            for task in tasks:
+                task.init()
+            try:
+                for task in tasks:
                     if self.VERBOSE:  # pragma: no cover
-                        PRINT(f"While accumulating records, an error was found and is being raised due to fail_fast.")
-                    raise record.error
-            if not self.raise_error:
-                if self.VERBOSE:  # pragma: no cover
-                    PRINT(f"Because fail_fast is false, returning list of {n_of(n, 'error or result')}"
-                          f" for chunk {chunk}.")
-                yield list(map(lambda record: record.error or record.result, records))
-            else:
-                errors = [record.error for record in records if record.ready and record.error]
-                if not errors:
+                        PRINT(f"Starting {task}...")
+                    task.start()
+                for task in tasks:
                     if self.VERBOSE:  # pragma: no cover
-                        PRINT(f"No errors to raise in chunk {chunk}.")
-                    yield [record.result for record in records]
-                elif len(errors) == 1:
+                        PRINT(f"Finishing {task}...")
+                    task.finish()
+                    if task.error and self.fail_fast:
+                        if self.VERBOSE:  # pragma: no cover
+                            PRINT(f"While accumulating tasks, an error was found and is being raised due to fail_fast.")
+                        raise task.error
+                if not self.raise_error:
                     if self.VERBOSE:  # pragma: no cover
-                        PRINT(f"Just one error to raise in chunk {chunk}.")
-                    raise errors[0]
+                        PRINT(f"Because fail_fast is false, returning list of {n_of(n, 'error or result')}"
+                              f" for chunk {chunk}.")
+                    yield list(map(lambda record: record.error or record.result, tasks))
                 else:
-                    if self.VERBOSE:  # pragma: no cover
-                        PRINT(f"Multiple errors to raise as a MultiError in chunk {chunk}.")
-                    raise MultiError(*errors)
+                    errors = [record.error for record in tasks if record.ready and record.error]
+                    if not errors:
+                        if self.VERBOSE:  # pragma: no cover
+                            PRINT(f"No errors to raise in chunk {chunk}.")
+                        yield [record.result for record in tasks]
+                    elif len(errors) == 1:
+                        if self.VERBOSE:  # pragma: no cover
+                            PRINT(f"Just one error to raise in chunk {chunk}.")
+                        raise errors[0]
+                    else:
+                        if self.VERBOSE:  # pragma: no cover
+                            PRINT(f"Multiple errors to raise as a MultiError in chunk {chunk}.")
+                        raise MultiError(*errors)
+            finally:
+                for task in tasks:
+                    task.kill()
             chunk_post += n
 
 
