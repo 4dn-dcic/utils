@@ -175,11 +175,11 @@ def test_pmap_parallelism():
     # For example, a sample test run with
     #    pytest -s -vv -k test_pmap_parallelism
     # showed:
-    # Total seconds (serial): 1.180179, average 0.012 sec/call
-    # Total seconds ( 2 at a time): 0.609771, expected range 0.531 < t < 0.885
-    # Total seconds ( 5 at a time): 0.252411, expected range 0.212 < t < 0.354
-    # Total seconds (10 at a time): 0.131777, expected range 0.106 < t < 0.177
-    # Total seconds (20 at a time): 0.072549, expected range 0.053 < t < 0.089
+    # Total seconds (serial): 1.177421, average 0.012 sec/call
+    # Total seconds ( 2 at a time): 0.614222, expected e=0.589 range e*0.8=0.471 < t < e*1.06=0.625
+    # Total seconds ( 5 at a time): 0.255491, expected e=0.235 range e*0.8=0.188 < t < e*1.16=0.273
+    # Total seconds (10 at a time): 0.134456, expected e=0.118 range e*0.8=0.094 < t < e*1.34=0.158
+    # Total seconds (20 at a time): 0.071740, expected e=0.059 range e*0.8=0.047 < t < e*1.81=0.106
 
     print()  # start on a fresh line
 
@@ -200,8 +200,8 @@ def test_pmap_parallelism():
     with Timer() as timer:
         assert list(map(slow_add1, the_input())) == list(expected_output())
     n_secs = timer.duration_seconds()
-    measured_slowness = n_secs / n_tries
-    print(f"Total seconds (serial): {n_secs}, average {measured_slowness:.3f} sec/call")
+    calibrated_slowness = n_secs / n_tries
+    print(f"Total seconds (serial): {n_secs}, average {calibrated_slowness:.3f} sec/call")
     assert 0.9 < n_secs  # allow for floating roundoff error, though really we expect n_secs > 1
 
     for chunk_size in [2, 5, 10, 20]:
@@ -210,10 +210,16 @@ def test_pmap_parallelism():
             assert list(pmap(slow_add1, the_input(), chunk_size=chunk_size)) == list(expected_output())
         n_secs = timer.duration_seconds()
         n_chunks = n_tries / chunk_size
-        expected = measured_slowness * n_chunks
+        expected = calibrated_slowness * n_chunks
+        # We could compute margin of error, too, by timing each iteration in calibration, but we'll guess for now.
+        # -kmp 17-Apr-2023
+        margin_of_error = 1.03
         # Allow for float round-off error on low side and additional computational overhead in the loop on high side
-        expected_lo = expected * 0.9
-        expected_hi = expected * 1.5
-        print(f"Total seconds ({chunk_size:2d} at a time): {n_secs},"
-              f" expected range {expected_lo:.3f} < t < {expected_hi:.3f}")
+        lo_factor = 0.8
+        expected_lo = expected * lo_factor
+        hi_factor = (margin_of_error ** chunk_size) # with k items per chunk, margin of error multiplies k times
+        expected_hi = expected * hi_factor
+        print(f"Total seconds ({chunk_size:2d} at a time): {n_secs:.6f},"
+              f" expected e={expected:.3f}"
+              f" range e*{lo_factor:.1f}={expected_lo:.3f} < t < e*{hi_factor:.2f}={expected_hi:.3f}")
         assert expected_lo < n_secs < expected_hi
