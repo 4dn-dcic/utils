@@ -27,6 +27,8 @@ def get_ssl_certificate_info(hostname: str, raise_exception: bool = False, expir
                                                               raise_exception=raise_exception,
                                                               expires_soon_days=expires_soon_days)
         certificate_okay, certificate_exception = _is_ssl_certificate_okay(hostname, raise_exception=raise_exception)
+        # The hostname from _get_ssl_certificate_info_from_pem is not necessarily exactly correct;
+        # for example, for cgap-wolf.hms.harvard.edu it is imperva.com.
         certificate_info["hostname"] = hostname
         certificate_info["valid"] = certificate_info["valid"] and certificate_okay
         if certificate_exception:
@@ -106,13 +108,16 @@ def _get_ssl_certificate_info_from_pem(pem_string: str,
         certificate = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, pem_string)
 
         subject = certificate.get_subject()
-        hostname = subject.commonName
+        components = subject.get_components()
+        common_name = subject.commonName
         hostnames = get_hostnames(certificate)
         owner_country = subject.countryName
         owner_state = subject.stateOrProvinceName
         owner_city = subject.localityName
         owner_entity = subject.organizationName
         owner = subject.organizationalUnitName or owner_entity
+        if not owner:
+            owner = common_name
 
         issuer = certificate.get_issuer()
         issuer_country = issuer.countryName
@@ -141,7 +146,7 @@ def _get_ssl_certificate_info_from_pem(pem_string: str,
         ).decode("UTF-8")
 
         return {
-            "hostname": hostname,
+            "common_name": common_name,
             "hostnames": hostnames,
             "owner": owner,
             "owner_entity": owner_entity,
