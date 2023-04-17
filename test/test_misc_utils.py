@@ -29,7 +29,7 @@ from dcicutils.misc_utils import (
     string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, lines_printed_to,
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
-    deduplicate_list,
+    deduplicate_list, chunked,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -3232,3 +3232,45 @@ def test_deduplicate_list():
         # Lists with elements that are mutable objects that cannot be hashed as sets can't be dedupliated.
         # For example, a list of lists.  This is because set([['a'], ['b'], ['c']]) will fail.
         deduplicate_list([['a'], ['b'], ['c']])
+
+
+def test_chunked():
+
+    foo = []
+    for x in chunked([1, 2, 3, 4, 5, 6], chunk_size=2):
+        foo.append(x)
+    assert foo == [[1, 2], [3, 4], [5, 6]]
+
+    foo = []
+    for x in chunked([1, 2, 3, 4, 5, 6, 7], chunk_size=2):
+        foo.append(x)
+    assert foo == [[1, 2], [3, 4], [5, 6], [7]]
+
+    foo = []
+    for x in chunked([], chunk_size=2):
+        foo.append(x)
+    assert foo == []
+
+    foo = []
+    for x in chunked([1, 2, 3, 4, 5, 6], chunk_size=3):
+        for y in chunked(x, chunk_size=2):
+            foo.append(y)
+    assert foo == [[1, 2], [3], [4, 5], [6]]
+
+    foo = []
+    for x in chunked([1, 2, 3, 4, 5, 6, 7], chunk_size=3):
+        for y in chunked(x, chunk_size=2):
+            foo.append(y)
+    assert foo == [[1, 2], [3], [4, 5], [6], [7]]
+
+    foo = []
+    for x in chunked([1, 2, 3, 4, 5, 6], chunk_size=2):
+        for y in chunked(x, chunk_size=3):
+            foo.append(y)
+    assert foo == [[1, 2], [3, 4], [5, 6]]
+
+    foo = []
+    for x in chunked([1, 2, 3, 4, 5, 6, 7], chunk_size=2):
+        for y in chunked(x, chunk_size=3):
+            foo.append(y)
+    assert foo == [[1, 2], [3, 4], [5, 6], [7]]

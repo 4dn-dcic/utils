@@ -14,6 +14,33 @@ Change Log
     * Class for interacting with/restoring files from Glacier
 
 
+7.2.0
+=====
+
+* In ``exceptions``:
+
+  * New class ``MultiError``
+
+* In ``qa_utils``:
+
+  * New class ``Timer``
+
+* In ``misc_utils``:
+
+  * New generator function ``chunked``
+
+* New module ``task_utils``:
+
+  * New class ``Task``
+  * New class ``TaskManager``
+  * New function ``pmap``
+  * New function ``pmap_list``
+  * New function ``pmap_chunked``
+
+* Adjust expectations for environment ``hotseat``
+  in live ecosystem integration testing by ``tests/test_s3_utils.py``
+
+
 7.1.0
 =====
 
