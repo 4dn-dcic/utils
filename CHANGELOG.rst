@@ -28,7 +28,7 @@ Change Log
   * New class ``TaskManager``
   * New function ``pmap``
   * New function ``pmap_list``
-  * New function ``map_chunked``
+  * New function ``pmap_chunked``
 
 * Adjust expectations for environment ``hotseat``
   in live ecosystem integration testing by ``tests/test_s3_utils.py``

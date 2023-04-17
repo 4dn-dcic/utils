@@ -23,7 +23,7 @@ from dcicutils.misc_utils import chunked, environ_bool, PRINT
 # To use the chunking, you might instead have written
 #
 #    result = []
-#    for chunk in map_chunks(lambda x: x + 1, range(100)):
+#    for chunk in pmap_chunks(lambda x: x + 1, range(100)):
 #      result += chunk
 #
 # Caveats:
@@ -115,21 +115,21 @@ class TaskManager:
 
     @classmethod
     def pmap(cls, fn, seq, *more_seqs, fail_fast=True, raise_error=True, chunk_size=None):
-        for chunk in cls.map_chunks(fn, seq, *more_seqs, fail_fast=fail_fast, raise_error=raise_error,
-                                    chunk_size=chunk_size):
+        for chunk in cls.pmap_chunks(fn, seq, *more_seqs, fail_fast=fail_fast, raise_error=raise_error,
+                                     chunk_size=chunk_size):
             for item in chunk:
                 yield item
 
     @classmethod
     def pmap_list(cls, fn, seq, *more_seqs, fail_fast=True, raise_error=True, chunk_size=None):
         result = []
-        for chunk in cls.map_chunks(fn, seq, *more_seqs, fail_fast=fail_fast, raise_error=raise_error,
-                                    chunk_size=chunk_size):
+        for chunk in cls.pmap_chunks(fn, seq, *more_seqs, fail_fast=fail_fast, raise_error=raise_error,
+                                     chunk_size=chunk_size):
             result += chunk
         return result
 
     @classmethod
-    def map_chunks(cls, fn, seq, *more_seqs, fail_fast=True, raise_error=True, chunk_size=None):  # generator
+    def pmap_chunks(cls, fn, seq, *more_seqs, fail_fast=True, raise_error=True, chunk_size=None):  # generator
         """
         Maps a function across given arguments with each call performed in a separate thread.
         If errors occur, they are trapped and appropriate information is communicated to the main thread.
@@ -146,9 +146,9 @@ class TaskManager:
         :param chunk_size: How many items to do at once. If unsupplied, the .DEFAULT_CHUNK_SIZE will be used.
         """
         manager = TaskManager(fail_fast=fail_fast, raise_error=raise_error, chunk_size=chunk_size)
-        return manager._map_chunks(fn, seq, *more_seqs)
+        return manager._pmap_chunks(fn, seq, *more_seqs)
 
-    def _map_chunks(self, fn, seq1, *more_seqs):
+    def _pmap_chunks(self, fn, seq1, *more_seqs):
         call_id = self.new_call_id()
         chunk_post = 0
         more_seq_generators = [(x for x in seq) for seq in more_seqs]
@@ -198,6 +198,6 @@ class TaskManager:
             chunk_post += n
 
 
-map_chunks = TaskManager.map_chunks
+pmap_chunks = TaskManager.pmap_chunks
 pmap = TaskManager.pmap
 pmap_list = TaskManager.pmap_list

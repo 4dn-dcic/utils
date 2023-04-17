@@ -4,7 +4,7 @@ import time
 from dcicutils.exceptions import MultiError
 from dcicutils.misc_utils import print_error_message
 from dcicutils.qa_utils import Timer
-from dcicutils.task_utils import Task, TaskManager, map_chunks, pmap, pmap_list
+from dcicutils.task_utils import Task, TaskManager, pmap_chunks, pmap, pmap_list
 
 
 def _add1(x):
@@ -52,7 +52,7 @@ def test_map_chunks_simple():
     for chunk_size in [2, 3]:
         i = 1
         n_chunks = 0
-        for chunk in map_chunks(_add1, [1, 2, 3, 4, 5, 6], chunk_size=chunk_size):
+        for chunk in pmap_chunks(_add1, [1, 2, 3, 4, 5, 6], chunk_size=chunk_size):
             n_chunks += 1
             assert isinstance(chunk, list)
             assert len(chunk) == chunk_size
