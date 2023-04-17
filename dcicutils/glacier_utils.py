@@ -7,9 +7,13 @@ from .ff_utils import get_metadata, get_health_page, patch_metadata
 from .creds_utils import CGAPKeyManager
 
 
+# See https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
+# See boto3 docs for info on possible values, but these 3 are the current ones used for
+# glacier (that require restore calls) - Will 7 Apr 2023
 GLACIER_CLASSES = [
-    'GLACIER',
-    'DEEP_ARCHIVE'
+    'GLACIER_IR',  # Glacier Instant Retrieval
+    'GLACIER',  # Glacier Flexible Retrieval
+    'DEEP_ARCHIVE'  # Glacier Deep Archive
 ]
 
 
@@ -127,7 +131,7 @@ class GlacierUtils:
             PRINT(f'Error copying object {bucket}/{key} back to its original location in S3: {str(e)}')
             return None
 
-    def patch_file_lifecycle_status_to_standard(self, atid: str, status: str,
+    def patch_file_lifecycle_status_to_standard(self, atid: str, status: str = 'uploaded',
                                                 s3_lifecycle_status: str = 'standard') -> dict:
         """ Patches the File @id object to update 3 things
                 1. status denoted by the status argument (usually uploaded)
@@ -159,43 +163,22 @@ class GlacierUtils:
         :return: True if success or False if failed
         """
         try:
-            # Retrieve the object versions for the key
             response = self.s3.list_object_versions(Bucket=bucket, Prefix=key)
-            versions = response.get('Versions', [])
-            versions.sort(key=lambda x: x['VersionId'], reverse=True)  # most recent version will be first
-
-            # Delete all glaciered versions if the flag is set
-            if delete_all_versions:
-                glacier_versions = [v for v in versions if v.get('StorageClass') in GLACIER_CLASSES]
-                for v in glacier_versions:
-                    response = self.s3.delete_object(
-                        Bucket=bucket,
-                        Key=key,
-                        VersionId=v.get('VersionId')
-                    )
-                    PRINT(f'Object {key} Glacier version {v.get("VersionId")} deleted:\n{response}')
-                # no Glacier versions were found
-                if not glacier_versions:
-                    PRINT(f'No Glacier versions found for object {bucket}/{key}')
-                    return False
-                else:
-                    return True
-            else:
-                # Find the first glacierized version and delete it
-                for v in versions:
-                    if v.get('StorageClass') in GLACIER_CLASSES:
-                        response = self.s3.delete_object(
-                            Bucket=bucket,
-                            Key=key,
-                            VersionId=v.get('VersionId')
-                        )
-                        PRINT(f'Object {key} Glacier version {v.get("VersionId")} deleted:\n{response}')
+            versions = sorted(response.get('Versions', []), key=lambda x: x['VersionId'], reverse=True)
+            deleted = False
+            for v in versions:
+                if v.get('StorageClass') in GLACIER_CLASSES:
+                    response = self.s3.delete_object(Bucket=bucket, Key=key, VersionId=v.get('VersionId'))
+                    PRINT(f'Object {bucket}/{key} Glacier version {v.get("VersionId")} deleted:\n{response}')
+                    deleted = True
+                    if not delete_all_versions:
                         break
-                else:
-                    PRINT(f'No Glacier version found for object {key}')
-
+            if not deleted:
+                PRINT(f'No Glacier version found for object {bucket}/{key}')
+                return False
+            return True
         except Exception as e:
-            PRINT(f'Error deleting Glacier versions of object {key}: {str(e)}')
+            PRINT(f'Error deleting Glacier versions of object {bucket}/{key}: {str(e)}')
             return False
 
     def copy_object_back_to_original_location(self, bucket: str, key: str,
