@@ -8,7 +8,6 @@ from typing import Any, Optional, Tuple, Union
 
 def get_ssl_certificate_info(hostname: str,
                              raise_exception: bool = False,
-                             test_mode_certificate_simulate_expired: bool = False,
                              test_mode_certificate_expiration_warning_days: int = 0) -> Optional[dict]:
     """
     Returns a dictionary containing various data points for the SSL certificate of the given
@@ -58,7 +57,7 @@ def _get_ssl_certificate_pem(hostname: str, raise_exception: bool = False) -> Op
         with ssl.create_connection((hostname, _SSL_PORT)) as socket_connection:
             # Note that we turn off certificate verification for getting the PEM here,
             # because we want the PEM regardless of whether or not the certificate is
-            # valid; we do the real certificate sanity check in  _is_ssl_certificate_okay.
+            # valid; we do the real certificate sanity check in _is_ssl_certificate_okay.
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
