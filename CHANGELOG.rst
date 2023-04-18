@@ -14,6 +14,10 @@ Change Log
     * Class for interacting with/restoring files from Glacier
 
 
+* Load ``coveralls`` dependency only dynamically in GA workflow, not in poetry,
+  because it implicates ``docopt`` library, which needs ``2to3``, and would fail.
+
+
 7.2.0
 =====
 
