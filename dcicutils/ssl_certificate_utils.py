@@ -6,7 +6,10 @@ import ssl
 from typing import Any, Optional, Tuple, Union
 
 
-def get_ssl_certificate_info(hostname: str, raise_exception: bool = False, expires_soon_days: int = 0) -> Optional[dict]:
+def get_ssl_certificate_info(hostname: str,
+                             raise_exception: bool = False,
+                             test_mode_certificate_simulate_expired: bool = False,
+                             test_mode_certificate_expiration_warning_days: int = 0) -> Optional[dict]:
     """
     Returns a dictionary containing various data points for the SSL certificate of the given
     hostname. If an error is encountered then returns None, or, if the given raise_exception
@@ -23,9 +26,11 @@ def get_ssl_certificate_info(hostname: str, raise_exception: bool = False, expir
     hostname = _normalize_hostname(hostname)
     try:
         certificate_pem = _get_ssl_certificate_pem(hostname, raise_exception=False)
-        certificate_info = _get_ssl_certificate_info_from_pem(certificate_pem,
-                                                              raise_exception=raise_exception,
-                                                              expires_soon_days=expires_soon_days)
+        certificate_info = _get_ssl_certificate_info_from_pem(
+            certificate_pem,
+            raise_exception=raise_exception,
+            test_mode_certificate_expiration_warning_days=test_mode_certificate_expiration_warning_days
+        )
         certificate_okay, certificate_exception = _is_ssl_certificate_okay(hostname, raise_exception=raise_exception)
         # The hostname from _get_ssl_certificate_info_from_pem is not necessarily exactly correct;
         # for example, for cgap-wolf.hms.harvard.edu it is imperva.com.
@@ -68,14 +73,16 @@ def _get_ssl_certificate_pem(hostname: str, raise_exception: bool = False) -> Op
 
 def _get_ssl_certificate_info_from_pem(pem_string: str,
                                        raise_exception: bool = False,
-                                       expires_soon_days: int = 0) -> Optional[dict]:
+                                       test_mode_certificate_expiration_warning_days: int = 0) -> Optional[dict]:
     """
     Returns a dictionary containing various data points for the given SSL certificate string
     string in PEM format. If an error is encountered in parsing this given string then returns
     None by default, or raises and exception of the given raise_exception argument is True.
     """
     now = datetime.now()
-    if not expires_soon_days or expires_soon_days <= 0:
+    if test_mode_certificate_expiration_warning_days > 0:
+        expires_soon_days = test_mode_certificate_expiration_warning_days
+    else:
         expires_soon_days = _SSL_CERTIFICATE_EXPIRES_SOON_WARNING_DAYS
 
     def get_hostnames(certificate: OpenSSL.crypto.X509) -> list:
