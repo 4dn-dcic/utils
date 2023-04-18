@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import OpenSSL
 import socket
 import ssl
-from typing import Any, Optional, Tuple, Union
+from typing import Optional, Tuple
 
 
 def get_ssl_certificate_info(hostname: str,
@@ -66,7 +66,7 @@ def _get_ssl_certificate_pem(hostname: str, raise_exception: bool = False) -> Op
                 return ssl.DER_cert_to_PEM_cert(certificate)
     except Exception as e:
         if raise_exception:
-            raise ee
+            raise e
         return None
 
 
@@ -114,7 +114,6 @@ def _get_ssl_certificate_info_from_pem(pem_string: str,
         certificate = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, pem_string)
 
         subject = certificate.get_subject()
-        components = subject.get_components()
         common_name = subject.commonName
         hostnames = get_hostnames(certificate)
         owner_country = subject.countryName
@@ -138,8 +137,8 @@ def _get_ssl_certificate_info_from_pem(pem_string: str,
         expires_at = datetime.strptime(not_after, "%Y%m%d%H%M%SZ")
         expires_soon = is_datetime_within_ndays(expires_at, expires_soon_days)
 
-        expired = now >= expires_at 
-        inactive = now <= active_at 
+        expired = now >= expires_at
+        inactive = now <= active_at
         valid = not inactive and not expired
 
         # Note we could not currently get detect specifically if the certificate is revoked;
@@ -147,8 +146,8 @@ def _get_ssl_certificate_info_from_pem(pem_string: str,
 
         serial_number = str(certificate.get_serial_number())
         public_key_pem = certificate.get_pubkey().to_cryptography_key().public_bytes(
-            encoding = serialization.Encoding.PEM,
-            format = serialization.PublicFormat.SubjectPublicKeyInfo
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
         ).decode("UTF-8")
 
         return {
