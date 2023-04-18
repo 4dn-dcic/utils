@@ -55,7 +55,7 @@ class GlacierUtils:
         profile = get_metadata('/profiles/file.json', key=self.env_key, ff_env=self.env_name)
         return profile['properties']['s3_lifecycle_category']['suggested_enum']
 
-    def resolve_bucket_key_from_portal(self, atid: str) -> (str, str):
+    def resolve_bucket_key_from_portal(self, atid: str) -> List[(str, str)]:
         """ Resolves the bucket, key combination for the given @id
             Raises GlacierRestoreException if not found
 
@@ -66,24 +66,36 @@ class GlacierUtils:
                                  add_on='frame=object&datastore=database')
         upload_key = atid_meta.get('upload_key', None)
         atid_types = atid_meta.get('@type', [])
+        bucket = self.health_page.get('file_upload_bucket')
         if upload_key:
             if 'FileProcessed' in atid_types:
-                return self.health_page.get('processed_file_bucket'), upload_key
+                bucket = self.health_page.get('processed_file_bucket')
+                files = [bucket, upload_key]
             else:  # if not a processed file assume it is an uploaded file
-                return self.health_page.get('file_upload_bucket'), upload_key
+                files = [bucket, upload_key]
         else:
             raise GlacierRestoreException(f'@id {atid} does not have an upload_key, thus cannot be queried for'
                                           f' Glacier restore.')
+        # Add extra files
+        if 'extra_files' in atid_meta:
+            for extra_file in atid_meta['extra_files']:
+                if 'upload_key' in extra_file:
+                    files.append((bucket, extra_file['upload_key']))
+        return files
 
-    def restore_portal_from_glacier(self, atid: str, days: int = 7) -> Union[dict, None]:
+    def restore_portal_from_glacier(self, atid: str, days: int = 7) -> List[dict]:
         """ Resolves the given atid and restores it from glacier, returning the response if successful
 
         :param atid: resource path to extract bucket, key information from
         :param days: number of days to store in the temporary location
         :return: response if successful or None
         """
-        bucket, key = self.resolve_bucket_key_from_portal(atid)
-        return self.restore_s3_from_glacier(bucket, key, days=days)
+        responses = []
+        file_meta = self.resolve_bucket_key_from_portal(atid)
+        for bucket, key in file_meta:
+            resp = self.restore_s3_from_glacier(bucket, key, days=days)
+            responses.append(resp)
+        return responses
 
     def restore_s3_from_glacier(self, bucket: str, key: str, days: int = 7) -> Union[dict, None]:
         """ Restores a file from glacier given the bucket, key and duration of restore
@@ -106,30 +118,28 @@ class GlacierUtils:
             PRINT(f'Error restoring object {key} from Glacier storage class: {str(e)}')
             return None
 
-    def extract_temporary_s3_location_from_restore_response(self, bucket: str, key: str) -> Union[dict, None]:
-        """ Extracts the S3 location that the restored file will be sent to given the bucket and key
+    def is_restore_finished(self, bucket: str, key: str) -> bool:
+        """ Heads the object to see if it has been restored - note that from the POV of the API,
+            the object is still in Glacier but it has been restored to its original location and
+            can be downloaded immediately
 
         :param bucket: bucket of original file location
         :param key: key of original file location
-        :return: Restore object from s3
+        :return: boolean whether the restore was successful yet
         """
         try:  # extract temporary location by heading object
             response = self.s3.head_object(Bucket=bucket, Key=key)
             restore = response.get('Restore')
             if restore is None:
                 PRINT(f'Object {bucket}/{key} is not currently being restored from Glacier')
-                return None
+                return False
             if 'ongoing-request="false"' not in restore:
                 PRINT(f'Object {bucket}/{key} is still being restored from Glacier')
-                return None
-            restore_path = response.get('RestoreOutputPath')
-            if restore_path is None:
-                PRINT(f'Error: Could not determine the temporary location of restored object {bucket}/{key}')
-                return None
-            return response['RestoreOutputPath']
+                return False
+            return True
         except Exception as e:
             PRINT(f'Error copying object {bucket}/{key} back to its original location in S3: {str(e)}')
-            return None
+            return False
 
     def patch_file_lifecycle_status_to_standard(self, atid: str, status: str = 'uploaded',
                                                 s3_lifecycle_status: str = 'standard') -> dict:
@@ -181,25 +191,27 @@ class GlacierUtils:
             PRINT(f'Error deleting Glacier versions of object {bucket}/{key}: {str(e)}')
             return False
 
-    def copy_object_back_to_original_location(self, bucket: str, key: str,
+    def copy_object_back_to_original_location(self, bucket: str, key: str, storage_class: str = 'STANDARD',
                                               version_id: Union[str, None] = None) -> Union[dict, None]:
         """ Reads the temporary location from the restored object and copies it back to the original location
 
         :param bucket: bucket where object is stored
         :param key: key within bucket where object is stored
+        :param storage_class: new storage class for this object
         :param version_id: version of object, if applicable
         :return: boolean whether the copy was successful
         """
         try:
-            # Get temporary location
-            restore = self.extract_temporary_s3_location_from_restore_response(bucket, key)
-            # Copy the object from the temporary location to its original location
-            copy_source = {'Bucket': bucket, 'Key': key, 'Restore': restore}
-            copy_args = {'Bucket': bucket, 'Key': key}
+            # Force copy the object into standard
+            copy_source = {'Bucket': bucket, 'Key': key}
+            copy_target = {
+                'Bucket': bucket, 'Key': key,
+                'StorageClass': storage_class,
+            }
             if version_id:
                 copy_source['VersionId'] = version_id
-                copy_args['CopySourceVersionId'] = version_id
-            response = self.s3.copy_object(CopySource=copy_source, **copy_args)
+                copy_target['CopySourceVersionId'] = version_id
+            response = self.s3.copy_object(CopySource=copy_source, **copy_target)
             PRINT(f'Response from boto3 copy:\n{response}')
             PRINT(f'Object {bucket}/{key} copied back to its original location in S3')
             return response
@@ -242,9 +254,10 @@ class GlacierUtils:
             with ThreadPoolExecutor(max_workers=num_threads) as executor:
                 futures = []
                 for atid in atid_list:
-                    bucket, key = self.resolve_bucket_key_from_portal(atid)
-                    future = executor.submit(self.copy_object_back_to_original_location, bucket, key)
-                    futures.append(future)
+                    files_meta = self.resolve_bucket_key_from_portal(atid)
+                    for bucket, key in files_meta:
+                        future = executor.submit(self.copy_object_back_to_original_location, bucket, key)
+                        futures.append(future)
                 for future in tqdm(futures, total=len(atid_list)):
                     res = future.result()
                     if res:
@@ -253,12 +266,13 @@ class GlacierUtils:
                         errors.append(res)
         else:
             for atid in atid_list:
-                bucket, key = self.resolve_bucket_key_from_portal(atid)
-                resp = self.copy_object_back_to_original_location(bucket, key)
-                if resp:
-                    success.append(atid)
-                else:
-                    errors.append(atid)
+                files_meta = self.resolve_bucket_key_from_portal(atid)
+                for bucket, key in files_meta:
+                    resp = self.copy_object_back_to_original_location(bucket, key)
+                    if resp:
+                        success.append(atid)
+                    else:
+                        errors.append(atid)
         if len(errors) != 0:
             PRINT(f'Errors encountered copying @ids: {errors}')
         else:

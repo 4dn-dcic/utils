@@ -124,18 +124,17 @@ class TestGlacierUtils:
             assert gu.restore_s3_from_glacier(bucket, key) is None
 
     @pytest.mark.parametrize('response, expected', [
-        ({"Restore": "ongoing-request=\"false\"", "RestoreOutputPath": "s3://temp-bucket/temp-key"},
-         "s3://temp-bucket/temp-key"),
-        ({"Restore": None}, None),
-        ({"Restore": "ongoing-request=\"true\""}, None),
-        ({}, None),
+        ({"Restore": "ongoing-request=\"false\""}, True),
+        ({"Restore": None}, False),
+        ({"Restore": "ongoing-request=\"true\""}, False),
+        ({}, False),
     ])
-    def test_glacier_utils_extract_temporary_s3_location_from_restore_response(self, glacier_utils, response, expected):
+    def test_glacier_utils_is_restore_finished(self, glacier_utils, response, expected):
         """ Tests getting the restore object from some example head responses """
         gu = glacier_utils
         with mock.patch.object(gu.s3, 'head_object',
                                return_value={'ResponseMetadata': {'HTTPStatusCode': 200}, **response}):
-            result = gu.extract_temporary_s3_location_from_restore_response('bucket', 'key')
+            result = gu.is_restore_finished('bucket', 'key')
             assert result == expected
 
     @pytest.mark.parametrize('response', [
