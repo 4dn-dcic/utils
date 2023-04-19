@@ -51,7 +51,7 @@ class TestGlacierUtils:
         """ Tests bootstrapping a glacier utils object and resolving uploaded (files bucket) files """
         gu = glacier_utils
         with mock.patch('dcicutils.glacier_utils.get_metadata', return_value=file_meta):
-            bucket, key = gu.resolve_bucket_key_from_portal('discarded')
+            [(bucket, key)] = gu.resolve_bucket_key_from_portal('discarded')
             assert f'{bucket}/{key}' == f"{gu.health_page.get('file_upload_bucket')}/{file_meta['upload_key']}"
 
     @pytest.mark.parametrize('file_meta', [
@@ -70,8 +70,50 @@ class TestGlacierUtils:
         """ Tests bootstrapping a glacier utils object and resolving processed files """
         gu = glacier_utils
         with mock.patch('dcicutils.glacier_utils.get_metadata', return_value=file_meta):
-            bucket, key = gu.resolve_bucket_key_from_portal('discarded')
+            [(bucket, key)] = gu.resolve_bucket_key_from_portal('discarded')
             assert f'{bucket}/{key}' == f"{gu.health_page.get('processed_file_bucket')}/{file_meta['upload_key']}"
+
+    @pytest.mark.parametrize('file_meta', [
+        {
+            '@id': 'dummy1',
+            'upload_key': 'uuid/test.gz',
+            '@type': ['File', 'FileProcessed'],
+            'extra_files': [
+                {
+                    'upload_key': 'uuid/test.gz.tbi'
+                }
+            ]
+        },
+        {
+            '@id': 'dummy2',
+            'upload_key': 'uuid/test.gz',
+            '@type': ['FileProcessed'],
+            'extra_files': [
+                {
+                    'upload_key': 'uuid/test.gz.tbi'
+                },
+                {
+                    'upload_key': 'uuid/test2.gz.tbi'
+                }
+            ]
+        }
+    ])
+    def test_glacier_utils_bucket_key_processed_file_with_extra_files(self, glacier_utils, file_meta):
+        """ Tests bootstrapping a glacier utils object and resolving processed files with extra files """
+        gu = glacier_utils
+        with mock.patch('dcicutils.glacier_utils.get_metadata', return_value=file_meta):
+            files = gu.resolve_bucket_key_from_portal('discarded')
+            found = 0
+            total_expected = 1 + len(file_meta['extra_files'])
+            for bucket, key in files:
+                assert bucket == gu.health_page.get('processed_file_bucket')
+                assert key in [
+                    'uuid/test.gz',
+                    'uuid/test.gz.tbi',
+                    'uuid/test2.gz.tbi'
+                ]
+                found += 1
+            assert found == total_expected
 
     @pytest.mark.parametrize('mocked_response', [
         {
