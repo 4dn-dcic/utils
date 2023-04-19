@@ -23,11 +23,24 @@ from collections import defaultdict
 from dateutil.parser import parse as dateutil_parse
 from datetime import datetime as datetime_type
 from typing import Optional
+from typing_extensions import Literal
 
 
 # Is this the right place for this? I feel like this should be done in an application, not a library.
 # -kmp 27-Apr-2020
 logging.basicConfig()
+
+
+class NamedObject(object):
+
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return f"<{self.name}>"
+
+    def __repr__(self):
+        return f"<{self.name}@{id(self):x}>"
 
 
 # Using PRINT(...) for debugging, rather than its more familiar lowercase form) for intended programmatic output,
@@ -1698,6 +1711,46 @@ class classproperty(object):
         return self.getter(instance_class)
 
 
+class managed_property(object):
+    """
+    Sample use:
+
+        class Temperature:
+
+            def __init__(self, fahrenheit=32):
+                self.fahrenheit = fahrenheit
+
+            @managed_property
+            def centigrade(self, degrees):
+                if degrees == managed_property.MISSING:
+                    return (self.fahrenheit - 32) * 5 / 9.0
+                else:
+                    self.fahrenheit = degrees * 9 / 5.0 + 32
+
+        x = Temperature(fahrenheit=68)
+        x.centigrade
+        20.0
+        x.centigrade = 5
+        x.centigrade
+        5.0
+        x.fahrenheit
+        41.0
+    """
+
+    MISSING = NamedObject("missing")
+
+    def __init__(self, handler):
+
+        self.handler = handler
+
+    def __get__(self, instance, instance_class):
+        ignored(instance_class)
+        return self.handler(instance, self.MISSING)
+
+    def __set__(self, instance, value):
+        self.handler(instance, value)
+
+
 class classproperty_cached(object):
     """
     This decorator is like 'classproperty', but the function is run only on first use, not every time, and then cached.
@@ -1895,18 +1948,6 @@ class Singleton:
     @classproperty_cached_each_subclass
     def singleton(cls):  # noQA - PyCharm wrongly thinks the argname should be 'self'
         return cls()     # noQA - PyCharm flags a bogus warning for this
-
-
-class NamedObject(object):
-
-    def __init__(self, name):
-        self.name = name
-
-    def __str__(self):
-        return f"<{self.name}>"
-
-    def __repr__(self):
-        return f"<{self.name}@{id(self):x}>"
 
 
 def key_value_dict(key, value):
@@ -2196,3 +2237,19 @@ def chunked(seq, chunk_size=1):
             chunk = []
     if chunk:
         yield chunk
+
+
+def format_in_radix(n, *, radix):
+    digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    if not isinstance(n, int):
+        raise ValueError(f"Expected n to be an integer {n}")
+    if not radix in range(2, 37):
+        raise ValueError(f"Expected radix to be an integer between 2 and 36, inclusive: {radix}")
+    buffer = []
+    while n > 0:
+        quo = n // radix
+        rem = n % radix
+        buffer += digits[rem]
+        n = quo
+    buffer.reverse()
+    return "".join(buffer) or "0"
