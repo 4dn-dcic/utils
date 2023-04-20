@@ -151,8 +151,10 @@ def _get_ssl_certificate_info_from_pem(pem_string: str,
         ).decode("UTF-8")
 
         return {
-            "common_name": common_name,
+            "name": None,  # Filled in by caller (get_ssl_certificate_info)
+            "hostname": None,  # Filled in by caller (get_ssl_certificate_info)
             "hostnames": hostnames,
+            "common_name": common_name,
             "owner": owner,
             "owner_entity": owner_entity,
             "owner_country": owner_country,
@@ -172,7 +174,8 @@ def _get_ssl_certificate_info_from_pem(pem_string: str,
             "inactive": inactive,
             "expired": expired,
             "expires_soon": expires_soon,
-            "exception": None
+            "exception": None,
+            "timestamp": now.strftime("%Y-%m-%d %H:%M:%S")
         }
 
     except Exception as e:
