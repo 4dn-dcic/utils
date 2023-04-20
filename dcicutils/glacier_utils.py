@@ -326,7 +326,8 @@ class GlacierUtils:
             PRINT(f'Successfully triggered copy for all @ids passed {success}')
         return success, errors
 
-    def restore_glacier_phase_three_patch(self, atid_list: List[Union[str, dict]], status='uploaded') -> (List[str], List[str]):
+    def restore_glacier_phase_three_patch(self, atid_list: List[Union[str, dict]],
+                                          status: str = 'uploaded') -> (List[str], List[str]):
         """ Patches out lifecycle information for @ids we've transferred back to standard
 
         :param atid_list: list of @ids or actual file metadata objects to patch info on
