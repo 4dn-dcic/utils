@@ -1,9 +1,9 @@
 import boto3
-from typing import Union, List
+from typing import Union, List, Tuple
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 from .misc_utils import PRINT
-from .ff_utils import get_metadata, get_health_page, patch_metadata
+from .ff_utils import get_metadata, search_metadata, get_health_page, patch_metadata
 from .creds_utils import CGAPKeyManager
 
 
@@ -35,6 +35,27 @@ class GlacierUtils:
                 4. Once the copy is complete, delete all glacierized versions of the object (if desired). This is
                    optional as you can choose to keep the glacierized version if you plan to delete it from standard
                    shortly after analysis.
+
+            There are multiple ways to use this library:
+                1. Given a search, run the particular phase given with relevant arguments. The user
+                   is responsible for checking restores were successful before moving on after phase 1.
+                   This is the recommended way to use this library. Call the restore_all_from_search to
+                   use this pathway. Note that this method does not handle object versioning.
+                2. Given a list of @ids, you can use the phasing methods directly to resolve metadata
+                   on-demand for each item. This is likely to be slower but may be more convenient/compatible
+                   in certain cases with existing code looking for very specific files. Call the following
+                   methods in this case:
+                       * restore_glacier_phase_one_restore
+                       * restore_glacier_phase_two_copy
+                       * restore_glacier_phase_three_patch
+                       * restore_glacier_phase_four_delete
+                3. Given an individual @id, you can use the internal methods for working on just that
+                   one item, or you can use the phase methods above with the single item list (recommended).
+                   If you want to use the internal methods, see:
+                       * get_portal_file_and_restore_from_glacier
+                       * copy_object_back_to_original_location
+                       * patch_file_lifecycle_status
+                       * delete_glaciered_object_versions
         """
         self.s3 = boto3.client('s3')
         self.env_name = env_name
@@ -55,35 +76,54 @@ class GlacierUtils:
         profile = get_metadata('/profiles/file.json', key=self.env_key, ff_env=self.env_name)
         return profile['properties']['s3_lifecycle_category']['suggested_enum']
 
-    def resolve_bucket_key_from_portal(self, atid: str) -> (str, str):
+    def resolve_bucket_key_from_portal(self, atid: str, atid_meta: dict = None) -> List[Tuple[str, str]]:
         """ Resolves the bucket, key combination for the given @id
             Raises GlacierRestoreException if not found
 
         :param atid: resource path to extract bucket, key information from
+        :param atid_meta: metadata if already resolved (such as from search)
         :return: bucket, key tuple
         """
-        atid_meta = get_metadata(atid, key=self.env_key, ff_env=self.env_name,
-                                 add_on='frame=object&datastore=database')
+        if not atid_meta:
+            atid_meta = get_metadata(atid, key=self.env_key, ff_env=self.env_name,
+                                     add_on='frame=object&datastore=database')
         upload_key = atid_meta.get('upload_key', None)
         atid_types = atid_meta.get('@type', [])
+        bucket = self.health_page.get('file_upload_bucket')
         if upload_key:
             if 'FileProcessed' in atid_types:
-                return self.health_page.get('processed_file_bucket'), upload_key
+                bucket = self.health_page.get('processed_file_bucket')
+                files = [(bucket, upload_key)]
             else:  # if not a processed file assume it is an uploaded file
-                return self.health_page.get('file_upload_bucket'), upload_key
+                files = [(bucket, upload_key)]
         else:
             raise GlacierRestoreException(f'@id {atid} does not have an upload_key, thus cannot be queried for'
                                           f' Glacier restore.')
+        # Add extra files
+        if 'extra_files' in atid_meta:
+            for extra_file in atid_meta['extra_files']:
+                if 'upload_key' in extra_file:
+                    files.append((bucket, extra_file['upload_key']))
+        return files
 
-    def restore_portal_from_glacier(self, atid: str, days: int = 7) -> Union[dict, None]:
+    def get_portal_file_and_restore_from_glacier(self, atid: str, file_meta: Union[None, dict] = None,
+                                                 days: int = 7) -> (List[Tuple[str, str]], List[Tuple[str, str]]):
         """ Resolves the given atid and restores it from glacier, returning the response if successful
 
         :param atid: resource path to extract bucket, key information from
+        :param file_meta: object metadata if already resolved from file metadata upstream
         :param days: number of days to store in the temporary location
-        :return: response if successful or None
+        :return: arrays of success, failure tuples containing bucket, key
         """
-        bucket, key = self.resolve_bucket_key_from_portal(atid)
-        return self.restore_s3_from_glacier(bucket, key, days=days)
+        success, fail = [], []
+        file_meta = self.resolve_bucket_key_from_portal(atid, file_meta)
+        for bucket, key in file_meta:
+            resp = self.restore_s3_from_glacier(bucket, key, days=days)
+            if resp:
+                success.append((bucket, key))
+            else:
+                fail.append((bucket, key))
+        return success, fail
 
     def restore_s3_from_glacier(self, bucket: str, key: str, days: int = 7) -> Union[dict, None]:
         """ Restores a file from glacier given the bucket, key and duration of restore
@@ -100,39 +140,37 @@ class GlacierUtils:
                 RestoreRequest={'Days': days}
             )
             PRINT(f'Object {bucket}/{key} restored from Glacier storage class and will be available in S3'
-                  f' for {days} days')
+                  f' for {days} days after restore has been processed (24 hours)')
             return response
         except Exception as e:
             PRINT(f'Error restoring object {key} from Glacier storage class: {str(e)}')
             return None
 
-    def extract_temporary_s3_location_from_restore_response(self, bucket: str, key: str) -> Union[dict, None]:
-        """ Extracts the S3 location that the restored file will be sent to given the bucket and key
+    def is_restore_finished(self, bucket: str, key: str) -> bool:
+        """ Heads the object to see if it has been restored - note that from the POV of the API,
+            the object is still in Glacier but it has been restored to its original location and
+            can be downloaded immediately
 
         :param bucket: bucket of original file location
         :param key: key of original file location
-        :return: Restore object from s3
+        :return: boolean whether the restore was successful yet
         """
         try:  # extract temporary location by heading object
             response = self.s3.head_object(Bucket=bucket, Key=key)
             restore = response.get('Restore')
             if restore is None:
                 PRINT(f'Object {bucket}/{key} is not currently being restored from Glacier')
-                return None
+                return False
             if 'ongoing-request="false"' not in restore:
                 PRINT(f'Object {bucket}/{key} is still being restored from Glacier')
-                return None
-            restore_path = response.get('RestoreOutputPath')
-            if restore_path is None:
-                PRINT(f'Error: Could not determine the temporary location of restored object {bucket}/{key}')
-                return None
-            return response['RestoreOutputPath']
+                return False
+            return True
         except Exception as e:
-            PRINT(f'Error copying object {bucket}/{key} back to its original location in S3: {str(e)}')
-            return None
+            PRINT(f'Error checking restore status of object {bucket}/{key} in S3: {str(e)}')
+            return False
 
-    def patch_file_lifecycle_status_to_standard(self, atid: str, status: str = 'uploaded',
-                                                s3_lifecycle_status: str = 'standard') -> dict:
+    def patch_file_lifecycle_status(self, atid: str, status: str = 'uploaded',
+                                    s3_lifecycle_status: str = 'standard') -> dict:
         """ Patches the File @id object to update 3 things
                 1. status denoted by the status argument (usually uploaded)
                 2. s3_lifecycle_status to 'standard' by default
@@ -164,7 +202,7 @@ class GlacierUtils:
         """
         try:
             response = self.s3.list_object_versions(Bucket=bucket, Prefix=key)
-            versions = sorted(response.get('Versions', []), key=lambda x: x['VersionId'], reverse=True)
+            versions = sorted(response.get('Versions', []), key=lambda x: x['LastModified'], reverse=True)
             deleted = False
             for v in versions:
                 if v.get('StorageClass') in GLACIER_CLASSES:
@@ -181,25 +219,27 @@ class GlacierUtils:
             PRINT(f'Error deleting Glacier versions of object {bucket}/{key}: {str(e)}')
             return False
 
-    def copy_object_back_to_original_location(self, bucket: str, key: str,
+    def copy_object_back_to_original_location(self, bucket: str, key: str, storage_class: str = 'STANDARD',
                                               version_id: Union[str, None] = None) -> Union[dict, None]:
         """ Reads the temporary location from the restored object and copies it back to the original location
 
         :param bucket: bucket where object is stored
         :param key: key within bucket where object is stored
+        :param storage_class: new storage class for this object
         :param version_id: version of object, if applicable
         :return: boolean whether the copy was successful
         """
         try:
-            # Get temporary location
-            restore = self.extract_temporary_s3_location_from_restore_response(bucket, key)
-            # Copy the object from the temporary location to its original location
-            copy_source = {'Bucket': bucket, 'Key': key, 'Restore': restore}
-            copy_args = {'Bucket': bucket, 'Key': key}
+            # Force copy the object into standard
+            copy_source = {'Bucket': bucket, 'Key': key}
+            copy_target = {
+                'Bucket': bucket, 'Key': key,
+                'StorageClass': storage_class,
+            }
             if version_id:
                 copy_source['VersionId'] = version_id
-                copy_args['CopySourceVersionId'] = version_id
-            response = self.s3.copy_object(CopySource=copy_source, **copy_args)
+                copy_target['CopySourceVersionId'] = version_id
+            response = self.s3.copy_object(CopySource=copy_source, **copy_target)
             PRINT(f'Response from boto3 copy:\n{response}')
             PRINT(f'Object {bucket}/{key} copied back to its original location in S3')
             return response
@@ -207,33 +247,41 @@ class GlacierUtils:
             PRINT(f'Error copying object {bucket}/{key} back to its original location in S3: {str(e)}')
             return None
 
-    def restore_glacier_phase_one_restore(self, atid_list: List[str], days: int = 7) -> (List[str], List[str]):
+    def restore_glacier_phase_one_restore(self, atid_list: List[Union[dict, str]],
+                                          days: int = 7) -> (List[str], List[str]):
         """ Triggers a restore operation for all @id in the @id list, returning a list of success and
             error objects.
 
-        :param atid_list: list of @ids to restore from glacier
+        :param atid_list: list of @ids or actual file object metadata to restore from glacier
         :param days: days to store the temporary copy
         :return: 2 tuple of success, error list of @ids
         """
         success, errors = [], []
         for atid in atid_list:
-            resp = self.restore_portal_from_glacier(atid, days=days)
-            if resp:
-                success.append(atid)
+            if isinstance(atid, dict):
+                _atid = atid['@id']
             else:
-                errors.append(atid)
+                _atid = atid
+            _, current_error = self.get_portal_file_and_restore_from_glacier(_atid, file_meta=atid, days=days)
+            if current_error:
+                PRINT(f'Failed to restore bucket/keys: {current_error}')
+                errors.append(_atid)
+            else:  # no errors should occur
+                success.append(_atid)
         if len(errors) != 0:
             PRINT(f'Errors encountered restoring @ids: {errors}')
         else:
             PRINT(f'Successfully triggered restore requests for all @ids passed {success}')
         return success, errors
 
-    def restore_glacier_phase_two_copy(self, atid_list: List[str],
+    def restore_glacier_phase_two_copy(self, atid_list: List[Union[str, dict]], storage_class: str = 'STANDARD',
                                        parallel: bool = False, num_threads: int = 4) -> (List[str], List[str]):
         """ Triggers a copy operation for all restored objects passed in @id list
 
-        :param atid_list: list of @ids to issue copy operations back to their original bucket/key location
-        :param parallel: whether or not to parallelize the copy
+        :param atid_list: list of @ids or actual file metadata objects to issue copy operations back to their
+                          original bucket/key location
+        :param storage_class: which storage class to copy into
+        :param parallel: whether to parallelize the copy
         :param num_threads: number of threads to use when parallelizing, default to 4
         :return: 2 tuple of success, error list of @ids
         """
@@ -242,9 +290,14 @@ class GlacierUtils:
             with ThreadPoolExecutor(max_workers=num_threads) as executor:
                 futures = []
                 for atid in atid_list:
-                    bucket, key = self.resolve_bucket_key_from_portal(atid)
-                    future = executor.submit(self.copy_object_back_to_original_location, bucket, key)
-                    futures.append(future)
+                    if isinstance(atid, dict):
+                        _atid = atid['@id']
+                    else:
+                        _atid = atid
+                    files_meta = self.resolve_bucket_key_from_portal(_atid, atid)
+                    for bucket, key in files_meta:
+                        future = executor.submit(self.copy_object_back_to_original_location, bucket, key, storage_class)
+                        futures.append(future)
                 for future in tqdm(futures, total=len(atid_list)):
                     res = future.result()
                     if res:
@@ -253,28 +306,39 @@ class GlacierUtils:
                         errors.append(res)
         else:
             for atid in atid_list:
-                bucket, key = self.resolve_bucket_key_from_portal(atid)
-                resp = self.copy_object_back_to_original_location(bucket, key)
-                if resp:
-                    success.append(atid)
+                if isinstance(atid, dict):
+                    _atid = atid['@id']
                 else:
-                    errors.append(atid)
+                    _atid = atid
+                files_meta = self.resolve_bucket_key_from_portal(_atid, atid)
+                accumulated_results = []
+                for bucket, key in files_meta:
+                    resp = self.copy_object_back_to_original_location(bucket, key, storage_class)
+                    if resp:
+                        accumulated_results.append(_atid)
+                if len(accumulated_results) == len(files_meta):  # all files for this @id were successful
+                    success.append(_atid)
+                else:
+                    errors.append(_atid)
         if len(errors) != 0:
             PRINT(f'Errors encountered copying @ids: {errors}')
         else:
             PRINT(f'Successfully triggered copy for all @ids passed {success}')
         return success, errors
 
-    def restore_glacier_phase_three_patch(self, atid_list: List[str], status='uploaded') -> (List[str], List[str]):
+    def restore_glacier_phase_three_patch(self, atid_list: List[Union[str, dict]], status='uploaded') -> (List[str], List[str]):
         """ Patches out lifecycle information for @ids we've transferred back to standard
-        :param atid_list: list of @ids to patch info on
+
+        :param atid_list: list of @ids or actual file metadata objects to patch info on
         :param status: top level status to replace for files
         :return: 2 tuple of success, error list of @ids
         """
         success, errors = [], []
         for atid in atid_list:
+            if isinstance(atid, dict):
+                atid = atid['@id']
             try:
-                self.patch_file_lifecycle_status_to_standard(atid, status=status)
+                self.patch_file_lifecycle_status(atid, status=status)
                 success.append(atid)
             except Exception as e:
                 PRINT(f'Error encountered patching @id {atid}, error: {str(e)}')
@@ -285,20 +349,110 @@ class GlacierUtils:
                                            delete_all_versions: bool = False) -> (List[str], List[str]):
         """ Triggers delete requests for all @ids for the glacierized objects, since they are in standard
 
-        :param atid_list: list of @ids to delete from glacier
+        :param atid_list: list of @ids or actual file metadata objects to delete from glacier
         :param delete_all_versions: bool whether to clear all glacier versions
         :return: 2 tuple of success, error list of @ids
         """
         success, errors = [], []
         for atid in atid_list:
-            bucket, key = self.resolve_bucket_key_from_portal(atid)
-            resp = self.delete_glaciered_object_versions(bucket, key, delete_all_versions=delete_all_versions)
-            if resp:
-                success.append(atid)
+            if isinstance(atid, dict):
+                _atid = atid['@id']
             else:
-                errors.append(atid)
+                _atid = atid
+            bucket_key_pairs = self.resolve_bucket_key_from_portal(_atid, atid)
+            accumulated_results = []
+            for bucket, key in bucket_key_pairs:
+                resp = self.delete_glaciered_object_versions(bucket, key, delete_all_versions=delete_all_versions)
+                if resp:
+                    accumulated_results.append(_atid)
+            if len(accumulated_results) == len(bucket_key_pairs):
+                success.append(_atid)
+            else:
+                errors.append(_atid)
         if len(errors) != 0:
             PRINT(f'Errors encountered deleting glaciered @ids: {errors}')
         else:
             PRINT(f'Successfully triggered delete for all @ids passed {success}')
         return success, errors
+
+    def restore_all_from_search(self, *, search_query: str, page_limit: int = 50, search_generator: bool = False,
+                                restore_length: int = 7, new_status: str = 'uploaded', storage_class: str = 'STANDARD',
+                                parallel: bool = False, num_threads: int = 4, delete_all_versions: bool = False,
+                                phase: int = 1) -> (List[str], List[str]):
+        """ Overarching method that will take a search query and loop through all files in the
+            search results, running the appropriate phase as passed
+
+        :param search_query: search query used to resolve items desired to be restored
+        :param page_limit: number of pages to resolve ie: 25 * page_limit items, 25 * 50 = 1250 items by default
+        :param search_generator: whether to use a generator - can be useful in some steps, but not in the copy
+        :param restore_length: length of time for restore to be active in days
+        :param new_status: status to patch to file items
+        :param storage_class: new storage class for copy
+        :param parallel: whether to use the parallel copy
+        :param num_threads: number of threads to use if parallel is active
+        :param delete_all_versions: if deleting, whether to clear ALL glacier versions
+        :param phase: which phase of the glacier restore to run, one of [1, 2, 3, 4]
+        :return: 2-tuple of successful, failed @ids extracted from search
+        """
+        if phase not in [1, 2, 3, 4]:
+            raise GlacierRestoreException(f'Invalid phase passed to restore_all_from_search: {phase},'
+                                          f' valid phases: [1, 2, 3, 4]\n'
+                                          f'Phase 1: Issue Restore\n'
+                                          f'Phase 2: Issue Copy\n'
+                                          f'Phase 3: Patch lifecycle status\n'
+                                          f'Phase 4: Delete Glacier copies')
+        success, failed = [], []
+        if search_generator:  # operate on search results individually, fine for all phases except the copy (2)
+            for item_meta in search_metadata(
+                search_query,
+                key=self.env_key, ff_env=self.env_name,
+                page_limit=page_limit, is_generator=search_generator
+            ):
+                if phase == 1:
+                    current_success, current_failed = self.restore_glacier_phase_one_restore(
+                        [item_meta], days=restore_length
+                    )
+                    success += current_success
+                    failed += current_failed
+                elif phase == 2:
+                    if parallel:
+                        raise GlacierRestoreException(f'Invalid phase for search_generator=True!'
+                                                      f' Do not use a generator when doing the copy phase in parallel'
+                                                      f' mode.')
+                    else:
+                        current_success, current_failed = self.restore_glacier_phase_two_copy([item_meta],
+                                                                                              storage_class)
+                        success += current_success
+                        failed += current_failed
+                elif phase == 3:
+                    current_success, current_failed = self.restore_glacier_phase_three_patch([item_meta],
+                                                                                             status=new_status)
+                    success += current_success
+                    failed += current_failed
+                else:  # phase == 4
+                    current_success, current_failed = self.restore_glacier_phase_four_cleanup(
+                        atid_list=[item_meta],
+                        delete_all_versions=delete_all_versions
+                    )
+                    success += current_success
+                    failed += current_failed
+            return success, failed
+        else:  # generate all results immediately - tune page_length if resolving results is too slow
+            search_results = search_metadata(
+                search_query,
+                key=self.env_key, ff_env=self.env_name,
+                page_limit=page_limit
+            )
+            if phase == 1:
+                return self.restore_glacier_phase_one_restore(atid_list=search_results,
+                                                              days=restore_length)
+            elif phase == 2:
+                return self.restore_glacier_phase_two_copy(atid_list=search_results,
+                                                           parallel=parallel, storage_class=storage_class,
+                                                           num_threads=num_threads)
+            elif phase == 3:
+                return self.restore_glacier_phase_three_patch(atid_list=search_results,
+                                                              status=new_status)
+            else:  # phase == 4
+                return self.restore_glacier_phase_four_cleanup(atid_list=search_results,
+                                                               delete_all_versions=delete_all_versions)
