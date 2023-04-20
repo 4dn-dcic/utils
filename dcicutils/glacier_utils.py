@@ -52,9 +52,9 @@ class GlacierUtils:
                 3. Given an individual @id, you can use the internal methods for working on just that
                    one item, or you can use the phase methods above with the single item list (recommended).
                    If you want to use the internal methods, see:
-                       * restore_portal_from_glacier
+                       * get_portal_file_and_restore_from_glacier
                        * copy_object_back_to_original_location
-                       * patch_file_lifecycle_status_to_standard
+                       * patch_file_lifecycle_status
                        * delete_glaciered_object_versions
         """
         self.s3 = boto3.client('s3')
@@ -106,20 +106,17 @@ class GlacierUtils:
                     files.append((bucket, extra_file['upload_key']))
         return files
 
-    def restore_portal_from_glacier(self, atid: str, file_meta: Union[None, dict] = None,
-                                    days: int = 7) -> (List[Tuple[str, str]], List[Tuple[str, str]]):
+    def get_portal_file_and_restore_from_glacier(self, atid: str, file_meta: Union[None, dict] = None,
+                                                 days: int = 7) -> (List[Tuple[str, str]], List[Tuple[str, str]]):
         """ Resolves the given atid and restores it from glacier, returning the response if successful
 
         :param atid: resource path to extract bucket, key information from
         :param file_meta: object metadata if already resolved from file metadata upstream
         :param days: number of days to store in the temporary location
-        :return: arrays of success, failure
+        :return: arrays of success, failure tuples containing bucket, key
         """
         success, fail = [], []
-        if not file_meta:
-            file_meta = self.resolve_bucket_key_from_portal(atid)
-        else:
-            file_meta = self.resolve_bucket_key_from_portal(atid, file_meta)
+        file_meta = self.resolve_bucket_key_from_portal(atid, file_meta)
         for bucket, key in file_meta:
             resp = self.restore_s3_from_glacier(bucket, key, days=days)
             if resp:
@@ -172,8 +169,8 @@ class GlacierUtils:
             PRINT(f'Error copying object {bucket}/{key} back to its original location in S3: {str(e)}')
             return False
 
-    def patch_file_lifecycle_status_to_standard(self, atid: str, status: str = 'uploaded',
-                                                s3_lifecycle_status: str = 'standard') -> dict:
+    def patch_file_lifecycle_status(self, atid: str, status: str = 'uploaded',
+                                    s3_lifecycle_status: str = 'standard') -> dict:
         """ Patches the File @id object to update 3 things
                 1. status denoted by the status argument (usually uploaded)
                 2. s3_lifecycle_status to 'standard' by default
@@ -263,10 +260,9 @@ class GlacierUtils:
         for atid in atid_list:
             if isinstance(atid, dict):
                 _atid = atid['@id']
-                current_success, current_error = self.restore_portal_from_glacier(_atid, file_meta=atid, days=days)
             else:
                 _atid = atid
-                success, current_error = self.restore_portal_from_glacier(atid, days=days)
+            _, current_error = self.get_portal_file_and_restore_from_glacier(_atid, file_meta=atid, days=days)
             if current_error:
                 PRINT(f'Failed to restore bucket/keys: {current_error}')
                 errors.append(_atid)
@@ -296,10 +292,9 @@ class GlacierUtils:
                 for atid in atid_list:
                     if isinstance(atid, dict):
                         _atid = atid['@id']
-                        files_meta = self.resolve_bucket_key_from_portal(_atid, atid)
                     else:
                         _atid = atid
-                        files_meta = self.resolve_bucket_key_from_portal(_atid)
+                    files_meta = self.resolve_bucket_key_from_portal(_atid, atid)
                     for bucket, key in files_meta:
                         future = executor.submit(self.copy_object_back_to_original_location, bucket, key, storage_class)
                         futures.append(future)
@@ -341,7 +336,7 @@ class GlacierUtils:
             if isinstance(atid, dict):
                 atid = atid['@id']
             try:
-                self.patch_file_lifecycle_status_to_standard(atid, status=status)
+                self.patch_file_lifecycle_status(atid, status=status)
                 success.append(atid)
             except Exception as e:
                 PRINT(f'Error encountered patching @id {atid}, error: {str(e)}')
@@ -410,18 +405,26 @@ class GlacierUtils:
             ):
                 atid = item_meta['@id']
                 if phase == 1:
-                    current_success, current_failed = self.restore_portal_from_glacier(atid, item_meta,
-                                                                                       days=restore_length)
+                    _, current_failed = self.get_portal_file_and_restore_from_glacier(atid, item_meta,
+                                                                                      days=restore_length)
                     if current_failed:
                         failed.append(atid)
                     else:
                         success.append(atid)
                 elif phase == 2:
-                    raise GlacierRestoreException(f'Invalid phase for search_generator=True!'
-                                                  f' Do not use a generator when doing the copy phase.')
+                    if parallel:
+                        raise GlacierRestoreException(f'Invalid phase for search_generator=True!'
+                                                      f' Do not use a generator when doing the copy phase in parallel'
+                                                      f' mode.')
+                    else:
+                        _, current_failed = self.restore_glacier_phase_two_copy([atid], storage_class)
+                        if current_failed:
+                            failed.append(atid)
+                        else:
+                            success.append(atid)
                 elif phase == 3:
                     try:
-                        self.patch_file_lifecycle_status_to_standard(atid, status=new_status)
+                        self.patch_file_lifecycle_status(atid, status=new_status)
                         success.append(atid)
                     except Exception as e:
                         PRINT(f'Error encountered patching @id {atid}, error: {str(e)}')
