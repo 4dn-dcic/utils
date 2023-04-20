@@ -191,6 +191,25 @@ class GlacierUtils:
             add_on='?delete_fields=s3_lifecycle_category'
         )
 
+    def non_glacier_versions_exist(self, bucket: str, key: str) -> bool:
+        """ Returns True if non-glacier tiered versions of an object exist,
+            False otherwise.
+
+        :param bucket: bucket to look in
+        :param key: key to check
+        :return: True if non-glacier versions exist, False otherwise
+        """
+        try:
+            response = self.s3.list_object_versions(Bucket=bucket, Prefix=key)
+            versions = sorted(response.get('Versions', []), key=lambda x: x['LastModified'], reverse=True)
+            for v in versions:
+                if v.get('StorageClass') not in GLACIER_CLASSES:
+                    return True
+            return False
+        except Exception as e:
+            PRINT(f'Error checking versions for object {bucket}/key: {str(e)}')
+            return False
+
     def delete_glaciered_object_versions(self, bucket: str, key: str, delete_all_versions: bool = False) -> bool:
         """ Deletes glaciered object versions of the given bucket/key, clearing all versions in glacier if the
             delete_all_versions flag is specified
@@ -363,9 +382,13 @@ class GlacierUtils:
             bucket_key_pairs = self.resolve_bucket_key_from_portal(_atid, atid)
             accumulated_results = []
             for bucket, key in bucket_key_pairs:
-                resp = self.delete_glaciered_object_versions(bucket, key, delete_all_versions=delete_all_versions)
-                if resp:
-                    accumulated_results.append(_atid)
+                if self.non_glacier_versions_exist(bucket, key):
+                    resp = self.delete_glaciered_object_versions(bucket, key, delete_all_versions=delete_all_versions)
+                    if resp:
+                        accumulated_results.append(_atid)
+                else:
+                    PRINT(f'Error cleaning up {bucket}/{key}, no non-glaciered versions'
+                          f' exist, ignoring this file and erroring on @id {_atid}')
             if len(accumulated_results) == len(bucket_key_pairs):
                 success.append(_atid)
             else:
