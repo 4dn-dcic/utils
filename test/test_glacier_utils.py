@@ -1,6 +1,6 @@
 import pytest
 from unittest import mock
-from dcicutils.glacier_utils import GlacierUtils
+from dcicutils.glacier_utils import GlacierUtils, GlacierRestoreException
 
 
 def mock_keydict() -> dict:
@@ -188,7 +188,8 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD'
+                    'StorageClass': 'STANDARD',
+                    'LastModified': '2023'
                 },
                 {
                     'Key': 'example.txt',
@@ -196,7 +197,8 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER'
+                    'StorageClass': 'GLACIER',
+                    'LastModified': '2023'
                 }
             ],
             'Name': 'dummy-bucket',
@@ -210,7 +212,8 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER'
+                    'StorageClass': 'GLACIER',
+                    'LastModified': '2023'
                 }
             ],
             'Name': 'dummy-bucket',
@@ -224,7 +227,8 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER_IR'
+                    'StorageClass': 'GLACIER_IR',
+                    'LastModified': '2023'
                 }
             ],
             'Name': 'dummy-bucket',
@@ -238,7 +242,8 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD'
+                    'StorageClass': 'STANDARD',
+                    'LastModified': '2023'
                 },
                 {
                     'Key': 'example.txt',
@@ -246,7 +251,8 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'DEEP_ARCHIVE'
+                    'StorageClass': 'DEEP_ARCHIVE',
+                    'LastModified': '2023'
                 }
             ],
             'Name': 'dummy-bucket',
@@ -272,7 +278,8 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD'
+                    'StorageClass': 'STANDARD',
+                    'LastModified': '2023'
                 },
                 {
                     'Key': 'example.txt',
@@ -280,7 +287,8 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'STANDARD'
+                    'StorageClass': 'STANDARD',
+                    'LastModified': '2023'
                 }
             ],
             'Name': 'dummy-bucket',
@@ -294,7 +302,8 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD'
+                    'StorageClass': 'STANDARD',
+                    'LastModified': '2023'
                 },
             ],
             'Name': 'dummy-bucket',
@@ -310,3 +319,65 @@ class TestGlacierUtils:
             with mock.patch.object(gu.s3, 'delete_object'):
                 assert not gu.delete_glaciered_object_versions('bucket', 'key')
                 assert not gu.delete_glaciered_object_versions('bucket', 'key', delete_all_versions=True)
+
+    @pytest.mark.parametrize('search_result, expected_success', [
+        ([{
+            '@id': 'uuid',
+            '@type': ['File'],
+            'upload_key': 'uuid/file.txt',
+            'extra_files': [
+                {
+                    'upload_key': 'uuid/file2.txt'
+                }
+            ]
+        }], ['uuid']),
+        ([
+             {
+                '@id': 'uuid',
+                '@type': ['File'],
+                'upload_key': 'uuid/file.txt',
+                'extra_files': [
+                    {
+                        'upload_key': 'uuid/file2.txt'
+                    }
+                ]
+             },
+             {
+                 '@id': 'uuid2',
+                 '@type': ['File'],
+                 'upload_key': 'uuid/file2.txt',
+             }
+         ], ['uuid', 'uuid2'])
+    ])
+    def test_glacier_utils_restore_all_from_search(self, glacier_utils, search_result, expected_success):
+        """ Tests a couple different argument combinations for this method """
+        gu = glacier_utils
+        with mock.patch('dcicutils.glacier_utils.search_metadata', return_value=search_result):
+            # Test phase 1
+            with mock.patch.object(gu, 'get_portal_file_and_restore_from_glacier', return_value=(
+                ['uuid'], []
+            )):
+                assert gu.restore_all_from_search(search_query='/search', phase=1) == (expected_success, [])
+                assert gu.restore_all_from_search(search_query='/search', phase=1,
+                                                  search_generator=True) == (expected_success, [])
+
+            # Test phase 2
+            with mock.patch.object(gu, 'copy_object_back_to_original_location', return_value={'success': True}):
+                assert gu.restore_all_from_search(search_query='/search', phase=2,
+                                                  search_generator=True) == (expected_success, [])
+                assert gu.restore_all_from_search(search_query='/search', phase=2) == (expected_success, [])
+                with pytest.raises(GlacierRestoreException):
+                    gu.restore_all_from_search(search_query='/search', phase=2,
+                                               search_generator=True, parallel=True)
+
+            # Test phase 3
+            with mock.patch('dcicutils.glacier_utils.patch_metadata', return_value={'success': True}):
+                assert gu.restore_all_from_search(search_query='/search', phase=3) == (expected_success, [])
+                assert gu.restore_all_from_search(search_query='/search', phase=3,
+                                                  search_generator=True) == (expected_success, [])
+
+            # Test phase 4
+            with mock.patch.object(gu, 'delete_glaciered_object_versions', return_value={'success': True}):
+                assert gu.restore_all_from_search(search_query='/search', phase=4) == (expected_success, [])
+                assert gu.restore_all_from_search(search_query='/search', phase=4,
+                                                  search_generator=True) == (expected_success, [])

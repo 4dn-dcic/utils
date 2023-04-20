@@ -166,7 +166,7 @@ class GlacierUtils:
                 return False
             return True
         except Exception as e:
-            PRINT(f'Error copying object {bucket}/{key} back to its original location in S3: {str(e)}')
+            PRINT(f'Error checking restore status of object {bucket}/{key} in S3: {str(e)}')
             return False
 
     def patch_file_lifecycle_status(self, atid: str, status: str = 'uploaded',
@@ -202,7 +202,7 @@ class GlacierUtils:
         """
         try:
             response = self.s3.list_object_versions(Bucket=bucket, Prefix=key)
-            versions = sorted(response.get('Versions', []), key=lambda x: x['VersionId'], reverse=True)
+            versions = sorted(response.get('Versions', []), key=lambda x: x['LastModified'], reverse=True)
             deleted = False
             for v in versions:
                 if v.get('StorageClass') in GLACIER_CLASSES:
@@ -308,23 +308,25 @@ class GlacierUtils:
             for atid in atid_list:
                 if isinstance(atid, dict):
                     _atid = atid['@id']
-                    files_meta = self.resolve_bucket_key_from_portal(_atid, atid)
                 else:
                     _atid = atid
-                    files_meta = self.resolve_bucket_key_from_portal(atid)
+                files_meta = self.resolve_bucket_key_from_portal(_atid, atid)
+                accumulated_results = []
                 for bucket, key in files_meta:
                     resp = self.copy_object_back_to_original_location(bucket, key, storage_class)
                     if resp:
-                        success.append(_atid)
-                    else:
-                        errors.append(_atid)
+                        accumulated_results.append(_atid)
+                if len(accumulated_results) == len(files_meta):  # all files for this @id were successful
+                    success.append(_atid)
+                else:
+                    errors.append(_atid)
         if len(errors) != 0:
             PRINT(f'Errors encountered copying @ids: {errors}')
         else:
             PRINT(f'Successfully triggered copy for all @ids passed {success}')
         return success, errors
 
-    def restore_glacier_phase_three_patch(self, atid_list: List[str], status='uploaded') -> (List[str], List[str]):
+    def restore_glacier_phase_three_patch(self, atid_list: List[Union[str, dict]], status='uploaded') -> (List[str], List[str]):
         """ Patches out lifecycle information for @ids we've transferred back to standard
 
         :param atid_list: list of @ids or actual file metadata objects to patch info on
@@ -355,12 +357,15 @@ class GlacierUtils:
         for atid in atid_list:
             if isinstance(atid, dict):
                 _atid = atid['@id']
-                bucket, key = self.resolve_bucket_key_from_portal(_atid, atid)
             else:
                 _atid = atid
-                bucket, key = self.resolve_bucket_key_from_portal(_atid)
-            resp = self.delete_glaciered_object_versions(bucket, key, delete_all_versions=delete_all_versions)
-            if resp:
+            bucket_key_pairs = self.resolve_bucket_key_from_portal(_atid, atid)
+            accumulated_results = []
+            for bucket, key in bucket_key_pairs:
+                resp = self.delete_glaciered_object_versions(bucket, key, delete_all_versions=delete_all_versions)
+                if resp:
+                    accumulated_results.append(_atid)
+            if len(accumulated_results) == len(bucket_key_pairs):
                 success.append(_atid)
             else:
                 errors.append(_atid)
@@ -403,40 +408,35 @@ class GlacierUtils:
                 key=self.env_key, ff_env=self.env_name,
                 page_limit=page_limit, is_generator=search_generator
             ):
-                atid = item_meta['@id']
                 if phase == 1:
-                    _, current_failed = self.get_portal_file_and_restore_from_glacier(atid, item_meta,
-                                                                                      days=restore_length)
-                    if current_failed:
-                        failed.append(atid)
-                    else:
-                        success.append(atid)
+                    current_success, current_failed = self.restore_glacier_phase_one_restore(
+                        [item_meta], days=restore_length
+                    )
+                    success += current_success
+                    failed += current_failed
                 elif phase == 2:
                     if parallel:
                         raise GlacierRestoreException(f'Invalid phase for search_generator=True!'
                                                       f' Do not use a generator when doing the copy phase in parallel'
                                                       f' mode.')
                     else:
-                        _, current_failed = self.restore_glacier_phase_two_copy([atid], storage_class)
-                        if current_failed:
-                            failed.append(atid)
-                        else:
-                            success.append(atid)
+                        current_success, current_failed = self.restore_glacier_phase_two_copy([item_meta],
+                                                                                              storage_class)
+                        success += current_success
+                        failed += current_failed
                 elif phase == 3:
-                    try:
-                        self.patch_file_lifecycle_status(atid, status=new_status)
-                        success.append(atid)
-                    except Exception as e:
-                        PRINT(f'Error encountered patching @id {atid}, error: {str(e)}')
-                        failed.append(atid)
+                    current_success, current_failed = self.restore_glacier_phase_three_patch([item_meta],
+                                                                                             status=new_status)
+                    success += current_success
+                    failed += current_failed
                 else:  # phase == 4
-                    bucket, key = self.resolve_bucket_key_from_portal(atid)
-                    resp = self.delete_glaciered_object_versions(bucket, key, delete_all_versions=delete_all_versions)
-                    if resp:
-                        success.append(atid)
-                    else:
-                        failed.append(atid)
-
+                    current_success, current_failed = self.restore_glacier_phase_four_cleanup(
+                        atid_list=[item_meta],
+                        delete_all_versions=delete_all_versions
+                    )
+                    success += current_success
+                    failed += current_failed
+            return success, failed
         else:  # generate all results immediately - tune page_length if resolving results is too slow
             search_results = search_metadata(
                 search_query,
