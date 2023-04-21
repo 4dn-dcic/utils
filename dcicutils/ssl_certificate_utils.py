@@ -28,7 +28,7 @@ def get_ssl_certificate_info(hostname: str,
         certificate_info = _get_ssl_certificate_info_from_pem(
             certificate_pem,
             raise_exception=raise_exception,
-            test_mode_certificate_expiration_warning_days=test_mode_certificate_expiration_warning_days
+            expires_soon_days=test_mode_certificate_expiration_warning_days
         )
         certificate_okay, certificate_exception = _is_ssl_certificate_okay(hostname, raise_exception=raise_exception)
         # The hostname from _get_ssl_certificate_info_from_pem is not necessarily exactly correct;
@@ -72,16 +72,14 @@ def _get_ssl_certificate_pem(hostname: str, raise_exception: bool = False) -> Op
 
 def _get_ssl_certificate_info_from_pem(pem_string: str,
                                        raise_exception: bool = False,
-                                       test_mode_certificate_expiration_warning_days: int = 0) -> Optional[dict]:
+                                       expires_soon_days: int = 0) -> Optional[dict]:
     """
     Returns a dictionary containing various data points for the given SSL certificate string
     string in PEM format. If an error is encountered in parsing this given string then returns
     None by default, or raises and exception of the given raise_exception argument is True.
     """
     now = datetime.now()
-    if test_mode_certificate_expiration_warning_days > 0:
-        expires_soon_days = test_mode_certificate_expiration_warning_days
-    else:
+    if expires_soon_days <= 0:
         expires_soon_days = _SSL_CERTIFICATE_EXPIRES_SOON_WARNING_DAYS
 
     def get_hostnames(certificate: OpenSSL.crypto.X509) -> list:
