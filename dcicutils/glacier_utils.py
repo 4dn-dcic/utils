@@ -2,7 +2,7 @@ import boto3
 from typing import Union, List, Tuple
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
-from .misc_utils import PRINT
+from .misc_utils import PRINT, ignored, explicit_confirm
 from .ff_utils import get_metadata, search_metadata, get_health_page, patch_metadata
 from .creds_utils import CGAPKeyManager
 
@@ -399,10 +399,11 @@ class GlacierUtils:
             PRINT(f'Successfully triggered delete for all @ids passed {success}')
         return success, errors
 
+    @explicit_confirm
     def restore_all_from_search(self, *, search_query: str, page_limit: int = 50, search_generator: bool = False,
                                 restore_length: int = 7, new_status: str = 'uploaded', storage_class: str = 'STANDARD',
                                 parallel: bool = False, num_threads: int = 4, delete_all_versions: bool = False,
-                                phase: int = 1) -> (List[str], List[str]):
+                                phase: int = 1, confirm=True) -> (List[str], List[str]):
         """ Overarching method that will take a search query and loop through all files in the
             search results, running the appropriate phase as passed
 
@@ -416,8 +417,10 @@ class GlacierUtils:
         :param num_threads: number of threads to use if parallel is active
         :param delete_all_versions: if deleting, whether to clear ALL glacier versions
         :param phase: which phase of the glacier restore to run, one of [1, 2, 3, 4]
+        :param confirm: whether to prompt the user to confirm the operation
         :return: 2-tuple of successful, failed @ids extracted from search
         """
+        ignored(confirm)  # used in decorator
         if phase not in [1, 2, 3, 4]:
             raise GlacierRestoreException(f'Invalid phase passed to restore_all_from_search: {phase},'
                                           f' valid phases: [1, 2, 3, 4]\n'

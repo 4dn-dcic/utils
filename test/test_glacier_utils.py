@@ -468,28 +468,32 @@ class TestGlacierUtils:
             with mock.patch.object(gu, 'get_portal_file_and_restore_from_glacier', return_value=(
                 ['uuid'], []
             )):
-                assert gu.restore_all_from_search(search_query='/search', phase=1) == (expected_success, [])
                 assert gu.restore_all_from_search(search_query='/search', phase=1,
-                                                  search_generator=True) == (expected_success, [])
+                                                  confirm=False) == (expected_success, [])
+                assert gu.restore_all_from_search(search_query='/search', phase=1,
+                                                  search_generator=True, confirm=False) == (expected_success, [])
 
             # Test phase 2
             with mock.patch.object(gu, 'copy_object_back_to_original_location', return_value={'success': True}):
                 assert gu.restore_all_from_search(search_query='/search', phase=2,
-                                                  search_generator=True) == (expected_success, [])
-                assert gu.restore_all_from_search(search_query='/search', phase=2) == (expected_success, [])
+                                                  search_generator=True, confirm=False) == (expected_success, [])
+                assert gu.restore_all_from_search(search_query='/search', phase=2,
+                                                  confirm=False) == (expected_success, [])
                 with pytest.raises(GlacierRestoreException):
                     gu.restore_all_from_search(search_query='/search', phase=2,
-                                               search_generator=True, parallel=True)
+                                               search_generator=True, parallel=True, confirm=False)
 
             # Test phase 3
             with mock.patch('dcicutils.glacier_utils.patch_metadata', return_value={'success': True}):
-                assert gu.restore_all_from_search(search_query='/search', phase=3) == (expected_success, [])
                 assert gu.restore_all_from_search(search_query='/search', phase=3,
-                                                  search_generator=True) == (expected_success, [])
+                                                  confirm=False) == (expected_success, [])
+                assert gu.restore_all_from_search(search_query='/search', phase=3,
+                                                  search_generator=True, confirm=False) == (expected_success, [])
 
             # Test phase 4
             with mock.patch.object(gu, 'delete_glaciered_object_versions', return_value={'success': True}):
                 with mock.patch.object(gu, 'non_glacier_versions_exist', return_value=True):
-                    assert gu.restore_all_from_search(search_query='/search', phase=4) == (expected_success, [])
                     assert gu.restore_all_from_search(search_query='/search', phase=4,
+                                                      confirm=False) == (expected_success, [])
+                    assert gu.restore_all_from_search(search_query='/search', phase=4, confirm=False,
                                                       search_generator=True) == (expected_success, [])
