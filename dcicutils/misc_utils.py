@@ -23,7 +23,6 @@ from collections import defaultdict
 from dateutil.parser import parse as dateutil_parse
 from datetime import datetime as datetime_type
 from typing import Optional
-from typing_extensions import Literal
 
 
 # Is this the right place for this? I feel like this should be done in an application, not a library.
@@ -611,6 +610,15 @@ def as_seconds(*, seconds=0, minutes=0, hours=0, days=0, weeks=0, milliseconds=0
     if as_type is not None:
         seconds = as_type(seconds)
     return seconds
+
+
+MIN_DATETIME = datetime.datetime(datetime.MINYEAR, 1, 1, 0, 0, 0)
+MIN_DATETIME_UTC = datetime.datetime(datetime.MINYEAR, 1, 1, 0, 0, 0, tzinfo=pytz.UTC)
+
+def future_datetime(*, now=None, seconds=0, minutes=0, hours=0, days=0, weeks=0, milliseconds=0):
+    delta = datetime.timedelta(seconds=seconds, minutes=minutes, hours=hours,
+                               days=days, weeks=weeks, milliseconds=milliseconds)
+    return (now or datetime.datetime.now()) + delta
 
 
 REF_TZ = pytz.timezone(os.environ.get("REF_TZ") or "US/Eastern")
@@ -2224,7 +2232,7 @@ def deduplicate_list(lst):
     return list(set(lst))
 
 
-def chunked(seq, chunk_size=1):
+def chunked(seq, *, chunk_size=1):
     if not isinstance(chunk_size, int) or chunk_size < 1:
         raise ValueError(f"The chunk_size, {chunk_size}, must be a positive integer.")
     chunk = []
@@ -2239,17 +2247,32 @@ def chunked(seq, chunk_size=1):
         yield chunk
 
 
+def map_chunked(fn, seq, *, chunk_size=1, reduce=None):
+    result = (fn(chunk) for chunk in chunked(seq, chunk_size=chunk_size))
+    return reduce(result) if reduce is not None else result
+
+
+_36_DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
 def format_in_radix(n, *, radix):
-    digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
     if not isinstance(n, int):
         raise ValueError(f"Expected n to be an integer {n}")
-    if not radix in range(2, 37):
+    if radix not in range(2, 37):
         raise ValueError(f"Expected radix to be an integer between 2 and 36, inclusive: {radix}")
     buffer = []
     while n > 0:
         quo = n // radix
         rem = n % radix
-        buffer += digits[rem]
+        buffer += _36_DIGITS[rem]
         n = quo
     buffer.reverse()
     return "".join(buffer) or "0"
+
+
+def parse_in_radix(text, *, radix):
+    res = 0
+    for c in text:
+        res = res * radix + _36_DIGITS.index(c.upper())
+    return res

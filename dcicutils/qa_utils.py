@@ -16,6 +16,7 @@ import pytest
 import pytz
 import re
 import sys
+import threading
 import time
 import uuid
 
@@ -23,15 +24,18 @@ from botocore.credentials import Credentials as Boto3Credentials
 from botocore.exceptions import ClientError
 from collections import defaultdict
 from json import dumps as json_dumps, loads as json_loads
-from typing import Any, Optional, List, DefaultDict
+from typing import Any, Optional, List, DefaultDict, Union, Type, Dict
+from typing_extensions import Literal
 from unittest import mock
+from .common import S3StorageClass, S3_GLACIER_CLASSES
 from .env_utils import short_env_name
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
+from .glacier_utils import GlacierUtils
 from .lang_utils import there_are
 from .misc_utils import (
-    PRINT, ignored, Retry, remove_prefix, REF_TZ,
+    PRINT, ignored, Retry, remove_prefix, REF_TZ, MIN_DATETIME,
     environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name,
-    find_associations, get_error_message, remove_suffix,
+    find_associations, get_error_message, remove_suffix, format_in_radix, future_datetime,
 )
 from .qa_checkers import QA_EXCEPTION_PATTERN, find_uses, confirm_no_uses, VersionChecker, ChangeLogChecker
 
@@ -399,9 +403,14 @@ class MockFileWriter:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         content = self.stream.getvalue()
+        file_system = self.file_system
+        if file_system.files.get(self.file):
+            if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
+                PRINT(f"Preparing to overwrite {self.file}.")
+            file_system.prepare_for_overwrite(self.file)
         if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
-            PRINT("Writing %r to %s." % (content, self.file))
-        self.file_system.files[self.file] = content if isinstance(content, bytes) else content.encode(self.encoding)
+            PRINT(f"Writing {content!r} to {self.file}.")
+        file_system.files[self.file] = content if isinstance(content, bytes) else content.encode(self.encoding)
 
 
 class MockFileSystem:
@@ -434,9 +443,13 @@ class MockFileSystem:
                         self.files[file] = fp.read()
                 self._do_not_mirror(file)
 
+    def prepare_for_overwrite(self, file):
+        # By default this does nothing, but it could do something
+        pass
+
     def exists(self, file):
         self._maybe_auto_mirror_file(file)
-        return bool(self.files.get(file))
+        return self.files.get(file) is not None  # don't want an empty file to pass for missing
 
     def remove(self, file):
         self._maybe_auto_mirror_file(file)
@@ -477,6 +490,29 @@ class MockFileSystem:
             with mock.patch("io.open", self.open):
                 with mock.patch("os.remove", self.remove):
                     yield self
+
+
+class MockAWSFileSystem(MockFileSystem):
+
+    def __init__(self, boto3=None, s3=None, versioning_buckets: Union[Literal[True], list, set, tuple] = True,
+                 **kwargs):
+        self.boto3 = boto3 or MockBoto3()
+        self.s3: MockBotoS3Client = s3 or self.boto3.client('s3')
+        if versioning_buckets is not True:
+            versioning_buckets = set(versioning_buckets or {})
+        self.versioning_buckets: Union[Literal[True], set] = versioning_buckets
+        super().__init__(**kwargs)
+
+    def version_buckets(self, versioning_buckets: Union[Literal[True], list, set, tuple]):
+        if versioning_buckets is not True:
+            versioning_buckets = set(versioning_buckets or {})
+        self.versioning_buckets = versioning_buckets
+
+    def prepare_for_overwrite(self, filename):
+        bucket, key = filename.split('/', 1)
+        if self.versioning_buckets is True or bucket in self.versioning_buckets:
+            # content = self.files[filename]
+            self.s3.archive_current_version(filename=filename)  # , content=content
 
 
 class MockUUIDModule:
@@ -1922,17 +1958,116 @@ class MockBotoCloudFormationResourceSummary:
         self.stack_name = None  # This will get filled out if used as a resource on a mock stack
 
 
-class MockObjectAttributeBlock:
+class MockObjectBasicAttributeBlock:
 
-    def __init__(self, filename, boto3):
-        self.filename = filename
-        self.storage_class = boto3.storage_class
-        self.tagset = []
-        # keys go here
+    def __init__(self, filename, s3):
+        self.s3: MockBotoS3Client = s3
+        self.filename: str = filename
+        self.version_id: str = self._generate_version_id()
+
+    def __str__(self):
+        return f"<{self.filename}#{self.version_id}>"
+
+    VERSION_ID_INITIAL_WIDTH = len(format_in_radix(time.time_ns(), radix=36))
+    #  In a single instantiation of python, now 50+ years into the epoch, this mock could overflow one
+    #  digit of this, but not realistically more. So reserving space for one digit of overflow after
+    #  whatever time it is on load.
+    VERSION_ID_MAX_WIDTH = VERSION_ID_INITIAL_WIDTH + 1
+
+    MONTONIC_VERSIONS = False
+
+    @classmethod
+    def _generate_version_id(cls):
+        if cls.MONTONIC_VERSIONS:
+            return format_in_radix(time.time_ns(), radix=36)
+        else:
+            return str(uuid.uuid4()).replace('-', '.').lower()
+
+
+class MockObjectDeleteMarker(MockObjectBasicAttributeBlock):
+    pass
+
+
+class MockTemporaryRestoration:
+
+    def __init__(self, delay_seconds: Union[int, float], duration_days: Union[int, float],
+                 storage_class: S3StorageClass):
+        self.available_after = future_datetime(seconds=delay_seconds)
+        self.available_until = future_datetime(now=self.available_after, days=duration_days)
+        self.storage_class = storage_class
+
+    def is_expired(self, now=None):
+        now = now or datetime.datetime.now()
+        return now >= self.available_until
+
+    def is_active(self, now=None):
+        now = now or datetime.datetime.now()
+        return now >= self.available_after and not self.is_expired(now=now)
+
+class MockObjectAttributeBlock(MockObjectBasicAttributeBlock):
+
+    def __init__(self, filename, s3):  # , all_versions=None
+        super().__init__(filename=filename, s3=s3)
+        # self.s3 = s3
+        # self.filename = filename
+        self._storage_class: S3StorageClass = s3.storage_class
+        self.tagset: List[str] = []
+        # Content must be added later. The file system at time this object is created may still have a stale value.
+        self.content = None
+        # self.available_after = MIN_DATETIME
+        self._restoration: Optional[MockTemporaryRestoration] = None
+        # all_versions: List[MockObjectAttributeBlock] = all_versions or []
+        # self.all_versions: List[MockObjectAttributeBlock] = all_versions
+        # all_versions.append(self)
+
+    @property
+    def storage_class(self):
+        restoration = self.restoration
+        return restoration.storage_class if restoration else self._storage_class
+
+    _RESTORATION_LOCK = threading.Lock()
+
+    def hurry_restoration(self):
+        with self._RESTORATION_LOCK:
+            restoration = self.restoration
+            if restoration:
+                restoration.available_after = datetime.datetime.now()
+
+    def hurry_restoration_expiry(self):
+        with self._RESTORATION_LOCK:
+            restoration = self.restoration
+            if restoration:
+                restoration.available_until = datetime.datetime.now()
+
+    def storage_class_for_copy_source(self):
+        with self._RESTORATION_LOCK:
+            restoration = self.restoration
+            if restoration:
+                if not restoration.is_active():
+                    raise Exception("Restoration request still in progress.")
+                return restoration.storage_class
+            else:
+                return self._storage_class
+
+    @property
+    def restoration(self):
+        restoration = self._restoration
+        if restoration and restoration.is_expired():
+            self._restoration = restoration = None
+        return restoration
+
+    def restore_temporarily(self, delay_seconds: Union[int, float], duration_days: Union[int, float],
+                            storage_class: S3StorageClass):
+        with self._RESTORATION_LOCK:
+            if self.restoration:
+                raise Exception("You are already have an active restoration and cannot re-restore it.")
+            self._restoration = MockTemporaryRestoration(delay_seconds=delay_seconds,
+                                                         duration_days=duration_days,
+                                                         storage_class=storage_class)
 
 
 @MockBoto3.register_client(kind='s3')
-class MockBotoS3Client:
+class MockBotoS3Client(MockBoto3Client):
     """
     This is a mock of certain S3 functionality.
     """
@@ -1940,34 +2075,44 @@ class MockBotoS3Client:
     MOCK_STATIC_FILES = {}
     MOCK_REQUIRED_ARGUMENTS = {}
 
-    DEFAULT_STORAGE_CLASS = "STANDARD"
+    DEFAULT_STORAGE_CLASS: S3StorageClass = "STANDARD"
 
-    def __init__(self, *, region_name=None, mock_other_required_arguments=None, mock_s3_files=None,
-                 storage_class=None, boto3=None):
-        self.boto3 = boto3 or MockBoto3()
+    def __init__(self, *,
+                 region_name: str = None,
+                 mock_other_required_arguments: Optional[List[str]] = None,
+                 mock_s3_files: Dict[str, Union[str, bytes]] = None,
+                 storage_class: Optional[S3StorageClass] = None,
+                 boto3: Optional[MockBoto3] = None,
+                 versioning_buckets: Union[Literal[True], list, set, tuple] = True):
+        self.boto3 = boto3 = boto3 or MockBoto3()
         if region_name not in (None, 'us-east-1'):
             raise ValueError(f"Unexpected region: {region_name}")
 
         files_cache_marker = '_s3_file_data'
-        shared_reality = self.boto3.shared_reality
+        shared_reality = boto3.shared_reality
         s3_files = shared_reality.get(files_cache_marker)
         if s3_files is None:
             files = self.MOCK_STATIC_FILES.copy()
             for name, content in (mock_s3_files or {}).items():
                 files[name] = content
-            shared_reality[files_cache_marker] = s3_files = MockFileSystem(files=files)
+            shared_reality[files_cache_marker] = s3_files = MockAWSFileSystem(files=files, boto3=boto3, s3=self)
         self.s3_files = s3_files
+        s3_files.version_buckets(versioning_buckets)
 
         other_required_arguments = self.MOCK_REQUIRED_ARGUMENTS.copy()
         for name, content in mock_other_required_arguments or {}:
             other_required_arguments[name] = content
         self.other_required_arguments = other_required_arguments
-        self.storage_class = storage_class or self.DEFAULT_STORAGE_CLASS
+        self.storage_class: S3StorageClass = storage_class or self.DEFAULT_STORAGE_CLASS
 
     def check_for_kwargs_required_by_mock(self, operation, Bucket, Key, **kwargs):
         ignored(Bucket, Key)
         if kwargs != self.other_required_arguments:
             raise MockKeysNotImplemented(operation, self.other_required_arguments.keys())
+
+    def create_object_for_testing(self, object_content: str, *, Bucket: str, Key: str):
+        assert isinstance(object_content, str)
+        self.upload_fileobj(Fileobj=io.BytesIO(object_content.encode('utf-8')), Bucket=Bucket, Key=Key)
 
     def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
         self.check_for_kwargs_required_by_mock("upload_fileobj", Bucket=Bucket, Key=Key, **kwargs)
@@ -2028,7 +2173,11 @@ class MockBotoS3Client:
 
     @staticmethod
     def _content_etag(content):
-        return hashlib.md5(content).hexdigest()
+        # For reasons known only to AWS, the ETag, though described as an MD5 hash, begins and ends with
+        # doublequotes, so an example from
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/list_object_versions.html
+        # shows:  'ETag': '"6805f2cfc46c0f04559748bb039d69ae"',
+        return f'"{hashlib.md5(content).hexdigest()}"'
 
     def Bucket(self, name):  # noQA - AWS function naming style
         return MockBotoS3Bucket(s3=self, name=name)
@@ -2040,14 +2189,26 @@ class MockBotoS3Client:
 
         if self.s3_files.exists(pseudo_filename):
             content = self.s3_files.files[pseudo_filename]
-            return {
+            attribute_block = self._object_attribute_block(filename=pseudo_filename)
+            assert isinstance(attribute_block, MockObjectAttributeBlock)  # if file exists, should be normal block
+            result = {
                 'Bucket': Bucket,
                 'Key': Key,
                 'ETag': self._content_etag(content),
                 'ContentLength': len(content),
-                'StorageClass': self._object_storage_class(filename=pseudo_filename),
+                'StorageClass': attribute_block.storage_class,  # self._object_storage_class(filename=pseudo_filename)
                 # Numerous others, but this is enough to make the dictionary non-empty and to satisfy some of our tools
             }
+            restoration = attribute_block.restoration
+            if restoration:
+                assert isinstance(restoration, MockTemporaryRestoration)
+                if restoration.is_active():
+                    result['Restore'] = f'ongoing-request="false", expiry-date="{restoration.available_until}"'
+                else:
+                    result['Restora'] = f'ongoing-request="true"'
+            # if datetime.datetime.now() < attribute_block.available_after:
+            #     result['Restore'] = 'ongoing-request="true"'
+            return result
         else:
             # I would need to research what specific error is needed here and hwen,
             # since it might be a 404 (not found) or a 403 (permissions), depending on various details.
@@ -2066,10 +2227,6 @@ class MockBotoS3Client:
                               "Error": {"Code": "404", "Message": "Not Found"},
                               "ResponseMetadata": {"HTTPStatusCode": 404},
                           })
-
-    def list_objects_v2(self, Bucket):  # noQA - AWS argument naming style
-        # This is different but similar to list_objects. However we don't really care about that.
-        return self.list_objects(Bucket=Bucket)
 
     def get_object_tagging(self, Bucket, Key):
         pseudo_file = f"{Bucket}/{Key}"
@@ -2116,12 +2273,30 @@ class MockBotoS3Client:
         Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
         so that if another client is created by that same boto3 mock, it will see the same storage classes.
         """
-        storage_class_map = self.boto3.shared_reality.get('storage_class_map')
-        if not storage_class_map:
-            self.boto3.shared_reality['storage_class_map'] = storage_class_map = {}
-        return storage_class_map
+        object_attribute_map = self.boto3.shared_reality.get('object_attribute_map')
+        if not object_attribute_map:
+            self.boto3.shared_reality['object_attribute_map'] = object_attribute_map = {}
+        return object_attribute_map
 
-    def _object_attribute_block(self, filename):
+    def _object_attribute_blocks(self, filename):
+        attribute_map = self._object_attribute_map()
+        attribute_blocks = attribute_map.get(filename) or []
+        if not attribute_blocks:
+            attribute_map[filename] = attribute_blocks
+        return attribute_blocks
+
+    def _object_all_versions(self, filename):
+        attribute_blocks = self._object_attribute_blocks(filename)
+        if not attribute_blocks and self.s3_files.files.get(filename) is not None:
+            # print(f"AUTOCREATING {filename}")
+            # This will demand-create the first one because our mock initialization protocols are sloppy
+            new_attribute_block = MockObjectAttributeBlock(filename=filename, s3=self)
+            attribute_blocks.append(new_attribute_block)
+        # else:
+        #     print(f"NOT AUTOCREATING {filename} for {self} because {self.s3_files.files}")
+        return attribute_blocks
+
+    def _object_attribute_block(self, filename) -> MockObjectBasicAttributeBlock:
         """
         Returns the attribute_block for an S3 object.
         This contains information like storage class and tagsets.
@@ -2131,11 +2306,62 @@ class MockBotoS3Client:
         Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
         so that if another client is created by that same boto3 mock, it will see the same storage classes.
         """
-        attribute_map = self._object_attribute_map()
-        attribute_block = attribute_map.get(filename)
-        if not attribute_block:
-            attribute_map[filename] = attribute_block = MockObjectAttributeBlock(filename=filename, boto3=self)
-        return attribute_block
+        all_versions: List[MockObjectBasicAttributeBlock] = self._object_all_versions(filename)
+        if not all_versions:
+            # This situation and usually we should not be calling this function at this point,
+            # but try to help developer debug what's going on...
+            if filename in self.s3_files.files:
+                context = f"mock special non-file (bucket?) s3 item: {filename}"
+            else:
+                context = f"mock non-existent S3 file: {filename}"
+            raise ValueError(f"Attempt to obtain object attribute block for {context}.")
+        return all_versions[-1]
+
+    _ARCHIVE_LOCK = threading.Lock()
+
+    def delete_current_version(self, filename):
+        return self.archive_current_version(filename, replacement_class=MockObjectDeleteMarker)
+
+    def hurry_restoration_for_testing(self, s3_filename, attribute_block=None):
+        attribute_block = attribute_block or self._object_attribute_block(s3_filename)
+        assert isinstance(attribute_block, MockObjectAttributeBlock)
+        attribute_block.hurry_restoration()
+
+    def hurry_restoration_expiry_for_testing(self, s3_filename, attribute_block=None):
+        attribute_block = attribute_block or self._object_attribute_block(s3_filename)
+        assert isinstance(attribute_block, MockObjectAttributeBlock)
+        attribute_block.hurry_restoration_expiry()
+
+    def archive_current_version(self, filename,  # content,
+                                replacement_class: Type[MockObjectBasicAttributeBlock] = MockObjectAttributeBlock,
+                                init: Optional[callable] = None):
+        with self._ARCHIVE_LOCK:
+            content = self.s3_files.files.get(filename)  # might be missing. you can delete a file that doesn't exist
+            preexisting_version = None
+            if content:
+                preexisting_version = self._object_attribute_block(filename)
+                # print(f"archive_version obtained existing block {preexisting_version}")
+                if preexisting_version.content is not None and preexisting_version.content is not content:
+                    raise Exception("Consistency problem in mock.")
+                preexisting_version.content = content
+
+            new_block = self._prepare_new_attribute_block(filename, attribute_class=replacement_class)
+            all_versions = self._object_all_versions(filename)
+            if preexisting_version:
+                assert preexisting_version in all_versions
+            assert new_block in all_versions
+            if init is not None:
+                init()  # caller-supplied init function to be run within lock
+
+    def _prepare_new_attribute_block(self, filename,
+                                     attribute_class: Type[MockObjectBasicAttributeBlock] = MockObjectAttributeBlock):
+        new_block = attribute_class(filename=filename, s3=self)
+        # print(f"archive_version obtained new block {new_block}")
+        all_versions = self._object_all_versions(filename)
+        all_versions.append(new_block)
+        # print(f"s3 file {filename} now has attribute blocks: {all_versions}")
+        self.s3_files.files[filename] = None
+        return new_block
 
     def _object_tagset(self, filename):
         """
@@ -2146,6 +2372,9 @@ class MockBotoS3Client:
         so that if another client is created by that same boto3 mock, it will see the same storage classes.
         """
         attribute_block = self._object_attribute_block(filename)
+        if isinstance(attribute_block, MockObjectDeleteMarker):
+            raise Exception("Attempt to find tagset for mock-deleted S3 filename {filename}")
+        assert isinstance(attribute_block, MockObjectAttributeBlock)
         return copy.deepcopy(attribute_block.tagset)  # Don't let recipient of value change our stored value
 
     def _set_object_tagset(self, filename, tagset):
@@ -2166,6 +2395,17 @@ class MockBotoS3Client:
         attribute_block = self._object_attribute_block(filename)
         attribute_block.tagset = copy.deepcopy(tagset)  # Don't share state with our argument
 
+    def _object_version_id(self, filename):
+        """
+        Returns the VersionId for the 'filename' in this S3 mock.
+        Because this is an internal routine, 'filename' is 'bucket/key' to match the mock file system we use internally.
+
+        Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
+        so that if another client is created by that same boto3 mock, it will see the same storage classes.
+        """
+        attribute_block = self._object_attribute_block(filename)
+        return attribute_block.version_id
+
     def _object_storage_class(self, filename):
         """
         Returns the storage class for the 'filename' in this S3 mock.
@@ -2175,6 +2415,9 @@ class MockBotoS3Client:
         so that if another client is created by that same boto3 mock, it will see the same storage classes.
         """
         attribute_block = self._object_attribute_block(filename)
+        if isinstance(attribute_block, MockObjectDeleteMarker):
+            raise Exception("Attempt to find storage class for mock-deleted S3 filename {filename}")
+        assert isinstance(attribute_block, MockObjectAttributeBlock)
         return attribute_block.storage_class
 
     def _set_object_storage_class(self, filename, value):
@@ -2221,6 +2464,190 @@ class MockBotoS3Client:
             "Name": Bucket,
             "Prefix": Prefix,
             # "StartAfter": ...,
+        }
+
+    def list_objects_v2(self, Bucket):  # noQA - AWS argument naming style
+        # This is different but similar to list_objects. However we don't really care about that.
+        return self.list_objects(Bucket=Bucket)
+
+    def copy_object(self, CopySource, Bucket, Key, CopySourceVersionId=None,
+                    StorageClass: Optional[S3StorageClass] = None):
+        return self._copy_object(CopySource=CopySource, Bucket=Bucket, Key=Key,
+                                 CopySourceVersionId=CopySourceVersionId, StorageClass=StorageClass)
+
+    def _copy_object(self, CopySource, Bucket, Key, CopySourceVersionId, StorageClass: Optional[S3StorageClass] = None,
+                     allow_glacial=False):
+        target_storage_class: S3StorageClass = StorageClass or self.storage_class
+        source_bucket = CopySource['Bucket']
+        source_key = CopySource['Key']
+        source_s3_filename = f"{source_bucket}/{source_key}"
+        target_s3_filename = f"{Bucket}/{Key}"
+        source_version_id = CopySource.get('VersionId')
+        copy_in_place = False  # might be overridden below
+        if CopySourceVersionId:
+            if CopySourceVersionId != source_version_id or source_bucket != Bucket or source_key != Key:
+                raise AssertionError(f"This mock expected that if CopySourceVersionId is given,"
+                                     f" a matching Bucket, Key, and VersionId appears in CopySource."
+                                     f" CopySource['Bucket']={source_bucket!r}"
+                                     f" CopySource['Key']={source_key!r}"
+                                     f" CopySource['VersionId']={source_version_id!r}"
+                                     f" Bucket={Bucket!r}"
+                                     f" Key={Key!r}"
+                                     f" CopySourceVersionId={CopySourceVersionId!r}")
+            copy_in_place = True
+        source_data = self.s3_files.files.get(source_s3_filename)
+        if source_version_id:
+            source_version = None
+            source_all_versions = self._object_all_versions(source_s3_filename)
+            for version in source_all_versions:
+                if version.version_id == source_version_id:
+                    source_version = version
+                    break
+            if not source_version:
+                raise Exception(f"Mock S3 location Bucket={Bucket} Key={Key} VersionId={source_version_id} not found.")
+            source_data = source_data if source_version.content is None else source_version.content
+        else:
+            source_version = self._object_attribute_block(source_s3_filename)
+        source_storage_class = source_version.storage_class_for_copy_source()
+        if source_data is None:
+            # Probably this will only happen for VersionId=None, but show the VersionId anyway,
+            # but if there's a data inconsistency, we could get here for other reasons,
+            # so show the version id just in case to help debugging. -kmp 21-Apr-2023
+            raise Exception(f"S3 location Bucket={Bucket} Key={Key} VersionId{source_version_id} does not exist.")
+        assert isinstance(source_version, MockObjectAttributeBlock)  # we know this because it has data
+        if not allow_glacial:
+            source_id = f"Bucket={source_bucket!r} Key={source_key!r} VersionId={source_version_id!r}"
+            if GlacierUtils.is_glacier_storage_class(source_storage_class):
+                raise Exception(f"The Copy source {source_id}"
+                                f" is in storage class {source_storage_class!r} and must be restored first.")
+            else:
+                print("Storage class is OK for copy.")
+            # now = datetime.datetime.now()
+            # print(f"Checking availability")
+            # print(f"Time now is {now}")
+            # print(f"Source version available at {source_version.available_after}")
+            # seconds_until_available = (source_version.available_after - now).total_seconds()
+            # if seconds_until_available > 0:
+            #     raise Exception(f"The Copy source {source_id} is still being mock-restored from glacier."
+            #                     f" Wait {seconds_until_available} seconds more.")
+        if not copy_in_place:
+            self.archive_current_version(target_s3_filename)
+            self.s3_files.files[target_s3_filename] = source_data
+        attribute_block = self._object_attribute_block(target_s3_filename)
+        assert isinstance(attribute_block, MockObjectAttributeBlock)
+        target_attribute_block: MockObjectAttributeBlock = attribute_block
+        target_attribute_block._storage_class = target_storage_class
+        # else:
+        #     attribute_block = self._object_attribute_block(target_s3_filename)
+        #     assert isinstance(attribute_block, MockObjectAttributeBlock)
+        #     target_attribute_block: MockObjectAttributeBlock = attribute_block
+        #     target_attribute_block.storage_class = target_storage_class
+        print(f"Copied from {source_storage_class} to {target_storage_class}")
+        if GlacierUtils.is_delayed_storage_class_transition(source_storage_class, target_storage_class):
+            target_attribute_block.restore_temporarily(delay_seconds=self.RESTORATION_DELAY_SECONDS,
+                                                       duration_days=1, storage_class=target_storage_class)
+            print(f"Set up restoration {target_attribute_block.restoration}")
+        else:
+            print(f"No restoration performed")
+
+
+    RESTORATION_DELAY_SECONDS = 2
+
+    def delete_object(self, Bucket, Key, VersionId, **unimplemented_keyargs):
+        # Doc:
+        #  * https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/delete_object.html
+        #  * https://docs.aws.amazon.com/AmazonS3/latest/userguide/DeletingObjectVersions.html
+        assert not unimplemented_keyargs, (f"The mock for delete_object needs to be extended."
+                                           f" {there_are(unimplemented_keyargs, kind='unimplemented key')}")
+        assert VersionId and isinstance(VersionId, str), "A VersionId must be supplied to delete_object."
+        s3_filename = f"{Bucket}/{Key}"
+        all_versions = self._object_all_versions(s3_filename)
+        delete_marker = None
+        if not VersionId:
+            # NOTE WELL: Just like AWS, we don't actually verify that this file even exists in this case.
+            #            We allow you to delete a file that does not exist.
+            self.delete_current_version(filename=Key)
+            all_versions.append(delete_marker)
+        else:
+            found = None
+            for version in all_versions:
+                if version.version_id == VersionId:
+                    found = version
+                    all_versions.remove(version)
+                    new_current_version = all_versions[-1]
+                    self.s3_files.files[s3_filename] = new_current_version.content
+                    break
+            if not found:
+                raise ClientError(operation_name="DeleteObject",
+                                  error_response={  # noQA - PyCharm wrongly complains about this dictionary
+                                      "Error": {
+                                          "Code": "InvalidArgument",
+                                          "Message": "Invalid version id specified",
+                                          "ArgumentName": "versionId",
+                                          "ArgumentValue": VersionId
+                                      }})
+            if isinstance(found, MockObjectDeleteMarker):
+                delete_marker = found
+        result = {
+            'ResponseMetadata': self.compute_mock_response_metadata(),
+            'VersionId': VersionId
+        }
+        if delete_marker:
+            result['DeleteMarker'] = True
+        return result
+
+    def restore_object(self, Bucket, Key, RestoreRequest, StorageClass: Optional[S3StorageClass] = None):
+        duration_days: int = RestoreRequest.get('Days')
+        storage_class: S3StorageClass = StorageClass or self.storage_class
+        s3_filename = f"{Bucket}/{Key}"
+        if not self.s3_files.exists(s3_filename):
+            raise Exception(f"S3 file at Bucket={Bucket!r} Key={Key!r} does not exist,"
+                            f" so cannot be restored from glacier.")
+        attribute_block = self._object_attribute_block(s3_filename)
+        assert isinstance(attribute_block, MockObjectAttributeBlock)  # since the file exists, this should be good
+        attribute_block.restore_temporarily(delay_seconds=self.RESTORATION_DELAY_SECONDS,
+                                            duration_days=duration_days,
+                                            storage_class=storage_class)
+
+    def list_object_versions(self, Bucket, Prefix='', **unimplemented_keyargs):  # noQA - AWS argument naming style
+        assert not unimplemented_keyargs, (f"The mock for list_object_versions needs to be extended."
+                                           f" {there_are(unimplemented_keyargs, kind='unimplemented key')}")
+        versions = []
+        bucket_prefix = Bucket + "/"
+        bucket_prefix_length = len(bucket_prefix)
+        search_prefix = bucket_prefix + (Prefix or '')
+        aws_file_system = self.s3_files
+        for filename, content in aws_file_system.files.items():
+            key = filename[bucket_prefix_length:]
+            if filename.startswith(search_prefix):
+                all_versions = self._object_all_versions(filename)
+                most_recent_version = all_versions[-1]
+                for version in all_versions:
+                    versions.append({
+                        'Key': key,
+                        'VersionId': version.version_id,
+                        'IsLatest': version == most_recent_version,
+                        'ETag': self._content_etag(content),
+                        'Size': len(content if version.content is None else version.content),
+                        'StorageClass': version.storage_class,
+                        # 'LastModified': "2023-04-20 03:48:04+00:00",
+                        # 'Owner': {
+                        #     "DisplayName": "4dn-dcic-technical",
+                        #     "ID": "9e7e144b18724b65641286dfa355edb64c424035706bd1674e9096ee77422a45"
+                        # },
+                    })
+
+                # for other_versions in self.s3_files.other_files[filename]:
+        return {
+            'ResponseMetadata': self.compute_mock_response_metadata(),
+            'IsTruncated': False,
+            'Versions': versions,
+            'Name': Bucket,
+            'Prefix': Prefix,
+            # 'KeyMarker': "",
+            # 'VersionIdMarker': "",
+            # 'MaxKeys': 1000,
+            # 'EncodingType': "url",
         }
 
 

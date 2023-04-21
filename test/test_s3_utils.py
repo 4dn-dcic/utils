@@ -25,7 +25,7 @@ from dcicutils.env_utils_legacy import (
 from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs
 from dcicutils.ff_mocks import make_mock_es_url, make_mock_portal_url
 from dcicutils.misc_utils import ignored, ignorable, override_environ, exported
-from dcicutils.qa_utils import MockBoto3, MockResponse, known_bug_expected
+from dcicutils.qa_utils import MockBoto3, MockResponse, known_bug_expected, MockBotoS3Client
 from dcicutils.s3_utils import s3Utils, HealthPageKey
 from requests.exceptions import ConnectionError
 from typing import Optional, Callable, Dict
@@ -1381,6 +1381,13 @@ def test_get_and_set_object_tags():
     with mock.patch.object(s3_utils_module, "boto3", mock_boto3):
 
         s3u = s3Utils(sys_bucket='irrelevant')
+
+        s3 = s3u.s3
+
+        assert isinstance(s3, MockBotoS3Client)
+
+        # An s3 file must exist for us to manipulate its tags
+        s3.create_object_for_testing("irrelevant", Bucket=bucket, Key=key)
 
         actual = s3u.get_object_tags(key=key, bucket=bucket)
         expected = []
