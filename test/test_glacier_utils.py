@@ -293,6 +293,117 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
+                    'StorageClass': 'GLACIER',
+                    'LastModified': '2023'
+                }
+            ],
+            'Name': 'dummy-bucket',
+            'KeyCount': 2,
+        },
+        {
+            'Versions': [
+                {
+                    'Key': 'example.txt',
+                    'VersionId': 'rOthWbK8m0MFeX9Y_k4E4V69gJu8n0RU',
+                    'IsLatest': True,
+                    'ETag': '"abc123"',
+                    'Size': 1024,
+                    'StorageClass': 'STANDARD',
+                    'LastModified': '2023'
+                },
+                {
+                    'Key': 'example.txt',
+                    'VersionId': 'Y4D4UNy1m4vLyJ7fIQdSPS1LzZuT8TJG',
+                    'IsLatest': False,
+                    'ETag': '"def456"',
+                    'Size': 2048,
+                    'StorageClass': 'GLACIER_IR',
+                    'LastModified': '2023'
+                }
+            ],
+            'Name': 'dummy-bucket',
+            'KeyCount': 2,
+        },
+        {
+            'Versions': [
+                {
+                    'Key': 'example.txt',
+                    'VersionId': 'rOthWbK8m0MFeX9Y_k4E4V69gJu8n0RU',
+                    'IsLatest': True,
+                    'ETag': '"abc123"',
+                    'Size': 1024,
+                    'StorageClass': 'STANDARD_IA',
+                    'LastModified': '2023'
+                }
+            ],
+            'Name': 'dummy-bucket',
+            'KeyCount': 1,
+        }
+    ])
+    def test_glacier_utils_non_glacier_versions_exist(self, glacier_utils, response):
+        """ Tests that we can detect when non-glacier versions exist """
+        gu = glacier_utils
+        with mock.patch.object(gu.s3, 'list_object_versions',
+                               return_value=response):
+            assert gu.non_glacier_versions_exist('bucket', 'key')
+
+    @pytest.mark.parametrize('response', [
+        {
+            'Versions': [
+                {
+                    'Key': 'example.txt',
+                    'VersionId': 'Y4D4UNy1m4vLyJ7fIQdSPS1LzZuT8TJG',
+                    'IsLatest': False,
+                    'ETag': '"def456"',
+                    'Size': 2048,
+                    'StorageClass': 'GLACIER',
+                    'LastModified': '2023'
+                }
+            ],
+            'Name': 'dummy-bucket',
+            'KeyCount': 1,
+        },
+        {
+            'Versions': [
+                {
+                    'Key': 'example.txt',
+                    'VersionId': 'Y4D4UNy1m4vLyJ7fIQdSPS1LzZuT8TJG',
+                    'IsLatest': False,
+                    'ETag': '"def456"',
+                    'Size': 2048,
+                    'StorageClass': 'DEEP_ARCHIVE',
+                    'LastModified': '2023'
+                }
+            ],
+            'Name': 'dummy-bucket',
+            'KeyCount': 1,
+        }]
+    )
+    def test_glacier_utils_non_glacier_versions_dont_exist(self, glacier_utils, response):
+        """ Tests that we can detect when non-glacier versions exist """
+        gu = glacier_utils
+        with mock.patch.object(gu.s3, 'list_object_versions',
+                               return_value=response):
+            assert not gu.non_glacier_versions_exist('bucket', 'key')
+
+    @pytest.mark.parametrize('response', [
+        {
+            'Versions': [
+                {
+                    'Key': 'example.txt',
+                    'VersionId': 'rOthWbK8m0MFeX9Y_k4E4V69gJu8n0RU',
+                    'IsLatest': True,
+                    'ETag': '"abc123"',
+                    'Size': 1024,
+                    'StorageClass': 'STANDARD',
+                    'LastModified': '2023'
+                },
+                {
+                    'Key': 'example.txt',
+                    'VersionId': 'Y4D4UNy1m4vLyJ7fIQdSPS1LzZuT8TJG',
+                    'IsLatest': False,
+                    'ETag': '"def456"',
+                    'Size': 2048,
                     'StorageClass': 'STANDARD',
                     'LastModified': '2023'
                 }
@@ -363,30 +474,35 @@ class TestGlacierUtils:
             with mock.patch.object(gu, 'get_portal_file_and_restore_from_glacier', return_value=(
                 ['uuid'], []
             )):
-                assert gu.restore_all_from_search(search_query='/search', phase=1) == (expected_success, [])
                 assert gu.restore_all_from_search(search_query='/search', phase=1,
-                                                  search_generator=True) == (expected_success, [])
+                                                  confirm=False) == (expected_success, [])
+                assert gu.restore_all_from_search(search_query='/search', phase=1,
+                                                  search_generator=True, confirm=False) == (expected_success, [])
 
             # Test phase 2
             with mock.patch.object(gu, 'copy_object_back_to_original_location', return_value={'success': True}):
                 assert gu.restore_all_from_search(search_query='/search', phase=2,
-                                                  search_generator=True) == (expected_success, [])
-                assert gu.restore_all_from_search(search_query='/search', phase=2) == (expected_success, [])
+                                                  search_generator=True, confirm=False) == (expected_success, [])
+                assert gu.restore_all_from_search(search_query='/search', phase=2,
+                                                  confirm=False) == (expected_success, [])
                 with pytest.raises(GlacierRestoreException):
                     gu.restore_all_from_search(search_query='/search', phase=2,
-                                               search_generator=True, parallel=True)
+                                               search_generator=True, parallel=True, confirm=False)
 
             # Test phase 3
             with mock.patch('dcicutils.glacier_utils.patch_metadata', return_value={'success': True}):
-                assert gu.restore_all_from_search(search_query='/search', phase=3) == (expected_success, [])
                 assert gu.restore_all_from_search(search_query='/search', phase=3,
-                                                  search_generator=True) == (expected_success, [])
+                                                  confirm=False) == (expected_success, [])
+                assert gu.restore_all_from_search(search_query='/search', phase=3,
+                                                  search_generator=True, confirm=False) == (expected_success, [])
 
             # Test phase 4
             with mock.patch.object(gu, 'delete_glaciered_object_versions', return_value={'success': True}):
-                assert gu.restore_all_from_search(search_query='/search', phase=4) == (expected_success, [])
-                assert gu.restore_all_from_search(search_query='/search', phase=4,
-                                                  search_generator=True) == (expected_success, [])
+                with mock.patch.object(gu, 'non_glacier_versions_exist', return_value=True):
+                    assert gu.restore_all_from_search(search_query='/search', phase=4,
+                                                      confirm=False) == (expected_success, [])
+                    assert gu.restore_all_from_search(search_query='/search', phase=4, confirm=False,
+                                                      search_generator=True) == (expected_success, [])
 
 
 # An equivalent test is now in test_qa_utils.py, but this code is kept here to give a sense of what would work.

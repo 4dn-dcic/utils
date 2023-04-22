@@ -3,7 +3,7 @@ from typing import Union, List, Tuple
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 from .common import S3_GLACIER_CLASSES, S3StorageClass
-from .misc_utils import PRINT
+from .misc_utils import PRINT, ignored, explicit_confirm
 from .ff_utils import get_metadata, search_metadata, get_health_page, patch_metadata
 from .creds_utils import CGAPKeyManager
 
@@ -194,6 +194,25 @@ class GlacierUtils:
             add_on='?delete_fields=s3_lifecycle_category'
         )
 
+    def non_glacier_versions_exist(self, bucket: str, key: str) -> bool:
+        """ Returns True if non-glacier tiered versions of an object exist,
+            False otherwise.
+
+        :param bucket: bucket to look in
+        :param key: key to check
+        :return: True if non-glacier versions exist, False otherwise
+        """
+        try:
+            response = self.s3.list_object_versions(Bucket=bucket, Prefix=key)
+            versions = sorted(response.get('Versions', []), key=lambda x: x['LastModified'], reverse=True)
+            for v in versions:
+                if v.get('StorageClass') not in GLACIER_CLASSES:
+                    return True
+            return False
+        except Exception as e:
+            PRINT(f'Error checking versions for object {bucket}/key: {str(e)}')
+            return False
+
     def delete_glaciered_object_versions(self, bucket: str, key: str, delete_all_versions: bool = False) -> bool:
         """ Deletes glaciered object versions of the given bucket/key, clearing all versions in glacier if the
             delete_all_versions flag is specified
@@ -331,7 +350,7 @@ class GlacierUtils:
         return success, errors
 
     def restore_glacier_phase_three_patch(self, atid_list: List[Union[str, dict]],
-                                          status='uploaded') -> (List[str], List[str]):
+                                          status: str = 'uploaded') -> (List[str], List[str]):
         """ Patches out lifecycle information for @ids we've transferred back to standard
 
         :param atid_list: list of @ids or actual file metadata objects to patch info on
@@ -367,9 +386,13 @@ class GlacierUtils:
             bucket_key_pairs = self.resolve_bucket_key_from_portal(_atid, atid)
             accumulated_results = []
             for bucket, key in bucket_key_pairs:
-                resp = self.delete_glaciered_object_versions(bucket, key, delete_all_versions=delete_all_versions)
-                if resp:
-                    accumulated_results.append(_atid)
+                if self.non_glacier_versions_exist(bucket, key):
+                    resp = self.delete_glaciered_object_versions(bucket, key, delete_all_versions=delete_all_versions)
+                    if resp:
+                        accumulated_results.append(_atid)
+                else:
+                    PRINT(f'Error cleaning up {bucket}/{key}, no non-glaciered versions'
+                          f' exist, ignoring this file and erroring on @id {_atid}')
             if len(accumulated_results) == len(bucket_key_pairs):
                 success.append(_atid)
             else:
@@ -380,11 +403,12 @@ class GlacierUtils:
             PRINT(f'Successfully triggered delete for all @ids passed {success}')
         return success, errors
 
+    @explicit_confirm
     def restore_all_from_search(self, *, search_query: str, page_limit: int = 50, search_generator: bool = False,
                                 restore_length: int = 7, new_status: str = 'uploaded',
                                 storage_class: S3StorageClass = 'STANDARD',
                                 parallel: bool = False, num_threads: int = 4, delete_all_versions: bool = False,
-                                phase: int = 1) -> (List[str], List[str]):
+                                phase: int = 1, confirm=True) -> (List[str], List[str]):
         """ Overarching method that will take a search query and loop through all files in the
             search results, running the appropriate phase as passed
 
@@ -398,8 +422,10 @@ class GlacierUtils:
         :param num_threads: number of threads to use if parallel is active
         :param delete_all_versions: if deleting, whether to clear ALL glacier versions
         :param phase: which phase of the glacier restore to run, one of [1, 2, 3, 4]
+        :param confirm: whether to prompt the user to confirm the operation
         :return: 2-tuple of successful, failed @ids extracted from search
         """
+        ignored(confirm)  # used in decorator
         if phase not in [1, 2, 3, 4]:
             raise GlacierRestoreException(f'Invalid phase passed to restore_all_from_search: {phase},'
                                           f' valid phases: [1, 2, 3, 4]\n'

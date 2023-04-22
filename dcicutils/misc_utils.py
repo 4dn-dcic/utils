@@ -2247,6 +2247,20 @@ def chunked(seq, *, chunk_size=1):
         yield chunk
 
 
+def explicit_confirm(func):
+    """ Decorator that if specified will look for a kwarg called 'confirm' and if True will prompt the user
+        for confirmation.
+    """
+    def wrapper(*args, **kwargs):
+        if kwargs.get('confirm', False):
+            response = input(f'Are you sure you want to proceed with {func.__name__}? (y/n): ')
+            if response.lower() != 'y':
+                PRINT('Aborted.')
+                return
+        return func(*args, **kwargs)
+    return wrapper
+
+
 def map_chunked(fn, seq, *, chunk_size=1, reduce=None):
     result = (fn(chunk) for chunk in chunked(seq, chunk_size=chunk_size))
     return reduce(result) if reduce is not None else result
