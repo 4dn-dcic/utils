@@ -24,7 +24,7 @@ from dcicutils.qa_utils import (
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
-    logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually, Timer, MockObjectAttributeBlock,
+    logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually, Timer,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -1156,7 +1156,7 @@ def test_mock_boto3_client_use():
         assert isinstance(s3, MockBotoS3Client)
 
         assert s3._object_storage_class('foo/bar') == s3.DEFAULT_STORAGE_CLASS == 'STANDARD'
-        s3._set_object_storage_class('foo/bar', 'DEEP_ARCHIVE')
+        s3._set_object_storage_class_for_testing('foo/bar', 'DEEP_ARCHIVE')
         assert s3._object_storage_class('foo/bar') == 'DEEP_ARCHIVE'
         assert s3._object_storage_class('foo/baz') == 'STANDARD'
 
@@ -1953,7 +1953,7 @@ def test_s3_copy_object_restoring():
             # time.sleep(MockBotoS3Client.RESTORATION_DELAY_SECONDS)
             s3.hurry_restoration_for_testing(s3_filename)
             s3.copy_object(CopySource={'Bucket': bucket_name, 'Key': key_name, 'VersionId': existing_version_id},
-                           Bucket=bucket_name, Key=key_name+"_new", # CopySourceVersionId=existing_version_id,
+                           Bucket=bucket_name, Key=key_name + "_new",  # NOTE: Not using CopySourceVersionId here.
                            StorageClass='STANDARD')
             print("Step 6")
             show_s3_debugging_data(mfs=mfs, s3=s3, bucket_name=bucket_name)
@@ -1965,9 +1965,6 @@ def test_s3_copy_object_restoring():
             version_info = show_s3_list_object_version_data(s3=s3, bucket_name=bucket_name)
             versions = version_info['Versions']
             assert len(versions) == 2
-
-
-
 
 
 def test_s3_copy_object_new():

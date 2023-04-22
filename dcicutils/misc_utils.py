@@ -615,6 +615,7 @@ def as_seconds(*, seconds=0, minutes=0, hours=0, days=0, weeks=0, milliseconds=0
 MIN_DATETIME = datetime.datetime(datetime.MINYEAR, 1, 1, 0, 0, 0)
 MIN_DATETIME_UTC = datetime.datetime(datetime.MINYEAR, 1, 1, 0, 0, 0, tzinfo=pytz.UTC)
 
+
 def future_datetime(*, now=None, seconds=0, minutes=0, hours=0, days=0, weeks=0, milliseconds=0):
     delta = datetime.timedelta(seconds=seconds, minutes=minutes, hours=hours,
                                days=days, weeks=weeks, milliseconds=milliseconds)
@@ -1735,14 +1736,20 @@ class managed_property(object):
                 else:
                     self.fahrenheit = degrees * 9 / 5.0 + 32
 
-        x = Temperature(fahrenheit=68)
-        x.centigrade
-        20.0
-        x.centigrade = 5
-        x.centigrade
-        5.0
-        x.fahrenheit
-        41.0
+        t1 = Temperature()
+        assert t1.fahrenheit == 32
+        assert t1.centigrade == 0.0
+
+        t2 = Temperature(fahrenheit=68)
+        assert t2.fahrenheit == 68.0
+        assert t2.centigrade == 20.0
+        t2.centigrade = 5
+        assert t2.centigrade == 5.0
+        assert t2.fahrenheit == 41.0
+
+        t2.fahrenheit = -40
+        assert t2.centigrade == -40.0
+
     """
 
     MISSING = NamedObject("missing")
@@ -2247,20 +2254,6 @@ def chunked(seq, *, chunk_size=1):
         yield chunk
 
 
-def explicit_confirm(func):
-    """ Decorator that if specified will look for a kwarg called 'confirm' and if True will prompt the user
-        for confirmation.
-    """
-    def wrapper(*args, **kwargs):
-        if kwargs.get('confirm', False):
-            response = input(f'Are you sure you want to proceed with {func.__name__}? (y/n): ')
-            if response.lower() != 'y':
-                PRINT('Aborted.')
-                return
-        return func(*args, **kwargs)
-    return wrapper
-
-
 def map_chunked(fn, seq, *, chunk_size=1, reduce=None):
     result = (fn(chunk) for chunk in chunked(seq, chunk_size=chunk_size))
     return reduce(result) if reduce is not None else result
@@ -2269,11 +2262,11 @@ def map_chunked(fn, seq, *, chunk_size=1, reduce=None):
 _36_DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
-def format_in_radix(n, *, radix):
+def format_in_radix(n: int, *, radix: int):
 
-    if not isinstance(n, int):
-        raise ValueError(f"Expected n to be an integer {n}")
-    if radix not in range(2, 37):
+    if not isinstance(n, int) or n < 0:
+        raise ValueError(f"Expected n to be a non-negative integer {n}")
+    if radix < 2 or radix > 36:
         raise ValueError(f"Expected radix to be an integer between 2 and 36, inclusive: {radix}")
     buffer = []
     while n > 0:
@@ -2285,8 +2278,16 @@ def format_in_radix(n, *, radix):
     return "".join(buffer) or "0"
 
 
-def parse_in_radix(text, *, radix):
+def parse_in_radix(text: str, *, radix: int):
+    if not (text and isinstance(text, str)):
+        raise ValueError(f"Expected a string to parse: {text}")
+    if radix < 2 or radix > 36:
+        raise ValueError(f"Expected radix to be an integer between 2 and 36, inclusive: {radix}")
     res = 0
-    for c in text:
-        res = res * radix + _36_DIGITS.index(c.upper())
-    return res
+    try:
+        for c in text:
+            res = res * radix + _36_DIGITS.index(c.upper())
+        return res
+    except Exception:
+        pass
+    raise ValueError(f"Unable to parse: {text!r}")

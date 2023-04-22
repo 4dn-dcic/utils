@@ -1,14 +1,16 @@
 import contextlib
+import functools
 import glob
 import logging
 import os
+import re
 import requests
 import subprocess
 
 from typing import Optional
 from .exceptions import InvalidParameterError
 from .lang_utils import there_are
-from .misc_utils import PRINT, environ_bool, print_error_message
+from .misc_utils import PRINT, environ_bool, print_error_message, decorator
 
 
 def _ask_boolean_question(question, quick=None, default=None):
@@ -71,6 +73,50 @@ def y_or_n(question, default=None):
     If Enter is pressed after other text than the valid responses, the user is reprompted.
     """
     return _ask_boolean_question(question, quick=True, default=default)
+
+
+DOC_PARAM_PATTERN = re.compile("^( *:param *)[^: ][^:]*:.*$")
+DOC_RETURN_PATTERN = re.compile("^ *:return:.*$")
+
+
+def add_param_to_doc(docstring, var, var_desc):
+    doclines = (docstring or "").splitlines()
+    prefix = ":param "
+    for i, line in enumerate(doclines):
+        m = DOC_PARAM_PATTERN.match(line)
+        if m:
+            prefix = m.group(1)  # the last one is best
+        m = DOC_RETURN_PATTERN.match(line)
+        if m:
+            new_desc_line = prefix + f"{var}: {var_desc}"
+            return "\n".join(doclines[:i] + [new_desc_line] + doclines[i:])
+    new_desc_line = prefix + f"{var}: {var_desc}"
+    return "\n".join(doclines + [new_desc_line])
+
+
+@decorator()
+def require_confirmation(*, prompt=None, default=True, raise_error=True):
+    """
+    Decorator that if specified will look for a kwarg called 'confirm' and if True will prompt the user
+    for confirmation.
+    """
+    def _attach_confirmation(func):
+
+        func_name = func.__name__
+
+        @functools.wraps(func)
+        def _func_with_confirmation(*args, confirm=default, **kwargs):
+            if not confirm or y_or_n(prompt or "Are you sure you want to proceed with {func_name}?"):
+                return func(*args, **kwargs)
+            elif raise_error:
+                raise ScriptFailure("Aborted by user.")
+
+        _func_with_confirmation.__doc__ = add_param_to_doc(func.__doc__ or f"Missing doc for {func_name}.",
+                                                           "confirm", "whether to ask for confirmation")
+
+        return _func_with_confirmation
+
+    return _attach_confirmation
 
 
 class ShellScript:

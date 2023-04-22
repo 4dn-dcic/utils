@@ -27,13 +27,13 @@ from json import dumps as json_dumps, loads as json_loads
 from typing import Any, Optional, List, DefaultDict, Union, Type, Dict
 from typing_extensions import Literal
 from unittest import mock
-from .common import S3StorageClass, S3_GLACIER_CLASSES
+from .common import S3StorageClass
 from .env_utils import short_env_name
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
 from .glacier_utils import GlacierUtils
 from .lang_utils import there_are
 from .misc_utils import (
-    PRINT, ignored, Retry, remove_prefix, REF_TZ, MIN_DATETIME,
+    PRINT, ignored, Retry, remove_prefix, REF_TZ,
     environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name,
     find_associations, get_error_message, remove_suffix, format_in_radix, future_datetime,
 )
@@ -2004,6 +2004,7 @@ class MockTemporaryRestoration:
         now = now or datetime.datetime.now()
         return now >= self.available_after and not self.is_expired(now=now)
 
+
 class MockObjectAttributeBlock(MockObjectBasicAttributeBlock):
 
     def __init__(self, filename, s3):  # , all_versions=None
@@ -2024,6 +2025,15 @@ class MockObjectAttributeBlock(MockObjectBasicAttributeBlock):
     def storage_class(self):
         restoration = self.restoration
         return restoration.storage_class if restoration else self._storage_class
+
+    def initialize_storage_class(self, value):
+        if self.restoration:
+            # It's ambiguous what is intended, but also this interface is really intended only for initialization
+            # and should not be used in the middle of a mock operation. The storage class is not dynamically mutable.
+            # You need to use the mock operations to make new versions with the right storage class after that.
+            raise Exception("Tried to set storage class in an attribute block"
+                            " while a temporary restoration is ongoing.")
+        self._storage_class = value
 
     _RESTORATION_LOCK = threading.Lock()
 
@@ -2420,7 +2430,7 @@ class MockBotoS3Client(MockBoto3Client):
         assert isinstance(attribute_block, MockObjectAttributeBlock)
         return attribute_block.storage_class
 
-    def _set_object_storage_class(self, filename, value):
+    def _set_object_storage_class_for_testing(self, filename, value):
         """
         Sets the storage class for the 'filename' in this S3 mock to the given value.
         Because this is an internal routine, 'filename' is 'bucket/key' to match the mock file system we use internally.
@@ -2433,7 +2443,8 @@ class MockBotoS3Client(MockBoto3Client):
         so that if another client is created by that same boto3 mock, it will see the same storage classes.
         """
         attribute_block = self._object_attribute_block(filename)
-        attribute_block.storage_class = value
+        assert isinstance(attribute_block, MockObjectAttributeBlock), f"Cannot set storage class of {attribute_block}"
+        attribute_block.initialize_storage_class(value)
 
     def list_objects(self, Bucket, Prefix=None):  # noQA - AWS argument naming style
         # Ref: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects
@@ -2549,7 +2560,6 @@ class MockBotoS3Client(MockBoto3Client):
             print(f"Set up restoration {target_attribute_block.restoration}")
         else:
             print(f"No restoration performed")
-
 
     RESTORATION_DELAY_SECONDS = 2
 
