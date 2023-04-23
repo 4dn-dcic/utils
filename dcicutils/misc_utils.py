@@ -45,10 +45,10 @@ class NamedObject(object):
 # Using PRINT(...) for debugging, rather than its more familiar lowercase form) for intended programmatic output,
 # makes it easier to find stray print statements that were left behind in debugging. -kmp 30-Mar-2020
 
-class _PRINT:
+class _MOCKABLE_IO:
 
-    def __init__(self):
-        self._printer = print  # necessary indirection for sake of qa_utils.printed_output
+    def __init__(self, wrapped_action):
+        self.wrapped_action = wrapped_action  # necessary indirection for sake of qa_utils.printed_output
 
     def __call__(self, *args, timestamped=False, **kwargs):
         """
@@ -59,15 +59,22 @@ class _PRINT:
         """
         if timestamped:
             hh_mm_ss = str(datetime.datetime.now().strftime("%H:%M:%S"))
-            self._printer(hh_mm_ss, *args, **kwargs)
+            return self.wrapped_action(' '.join(map(str, (hh_mm_ss, *args))), **kwargs)
         else:
-            self._printer(*args, **kwargs)
+            return self.wrapped_action(' '.join(map(str, args)), **kwargs)
 
 
-prompt_for_input = input  # In Python 3, this does 'safe' input reading.
+def _mockable_input(*args):
+    return input(*args)
 
-PRINT = _PRINT()
+
+PRINT = _MOCKABLE_IO(wrapped_action=print)
 PRINT.__name__ = 'PRINT'
+
+INPUT = _MOCKABLE_IO(wrapped_action=_mockable_input)
+INPUT.__name__ = 'INPUT'
+
+prompt_for_input = INPUT  # In Python 3, input does 'safe' input reading. INPUT is our mockable alternative
 
 
 @contextlib.contextmanager

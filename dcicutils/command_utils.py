@@ -10,7 +10,7 @@ import subprocess
 from typing import Optional
 from .exceptions import InvalidParameterError
 from .lang_utils import there_are
-from .misc_utils import PRINT, environ_bool, print_error_message, decorator
+from .misc_utils import INPUT, PRINT, environ_bool, print_error_message, decorator
 
 
 def _ask_boolean_question(question, quick=None, default=None):
@@ -36,7 +36,7 @@ def _ask_boolean_question(question, quick=None, default=None):
                  affirmative.upper() if default is True else affirmative,
                  negative.upper() if default is False else negative))
     while True:
-        answer = input(prompt).strip().lower()
+        answer = INPUT(prompt).strip().lower()
         if answer in affirmatives:
             return True
         elif answer in negatives:
@@ -106,7 +106,7 @@ def require_confirmation(*, prompt=None, default=True, raise_error=True):
 
         @functools.wraps(func)
         def _func_with_confirmation(*args, confirm=default, **kwargs):
-            if not confirm or y_or_n(prompt or "Are you sure you want to proceed with {func_name}?"):
+            if not confirm or y_or_n(prompt or f"Are you sure you want to proceed with {func_name}?"):
                 return func(*args, **kwargs)
             elif raise_error:
                 raise ScriptFailure("Aborted by user.")
