@@ -39,27 +39,6 @@ logging.basicConfig()
 logger = logging.getLogger('logger')
 logger.setLevel(logging.INFO)
 
-# In Python 2, the safe 'input' function was called 'raw_input'.  Also in Python 2, there was a function
-# named 'input' that did eval(raw_input(...)).  Python 3 made an incompatible change, renaming 'raw_input'
-# to 'input', and it no longer has a function that does an unsafe eval.  When we supported both Python 2 & 3,
-# use a 'try' expression to sort things out and call the safe function 'use_input' to avoid confusion.
-# But PyCharm found that 'try' expression confusing, so now that we are Python 3 only, we're phasing that
-# out. For a time, we'll retain the transitional naming, though, along with an affirmative error check, so
-# we don't open any security holes.
-# TODO: We can remove this naming and check once we're we're only using Python 3.
-# -kmp 27-Mar-2020
-
-# The name whodaman was deprecated and has been removed as of dcicutils 3.0
-# Please use compute_ff_prd_env instead.
-#
-# whodaman = compute_ff_prd_env  # This naming is obsolete but retained for compatibility.
-
-# The legacy name MAGIC_CNAME was deprecated and is finally removed as of dcicutils 3.0.
-# MAGIC_CNAME = _FF_MAGIC_CNAME
-
-# The legacy name GOLDEN_DB was deprecated and is finally removed as of dcicutils 3.0.
-# GOLDEN_DB = _FF_GOLDEN_DB
-
 # identifier for locating environment variables in EB config
 ENV_VARIABLE_NAMESPACE = 'aws:elasticbeanstalk:application:environment'
 
