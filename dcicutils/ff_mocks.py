@@ -175,19 +175,15 @@ def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=
                                     # The mocked encrypt key is expected by various tools in the s3_utils module
                                     # to be supplied as an environment variable (i.e., in os.environ), so this
                                     # sets up that environment variable.
+                                    overrides = {}
                                     if require_sse:
-                                        with override_environ(S3_ENCRYPT_KEY=s3_class.SSE_ENCRYPT_KEY):
-                                            with EnvUtils.local_env_utils_for_testing(
-                                                    global_env_bucket=os.environ.get('GLOBAL_ENV_BUCKET'),
-                                                    env_name=(
-                                                            environments[0]
-                                                            if environments else
-                                                            os.environ.get('ENV_NAME'))):
-                                                yield mock_boto3
-                                    else:
+                                        overrides['S3_ENCRYPT_KEY'] = s3_class.SSE_ENCRYPT_KEY
+                                    with override_environ(**overrides):
                                         with EnvUtils.local_env_utils_for_testing(
                                                 global_env_bucket=os.environ.get('GLOBAL_ENV_BUCKET'),
-                                                env_name=os.environ.get('ENV_NAME')):
+                                                env_name=(environments[0]
+                                                          if environments
+                                                          else os.environ.get('ENV_NAME'))):
                                             yield mock_boto3
 
 
