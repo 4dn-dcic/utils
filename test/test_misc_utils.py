@@ -30,7 +30,7 @@ from dcicutils.misc_utils import (
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
-    MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print,
+    MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -3435,3 +3435,19 @@ def test_future_datetime():
         two_hours_from_now = future_datetime(hours=2, now=now)  # this won't check the time, so no seconds consumed
 
         assert two_hours_from_now == now + datetime_module.timedelta(hours=2)
+
+
+def test_map_chunked():
+
+    res = map_chunked(lambda x: ''.join(x), "abcdefghij", chunk_size=4)
+    assert next(res) == 'abcd'
+    assert next(res) == 'efgh'
+    assert next(res) == 'ij'
+    with pytest.raises(StopIteration):
+        next(res)
+
+    res = map_chunked(lambda x: ''.join(x), "abcdefghij", chunk_size=4, reduce=list)
+    assert res == ['abcd', 'efgh', 'ij']
+
+    res = map_chunked(lambda x: ''.join(x), "abcdefghij", chunk_size=4, reduce=lambda x: '.'.join(x))
+    assert res == 'abcd.efgh.ij'

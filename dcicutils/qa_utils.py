@@ -406,7 +406,7 @@ class MockFileWriter:
     def __exit__(self, exc_type, exc_val, exc_tb):
         content = self.stream.getvalue()
         file_system = self.file_system
-        if file_system.files.get(self.file):
+        if file_system.exists(self.file):
             if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
                 PRINT(f"Preparing to overwrite {self.file}.")
             file_system.prepare_for_overwrite(self.file)
@@ -505,16 +505,38 @@ class MockAWSFileSystem(MockFileSystem):
         self.versioning_buckets: Union[Literal[True], set] = versioning_buckets
         super().__init__(**kwargs)
 
-    def version_buckets(self, versioning_buckets: Union[Literal[True], list, set, tuple]):
-        if versioning_buckets is not True:
-            versioning_buckets = set(versioning_buckets or {})
-        self.versioning_buckets = versioning_buckets
+    def add_bucket_versioning(self, versioning_buckets: Union[Literal[True], list, set, tuple]):
+        """
+        Expands bucket versioning as follows:
+          * If the set is already True (all buckets are versioned), nothing can expand that, so do nothing.
+          * If the set is given as simply True (all buckets should be versioned), that bcomes the new state.
+          * Otherwise, if given a list, set, or tuple of bucket names, and there's already a set, then merge those.
+        """
+        if versioning_buckets is True or self.versioning_buckets is True:
+            self.versioning_buckets = True
+            return
+        else:
+            self.versioning_buckets |= (versioning_buckets or {})
+            return
+
+    def bucket_uses_versioning(self, bucket):
+        """
+        Returns True if the given bucket is needs versioning support.
+        This can happen either of two ways:
+          * If self.versioning_buckets is True, the result is True.
+          * Otherwise, self.versioning_buckets is expected to be a set, and we check if bucket is in that set.
+        """
+        return self.versioning_buckets is True or bucket in self.versioning_buckets
 
     def prepare_for_overwrite(self, filename):
+        """
+        This method overrides a no-op in the parent class and is a hook to allow noticing we'll want to
+        archive an old file version when we're about to write new data.
+        """
         bucket, key = filename.split('/', 1)
-        if self.versioning_buckets is True or bucket in self.versioning_buckets:
-            # content = self.files[filename]
-            self.s3.archive_current_version(filename=filename)  # , content=content
+        ignored(key)
+        if self.bucket_uses_versioning(bucket):
+            self.s3.archive_current_version(filename=filename)
 
 
 class MockUUIDModule:
@@ -669,7 +691,7 @@ class _PrintCapturer:
         # All accesses of any file/fp, including stdout, get associated with that destination
         self.file_lines[file].extend(texts)
         self.file_last[file] = last_text
-        return result
+        return result  # print did not havea a result, but input does, so be careful to return it.
 
     def reset(self):
         self.lines = []
@@ -709,6 +731,7 @@ def printed_output():
     """
 
     printed = _PrintCapturer()
+    # Use the same PrintCapturer object to capture output from both print and input.
     with local_attrs(PRINT, wrapped_action=printed.mock_print_handler):
         with local_attrs(INPUT, wrapped_action=printed.mock_input_handler):
             yield printed
@@ -2002,9 +2025,21 @@ class MockTemporaryRestoration:
 
     def __init__(self, delay_seconds: Union[int, float], duration_days: Union[int, float],
                  storage_class: S3StorageClass):
-        self.available_after = future_datetime(seconds=delay_seconds)
-        self.available_until = future_datetime(now=self.available_after, days=duration_days)
-        self.storage_class = storage_class
+        self._available_after = future_datetime(seconds=delay_seconds)
+        self._available_until = future_datetime(now=self.available_after, days=duration_days)
+        self._storage_class = storage_class
+
+    @property
+    def available_after(self):
+        return self._available_after
+
+    @property
+    def available_until(self):
+        return self._available_until
+
+    @property
+    def storage_class(self):
+        return self._storage_class
 
     def is_expired(self, now=None):
         now = now or datetime.datetime.now()
@@ -2014,22 +2049,32 @@ class MockTemporaryRestoration:
         now = now or datetime.datetime.now()
         return now >= self.available_after and not self.is_expired(now=now)
 
+    def hurry_restoration(self):
+        self._available_after = datetime.datetime.now()
+
+    def hurry_restoration_expiry(self):
+        self._available_until = datetime.datetime.now()
+
 
 class MockObjectAttributeBlock(MockObjectBasicAttributeBlock):
 
-    def __init__(self, filename, s3):  # , all_versions=None
+    def __init__(self, filename, s3):
         super().__init__(filename=filename, s3=s3)
-        # self.s3 = s3
-        # self.filename = filename
         self._storage_class: S3StorageClass = s3.storage_class
         self.tagset: List[str] = []
         # Content must be added later. The file system at time this object is created may still have a stale value.
-        self.content = None
-        # self.available_after = MIN_DATETIME
+        self._content = None
         self._restoration: Optional[MockTemporaryRestoration] = None
-        # all_versions: List[MockObjectAttributeBlock] = all_versions or []
-        # self.all_versions: List[MockObjectAttributeBlock] = all_versions
-        # all_versions.append(self)
+
+    @property
+    def content(self):
+        return self._content
+
+    def set_content(self, content):
+        if self._content is None:
+            self._content = content
+        else:
+            raise RuntimeError("Attempt to set content for an attribute block that already had content.")
 
     @property
     def storage_class(self):
@@ -2051,13 +2096,13 @@ class MockObjectAttributeBlock(MockObjectBasicAttributeBlock):
         with self._RESTORATION_LOCK:
             restoration = self.restoration
             if restoration:
-                restoration.available_after = datetime.datetime.now()
+                restoration.hurry_restoration()
 
     def hurry_restoration_expiry(self):
         with self._RESTORATION_LOCK:
             restoration = self.restoration
             if restoration:
-                restoration.available_until = datetime.datetime.now()
+                restoration.hurry_restoration_expiry()
 
     def storage_class_for_copy_source(self):
         with self._RESTORATION_LOCK:
@@ -2117,7 +2162,7 @@ class MockBotoS3Client(MockBoto3Client):
                 files[name] = content
             shared_reality[files_cache_marker] = s3_files = MockAWSFileSystem(files=files, boto3=boto3, s3=self)
         self.s3_files = s3_files
-        s3_files.version_buckets(versioning_buckets)
+        s3_files.add_bucket_versioning(versioning_buckets)
 
         other_required_arguments = self.MOCK_REQUIRED_ARGUMENTS.copy()
         for name, content in mock_other_required_arguments or {}:
@@ -2352,34 +2397,45 @@ class MockBotoS3Client(MockBoto3Client):
         assert isinstance(attribute_block, MockObjectAttributeBlock)
         attribute_block.hurry_restoration_expiry()
 
-    def archive_current_version(self, filename,  # content,
+    def archive_current_version(self, filename,
                                 replacement_class: Type[MockObjectBasicAttributeBlock] = MockObjectAttributeBlock,
                                 init: Optional[callable] = None):
         with self._ARCHIVE_LOCK:
+            # The file system dictionary is the source of content authority until we archive things,
+            # and then the current version has to be archived.
             content = self.s3_files.files.get(filename)  # might be missing. you can delete a file that doesn't exist
             preexisting_version = None
             if content:
                 preexisting_version = self._object_attribute_block(filename)
-                # print(f"archive_version obtained existing block {preexisting_version}")
-                if preexisting_version.content is not None and preexisting_version.content is not content:
-                    raise Exception("Consistency problem in mock.")
-                preexisting_version.content = content
-
+                assert isinstance(preexisting_version, MockObjectAttributeBlock)  # should be no content if deleted
+                preexisting_version.set_content(content)
             new_block = self._prepare_new_attribute_block(filename, attribute_class=replacement_class)
-            all_versions = self._object_all_versions(filename)
-            if preexisting_version:
-                assert preexisting_version in all_versions
-            assert new_block in all_versions
+            self._check_versions_registered(filename, preexisting_version, new_block)
             if init is not None:
-                init()  # caller-supplied init function to be run within lock
+                init()  # caller can supply an init function to be run while still inside lock
+
+    def _check_versions_registered(self, filename, *versions: Optional[MockObjectBasicAttributeBlock]):
+        """
+        Performs a useful consistency check to identify problems early, but has no functional effect on other code
+        other than to raise an error if there is a problem.
+
+        :param filename: the S3 filename (in the form bucket/key)
+        :param versions: the versions to check. each should be an attribute block, a delete marker, or None
+        """
+        all_versions = self._object_all_versions(filename)
+        for version in versions:
+            if version:
+                assert version in all_versions
 
     def _prepare_new_attribute_block(self, filename,
                                      attribute_class: Type[MockObjectBasicAttributeBlock] = MockObjectAttributeBlock):
         new_block = attribute_class(filename=filename, s3=self)
-        # print(f"archive_version obtained new block {new_block}")
         all_versions = self._object_all_versions(filename)
         all_versions.append(new_block)
-        # print(f"s3 file {filename} now has attribute blocks: {all_versions}")
+        # NOTE WELL: This would seem information-destroying, but this method should only be called when you're
+        #            about to write new data anyway, after having archived previous data, which means it should
+        #            really only be called by archive_current_version after it has done any necessary saving away
+        #            of a prior version (depending on whether versioning is enabled).
         self.s3_files.files[filename] = None
         return new_block
 
