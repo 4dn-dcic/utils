@@ -34,7 +34,7 @@ from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAft
 from .glacier_utils import GlacierUtils
 from .lang_utils import there_are
 from .misc_utils import (
-    PRINT, INPUT, ignored, Retry, remove_prefix, REF_TZ,
+    PRINT, INPUT, ignored, Retry, remove_prefix, REF_TZ, builtin_print,
     environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name,
     find_associations, get_error_message, remove_suffix, format_in_radix, future_datetime,
     _mockable_input,  # noQA - need this to keep mocking consistent
@@ -2542,7 +2542,8 @@ class MockBotoS3Client(MockBoto3Client):
                 raise Exception(f"The Copy source {source_id}"
                                 f" is in storage class {source_storage_class!r} and must be restored first.")
             else:
-                print("Storage class is OK for copy.")
+                # print("Storage class is OK for copy.")
+                pass
             # now = datetime.datetime.now()
             # print(f"Checking availability")
             # print(f"Time now is {now}")
@@ -2557,19 +2558,19 @@ class MockBotoS3Client(MockBoto3Client):
         attribute_block = self._object_attribute_block(target_s3_filename)
         assert isinstance(attribute_block, MockObjectAttributeBlock)
         target_attribute_block: MockObjectAttributeBlock = attribute_block
-        target_attribute_block._storage_class = target_storage_class
+        target_attribute_block._storage_class = target_storage_class   # TODO: This seems suspect
         # else:
         #     attribute_block = self._object_attribute_block(target_s3_filename)
         #     assert isinstance(attribute_block, MockObjectAttributeBlock)
         #     target_attribute_block: MockObjectAttributeBlock = attribute_block
         #     target_attribute_block.storage_class = target_storage_class
-        print(f"Copied from {source_storage_class} to {target_storage_class}")
+        PRINT(f"Copied from {source_storage_class} to {target_storage_class}")
         if GlacierUtils.is_delayed_storage_class_transition(source_storage_class, target_storage_class):
             target_attribute_block.restore_temporarily(delay_seconds=self.RESTORATION_DELAY_SECONDS,
                                                        duration_days=1, storage_class=target_storage_class)
-            print(f"Set up restoration {target_attribute_block.restoration}")
+            PRINT(f"Set up restoration {target_attribute_block.restoration}")
         else:
-            print(f"No restoration performed")
+            PRINT(f"The copy was not a temporary restoration.")
 
     RESTORATION_DELAY_SECONDS = 2
 
@@ -3258,8 +3259,8 @@ def input_series(*items):
             if not inputs:
                 raise OutOfInputs()
             result = inputs.pop()
-            print(arg)
-            print(result)
+            builtin_print(arg)
+            builtin_print(result)
             return result
 
         mock_input.side_effect = mocked_input

@@ -68,6 +68,8 @@ def _mockable_input(*args):
     return input(*args)
 
 
+builtin_print = print
+
 PRINT = _MOCKABLE_IO(wrapped_action=print)
 PRINT.__name__ = 'PRINT'
 

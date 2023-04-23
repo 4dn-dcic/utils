@@ -30,7 +30,7 @@ from dcicutils.misc_utils import (
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
-    MIN_DATETIME, MIN_DATETIME_UTC, INPUT,
+    MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -62,6 +62,15 @@ def test_uppercase_input():
         with input_series(some_response):
             assert INPUT(some_prompt) == some_response
     assert printed.lines == [some_prompt]
+
+
+def test_builtin_print():
+
+    with printed_output() as print:
+        s = io.StringIO()
+        builtin_print("foo", file=s)
+        assert s.getvalue() == "foo\n"
+    assert print.lines == []  # builtin_print does not cooperate in this stuff
 
 
 def test_ignored():
