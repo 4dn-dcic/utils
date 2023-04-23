@@ -25,28 +25,43 @@ from dcicutils.misc_utils import (
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
     capitalize1, local_attrs, dict_zip, json_leaf_subst, print_error_message, get_error_message, utc_now_str,
-    _is_function_of_exactly_one_required_arg, _apply_decorator,  _36_DIGITS, # noQA
+    _is_function_of_exactly_one_required_arg, _apply_decorator,  _36_DIGITS, _mockable_input, # noQA
     string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, lines_printed_to,
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
-    MIN_DATETIME, MIN_DATETIME_UTC,
+    MIN_DATETIME, MIN_DATETIME_UTC, INPUT,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
-    raises_regexp, MockId, MockLog,
+    raises_regexp, MockId, MockLog, input_series,
 )
 from unittest import mock
 
 
 def test_uppercase_print():
     # This is just a synonym, so the easiest thing is just to test that fact.
-    assert PRINT._printer == print
+    assert PRINT.wrapped_action == print
 
     # But also a basic test that it does something
     s = io.StringIO()
     PRINT("something", file=s)
     assert s.getvalue() == "something\n"
+
+
+def test_uppercase_input():
+    print()  # start on a fresh line
+
+    # This is just a synonym, so the easiest thing is just to test that fact.
+    assert INPUT.wrapped_action == _mockable_input
+
+    # But also a basic test that it does something
+    some_response = "some response"
+    some_prompt = "foo?"
+    with printed_output() as printed:
+        with input_series(some_response):
+            assert INPUT(some_prompt) == some_response
+    assert printed.lines == [some_prompt]
 
 
 def test_ignored():
