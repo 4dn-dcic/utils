@@ -27,15 +27,17 @@ from json import dumps as json_dumps, loads as json_loads
 from typing import Any, Optional, List, DefaultDict, Union, Type, Dict
 from typing_extensions import Literal
 from unittest import mock
+from . import misc_utils as misc_utils_module, command_utils as command_utils_module
 from .common import S3StorageClass
 from .env_utils import short_env_name
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
 from .glacier_utils import GlacierUtils
 from .lang_utils import there_are
 from .misc_utils import (
-    PRINT, ignored, Retry, remove_prefix, REF_TZ,
+    PRINT, INPUT, ignored, Retry, remove_prefix, REF_TZ,
     environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name,
     find_associations, get_error_message, remove_suffix, format_in_radix, future_datetime,
+    _mockable_input,  # noQA - need this to keep mocking consistent
 )
 from .qa_checkers import QA_EXCEPTION_PATTERN, find_uses, confirm_no_uses, VersionChecker, ChangeLogChecker
 
@@ -635,6 +637,12 @@ class _PrintCapturer:
         return defaultdict(lambda: None)
 
     def mock_print_handler(self, *args, **kwargs):
+        return self.mock_action_handler(print, *args, **kwargs)
+
+    def mock_input_handler(self, *args, **kwargs):
+        return self.mock_action_handler(_mockable_input, *args, **kwargs)
+
+    def mock_action_handler(self, wrapped_action, *args, **kwargs):
         """
         For the simple case of stdout, .last has the last line and .lines contains all lines.
         For all cases, even stdout, .file_lines[fp] and .lines[fp] contain it.
@@ -646,7 +654,7 @@ class _PrintCapturer:
         text = " ".join(map(str, args))
         texts = remove_suffix('\n', text).split('\n')
         last_text = texts[-1]
-        print(text, **kwargs)  # noQA - This call to print is low-level implementation
+        result = wrapped_action(text, **kwargs)  # noQA - This call to print is low-level implementation
         # This only captures non-file output output.
         file = kwargs.get('file')
         if file is None:
@@ -661,6 +669,7 @@ class _PrintCapturer:
         # All accesses of any file/fp, including stdout, get associated with that destination
         self.file_lines[file].extend(texts)
         self.file_last[file] = last_text
+        return result
 
     def reset(self):
         self.lines = []
@@ -700,8 +709,9 @@ def printed_output():
     """
 
     printed = _PrintCapturer()
-    with local_attrs(PRINT, _printer=printed.mock_print_handler):
-        yield printed
+    with local_attrs(PRINT, wrapped_action=printed.mock_print_handler):
+        with local_attrs(INPUT, wrapped_action=printed.mock_input_handler):
+            yield printed
 
 
 class MockKeysNotImplemented(NotImplementedError):
@@ -3220,3 +3230,43 @@ class Timer:
             return None
         end = datetime.datetime.now() if self.end is None else self.end
         return (end - self.start).total_seconds()
+
+
+@contextlib.contextmanager
+def print_expected(*expected):
+
+    def mocked_print(*what):
+        printed = " ".join(what)
+        assert printed in expected
+
+    with mock.patch.object(command_utils_module, "PRINT") as mock_print:
+        mock_print.side_effect = mocked_print
+        yield
+
+
+class OutOfInputs(Exception):
+    pass
+
+
+@contextlib.contextmanager
+def input_series(*items):
+    with mock.patch.object(misc_utils_module, 'input') as mock_input:
+
+        def mocked_input(*args, **kwargs):
+            ignored(kwargs)
+            (arg,) = args
+            if not inputs:
+                raise OutOfInputs()
+            result = inputs.pop()
+            print(arg)
+            print(result)
+            return result
+
+        mock_input.side_effect = mocked_input
+
+        inputs = []
+
+        for item in reversed(items):
+            inputs.append(item)
+        yield
+        assert not inputs, "Did not use all inputs."
