@@ -2,7 +2,7 @@ import boto3
 from typing import Union, List, Tuple
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
-from .common import S3_GLACIER_CLASSES, S3StorageClass
+from .common import S3_GLACIER_CLASSES, S3StorageClass, MAX_MULTIPART_CHUNKS, MAX_STANDARD_COPY_SIZE
 from .command_utils import require_confirmation
 from .misc_utils import PRINT
 from .ff_utils import get_metadata, search_metadata, get_health_page, patch_metadata
@@ -243,30 +243,113 @@ class GlacierUtils:
             PRINT(f'Error deleting Glacier versions of object {bucket}/{key}: {str(e)}')
             return False
 
-    def copy_object_back_to_original_location(self, bucket: str, key: str, storage_class: S3StorageClass = 'STANDARD',
+    def _do_multipart_upload(self, bucket: str, key: str, total_size: int, part_size: int = 200,
+                             storage_class: str = 'STANDARD', version_id: Union[str, None] = None) -> Union[dict, None]:
+        """ Helper function for copy_object_back_to_original_location, not intended to
+            be called directly, will arrange for a multipart copy of large updates
+            to change storage class
+
+        :param bucket: bucket to copy from
+        :param key: key to copy within bucket
+        :param total_size: total size of object
+        :param part_size: what size to divide the object into when uploading the chunks
+        :param storage_class: new storage class to use
+        :param version_id: object version Id, if applicable
+        :return: response if successful, None otherwise
+        """
+        try:
+            part_size = part_size * 1024 * 1024  # convert MB to B
+            num_parts = int(total_size / part_size) + 1
+            if num_parts > MAX_MULTIPART_CHUNKS:
+                raise GlacierRestoreException(f'Must user a part_size larger than {part_size}'
+                                              f' that will result in fewer than {MAX_MULTIPART_CHUNKS} chunks')
+            mpu = self.s3.create_multipart_upload(Bucket=bucket, Key=key, StorageClass=storage_class)
+            mpu_upload_id = mpu['UploadId']
+        except Exception as e:
+            PRINT(f'Error creating multipart upload for {bucket}/{key} : {str(e)}')
+            return None
+        parts = []
+        for i in range(num_parts):
+            start = i * part_size
+            end = min(start + part_size, total_size)
+            part = {
+                'PartNumber': i + 1
+            }
+            copy_source = {'Bucket': bucket, 'Key': key}
+            copy_target = {
+                'Bucket': bucket, 'Key': key,
+            }
+            if version_id:
+                copy_source['VersionId'] = version_id
+                copy_target['CopySourceVersionId'] = version_id
+
+            # retry upload a few times
+            for _ in range(3):
+                try:
+                    response = self.s3.upload_part_copy(
+                        CopySource=copy_source, **copy_target,
+                        PartNumber=i + 1,
+                        CopySourceRange=f'bytes={start}-{end-1}',
+                        UploadId=mpu_upload_id
+                    )
+                    break
+                except Exception as e:
+                    PRINT(f'Failed to upload part {i+1}, potentially retrying: {str(e)}')
+            else:
+                PRINT(f'Fatal error arranging multipart upload of {bucket}/{key},'
+                      f' see previous output')
+                return None
+            part['ETag'] = response['CopyPartResult']['ETag']
+            parts.append(part)
+
+        # mark upload as completed
+        # exception should be caught by caller
+        return self.s3.complete_multipart_upload(
+            Bucket=bucket,
+            Key=key,
+            MultipartUpload={
+                'Parts': parts
+            },
+            UploadId=mpu_upload_id
+        )
+
+    def copy_object_back_to_original_location(self, bucket: str, key: str, storage_class: str = 'STANDARD',
+                                              part_size: int = 200,  # MB
                                               version_id: Union[str, None] = None) -> Union[dict, None]:
         """ Reads the temporary location from the restored object and copies it back to the original location
 
         :param bucket: bucket where object is stored
         :param key: key within bucket where object is stored
         :param storage_class: new storage class for this object
+        :param part_size: if doing a large copy, size of chunks to upload (in MB)
         :param version_id: version of object, if applicable
         :return: boolean whether the copy was successful
         """
+        # Determine file size
         try:
-            # Force copy the object into standard
-            copy_source = {'Bucket': bucket, 'Key': key}
-            copy_target = {
-                'Bucket': bucket, 'Key': key,
-                'StorageClass': storage_class,
-            }
-            if version_id:
-                copy_source['VersionId'] = version_id
-                copy_target['CopySourceVersionId'] = version_id
-            response = self.s3.copy_object(CopySource=copy_source, **copy_target)
-            PRINT(f'Response from boto3 copy:\n{response}')
-            PRINT(f'Object {bucket}/{key} copied back to its original location in S3')
-            return response
+            response = self.s3.head_object(Bucket=bucket, Key=key)
+            size = response['ContentLength']
+            multipart = (size >= MAX_STANDARD_COPY_SIZE)
+        except Exception as e:
+            PRINT(f'Could not retrieve metadata on file {bucket}/{key} : {str(e)}')
+            return None
+        try:
+            if multipart:
+                return self._do_multipart_upload(bucket, key, size, part_size, storage_class, version_id)
+            else:
+                # Force copy the object into standard in a single operation
+                copy_source = {'Bucket': bucket, 'Key': key}
+                copy_target = {
+                    'Bucket': bucket, 'Key': key,
+                    'StorageClass': storage_class,
+                }
+                if version_id:
+                    copy_source['VersionId'] = version_id
+                    copy_target['CopySourceVersionId'] = version_id
+                response = self.s3.copy_object(CopySource=copy_source, **copy_target)
+                PRINT(f'Response from boto3 copy:\n{response}')
+                PRINT(f'Object {bucket}/{key} copied back to its original location in S3')
+                return response
         except Exception as e:
             PRINT(f'Error copying object {bucket}/{key} back to its original location in S3: {str(e)}')
             return None

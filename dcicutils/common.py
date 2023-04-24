@@ -116,3 +116,9 @@ S3StorageClass = Union[
     Literal['OUTPOSTS'],
     Literal['GLACIER_IR'],
 ]
+
+
+# These numbers come from AWS and is the max size that can be copied with a single request
+# Any larger than this requires a multipart upload - Will 24 April 2023
+MAX_STANDARD_COPY_SIZE = 5368709120
+MAX_MULTIPART_CHUNKS = 10000
