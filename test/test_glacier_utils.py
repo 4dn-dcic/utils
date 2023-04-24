@@ -1,6 +1,12 @@
+# import io
+# import json
 import pytest
+
 from unittest import mock
 from dcicutils.glacier_utils import GlacierUtils, GlacierRestoreException
+# from dcicutils.ff_mocks import mocked_s3utils
+# from dcicutils.lang_utils import there_are
+# from dcicutils.qa_utils import MockFileSystem, MockBotoS3Client
 
 
 def mock_keydict() -> dict:
@@ -497,3 +503,51 @@ class TestGlacierUtils:
                                                       confirm=False) == (expected_success, [])
                     assert gu.restore_all_from_search(search_query='/search', phase=4, confirm=False,
                                                       search_generator=True) == (expected_success, [])
+
+
+# An equivalent test is now in test_qa_utils.py, but this code is kept here to give a sense of what would work.
+#
+# def test_glacier_utils_list_object_versions():
+#     # Output from this test is usefully viewed by doing:  pytest -s -vv -k test_glacier_utils_object_versions
+#     # In fact, this doesn't test any glacier_utils functionality, but just that a mock of this kind,
+#     # calling list_object_versions, would work. It is in some ways a better test of qa_utils.
+#     mfs = MockFileSystem()
+#     with mocked_s3utils(environments=['fourfront-mastertest']) as mock_boto3:
+#         with mfs.mock_exists_open_remove():
+#             s3: MockBotoS3Client = mock_boto3.client('s3')
+#             bucket_name = 'foo'
+#             key_name = 'file.txt'
+#             key2_name = 'file2.txt'
+#             with io.open(key_name, 'w') as fp:
+#                 fp.write("first contents")
+#             s3.upload_file(key_name, Bucket=bucket_name, Key=key_name)
+#             with io.open(key_name, 'w') as fp:
+#                 fp.write("second contents")
+#             s3.upload_file(key_name, Bucket=bucket_name, Key=key_name)
+#             with io.open(key2_name, 'w') as fp:
+#                 fp.write("other stuff")
+#             s3.upload_file(key2_name, Bucket=bucket_name, Key=key2_name)
+#             print("file system:")
+#             for file, data in mfs.files.items():
+#                 s3_filename = f'{bucket_name}/{file}'
+#                 all_versions = s3._object_attribute_blocks(s3_filename)
+#                 print(f" {file}[{s3._object_attribute_block(s3_filename).version_id}]:"
+#                       f" {data!r}  # length={len(data)}."
+#                       f" {there_are([x.version_id for x in all_versions[:-1]], kind='back version')}")
+#             version_info = s3.list_object_versions(Bucket=bucket_name)
+#             print(f"list_object_versions(Bucket={bucket_name!r}) =")
+#             print(json.dumps(version_info, indent=2))
+#             versions = version_info['Versions']
+#             assert len(versions) == 3
+#             version1, version2, version3 = versions
+#             # Back version of file.txt
+#             assert version1['Key'] == key_name
+#             assert version1['IsLatest'] is False
+#             # Current version of file.txt
+#             assert version2['Key'] == key_name
+#             assert version2['IsLatest'] is True
+#             # Current version of file2.txt
+#             assert version3['Key'] == key2_name
+#             assert version3['IsLatest'] is True
+#             assert all(version['StorageClass'] == 'STANDARD' for version in versions)
+#

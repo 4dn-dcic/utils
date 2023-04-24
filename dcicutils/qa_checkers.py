@@ -327,7 +327,7 @@ class DebuggingArtifactChecker(StaticSourcesChecker):
         {
             'key': 'print',
             'summary': "call to print",
-            'pattern': r"^[^#]*print[(]"
+            'pattern': r"^[^#]*\bprint[(]"
         },
         {
             'key': 'pdb',

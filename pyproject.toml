@@ -64,7 +64,9 @@ tqdm = "^4.65.0"
 botocore-stubs = "1.21.22"
 boto3-stubs = "1.18.23"
 coverage = ">=5.3.1"
-coveralls = ">=3.3.1"
+# Loaded manually in GA workflow for coverage because a dependency on 2to3
+# in its docopts dependency makes a problem for laoding it here in poetry. -kmp 7-Apr-2023
+# coveralls = ">=3.3.1"
 flake8 = ">=3.9.2"
 flaky = ">=3.7.0"
 pytest = ">=4.5.0"

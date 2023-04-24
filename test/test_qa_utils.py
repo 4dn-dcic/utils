@@ -3,6 +3,7 @@ import logging
 import boto3
 import datetime
 import io
+import json
 import os
 import platform
 import pytest
@@ -15,16 +16,21 @@ import uuid
 
 from dcicutils import qa_utils
 from dcicutils.exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix
-from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ
+from dcicutils.ff_mocks import mocked_s3utils
+from dcicutils.lang_utils import there_are
+from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ, local_attrs, ignored
 from dcicutils.qa_utils import (
     mock_not_called, override_environ, override_dict, show_elapsed_time, timed,
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
-    logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually, Timer
+    logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually, Timer,
+    MockObjectBasicAttributeBlock, MockObjectAttributeBlock, MockObjectDeleteMarker, MockTemporaryRestoration,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
+from typing import List, Dict
+from typing_extensions import Literal
 from unittest import mock
 from .fixtures.sample_fixtures import MockMathError, MockMath, math_enabled
 
@@ -1123,44 +1129,53 @@ def test_mock_boto3_client():
 
 def test_mock_boto3_client_use():
 
+    print()
+
     mock_boto3 = MockBoto3()
-    mfs = MockFileSystem(files={"myfile": "some content"})
+    mfs = MockFileSystem(files={"myfile": "some content", 'other_file': "other content"})
 
-    with mock.patch("io.open", mfs.open):
-        with mock.patch("os.path.exists", mfs.exists):
-            with mock.patch.object(boto3, "client", mock_boto3.client):
+    with mfs.mock_exists_open_remove():
+        with mock.patch.object(boto3, "client", mock_boto3.client):
 
-                s3 = boto3.client('s3')  # noQA - PyCharm wrongly sees a syntax error
-                assert isinstance(s3, MockBotoS3Client)
-                s3.upload_file(Filename="myfile", Bucket="foo", Key="bar")
-                s3.download_file(Filename="myfile2", Bucket="foo", Key="bar")
-                myfile_content = file_contents("myfile")
-                myfile_content2 = file_contents("myfile2")
-                assert myfile_content == myfile_content2 == "some content"
+            s3 = mock_boto3.client('s3')  # noQA - PyCharm wrongly sees a syntax error
+            assert isinstance(s3, MockBotoS3Client)
+            s3.upload_file(Filename="myfile", Bucket="foo", Key="bar")
+            s3.upload_file(Filename="other_file", Bucket="foo", Key="baz")
+            s3.download_file(Filename="myfile2", Bucket="foo", Key="bar")
+            myfile_content = file_contents("myfile")
+            myfile_content2 = file_contents("myfile2")
+            assert myfile_content == myfile_content2 == "some content"
 
-    s3 = mock_boto3.client('s3')
+        s3 = mock_boto3.client('s3')
 
-    # No matter what clients you get, they all share the same MockFileSystem, which we can get from s3_files
-    s3fs = s3.s3_files
-    # We saved an s3 file to bucket "foo" and key "bar", so it will be in the s3fs as "foo/bar"
-    assert sorted(s3fs.files.keys()) == ['foo/bar']
-    # The content is stored in binary format
-    assert s3fs.files['foo/bar'] == b'some content'
+        # No matter what clients you get, they all share the same MockFileSystem, which we can get from s3_files
+        s3fs = s3.s3_files
+        # We saved an s3 file to bucket "foo" and key "bar", so it will be in the s3fs as "foo/bar"
+        assert sorted(s3fs.files.keys()) == ['foo/bar', 'foo/baz']
+        # The content is stored in binary format
+        assert s3fs.files['foo/bar'] == b'some content'
+        assert s3fs.files['foo/baz'] == b'other content'
 
-    assert isinstance(s3, MockBotoS3Client)
+        assert isinstance(s3, MockBotoS3Client)
 
-    assert s3._object_storage_class('foo/bar') == s3.DEFAULT_STORAGE_CLASS
-    s3._set_object_storage_class('foo/bar', 'DEEP_ARCHIVE')
-    assert s3._object_storage_class('foo/bar') == 'DEEP_ARCHIVE'
-    assert s3._object_storage_class('foo/baz') == 'STANDARD'
+        assert s3._object_storage_class('foo/bar') == s3.DEFAULT_STORAGE_CLASS == 'STANDARD'
+        s3._set_object_storage_class_for_testing('foo/bar', 'DEEP_ARCHIVE')
+        assert s3._object_storage_class('foo/bar') == 'DEEP_ARCHIVE'
+        assert s3._object_storage_class('foo/baz') == 'STANDARD'
 
-    # Because of shared reality in our mock_boto3, we'll see those same results with a new client.
-    s3_client2 = mock_boto3.client('s3')
-    assert s3_client2._object_storage_class('foo/bar') == 'DEEP_ARCHIVE'
-    assert s3_client2._object_storage_class('foo/baz') == 'STANDARD'
+        # Because of shared reality in our mock_boto3, we'll see those same results with a new client.
+        s3_client2 = mock_boto3.client('s3')
+        assert s3_client2._object_storage_class('foo/bar') == 'DEEP_ARCHIVE'
+        assert s3_client2._object_storage_class('foo/baz') == 'STANDARD'
 
-    # Creating a new boto3 and asking for a client will see a different reality and get a different value.
-    assert MockBoto3().client('s3')._object_storage_class('foo/bar') == 'STANDARD'
+        # Creating a new boto3 and asking for a client will see a different reality that does not know about
+        # the files we've created in the above boto3 mock.
+
+        new_s3_from_new_boto3 = MockBoto3().client('s3')
+        with pytest.raises(Exception):  # This s3 file does not exist
+            new_s3_from_new_boto3._object_storage_class('foo/bar')
+        new_s3_from_new_boto3.upload_file(Filename="myfile", Bucket="foo", Key="bar")  # now it does
+        assert new_s3_from_new_boto3._object_storage_class('foo/bar') == 'STANDARD'
 
 
 def test_mock_uuid_module_documentation_example():
@@ -1332,6 +1347,123 @@ def test_mock_boto_s3_client_limitations():
         with pytest.raises(MockKeysNotImplemented):
             mock_s3_client.download_fileobj(Fileobj=io.BytesIO(), Bucket="bucketname", Key="keyname",
                                             Config='not-implemented')
+
+
+def test_object_basic_attribute_block():
+
+    start_time = datetime.datetime.now()
+    sample_filename = "foo"
+    mock_boto3 = MockBoto3()
+    s3 = mock_boto3.client('s3')
+    b = MockObjectBasicAttributeBlock(filename=sample_filename, s3=s3)
+
+    assert b.last_modified < datetime.datetime.now()
+    assert b.last_modified > start_time
+    assert b.s3 == s3
+    assert b.filename == sample_filename
+    assert isinstance(b.version_id, str)
+
+    with local_attrs(MockObjectBasicAttributeBlock, MONTONIC_VERSIONS=False):
+        version_id_monotonic_false = MockObjectBasicAttributeBlock._generate_version_id()
+    with local_attrs(MockObjectBasicAttributeBlock, MONTONIC_VERSIONS=True):
+        version_id_monotonic_true = MockObjectBasicAttributeBlock._generate_version_id()
+
+    assert isinstance(version_id_monotonic_false, str)
+    assert '.' in version_id_monotonic_false      # a random string is really a guid with '.' instead of '-'
+    assert isinstance(version_id_monotonic_true, str)
+    assert '.' not in version_id_monotonic_true  # a timestamp of sorts, with digits 0-9 and a-z, but no dots
+
+    with pytest.raises(NotImplementedError):
+        x = b.storage_class
+        ignored(x)
+
+    with pytest.raises(NotImplementedError):
+        b.initialize_storage_class('STANDARD')
+
+    with pytest.raises(NotImplementedError):
+        x = b.tagset
+        ignored(x)
+
+    with pytest.raises(NotImplementedError):
+        b.set_tagset([])
+
+
+def test_object_delete_marker():
+
+    sample_filename = "foo"
+    mock_boto3 = MockBoto3()
+    s3 = mock_boto3.client('s3')
+    b = MockObjectDeleteMarker(filename=sample_filename, s3=s3)
+
+    assert isinstance(b.last_modified, datetime.datetime)
+    assert b.s3 == s3
+    assert b.filename == sample_filename
+    assert isinstance(b.version_id, str)
+
+    with pytest.raises(Exception):
+        x = b.storage_class
+        ignored(x)
+
+    with pytest.raises(Exception):
+        b.initialize_storage_class('STANDARD')
+
+    with pytest.raises(Exception):
+        x = b.tagset
+        ignored(x)
+
+    with pytest.raises(Exception):
+        b.set_tagset([])
+
+
+def test_object_attribute_block():
+
+    start_time = datetime.datetime.now()
+    sample_filename = "foo"
+    sample_content = "some text"
+    sample_tagset: List[Dict[Literal['Key', 'Value'], str]] = [{'Key': 'foo', 'Value': 'bar'}]
+    sample_delay_seconds = 60
+    sample_duration_days = 7
+    mock_boto3 = MockBoto3()
+    s3 = mock_boto3.client('s3')
+    b = MockObjectAttributeBlock(filename=sample_filename, s3=s3)
+
+    assert isinstance(b.last_modified, datetime.datetime)
+    assert b.s3 == s3
+    assert b.filename == sample_filename
+    assert isinstance(b.version_id, str)
+    assert b.storage_class == 'STANDARD'
+    b.initialize_storage_class('GLACIER')
+    assert b.storage_class == 'GLACIER'
+    assert b.tagset == []
+    b.set_tagset(sample_tagset)
+    assert b.tagset == sample_tagset
+    assert b.content is None
+    b.set_content(sample_content)
+    assert b.content == sample_content
+    with pytest.raises(Exception):
+        b.set_content(sample_content)
+
+    assert b.restoration is None
+    b.restore_temporarily(delay_seconds=sample_delay_seconds, duration_days=sample_duration_days,
+                          storage_class='STANDARD')
+    assert isinstance(b.restoration, MockTemporaryRestoration)
+    assert b.restoration.available_after > start_time
+    assert b.restoration.available_after < datetime.datetime.now() + datetime.timedelta(seconds=sample_delay_seconds)
+    assert b.storage_class == 'STANDARD'
+    b.hurry_restoration()
+    assert b.storage_class == 'STANDARD'
+    assert b.restoration.available_after < datetime.datetime.now()
+    assert b.restoration.available_until > datetime.datetime.now()
+    assert b.restoration.available_until > datetime.datetime.now()
+    assert b.restoration.available_until < datetime.datetime.now() + datetime.timedelta(days=sample_duration_days,
+                                                                                        seconds=sample_delay_seconds)
+    assert b.storage_class == 'STANDARD'
+    b.hurry_restoration_expiry()
+    # We have to examine ._restoration because an expired restoration will disappear as soon as we check it
+    assert b._restoration.available_until < datetime.datetime.now()
+    # Here we see it goes away...
+    assert b.restoration is None
+    assert b.storage_class == 'GLACIER'
 
 
 def test_mock_keys_not_implemented():
@@ -1838,3 +1970,184 @@ def test_timer():
         assert 20.25 < s2a < 20.35  # see explanation above
 
         assert t2.start > check_time
+
+
+def show_s3_debugging_data(mfs, s3, bucket_name):
+    print("file system:")
+    for file, data in mfs.files.items():
+        s3_filename = f'{bucket_name}/{file}'
+        all_versions = s3._object_all_versions(s3_filename)  # noQA - internal method needed for testing
+        print(f" {file}[{s3._object_attribute_block(s3_filename).version_id}]:"  # noQA - ditto
+              f" {data!r}  # length={len(data)}."
+              f" {there_are([x.version_id for x in all_versions[:-1]], kind='back version')}")
+
+
+def show_s3_list_object_version_data(s3, bucket_name) -> dict:
+    version_info = s3.list_object_versions(Bucket=bucket_name)
+    keys = [version['Key'] for version in version_info.get('Versions', [])]
+    for key in keys:
+        head = s3.head_object(Bucket=bucket_name, Key=key)
+        print(f"head_object(Bucket={bucket_name!r}, Key={key!r}) =")
+        print(json.dumps(head, indent=2, default=str))
+    print(f"list_object_versions(Bucket={bucket_name!r}) =")
+    print(json.dumps(version_info, indent=2, default=str))
+    return version_info
+
+
+def test_s3_copy_object_overwrite():
+    # Output from this test is usefully viewed by doing:  pytest -s -vv -k test_glacier_utils_object_versions
+    # In fact, this doesn't test any glacier_utils functionality, but just that a mock of this kind,
+    # calling list_object_versions, would work. It is in some ways a better test of qa_utils.
+    mfs = MockFileSystem()
+    with mocked_s3utils(environments=['fourfront-mastertest']) as mock_boto3:
+        with mfs.mock_exists_open_remove():
+            s3: MockBotoS3Client = mock_boto3.client('s3')
+            bucket_name = 'foo'
+            key_name = 'file.txt'
+            s3_filename = f"{bucket_name}/{key_name}"
+            s3.create_object_for_testing("first contents", Bucket=bucket_name, Key=key_name)
+            show_s3_debugging_data(mfs=mfs, s3=s3, bucket_name=bucket_name)
+            attribute_block = s3._object_attribute_block(s3_filename)
+            existing_version_id = attribute_block.version_id
+            s3.copy_object(CopySource={'Bucket': bucket_name, 'Key': key_name, 'VersionId': existing_version_id},
+                           Bucket=bucket_name, Key=key_name, CopySourceVersionId=existing_version_id,
+                           StorageClass='GLACIER')
+            show_s3_debugging_data(mfs=mfs, s3=s3, bucket_name=bucket_name)
+            version_info = show_s3_list_object_version_data(s3=s3, bucket_name=bucket_name)
+            versions = version_info['Versions']
+            assert len(versions) == 1
+
+
+def test_s3_copy_object_restoring():
+    # Output from this test is usefully viewed by doing:  pytest -s -vv -k test_glacier_utils_object_versions
+    # In fact, this doesn't test any glacier_utils functionality, but just that a mock of this kind,
+    # calling list_object_versions, would work. It is in some ways a better test of qa_utils.
+    mfs = MockFileSystem()
+    with mocked_s3utils(environments=['fourfront-mastertest']) as mock_boto3:
+        with mfs.mock_exists_open_remove():
+            s3: MockBotoS3Client = mock_boto3.client('s3')
+            bucket_name = 'foo'
+            key_name = 'file.txt'
+            s3_filename = f"{bucket_name}/{key_name}"
+            print("Step 0")
+            s3.create_object_for_testing("first contents", Bucket=bucket_name, Key=key_name)
+            print("Step 1")
+            show_s3_debugging_data(mfs=mfs, s3=s3, bucket_name=bucket_name)
+            attribute_block = s3._object_attribute_block(s3_filename)
+            existing_version_id = attribute_block.version_id
+            s3.copy_object(CopySource={'Bucket': bucket_name, 'Key': key_name, 'VersionId': existing_version_id},
+                           Bucket=bucket_name, Key=key_name, CopySourceVersionId=existing_version_id,
+                           StorageClass='GLACIER')
+            print("Step 2")
+            show_s3_debugging_data(mfs=mfs, s3=s3, bucket_name=bucket_name)
+            version_info = show_s3_list_object_version_data(s3=s3, bucket_name=bucket_name)
+            versions = version_info['Versions']
+            assert len(versions) == 1
+            with pytest.raises(Exception):
+                s3.copy_object(CopySource={'Bucket': bucket_name, 'Key': key_name, 'VersionId': existing_version_id},
+                               Bucket=bucket_name, Key=key_name, CopySourceVersionId=existing_version_id,
+                               StorageClass='STANDARD')
+            print("Step 3")
+            show_s3_debugging_data(mfs=mfs, s3=s3, bucket_name=bucket_name)
+            version_info = show_s3_list_object_version_data(s3=s3, bucket_name=bucket_name)
+            versions = version_info['Versions']
+            assert len(versions) == 1
+            s3.restore_object(Bucket=bucket_name, Key=key_name, RestoreRequest={'Days': 7})
+            # s3._copy_object(CopySource={'Bucket': bucket_name, 'Key': key_name, 'VersionId': existing_version_id},
+            #                Bucket=bucket_name, Key=key_name, CopySourceVersionId=existing_version_id,
+            #                StorageClass='STANDARD', allow_glacial=True)
+            print("Step 4")
+            show_s3_debugging_data(mfs=mfs, s3=s3, bucket_name=bucket_name)
+            version_info = show_s3_list_object_version_data(s3=s3, bucket_name=bucket_name)
+            versions = version_info['Versions']
+            assert len(versions) == 1
+            with pytest.raises(Exception):
+                s3.copy_object(CopySource={'Bucket': bucket_name, 'Key': key_name, 'VersionId': existing_version_id},
+                               Bucket=bucket_name, Key=key_name, CopySourceVersionId=existing_version_id,
+                               StorageClass='STANDARD')
+            print("Step 5")
+            show_s3_debugging_data(mfs=mfs, s3=s3, bucket_name=bucket_name)
+            version_info = show_s3_list_object_version_data(s3=s3, bucket_name=bucket_name)
+            versions = version_info['Versions']
+            assert len(versions) == 1
+            # time.sleep(MockBotoS3Client.RESTORATION_DELAY_SECONDS)
+            s3.hurry_restoration_for_testing(s3_filename)
+            s3.copy_object(CopySource={'Bucket': bucket_name, 'Key': key_name, 'VersionId': existing_version_id},
+                           Bucket=bucket_name, Key=key_name + "_new",  # NOTE: Not using CopySourceVersionId here.
+                           StorageClass='STANDARD')
+            print("Step 6")
+            show_s3_debugging_data(mfs=mfs, s3=s3, bucket_name=bucket_name)
+            version_info = show_s3_list_object_version_data(s3=s3, bucket_name=bucket_name)
+            versions = version_info['Versions']
+            assert len(versions) == 2
+            s3.hurry_restoration_expiry_for_testing(s3_filename)
+            show_s3_debugging_data(mfs=mfs, s3=s3, bucket_name=bucket_name)
+            version_info = show_s3_list_object_version_data(s3=s3, bucket_name=bucket_name)
+            versions = version_info['Versions']
+            assert len(versions) == 2
+
+
+def test_s3_copy_object_new():
+    # Output from this test is usefully viewed by doing:  pytest -s -vv -k test_glacier_utils_object_versions
+    # In fact, this doesn't test any glacier_utils functionality, but just that a mock of this kind,
+    # calling list_object_versions, would work. It is in some ways a better test of qa_utils.
+    mfs = MockFileSystem()
+    with mocked_s3utils(environments=['fourfront-mastertest']) as mock_boto3:
+        with mfs.mock_exists_open_remove():
+            s3: MockBotoS3Client = mock_boto3.client('s3')
+            bucket_name = 'foo'
+            key_name = 'file.txt'
+            s3.create_object_for_testing("first contents", Bucket=bucket_name, Key=key_name)
+            show_s3_debugging_data(mfs=mfs, s3=s3, bucket_name=bucket_name)
+            s3.copy_object(CopySource={'Bucket': bucket_name, 'Key': key_name},
+                           Bucket=bucket_name, Key=key_name, CopySourceVersionId=None,
+                           StorageClass='GLACIER')
+            show_s3_debugging_data(mfs=mfs, s3=s3, bucket_name=bucket_name)
+            version_info = show_s3_list_object_version_data(s3=s3, bucket_name=bucket_name)
+            versions = version_info['Versions']
+            assert len(versions) == 2
+
+
+def test_s3_list_object_versions():
+    # Output from this test is usefully viewed by doing:  pytest -s -vv -k test_glacier_utils_object_versions
+    # In fact, this doesn't test any glacier_utils functionality, but just that a mock of this kind,
+    # calling list_object_versions, would work. It is in some ways a better test of qa_utils.
+    mfs = MockFileSystem()
+    with mocked_s3utils(environments=['fourfront-mastertest']) as mock_boto3:
+        with mfs.mock_exists_open_remove():
+            s3: MockBotoS3Client = mock_boto3.client('s3')
+            bucket_name = 'foo'
+            key_name = 'file.txt'
+            key2_name = 'file2.txt'
+
+            s3.create_object_for_testing("first contents", Bucket=bucket_name, Key=key_name)
+            # with io.open(key_name, 'w') as fp:
+            #     fp.write("first contents")
+            # s3.upload_file(key_name, Bucket=bucket_name, Key=key_name)
+
+            # s3.create_object_for_testing("second contents", Bucket=bucket_name, Key=key_name)
+            with io.open(key_name, 'w') as fp:
+                fp.write("second contents")
+            s3.upload_file(key_name, Bucket=bucket_name, Key=key_name)
+
+            # s3.create_object_for_testing("other stuff", Bucket=bucket_name, Key=key2_name)
+            with io.open(key2_name, 'w') as fp:
+                fp.write("other stuff")
+            s3.upload_file(key2_name, Bucket=bucket_name, Key=key2_name)
+
+            show_s3_debugging_data(mfs=mfs, s3=s3, bucket_name=bucket_name)
+            version_info = show_s3_list_object_version_data(s3=s3, bucket_name=bucket_name)
+            versions = version_info['Versions']
+            assert len(versions) == 3
+
+            version1, version2, version3 = versions
+            # Back version of file.txt
+            assert version1['Key'] == key_name
+            assert version1['IsLatest'] is False
+            # Current version of file.txt
+            assert version2['Key'] == key_name
+            assert version2['IsLatest'] is True
+            # Current version of file2.txt
+            assert version3['Key'] == key2_name
+            assert version3['IsLatest'] is True
+            assert all(version['StorageClass'] == 'STANDARD' for version in versions)

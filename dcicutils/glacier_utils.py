@@ -2,19 +2,11 @@ import boto3
 from typing import Union, List, Tuple
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
-from .misc_utils import PRINT, ignored, explicit_confirm
+from .common import S3_GLACIER_CLASSES, S3StorageClass
+from .command_utils import require_confirmation
+from .misc_utils import PRINT
 from .ff_utils import get_metadata, search_metadata, get_health_page, patch_metadata
 from .creds_utils import CGAPKeyManager
-
-
-# See https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
-# See boto3 docs for info on possible values, but these 3 are the current ones used for
-# glacier (that require restore calls) - Will 7 Apr 2023
-GLACIER_CLASSES = [
-    'GLACIER_IR',  # Glacier Instant Retrieval
-    'GLACIER',  # Glacier Flexible Retrieval
-    'DEEP_ARCHIVE'  # Glacier Deep Archive
-]
 
 
 class GlacierRestoreException(Exception):
@@ -62,6 +54,19 @@ class GlacierUtils:
         self.key_manager = CGAPKeyManager()
         self.env_key = self.key_manager.get_keydict_for_env(env_name)
         self.health_page = get_health_page(key=self.env_key, ff_env=env_name)
+
+    @classmethod
+    def is_glacier_storage_class(cls, storage_class: S3StorageClass):
+        return storage_class in S3_GLACIER_CLASSES
+
+    @classmethod
+    def is_available_storage_class(cls, storage_class: S3StorageClass):
+        return not cls.is_glacier_storage_class(storage_class)
+
+    @classmethod
+    def transition_involves_glacier_restoration(cls, from_storage_class: S3StorageClass,
+                                                to_storage_class: S3StorageClass):
+        return cls.is_glacier_storage_class(from_storage_class) and cls.is_available_storage_class(to_storage_class)
 
     def resolve_possible_file_status(self) -> list:
         """ Checks the File.json profile to see valid status values for files """
@@ -203,7 +208,7 @@ class GlacierUtils:
             response = self.s3.list_object_versions(Bucket=bucket, Prefix=key)
             versions = sorted(response.get('Versions', []), key=lambda x: x['LastModified'], reverse=True)
             for v in versions:
-                if v.get('StorageClass') not in GLACIER_CLASSES:
+                if v.get('StorageClass') not in S3_GLACIER_CLASSES:
                     return True
             return False
         except Exception as e:
@@ -224,7 +229,7 @@ class GlacierUtils:
             versions = sorted(response.get('Versions', []), key=lambda x: x['LastModified'], reverse=True)
             deleted = False
             for v in versions:
-                if v.get('StorageClass') in GLACIER_CLASSES:
+                if v.get('StorageClass') in S3_GLACIER_CLASSES:
                     response = self.s3.delete_object(Bucket=bucket, Key=key, VersionId=v.get('VersionId'))
                     PRINT(f'Object {bucket}/{key} Glacier version {v.get("VersionId")} deleted:\n{response}')
                     deleted = True
@@ -238,7 +243,7 @@ class GlacierUtils:
             PRINT(f'Error deleting Glacier versions of object {bucket}/{key}: {str(e)}')
             return False
 
-    def copy_object_back_to_original_location(self, bucket: str, key: str, storage_class: str = 'STANDARD',
+    def copy_object_back_to_original_location(self, bucket: str, key: str, storage_class: S3StorageClass = 'STANDARD',
                                               version_id: Union[str, None] = None) -> Union[dict, None]:
         """ Reads the temporary location from the restored object and copies it back to the original location
 
@@ -293,7 +298,8 @@ class GlacierUtils:
             PRINT(f'Successfully triggered restore requests for all @ids passed {success}')
         return success, errors
 
-    def restore_glacier_phase_two_copy(self, atid_list: List[Union[str, dict]], storage_class: str = 'STANDARD',
+    def restore_glacier_phase_two_copy(self, atid_list: List[Union[str, dict]],
+                                       storage_class: S3StorageClass = 'STANDARD',
                                        parallel: bool = False, num_threads: int = 4) -> (List[str], List[str]):
         """ Triggers a copy operation for all restored objects passed in @id list
 
@@ -399,11 +405,12 @@ class GlacierUtils:
             PRINT(f'Successfully triggered delete for all @ids passed {success}')
         return success, errors
 
-    @explicit_confirm
+    @require_confirmation
     def restore_all_from_search(self, *, search_query: str, page_limit: int = 50, search_generator: bool = False,
-                                restore_length: int = 7, new_status: str = 'uploaded', storage_class: str = 'STANDARD',
+                                restore_length: int = 7, new_status: str = 'uploaded',
+                                storage_class: S3StorageClass = 'STANDARD',
                                 parallel: bool = False, num_threads: int = 4, delete_all_versions: bool = False,
-                                phase: int = 1, confirm=True) -> (List[str], List[str]):
+                                phase: int = 1) -> (List[str], List[str]):
         """ Overarching method that will take a search query and loop through all files in the
             search results, running the appropriate phase as passed
 
@@ -417,10 +424,8 @@ class GlacierUtils:
         :param num_threads: number of threads to use if parallel is active
         :param delete_all_versions: if deleting, whether to clear ALL glacier versions
         :param phase: which phase of the glacier restore to run, one of [1, 2, 3, 4]
-        :param confirm: whether to prompt the user to confirm the operation
         :return: 2-tuple of successful, failed @ids extracted from search
         """
-        ignored(confirm)  # used in decorator
         if phase not in [1, 2, 3, 4]:
             raise GlacierRestoreException(f'Invalid phase passed to restore_all_from_search: {phase},'
                                           f' valid phases: [1, 2, 3, 4]\n'
