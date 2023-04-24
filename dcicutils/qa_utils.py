@@ -2772,7 +2772,8 @@ class MockBotoS3Client(MockBoto3Client):
     def list_object_versions(self, Bucket, Prefix='', **unimplemented_keyargs):  # noQA - AWS argument naming style
         assert not unimplemented_keyargs, (f"The mock for list_object_versions needs to be extended."
                                            f" {there_are(unimplemented_keyargs, kind='unimplemented key')}")
-        versions = []
+        version_descriptions = []
+        delete_marker_descriptions = []
         bucket_prefix = Bucket + "/"
         bucket_prefix_length = len(bucket_prefix)
         search_prefix = bucket_prefix + (Prefix or '')
@@ -2783,25 +2784,37 @@ class MockBotoS3Client(MockBoto3Client):
                 all_versions = self._object_all_versions(filename)
                 most_recent_version = all_versions[-1]
                 for version in all_versions:
-                    versions.append({
-                        'Key': key,
-                        'VersionId': version.version_id,
-                        'IsLatest': version == most_recent_version,
-                        'ETag': self._content_etag(content),
-                        'Size': len(content if version.content is None else version.content),
-                        'StorageClass': version.storage_class,
-                        'LastModified': version.last_modified,  # type datetime.datetime
-                        # 'Owner': {
-                        #     "DisplayName": "4dn-dcic-technical",
-                        #     "ID": "9e7e144b18724b65641286dfa355edb64c424035706bd1674e9096ee77422a45"
-                        # },
-                    })
-
+                    if isinstance(version, MockObjectAttributeBlock):
+                        version_descriptions.append({
+                            # 'Owner': {
+                            #     "DisplayName": "4dn-dcic-technical",
+                            #     "ID": "9e7e144b18724b65641286dfa355edb64c424035706bd1674e9096ee77422a45"
+                            # },
+                            'Key': key,
+                            'VersionId': version.version_id,
+                            'IsLatest': version == most_recent_version,
+                            'ETag': self._content_etag(content),
+                            'Size': len(content if version.content is None else version.content),
+                            'StorageClass': version.storage_class,
+                            'LastModified': version.last_modified,  # type datetime.datetime
+                        })
+                    else:
+                        delete_marker_descriptions.append({
+                            # 'Owner': {
+                            #     "DisplayName": "4dn-dcic-technical",
+                            #     "ID": "9e7e144b18724b65641286dfa355edb64c424035706bd1674e9096ee77422a45"
+                            # },
+                            'Key': key,
+                            'VersionId': version.version_id,
+                            'IsLatest': version == most_recent_version,
+                            'LastModified': version.last_modified,  # type datetime.datetime
+                        })
                 # for other_versions in self.s3_files.other_files[filename]:
         return {
             'ResponseMetadata': self.compute_mock_response_metadata(),
             'IsTruncated': False,
-            'Versions': versions,
+            'Versions': version_descriptions,
+            'DeleteMarkers': delete_marker_descriptions,
             'Name': Bucket,
             'Prefix': Prefix,
             # 'KeyMarker': "",
