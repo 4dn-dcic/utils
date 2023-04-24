@@ -1390,7 +1390,6 @@ def test_object_basic_attribute_block():
 
 def test_object_delete_marker():
 
-    start_time = datetime.datetime.now()
     sample_filename = "foo"
     mock_boto3 = MockBoto3()
     s3 = mock_boto3.client('s3')
@@ -1438,32 +1437,33 @@ def test_object_attribute_block():
     assert b.tagset == []
     b.set_tagset(sample_tagset)
     assert b.tagset == sample_tagset
-    assert b.content == None
+    assert b.content is None
     b.set_content(sample_content)
     assert b.content == sample_content
     with pytest.raises(Exception):
         b.set_content(sample_content)
 
-    assert b.restoration == None
-    b.restore_temporarily(delay_seconds=sample_delay_seconds, duration_days=sample_duration_days, storage_class='STANDARD')
+    assert b.restoration is None
+    b.restore_temporarily(delay_seconds=sample_delay_seconds, duration_days=sample_duration_days,
+                          storage_class='STANDARD')
     assert isinstance(b.restoration, MockTemporaryRestoration)
     assert b.restoration.available_after > start_time
     assert b.restoration.available_after < datetime.datetime.now() + datetime.timedelta(seconds=sample_delay_seconds)
-    assert b.storage_class is 'STANDARD'
+    assert b.storage_class == 'STANDARD'
     b.hurry_restoration()
-    assert b.storage_class is 'STANDARD'
+    assert b.storage_class == 'STANDARD'
     assert b.restoration.available_after < datetime.datetime.now()
     assert b.restoration.available_until > datetime.datetime.now()
     assert b.restoration.available_until > datetime.datetime.now()
     assert b.restoration.available_until < datetime.datetime.now() + datetime.timedelta(days=sample_duration_days,
                                                                                         seconds=sample_delay_seconds)
-    assert b.storage_class is 'STANDARD'
+    assert b.storage_class == 'STANDARD'
     b.hurry_restoration_expiry()
     # We have to examine ._restoration because an expired restoration will disappear as soon as we check it
     assert b._restoration.available_until < datetime.datetime.now()
     # Here we see it goes away...
     assert b.restoration is None
-    assert b.storage_class is 'GLACIER'
+    assert b.storage_class == 'GLACIER'
 
 
 def test_mock_keys_not_implemented():
