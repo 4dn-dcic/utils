@@ -18,16 +18,19 @@ from dcicutils import qa_utils
 from dcicutils.exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix
 from dcicutils.ff_mocks import mocked_s3utils
 from dcicutils.lang_utils import there_are
-from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ
+from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ, local_attrs, ignored
 from dcicutils.qa_utils import (
     mock_not_called, override_environ, override_dict, show_elapsed_time, timed,
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
     logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually, Timer,
+    MockObjectBasicAttributeBlock, MockObjectAttributeBlock, MockObjectDeleteMarker, MockTemporaryRestoration,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
+from typing import List, Dict
+from typing_extensions import Literal
 from unittest import mock
 from .fixtures.sample_fixtures import MockMathError, MockMath, math_enabled
 
@@ -1344,6 +1347,123 @@ def test_mock_boto_s3_client_limitations():
         with pytest.raises(MockKeysNotImplemented):
             mock_s3_client.download_fileobj(Fileobj=io.BytesIO(), Bucket="bucketname", Key="keyname",
                                             Config='not-implemented')
+
+
+def test_object_basic_attribute_block():
+
+    start_time = datetime.datetime.now()
+    sample_filename = "foo"
+    mock_boto3 = MockBoto3()
+    s3 = mock_boto3.client('s3')
+    b = MockObjectBasicAttributeBlock(filename=sample_filename, s3=s3)
+
+    assert b.last_modified < datetime.datetime.now()
+    assert b.last_modified > start_time
+    assert b.s3 == s3
+    assert b.filename == sample_filename
+    assert isinstance(b.version_id, str)
+
+    with local_attrs(MockObjectBasicAttributeBlock, MONTONIC_VERSIONS=False):
+        version_id_monotonic_false = MockObjectBasicAttributeBlock._generate_version_id()
+    with local_attrs(MockObjectBasicAttributeBlock, MONTONIC_VERSIONS=True):
+        version_id_monotonic_true = MockObjectBasicAttributeBlock._generate_version_id()
+
+    assert isinstance(version_id_monotonic_false, str)
+    assert '.' in version_id_monotonic_false      # a random string is really a guid with '.' instead of '-'
+    assert isinstance(version_id_monotonic_true, str)
+    assert '.' not in version_id_monotonic_true  # a timestamp of sorts, with digits 0-9 and a-z, but no dots
+
+    with pytest.raises(NotImplementedError):
+        x = b.storage_class
+        ignored(x)
+
+    with pytest.raises(NotImplementedError):
+        b.initialize_storage_class('STANDARD')
+
+    with pytest.raises(NotImplementedError):
+        x = b.tagset
+        ignored(x)
+
+    with pytest.raises(NotImplementedError):
+        b.set_tagset([])
+
+
+def test_object_delete_marker():
+
+    start_time = datetime.datetime.now()
+    sample_filename = "foo"
+    mock_boto3 = MockBoto3()
+    s3 = mock_boto3.client('s3')
+    b = MockObjectDeleteMarker(filename=sample_filename, s3=s3)
+
+    assert isinstance(b.last_modified, datetime.datetime)
+    assert b.s3 == s3
+    assert b.filename == sample_filename
+    assert isinstance(b.version_id, str)
+
+    with pytest.raises(Exception):
+        x = b.storage_class
+        ignored(x)
+
+    with pytest.raises(Exception):
+        b.initialize_storage_class('STANDARD')
+
+    with pytest.raises(Exception):
+        x = b.tagset
+        ignored(x)
+
+    with pytest.raises(Exception):
+        b.set_tagset([])
+
+
+def test_object_attribute_block():
+
+    start_time = datetime.datetime.now()
+    sample_filename = "foo"
+    sample_content = "some text"
+    sample_tagset: List[Dict[Literal['Key', 'Value'], str]] = [{'Key': 'foo', 'Value': 'bar'}]
+    sample_delay_seconds = 60
+    sample_duration_days = 7
+    mock_boto3 = MockBoto3()
+    s3 = mock_boto3.client('s3')
+    b = MockObjectAttributeBlock(filename=sample_filename, s3=s3)
+
+    assert isinstance(b.last_modified, datetime.datetime)
+    assert b.s3 == s3
+    assert b.filename == sample_filename
+    assert isinstance(b.version_id, str)
+    assert b.storage_class == 'STANDARD'
+    b.initialize_storage_class('GLACIER')
+    assert b.storage_class == 'GLACIER'
+    assert b.tagset == []
+    b.set_tagset(sample_tagset)
+    assert b.tagset == sample_tagset
+    assert b.content == None
+    b.set_content(sample_content)
+    assert b.content == sample_content
+    with pytest.raises(Exception):
+        b.set_content(sample_content)
+
+    assert b.restoration == None
+    b.restore_temporarily(delay_seconds=sample_delay_seconds, duration_days=sample_duration_days, storage_class='STANDARD')
+    assert isinstance(b.restoration, MockTemporaryRestoration)
+    assert b.restoration.available_after > start_time
+    assert b.restoration.available_after < datetime.datetime.now() + datetime.timedelta(seconds=sample_delay_seconds)
+    assert b.storage_class is 'STANDARD'
+    b.hurry_restoration()
+    assert b.storage_class is 'STANDARD'
+    assert b.restoration.available_after < datetime.datetime.now()
+    assert b.restoration.available_until > datetime.datetime.now()
+    assert b.restoration.available_until > datetime.datetime.now()
+    assert b.restoration.available_until < datetime.datetime.now() + datetime.timedelta(days=sample_duration_days,
+                                                                                        seconds=sample_delay_seconds)
+    assert b.storage_class is 'STANDARD'
+    b.hurry_restoration_expiry()
+    # We have to examine ._restoration because an expired restoration will disappear as soon as we check it
+    assert b._restoration.available_until < datetime.datetime.now()
+    # Here we see it goes away...
+    assert b.restoration is None
+    assert b.storage_class is 'GLACIER'
 
 
 def test_mock_keys_not_implemented():
