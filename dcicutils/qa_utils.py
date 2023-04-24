@@ -2029,6 +2029,7 @@ class MockTemporaryRestoration:
 class MockObjectBasicAttributeBlock:
 
     def __init__(self, filename, s3):
+        self.last_modified = datetime.datetime.now()
         self.s3: MockBotoS3Client = s3
         self.filename: str = filename
         self.version_id: str = self._generate_version_id()
@@ -2471,9 +2472,18 @@ class MockBotoS3Client(MockBoto3Client):
         :param versions: the versions to check. each should be an attribute block, a delete marker, or None
         """
         all_versions = self._object_all_versions(filename)
+        # Check that each of the given versions is present in all_versions
         for version in versions:
             if version:
                 assert version in all_versions
+        # We know that all versions are stored in time order. Make sure their simulated last-modified dates
+        # are in time order to match.
+        prior_date = None
+        for version in all_versions:
+            if version:
+                if prior_date:
+                    assert version.last_modified > prior_date
+                prior_date = version.last_modified
 
     def _prepare_new_attribute_block(self, filename,
                                      attribute_class: Type[MockObjectBasicAttributeBlock] = MockObjectAttributeBlock
@@ -2525,6 +2535,11 @@ class MockBotoS3Client(MockBoto3Client):
         attribute_block = self._object_attribute_block(filename)
         return attribute_block.version_id
 
+    def _object_last_modified(self, filename) -> datetime.datetime:
+
+        attribute_block = self._object_attribute_block(filename)
+        return attribute_block.last_modified
+
     def _object_storage_class(self, filename) -> S3StorageClass:
         """
         Returns the storage class for the 'filename' in this S3 mock.
@@ -2562,7 +2577,7 @@ class MockBotoS3Client(MockBoto3Client):
                 found.append({
                     'Key': filename[bucket_prefix_length:],
                     'ETag': self._content_etag(content),
-                    # "LastModified": ...,
+                    'LastModified': self._object_last_modified(filename=filename),
                     # "Owner": {"DisplayName": ..., "ID"...},
                     "Size": len(content),
                     "StorageClass": self._object_storage_class(filename=filename),
@@ -2775,7 +2790,7 @@ class MockBotoS3Client(MockBoto3Client):
                         'ETag': self._content_etag(content),
                         'Size': len(content if version.content is None else version.content),
                         'StorageClass': version.storage_class,
-                        # 'LastModified': "2023-04-20 03:48:04+00:00",
+                        'LastModified': version.last_modified,  # type datetime.datetime
                         # 'Owner': {
                         #     "DisplayName": "4dn-dcic-technical",
                         #     "ID": "9e7e144b18724b65641286dfa355edb64c424035706bd1674e9096ee77422a45"
