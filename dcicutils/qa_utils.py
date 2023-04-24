@@ -2315,7 +2315,7 @@ class MockBotoS3Client(MockBoto3Client):
                 if restoration.is_active():
                     result['Restore'] = f'ongoing-request="false", expiry-date="{restoration.available_until}"'
                 else:
-                    result['Restora'] = f'ongoing-request="true"'
+                    result['Restore'] = f'ongoing-request="true"'
             # if datetime.datetime.now() < attribute_block.available_after:
             #     result['Restore'] = 'ongoing-request="true"'
             return result
