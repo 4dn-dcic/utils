@@ -9,10 +9,43 @@ Change Log
 7.3.0
 =====
 
-* New ``glacier_utils`` module
+* In ``dcicutils.command_utils``:
+
+  * New decorator ``require_confirmation``
+
+* In ``dcicutils.common``:
+
+  * New variable ``ALL_S3_STORAGE_CLASSES``
+  * New variable ``AVAILABLE_S3_STORAGE_CLASSES``
+  * New variable ``S3_GLACIER_CLASSES``
+  * New type hint ``S3GlacierClass``
+  * New type hint ``S3StorageClass``
+
+* New module ``dcicutils.glacier_utils``:
 
     * Class for interacting with/restoring files from Glacier
 
+* In ``dcicutils.misc_utils``:
+
+  * New function ``INPUT``
+  * New function ``future_datetime``
+  * New decorator ``managed_property``
+  * New function ``map_chunked``
+  * New function ``format_in_radix``
+  * New function ``parse_in_radix``
+
+* In ``dcicutils.qa_checkers``:
+
+  * Fix bug in ``print`` statement recognizer
+
+* In ``dcicutils.qa_utils``:
+
+  * Support for Glacier-related operations in ``MockBotoS3Client``:
+
+    * Method ``copy_object``
+    * Method ``delete_object``
+    * Method ``list_object_versions``
+    * Method ``restore_object``
 
 * Load ``coveralls`` dependency only dynamically in GA workflow, not in poetry,
   because it implicates ``docopt`` library, which needs ``2to3``, and would fail.
