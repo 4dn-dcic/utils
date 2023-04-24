@@ -64,7 +64,8 @@ class GlacierUtils:
         return not cls.is_glacier_storage_class(storage_class)
 
     @classmethod
-    def is_delayed_storage_class_transition(cls, from_storage_class: S3StorageClass, to_storage_class: S3StorageClass):
+    def transition_involves_glacier_restoration(cls, from_storage_class: S3StorageClass,
+                                                to_storage_class: S3StorageClass):
         return cls.is_glacier_storage_class(from_storage_class) and cls.is_available_storage_class(to_storage_class)
 
     def resolve_possible_file_status(self) -> list:

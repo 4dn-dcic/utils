@@ -1991,36 +1991,6 @@ class MockBotoCloudFormationResourceSummary:
         self.stack_name = None  # This will get filled out if used as a resource on a mock stack
 
 
-class MockObjectBasicAttributeBlock:
-
-    def __init__(self, filename, s3):
-        self.s3: MockBotoS3Client = s3
-        self.filename: str = filename
-        self.version_id: str = self._generate_version_id()
-
-    def __str__(self):
-        return f"<{self.filename}#{self.version_id}>"
-
-    VERSION_ID_INITIAL_WIDTH = len(format_in_radix(time.time_ns(), radix=36))
-    #  In a single instantiation of python, now 50+ years into the epoch, this mock could overflow one
-    #  digit of this, but not realistically more. So reserving space for one digit of overflow after
-    #  whatever time it is on load.
-    VERSION_ID_MAX_WIDTH = VERSION_ID_INITIAL_WIDTH + 1
-
-    MONTONIC_VERSIONS = False
-
-    @classmethod
-    def _generate_version_id(cls):
-        if cls.MONTONIC_VERSIONS:
-            return format_in_radix(time.time_ns(), radix=36)
-        else:
-            return str(uuid.uuid4()).replace('-', '.').lower()
-
-
-class MockObjectDeleteMarker(MockObjectBasicAttributeBlock):
-    pass
-
-
 class MockTemporaryRestoration:
 
     def __init__(self, delay_seconds: Union[int, float], duration_days: Union[int, float],
@@ -2056,12 +2026,79 @@ class MockTemporaryRestoration:
         self._available_until = datetime.datetime.now()
 
 
+class MockObjectBasicAttributeBlock:
+
+    def __init__(self, filename, s3):
+        self.s3: MockBotoS3Client = s3
+        self.filename: str = filename
+        self.version_id: str = self._generate_version_id()
+
+    def __str__(self):
+        return f"<{self.filename}#{self.version_id}>"
+
+    VERSION_ID_INITIAL_WIDTH = len(format_in_radix(time.time_ns(), radix=36))
+    #  In a single instantiation of python, now 50+ years into the epoch, this mock could overflow one
+    #  digit of this, but not realistically more. So reserving space for one digit of overflow after
+    #  whatever time it is on load.
+    VERSION_ID_MAX_WIDTH = VERSION_ID_INITIAL_WIDTH + 1
+
+    MONTONIC_VERSIONS = False
+
+    @classmethod
+    def _generate_version_id(cls):
+        if cls.MONTONIC_VERSIONS:
+            return format_in_radix(time.time_ns(), radix=36)
+        else:
+            return str(uuid.uuid4()).replace('-', '.').lower()
+
+    @property
+    def storage_class(self) -> S3StorageClass:
+        raise NotImplementedError(f"The method 'storage_class' is expected to be implemented"
+                                  f" in subclasses of MockObjectBasicAttributeBlock: {self}")
+
+    def initialize_storage_class(self, value: S3StorageClass):
+        raise NotImplementedError(f"The method 'initialize_storage_class' is expected to be implemented"
+                                  f" in subclasses of MockObjectBasicAttributeBlock: {self}")
+
+    @property
+    def tagset(self) -> List[Dict[Literal['Key', 'Value'], str]]:
+        """
+        Returns a list of Key/Value dictionaries: [{'Key': ..., 'Value':  ...}, ...]
+        """
+        raise NotImplementedError(f"The method 'tagset' is expected to be implemented"
+                                  f" in subclasses of MockObjectBasicAttributeBlock: {self}")
+
+    def set_tagset(self, value: List[Dict[Literal['Key', 'Value'], str]]):
+        """
+        Sets the tagset to a given list of Key/Value dictionaries: [{'Key': ..., 'Value':  ...}, ...]
+        """
+        raise NotImplementedError(f"The method 'set_tagset' is expected to be implemented"
+                                  f" in subclasses of MockObjectBasicAttributeBlock: {self}")
+
+
+class MockObjectDeleteMarker(MockObjectBasicAttributeBlock):
+
+    @property
+    def storage_class(self) -> S3StorageClass:
+        raise Exception(f"Attempt to find storage class for mock-deleted S3 filename {self.filename}")
+
+    def initialize_storage_class(self, value: S3StorageClass):
+        raise Exception(f"Attempt to initialize storage class for mock-deleted S3 filename {self.filename}")
+
+    @property
+    def tagset(self) -> List[Dict[Literal['Key', 'Value'], str]]:
+        raise Exception(f"Attempt to set tagset for mock-deleted S3 filename {self.filename}")
+
+    def set_tagset(self, value: List[Dict[Literal['Key', 'Value'], str]]):
+        raise Exception(f"Attempt to set tagset for mock-deleted S3 filename {self.filename}")
+
+
 class MockObjectAttributeBlock(MockObjectBasicAttributeBlock):
 
     def __init__(self, filename, s3):
         super().__init__(filename=filename, s3=s3)
         self._storage_class: S3StorageClass = s3.storage_class
-        self.tagset: List[str] = []
+        self._tagset = []
         # Content must be added later. The file system at time this object is created may still have a stale value.
         self._content = None
         self._restoration: Optional[MockTemporaryRestoration] = None
@@ -2075,6 +2112,13 @@ class MockObjectAttributeBlock(MockObjectBasicAttributeBlock):
             self._content = content
         else:
             raise RuntimeError("Attempt to set content for an attribute block that already had content.")
+
+    @property
+    def tagset(self) -> List[Dict[Literal['Key', 'Value'], str]]:
+        return copy.deepcopy(self._tagset)  # don't rely on caller to leave what we give them unmodified
+
+    def set_tagset(self, value: List[Dict[Literal['Key', 'Value'], str]]):
+        self._tagset = copy.deepcopy(value)  # don't rely on caller not to later modify the value given
 
     @property
     def storage_class(self):
@@ -2384,22 +2428,25 @@ class MockBotoS3Client(MockBoto3Client):
 
     _ARCHIVE_LOCK = threading.Lock()
 
-    def delete_current_version(self, filename):
-        return self.archive_current_version(filename, replacement_class=MockObjectDeleteMarker)
-
     def hurry_restoration_for_testing(self, s3_filename, attribute_block=None):
+        """
+        This can be used in testing to hurry up the wait for a temporary restore to become available.
+        """
         attribute_block = attribute_block or self._object_attribute_block(s3_filename)
         assert isinstance(attribute_block, MockObjectAttributeBlock)
         attribute_block.hurry_restoration()
 
     def hurry_restoration_expiry_for_testing(self, s3_filename, attribute_block=None):
+        """
+        This can be used in testing to hurry up the wait for a temporary restore to expire.
+        """
         attribute_block = attribute_block or self._object_attribute_block(s3_filename)
         assert isinstance(attribute_block, MockObjectAttributeBlock)
         attribute_block.hurry_restoration_expiry()
 
     def archive_current_version(self, filename,
                                 replacement_class: Type[MockObjectBasicAttributeBlock] = MockObjectAttributeBlock,
-                                init: Optional[callable] = None):
+                                init: Optional[callable] = None) -> Optional[MockObjectBasicAttributeBlock]:
         with self._ARCHIVE_LOCK:
             # The file system dictionary is the source of content authority until we archive things,
             # and then the current version has to be archived.
@@ -2413,6 +2460,7 @@ class MockBotoS3Client(MockBoto3Client):
             self._check_versions_registered(filename, preexisting_version, new_block)
             if init is not None:
                 init()  # caller can supply an init function to be run while still inside lock
+            return new_block
 
     def _check_versions_registered(self, filename, *versions: Optional[MockObjectBasicAttributeBlock]):
         """
@@ -2428,7 +2476,8 @@ class MockBotoS3Client(MockBoto3Client):
                 assert version in all_versions
 
     def _prepare_new_attribute_block(self, filename,
-                                     attribute_class: Type[MockObjectBasicAttributeBlock] = MockObjectAttributeBlock):
+                                     attribute_class: Type[MockObjectBasicAttributeBlock] = MockObjectAttributeBlock
+                                     ) -> MockObjectBasicAttributeBlock:  # given the type, instantiates that type
         new_block = attribute_class(filename=filename, s3=self)
         all_versions = self._object_all_versions(filename)
         all_versions.append(new_block)
@@ -2448,10 +2497,7 @@ class MockBotoS3Client(MockBoto3Client):
         so that if another client is created by that same boto3 mock, it will see the same storage classes.
         """
         attribute_block = self._object_attribute_block(filename)
-        if isinstance(attribute_block, MockObjectDeleteMarker):
-            raise Exception("Attempt to find tagset for mock-deleted S3 filename {filename}")
-        assert isinstance(attribute_block, MockObjectAttributeBlock)
-        return copy.deepcopy(attribute_block.tagset)  # Don't let recipient of value change our stored value
+        return attribute_block.tagset
 
     def _set_object_tagset(self, filename, tagset):
         """
@@ -2465,11 +2511,8 @@ class MockBotoS3Client(MockBoto3Client):
         Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
         so that if another client is created by that same boto3 mock, it will see the same storage classes.
         """
-        assert isinstance(tagset, list) and all(isinstance(pair, dict) for pair in tagset), (
-            f"An internal tagset must be a list of Key/Value dictionaries: {tagset}"
-        )
         attribute_block = self._object_attribute_block(filename)
-        attribute_block.tagset = copy.deepcopy(tagset)  # Don't share state with our argument
+        attribute_block.set_tagset(tagset)
 
     def _object_version_id(self, filename):
         """
@@ -2482,7 +2525,7 @@ class MockBotoS3Client(MockBoto3Client):
         attribute_block = self._object_attribute_block(filename)
         return attribute_block.version_id
 
-    def _object_storage_class(self, filename):
+    def _object_storage_class(self, filename) -> S3StorageClass:
         """
         Returns the storage class for the 'filename' in this S3 mock.
         Because this is an internal routine, 'filename' is 'bucket/key' to match the mock file system we use internally.
@@ -2491,12 +2534,9 @@ class MockBotoS3Client(MockBoto3Client):
         so that if another client is created by that same boto3 mock, it will see the same storage classes.
         """
         attribute_block = self._object_attribute_block(filename)
-        if isinstance(attribute_block, MockObjectDeleteMarker):
-            raise Exception("Attempt to find storage class for mock-deleted S3 filename {filename}")
-        assert isinstance(attribute_block, MockObjectAttributeBlock)
         return attribute_block.storage_class
 
-    def _set_object_storage_class_for_testing(self, filename, value):
+    def _set_object_storage_class_for_testing(self, s3_filename, value: S3StorageClass):
         """
         Sets the storage class for the 'filename' in this S3 mock to the given value.
         Because this is an internal routine, 'filename' is 'bucket/key' to match the mock file system we use internally.
@@ -2508,8 +2548,7 @@ class MockBotoS3Client(MockBoto3Client):
         Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
         so that if another client is created by that same boto3 mock, it will see the same storage classes.
         """
-        attribute_block = self._object_attribute_block(filename)
-        assert isinstance(attribute_block, MockObjectAttributeBlock), f"Cannot set storage class of {attribute_block}"
+        attribute_block = self._object_attribute_block(s3_filename)
         attribute_block.initialize_storage_class(value)
 
     def list_objects(self, Bucket, Prefix=None):  # noQA - AWS argument naming style
@@ -2557,31 +2596,23 @@ class MockBotoS3Client(MockBoto3Client):
         target_storage_class: S3StorageClass = StorageClass or self.storage_class
         source_bucket = CopySource['Bucket']
         source_key = CopySource['Key']
+        source_version_id = CopySource.get('VersionId')  # Optional
         source_s3_filename = f"{source_bucket}/{source_key}"
-        target_s3_filename = f"{Bucket}/{Key}"
-        source_version_id = CopySource.get('VersionId')
+        target_bucket = Bucket
+        target_key = Key
+        target_version_id = CopySourceVersionId
+        target_s3_filename = f"{target_bucket}/{target_key}"
         copy_in_place = False  # might be overridden below
         if CopySourceVersionId:
             if CopySourceVersionId != source_version_id or source_bucket != Bucket or source_key != Key:
                 raise AssertionError(f"This mock expected that if CopySourceVersionId is given,"
                                      f" a matching Bucket, Key, and VersionId appears in CopySource."
-                                     f" CopySource['Bucket']={source_bucket!r}"
-                                     f" CopySource['Key']={source_key!r}"
-                                     f" CopySource['VersionId']={source_version_id!r}"
-                                     f" Bucket={Bucket!r}"
-                                     f" Key={Key!r}"
+                                     f" CopySource={CopySource!r} Bucket={Bucket!r} Key={Key!r}"
                                      f" CopySourceVersionId={CopySourceVersionId!r}")
             copy_in_place = True
         source_data = self.s3_files.files.get(source_s3_filename)
         if source_version_id:
-            source_version = None
-            source_all_versions = self._object_all_versions(source_s3_filename)
-            for version in source_all_versions:
-                if version.version_id == source_version_id:
-                    source_version = version
-                    break
-            if not source_version:
-                raise Exception(f"Mock S3 location Bucket={Bucket} Key={Key} VersionId={source_version_id} not found.")
+            source_version = self._get_versioned_object(source_s3_filename, source_version_id)
             source_data = source_data if source_version.content is None else source_version.content
         else:
             source_version = self._object_attribute_block(source_s3_filename)
@@ -2593,40 +2624,26 @@ class MockBotoS3Client(MockBoto3Client):
             raise Exception(f"S3 location Bucket={Bucket} Key={Key} VersionId{source_version_id} does not exist.")
         assert isinstance(source_version, MockObjectAttributeBlock)  # we know this because it has data
         if not allow_glacial:
-            source_id = f"Bucket={source_bucket!r} Key={source_key!r} VersionId={source_version_id!r}"
             if GlacierUtils.is_glacier_storage_class(source_storage_class):
-                raise Exception(f"The Copy source {source_id}"
-                                f" is in storage class {source_storage_class!r} and must be restored first.")
-            else:
-                # print("Storage class is OK for copy.")
-                pass
-            # now = datetime.datetime.now()
-            # print(f"Checking availability")
-            # print(f"Time now is {now}")
-            # print(f"Source version available at {source_version.available_after}")
-            # seconds_until_available = (source_version.available_after - now).total_seconds()
-            # if seconds_until_available > 0:
-            #     raise Exception(f"The Copy source {source_id} is still being mock-restored from glacier."
-            #                     f" Wait {seconds_until_available} seconds more.")
-        if not copy_in_place:
+                raise Exception(f"The Copy source {CopySource!r} is in storage class {source_storage_class!r}"
+                                f" and must be restored first.")
+        if not copy_in_place:  # We don't archive previous version or update content for copy-in-place.
             self.archive_current_version(target_s3_filename)
+            # In this case, we've made a new version and it will be current.
+            # In that case, the files dictionary needs the content copied.
             self.s3_files.files[target_s3_filename] = source_data
-        attribute_block = self._object_attribute_block(target_s3_filename)
-        assert isinstance(attribute_block, MockObjectAttributeBlock)
-        target_attribute_block: MockObjectAttributeBlock = attribute_block
-        target_attribute_block._storage_class = target_storage_class   # TODO: This seems suspect
-        # else:
-        #     attribute_block = self._object_attribute_block(target_s3_filename)
-        #     assert isinstance(attribute_block, MockObjectAttributeBlock)
-        #     target_attribute_block: MockObjectAttributeBlock = attribute_block
-        #     target_attribute_block.storage_class = target_storage_class
-        PRINT(f"Copied from {source_storage_class} to {target_storage_class}")
-        if GlacierUtils.is_delayed_storage_class_transition(source_storage_class, target_storage_class):
+        target_attribute_block = self._get_versioned_object(target_s3_filename, target_version_id)
+        new_storage_class = target_storage_class
+        if (copy_in_place
+                and GlacierUtils.transition_involves_glacier_restoration(source_storage_class, target_storage_class)):
+            new_storage_class = None  # For a restoration, the don't update the glacier data. It's restored elsewhere.
             target_attribute_block.restore_temporarily(delay_seconds=self.RESTORATION_DELAY_SECONDS,
                                                        duration_days=1, storage_class=target_storage_class)
             PRINT(f"Set up restoration {target_attribute_block.restoration}")
         else:
             PRINT(f"The copy was not a temporary restoration.")
+        if new_storage_class:
+            target_attribute_block.initialize_storage_class(new_storage_class)
 
     RESTORATION_DELAY_SECONDS = 2
 
@@ -2638,39 +2655,90 @@ class MockBotoS3Client(MockBoto3Client):
                                            f" {there_are(unimplemented_keyargs, kind='unimplemented key')}")
         assert VersionId and isinstance(VersionId, str), "A VersionId must be supplied to delete_object."
         s3_filename = f"{Bucket}/{Key}"
-        all_versions = self._object_all_versions(s3_filename)
-        delete_marker = None
-        if not VersionId:
-            # NOTE WELL: Just like AWS, we don't actually verify that this file even exists in this case.
-            #            We allow you to delete a file that does not exist.
-            self.delete_current_version(filename=Key)
-            all_versions.append(delete_marker)
-        else:
-            found = None
-            for version in all_versions:
-                if version.version_id == VersionId:
-                    found = version
-                    all_versions.remove(version)
-                    new_current_version = all_versions[-1]
-                    self.s3_files.files[s3_filename] = new_current_version.content
-                    break
-            if not found:
-                raise ClientError(operation_name="DeleteObject",
-                                  error_response={  # noQA - PyCharm wrongly complains about this dictionary
-                                      "Error": {
-                                          "Code": "InvalidArgument",
-                                          "Message": "Invalid version id specified",
-                                          "ArgumentName": "versionId",
-                                          "ArgumentValue": VersionId
-                                      }})
-            if isinstance(found, MockObjectDeleteMarker):
-                delete_marker = found
         result = {
             'ResponseMetadata': self.compute_mock_response_metadata(),
             'VersionId': VersionId
         }
+        if not VersionId:
+            # Just like AWS, we don't actually verify that this file even exists in this case.
+            # We allow you to delete a file that does not exist. We just add a delete marker
+            # on the top of the existing versions.
+            props = self._delete_current_version(s3_filename=s3_filename)
+        else:
+            # Just like in AWS, when a version id is given, that version is in-place deleted
+            # with no new delete marker creates.
+            props = self._delete_versioned_object(s3_filename=s3_filename, version_id=VersionId)
+        for key, value in props.items():
+            result[key] = value
+        return result
+
+    def _delete_current_version(self, s3_filename) -> Dict[str, Any]:
+        """
+        Deletes the current version of a versioned file, by piling a delete marker atop it.
+        """
+        delete_marker = self.archive_current_version(s3_filename, replacement_class=MockObjectDeleteMarker)
         if delete_marker:
+            assert isinstance(delete_marker, MockObjectDeleteMarker)
+            all_versions = self._object_all_versions(s3_filename)
+            all_versions.append(delete_marker)
+            return {'DeleteMarker': True}
+        else:
+            return {}
+
+    def _get_versioned_object(self, s3_filename, version_id=None) -> MockObjectAttributeBlock:
+        found = self._find_versioned_object(s3_filename, version_id)
+        if not found:
+            raise Exception(f"Mock S3 file {s3_filename!r} with version_id {version_id!r} not found.")
+        if isinstance(found, MockObjectDeleteMarker):
+            raise Exception(f"Mock S3 file {s3_filename!r} with version id {version_id!r} is a delete marker.")
+        assert isinstance(found, MockObjectAttributeBlock)
+        return found
+
+    def _find_versioned_object(self, s3_filename, version_id=None) -> Optional[MockObjectBasicAttributeBlock]:
+        all_versions = self._object_all_versions(s3_filename)
+        if version_id is None:
+            if all_versions:
+                return all_versions[-1]
+        else:
+            for version in all_versions:
+                if version.version_id == version_id:
+                    return version
+        return None
+
+    def _delete_versioned_object(self, s3_filename, version_id) -> Dict[str, Any]:
+        """
+        Deletes the current version of a versioned file, by removing it in-place.
+        This path never makes a new delete marker.
+        """
+        result = {}
+        found_version = self._find_versioned_object(s3_filename, version_id)
+        if not found_version:
+            raise ClientError(operation_name="DeleteObject",
+                              error_response={  # noQA - PyCharm wrongly complains about this dictionary
+                                  "Error": {
+                                      "Code": "InvalidArgument",
+                                      "Message": "Invalid version id specified",
+                                      "ArgumentName": "versionId",
+                                      "ArgumentValue": version_id
+                                  }})
+        # Delete the old version
+        all_versions = self._object_all_versions(s3_filename)
+        all_versions.remove(found_version)
+        if isinstance(found_version, MockObjectDeleteMarker):
+            # 'DeleteMarker': True appears in a result if a delete marker is added or removed.
+            # In this case, no new delete marker was added, but one was removed.
             result['DeleteMarker'] = True
+        # Reset state for the version that shows through
+        if all_versions:
+            # If there are still versions remaining, update the content dictionary in self.s3_files.files
+            new_content = None
+            new_current_version: MockObjectBasicAttributeBlock = all_versions[-1]
+            if isinstance(new_current_version, MockObjectAttributeBlock):
+                new_content = new_current_version.content
+            self.s3_files.files[s3_filename] = new_content
+        else:
+            # If there are no versions remaining, we've completely deleted the thing. Just remove all record.
+            del self.s3_files.files[s3_filename]
         return result
 
     def restore_object(self, Bucket, Key, RestoreRequest, StorageClass: Optional[S3StorageClass] = None):
