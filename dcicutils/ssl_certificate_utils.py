@@ -20,7 +20,7 @@ def get_ssl_certificate_info(hostname: str,
         expires_at   issuer_entity    pem
         hostname     issuer_state     public_key_pem
         hostnames    owner            serial_number
-        inactive     owner_city       valid
+        inactive     owner_city       invalid
     """
     hostname = _normalize_hostname(hostname)
     try:
@@ -34,7 +34,7 @@ def get_ssl_certificate_info(hostname: str,
         # The hostname from _get_ssl_certificate_info_from_pem is not necessarily exactly correct;
         # for example, for cgap-wolf.hms.harvard.edu it is imperva.com.
         certificate_info["hostname"] = hostname
-        certificate_info["valid"] = certificate_info["valid"] and certificate_okay
+        certificate_info["invalid"] = certificate_info["invalid"] or not certificate_okay
         if certificate_exception:
             certificate_info["exception"] = str(certificate_exception)
         return certificate_info
@@ -137,7 +137,7 @@ def _get_ssl_certificate_info_from_pem(pem_string: str,
 
         expired = now >= expires_at
         inactive = now <= active_at
-        valid = not inactive and not expired
+        invalid = inactive or expired
 
         # Note we could not currently get detect specifically if the certificate is revoked;
         # could not get the recommeneded code working consistently; no great matter.
@@ -168,7 +168,7 @@ def _get_ssl_certificate_info_from_pem(pem_string: str,
             "pem": pem_string,
             "serial_number": serial_number,
             "public_key_pem": public_key_pem,
-            "valid": valid,
+            "invalid": invalid,
             "inactive": inactive,
             "expired": expired,
             "expires_soon": expires_soon,
