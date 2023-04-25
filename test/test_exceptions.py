@@ -2,7 +2,7 @@ from dcicutils.exceptions import (
     ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix,
     ConfigurationError, SynonymousEnvironmentVariablesMismatched, InferredBucketConflict,
     CannotInferEnvFromNoGlobalEnvs, CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv, GlobalBucketAccessError,
-    InvalidParameterError, AppKeyMissing, AppServerKeyMissing, AppEnvKeyMissing
+    InvalidParameterError, AppKeyMissing, AppServerKeyMissing, AppEnvKeyMissing, MultiError,
 )
 from dcicutils.creds_utils import CGAPKeyManager
 
@@ -288,3 +288,27 @@ def test_app_server_key_missing():
 
     assert str(error) == ("Missing credential in file %s for CGAP server %s."
                           % (CGAPKeyManager._default_keys_file(), some_server))
+
+
+def test_MultiError():
+
+    e1 = ValueError("bad value")
+    e2 = RuntimeError("foo")
+    e3 = TypeError("wrong thing")
+
+    m1 = MultiError(e1)
+    m2 = MultiError(e1, e2)
+    m3 = MultiError(m2, e3)
+    m4 = MultiError(m2, e3, flatten=False)
+
+    assert isinstance(m1, MultiError)
+    assert m1.errors == [e1]
+
+    assert isinstance(m2, MultiError)
+    assert m2.errors == [e1, e2]
+
+    assert isinstance(m3, MultiError)
+    assert m3.errors == [e1, e2, e3]
+
+    assert isinstance(m4, MultiError)
+    assert m4.errors == [m2, e3]

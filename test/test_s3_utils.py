@@ -1003,9 +1003,9 @@ C4_853_FIX_INFO = {
         {'metadata_fix': True, 'tibanna_fix': False},
 
     'fourfront-hotseat':
-        {'metadata_fix': True, 'tibanna_fix': False},
+        {'metadata_fix': True, 'tibanna_fix': True},
     'hotseat':
-        {'metadata_fix': True, 'tibanna_fix': False},
+        {'metadata_fix': True, 'tibanna_fix': True},
 }
 
 

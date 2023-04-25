@@ -247,6 +247,13 @@ snapshot_utils
   :members:
 
 
+task_utils
+^^^^^^^^^^
+
+.. automodule:: dcicutils.task_utils
+  :members:
+
+
 trace_utils
 ^^^^^^^^^^^
 

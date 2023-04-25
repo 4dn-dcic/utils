@@ -7,7 +7,7 @@ Change Log
 ----------
 
 
-7.1.0
+7.3.0
 =====
 
 * In ``dcicutils.env_utils`` added function ``get_portal_url``;
@@ -15,6 +15,33 @@ Change Log
 
 * Added ``dcicutils.ssl_certificate_utils``;
   first usage of which was in foursight-core. 2023-04-16.
+
+
+7.2.0
+=====
+
+* In ``exceptions``:
+
+  * New class ``MultiError``
+
+* In ``qa_utils``:
+
+  * New class ``Timer``
+
+* In ``misc_utils``:
+
+  * New generator function ``chunked``
+
+* New module ``task_utils``:
+
+  * New class ``Task``
+  * New class ``TaskManager``
+  * New function ``pmap``
+  * New function ``pmap_list``
+  * New function ``pmap_chunked``
+
+* Adjust expectations for environment ``hotseat``
+  in live ecosystem integration testing by ``tests/test_s3_utils.py``
 
 
 7.1.0
