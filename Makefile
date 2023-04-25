@@ -5,7 +5,6 @@ clear-poetry-cache:  # clear poetry/pypi cache. for user to do explicitly, never
 
 configure:  # does any pre-requisite installs
 	pip install poetry
-	pip install requests
 
 lint:
 	@echo "Running flake8..."
@@ -91,8 +90,7 @@ publish:
 
 publish-for-ga:
 	# scripts/publish --noconfirm
-	pip install --upgrade pip
-	pip install requests==2.28.2
+	pip install requests==^2.21.0
 	pip install toml
 	poetry run publish --noconfirm
 
