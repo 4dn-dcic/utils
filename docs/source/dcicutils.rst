@@ -247,6 +247,13 @@ snapshot_utils
   :members:
 
 
+ssl_certificate_utils
+^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.ssl_certificate_utils
+   :members:
+
+
 task_utils
 ^^^^^^^^^^
 
