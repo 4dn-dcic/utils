@@ -31,6 +31,7 @@ from typing import Tuple, Union
 
 
 DEBUG = False
+PRINT = print
 
 
 def main() -> None:
@@ -48,7 +49,7 @@ def main() -> None:
         DEBUG = True
 
     if args.noconfirm and not is_github_actions_context():
-        print("The --noconfirm flag is only allowed within GitHub actions!")
+        PRINT("The --noconfirm flag is only allowed within GitHub actions!")
         exit_with_no_action()
 
     if not verify_unstaged_changes():
@@ -76,12 +77,12 @@ def main() -> None:
         if not answered_yes_to_confirmation(f"Do you want to publish {package_name} {package_version} to PyPi?"):
             exit_with_no_action()
 
-    print(f"Publishing {package_name} {package_version} to PyPi ...")
+    PRINT(f"Publishing {package_name} {package_version} to PyPi ...")
 
     if not publish_package():
         exit_with_no_action()
 
-    print(f"Publishing {package_name} {package_version} to PyPi complete.")
+    PRINT(f"Publishing {package_name} {package_version} to PyPi complete.")
 
 
 def publish_package(pypi_username: str = None, pypi_password: str = None) -> bool:
@@ -90,7 +91,7 @@ def publish_package(pypi_username: str = None, pypi_password: str = None) -> boo
     if not pypi_password:
         pypi_password = os.environ.get("PYPI_PASSWORD")
     if not pypi_username or not pypi_password:
-        print(f"No PyPi credentials. You must have PYPI_USER and PYPI_PASSWORD environment variables set.")
+        PRINT(f"No PyPi credentials. You must have PYPI_USER and PYPI_PASSWORD environment variables set.")
         return False
     poetry_publish_command = [
         "poetry", "publish",
@@ -98,9 +99,9 @@ def publish_package(pypi_username: str = None, pypi_password: str = None) -> boo
         f"--username={pypi_username}", f"--password={pypi_password}"
     ]
     poetry_publish_results, status_code = execute_command(poetry_publish_command)
-    print("\n".join(poetry_publish_results))
+    PRINT("\n".join(poetry_publish_results))
     if status_code != 0:
-        print(f"Publish to PyPi failed!")
+        PRINT(f"Publish to PyPi failed!")
         return False
     return True
 
@@ -112,7 +113,7 @@ def verify_unstaged_changes() -> bool:
     """
     git_diff_results, _ = execute_command(["git", "diff"])
     if git_diff_results:
-        print("You have changes to this branch that you have not staged for commit.")
+        PRINT("You have changes to this branch that you have not staged for commit.")
         return False
     return True
 
@@ -124,7 +125,7 @@ def verify_uncommitted_changes() -> bool:
     """
     git_diff_staged_results, _ = execute_command(["git", "diff", "--staged"])
     if git_diff_staged_results:
-        print("You have staged changes to this branch that you have not committed.")
+        PRINT("You have staged changes to this branch that you have not committed.")
         return False
     return True
 
@@ -136,7 +137,7 @@ def verify_unpushed_changes() -> bool:
     """
     git_uno_results, _ = execute_command(["git", "status", "-uno"], lines_containing="is ahead of")
     if git_uno_results:
-        print("You have committed changes to this branch that you have not pushed.")
+        PRINT("You have committed changes to this branch that you have not pushed.")
         return False
     return True
 
@@ -148,7 +149,7 @@ def verify_tagged() -> bool:
     """
     git_most_recent_commit, _ = execute_command(["git", "log", "-1", "--decorate"], lines_containing="tag:")
     if not git_most_recent_commit:
-        print("You can only publish a tagged commit.")
+        PRINT("You can only publish a tagged commit.")
         return False
     return True
 
@@ -162,11 +163,11 @@ def verify_untracked_files() -> bool:
     """
     untracked_files = get_untracked_files()
     if untracked_files:
-        print(f"WARNING: You are about to PUBLISH the following ({len(untracked_files)})"
+        PRINT(f"WARNING: You are about to PUBLISH the following ({len(untracked_files)})"
               f" UNTRACKED file{'' if len(untracked_files) == 1 else 's' } -> SECURITY risk:")
         for untracked_file in untracked_files:
-            print(f"-- {untracked_file}")
-        print("DO NOT continue UNLESS you KNOW what you are doing!")
+            PRINT(f"-- {untracked_file}")
+        PRINT("DO NOT continue UNLESS you KNOW what you are doing!")
         if not answered_yes_to_confirmation("Do you really want to continue?"):
             return False
     return True
@@ -179,7 +180,7 @@ def verify_not_already_published(package_name: str, package_version: str) -> boo
     """
     response = requests.get(f"https://pypi.org/project/{package_name}/{package_version}/")
     if response.status_code == 200:
-        print(f"Package {package_name} {package_version} has already been published to PyPi.")
+        PRINT(f"Package {package_name} {package_version} has already been published to PyPi.")
         return False
     return True
 
@@ -253,7 +254,7 @@ def execute_command(command_argv: Union[list, str], lines_containing: str = None
     if isinstance(command_argv, str):
         command_argv = [arg for arg in command_argv.split(" ") if arg.strip()]
     if DEBUG:
-        print(f"DEBUG: {' '.join(command_argv)}")
+        PRINT(f"DEBUG: {' '.join(command_argv)}")
     result = subprocess.run(command_argv, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
     lines = result.stdout.decode("utf-8").split("\n")
@@ -278,7 +279,7 @@ def exit_with_no_action() -> None:
     Exits this process immediately with status 1;
     first prints a message saying no action was taken.
     """
-    print("Exiting without taking action.")
+    PRINT("Exiting without taking action.")
     exit(1)
 
 
