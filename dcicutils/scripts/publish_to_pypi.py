@@ -52,6 +52,9 @@ def main() -> None:
         PRINT("The --noconfirm flag is only allowed within GitHub actions!")
         exit_with_no_action()
 
+    if not verify_git_repo():
+        exit_with_no_action()
+
     if not verify_unstaged_changes():
         exit_with_no_action()
 
@@ -106,6 +109,17 @@ def publish_package(pypi_username: str = None, pypi_password: str = None) -> boo
     return True
 
 
+def verify_git_repo() -> bool:
+    """
+    If this (the current directory) looks like a git repo then return True,
+    otherwise prints a warning and returns False.
+    """
+    _, status = execute_command("git rev-parse --is-inside-work-tree")
+    if status != 0:
+        print("You are not in a git repo directory!")
+        return False
+    return True
+
 def verify_unstaged_changes() -> bool:
     """
     If the current git repo has no unstaged changes then returns True,
@@ -125,7 +139,7 @@ def verify_uncommitted_changes() -> bool:
     """
     git_diff_staged_results, _ = execute_command(["git", "diff", "--staged"])
     if git_diff_staged_results:
-        PRINT("You have staged changes to this branch that you have not committed.")
+        PRINT("You have changes to this branch that you have staged but not committed.")
         return False
     return True
 
@@ -137,7 +151,7 @@ def verify_unpushed_changes() -> bool:
     """
     git_uno_results, _ = execute_command(["git", "status", "-uno"], lines_containing="is ahead of")
     if git_uno_results:
-        PRINT("You have committed changes to this branch that you have not pushed.")
+        PRINT("You have committed changes to this branch that you committed but not pushed.")
         return False
     return True
 
