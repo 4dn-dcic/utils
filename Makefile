@@ -86,6 +86,7 @@ update:  # updates dependencies
 
 publish:
 	# scripts/publish
+	pip install requests toml
 	poetry run publish
 
 publish-for-ga:
