@@ -87,17 +87,12 @@ update:  # updates dependencies
 publish:
 	# New Python based publish script (2023-04-25).
 	# scripts/publish
-	poetry run publish
+	python dcicutils/scripts/publish_to_pypi.py
 
 publish-for-ga:
 	# New Python based publish script (2023-04-25).
 	# scripts/publish --noconfirm
 	pip install requests toml
-	# For some reason the following gives this error when run from GitHub actions:
-	# - ModuleNotFoundError: No module named 'requests'
-	# Even though requests has explicitly installed (no such error for toml).
-	# So instead as a workaround we use python to run the publish script.
-	# poetry run publish --noconfirm
 	python dcicutils/scripts/publish_to_pypi.py --noconfirm
 
 help:
