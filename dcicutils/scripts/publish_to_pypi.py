@@ -120,6 +120,7 @@ def verify_git_repo() -> bool:
         return False
     return True
 
+
 def verify_unstaged_changes() -> bool:
     """
     If the current git repo has no unstaged changes then returns True,
