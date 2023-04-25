@@ -90,6 +90,7 @@ publish:
 
 publish-for-ga:
 	# scripts/publish --noconfirm
+	pip install --upgrade pip
 	pip install requests==2.28.2
 	pip install toml
 	poetry run publish --noconfirm
