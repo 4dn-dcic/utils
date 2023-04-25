@@ -25,6 +25,7 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
+      - uses: requests
         with:
           python-version: 3.9
       - name: Publish
@@ -33,5 +34,4 @@ jobs:
           PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: | 
           make configure
-          pip install requests
           make publish-for-ga
