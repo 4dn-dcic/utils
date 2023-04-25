@@ -92,7 +92,8 @@ publish:
 publish-for-ga:
 	# scripts/publish --noconfirm
 	pip install requests toml
-	poetry run publish --noconfirm
+	# poetry run publish --noconfirm
+	python dcicutils/scripts/publish_to_pypi.py --noconfirm
 
 help:
 	@make info
