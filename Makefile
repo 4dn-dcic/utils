@@ -87,13 +87,15 @@ update:  # updates dependencies
 publish:
 	# New Python based publish script (2023-04-25).
 	# scripts/publish
-	python dcicutils/scripts/publish_to_pypi.py
+	# python dcicutils/scripts/publish_to_pypi.py
+	poetry run publish-to-pypi
 
 publish-for-ga:
 	# New Python based publish script (2023-04-25).
 	# scripts/publish --noconfirm
+	# python dcicutils/scripts/publish_to_pypi.py --noconfirm
 	pip install requests toml
-	python dcicutils/scripts/publish_to_pypi.py --noconfirm
+	poetry run publish-to-pypi --noconfirm
 
 help:
 	@make info

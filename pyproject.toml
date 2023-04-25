@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "7.3.0.1b21"
+version = "7.3.0.1b22"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -73,6 +73,10 @@ pytest-cov = ">=2.7.1"
 pytest-mock = ">=1.11.0"
 pytest-redis = "^2.0.0"
 pytest-runner = ">=5.1"
+
+
+[tool.poetry.scripts]
+publish-to-pypi = "dcicutils.scripts.publish_to_pypi:main"
 
 
 [tool.pytest.ini_options]
