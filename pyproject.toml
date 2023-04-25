@@ -74,6 +74,10 @@ pytest-redis = "^2.0.0"
 pytest-runner = ">=5.1"
 
 
+[tool.poetry.scripts]
+publish = "dcicutils.scripts.publish_to_pypi:main"
+
+
 [tool.pytest.ini_options]
 addopts = "--basetemp=/tmp/pytest"
 redis_exec = "/usr/local/bin/redis-server"

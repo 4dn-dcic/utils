@@ -85,10 +85,12 @@ update:  # updates dependencies
 	poetry update
 
 publish:
-	scripts/publish
+	# scripts/publish
+	poetry run publish
 
 publish-for-ga:
-	scripts/publish --noconfirm
+	# scripts/publish --noconfirm
+	poetry run publish --noconfirm
 
 help:
 	@make info

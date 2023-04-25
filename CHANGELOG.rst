@@ -16,6 +16,8 @@ Change Log
 * Added ``dcicutils.ssl_certificate_utils``;
   first usage of which was in foursight-core. 2023-04-16.
 
+* Added ``dcicutils.scripts.publish_to_pypi``; 2023-04-24.
+
 
 7.2.0
 =====
