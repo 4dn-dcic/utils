@@ -33,4 +33,5 @@ jobs:
           PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: | 
           make configure
+          pip install requests toml
           make publish-for-ga
