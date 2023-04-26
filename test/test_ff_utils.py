@@ -276,7 +276,8 @@ def test_unified_authenticator_normalize_auth():
 #         s3 = mock_boto3.client('s3')
 #         assert isinstance(s3, MockBotoS3Client)
 #         for filename, string in (files or {}).items():
-#             s3.s3_files.files[filename] = string.encode('utf-8')
+#             # s3.s3_files.files[filename] = string.encode('utf-8')
+#             s3.s3_files.set_file_content(filename, string.encode('utf-8'))
 #         yield mock_boto3
 
 

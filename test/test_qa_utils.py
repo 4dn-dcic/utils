@@ -808,17 +808,17 @@ def test_mock_file_system_simple():
                 with io.open(filename, 'r') as fp:
                     assert fp.read() == 'foobar\nbaz\n'
 
-                assert len(mfs.files) == 2
+                mfs.assert_file_count(2)
 
                 with io.open(filename2, 'r') as fp:
                     assert fp.read() == "stuff from yesterday"
 
                 assert sorted(mfs.files.keys()) == ['no.such.file', 'pre-existing-file.txt']
 
-                assert mfs.files == {
+                mfs.assert_file_system_state({
                     'no.such.file': b'foobar\nbaz\n',
                     'pre-existing-file.txt': b'stuff from yesterday'
-                }
+                })
 
 
 def test_mock_file_system_auto():
@@ -1152,7 +1152,8 @@ def test_mock_boto3_client_use():
         # No matter what clients you get, they all share the same MockFileSystem, which we can get from s3_files
         s3fs = s3.s3_files
         # We saved an s3 file to bucket "foo" and key "bar", so it will be in the s3fs as "foo/bar"
-        assert sorted(s3fs.files.keys()) == ['foo/bar', 'foo/baz']
+        assert s3fs.all_filenames_for_testing() == ['foo/bar', 'foo/baz']
+        # assert sorted(s3fs.files.keys()) == ['foo/bar', 'foo/baz']
         # The content is stored in binary format
         s3fs.assert_file_content('foo/bar', b'some content')
         s3fs.assert_file_content('foo/baz', b'other content')
@@ -1213,21 +1214,28 @@ def test_mock_boto_s3_client_upload_file_and_download_file_positional():
         with io.open("file1.txt", 'w') as fp:
             fp.write('Hello!\n')
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {}
+        # assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        local_mfs.assert_file_system_state({"file1.txt": b"Hello!\n"})
+        # assert mock_s3_client.s3_files.files == {}
+        mock_s3_client.s3_files.assert_file_system_state({})
 
         mock_s3_client.upload_file("file1.txt", "MyBucket", "MyFile")
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        local_mfs.assert_file_system_state({"file1.txt": b"Hello!\n"})
+        # assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+
+        mock_s3_client.s3_files.assert_file_system_state({'MyBucket/MyFile': b"Hello!\n"})
+        # assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
 
         mock_s3_client.download_file("MyBucket", "MyFile", "file2.txt")
 
-        assert local_mfs.files == {
+        # assert local_mfs.files == {...}
+        local_mfs.assert_file_system_state({
             "file1.txt": b"Hello!\n",
             "file2.txt": b"Hello!\n",
-        }
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        })
+        mock_s3_client.s3_files.assert_file_system_state({'MyBucket/MyFile': b"Hello!\n"})
+        # assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
 
         assert file_contents("file1.txt") == file_contents("file2.txt")
 
@@ -1275,23 +1283,29 @@ def test_mock_boto_s3_client_upload_fileobj_and_download_fileobj_positional():
         with io.open("file1.txt", 'w') as fp:
             fp.write('Hello!\n')
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {}
+        # assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        local_mfs.assert_file_system_state({"file1.txt": b"Hello!\n"})
+        # assert mock_s3_client.s3_files.files == {}
+        mock_s3_client.s3_files.assert_file_system_state({})
 
         with io.open("file1.txt", 'rb') as fp:
             mock_s3_client.upload_fileobj(fp, "MyBucket", "MyFile")
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        # assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        local_mfs.assert_file_system_state({"file1.txt": b"Hello!\n"})
+        # assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        mock_s3_client.s3_files.assert_file_system_state({'MyBucket/MyFile': b"Hello!\n"})
 
         with io.open("file2.txt", 'wb') as fp:
             mock_s3_client.download_fileobj("MyBucket", "MyFile", fp)
 
-        assert local_mfs.files == {
+        # assert local_mfs.files == { ... }
+        local_mfs.assert_file_system_state({
             "file1.txt": b"Hello!\n",
             "file2.txt": b"Hello!\n",
-        }
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        })
+        # assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        mock_s3_client.s3_files.assert_file_system_state({'MyBucket/MyFile': b"Hello!\n"})
 
         assert file_contents("file1.txt") == file_contents("file2.txt")
 
@@ -1306,23 +1320,29 @@ def test_mock_boto_s3_client_upload_fileobj_and_download_fileobj_keyworded():
         with io.open("file1.txt", 'w') as fp:
             fp.write('Hello!\n')
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {}
+        # assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        local_mfs.assert_file_system_state({"file1.txt": b"Hello!\n"})
+        # assert mock_s3_client.s3_files.files == {}
+        mock_s3_client.s3_files.assert_file_system_state({})
 
         with io.open("file1.txt", 'rb') as fp:
             mock_s3_client.upload_fileobj(Fileobj=fp, Bucket="MyBucket", Key="MyFile")
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        # assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        local_mfs.assert_file_system_state({"file1.txt": b"Hello!\n"})
+        # assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        mock_s3_client.s3_files.assert_file_system_state({'MyBucket/MyFile': b"Hello!\n"})
 
         with io.open("file2.txt", 'wb') as fp:
             mock_s3_client.download_fileobj(Bucket="MyBucket", Key="MyFile", Fileobj=fp)
 
-        assert local_mfs.files == {
+        # assert local_mfs.files == { ... }
+        local_mfs.assert_file_system_state({
             "file1.txt": b"Hello!\n",
             "file2.txt": b"Hello!\n",
-        }
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        })
+        # assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        mock_s3_client.s3_files.assert_file_system_state({'MyBucket/MyFile': b"Hello!\n"})
 
         assert file_contents("file1.txt") == file_contents("file2.txt")
 

@@ -501,7 +501,7 @@ class MockFileSystem:
             raise FileNotFoundError("No such file or directory: %s" % file)
 
     def all_filenames_for_testing(self):
-        return list(self.files.keys())
+        return sorted(self.files.keys())
 
     def open(self, file, mode='r', encoding=None):
         if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.

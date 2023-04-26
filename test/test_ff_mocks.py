@@ -183,7 +183,8 @@ def test_abstract_test_recorder_recording(recording_enabled):
             else:
                 expected = {f"{recordings_dir}/{test_name}": f"{json.dumps(initial_data)}\n".encode('utf-8')}
 
-            assert mfs.files == expected
+            # assert mfs.files == expected
+            mfs.assert_file_system_state(expected)
 
         recording = "Recording" if recording_enabled else "NOT recording"
         assert printed.lines == [
