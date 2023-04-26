@@ -4,6 +4,7 @@ import OpenSSL
 import socket
 import ssl
 from typing import Optional, Tuple
+from .misc_utils import future_datetime
 
 
 def get_ssl_certificate_info(hostname: str,
@@ -100,14 +101,6 @@ def _get_ssl_certificate_info_from_pem(pem_string: str,
                         sans.append(san[4:])
         return sorted(sans)
 
-    def is_datetime_within_ndays(d: datetime, ndays: int) -> bool:
-        """
-        Returns True iff the given datatime is within "ndays" days (in the future) of the current
-        datetime, i.e. if the current datetime plus "ndays" days is greater-than-or-equal to the
-        given datetime; otherwise returns False.
-        """
-        return (d - now) <= timedelta(days=ndays) if d >= now else False
-
     try:
         certificate = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, pem_string)
 
@@ -133,7 +126,7 @@ def _get_ssl_certificate_info_from_pem(pem_string: str,
         not_after = certificate.get_notAfter().decode("UTF-8")
         active_at = datetime.strptime(not_before, "%Y%m%d%H%M%SZ")
         expires_at = datetime.strptime(not_after, "%Y%m%d%H%M%SZ")
-        expires_soon = is_datetime_within_ndays(expires_at, expires_soon_days)
+        expires_soon = expires_at <= future_datetime(now=now, days=expires_soon_days)
 
         expired = now >= expires_at
         inactive = now <= active_at
