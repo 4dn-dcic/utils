@@ -1,5 +1,5 @@
 from cryptography.hazmat.primitives import serialization
-from datetime import datetime, timedelta
+from datetime import datetime
 import OpenSSL
 import socket
 import ssl
