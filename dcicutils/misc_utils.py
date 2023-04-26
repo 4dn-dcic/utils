@@ -600,6 +600,13 @@ def as_seconds(*, seconds=0, minutes=0, hours=0, days=0, weeks=0, milliseconds=0
     return seconds
 
 
+# Pulled this in from "glacier" branch for use in foursight-core (2023-04-26).
+def future_datetime(*, now=None, seconds=0, minutes=0, hours=0, days=0, weeks=0, milliseconds=0):
+    delta = datetime.timedelta(seconds=seconds, minutes=minutes, hours=hours,
+                               days=days, weeks=weeks, milliseconds=milliseconds)
+    return (now or datetime.datetime.now()) + delta
+
+
 REF_TZ = pytz.timezone(os.environ.get("REF_TZ") or "US/Eastern")
 
 
