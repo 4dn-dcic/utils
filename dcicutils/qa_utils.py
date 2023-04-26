@@ -442,8 +442,20 @@ class MockFileSystem:
     def assert_file_count(self, n):
         assert len(self.files) == n
 
-    def set_file_content_for_testing(self, filename, content):
+    def _set_file_content_for_testing(self, filename, content):
+        # This is subprimitive to set_file_content_for_testing or others that need to do auxiliary actions as well.
         self.files[filename] = content
+
+    def set_file_content_for_testing(self, filename, content):
+        # We might at some future point want to consider whether callers of this function should
+        # see auto-mirroring or versioning.
+        self._set_file_content_for_testing(filename, content)
+
+    def restore_file_content_for_testing(self, filename, content):
+        # This interface is for things like undelete and restore that are restoring prior state and don't want to
+        # get caught up in mirroring or versioning. In the future, this might need information about versioning
+        # that needs to be threaded together. -kmp 26-Apr-2023
+        self._set_file_content_for_testing(filename, content)
 
     def get_file_content_for_testing(self, filename, required=False):
         content = self.files.get(filename)
@@ -502,6 +514,9 @@ class MockFileSystem:
 
     def all_filenames_for_testing(self):
         return sorted(self.files.keys())
+
+    def all_filenames_with_content_for_testing(self):
+        return self.files.items()
 
     def open(self, file, mode='r', encoding=None):
         if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
@@ -2798,7 +2813,10 @@ class MockBotoS3Client(MockBoto3Client):
             new_current_version: MockObjectBasicAttributeBlock = all_versions[-1]
             if isinstance(new_current_version, MockObjectAttributeBlock):
                 new_content = new_current_version.content
-            self.s3_files.files[s3_filename] = new_content
+            # This isn't really creating the file, it's restoring the data cache in the file dictionary.
+            # The file version, in a sense, already existed.
+            self.s3_files.restore_file_content_for_testing(s3_filename, new_content)
+            # self.s3_files.files[s3_filename] = new_content
         else:
             # If there are no versions remaining, we've completely deleted the thing. Just remove all record.
             del self.s3_files.files[s3_filename]

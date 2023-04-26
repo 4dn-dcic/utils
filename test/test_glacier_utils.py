@@ -528,7 +528,7 @@ class TestGlacierUtils:
 #                 fp.write("other stuff")
 #             s3.upload_file(key2_name, Bucket=bucket_name, Key=key2_name)
 #             print("file system:")
-#             for file, data in mfs.files.items():  # This needs an abstracted enumerator
+#             for file, data in mfs.all_filenames_with_content_for_testing():
 #                 s3_filename = f'{bucket_name}/{file}'
 #                 all_versions = s3._object_attribute_blocks(s3_filename)
 #                 print(f" {file}[{s3._object_attribute_block(s3_filename).version_id}]:"
