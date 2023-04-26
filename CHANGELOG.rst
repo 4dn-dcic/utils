@@ -18,6 +18,10 @@ Change Log
 
 * Added ``dcicutils.scripts.publish_to_pypi``; 2023-04-24.
 
+* Added ``dcicutils.function_cache_decorator``; 2023-04-24;
+  future help in simplifying some caching in foursight-core APIs.
+  
+
 
 7.2.0
 =====
