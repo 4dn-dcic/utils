@@ -90,9 +90,11 @@ publish:
 
 publish-for-ga:
 	# New Python based publish script (2023-04-25).
-	# Cannot get this pip install of requests and toml to take in main-publish.yml
-	python -m pip install requests toml
-	poetry run publish-to-pypi --noconfirm
+	# Cannot get this pip install of requests and toml either
+	# here or in .main-publish.yml to take in main-publish.yml.
+	# pip install requests toml
+	# poetry run publish-to-pypi --noconfirm
+	python -m dcicutils.scripts.publish_to_pypi --noconfirm
 
 help:
 	@make info
