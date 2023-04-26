@@ -94,6 +94,7 @@ publish-for-ga:
 	# of requests and toml to take either here or in .main-publish.yml;
 	# still get module not found error for requests in GA.
 	# poetry run publish-to-pypi --noconfirm
+	pip install requests toml
 	python -m dcicutils.scripts.publish_to_pypi --noconfirm
 
 help:
