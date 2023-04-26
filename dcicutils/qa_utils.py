@@ -431,6 +431,26 @@ class MockFileSystem:
     OS_PATH_EXISTS = staticmethod(os.path.exists)
     OS_REMOVE = staticmethod(os.remove)
 
+    def assert_file_count(self, n):
+        assert len(self.files) == n
+
+    def set_file_content_for_testing(self, filename, content):
+        self.files[filename] = content
+
+    def assert_file_content(self, filename, expected_content):
+        assert filename in self.files, f"Mock file {filename} not found in {self}."
+        actual_content = self.files[filename]
+        assert actual_content == expected_content, (
+            f"Mock file {filename} does not have the expected content."
+            f" Actual={actual_content} Expected={expected_content}"
+        )
+
+    def assert_file_system_state(self, expected_file_dictionary):
+        actual_files = self.files
+        assert self.files == expected_file_dictionary, (
+            f"Mock file system not in expected state. Actual={actual_files} Expected={expected_file_dictionary}"
+        )
+
     def _do_not_mirror(self, file):
         if self._auto_mirror_files_for_read:
             self._do_not_auto_mirror.add(file)

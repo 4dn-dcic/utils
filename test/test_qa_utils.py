@@ -797,7 +797,7 @@ def test_mock_file_system_simple():
                 filename2 = "pre-existing-file.txt"
                 assert os.path.exists(filename2)
 
-                assert len(mfs.files) == 1
+                mfs.assert_file_count(1)
 
                 with io.open(filename, 'w') as fp:
                     fp.write("foo")
@@ -836,13 +836,14 @@ def test_mock_file_system_auto():
         with open(temp_filename, 'w') as outfile:
             outfile.write(temp_file_text)
 
+        mfs: MockFileSystem
         with MockFileSystem(auto_mirror_files_for_read=True).mock_exists_open_remove() as mfs:
 
-            assert len(mfs.files) == 0
+            mfs.assert_file_count(0)
 
             assert os.path.exists(temp_filename)
 
-            assert len(mfs.files) == 1
+            mfs.assert_file_count(1)  # auto-mirroring has pulled in a file
 
             with open(temp_filename) as infile:
                 content = infile.read()
@@ -851,13 +852,13 @@ def test_mock_file_system_auto():
 
             os.remove(temp_filename)
 
-            assert len(mfs.files) == 0
+            mfs.assert_file_count(0)
 
             # Removing the file in the mock does not cause us to auto-mirror anew.
             assert not os.path.exists(temp_filename)
 
             # This is just confirmation
-            assert len(mfs.files) == 0
+            mfs.assert_file_count(0)
 
         # But now we are outside the mock again, so the file should be visible.
         assert os.path.exists(temp_filename)
@@ -1153,8 +1154,8 @@ def test_mock_boto3_client_use():
         # We saved an s3 file to bucket "foo" and key "bar", so it will be in the s3fs as "foo/bar"
         assert sorted(s3fs.files.keys()) == ['foo/bar', 'foo/baz']
         # The content is stored in binary format
-        assert s3fs.files['foo/bar'] == b'some content'
-        assert s3fs.files['foo/baz'] == b'other content'
+        s3fs.assert_file_content('foo/bar', b'some content')
+        s3fs.assert_file_content('foo/baz', b'other content')
 
         assert isinstance(s3, MockBotoS3Client)
 
@@ -1241,21 +1242,23 @@ def test_mock_boto_s3_client_upload_file_and_download_file_keyworded():
         with io.open("file1.txt", 'w') as fp:
             fp.write('Hello!\n')
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {}
+        local_mfs.assert_file_content("file1.txt", b"Hello!\n")
+        mock_s3_client.s3_files.assert_file_count(0)
 
         mock_s3_client.upload_file(Filename="file1.txt", Bucket="MyBucket", Key="MyFile")
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        local_mfs.assert_file_content("file1.txt", b"Hello!\n")
+        mock_s3_client.s3_files.assert_file_system_state({'MyBucket/MyFile': b"Hello!\n"})
 
         mock_s3_client.download_file(Bucket="MyBucket", Key="MyFile", Filename="file2.txt")
 
-        assert local_mfs.files == {
+        local_mfs.assert_file_system_state({
             "file1.txt": b"Hello!\n",
             "file2.txt": b"Hello!\n",
-        }
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        })
+        mock_s3_client.s3_files.assert_file_system_state({
+            'MyBucket/MyFile': b"Hello!\n"
+        })
 
         assert file_contents("file1.txt") == file_contents("file2.txt")
 

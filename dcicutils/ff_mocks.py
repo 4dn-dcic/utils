@@ -135,7 +135,8 @@ def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=
 
     def write_config(config_name, record):
         record_string = json.dumps(record)
-        s3_client.s3_files.files[f"{LEGACY_GLOBAL_ENV_BUCKET}/{config_name}"] = bytes(record_string.encode('utf-8'))
+        s3_client.s3_files.set_file_content_for_testing(f"{LEGACY_GLOBAL_ENV_BUCKET}/{config_name}",
+                                                        record_string.encode('utf-8'))
 
     ecosystem_file = "main.ecosystem"
     for environment in environments:
@@ -200,7 +201,7 @@ def mocked_s3utils_with_sse(beanstalks=None, environments=None, require_sse=True
         s3 = mock_boto3.client('s3')
         assert isinstance(s3, MockBotoS3Client)
         for filename, string in (files or {}).items():
-            s3.s3_files.files[filename] = string.encode('utf-8')
+            s3.s3_files.set_file_content_for_testing(filename, string.encode('utf-8'))
         yield mock_boto3
 
 
