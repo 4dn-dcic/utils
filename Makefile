@@ -91,10 +91,10 @@ publish:
 publish-for-ga:
 	# New Python based publish script (2023-04-25).
 	# For some reason, have NOT been able to get the required pip install
-	# of requests and toml to take either here or in .main-publish.yml;
-	# still get module not found error for requests in GA.
+	# of requests and toml to "take" for use with the poetry run publish
+	# command, either here or in .main-publish.yml; still get module not
+	# found error for requests in GA.
 	# poetry run publish-to-pypi --noconfirm
-	pip install requests toml
 	python -m dcicutils.scripts.publish_to_pypi --noconfirm
 
 help:
