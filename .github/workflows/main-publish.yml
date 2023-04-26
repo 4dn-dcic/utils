@@ -37,4 +37,5 @@ jobs:
           PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: | 
           make configure
+          python -m pip install requests==2.28.2 toml
           make publish-for-ga
