@@ -30,13 +30,25 @@ from typing import Optional
 logging.basicConfig()
 
 
+class NamedObject(object):
+
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return f"<{self.name}>"
+
+    def __repr__(self):
+        return f"<{self.name}@{id(self):x}>"
+
+
 # Using PRINT(...) for debugging, rather than its more familiar lowercase form) for intended programmatic output,
 # makes it easier to find stray print statements that were left behind in debugging. -kmp 30-Mar-2020
 
-class _PRINT:
+class _MOCKABLE_IO:
 
-    def __init__(self):
-        self._printer = print  # necessary indirection for sake of qa_utils.printed_output
+    def __init__(self, wrapped_action):
+        self.wrapped_action = wrapped_action  # necessary indirection for sake of qa_utils.printed_output
 
     def __call__(self, *args, timestamped=False, **kwargs):
         """
@@ -47,15 +59,24 @@ class _PRINT:
         """
         if timestamped:
             hh_mm_ss = str(datetime.datetime.now().strftime("%H:%M:%S"))
-            self._printer(hh_mm_ss, *args, **kwargs)
+            return self.wrapped_action(' '.join(map(str, (hh_mm_ss, *args))), **kwargs)
         else:
-            self._printer(*args, **kwargs)
+            return self.wrapped_action(' '.join(map(str, args)), **kwargs)
 
 
-prompt_for_input = input  # In Python 3, this does 'safe' input reading.
+def _mockable_input(*args):
+    return input(*args)
 
-PRINT = _PRINT()
+
+builtin_print = print
+
+PRINT = _MOCKABLE_IO(wrapped_action=print)
 PRINT.__name__ = 'PRINT'
+
+INPUT = _MOCKABLE_IO(wrapped_action=_mockable_input)
+INPUT.__name__ = 'INPUT'
+
+prompt_for_input = INPUT  # In Python 3, input does 'safe' input reading. INPUT is our mockable alternative
 
 
 @contextlib.contextmanager
@@ -600,7 +621,10 @@ def as_seconds(*, seconds=0, minutes=0, hours=0, days=0, weeks=0, milliseconds=0
     return seconds
 
 
-# Pulled this in from "glacier" branch for use in foursight-core (2023-04-26).
+MIN_DATETIME = datetime.datetime(datetime.MINYEAR, 1, 1, 0, 0, 0)
+MIN_DATETIME_UTC = datetime.datetime(datetime.MINYEAR, 1, 1, 0, 0, 0, tzinfo=pytz.UTC)
+
+
 def future_datetime(*, now=None, seconds=0, minutes=0, hours=0, days=0, weeks=0, milliseconds=0):
     delta = datetime.timedelta(seconds=seconds, minutes=minutes, hours=hours,
                                days=days, weeks=weeks, milliseconds=milliseconds)
@@ -1705,6 +1729,52 @@ class classproperty(object):
         return self.getter(instance_class)
 
 
+class managed_property(object):
+    """
+    Sample use:
+
+        class Temperature:
+
+            def __init__(self, fahrenheit=32):
+                self.fahrenheit = fahrenheit
+
+            @managed_property
+            def centigrade(self, degrees):
+                if degrees == managed_property.MISSING:
+                    return (self.fahrenheit - 32) * 5 / 9.0
+                else:
+                    self.fahrenheit = degrees * 9 / 5.0 + 32
+
+        t1 = Temperature()
+        assert t1.fahrenheit == 32
+        assert t1.centigrade == 0.0
+
+        t2 = Temperature(fahrenheit=68)
+        assert t2.fahrenheit == 68.0
+        assert t2.centigrade == 20.0
+        t2.centigrade = 5
+        assert t2.centigrade == 5.0
+        assert t2.fahrenheit == 41.0
+
+        t2.fahrenheit = -40
+        assert t2.centigrade == -40.0
+
+    """
+
+    MISSING = NamedObject("missing")
+
+    def __init__(self, handler):
+
+        self.handler = handler
+
+    def __get__(self, instance, instance_class):
+        ignored(instance_class)
+        return self.handler(instance, self.MISSING)
+
+    def __set__(self, instance, value):
+        self.handler(instance, value)
+
+
 class classproperty_cached(object):
     """
     This decorator is like 'classproperty', but the function is run only on first use, not every time, and then cached.
@@ -1902,18 +1972,6 @@ class Singleton:
     @classproperty_cached_each_subclass
     def singleton(cls):  # noQA - PyCharm wrongly thinks the argname should be 'self'
         return cls()     # noQA - PyCharm flags a bogus warning for this
-
-
-class NamedObject(object):
-
-    def __init__(self, name):
-        self.name = name
-
-    def __str__(self):
-        return f"<{self.name}>"
-
-    def __repr__(self):
-        return f"<{self.name}@{id(self):x}>"
 
 
 def key_value_dict(key, value):
@@ -2190,7 +2248,7 @@ def deduplicate_list(lst):
     return list(set(lst))
 
 
-def chunked(seq, chunk_size=1):
+def chunked(seq, *, chunk_size=1):
     if not isinstance(chunk_size, int) or chunk_size < 1:
         raise ValueError(f"The chunk_size, {chunk_size}, must be a positive integer.")
     chunk = []
@@ -2203,3 +2261,42 @@ def chunked(seq, chunk_size=1):
             chunk = []
     if chunk:
         yield chunk
+
+
+def map_chunked(fn, seq, *, chunk_size=1, reduce=None):
+    result = (fn(chunk) for chunk in chunked(seq, chunk_size=chunk_size))
+    return reduce(result) if reduce is not None else result
+
+
+_36_DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def format_in_radix(n: int, *, radix: int):
+
+    if not isinstance(n, int) or n < 0:
+        raise ValueError(f"Expected n to be a non-negative integer {n}")
+    if radix < 2 or radix > 36:
+        raise ValueError(f"Expected radix to be an integer between 2 and 36, inclusive: {radix}")
+    buffer = []
+    while n > 0:
+        quo = n // radix
+        rem = n % radix
+        buffer += _36_DIGITS[rem]
+        n = quo
+    buffer.reverse()
+    return "".join(buffer) or "0"
+
+
+def parse_in_radix(text: str, *, radix: int):
+    if not (text and isinstance(text, str)):
+        raise ValueError(f"Expected a string to parse: {text}")
+    if radix < 2 or radix > 36:
+        raise ValueError(f"Expected radix to be an integer between 2 and 36, inclusive: {radix}")
+    res = 0
+    try:
+        for c in text:
+            res = res * radix + _36_DIGITS.index(c.upper())
+        return res
+    except Exception:
+        pass
+    raise ValueError(f"Unable to parse: {text!r}")

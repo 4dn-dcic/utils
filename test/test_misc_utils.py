@@ -25,27 +25,52 @@ from dcicutils.misc_utils import (
     DatetimeCoercionFailure, remove_element, identity, count, count_if, find_association, find_associations,
     ancestor_classes, is_proper_subclass, decorator, is_valid_absolute_uri, override_environ, override_dict,
     capitalize1, local_attrs, dict_zip, json_leaf_subst, print_error_message, get_error_message, utc_now_str,
-    _is_function_of_exactly_one_required_arg, _apply_decorator,  # noQA
+    _is_function_of_exactly_one_required_arg, _apply_decorator,  _36_DIGITS, _mockable_input, # noQA
     string_list, string_md5, SingletonManager, key_value_dict, merge_key_value_dict_lists, lines_printed_to,
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
-    deduplicate_list, chunked,
+    deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
+    MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
-    raises_regexp, MockId, MockLog,
+    raises_regexp, MockId, MockLog, input_series,
 )
 from unittest import mock
 
 
 def test_uppercase_print():
     # This is just a synonym, so the easiest thing is just to test that fact.
-    assert PRINT._printer == print
+    assert PRINT.wrapped_action == print
 
     # But also a basic test that it does something
     s = io.StringIO()
     PRINT("something", file=s)
     assert s.getvalue() == "something\n"
+
+
+def test_uppercase_input():
+    print()  # start on a fresh line
+
+    # This is just a synonym, so the easiest thing is just to test that fact.
+    assert INPUT.wrapped_action == _mockable_input
+
+    # But also a basic test that it does something
+    some_response = "some response"
+    some_prompt = "foo?"
+    with printed_output() as printed:
+        with input_series(some_response):
+            assert INPUT(some_prompt) == some_response
+    assert printed.lines == [some_prompt]
+
+
+def test_builtin_print():
+
+    with printed_output() as print:
+        s = io.StringIO()
+        builtin_print("foo", file=s)
+        assert s.getvalue() == "foo\n"
+    assert print.lines == []  # builtin_print does not cooperate in this stuff
 
 
 def test_ignored():
@@ -3274,3 +3299,155 @@ def test_chunked():
         for y in chunked(x, chunk_size=3):
             foo.append(y)
     assert foo == [[1, 2], [3, 4], [5, 6], [7]]
+
+
+def test_parse_in_radix():
+
+    # Just some random examples...
+    assert parse_in_radix("0", radix=17) == 0
+    assert parse_in_radix("1101", radix=2) == 13
+    assert parse_in_radix("123", radix=10) == 123
+    assert parse_in_radix("325", radix=8) == 3 * (8 * 8) + 2 * 8 + 5
+    assert parse_in_radix("dead", radix=16) == 13 * (16 ** 3) + 14 * (16 ** 2) + 10 * (16 ** 1) + 13 * (16 ** 0)
+    assert parse_in_radix("DEAD", radix=16) == 13 * (16 ** 3) + 14 * (16 ** 2) + 10 * (16 ** 1) + 13 * (16 ** 0)
+    assert parse_in_radix("10Z", radix=36) == 36 * 36 + 35
+    assert parse_in_radix("10z", radix=36) == 36 * 36 + 35
+
+    def char_range(lo, hi):
+        return ''.join(chr(c) for c in range(ord(lo), ord(hi) + 1))
+
+    assert char_range('b', 'e') == "bcde"  # just testing
+
+    all_digits = char_range('0', '9') + char_range('A', 'Z')
+    assert all_digits == _36_DIGITS
+
+    for r in range(2, 37):
+
+        assert parse_in_radix("0", radix=r) == 0
+
+        for i in range(1, r):
+            # All single-digits should parse to their string position.
+            assert parse_in_radix(_36_DIGITS[i], radix=r) == i
+            # Adding leading 0's shouldn't matter.
+            assert parse_in_radix("000" + _36_DIGITS[i], radix=r) == i
+
+        assert parse_in_radix("10", radix=r) == r
+
+        for i in range(2, 6):
+            # print(r"===== i={i}, radix={r} =====")
+            ri = r ** i
+            # 100=r^2, 1000=r^3, ...
+            n_str = "1" + ("0" * i)
+            # print(f"parsing n={n_str!r} in radix {r}, expecting {r}^{i}={ri}")
+            assert parse_in_radix(n_str, radix=r) == ri
+            # 11[2] + 1 = 100[2] = 2^2, 22[3] + 1 == 100[3] = 3^2,
+            # 111[2] + 1 = 1000[2] = 2^3, 222[3] + 1 = 1000[3] = 3^3
+            n_str = _36_DIGITS[r - 1] * i
+            # print(f"parsing n={n_str!r} in radix {r}, expecting {r}^{i}-1={ri - 1}")
+            assert parse_in_radix(n_str, radix=r) == ri - 1
+
+    with pytest.raises(ValueError):
+        parse_in_radix(" ", radix=10)  # bad character
+
+    with pytest.raises(ValueError):
+        parse_in_radix("", radix=10)  # empty string
+
+    with pytest.raises(ValueError):
+        parse_in_radix("0", radix=1)  # radix too low
+
+    with pytest.raises(ValueError):
+        parse_in_radix("0", radix=40)  # radix too high
+
+
+def test_format_in_radix():
+
+    # Just some random examples...
+    assert format_in_radix(0, radix=10) == "0"
+    assert format_in_radix(13, radix=2) == "1101"
+    assert format_in_radix(123, radix=10) == "123"
+    assert format_in_radix(3 * (8 * 8) + 2 * 8 + 5, radix=8) == "325"
+    assert format_in_radix(13 * (16 ** 3) + 14 * (16 ** 2) + 10 * (16 ** 1) + 13 * (16 ** 0), radix=16) == "DEAD"
+    assert format_in_radix(36 * 36 + 35, radix=36) == "10Z"
+
+    for r in range(2, 37):
+        for i in range(0, 6):
+            for n in [i, r ** i, r ** i - 1]:
+                assert parse_in_radix(format_in_radix(n, radix=r), radix=r) == n
+
+    with pytest.raises(ValueError):
+        assert format_in_radix(-27, radix=10)  # won't format negative number
+
+    with pytest.raises(ValueError):
+        format_in_radix(27, radix=1)  # radix too low
+
+    with pytest.raises(ValueError):
+        format_in_radix(27, radix=40)  # radix too high
+
+
+def test_managed_property():
+
+    class Temperature:
+
+        def __init__(self, fahrenheit=32):
+            self.fahrenheit = fahrenheit
+
+        @managed_property
+        def centigrade(self, degrees):
+            if degrees == managed_property.MISSING:
+                return (self.fahrenheit - 32) * 5 / 9.0
+            else:
+                self.fahrenheit = degrees * 9 / 5.0 + 32
+
+    t1 = Temperature()
+    assert t1.fahrenheit == 32
+    assert t1.centigrade == 0.0
+
+    t2 = Temperature(fahrenheit=68)
+    assert t2.fahrenheit == 68.0
+    assert t2.centigrade == 20.0
+    t2.centigrade = 5
+    assert t2.centigrade == 5.0
+    assert t2.fahrenheit == 41.0
+
+    t2.fahrenheit = -40
+    assert t2.centigrade == -40.0
+
+
+def test_min_datetime():
+
+    assert MIN_DATETIME == datetime_module.datetime(1, 1, 1, 0, 0, 0)
+
+    assert MIN_DATETIME.replace(tzinfo=pytz.UTC) == MIN_DATETIME_UTC
+
+
+def test_future_datetime():
+
+    dt = ControlledTime(tick_seconds=0.1)
+
+    now = dt.just_now()
+
+    with mock.patch.object(misc_utils_module, "datetime", dt):
+
+        an_hour_from_now = future_datetime(minutes=60)  # computing now() inside this will consume one tick = .1 second
+
+        assert an_hour_from_now == now + datetime_module.timedelta(hours=1, seconds=0.1)
+
+        two_hours_from_now = future_datetime(hours=2, now=now)  # this won't check the time, so no seconds consumed
+
+        assert two_hours_from_now == now + datetime_module.timedelta(hours=2)
+
+
+def test_map_chunked():
+
+    res = map_chunked(lambda x: ''.join(x), "abcdefghij", chunk_size=4)
+    assert next(res) == 'abcd'
+    assert next(res) == 'efgh'
+    assert next(res) == 'ij'
+    with pytest.raises(StopIteration):
+        next(res)
+
+    res = map_chunked(lambda x: ''.join(x), "abcdefghij", chunk_size=4, reduce=list)
+    assert res == ['abcd', 'efgh', 'ij']
+
+    res = map_chunked(lambda x: ''.join(x), "abcdefghij", chunk_size=4, reduce=lambda x: '.'.join(x))
+    assert res == 'abcd.efgh.ij'

@@ -167,6 +167,12 @@ function_cache_decorator
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. automodule:: dcicutils.function_cache_decorator
+
+
+glacier_utils
+^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.glacier_utils
    :members:
 
 

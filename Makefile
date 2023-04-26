@@ -4,7 +4,7 @@ clear-poetry-cache:  # clear poetry/pypi cache. for user to do explicitly, never
 	poetry cache clear pypi --all
 
 configure:  # does any pre-requisite installs
-	pip install poetry
+	pip install poetry==1.3.2
 
 lint:
 	@echo "Running flake8..."
