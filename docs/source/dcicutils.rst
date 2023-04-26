@@ -166,7 +166,7 @@ ff_utils
 function_cache_decorator
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automodule:: dcicutils.function_cache_decorator.
+.. automodule:: dcicutils.function_cache_decorator
    :members:
 
 
