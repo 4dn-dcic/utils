@@ -412,20 +412,28 @@ class MockFileWriter:
             file_system.prepare_for_overwrite(self.file)
         if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
             PRINT(f"Writing {content!r} to {self.file}.")
-        file_system.files[self.file] = content if isinstance(content, bytes) else content.encode(self.encoding)
+        file_system.set_file_content_for_testing(self.file,
+                                                 (content
+                                                  if isinstance(content, bytes)
+                                                  else content.encode(self.encoding)))
+        # file_system.files[self.file] = content if isinstance(content, bytes) else content.encode(self.encoding)
 
 
 class MockFileSystem:
     """Extremely low-tech mock file system."""
 
     def __init__(self, files=None, default_encoding='utf-8', auto_mirror_files_for_read=False, do_not_auto_mirror=()):
+        files = files or {}
         self.default_encoding = default_encoding
         # Setting this dynamically will make things inconsistent
         self._auto_mirror_files_for_read = auto_mirror_files_for_read
         self._do_not_auto_mirror = set(do_not_auto_mirror or [])
-        self.files = {filename: content.encode(default_encoding) for filename, content in (files or {}).items()}
-        for filename in self.files:
+        # self.files = {filename: content.encode(default_encoding) for filename, content in (files or {}).items()}
+        for filename in files:
             self._do_not_mirror(filename)
+        self.files = {}
+        for filename, content in files.items():
+            self.set_file_content_for_testing(filename, content.encode(default_encoding))
 
     IO_OPEN = staticmethod(io.open)
     OS_PATH_EXISTS = staticmethod(os.path.exists)
@@ -436,6 +444,12 @@ class MockFileSystem:
 
     def set_file_content_for_testing(self, filename, content):
         self.files[filename] = content
+
+    def get_file_content_for_testing(self, filename, required=False):
+        content = self.files.get(filename)
+        if required and content is None:
+            raise Exception(f"Mocked file not found: {filename}")
+        return content
 
     def assert_file_content(self, filename, expected_content):
         assert filename in self.files, f"Mock file {filename} not found in {self}."
@@ -460,9 +474,10 @@ class MockFileSystem:
             if file not in self._do_not_auto_mirror:
                 if (self.OS_PATH_EXISTS(file)
                         # file might be in files if someone has been manipulating the file structure directly
-                        and file not in self.files):
+                        and not self._file_is_mocked(file)):  # file not in self.files
                     with open(file, 'rb') as fp:
-                        self.files[file] = fp.read()
+                        self.set_file_content_for_testing(file, fp.read())
+                        # self.files[file] = fp.read()
                 self._do_not_mirror(file)
 
     def prepare_for_overwrite(self, file):
@@ -471,12 +486,22 @@ class MockFileSystem:
 
     def exists(self, file):
         self._maybe_auto_mirror_file(file)
+        # return self.files.get(file) is not None  # don't want an empty file to pass for missing
+        return self._file_is_mocked(file)
+
+    def _file_is_mocked(self, file):
+        """
+        This checks the state of the file now, independent of auto-mirroring.
+        """
         return self.files.get(file) is not None  # don't want an empty file to pass for missing
 
     def remove(self, file):
         self._maybe_auto_mirror_file(file)
         if self.files.pop(file, None) is None:
             raise FileNotFoundError("No such file or directory: %s" % file)
+
+    def all_filenames_for_testing(self):
+        return list(self.files.keys())
 
     def open(self, file, mode='r', encoding=None):
         if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
@@ -494,7 +519,8 @@ class MockFileSystem:
 
     def _open_for_read(self, file, binary=False, encoding=None):
         self._maybe_auto_mirror_file(file)
-        content = self.files.get(file)
+        content = self.get_file_content_for_testing(file)
+        # content = self.files.get(file)
         if content is None:
             raise FileNotFoundError("No such file or directory: %s" % file)
         if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
@@ -2296,7 +2322,8 @@ class MockBotoS3Client(MockBoto3Client):
             assert any(Key.endswith(ext) for ext in exts), (
                     "mock .put_object expects Key=%s to end in one of %s for ContentType=%s" % (Key, exts, ContentType))
         assert not kwargs, "put_object mock doesn't support %s." % kwargs
-        self.s3_files.files[Bucket + "/" + Key] = Body
+        self.s3_files.set_file_content_for_testing(Bucket + "/" + Key, Body)
+        # self.s3_files.files[Bucket + "/" + Key] = Body
         return {
             'ETag': self._content_etag(Body)
         }
@@ -2318,7 +2345,8 @@ class MockBotoS3Client(MockBoto3Client):
         pseudo_filename = os.path.join(Bucket, Key)
 
         if self.s3_files.exists(pseudo_filename):
-            content = self.s3_files.files[pseudo_filename]
+            content = self.s3_files.get_file_content_for_testing(pseudo_filename, required=True)
+            # content = self.s3_files.files[pseudo_filename]
             attribute_block = self._object_attribute_block(filename=pseudo_filename)
             assert isinstance(attribute_block, MockObjectAttributeBlock)  # if file exists, should be normal block
             result = {
@@ -2344,7 +2372,7 @@ class MockBotoS3Client(MockBoto3Client):
             # since it might be a 404 (not found) or a 403 (permissions), depending on various details.
             # For now, just fail in any way since maybe our code doesn't care.
             raise Exception(f"Mock File Not Found: {pseudo_filename}."
-                            f" Existing files: {list(self.s3_files.files.keys())}")
+                            f" Existing files: {self.s3_files.all_filenames_for_testing()}")
 
     def head_bucket(self, Bucket):  # noQA - AWS argument naming style
         bucket_prefix = Bucket + "/"
