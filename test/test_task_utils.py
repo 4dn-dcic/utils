@@ -213,7 +213,7 @@ def test_pmap_parallelism():
         expected = calibrated_slowness * n_chunks
         # We could compute margin of error, too, by timing each iteration in calibration, but we'll guess for now.
         # -kmp 17-Apr-2023
-        margin_of_error = 1.1333
+        margin_of_error = 1.05
         # Allow for float round-off error on low side and additional computational overhead in the loop on high side
         lo_factor = 0.8
         expected_lo = expected * lo_factor
