@@ -130,20 +130,25 @@ class GlacierUtils:
                 fail.append((bucket, key))
         return success, fail
 
-    def restore_s3_from_glacier(self, bucket: str, key: str, days: int = 7) -> Union[dict, None]:
+    def restore_s3_from_glacier(self, bucket: str, key: str, days: int = 7,
+                                version_id: str = None,) -> Union[dict, None]:
         """ Restores a file from glacier given the bucket, key and duration of restore
 
         :param bucket: bucket where the file is stored
         :param key: key under which the file is stored
         :param days: number of days to store in the temporary location
+        :param version_id: version ID to restore if applicable
         :return: response if successful or None
         """
         try:
-            response = self.s3.restore_object(
-                Bucket=bucket,
-                Key=key,
-                RestoreRequest={'Days': days}
-            )
+            args = {
+                'Bucket': bucket,
+                'Key': key,
+                'RestoreRequest': {'Days': days}
+            }
+            if version_id:
+                args['VersionId'] = version_id
+            response = self.s3.restore_object(**args)
             PRINT(f'Object {bucket}/{key} restored from Glacier storage class and will be available in S3'
                   f' for {days} days after restore has been processed (24 hours)')
             return response
