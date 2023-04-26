@@ -1,4 +1,3 @@
-import contextlib
 import os
 import pytest
 import tempfile
@@ -8,45 +7,10 @@ from dcicutils import command_utils as command_utils_module
 from dcicutils.command_utils import (
     _ask_boolean_question,  # noQA - access to internal function is so we can test it
     yes_or_no, y_or_n, ShellScript, shell_script, script_catch_errors, DEBUG_SCRIPT, SCRIPT_ERROR_HERALD,
+    require_confirmation, ScriptFailure,
 )
-from dcicutils.misc_utils import ignored, file_contents, PRINT
-from dcicutils.qa_utils import printed_output
-
-
-@contextlib.contextmanager
-def print_expected(*expected):
-
-    def mocked_print(*what):
-        printed = " ".join(what)
-        assert printed in expected
-
-    with mock.patch.object(command_utils_module, "PRINT") as mock_print:
-        mock_print.side_effect = mocked_print
-        yield
-
-
-class OutOfInputs(Exception):
-    pass
-
-
-@contextlib.contextmanager
-def input_series(*items):
-    with mock.patch.object(command_utils_module, "input") as mock_input:
-
-        def mocked_input(*args, **kwargs):
-            ignored(args, kwargs)
-            if not inputs:
-                raise OutOfInputs()
-            return inputs.pop()
-
-        mock_input.side_effect = mocked_input
-
-        inputs = []
-
-        for item in reversed(items):
-            inputs.append(item)
-        yield
-        assert not inputs, "Did not use all inputs."
+from dcicutils.misc_utils import file_contents, PRINT
+from dcicutils.qa_utils import printed_output, print_expected, input_series, OutOfInputs
 
 
 def test_ask_boolean_question():
@@ -142,6 +106,83 @@ def test_y_or_n():
                         "Please answer 'y' or 'n'."):
         with input_series('foo', 'bar', ''):
             assert y_or_n("foo?", default=False) is False
+
+
+def test_require_confirmation():
+
+    print()  # Start on a fresh line
+
+    @require_confirmation
+    def carefully_add(x, y):
+        return x + y
+
+    explain_y_or_n = "Please answer 'y' or 'n'."
+    y_or_n_suffix = " [y/n]: "
+    default_prompt = "Are you sure you want to proceed with carefully_add?"
+
+    with printed_output() as printed:
+        assert carefully_add(3, 4, confirm=False) == 7
+    assert printed.lines == []
+
+    with printed_output() as printed:
+        with input_series("n"):
+            with pytest.raises(ScriptFailure):
+                carefully_add(3, 4)
+    assert printed.lines == [default_prompt + y_or_n_suffix]
+
+    with printed_output() as printed:
+        with input_series("x", "n"):
+            with pytest.raises(ScriptFailure):
+                carefully_add(3, 4)
+    assert printed.lines == [
+        default_prompt + y_or_n_suffix,
+        explain_y_or_n,
+        default_prompt + y_or_n_suffix,
+    ]
+
+    my_prompt = "Are you sure you want to do the add?"
+
+    @require_confirmation(raise_error=False, prompt=my_prompt)
+    def add_if_confirmed(x, y):
+        return x + y
+
+    with printed_output() as printed:
+        with input_series():
+            assert add_if_confirmed(3, 4, confirm=False) == 7
+    assert printed.lines == []
+
+    with printed_output() as printed:
+        with input_series("y"):
+            assert add_if_confirmed(3, 4, confirm=True) == 7
+    assert printed.lines == [my_prompt + y_or_n_suffix]
+
+    with printed_output() as printed:
+        with input_series("y"):
+            assert add_if_confirmed(3, 4) == 7
+    assert printed.lines == [my_prompt + y_or_n_suffix]
+
+    with printed_output() as printed:
+        with input_series("n"):
+            assert add_if_confirmed(3, 4) is None
+    assert printed.lines == [my_prompt + y_or_n_suffix]
+
+    @require_confirmation
+    def documented_add(x, y):
+        """
+        Adds x and y, returning their sum.
+        :param x: a number
+        :param y: a number
+        :return: the sum
+        """
+        return x + y
+
+    assert documented_add.__doc__ == """
+        Adds x and y, returning their sum.
+        :param x: a number
+        :param y: a number
+        :param confirm: whether to ask for confirmation
+        :return: the sum
+        """
 
 
 def test_shell_script_class():
@@ -371,7 +412,6 @@ def test_script_catch_errors():
     # Erring program explicitly fails, bypassing regular exception catches
     with printed_output() as printed:
         failure_message = "Foo! This failed."
-        failure_message_parts = failure_message.split(' ')
         with pytest.raises(SystemExit) as exit_exc:
             with script_catch_errors() as fail:
                 try:
