@@ -1,5 +1,4 @@
 import io
-import json
 import pytest
 
 from unittest import mock
@@ -508,7 +507,7 @@ class TestGlacierUtils:
         """ Tests the basics of a multipart upload """
         gu = glacier_utils
         with mock.patch.object(gu.s3, 'create_multipart_upload', return_value={'UploadId': '123'}):
-            with mock.patch.object(gu.s3, 'upload_part_copy', return_value={'CopyPartResult':{'ETag': 'abc'}}):
+            with mock.patch.object(gu.s3, 'upload_part_copy', return_value={'CopyPartResult': {'ETag': 'abc'}}):
                 with mock.patch.object(gu.s3, 'complete_multipart_upload', return_value={'success': True}):
                     with mock.patch.object(gu.s3, 'head_object', return_value={'ContentLength': 600000000000}):
                         assert gu.copy_object_back_to_original_location('bucket', 'key')

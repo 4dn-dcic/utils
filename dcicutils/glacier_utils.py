@@ -419,11 +419,12 @@ class GlacierUtils:
                         _atid = atid
                     files_meta = self.resolve_bucket_key_from_portal(_atid, atid)
                     version_id = None
-                    if versioning:
-                        response = self.s3.list_object_versions(Bucket=bucket, Prefix=key)
-                        versions = sorted(response.get('Versions', []), key=lambda x: x['LastModified'], reverse=True)
-                        version_id = versions[0]['VersionId']
                     for bucket, key in files_meta:
+                        if versioning:
+                            response = self.s3.list_object_versions(Bucket=bucket, Prefix=key)
+                            versions = sorted(response.get('Versions', []), key=lambda x: x['LastModified'],
+                                              reverse=True)
+                            version_id = versions[0]['VersionId']
                         future = executor.submit(self.copy_object_back_to_original_location, bucket, key, storage_class,
                                                  version_id)
                         futures.append(future)
