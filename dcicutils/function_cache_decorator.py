@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import namedtuple, OrderedDict
 from datetime import datetime, timedelta
 import json
 import sys
@@ -6,9 +6,9 @@ import sys
 
 def function_cache(*decorator_args, **decorator_kwargs):
     """
-    Exactly analogous to the functools.lru_cache decorator, but also allows
-    specifying that if the return value of the function is None then no caching
-    is to be done; use the do_not_cache_none=True as a decorator argument to do this.
+    Exactly analogous to the functools.lru_cache decorator, but also allows specifying
+    hat if the return value of the function is None then no caching is to be done; use
+    the do_not_cache_none (nocache_none) set to True as a decorator argument to do this.
 
     Also like @lru_cache, this supports the maxsize decorator argument, as well
     as the cache_info and cache_clear functions on the decorated function.
@@ -48,9 +48,9 @@ def function_cache(*decorator_args, **decorator_kwargs):
         decorator_target_function = None
 
     maxsize = sys.maxsize
-    nocache_none = False
     ttl = None
     ttl_none = None
+    nocache_none = False
     key = None
     serialize_key = False
 
@@ -62,19 +62,19 @@ def function_cache(*decorator_args, **decorator_kwargs):
         maxsize_kwarg = decorator_kwargs.get("maxsize")
         if isinstance(maxsize_kwarg, int) and maxsize_kwarg > 0:
             maxsize = maxsize_kwarg
-        nocache_none_kwarg = decorator_kwargs.get("do_not_cache_none", decorator_kwargs.get("nocache_none"))
-        if isinstance(nocache_none_kwarg, bool):
-            nocache_none = nocache_none_kwarg
-        ttl_kwarg = decorator_kwargs.get("time_to_live", decorator_kwargs.get("ttl"))
+        ttl_kwarg = decorator_kwargs.get("ttl", decorator_kwargs.get("time_to_live"))
         if isinstance(ttl_kwarg, timedelta):
             ttl = ttl_kwarg
-        ttl_none_kwarg = decorator_kwargs.get("time_to_live_none", decorator_kwargs.get("ttl_none"))
+        ttl_none_kwarg = decorator_kwargs.get("ttl_none", decorator_kwargs.get("time_to_live_none"))
         if isinstance(ttl_none_kwarg, timedelta):
             ttl_none = ttl_none_kwarg
-        key_kwarg = decorator_kwargs.get("key")
+        nocache_none_kwarg = decorator_kwargs.get("nocache_none", decorator_kwargs.get("do_not_cache_none"))
+        if isinstance(nocache_none_kwarg, bool):
+            nocache_none = nocache_none_kwarg
+        key_kwarg = decorator_kwargs.get("key", decorator_kwargs.get("key_function"))
         if callable(key_kwarg):
             key = key_kwarg
-        serialize_key_kwarg = decorator_kwargs.get("serialize_key", decorator_kwargs.get("serialize"))
+        serialize_key_kwarg = decorator_kwargs.get("serialize_key")
         if isinstance(serialize_key_kwarg, bool):
             serialize_key = serialize_key_kwarg
 
@@ -86,7 +86,7 @@ def function_cache(*decorator_args, **decorator_kwargs):
             if serialize_key:
                 cache_key = json.dumps(cache_key, default=str, separators=(",", ":"))
             cached = cache.get(cache_key, None)
-            now = None
+            now = None  # do not call datetime.now more than once
 
             if cached is not None:
 
@@ -94,6 +94,7 @@ def function_cache(*decorator_args, **decorator_kwargs):
                     now = datetime.now()
 
                 def is_stale():
+                    # Uses outer variables: ttl, ttl_none, cached, now
                     if ttl and now > cached["timestamp"] + ttl:
                         return True
                     if ttl_none and cached["value"] is None and now > cached["timestamp"] + ttl_none:
@@ -120,20 +121,9 @@ def function_cache(*decorator_args, **decorator_kwargs):
             return value
 
         def cache_info():
-            info = {
-                "hits": nhits,
-                "misses": nmisses,
-                "size": len(cache)
-            }
-            if maxsize != sys.maxsize:
-                info["maxsize"] = maxsize
-            if ttl:
-                info["ttl"] = ttl
-            if ttl_none:
-                info["ttl_none"] = ttl_none
-            if serialize_key:
-                info["serialize"] = serialize_key
-            return info
+            cache_info = namedtuple("cache_info", ["hits", "misses", "size", "maxsize",
+                                                   "ttl", "ttl_none", "nocache_none", "key", "serialize_key"])
+            return cache_info(nhits, nmisses, len(cache), maxsize, ttl, ttl_none, nocache_none, key, serialize_key)
 
         def cache_clear():
             nonlocal nhits, nmisses
