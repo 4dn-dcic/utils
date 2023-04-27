@@ -183,3 +183,24 @@ def test_function_cache_decorator_with_ttl_none():
     assert called == 2
     assert f.cache_info()["hits"] == 3
     assert f.cache_info()["misses"] == 2
+
+
+def test_function_cache_decorator_structured_types():
+
+    called = 0
+
+    @function_cache(serialize_key=True)
+    def f(d):
+        nonlocal called
+        called += 1
+        return dict
+
+    f({"abc":123})  # miss
+    assert f.cache_info()["size"] == 1
+    f({"abc":123})  # hit
+    assert f.cache_info()["size"] == 1
+    f({"abc":123})  # hit
+    assert called == 1
+    assert f.cache_info()["hits"] == 2
+    assert f.cache_info()["misses"] == 1
+    assert f.cache_info()["size"] == 1

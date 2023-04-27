@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from datetime import datetime, timedelta
+import json
 import sys
 
 
@@ -20,6 +21,13 @@ def function_cache(*decorator_args, **decorator_kwargs):
     And, there is a separate time_to_live_none (ttl_none) supported which will do the
     same as ttl but will apply only if the cached value is None.
 
+    There is also a serialize_key (serialize) decorator kwarg which if specified as True,
+    will serialize the arguments (args and kwargs) to the function call and use that value,
+    converted to a string, as the key for caching the function result; this will allow
+    caching for functions which take non-hashable structured types (i.e. dict or list)
+    as arguments, which normally would not be possible, i.e. e.g. in which case this
+    error would be generated: TypeError: unhashable type: 'dict' 
+
     Looked/tried and could not find an way to do this using @lru_cache;
     and also had issues trying to wrap @lru_cache with this functionality.
     First created (April 2023) to try simplify some of the caching in foursight-core APIs.
@@ -39,6 +47,7 @@ def function_cache(*decorator_args, **decorator_kwargs):
     nocache_none = False
     ttl = None
     ttl_none = None
+    serialize_key = False
 
     if decorator_args:
         maxsize_arg = decorator_args[0]
@@ -57,12 +66,17 @@ def function_cache(*decorator_args, **decorator_kwargs):
         ttl_none_kwarg = decorator_kwargs.get("time_to_live_none", decorator_kwargs.get("ttl_none"))
         if isinstance(ttl_none_kwarg, timedelta):
             ttl_none = ttl_none_kwarg
+        serialize_key_kwarg = decorator_kwargs.get("serialize_key", decorator_kwargs.get("serialize"))
+        if isinstance(serialize_key_kwarg, bool):
+            serialize_key = serialize_key_kwarg
 
     def function_cache_decorator_registration(wrapped_function):
 
         def function_wrapper(*args, **kwargs):
 
             key = args + tuple(sorted(kwargs.items()))
+            if serialize_key:
+                key = json.dumps(key, default=str, separators=(",", ":"))
             cached = cache.get(key, None)
             now = None
 
@@ -109,6 +123,8 @@ def function_cache(*decorator_args, **decorator_kwargs):
                 info["ttl"] = ttl
             if ttl_none:
                 info["ttl_none"] = ttl_none
+            if serialize_key:
+                info["serialize"] = serialize_key
             return info
 
         def cache_clear():
