@@ -26,7 +26,7 @@ def function_cache(*decorator_args, **decorator_kwargs):
     converted to a string, as the key for caching the function result; this will allow
     caching for functions which take non-hashable structured types (i.e. dict or list)
     as arguments, which normally would not be possible, i.e. e.g. in which case this
-    error would be generated: TypeError: unhashable type: 'dict' 
+    error would be generated: TypeError: unhashable type: 'dict'
 
     Looked/tried and could not find an way to do this using @lru_cache;
     and also had issues trying to wrap @lru_cache with this functionality.
