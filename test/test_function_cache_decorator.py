@@ -193,13 +193,14 @@ def test_function_cache_decorator_structured_types():
     def f(d):
         nonlocal called
         called += 1
-        return dict
+        return d
 
-    f({"abc": 123})  # miss
+    d = {"abc": 123}
+    assert f(d) == d  # miss
     assert f.cache_info()["size"] == 1
-    f({"abc": 123})  # hit
+    assert f(d) == d  # hit
     assert f.cache_info()["size"] == 1
-    f({"abc": 123})  # hit
+    assert f(d) == d  # hit
     assert called == 1
     assert f.cache_info()["hits"] == 2
     assert f.cache_info()["misses"] == 1
