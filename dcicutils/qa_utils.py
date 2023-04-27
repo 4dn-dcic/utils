@@ -2704,7 +2704,8 @@ class MockBotoS3Client(MockBoto3Client):
                                      f" CopySource={CopySource!r} Bucket={Bucket!r} Key={Key!r}"
                                      f" CopySourceVersionId={CopySourceVersionId!r}")
             copy_in_place = True
-        source_data = self.s3_files.files.get(source_s3_filename)
+        # source_data = self.s3_files.files.get(source_s3_filename)
+        source_data = self.s3_files.get_file_content_for_testing(source_s3_filename)
         if source_version_id:
             source_version = self._get_versioned_object(source_s3_filename, source_version_id)
             source_data = source_data if source_version.content is None else source_version.content
@@ -2919,16 +2920,20 @@ class MockBotoS3Bucket:
 
     def _delete(self, delete_bucket_too=False):
         prefix = self.name + "/"
-        files = self.s3.s3_files.files
+        s3_files: MockAWSFileSystem = self.s3.s3_files
+        # files = self.s3.s3_files.files
         to_delete = set()
-        for pseudo_filename, _ in [files.items()]:
+        # for pseudo_filename, _ in [s3_files.files.items()]:
+        for pseudo_filename, _ in s3_files.all_filenames_with_content_for_testing():
             if pseudo_filename.startswith(prefix):
                 if pseudo_filename != prefix:
                     to_delete.add(pseudo_filename)
         for pseudo_filename in to_delete:
-            del files[pseudo_filename]
+            # del s3_files.files[pseudo_filename]
+            s3_files.remove_file_entry_for_testing(pseudo_filename)
         if not delete_bucket_too:
-            files[prefix] = b''
+            s3_files.set_file_content_for_testing(prefix, b'')
+            # s3_files.files[prefix] = b''
         # TODO: Does anything need to be returned here?
 
     def _keys(self):
