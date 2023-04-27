@@ -1,5 +1,6 @@
 from collections import namedtuple, OrderedDict
 from datetime import datetime, timedelta
+from typing import Union
 import json
 import sys
 
@@ -123,15 +124,16 @@ def function_cache(*decorator_args, **decorator_kwargs):
 
             return value
 
-        def cache_info(as_dict: bool = False):
+        def cache_info(as_dict: bool = False) -> Union[namedtuple, dict]:
             cache_info = namedtuple("cache_info", ["hits", "misses", "size", "maxsize", "ttl", "ttl_none",
                                                    "nocache_none", "key", "serialize_key", "updated"])
             updated = next(iter(cache.items()))[1]["timestamp"] if len(cache) > 0 else None
+            updated = updated.strftime("%Y-%m-%d %H:%M:%S") if updated else None
             info = cache_info(nhits, nmisses, len(cache), maxsize, ttl, ttl_none,
                               nocache_none, key, serialize_key, updated)
             return dict(info._asdict()) if as_dict else info
 
-        def cache_clear():
+        def cache_clear() -> None:
             nonlocal nhits, nmisses
             nhits = nmisses = 0
             cache.clear()
@@ -147,7 +149,7 @@ def function_cache(*decorator_args, **decorator_kwargs):
     return function_cache_decorator_registration
 
 
-def function_cache_info():
+def function_cache_info() -> dict:
     """
     Returns a list of dictionaries representing all of the function_cache instances
     which exist; each dictonary containing detailed info about the function cache.
