@@ -6,6 +6,28 @@ dcicutils
 Change Log
 ----------
 
+7.3.2
+=====
+
+* In ``dcicutils.env_utils`` added function ``get_portal_url``;
+  first usage of which was in foursight-core. 2023-04-16.
+
+* Added ``dcicutils.ssl_certificate_utils``;
+  first usage of which was in foursight-core. 2023-04-16.
+
+* Added ``dcicutils.scripts.publish_to_pypi``; 2023-04-24.
+
+* Added ``dcicutils.function_cache_decorator``; 2023-04-24;
+  future help in simplifying some caching in foursight-core APIs.
+  
+
+7.3.1
+=====
+
+Add LICENSE.txt (MIT Licenses). The ``pyproject.toml`` already declared that lic
+ense, so no real change. Just pro forma.
+
+
 7.3.0
 =====
 
@@ -50,21 +72,6 @@ Change Log
 * Load ``coveralls`` dependency only dynamically in GA workflow, not in poetry,
   because it implicates ``docopt`` library, which needs ``2to3``, and would fail.
 
-
-7.3.0
-=====
-
-* In ``dcicutils.env_utils`` added function ``get_portal_url``;
-  first usage of which was in foursight-core. 2023-04-16.
-
-* Added ``dcicutils.ssl_certificate_utils``;
-  first usage of which was in foursight-core. 2023-04-16.
-
-* Added ``dcicutils.scripts.publish_to_pypi``; 2023-04-24.
-
-* Added ``dcicutils.function_cache_decorator``; 2023-04-24;
-  future help in simplifying some caching in foursight-core APIs.
-  
 
 
 7.2.0
