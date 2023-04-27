@@ -235,7 +235,8 @@ def test_abstract_test_recorder_playback():
                     raise AssertionError("Should not get here.")
                 assert str(exc.value) == datum4['error_message']  # 'yikes'
 
-            assert mfs.files == {}  # no files created on playback
+            # assert mfs.files == {}  # no files created on playback
+            mfs.assert_file_system_state({})  # no files created on playback
 
         assert printed.lines == [
             f"Replaying GET {datum1['url']}",  # http://foo

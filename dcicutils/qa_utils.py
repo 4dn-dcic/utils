@@ -457,6 +457,18 @@ class MockFileSystem:
         # that needs to be threaded together. -kmp 26-Apr-2023
         self._set_file_content_for_testing(filename, content)
 
+    def initialize_file_entry_testing(self, filename):
+        # This interface is for things like undelete and restore that are restoring prior state and don't want to
+        # get caught up in mirroring or versioning. In the future, this might need information about versioning
+        # that needs to be threaded together. -kmp 26-Apr-2023
+        self._set_file_content_for_testing(filename, None)
+
+    def remove_file_entry_for_testing(self, filename):
+        # This interface is for things like undelete and restore that are restoring prior state and don't want to
+        # get caught up in mirroring or versioning. In the future, this might need information about versioning
+        # that needs to be threaded together. -kmp 26-Apr-2023
+        del self.files[filename]
+
     def get_file_content_for_testing(self, filename, required=False):
         content = self.files.get(filename)
         if required and content is None:
@@ -2391,7 +2403,8 @@ class MockBotoS3Client(MockBoto3Client):
 
     def head_bucket(self, Bucket):  # noQA - AWS argument naming style
         bucket_prefix = Bucket + "/"
-        for filename, content in self.s3_files.files.items():
+        # for filename, content in self.s3_files.files.items():
+        for filename, content in self.s3_files.all_filenames_with_content_for_testing():
             if filename.startswith(bucket_prefix):
                 # Returns other things probably, but this will do to start for our mocking.
                 return {"ResponseMetadata": {"HTTPStatusCode": 200}}
@@ -2483,7 +2496,8 @@ class MockBotoS3Client(MockBoto3Client):
         if not all_versions:
             # This situation and usually we should not be calling this function at this point,
             # but try to help developer debug what's going on...
-            if filename in self.s3_files.files:
+            # if filename in self.s3_files.files:
+            if filename in self.s3_files.all_filenames_for_testing():
                 context = f"mock special non-file (bucket?) s3 item: {filename}"
             else:
                 context = f"mock non-existent S3 file: {filename}"
@@ -2558,7 +2572,8 @@ class MockBotoS3Client(MockBoto3Client):
         #            about to write new data anyway, after having archived previous data, which means it should
         #            really only be called by archive_current_version after it has done any necessary saving away
         #            of a prior version (depending on whether versioning is enabled).
-        self.s3_files.files[filename] = None
+        # self.s3_files.files[filename] = None
+        self.s3_files.initialize_file_entry_testing(filename)
         return new_block
 
     def _object_tagset(self, filename):
@@ -2635,7 +2650,8 @@ class MockBotoS3Client(MockBoto3Client):
         bucket_prefix_length = len(bucket_prefix)
         search_prefix = bucket_prefix + (Prefix or '')
         found = []
-        for filename, content in self.s3_files.files.items():
+        # for filename, content in self.s3_files.files.items():
+        for filename, content in self.s3_files.all_filenames_with_content_for_testing():
             if filename.startswith(search_prefix):
                 found.append({
                     'Key': filename[bucket_prefix_length:],
@@ -2709,7 +2725,8 @@ class MockBotoS3Client(MockBoto3Client):
             self.archive_current_version(target_s3_filename)
             # In this case, we've made a new version and it will be current.
             # In that case, the files dictionary needs the content copied.
-            self.s3_files.files[target_s3_filename] = source_data
+            # self.s3_files.files[target_s3_filename] = source_data
+            self.s3_files.set_file_content_for_testing(target_s3_filename, source_data)
         target_attribute_block = self._get_versioned_object(target_s3_filename, target_version_id)
         new_storage_class = target_storage_class
         if (copy_in_place
@@ -2819,7 +2836,8 @@ class MockBotoS3Client(MockBoto3Client):
             # self.s3_files.files[s3_filename] = new_content
         else:
             # If there are no versions remaining, we've completely deleted the thing. Just remove all record.
-            del self.s3_files.files[s3_filename]
+            # del self.s3_files.files[s3_filename]
+            self.s3_files.remove_file_entry_for_testing(s3_filename)
         return result
 
     def restore_object(self, Bucket, Key, RestoreRequest, StorageClass: Optional[S3StorageClass] = None):
@@ -2844,7 +2862,8 @@ class MockBotoS3Client(MockBoto3Client):
         bucket_prefix_length = len(bucket_prefix)
         search_prefix = bucket_prefix + (Prefix or '')
         aws_file_system = self.s3_files
-        for filename, content in aws_file_system.files.items():
+        # for filename, content in aws_file_system.files.items():
+        for filename, content in aws_file_system.all_filenames_with_content_for_testing():
             key = filename[bucket_prefix_length:]
             if filename.startswith(search_prefix):
                 all_versions = self._object_all_versions(filename)
@@ -2916,7 +2935,8 @@ class MockBotoS3Bucket:
         found = False
         keys = set()  # In real S3, this would be cached info, but for testing we just create it on demand
         prefix = self.name + "/"
-        for pseudo_filename, content in self.s3.s3_files.files.items():
+        # for pseudo_filename, content in self.s3.s3_files.files.items():
+        for pseudo_filename, content in self.s3.s3_files.all_filenames_with_content_for_testing():
             if pseudo_filename.startswith(prefix):
                 found = True
                 key = remove_prefix(prefix, pseudo_filename)

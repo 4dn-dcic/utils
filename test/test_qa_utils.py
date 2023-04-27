@@ -813,7 +813,8 @@ def test_mock_file_system_simple():
                 with io.open(filename2, 'r') as fp:
                     assert fp.read() == "stuff from yesterday"
 
-                assert sorted(mfs.files.keys()) == ['no.such.file', 'pre-existing-file.txt']
+                # assert sorted(mfs.files.keys()) == ['no.such.file', 'pre-existing-file.txt']
+                assert mfs.all_filenames_for_testing() == ['no.such.file', 'pre-existing-file.txt']
 
                 mfs.assert_file_system_state({
                     'no.such.file': b'foobar\nbaz\n',
@@ -1997,7 +1998,8 @@ def test_timer():
 
 def show_s3_debugging_data(mfs, s3, bucket_name):
     print("file system:")
-    for file, data in mfs.files.items():
+    # for file, data in mfs.files.items():
+    for file, data in mfs.all_filenames_with_content_for_testing():
         s3_filename = f'{bucket_name}/{file}'
         all_versions = s3._object_all_versions(s3_filename)  # noQA - internal method needed for testing
         print(f" {file}[{s3._object_attribute_block(s3_filename).version_id}]:"  # noQA - ditto
