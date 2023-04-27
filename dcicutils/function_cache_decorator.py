@@ -60,7 +60,7 @@ def function_cache(*decorator_args, **decorator_kwargs):
 
     def function_cache_decorator_registration(wrapped_function):
 
-        def wrapper_function(*args, **kwargs):
+        def function_wrapper(*args, **kwargs):
 
             key = args + tuple(sorted(kwargs.items()))
             cached = cache.get(key, None)
@@ -116,9 +116,9 @@ def function_cache(*decorator_args, **decorator_kwargs):
             nhits = nmisses = 0
             cache.clear()
 
-        wrapper_function.cache_info = cache_info
-        wrapper_function.cache_clear = cache_clear
-        return wrapper_function
+        function_wrapper.cache_info = cache_info
+        function_wrapper.cache_clear = cache_clear
+        return function_wrapper
 
     if decorator_invoked_without_args:
         return function_cache_decorator_registration(decorator_target_function)
