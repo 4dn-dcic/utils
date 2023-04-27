@@ -1,6 +1,6 @@
 from collections import namedtuple, OrderedDict
 from datetime import datetime, timedelta
-from typing import Union
+from typing import Optional, Union
 import json
 import sys
 
@@ -149,17 +149,39 @@ def function_cache(*decorator_args, **decorator_kwargs):
     return function_cache_decorator_registration
 
 
+def _get_function_name(wrapped_function: callable) -> str:
+    return f"{wrapped_function.__module__}.{wrapped_function.__qualname__}"
+
+
 def function_cache_info() -> dict:
     """
     Returns a list of dictionaries representing all of the function_cache instances
     which exist; each dictonary containing detailed info about the function cache.
-    For debugging/testing/troubleshooting.
+    Only for debugging/testing/troubleshooting.
     """
     info = []
     for function_cache in _function_cache_list:
         function_wrapper = function_cache["function_wrapper"]
         wrapped_function = function_cache["wrapped_function"]
         cache_info = function_wrapper.cache_info(as_dict=True)
-        cache_info["function"] = f"{wrapped_function.__module__}.{wrapped_function.__qualname__}"
+        cache_info["function"] = _get_function_name(wrapped_function)
         info.append(cache_info)
     return info
+
+
+def function_cache_clear(function_name: Optional[str] = None) -> int:
+    """
+    Clears the cache for the given named function (as per function_cache_info),
+    of for all existing caches of no given name function.
+    Returns the number of caches cleared.
+    """
+    ncleared = 0
+    for function_cache in _function_cache_list:
+        wrapped_function = function_cache["wrapped_function"]
+        if not function_name or _get_function_name(wrapped_function) == function_name:
+            function_wrapper = function_cache["function_wrapper"]
+            function_wrapper.cache_clear()
+            ncleared += 1
+            if function_name:
+                break
+    return ncleared
