@@ -39,7 +39,6 @@ def function_cache(*decorator_args, **decorator_kwargs):
     nocache_none = False
     ttl = None
     ttl_none = None
-    null_object = object()
 
     if decorator_args:
         maxsize_arg = decorator_args[0]
@@ -64,10 +63,10 @@ def function_cache(*decorator_args, **decorator_kwargs):
         def wrapper_function(*args, **kwargs):
 
             key = args + tuple(sorted(kwargs.items()))
-            cached = cache.get(key, null_object)
+            cached = cache.get(key, None)
             now = None
 
-            if cached is not null_object:
+            if cached is not None:
 
                 if ttl or ttl_none:
                     now = datetime.now()
