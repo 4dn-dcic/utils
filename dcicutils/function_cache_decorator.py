@@ -4,6 +4,9 @@ import json
 import sys
 
 
+_function_cache_list = []
+
+
 def function_cache(*decorator_args, **decorator_kwargs):
     """
     Exactly analogous to the functools.lru_cache decorator, but also allows specifying
@@ -120,10 +123,13 @@ def function_cache(*decorator_args, **decorator_kwargs):
 
             return value
 
-        def cache_info():
-            cache_info = namedtuple("cache_info", ["hits", "misses", "size", "maxsize",
-                                                   "ttl", "ttl_none", "nocache_none", "key", "serialize_key"])
-            return cache_info(nhits, nmisses, len(cache), maxsize, ttl, ttl_none, nocache_none, key, serialize_key)
+        def cache_info(as_dict: bool = False):
+            cache_info = namedtuple("cache_info", ["hits", "misses", "size", "maxsize", "ttl", "ttl_none",
+                                                   "nocache_none", "key", "serialize_key", "updated"])
+            updated = next(iter(cache.items()))[1]["timestamp"] if len(cache) > 0 else None
+            info = cache_info(nhits, nmisses, len(cache), maxsize, ttl, ttl_none,
+                              nocache_none, key, serialize_key, updated)
+            return dict(info._asdict()) if as_dict else info
 
         def cache_clear():
             nonlocal nhits, nmisses
@@ -132,8 +138,26 @@ def function_cache(*decorator_args, **decorator_kwargs):
 
         function_wrapper.cache_info = cache_info
         function_wrapper.cache_clear = cache_clear
+        _function_cache_list.append({"function_wrapper": function_wrapper, "wrapped_function": wrapped_function})
+
         return function_wrapper
 
     if decorator_invoked_without_args:
         return function_cache_decorator_registration(decorator_target_function)
     return function_cache_decorator_registration
+
+
+def function_cache_info():
+    """
+    Returns a list of dictionaries representing all of the function_cache instances
+    which exist; each dictonary containing detailed info about the function cache.
+    For debugging/testing/troubleshooting.
+    """
+    info = []
+    for function_cache in _function_cache_list:
+        function_wrapper = function_cache["function_wrapper"]
+        wrapped_function = function_cache["wrapped_function"]
+        cache_info = function_wrapper.cache_info(as_dict=True)
+        cache_info["function"] = f"{wrapped_function.__module__}.{wrapped_function.__qualname__}"
+        info.append(cache_info)
+    return info
