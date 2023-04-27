@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+7.3.1
+=====
+
+Add LICENSE.txt (MIT Licenses). The ``pyproject.toml`` already declared that lic
+ense, so no real change. Just pro forma.
+
+
 7.3.0
 =====
 
