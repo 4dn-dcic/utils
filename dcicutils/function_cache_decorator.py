@@ -28,6 +28,10 @@ def function_cache(*decorator_args, **decorator_kwargs):
     as arguments, which normally would not be possible, i.e. e.g. in which case this
     error would be generated: TypeError: unhashable type: 'dict'
 
+    And a custom key decorator kwarg may be specified as a lambda/callable which
+    computes the key by which the function results should be cached; it is passed
+    the exact same arguments as the function itself.
+
     Looked/tried and could not find an way to do this using @lru_cache;
     and also had issues trying to wrap @lru_cache with this functionality.
     First created (April 2023) to try simplify some of the caching in foursight-core APIs.
@@ -47,6 +51,7 @@ def function_cache(*decorator_args, **decorator_kwargs):
     nocache_none = False
     ttl = None
     ttl_none = None
+    key = None
     serialize_key = False
 
     if decorator_args:
@@ -66,6 +71,9 @@ def function_cache(*decorator_args, **decorator_kwargs):
         ttl_none_kwarg = decorator_kwargs.get("time_to_live_none", decorator_kwargs.get("ttl_none"))
         if isinstance(ttl_none_kwarg, timedelta):
             ttl_none = ttl_none_kwarg
+        key_kwarg = decorator_kwargs.get("key")
+        if callable(key_kwarg):
+            key = key_kwarg
         serialize_key_kwarg = decorator_kwargs.get("serialize_key", decorator_kwargs.get("serialize"))
         if isinstance(serialize_key_kwarg, bool):
             serialize_key = serialize_key_kwarg
@@ -74,10 +82,10 @@ def function_cache(*decorator_args, **decorator_kwargs):
 
         def function_wrapper(*args, **kwargs):
 
-            key = args + tuple(sorted(kwargs.items()))
+            cache_key = key(*args, **kwargs) if key else args + tuple(sorted(kwargs.items()))
             if serialize_key:
-                key = json.dumps(key, default=str, separators=(",", ":"))
-            cached = cache.get(key, None)
+                cache_key = json.dumps(cache_key, default=str, separators=(",", ":"))
+            cached = cache.get(cache_key, None)
             now = None
 
             if cached is not None:
@@ -95,7 +103,7 @@ def function_cache(*decorator_args, **decorator_kwargs):
                 if not is_stale():
                     nonlocal nhits
                     nhits += 1
-                    cache.move_to_end(key)
+                    cache.move_to_end(cache_key)
                     return cached["value"]
 
             nonlocal nmisses
@@ -107,7 +115,7 @@ def function_cache(*decorator_args, **decorator_kwargs):
                     cache.popitem(last=False)
                 if not now:
                     now = datetime.now()
-                cache[key] = {"value": value, "timestamp": now}
+                cache[cache_key] = {"value": value, "timestamp": now}
 
             return value
 

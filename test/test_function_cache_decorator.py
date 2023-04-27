@@ -205,3 +205,22 @@ def test_function_cache_decorator_structured_types():
     assert f.cache_info()["hits"] == 2
     assert f.cache_info()["misses"] == 1
     assert f.cache_info()["size"] == 1
+
+
+def test_function_cache_decorator_with_key_function():
+
+    called = 0
+
+    @function_cache(key=lambda a, b: b)
+    def f(a, b):
+        nonlocal called
+        called += 1
+        return a * b
+
+    assert f(2, 3) == 6  # miss
+    assert f.cache_info()["size"] == 1
+    assert f(3, 3) == 6  # hit (key function says only cache by second arg)
+    assert called == 1
+    assert f.cache_info()["hits"] == 1
+    assert f.cache_info()["misses"] == 1
+    assert f.cache_info()["size"] == 1
