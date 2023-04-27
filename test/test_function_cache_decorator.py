@@ -135,7 +135,7 @@ def test_function_cache_decorator_with_ttl():
 
     called = 0
 
-    @function_cache(ttl=timedelta(seconds=2))
+    @function_cache(ttl=timedelta(milliseconds=500))
     def f(n):
         nonlocal called
         called += 1
@@ -150,7 +150,7 @@ def test_function_cache_decorator_with_ttl():
     assert f.cache_info()["hits"] == 2
     assert f.cache_info()["misses"] == 1
 
-    time.sleep(2)
+    time.sleep(1)
     assert f(3) == 9  # miss (due to ttl)
     assert f(3) == 9  # hit
     assert called == 2
@@ -162,7 +162,7 @@ def test_function_cache_decorator_with_ttl_none():
 
     called = 0
 
-    @function_cache(ttl_none=timedelta(seconds=2))
+    @function_cache(ttl_none=timedelta(milliseconds=500))
     def f(n):
         nonlocal called
         called += 1
@@ -177,7 +177,7 @@ def test_function_cache_decorator_with_ttl_none():
     assert f.cache_info()["hits"] == 2
     assert f.cache_info()["misses"] == 1
 
-    time.sleep(2)
+    time.sleep(1)
     assert f(-1) is None  # miss (due to ttl)
     assert f(-1) is None  # hit
     assert called == 2
