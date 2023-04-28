@@ -19,6 +19,9 @@ Change Log
 
 * Added ``dcicutils.function_cache_decorator``; 2023-04-24;
   future help in simplifying some caching in foursight-core APIs.
+
+* Updated ``test/test_task_utils.py`` (``test_pmap_parallelism``):
+  to increase ``margin_of_error`` to 1.1333.
   
 
 7.3.1
