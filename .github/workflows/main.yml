@@ -54,6 +54,7 @@ jobs:
       - name: Coveralls
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERALLS_SERVICE_NAME: github
         if: ${{ matrix.python_version == '3.9' }}
         run: |
           pip install coveralls
