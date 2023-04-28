@@ -6,7 +6,7 @@ dcicutils
 Change Log
 ----------
 
-7.3.2
+7.4.0
 =====
 
 * In ``dcicutils.env_utils`` added function ``get_portal_url`` which is
