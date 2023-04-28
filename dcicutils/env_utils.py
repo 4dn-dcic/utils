@@ -693,7 +693,7 @@ def _find_public_url_entry(envname):
 def get_portal_url(envname: EnvName) -> UrlString:
     """
     Returns the Portal URL for the given environment name.
-    Effectively same ase get_env_real_url (below) but does not actually access
+    Effectively same as get_env_real_url (below) but does not actually access
     the URL (to get the health page is that function does); i.e. so we can get
     the URL without exception even if there is a problem with the Portal.
     """

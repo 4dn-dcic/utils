@@ -9,8 +9,9 @@ Change Log
 7.3.2
 =====
 
-* In ``dcicutils.env_utils`` added function ``get_portal_url``;
-  first usage of which was in foursight-core. 2023-04-16.
+* In ``dcicutils.env_utils`` added function ``get_portal_url`` which is
+  the same as ``get_env_real_url`` but does not access the URL (via the
+  health page); first usage of which was in foursight-core. 2023-04-16.
 
 * Added ``dcicutils.ssl_certificate_utils``;
   first usage of which was in foursight-core. 2023-04-16.
