@@ -82,7 +82,7 @@ def function_cache(*decorator_args, **decorator_kwargs):
         if isinstance(serialize_key_kwarg, bool):
             serialize_key = serialize_key_kwarg
 
-    def function_cache_decorator_registration(wrapped_function):
+    def function_cache_decorator(wrapped_function):
 
         def function_wrapper(*args, **kwargs):
 
@@ -90,7 +90,7 @@ def function_cache(*decorator_args, **decorator_kwargs):
             if serialize_key:
                 cache_key = json.dumps(cache_key, default=str, separators=(",", ":"))
             cached = cache.get(cache_key, None)
-            now = None  # do not call datetime.now more than once
+            now = None  # Do not call datetime.now more than once
 
             if cached is not None:
 
@@ -145,8 +145,8 @@ def function_cache(*decorator_args, **decorator_kwargs):
         return function_wrapper
 
     if decorator_invoked_without_args:
-        return function_cache_decorator_registration(decorator_target_function)
-    return function_cache_decorator_registration
+        return function_cache_decorator(decorator_target_function)
+    return function_cache_decorator
 
 
 def _get_function_name(wrapped_function: callable) -> str:
