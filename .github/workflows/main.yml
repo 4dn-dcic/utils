@@ -57,4 +57,5 @@ jobs:
         if: ${{ matrix.python_version == '3.9' }}
         run: |
           pip install coveralls
+          pip install coverage==7.2.4
           poetry run coveralls --service=github
