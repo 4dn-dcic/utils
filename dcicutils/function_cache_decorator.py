@@ -159,8 +159,8 @@ def function_cache(*decorator_args, **decorator_kwargs):
                 updated = None
                 duration = None
             info = cache_info(nhits, nmisses, len(cache), maxsize, ttl, ttl_none,
-                              nocache is None, key, nocache is not null_object,
-                              key is not None, serialize_key, updated, duration, _get_function_name(wrapped_function))
+                              nocache is None, nocache is not None and nocache is not null_object,
+                              key, serialize_key, updated, duration, _get_function_name(wrapped_function))
             return dict(info._asdict()) if as_dict else info
 
         def cache_clear() -> None:
