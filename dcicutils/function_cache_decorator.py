@@ -11,7 +11,7 @@ _function_cache_list = []
 def function_cache(*decorator_args, **decorator_kwargs):
     """
     Exactly analogous to the functools.lru_cache decorator, but also allows specifying
-    hat if the return value of the function is None then no caching is to be done; use
+    that if the return value of the function is None then no caching is to be done; use
     the do_not_cache_none (nocache_none) set to True as a decorator argument to do this.
 
     Also like @lru_cache, this supports the maxsize decorator argument, as well
@@ -33,8 +33,12 @@ def function_cache(*decorator_args, **decorator_kwargs):
     error would be generated: TypeError: unhashable type: 'dict'
 
     And a custom key decorator kwarg may be specified as a lambda/callable which
-    computes the key by which the function results should be cached; it is passed
-    the exact same arguments as the function itself.
+    computes the key by which the function results should be cached; this lambda
+    is passed the exact same arguments as the function itself.
+
+    Lastly, if the nokey kwarg is specified for the decorator then no key at all
+    will used (or more precisely, and single/constant key will be used) by which
+    to cache the function result.
 
     Looked/tried and could not find an way to do this using @lru_cache;
     and also had issues trying to wrap @lru_cache with this functionality.
@@ -57,6 +61,7 @@ def function_cache(*decorator_args, **decorator_kwargs):
     nocache_none = False
     key = None
     serialize_key = False
+    nokey = False
 
     if decorator_args:
         maxsize_arg = decorator_args[0]
@@ -81,15 +86,22 @@ def function_cache(*decorator_args, **decorator_kwargs):
         serialize_key_kwarg = decorator_kwargs.get("serialize_key")
         if isinstance(serialize_key_kwarg, bool):
             serialize_key = serialize_key_kwarg
+        nokey_kwarg = decorator_kwargs.get("nokey")
+        if isinstance(nokey_kwarg, bool):
+            nokey = nokey_kwarg
 
     def function_cache_decorator(wrapped_function):
 
         def function_wrapper(*args, **kwargs):
 
-            cache_key = key(*args, **kwargs) if key else args + tuple(sorted(kwargs.items()))
-            if serialize_key:
-                cache_key = json.dumps(cache_key, default=str, separators=(",", ":"))
+            if nokey:
+                cache_key = 0
+            else:
+                cache_key = key(*args, **kwargs) if key else args + tuple(sorted(kwargs.items()))
+                if serialize_key:
+                    cache_key = json.dumps(cache_key, default=str, separators=(",", ":"))
             cached = cache.get(cache_key, None)
+
             now = None  # Do not call datetime.now more than once
 
             if cached is not None:
@@ -126,11 +138,11 @@ def function_cache(*decorator_args, **decorator_kwargs):
 
         def cache_info(as_dict: bool = False) -> Union[namedtuple, dict]:
             cache_info = namedtuple("cache_info", ["hits", "misses", "size", "maxsize", "ttl", "ttl_none",
-                                                   "nocache_none", "key", "serialize_key", "updated"])
+                                                   "nocache_none", "key", "serialize_key", "updated", "name"])
             updated = next(iter(cache.items()))[1]["timestamp"] if len(cache) > 0 else None
             updated = updated.strftime("%Y-%m-%d %H:%M:%S") if updated else None
             info = cache_info(nhits, nmisses, len(cache), maxsize, ttl, ttl_none,
-                              nocache_none, key, serialize_key, updated)
+                              nocache_none, key, serialize_key, updated, _get_function_name(wrapped_function))
             return dict(info._asdict()) if as_dict else info
 
         def cache_clear() -> None:
@@ -164,9 +176,9 @@ def function_cache_info() -> dict:
         function_wrapper = function_cache["function_wrapper"]
         wrapped_function = function_cache["wrapped_function"]
         cache_info = function_wrapper.cache_info(as_dict=True)
-        cache_info["function"] = _get_function_name(wrapped_function)
+        cache_info["name"] = _get_function_name(wrapped_function)
         info.append(cache_info)
-    return info
+    return sorted(info, key=lambda item: item["name"])
 
 
 def function_cache_clear(function_name: Optional[str] = None) -> int:
