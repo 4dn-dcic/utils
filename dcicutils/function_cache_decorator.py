@@ -1,5 +1,6 @@
 from collections import namedtuple, OrderedDict
 from datetime import datetime, timedelta
+import timeit
 from typing import Optional, Union
 import json
 import sys
@@ -11,8 +12,9 @@ _function_cache_list = []
 def function_cache(*decorator_args, **decorator_kwargs):
     """
     Exactly analogous to the functools.lru_cache decorator, but also allows specifying
-    that if the return value of the function is None then no caching is to be done; use
-    the do_not_cache_none (nocache_none) set to True as a decorator argument to do this.
+    that if the return value of the function is None then no caching is to be done;
+    use the nocache_none decorator kwarg set to True to do this. And more generally, use
+    the nocache decorator kwart set to anything to not cache any value which equals that.
 
     Also like @lru_cache, this supports the maxsize decorator argument, as well
     as the cache_info and cache_clear functions on the decorated function.
@@ -55,10 +57,11 @@ def function_cache(*decorator_args, **decorator_kwargs):
         decorator_invoked_without_args = False
         decorator_target_function = None
 
+    null_object = object()
     maxsize = sys.maxsize
     ttl = None
     ttl_none = None
-    nocache_none = False
+    nocache = null_object
     key = None
     serialize_key = False
     nokey = False
@@ -77,9 +80,12 @@ def function_cache(*decorator_args, **decorator_kwargs):
         ttl_none_kwarg = decorator_kwargs.get("ttl_none", decorator_kwargs.get("time_to_live_none"))
         if isinstance(ttl_none_kwarg, timedelta):
             ttl_none = ttl_none_kwarg
-        nocache_none_kwarg = decorator_kwargs.get("nocache_none", decorator_kwargs.get("do_not_cache_none"))
-        if isinstance(nocache_none_kwarg, bool):
-            nocache_none = nocache_none_kwarg
+        nocache_kwarg = decorator_kwargs.get("nocache", null_object)
+        if nocache_kwarg is not null_object:
+            nocache = nocache_kwarg
+        nocache_none_kwarg = decorator_kwargs.get("nocache_none")
+        if isinstance(nocache_none_kwarg, bool) and nocache_none_kwarg:
+            nocache = None
         key_kwarg = decorator_kwargs.get("key", decorator_kwargs.get("key_function"))
         if callable(key_kwarg):
             key = key_kwarg
@@ -125,24 +131,36 @@ def function_cache(*decorator_args, **decorator_kwargs):
 
             nonlocal nmisses
             nmisses += 1
+            start_time = timeit.default_timer()
             value = wrapped_function(*args, **kwargs)
+            duration = timeit.default_timer() - start_time
 
-            if value is not None or not nocache_none:
+            if nocache is null_object or nocache != value:
                 if len(cache) >= maxsize:
                     cache.popitem(last=False)
                 if not now:
                     now = datetime.now()
-                cache[cache_key] = {"value": value, "timestamp": now}
+                cache[cache_key] = {"value": value, "timestamp": now, "duration": duration}
 
             return value
 
         def cache_info(as_dict: bool = False) -> Union[namedtuple, dict]:
-            cache_info = namedtuple("cache_info", ["hits", "misses", "size", "maxsize", "ttl", "ttl_none",
-                                                   "nocache_none", "key", "serialize_key", "updated", "name"])
-            updated = next(iter(cache.items()))[1]["timestamp"] if len(cache) > 0 else None
-            updated = updated.strftime("%Y-%m-%d %H:%M:%S") if updated else None
+            cache_info = namedtuple("cache_info",
+                                    ["hits", "misses", "size", "maxsize", "ttl", "ttl_none",
+                                     "nocache_none", "nocache_other",
+                                     "key", "serialize_key", "updated", "duration", "name"])
+            if len(cache) > 0:
+                cached = next(iter(cache.items()))[1]
+                # This is the timstamp of the most recent call to the wrapped function.
+                updated = cached["timestamp"].strftime("%Y-%m-%d %H:%M:%S")
+                # This is the duration in milliseconds of the most recent call to the wrapped function.
+                duration = cached["duration"] * 1000
+            else:
+                updated = None
+                duration = None
             info = cache_info(nhits, nmisses, len(cache), maxsize, ttl, ttl_none,
-                              nocache_none, key, serialize_key, updated, _get_function_name(wrapped_function))
+                              nocache is None, key, nocache is not null_object,
+                              serialize_key, updated, duration, _get_function_name(wrapped_function))
             return dict(info._asdict()) if as_dict else info
 
         def cache_clear() -> None:

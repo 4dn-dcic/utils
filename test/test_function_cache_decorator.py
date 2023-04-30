@@ -49,11 +49,11 @@ def test_function_cache_decorator():
     assert called == 4
 
 
-def test_function_cache_decorator_with_do_not_cache_none():
+def test_function_cache_decorator_with_nocache_none():
 
     called = 0
 
-    @function_cache(do_not_cache_none=True)
+    @function_cache(nocache_none=True)
     def f(n):
         nonlocal called
         called += 1
@@ -87,11 +87,60 @@ def test_function_cache_decorator_with_do_not_cache_none():
     called = 0
     f.cache_clear()
     assert f.cache_info().size == 0
-    assert f(-1) is None  # miss (because do_not_cache_none=True)
+    assert f(-1) is None  # miss (because nocache_none=True)
     assert f.cache_info().size == 0
-    assert f(-1) is None  # miss (because do_not_cache_none=True)
+    assert f(-1) is None  # miss (because nocache_none=True)
     assert f.cache_info().size == 0
-    assert f(-1) is None  # miss (because do_not_cache_none=True)
+    assert f(-1) is None  # miss (because nocache_none=True)
+    assert f.cache_info().size == 0
+    assert called == 3
+    assert f.cache_info().hits == 0
+    assert f.cache_info().misses == 3
+
+
+def test_function_cache_decorator_with_nocache_none2():
+
+    called = 0
+
+    @function_cache(nocache=None)
+    def f(n):
+        nonlocal called
+        called += 1
+        if n < 0:
+            return None
+        return n * n
+
+    assert f.cache_info().size == 0
+    assert f(3) == 9   # miss
+    assert f.cache_info().size == 1
+    assert f(4) == 16  # miss
+    assert f.cache_info().size == 2
+    assert f(5) == 25  # miss
+    assert f.cache_info().size == 3
+    assert f(3) == 9   # hit
+    assert f.cache_info().size == 3
+    assert f(4) == 16  # hit
+    assert f.cache_info().size == 3
+    assert f(5) == 25  # hit
+    assert f.cache_info().size == 3
+    assert f(3) == 9   # hit
+    assert f.cache_info().size == 3
+    assert f(4) == 16  # hit
+    assert f.cache_info().size == 3
+    assert f(5) == 25  # hit
+    assert f.cache_info().size == 3
+    assert called == 3
+    assert f.cache_info().hits == 6
+    assert f.cache_info().misses == 3
+
+    called = 0
+    f.cache_clear()
+    assert f.cache_info().size == 0
+    assert f(-1) is None  # miss (because nocache=None)
+    assert f.cache_info().size == 0
+    assert f(-1) is None  # miss (because nocache=None)
+    assert f.cache_info().size == 0
+    assert f(-1) is None  # miss (because nocache=None)
     assert f.cache_info().size == 0
     assert called == 3
     assert f.cache_info().hits == 0
