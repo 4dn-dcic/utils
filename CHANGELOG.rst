@@ -6,6 +6,25 @@ dcicutils
 Change Log
 ----------
 
+7.4.0
+=====
+
+* In ``dcicutils.env_utils`` added function ``get_portal_url`` which is
+  the same as ``get_env_real_url`` but does not access the URL (via the
+  health page); first usage of which was in foursight-core. 2023-04-16.
+
+* Added ``dcicutils.ssl_certificate_utils``;
+  first usage of which was in foursight-core. 2023-04-16.
+
+* Added ``dcicutils.scripts.publish_to_pypi``; 2023-04-24.
+
+* Added ``dcicutils.function_cache_decorator``; 2023-04-24;
+  future help in simplifying some caching in foursight-core APIs.
+
+* Updated ``test/test_task_utils.py`` (``test_pmap_parallelism``):
+  to increase ``margin_of_error`` to 1.1333.
+  
+
 7.3.1
 =====
 
@@ -56,6 +75,7 @@ ense, so no real change. Just pro forma.
 
 * Load ``coveralls`` dependency only dynamically in GA workflow, not in poetry,
   because it implicates ``docopt`` library, which needs ``2to3``, and would fail.
+
 
 
 7.2.0
