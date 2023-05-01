@@ -6,6 +6,7 @@ import json
 import sys
 
 
+# Global list of all @function_decorator instances; for debugging/testing/troubleshooting.
 _function_cache_list = []
 
 
@@ -21,14 +22,14 @@ def function_cache(*decorator_args, **decorator_kwargs):
     The maxsize can be specified either as the first argument to the
     decorator or as a maxsize kwarg to the decorator.
 
-    In addition we support a time_to_live (ttl) decorator kwarg which can be specified,
+    In addition we support a ttl (time to live) decorator kwarg which can be specified,
     as a timedelta type. If the cached value for the function is more than the specified
     ttl then it is considered stale and the function will be called to get a fresh value.
-    And, there is a separate time_to_live_none (ttl_none) supported which will do the
-    same as ttl but will apply only if the cached value is None.
+    And, there is a separate ttl_none supported which will do the same as ttl but will
+    apply only if the cached value is None.
 
-    There is also a serialize_key (serialize) decorator kwarg which if specified as True,
-    will serialize the arguments (args and kwargs) to the function call and use that value,
+    There is also a serialize_key decorator kwarg which if specified as True, will
+    serialize the arguments (args and kwargs) to the function call and use that value,
     converted to a string, as the key for caching the function result; this will allow
     caching for functions which take non-hashable structured types (i.e. dict or list)
     as arguments, which normally would not be possible, i.e. e.g. in which case this
@@ -74,10 +75,10 @@ def function_cache(*decorator_args, **decorator_kwargs):
         maxsize_kwarg = decorator_kwargs.get("maxsize")
         if isinstance(maxsize_kwarg, int) and maxsize_kwarg > 0:
             maxsize = maxsize_kwarg
-        ttl_kwarg = decorator_kwargs.get("ttl", decorator_kwargs.get("time_to_live"))
+        ttl_kwarg = decorator_kwargs.get("ttl")
         if isinstance(ttl_kwarg, timedelta):
             ttl = ttl_kwarg
-        ttl_none_kwarg = decorator_kwargs.get("ttl_none", decorator_kwargs.get("time_to_live_none"))
+        ttl_none_kwarg = decorator_kwargs.get("ttl_none")
         if isinstance(ttl_none_kwarg, timedelta):
             ttl_none = ttl_none_kwarg
         nocache_kwarg = decorator_kwargs.get("nocache", null_object)
@@ -86,7 +87,7 @@ def function_cache(*decorator_args, **decorator_kwargs):
         nocache_none_kwarg = decorator_kwargs.get("nocache_none")
         if isinstance(nocache_none_kwarg, bool) and nocache_none_kwarg:
             nocache = None
-        key_kwarg = decorator_kwargs.get("key", decorator_kwargs.get("key_function"))
+        key_kwarg = decorator_kwargs.get("key")
         if callable(key_kwarg):
             key = key_kwarg
         serialize_key_kwarg = decorator_kwargs.get("serialize_key")
@@ -116,7 +117,11 @@ def function_cache(*decorator_args, **decorator_kwargs):
                     now = datetime.now()
 
                 def is_stale():
-                    # Uses outer variables: ttl, ttl_none, cached, now
+                    """
+                    Returns True iff the cached value for the @function_cache decorated
+                    function is stale, according to any ttl related decorator kwargs.
+                    Uses outer variables: ttl, ttl_none, cached, now
+                    """
                     if ttl and now > cached["timestamp"] + ttl:
                         return True
                     if ttl_none and cached["value"] is None and now > cached["timestamp"] + ttl_none:
@@ -145,6 +150,10 @@ def function_cache(*decorator_args, **decorator_kwargs):
             return value
 
         def cache_info(as_dict: bool = False) -> Union[namedtuple, dict]:
+            """
+            Returns a named tuple with sundry info about the function cache
+            for the @function_cache decorated function.
+            """
             cache_info = namedtuple("cache_info",
                                     ["hits", "misses", "size", "maxsize", "ttl", "ttl_none",
                                      "nocache_none", "nocache_other",
@@ -164,6 +173,9 @@ def function_cache(*decorator_args, **decorator_kwargs):
             return dict(info._asdict()) if as_dict else info
 
         def cache_clear() -> None:
+            """
+            Clears the cache for the @function_cache decorated function.
+            """
             nonlocal nhits, nmisses
             nhits = nmisses = 0
             cache.clear()
@@ -180,6 +192,9 @@ def function_cache(*decorator_args, **decorator_kwargs):
 
 
 def _get_function_name(wrapped_function: callable) -> str:
+    """
+    Returns a unique name for the given function/callable.
+    """
     return f"{wrapped_function.__module__}.{wrapped_function.__qualname__}"
 
 
@@ -201,9 +216,9 @@ def function_cache_info() -> dict:
 
 def function_cache_clear(function_name: Optional[str] = None) -> int:
     """
-    Clears the cache for the given named function (as per function_cache_info),
-    of for all existing caches of no given name function.
-    Returns the number of caches cleared.
+    Clears the cache for the given named function (as per function_cache_info), OR for
+    ALL existing caches if no named function given. Returns the number of caches cleared.
+    Only for debugging/testing/troubleshooting.
     """
     ncleared = 0
     for function_cache in _function_cache_list:
