@@ -535,4 +535,5 @@ class TestGlacierUtils:
                     versions = s3.list_object_versions(Bucket=bucket_name, Prefix=key2_name)
                     version_1 = versions['Versions'][0]['VersionId']
                     assert gu.restore_s3_from_glacier(bucket_name, key2_name, version_id=version_1)
-                    assert gu.copy_object_back_to_original_location(bucket_name, key2_name, version_id=version_1)
+                    assert gu.copy_object_back_to_original_location(bucket_name, key2_name, version_id=version_1,
+                                                                    preserve_lifecycle_tag=True)
