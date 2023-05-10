@@ -419,6 +419,61 @@ class MockFileWriter:
         # file_system.files[self.file] = content if isinstance(content, bytes) else content.encode(self.encoding)
 
 
+class MockAbstractContent:
+    pass
+
+
+class MockBigContent(MockAbstractContent):
+
+    ID_COUNTER = 0
+
+    def __init__(self, size, content_id=None):
+        if content_id is None:
+            self.__class__.ID_COUNTER = content_id = self.__class__.ID_COUNTER + 1
+        self.content_id = str(content_id)
+        self.coverage = fill_portion([], start=0, end=size)
+
+    def __str__(self):
+        return f"<{self.__class__.__name__} content_id={self.content_id} coverage={self.coverage}>"
+
+    def __repr__(self):
+        return f"{full_class_name(self)}(content_id={self.content_id}, coverage=={self.coverage})"
+
+    def __eq__(self, other):
+        if type(self) != type(other):
+            return False
+        return self.coverage == other.coverage and self.content_id == other.content_id
+
+    def start_partial_copy(self):
+        return self.__class__(content_id=self.content_id, size=0)
+
+    def copy_portion(self, start, end, target):
+        if type(target) != type(self) or self.content_id != target.content_id:
+            raise Exception("You cannot copy part of {self} into {target}.")
+        target.coverage  = fill_portion(coverage=target.coverage, start=start, end=end)
+
+
+def fill_portion(coverage, start, end):
+    current = [0, 0]
+    result = []
+    for item in sorted(coverage + [[start, end]]):
+        [s, e] = item
+        if e < s:
+            raise ValueError(f"Consistency problem: {item} is out of order.")
+        elif s > current[1]:
+            if current[0] != current[1]:
+                result.append(current)
+            current = [s, e]
+        elif e > current[1]:
+            current[1] = e
+    if current[0] != current[1]:
+        result.append(current)
+    return result
+
+def is_abstract_content(content):
+    return isinstance(content, MockAbstractContent)
+
+
 class MockFileSystem:
     """Extremely low-tech mock file system."""
 
@@ -473,6 +528,8 @@ class MockFileSystem:
         content = self.files.get(filename)
         if required and content is None:
             raise Exception(f"Mocked file not found: {filename}")
+        elif is_abstract_content(content):
+            raise Exception(f"Mock for file {filename} cannot be opened for specific content: {content}")
         return content
 
     def assert_file_content(self, filename, expected_content):

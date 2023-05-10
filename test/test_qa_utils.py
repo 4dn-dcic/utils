@@ -26,6 +26,7 @@ from dcicutils.qa_utils import (
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
     logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually, Timer,
     MockObjectBasicAttributeBlock, MockObjectAttributeBlock, MockObjectDeleteMarker, MockTemporaryRestoration,
+    fill_portion, MockBigContent, is_abstract_content,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -2176,3 +2177,51 @@ def test_s3_list_object_versions():
             assert version3['Key'] == key2_name
             assert version3['IsLatest'] is True
             assert all(version['StorageClass'] == 'STANDARD' for version in versions)
+
+
+def test_is_abstract_content():
+
+    content = MockBigContent(size=5000)
+    assert is_abstract_content(content)
+
+
+def test_fill_portion():
+    assert fill_portion([], 0, 0) == []
+    assert fill_portion([], 100, 100) == []
+
+    assert fill_portion([], 0, 100) == [[0, 100]]
+    assert fill_portion([], 100, 500) == [[100, 500]]
+
+    assert fill_portion([[0, 100]], 100, 200) == [[0, 200]]
+    assert fill_portion([[0, 100]], 101, 200) == [[0, 100], [101, 200]]
+
+    assert fill_portion([[0, 100], [100, 101]], 101, 200) == [[0, 200]]
+    assert fill_portion([[0, 100], [100, 101]], 90, 200) == [[0, 200]]
+    assert fill_portion([[100, 200], [225, 250]], 90, 300) == [[90, 300]]
+    assert fill_portion([[100, 200], [225, 250], [200, 227]], 0, 0) == [[100, 250]]
+
+
+def test_mock_big_content():
+
+    print()  # start on a fresh line
+
+    size = 5005
+    increment = 1000
+
+    content = MockBigContent(size=size)
+    assert isinstance(content.content_id, str)
+    assert content.coverage == [[0, size]]
+
+    content_copy = content.start_partial_copy()
+    assert content_copy != content
+    pos = 0
+    new_pos = 0
+    print(f"content={content}")
+    print(f"content_copy={content_copy}")
+    while pos < size:
+        assert content_copy != content
+        new_pos = min(pos + increment, size)
+        print(f"pos={pos} new_pos={new_pos} content_copy={content_copy}")
+        content.copy_portion(start=pos, end=new_pos, target=content_copy)
+        pos = new_pos
+    assert content_copy == content
