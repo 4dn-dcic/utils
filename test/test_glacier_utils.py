@@ -510,7 +510,7 @@ class TestGlacierUtils:
             with mock.patch.object(gu.s3, 'upload_part_copy', return_value={'CopyPartResult': {'ETag': 'abc'}}):
                 with mock.patch.object(gu.s3, 'complete_multipart_upload', return_value={'success': True}):
                     with mock.patch.object(gu.s3, 'head_object', return_value={'ContentLength': 600000000000}):
-                        assert gu.copy_object_back_to_original_location('bucket', 'key')
+                        assert gu.copy_object_back_to_original_location('bucket', 'key', preserve_lifecycle_tag=True)
 
     def test_glacier_utils_with_mock_s3(self, glacier_utils):
         """ Uses our mock_s3 system to test some operations with object versioning enabled """
@@ -525,7 +525,7 @@ class TestGlacierUtils:
                     key2_name = 'file2.txt'
                     with io.open(key_name, 'w') as fp:
                         fp.write("first contents")
-                    s3.upload_file(key_name, Bucket=bucket_name, Key=key_name,)
+                    s3.upload_file(key_name, Bucket=bucket_name, Key=key_name)
                     with io.open(key2_name, 'w') as fp:
                         fp.write("second contents")
                     s3.upload_file(key2_name, Bucket=bucket_name, Key=key2_name)
@@ -535,5 +535,6 @@ class TestGlacierUtils:
                     versions = s3.list_object_versions(Bucket=bucket_name, Prefix=key2_name)
                     version_1 = versions['Versions'][0]['VersionId']
                     assert gu.restore_s3_from_glacier(bucket_name, key2_name, version_id=version_1)
-                    assert gu.copy_object_back_to_original_location(bucket_name, key2_name, version_id=version_1)
+                    assert gu.copy_object_back_to_original_location(bucket_name, key2_name, version_id=version_1,
+                                                                    preserve_lifecycle_tag=True)
 

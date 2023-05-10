@@ -462,6 +462,8 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
         content_type = mimetypes.guess_type(upload_key)[0]
         if content_type is None:
             content_type = 'binary/octet-stream'
+        if isinstance(obj, dict):
+            obj = json.dumps(obj)
         if acl:
             # we use this to set some of the object as public
             return self.s3.put_object(Bucket=self.outfile_bucket,
@@ -480,6 +482,8 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             bucket = self.sys_bucket
         if not secret:
             secret = os.environ["S3_ENCRYPT_KEY"]
+        if isinstance(data, dict):
+            data = json.dumps(data)
         return self.s3.put_object(Bucket=bucket,
                                   Key=keyname,
                                   Body=data,

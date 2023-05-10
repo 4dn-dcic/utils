@@ -94,7 +94,6 @@ AVAILABLE_S3_STORAGE_CLASSES = [
 #
 # See boto3 docs for info on possible values, but these 3 are the current ones used for
 # glacier (that require restore calls) - Will 7 Apr 2023
-
 S3_GLACIER_CLASSES = [
     'GLACIER_IR',  # Glacier Instant Retrieval
     'GLACIER',  # Glacier Flexible Retrieval
@@ -116,6 +115,10 @@ S3StorageClass = Union[
     Literal['OUTPOSTS'],
     Literal['GLACIER_IR'],
 ]
+
+
+# This constant is used in our Lifecycle management system to automatically transition objects
+ENCODED_LIFECYCLE_TAG_KEY = 'Lifecycle'
 
 
 # These numbers come from AWS and is the max size that can be copied with a single request
