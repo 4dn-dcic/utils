@@ -2797,6 +2797,7 @@ class MockBotoS3Client(MockBoto3Client):
             PRINT(f"The copy was not a temporary restoration.")
         if new_storage_class:
             target_attribute_block.initialize_storage_class(new_storage_class)
+        return {'Success': True}
 
     RESTORATION_DELAY_SECONDS = 2
 
@@ -2898,7 +2899,8 @@ class MockBotoS3Client(MockBoto3Client):
             self.s3_files.remove_file_entry_for_testing(s3_filename)
         return result
 
-    def restore_object(self, Bucket, Key, RestoreRequest, StorageClass: Optional[S3StorageClass] = None):
+    def restore_object(self, Bucket, Key, RestoreRequest, VersionId: Optional[str] = None,
+                       StorageClass: Optional[S3StorageClass] = None):
         duration_days: int = RestoreRequest.get('Days')
         storage_class: S3StorageClass = StorageClass or self.storage_class
         s3_filename = f"{Bucket}/{Key}"
@@ -2910,6 +2912,7 @@ class MockBotoS3Client(MockBoto3Client):
         attribute_block.restore_temporarily(delay_seconds=self.RESTORATION_DELAY_SECONDS,
                                             duration_days=duration_days,
                                             storage_class=storage_class)
+        return {'Success': True}
 
     def list_object_versions(self, Bucket, Prefix='', **unimplemented_keyargs):  # noQA - AWS argument naming style
         assert not unimplemented_keyargs, (f"The mock for list_object_versions needs to be extended."

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "7.3.0"
+version = "7.4.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -8,7 +8,8 @@ readme = "README.rst"
 homepage = "https://github.com/4dn-dcic/utils"
 repository = "https://github.com/4dn-dcic/utils"
 packages = [
-  { include="dcicutils", from="." }
+  { include="dcicutils", from="." },
+  { include="scripts", from="dcicutils" }
 ]
 classifiers = [
     # How mature is this project? Common values are
@@ -56,6 +57,7 @@ urllib3 = "^1.26.6"
 webtest = "^2.0.34"
 opensearch-py = "^2.0.1"
 redis = "^4.5.1"
+pyOpenSSL = "^23.1.1"
 PyJWT = "^2.6.0"
 tqdm = "^4.65.0"
 
@@ -63,7 +65,7 @@ tqdm = "^4.65.0"
 [tool.poetry.dev-dependencies]
 botocore-stubs = "1.21.22"
 boto3-stubs = "1.18.23"
-coverage = ">=5.3.1"
+coverage = ">=7.2.3"
 # Loaded manually in GA workflow for coverage because a dependency on 2to3
 # in its docopts dependency makes a problem for laoding it here in poetry. -kmp 7-Apr-2023
 # coveralls = ">=3.3.1"
@@ -74,6 +76,10 @@ pytest-cov = ">=2.7.1"
 pytest-mock = ">=1.11.0"
 pytest-redis = "^2.0.0"
 pytest-runner = ">=5.1"
+
+
+[tool.poetry.scripts]
+publish-to-pypi = "dcicutils.scripts.publish_to_pypi:main"
 
 
 [tool.pytest.ini_options]

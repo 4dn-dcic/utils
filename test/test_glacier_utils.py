@@ -1,12 +1,11 @@
-# import io
-# import json
+import io
 import pytest
 
 from unittest import mock
+
+from dcicutils.ff_mocks import mocked_s3utils
 from dcicutils.glacier_utils import GlacierUtils, GlacierRestoreException
-# from dcicutils.ff_mocks import mocked_s3utils
-# from dcicutils.lang_utils import there_are
-# from dcicutils.qa_utils import MockFileSystem, MockBotoS3Client
+from dcicutils.qa_utils import MockFileSystem
 
 
 def mock_keydict() -> dict:
@@ -504,50 +503,37 @@ class TestGlacierUtils:
                     assert gu.restore_all_from_search(search_query='/search', phase=4, confirm=False,
                                                       search_generator=True) == (expected_success, [])
 
+    def test_glacier_utils_multipart_upload(self, glacier_utils):
+        """ Tests the basics of a multipart upload """
+        gu = glacier_utils
+        with mock.patch.object(gu.s3, 'create_multipart_upload', return_value={'UploadId': '123'}):
+            with mock.patch.object(gu.s3, 'upload_part_copy', return_value={'CopyPartResult': {'ETag': 'abc'}}):
+                with mock.patch.object(gu.s3, 'complete_multipart_upload', return_value={'success': True}):
+                    with mock.patch.object(gu.s3, 'head_object', return_value={'ContentLength': 600000000000}):
+                        assert gu.copy_object_back_to_original_location('bucket', 'key')
 
-# An equivalent test is now in test_qa_utils.py, but this code is kept here to give a sense of what would work.
-#
-# def test_glacier_utils_list_object_versions():
-#     # Output from this test is usefully viewed by doing:  pytest -s -vv -k test_glacier_utils_object_versions
-#     # In fact, this doesn't test any glacier_utils functionality, but just that a mock of this kind,
-#     # calling list_object_versions, would work. It is in some ways a better test of qa_utils.
-#     mfs = MockFileSystem()
-#     with mocked_s3utils(environments=['fourfront-mastertest']) as mock_boto3:
-#         with mfs.mock_exists_open_remove():
-#             s3: MockBotoS3Client = mock_boto3.client('s3')
-#             bucket_name = 'foo'
-#             key_name = 'file.txt'
-#             key2_name = 'file2.txt'
-#             with io.open(key_name, 'w') as fp:
-#                 fp.write("first contents")
-#             s3.upload_file(key_name, Bucket=bucket_name, Key=key_name)
-#             with io.open(key_name, 'w') as fp:
-#                 fp.write("second contents")
-#             s3.upload_file(key_name, Bucket=bucket_name, Key=key_name)
-#             with io.open(key2_name, 'w') as fp:
-#                 fp.write("other stuff")
-#             s3.upload_file(key2_name, Bucket=bucket_name, Key=key2_name)
-#             print("file system:")
-#             for file, data in mfs.all_filenames_with_content_for_testing():
-#                 s3_filename = f'{bucket_name}/{file}'
-#                 all_versions = s3._object_attribute_blocks(s3_filename)
-#                 print(f" {file}[{s3._object_attribute_block(s3_filename).version_id}]:"
-#                       f" {data!r}  # length={len(data)}."
-#                       f" {there_are([x.version_id for x in all_versions[:-1]], kind='back version')}")
-#             version_info = s3.list_object_versions(Bucket=bucket_name)
-#             print(f"list_object_versions(Bucket={bucket_name!r}) =")
-#             print(json.dumps(version_info, indent=2))
-#             versions = version_info['Versions']
-#             assert len(versions) == 3
-#             version1, version2, version3 = versions
-#             # Back version of file.txt
-#             assert version1['Key'] == key_name
-#             assert version1['IsLatest'] is False
-#             # Current version of file.txt
-#             assert version2['Key'] == key_name
-#             assert version2['IsLatest'] is True
-#             # Current version of file2.txt
-#             assert version3['Key'] == key2_name
-#             assert version3['IsLatest'] is True
-#             assert all(version['StorageClass'] == 'STANDARD' for version in versions)
-#
+    def test_glacier_utils_with_mock_s3(self, glacier_utils):
+        """ Uses our mock_s3 system to test some operations with object versioning enabled """
+        gu = glacier_utils
+        mfs = MockFileSystem()
+        with mocked_s3utils(environments=['fourfront-mastertest']) as mock_boto3:
+            with mfs.mock_exists_open_remove():
+                s3 = mock_boto3.client('s3')
+                with mock.patch.object(gu, 's3', s3):
+                    bucket_name = 'foo'
+                    key_name = 'file.txt'
+                    key2_name = 'file2.txt'
+                    with io.open(key_name, 'w') as fp:
+                        fp.write("first contents")
+                    s3.upload_file(key_name, Bucket=bucket_name, Key=key_name,)
+                    with io.open(key2_name, 'w') as fp:
+                        fp.write("second contents")
+                    s3.upload_file(key2_name, Bucket=bucket_name, Key=key2_name)
+                    with io.open(key2_name, 'w') as fp:  # add a second version
+                        fp.write("second contents 2")
+                    s3.upload_file(key2_name, Bucket=bucket_name, Key=key2_name)
+                    versions = s3.list_object_versions(Bucket=bucket_name, Prefix=key2_name)
+                    version_1 = versions['Versions'][0]['VersionId']
+                    assert gu.restore_s3_from_glacier(bucket_name, key2_name, version_id=version_1)
+                    assert gu.copy_object_back_to_original_location(bucket_name, key2_name, version_id=version_1)
+

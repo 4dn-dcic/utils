@@ -163,6 +163,12 @@ ff_utils
    :members:
 
 
+function_cache_decorator
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.function_cache_decorator
+
+
 glacier_utils
 ^^^^^^^^^^^^^
 
@@ -252,6 +258,13 @@ snapshot_utils
 
 .. automodule:: dcicutils.snapshot_utils
   :members:
+
+
+ssl_certificate_utils
+^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.ssl_certificate_utils
+   :members:
 
 
 task_utils
