@@ -26,7 +26,7 @@ from dcicutils.qa_utils import (
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
     logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually, Timer,
     MockObjectBasicAttributeBlock, MockObjectAttributeBlock, MockObjectDeleteMarker, MockTemporaryRestoration,
-    fill_portion, MockBigContent, is_abstract_content,
+    MockBigContent, is_abstract_content, add_coverage, simplify_coverage,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -186,7 +186,7 @@ class MockLocalTimezone:  # Technically should return pytz.tzinfo but doesn't
         self._winter_tz = winter_tz
 
     def tzname(self, dt: datetime.datetime):
-        # The exact time that daylight time runs varies from year to year. For testing we'll say that
+        # The exact time that daylight time runs varies from year to year. For testing, we'll say that
         # daylight time is April 1 to Oct 31.  In practice, we recommend times close to Dec 31 for winter
         # and Jun 30 for summer, so the precise transition date doesn't matter. -kmp 9-Mar-2021
         if 3 < dt.month < 11:
@@ -322,7 +322,7 @@ def test_controlled_time_utcnow():
     t1 = t.now()     # initial time + 1 second
     t.set_datetime(t0)
     t2 = t.utcnow()  # initial time UTC + 1 second
-    # This might be 5 hours in US/Eastern at HMS or it might be 0 hours in UTC on AWS or GitHub Actions.
+    # This might be 5 hours in US/Eastern at HMS, or it might be 0 hours in UTC on AWS or GitHub Actions.
     assert (t2 - t1).total_seconds() == abs(local_time.utcoffset(t0).total_seconds())
 
 
@@ -621,7 +621,7 @@ def test_retry_manager():
         return rarely_add3(x)
 
     # We have to access a random place out of a tuple structure for mock data on time.sleep's arg.
-    # Documentation says we should be able to access the call with .call_args[n] but that doesn't work
+    # Documentation says we should be able to access the call with .call_args[n] but that doesn't work,
     # and it's also documented to work by tuple, so .mock_calls[n][1][m] substitutes for
     # .mock_calls[n].call_args[m], but using .mock_calls[n][ARGS][m] as the compromise. -kmp 20-May-2020
 
@@ -1403,7 +1403,7 @@ def test_object_basic_attribute_block():
         ignored(x)
 
     with pytest.raises(NotImplementedError):
-        b.initialize_storage_class('STANDARD')
+        b.set_storage_class('STANDARD')
 
     with pytest.raises(NotImplementedError):
         x = b.tagset
@@ -1430,7 +1430,7 @@ def test_object_delete_marker():
         ignored(x)
 
     with pytest.raises(Exception):
-        b.initialize_storage_class('STANDARD')
+        b.set_storage_class('STANDARD')
 
     with pytest.raises(Exception):
         x = b.tagset
@@ -1457,7 +1457,7 @@ def test_object_attribute_block():
     assert b.filename == sample_filename
     assert isinstance(b.version_id, str)
     assert b.storage_class == 'STANDARD'
-    b.initialize_storage_class('GLACIER')
+    b.set_storage_class('GLACIER')
     assert b.storage_class == 'GLACIER'
     assert b.tagset == []
     b.set_tagset(sample_tagset)
@@ -1517,7 +1517,7 @@ def test_raises_regexp():
     with pytest.raises(Exception):
         # This will fail because the inner error is a KeyError, not a RuntimeError.
         # I WISH this would raise AssertionError, but pytest lets the KeyError through.
-        # I am not sure that's the same as what unittest does in this case but it will
+        # I am not sure that's the same as what unittest does in this case, but it will
         # suffice for now. -kmp 6-Oct-2020
         with raises_regexp(RuntimeError, "This.*test!"):
             raise KeyError('This is a test!')
@@ -2185,20 +2185,37 @@ def test_is_abstract_content():
     assert is_abstract_content(content)
 
 
-def test_fill_portion():
-    assert fill_portion([], 0, 0) == []
-    assert fill_portion([], 100, 100) == []
+def test_simplify_coverage():
 
-    assert fill_portion([], 0, 100) == [[0, 100]]
-    assert fill_portion([], 100, 500) == [[100, 500]]
+    assert simplify_coverage([[0, 0]]) == []
+    assert simplify_coverage([[100, 100]]) == []
 
-    assert fill_portion([[0, 100]], 100, 200) == [[0, 200]]
-    assert fill_portion([[0, 100]], 101, 200) == [[0, 100], [101, 200]]
+    assert simplify_coverage([[0, 100]]) == [[0, 100]]
+    assert simplify_coverage([[100, 500]]) == [[100, 500]]
 
-    assert fill_portion([[0, 100], [100, 101]], 101, 200) == [[0, 200]]
-    assert fill_portion([[0, 100], [100, 101]], 90, 200) == [[0, 200]]
-    assert fill_portion([[100, 200], [225, 250]], 90, 300) == [[90, 300]]
-    assert fill_portion([[100, 200], [225, 250], [200, 227]], 0, 0) == [[100, 250]]
+    assert simplify_coverage([[0, 100], [100, 200]]) == [[0, 200]]
+    assert simplify_coverage([[0, 100], [101, 200]]) == [[0, 100], [101, 200]]
+
+    assert simplify_coverage([[0, 100], [100, 101], [101, 200]]) == [[0, 200]]
+    assert simplify_coverage([[0, 100], [100, 101], [90, 200]]) == [[0, 200]]
+    assert simplify_coverage([[100, 200], [225, 250], [90, 300]]) == [[90, 300]]
+    assert simplify_coverage([[100, 200], [225, 250], [200, 227], [0, 0]]) == [[100, 250]]
+
+
+def test_add_coverage():
+    assert add_coverage([], 0, 0) == []
+    assert add_coverage([], 100, 100) == []
+
+    assert add_coverage([], 0, 100) == [[0, 100]]
+    assert add_coverage([], 100, 500) == [[100, 500]]
+
+    assert add_coverage([[0, 100]], 100, 200) == [[0, 200]]
+    assert add_coverage([[0, 100]], 101, 200) == [[0, 100], [101, 200]]
+
+    assert add_coverage([[0, 100], [100, 101]], 101, 200) == [[0, 200]]
+    assert add_coverage([[0, 100], [100, 101]], 90, 200) == [[0, 200]]
+    assert add_coverage([[100, 200], [225, 250]], 90, 300) == [[90, 300]]
+    assert add_coverage([[100, 200], [225, 250], [200, 227]], 0, 0) == [[100, 250]]
 
 
 def test_mock_big_content():
@@ -2209,13 +2226,12 @@ def test_mock_big_content():
     increment = 1000
 
     content = MockBigContent(size=size)
-    assert isinstance(content.content_id, str)
+    assert isinstance(content._content_id, str)
     assert content.coverage == [[0, size]]
 
     content_copy = content.start_partial_copy()
     assert content_copy != content
     pos = 0
-    new_pos = 0
     print(f"content={content}")
     print(f"content_copy={content_copy}")
     while pos < size:
@@ -2225,3 +2241,19 @@ def test_mock_big_content():
         content.copy_portion(start=pos, end=new_pos, target=content_copy)
         pos = new_pos
     assert content_copy == content
+
+
+def test_validate_parts_complete():
+
+    content = MockBigContent(size=5000)
+    part1 = content.part_etag("bytes=0-1000")
+    part2 = content.part_etag("bytes=1001-4500")
+    part3 = content.part_etag("bytes=4501-4999")
+    MockBigContent.validate_parts_complete([part1, part3, part2])
+
+    content = MockBigContent(size=5000)
+    part1 = content.part_etag("bytes=0-1000")
+    part2 = content.part_etag("bytes=1001-4500")
+    part3 = content.part_etag("bytes=4501-4998")
+    with pytest.raises(Exception):
+        MockBigContent.validate_parts_complete([part1, part3, part2])

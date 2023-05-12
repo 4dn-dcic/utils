@@ -7,7 +7,8 @@ from .common import (
     ENCODED_LIFECYCLE_TAG_KEY
 )
 from .command_utils import require_confirmation
-from .misc_utils import PRINT
+from .lang_utils import n_of
+from .misc_utils import PRINT, get_error_message
 from .ff_utils import get_metadata, search_metadata, get_health_page, patch_metadata
 from .creds_utils import CGAPKeyManager
 
@@ -148,7 +149,7 @@ class GlacierUtils:
         :param key: key under which the file is stored
         :param days: number of days to store in the temporary location
         :param version_id: version ID to restore if applicable
-        :return: response if successful or None
+        :return: response, if successful, or else None
         """
         try:
             args = {
@@ -159,16 +160,17 @@ class GlacierUtils:
             if version_id:
                 args['VersionId'] = version_id
             response = self.s3.restore_object(**args)
-            PRINT(f'Object {bucket}/{key} restored from Glacier storage class and will be available in S3'
-                  f' for {days} days after restore has been processed (24 hours)')
+            PRINT(f"Object Bucket={bucket!r} Key={key!r} restored from Glacier storage class"
+                  f" and will be available in S3 for {n_of(days, 'day')} after restore"
+                  f" has been processed (24 hours)")
             return response
         except Exception as e:
-            PRINT(f'Error restoring object {key} from Glacier storage class: {str(e)}')
+            PRINT(f'Error restoring object {key} from Glacier storage class: {get_error_message(e)}')
             return None
 
     def is_restore_finished(self, bucket: str, key: str) -> bool:
         """ Heads the object to see if it has been restored - note that from the POV of the API,
-            the object is still in Glacier but it has been restored to its original location and
+            the object is still in Glacier, but it has been restored to its original location and
             can be downloaded immediately
 
         :param bucket: bucket of original file location
@@ -179,14 +181,14 @@ class GlacierUtils:
             response = self.s3.head_object(Bucket=bucket, Key=key)
             restore = response.get('Restore')
             if restore is None:
-                PRINT(f'Object {bucket}/{key} is not currently being restored from Glacier')
+                PRINT(f'Object Bucket={bucket!r} Key={key!r} is not currently being restored from Glacier')
                 return False
             if 'ongoing-request="false"' not in restore:
-                PRINT(f'Object {bucket}/{key} is still being restored from Glacier')
+                PRINT(f'Object Bucket={bucket!r} Key={key!r} is still being restored from Glacier')
                 return False
             return True
         except Exception as e:
-            PRINT(f'Error checking restore status of object {bucket}/{key} in S3: {str(e)}')
+            PRINT(f'Error checking restore status of object Bucket={bucket!r} Key={key!r} in S3: {get_error_message(e)}')
             return False
 
     def patch_file_lifecycle_status(self, atid: str, status: str = 'uploaded',
@@ -227,7 +229,7 @@ class GlacierUtils:
                     return True
             return False
         except Exception as e:
-            PRINT(f'Error checking versions for object {bucket}/key: {str(e)}')
+            PRINT(f'Error checking versions for object Bucket={bucket!r} Key={key!r}: {get_error_message(e)}')
             return False
 
     def delete_glaciered_object_versions(self, bucket: str, key: str, delete_all_versions: bool = False) -> bool:
@@ -236,7 +238,7 @@ class GlacierUtils:
 
         :param bucket: bucket location containing key
         :param key: file name in s3 to delete
-        :param delete_all_versions: whether or not to delete all glacier versions or just the most recent one
+        :param delete_all_versions: whether to delete all glacier versions, rather than just the most recent one
         :return: True if success or False if failed
         """
         try:
@@ -246,21 +248,21 @@ class GlacierUtils:
             for v in versions:
                 if v.get('StorageClass') in S3_GLACIER_CLASSES:
                     response = self.s3.delete_object(Bucket=bucket, Key=key, VersionId=v.get('VersionId'))
-                    PRINT(f'Object {bucket}/{key} Glacier version {v.get("VersionId")} deleted:\n{response}')
+                    PRINT(f'Object Bucket={bucket!r} Key={key!r} VersionId={v.get("VersionId")!r} deleted:\n{response}')
                     deleted = True
                     if not delete_all_versions:
                         break
             if not deleted:
-                PRINT(f'No Glacier version found for object {bucket}/{key}')
+                PRINT(f"No Glacier version found for object Bucket={bucket!r} Key={key!r}.")
                 return False
             return True
         except Exception as e:
-            PRINT(f'Error deleting Glacier versions of object {bucket}/{key}: {str(e)}')
+            PRINT(f'Error deleting Glacier versions of object Bucket={bucket!r} Key={key!r}: {get_error_message(e)}')
             return False
 
     @staticmethod
     def _format_tags(tags: List[dict]) -> str:
-        """ Helper method that formats tags so they match the format expected by the boto3 API
+        """ Helper method that formats tags so that they match the format expected by the boto3 API
 
         :param tags: array of dictionaries containing Key, Value mappings to be reformatted
         :return: String formatted tag list ie:
@@ -268,8 +270,11 @@ class GlacierUtils:
         """
         return '&'.join([f'{tag["Key"]}={tag["Value"]}' for tag in tags])
 
+    ALLOW_PART_UPLOAD_ATTEMPTS = 3
+
     def _do_multipart_upload(self, bucket: str, key: str, total_size: int, part_size: int = 200,
-                             storage_class: str = 'STANDARD', tags: str = '', version_id: Union[str, None] = None) -> Union[dict, None]:
+                             storage_class: str = 'STANDARD', tags: str = '',
+                             version_id: Union[str, None] = None) -> Union[dict, None]:
         """ Helper function for copy_object_back_to_original_location, not intended to
             be called directly, will arrange for a multipart copy of large updates
             to change storage class
@@ -280,8 +285,8 @@ class GlacierUtils:
         :param part_size: what size to divide the object into when uploading the chunks
         :param storage_class: new storage class to use
         :param tags: string of tags to apply
-        :param version_id: object version Id, if applicable
-        :return: response if successful, None otherwise
+        :param version_id: object version ID, if applicable
+        :return: response, if successful, or else None
         """
         try:
             part_size = part_size * 1024 * 1024  # convert MB to B
@@ -289,62 +294,55 @@ class GlacierUtils:
             if num_parts > MAX_MULTIPART_CHUNKS:
                 raise GlacierRestoreException(f'Must user a part_size larger than {part_size}'
                                               f' that will result in fewer than {MAX_MULTIPART_CHUNKS} chunks')
-            cmu = {
-                'Bucket': bucket, 'Key': key, 'StorageClass': storage_class
-            }
+            cmu_args = {'Bucket': bucket, 'Key': key, 'StorageClass': storage_class}
             if tags:
-                cmu['Tagging'] = tags
-            mpu = self.s3.create_multipart_upload(**cmu)
+                cmu_args['Tagging'] = tags
+            mpu = self.s3.create_multipart_upload(**cmu_args)
             mpu_upload_id = mpu['UploadId']
         except Exception as e:
-            PRINT(f'Error creating multipart upload for {bucket}/{key} : {str(e)}')
+            PRINT(f'Error creating multipart upload for Bucket={bucket!r} Key={key!r}: {get_error_message(e)}')
             return None
+
+        copy_source = {'Bucket': bucket, 'Key': key}
+        copy_target = {'Bucket': bucket, 'Key': key}
+        if version_id:
+            copy_source['VersionId'] = version_id
+            copy_target['CopySourceVersionId'] = version_id
+
+        shared_part_args = {'UploadId': mpu_upload_id, 'CopySource': copy_source, **copy_target}
+
         parts = []
         for i in range(num_parts):
+            part_number = i + 1
             start = i * part_size
             end = min(start + part_size, total_size)
-            part = {
-                'PartNumber': i + 1
-            }
-            copy_source = {'Bucket': bucket, 'Key': key}
-            copy_target = {
-                'Bucket': bucket, 'Key': key,
-            }
-            if version_id:
-                copy_source['VersionId'] = version_id
-                copy_target['CopySourceVersionId'] = version_id
+            part = {'PartNumber': part_number}
+            source_range = f'bytes={start}-{end-1}'
 
             # retry upload a few times
-            for _ in range(3):
+            for attempt in range(self.ALLOW_PART_UPLOAD_ATTEMPTS):
+                PRINT(f"{'Trying' if attempt == 0 else 'Retrying'} upload of part {part_number} ...")
                 try:
-                    response = self.s3.upload_part_copy(
-                        CopySource=copy_source, **copy_target,
-                        PartNumber=i + 1,
-                        CopySourceRange=f'bytes={start}-{end-1}',
-                        UploadId=mpu_upload_id
-                    )
+                    response = self.s3.upload_part_copy(PartNumber=part_number, CopySourceRange=source_range,
+                                                        **shared_part_args)
                     break
                 except Exception as e:
-                    PRINT(f'Failed to upload part {i+1}, potentially retrying: {str(e)}')
+                    PRINT(f'Failed to upload Bucket={bucket!r} Key={key!r} PartNumber={part_number}:'
+                          f' {get_error_message(e)}')
             else:
-                PRINT(f'Fatal error arranging multipart upload of {bucket}/{key},'
-                      f' see previous output')
+                PRINT(f"Fatal error arranging multipart upload of Bucket={bucket!r} Key={key!r}"
+                      f" after {n_of(self.ALLOW_PART_UPLOAD_ATTEMPTS, 'try')}."
+                      f" For details, see previous output.")
                 return None
             part['ETag'] = response['CopyPartResult']['ETag']
             parts.append(part)
 
         # mark upload as completed
         # exception should be caught by caller
-        return self.s3.complete_multipart_upload(
-            Bucket=bucket,
-            Key=key,
-            MultipartUpload={
-                'Parts': parts
-            },
-            UploadId=mpu_upload_id
-        )
+        return self.s3.complete_multipart_upload(Bucket=bucket, Key=key, MultipartUpload={'Parts': parts},
+                                                 UploadId=mpu_upload_id)
 
-    def copy_object_back_to_original_location(self, bucket: str, key: str, storage_class: str = 'STANDARD',
+    def copy_object_back_to_original_location(self, bucket: str, key: str, storage_class: S3StorageClass = 'STANDARD',
                                               part_size: int = 200,  # MB
                                               preserve_lifecycle_tag: bool = False,
                                               version_id: Union[str, None] = None) -> Union[dict, None]:
@@ -370,7 +368,7 @@ class GlacierUtils:
             else:
                 tags = ''
         except Exception as e:
-            PRINT(f'Could not retrieve metadata on file {bucket}/{key} : {str(e)}')
+            PRINT(f'Could not retrieve metadata on file Bucket={bucket!r}, Key={key!r} : {get_error_message(e)}')
             return None
         try:
             if multipart:
@@ -389,10 +387,11 @@ class GlacierUtils:
                     copy_target['Tagging'] = tags
                 response = self.s3.copy_object(CopySource=copy_source, **copy_target)
                 PRINT(f'Response from boto3 copy:\n{response}')
-                PRINT(f'Object {bucket}/{key} copied back to its original location in S3')
+                PRINT(f'Object Bucket={bucket!r} Key={key!r} copied back to its original location in S3.')
                 return response
         except Exception as e:
-            PRINT(f'Error copying object {bucket}/{key} back to its original location in S3: {str(e)}')
+            PRINT(f'Error copying object Bucket={bucket!r} Key={key!r}'
+                  f' back to its original location in S3: {get_error_message(e)}')
             return None
 
     def restore_glacier_phase_one_restore(self, atid_list: List[Union[dict, str]], versioning: bool = False,
@@ -454,8 +453,9 @@ class GlacierUtils:
                             versions = sorted(response.get('Versions', []), key=lambda x: x['LastModified'],
                                               reverse=True)
                             version_id = versions[0]['VersionId']
-                        future = executor.submit(self.copy_object_back_to_original_location, bucket, key, storage_class,
-                                                 version_id)
+                        future = executor.submit(   # noQA - TODO: PyCharm doesn't like this call for some reason
+                            self.copy_object_back_to_original_location,
+                            bucket=bucket, key=key, storage_class=storage_class, version_id=version_id)
                         futures.append(future)
                 for future in tqdm(futures, total=len(atid_list)):
                     res = future.result()
@@ -477,7 +477,9 @@ class GlacierUtils:
                         response = self.s3.list_object_versions(Bucket=bucket, Prefix=key)
                         versions = sorted(response.get('Versions', []), key=lambda x: x['LastModified'], reverse=True)
                         version_id = versions[0]['VersionId']
-                    resp = self.copy_object_back_to_original_location(bucket, key, storage_class, version_id)
+                    resp = self.copy_object_back_to_original_location(bucket=bucket, key=key,
+                                                                      storage_class=storage_class,
+                                                                      version_id=version_id)
                     if resp:
                         accumulated_results.append(_atid)
                 if len(accumulated_results) == len(files_meta):  # all files for this @id were successful
@@ -506,7 +508,7 @@ class GlacierUtils:
                 self.patch_file_lifecycle_status(atid, status=status)
                 success.append(atid)
             except Exception as e:
-                PRINT(f'Error encountered patching @id {atid}, error: {str(e)}')
+                PRINT(f'Error encountered patching @id {atid}, error: {get_error_message(e)}')
                 errors.append(atid)
         return success, errors
 
@@ -532,7 +534,7 @@ class GlacierUtils:
                     if resp:
                         accumulated_results.append(_atid)
                 else:
-                    PRINT(f'Error cleaning up {bucket}/{key}, no non-glaciered versions'
+                    PRINT(f'Error cleaning up Bucket={bucket!r} Key={key!r}, no non-glaciered versions'
                           f' exist, ignoring this file and erroring on @id {_atid}')
             if len(accumulated_results) == len(bucket_key_pairs):
                 success.append(_atid)
