@@ -453,7 +453,7 @@ class GlacierUtils:
                             versions = sorted(response.get('Versions', []), key=lambda x: x['LastModified'],
                                               reverse=True)
                             version_id = versions[0]['VersionId']
-                        future = executor.submit(   # noQA - TODO: PyCharm doesn't like this call for some reason
+                        future = executor.submit(  # noQA - TODO: PyCharm doesn't like this call for some reason
                             self.copy_object_back_to_original_location,
                             bucket=bucket, key=key, storage_class=storage_class, version_id=version_id)
                         futures.append(future)

@@ -408,10 +408,10 @@ class MockFileWriter:
         content = self.stream.getvalue()
         file_system = self.file_system
         if file_system.exists(self.file):
-            if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
+            if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
                 PRINT(f"Preparing to overwrite {self.file}.")
             file_system.prepare_for_overwrite(self.file)
-        if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
+        if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
             PRINT(f"Writing {content!r} to {self.file}.")
         file_system.set_file_content_for_testing(self.file,
                                                  (content
@@ -659,7 +659,7 @@ class MockFileSystem:
         return self.files.items()
 
     def open(self, file, mode='r', encoding=None):
-        if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
+        if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
             PRINT("Opening %r in mode %r." % (file, mode))
         if mode in ('w', 'wt', 'w+', 'w+t', 'wt+'):
             return self._open_for_write(file_system=self, file=file, binary=False, encoding=encoding)
@@ -678,7 +678,7 @@ class MockFileSystem:
         # content = self.files.get(file)
         if content is None:
             raise FileNotFoundError("No such file or directory: %s" % file)
-        if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
+        if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
             PRINT("Read %r from %s." % (content, file))
         return io.BytesIO(content) if binary else io.StringIO(content.decode(encoding or self.default_encoding))
 
@@ -2494,6 +2494,8 @@ class MockBotoS3Client(MockBoto3Client):
     }
 
     def put_object(self, *, Bucket, Key, Body, ContentType=None, **kwargs):  # noQA - AWS CamelCase args
+        # TODO: This is not mocking other args like ACL that we might use ACL='public-read' or ACL='private'
+        #       grep for ACL= in tibanna, tibanna_ff, or dcicutils for examples of these values.
         # TODO: Shouldn't this be checking for required arguments (e.g., for SSE)? -kmp 9-May-2022
         if ContentType is not None:
             exts = self.PUT_OBJECT_CONTENT_TYPES.get(ContentType)
@@ -2501,6 +2503,8 @@ class MockBotoS3Client(MockBoto3Client):
             assert any(Key.endswith(ext) for ext in exts), (
                     "mock .put_object expects Key=%s to end in one of %s for ContentType=%s" % (Key, exts, ContentType))
         assert not kwargs, "put_object mock doesn't support %s." % kwargs
+        if isinstance(Body, str):
+            Body = Body.encode('utf-8')  # we just assume utf-8, which AWS seems to as well
         self.s3_files.set_file_content_for_testing(Bucket + "/" + Key, Body)
         # self.s3_files.files[Bucket + "/" + Key] = Body
         etag = self._content_etag(Body)

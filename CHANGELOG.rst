@@ -6,6 +6,38 @@ dcicutils
 Change Log
 ----------
 
+
+7.4.1
+=====
+
+* In ``glacier_utils.py``:
+
+  * Fix calls to ``self.copy_object_back_to_original_location``
+    in ``restore_glacier_phase_two_copy``.
+
+* In ``qa_utils.py``:
+
+  * Make ``boto3.client('s3').put_object`` handle either a string
+    or bytes object correctly.
+
+* Actively mark tests that are already marked with
+  ``pytest.mark.beanstalk_failure`` to also use ``pytest.mark.skip``
+  so they don't run and confuse things even when markers are not in play.
+
+* Update some live ecosystem expectations to match present real world state.
+
+* Separate tests of live ecosystem so that the parts that are supposed
+  to pass reliably are in a separate function from the parts that are
+  thought to be in legit transition.
+
+* Misc changes to satisfy various syntax checkers.
+
+  * One stray call to `print` changed to `PRINT`.
+
+  * Various grammar errors fixed in comment strings because
+    PyCharm now whines about that, and the suggestions seemed reasonable.
+
+
 7.4.0
 =====
 
