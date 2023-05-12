@@ -537,4 +537,3 @@ class TestGlacierUtils:
                     assert gu.restore_s3_from_glacier(bucket_name, key2_name, version_id=version_1)
                     assert gu.copy_object_back_to_original_location(bucket_name, key2_name, version_id=version_1,
                                                                     preserve_lifecycle_tag=True)
-
