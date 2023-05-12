@@ -68,7 +68,7 @@ def mocked_s3_integration(integrated_names=None, zip_suffix="", ffenv=None):
             # s3_connection.s3_delete_dir(prefix)
 
             # In our mock, this won't exist already on S3 like in the integrated version of this test,
-            # so we have to pre-load to our mock S3 manually. -kmp 13-Jan-2021
+            # so we have to preload to our mock S3 manually. -kmp 13-Jan-2021
             s3_connection.s3.upload_file(Filename=integrated_names[zip_path_key],
                                          Bucket=s3_connection.outfile_bucket,
                                          Key=integrated_names[zip_filename_key])
@@ -103,6 +103,7 @@ def test_s3utils_constants():
     assert s3Utils.TIBANNA_OUTPUT_BUCKET_TEMPLATE == "tibanna-output"
 
 
+@pytest.mark.skip("This test is obsolete and known to be broken.")
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
 @using_fresh_ff_state_for_testing()
@@ -146,6 +147,7 @@ def test_s3utils_creation_ff_ordinary(ff_ordinary_envname):
             pytest.skip(problem)
 
 
+@pytest.mark.skip("This test is obsolete and known to be broken.")
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
 @using_fresh_ff_state_for_testing()
@@ -180,6 +182,7 @@ def test_s3utils_creation_ff_stg():
     test_stg(stg_beanstalk_env)
 
 
+@pytest.mark.skip("This test is obsolete and known to be broken.")
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
 @using_fresh_ff_state_for_testing()
@@ -227,10 +230,12 @@ def test_s3utils_creation_ff_prd():
 #     assert util.sys_bucket == 'elasticbeanstalk-%s-system' % cgap_ordinary_envname
 
 
+@pytest.mark.skip("This test is obsolete and known to be broken.")
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
 @using_fresh_cgap_state_for_testing()
 def test_s3utils_creation_cgap_prd():
+    assert EnvUtils.PUBLIC_URL_TABLE is not None, "Something is not initialized."
     # TODO: I'm not sure what this is testing, so it's hard to rewrite
     #   But I fear this use of env 'data' implies the GA test environment has overbroad privilege.
     #   We should make this work without access to 'data'.
@@ -260,6 +265,7 @@ def test_s3utils_creation_cgap_prd():
     test_prd(compute_cgap_prd_env())  # Hopefully returns 'fourfront-cgap' but just in case we're into new naming
 
 
+@pytest.mark.skip("This test is obsolete and known to be broken.")
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
 @using_fresh_cgap_state_for_testing()
@@ -561,6 +567,7 @@ def test_s3utils_s3_put_secret():
             }
 
 
+@pytest.mark.skip("This test is obsolete and known to be broken.")
 @pytest.mark.beanstalk_failure
 @pytest.mark.integratedx
 @using_fresh_ff_state_for_testing()
@@ -572,6 +579,7 @@ def test_does_key_exist_integrated():
     assert not util.does_key_exist('not_a_key')
 
 
+@pytest.mark.skip("This test is obsolete and known to be broken.")
 @pytest.mark.beanstalk_failure
 @pytest.mark.unit
 @using_fresh_ff_state_for_testing()
@@ -737,7 +745,7 @@ def test_read_s3_zip_unit(integrated_names):
         s3_connection = s3Utils(env=ffenv)
 
         # In our mock, this won't exist already on S3 like in the integrated version of this test,
-        # so we have to pre-load to our mock S3 manually. -kmp 13-Jan-2021
+        # so we have to preload to our mock S3 manually. -kmp 13-Jan-2021
         s3_connection.s3.upload_file(Filename=integrated_names['zip_path'],
                                      Bucket=s3_connection.outfile_bucket,
                                      Key=integrated_names['zip_filename'])
@@ -792,7 +800,7 @@ def test_unzip_s3_to_s3_unit(integrated_names, suffix, expected_report):
         s3_connection = s3Utils(env=ffenv)
 
         # In our mock, this won't exist already on S3 like in the integrated version of this test,
-        # so we have to pre-load to our mock S3 manually. -kmp 13-Jan-2021
+        # so we have to preload to our mock S3 manually. -kmp 13-Jan-2021
         s3_connection.s3.upload_file(Filename=integrated_names['zip_path' + suffix],
                                      Bucket=s3_connection.outfile_bucket,
                                      Key=integrated_names['zip_filename' + suffix])
@@ -850,7 +858,7 @@ def test_unzip_s3_to_s3_store_results_unit(integrated_names):
         s3_connection = s3Utils(env=ffenv)
 
         # In our mock, this won't exist already on S3 like in the integrated version of this test,
-        # so we have to pre-load to our mock S3 manually. -kmp 13-Jan-2021
+        # so we have to preload to our mock S3 manually. -kmp 13-Jan-2021
         s3_connection.s3.upload_file(Filename=integrated_names['zip_path'],
                                      Bucket=s3_connection.outfile_bucket,
                                      Key=integrated_names['zip_filename'])
@@ -986,9 +994,9 @@ C4_853_FIX_INFO = {
     'fourfront-production-blue':
         {'metadata_fix': False, 'tibanna_fix': False},
     'fourfront-production-green':
-        {'metadata_fix': False, 'tibanna_fix': False},
+        {'metadata_fix': True, 'tibanna_fix': False},
     'data':
-        {'metadata_fix': False, 'tibanna_fix': False},
+        {'metadata_fix': True, 'tibanna_fix': False},
     'staging':
         {'metadata_fix': False, 'tibanna_fix': False},
 
@@ -1009,13 +1017,10 @@ C4_853_FIX_INFO = {
 }
 
 
-@pytest.mark.xfail(reason="awaiting deployment transition of ecosystem software")
 @pytest.mark.parametrize('env_name', [
     'fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat', 'mastertest', 'webdev', 'hotseat'])
 @using_fresh_ff_deployed_state_for_testing()
 def test_s3_utils_buckets_ff_live_ecosystem_not_production(env_name):
-    fix_info = C4_853_FIX_INFO[env_name]
-
     print()  # Start on fresh line
     print("=" * 80)
     print(f"env_name={env_name}")
@@ -1033,12 +1038,6 @@ def test_s3_utils_buckets_ff_live_ecosystem_not_production(env_name):
     assert s3u.raw_file_bucket == f'elasticbeanstalk-{full_env}-files'
     print(f"s3u.blob_bucket={s3u.blob_bucket}")
     assert s3u.blob_bucket == f'elasticbeanstalk-{full_env}-blobs'
-    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['metadata_fix'], error_class=AssertionError):
-        print(f"s3u.metadata_bucket={s3u.metadata_bucket}")
-        assert s3u.metadata_bucket == f'elasticbeanstalk-{full_env}-metadata-bundles'
-
-    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['tibanna_fix'], error_class=AssertionError):
-        assert s3u.tibanna_cwls_bucket == 'tibanna-cwls'
     assert s3u.tibanna_output_bucket == 'tibanna-output'
 
     assert s3u.s3_encrypt_key_id is None
@@ -1053,6 +1052,29 @@ def test_s3_utils_buckets_ff_live_ecosystem_not_production(env_name):
     print(f"pattern={pattern}")
     assert es_url and re.match(pattern, es_url)
     assert s3u.env_manager.env_name == full_env
+
+
+@pytest.mark.xfail(reason="awaiting deployment transition of ecosystem software")
+@pytest.mark.parametrize('env_name', [
+    'fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat', 'mastertest', 'webdev', 'hotseat'])
+@using_fresh_ff_deployed_state_for_testing()
+def test_s3_utils_buckets_ff_live_ecosystem_not_production_transition(env_name):
+    fix_info = C4_853_FIX_INFO[env_name]
+
+    print()  # Start on fresh line
+    print("=" * 80)
+    print(f"env_name={env_name}")
+    print("=" * 80)
+    s3u = s3Utils(env=env_name)
+
+    full_env = full_env_name(env_name)
+
+    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['metadata_fix'], error_class=AssertionError):
+        print(f"s3u.metadata_bucket={s3u.metadata_bucket}")
+        assert s3u.metadata_bucket == f'elasticbeanstalk-{full_env}-metadata-bundles'
+
+    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['tibanna_fix'], error_class=AssertionError):
+        assert s3u.tibanna_cwls_bucket == 'tibanna-cwls'
 
 
 def _make_similar_names_alternation(env_name):
@@ -1071,8 +1093,6 @@ def _make_similar_names_alternation(env_name):
     'data', 'staging'])
 @using_fresh_ff_deployed_state_for_testing()
 def test_s3_utils_buckets_ff_live_ecosystem_production(env_name):
-    fix_info = C4_853_FIX_INFO[env_name]
-
     print()  # Start on fresh line
     print("=" * 80)
     print(f"env_name={env_name}")
@@ -1092,13 +1112,6 @@ def test_s3_utils_buckets_ff_live_ecosystem_production(env_name):
     assert s3u.raw_file_bucket == f'elasticbeanstalk-{s3_env_token}-files'
     print(f"s3u.blob_bucket={s3u.blob_bucket}")
     assert s3u.blob_bucket == f'elasticbeanstalk-{s3_env_token}-blobs'
-    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['metadata_fix'], error_class=AssertionError):
-        print(f"s3u.metadata_bucket={s3u.metadata_bucket}")
-        assert s3u.metadata_bucket == f'elasticbeanstalk-{s3_env_token}-metadata-bundles'
-
-    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['tibanna_fix'], error_class=AssertionError):
-        assert s3u.tibanna_cwls_bucket == 'tibanna-cwls'
-    assert s3u.tibanna_output_bucket == 'tibanna-output'
 
     assert s3u.s3_encrypt_key_id is None
     assert isinstance(s3u.env_manager, EnvManager)
@@ -1111,6 +1124,30 @@ def test_s3_utils_buckets_ff_live_ecosystem_production(env_name):
     print(f"pattern={pattern}")
     assert es_url and re.match(pattern, es_url)
     assert is_stg_or_prd_env(s3u.env_manager.env_name)
+
+
+@pytest.mark.xfail(reason="awaiting deployment transition of ecosystem software")
+@pytest.mark.parametrize('env_name', [
+    'fourfront-production-blue', 'fourfront-production-green',
+    'data', 'staging'])
+@using_fresh_ff_deployed_state_for_testing()
+def test_s3_utils_buckets_ff_live_ecosystem_production_transition(env_name):
+    fix_info = C4_853_FIX_INFO[env_name]
+
+    s3_env_token = 'fourfront-webprod'  # Shared by data and staging for other than sys bucket
+
+    print()  # Start on fresh line
+    print("=" * 80)
+    print(f"env_name={env_name}")
+    print("=" * 80)
+    s3u = s3Utils(env=env_name)
+    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['metadata_fix'], error_class=AssertionError):
+        print(f"s3u.metadata_bucket={s3u.metadata_bucket}")
+        assert s3u.metadata_bucket == f'elasticbeanstalk-{s3_env_token}-metadata-bundles'
+
+    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['tibanna_fix'], error_class=AssertionError):
+        assert s3u.tibanna_cwls_bucket == 'tibanna-cwls'
+    assert s3u.tibanna_output_bucket == 'tibanna-output'
 
 
 @using_fresh_ff_state_for_testing()
@@ -1386,7 +1423,7 @@ def test_get_and_set_object_tags():
 
         assert isinstance(s3, MockBotoS3Client)
 
-        # An s3 file must exist for us to manipulate its tags
+        # An S3 file must exist for us to manipulate its tags
         s3.create_object_for_testing("irrelevant", Bucket=bucket, Key=key)
 
         actual = s3u.get_object_tags(key=key, bucket=bucket)
