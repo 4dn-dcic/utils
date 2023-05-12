@@ -407,10 +407,10 @@ class MockFileWriter:
         content = self.stream.getvalue()
         file_system = self.file_system
         if file_system.exists(self.file):
-            if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
+            if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
                 PRINT(f"Preparing to overwrite {self.file}.")
             file_system.prepare_for_overwrite(self.file)
-        if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
+        if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
             PRINT(f"Writing {content!r} to {self.file}.")
         file_system.files[self.file] = content if isinstance(content, bytes) else content.encode(self.encoding)
 
@@ -459,7 +459,7 @@ class MockFileSystem:
             raise FileNotFoundError("No such file or directory: %s" % file)
 
     def open(self, file, mode='r', encoding=None):
-        if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
+        if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
             PRINT("Opening %r in mode %r." % (file, mode))
         if mode in ('w', 'wt', 'w+', 'w+t', 'wt+'):
             return self._open_for_write(file_system=self, file=file, binary=False, encoding=encoding)
@@ -477,7 +477,7 @@ class MockFileSystem:
         content = self.files.get(file)
         if content is None:
             raise FileNotFoundError("No such file or directory: %s" % file)
-        if FILE_SYSTEM_VERBOSE:  # noQA - Debugging option. Doesn't need testing.
+        if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
             PRINT("Read %r from %s." % (content, file))
         return io.BytesIO(content) if binary else io.StringIO(content.decode(encoding or self.default_encoding))
 
