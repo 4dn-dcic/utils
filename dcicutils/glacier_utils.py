@@ -145,7 +145,7 @@ class GlacierUtils:
         :param key: key under which the file is stored
         :param days: number of days to store in the temporary location
         :param version_id: version ID to restore if applicable
-        :return: response if successful or None
+        :return: response, if successful, or else None
         """
         try:
             args = {
@@ -165,7 +165,7 @@ class GlacierUtils:
 
     def is_restore_finished(self, bucket: str, key: str) -> bool:
         """ Heads the object to see if it has been restored - note that from the POV of the API,
-            the object is still in Glacier but it has been restored to its original location and
+            the object is still in Glacier, but it has been restored to its original location and
             can be downloaded immediately
 
         :param bucket: bucket of original file location
@@ -233,7 +233,7 @@ class GlacierUtils:
 
         :param bucket: bucket location containing key
         :param key: file name in s3 to delete
-        :param delete_all_versions: whether or not to delete all glacier versions or just the most recent one
+        :param delete_all_versions: whether to delete all glacier versions or rather than just the most recent one
         :return: True if success or False if failed
         """
         try:
@@ -266,8 +266,8 @@ class GlacierUtils:
         :param total_size: total size of object
         :param part_size: what size to divide the object into when uploading the chunks
         :param storage_class: new storage class to use
-        :param version_id: object version Id, if applicable
-        :return: response if successful, None otherwise
+        :param version_id: object version ID, if applicable
+        :return: response, if successful, or else None
         """
         try:
             part_size = part_size * 1024 * 1024  # convert MB to B
@@ -425,8 +425,9 @@ class GlacierUtils:
                             versions = sorted(response.get('Versions', []), key=lambda x: x['LastModified'],
                                               reverse=True)
                             version_id = versions[0]['VersionId']
-                        future = executor.submit(self.copy_object_back_to_original_location, bucket, key, storage_class,
-                                                 version_id)
+                        future = executor.submit(  # noQA - TODO: PyCharm doesn't like this call for some reason
+                            self.copy_object_back_to_original_location,
+                            bucket=bucket, key=key, storage_class=storage_class, version_id=version_id)
                         futures.append(future)
                 for future in tqdm(futures, total=len(atid_list)):
                     res = future.result()
@@ -448,7 +449,9 @@ class GlacierUtils:
                         response = self.s3.list_object_versions(Bucket=bucket, Prefix=key)
                         versions = sorted(response.get('Versions', []), key=lambda x: x['LastModified'], reverse=True)
                         version_id = versions[0]['VersionId']
-                    resp = self.copy_object_back_to_original_location(bucket, key, storage_class, version_id)
+                    resp = self.copy_object_back_to_original_location(bucket=bucket, key=key,
+                                                                      storage_class=storage_class,
+                                                                      version_id=version_id)
                     if resp:
                         accumulated_results.append(_atid)
                 if len(accumulated_results) == len(files_meta):  # all files for this @id were successful

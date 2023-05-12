@@ -116,7 +116,7 @@ def verify_git_repo() -> bool:
     """
     _, status = execute_command("git rev-parse --is-inside-work-tree")
     if status != 0:
-        print("You are not in a git repo directory!")
+        PRINT("You are not in a git repo directory!")
         return False
     return True
 
