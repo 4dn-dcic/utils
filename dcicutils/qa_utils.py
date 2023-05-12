@@ -2269,6 +2269,8 @@ class MockBotoS3Client(MockBoto3Client):
     }
 
     def put_object(self, *, Bucket, Key, Body, ContentType=None, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+        # TODO: This is not mocking other args like ACL that we might use ACL='public-read' or ACL='private'
+        #       grep for ACL= in tibanna, tibanna_ff, or dcicutils for examples of these values.
         # TODO: Shouldn't this be checking for required arguments (e.g., for SSE)? -kmp 9-May-2022
         if ContentType is not None:
             exts = self.PUT_OBJECT_CONTENT_TYPES.get(ContentType)
@@ -2276,6 +2278,8 @@ class MockBotoS3Client(MockBoto3Client):
             assert any(Key.endswith(ext) for ext in exts), (
                     "mock .put_object expects Key=%s to end in one of %s for ContentType=%s" % (Key, exts, ContentType))
         assert not kwargs, "put_object mock doesn't support %s." % kwargs
+        if isinstance(Body, str):
+            Body = Body.encode('utf-8')  # we just assume utf-8, which AWS seems to as well
         self.s3_files.files[Bucket + "/" + Key] = Body
         return {
             'ETag': self._content_etag(Body)
