@@ -197,7 +197,7 @@ class EnvUtils:
     ORCHESTRATED_APP = None  # This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
     PRD_ENV_NAME = None  # the name of the prod env
     PRODUCTION_ECR_REPOSITORY = None  # the name of an ecr repository shared between stg and prd
-    PUBLIC_URL_TABLE = None  # dictionary mapping envnames & pseudo_envnames to public urls
+    PUBLIC_URL_TABLE = None  # list of dictionaries mapping envnames & pseudo_envnames to public urls
     STG_ENV_NAME = None  # the name of the stage env (or None)
     TEST_ENVS = None  # a list of environments that are for testing
     WEBPROD_PSEUDO_ENV = None
