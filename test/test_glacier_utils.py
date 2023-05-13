@@ -3,6 +3,7 @@ import pytest
 
 from unittest import mock
 
+from dcicutils.common import STANDARD, STANDARD_IA, DEEP_ARCHIVE, GLACIER, GLACIER_IR
 from dcicutils.ff_mocks import mocked_s3utils
 from dcicutils.glacier_utils import GlacierUtils, GlacierRestoreException
 from dcicutils.qa_utils import MockFileSystem, MockBotoS3Client
@@ -193,7 +194,7 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD',
+                    'StorageClass': STANDARD,
                     'LastModified': '2023'
                 },
                 {
@@ -202,7 +203,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER',
+                    'StorageClass': GLACIER,
                     'LastModified': '2023'
                 }
             ],
@@ -217,7 +218,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER',
+                    'StorageClass': GLACIER,
                     'LastModified': '2023'
                 }
             ],
@@ -232,7 +233,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER_IR',
+                    'StorageClass': GLACIER_IR,
                     'LastModified': '2023'
                 }
             ],
@@ -247,7 +248,7 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD',
+                    'StorageClass': STANDARD,
                     'LastModified': '2023'
                 },
                 {
@@ -256,7 +257,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'DEEP_ARCHIVE',
+                    'StorageClass': DEEP_ARCHIVE,
                     'LastModified': '2023'
                 }
             ],
@@ -283,7 +284,7 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD',
+                    'StorageClass': STANDARD,
                     'LastModified': '2023'
                 },
                 {
@@ -292,7 +293,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER',
+                    'StorageClass': GLACIER,
                     'LastModified': '2023'
                 }
             ],
@@ -307,7 +308,7 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD',
+                    'StorageClass': STANDARD,
                     'LastModified': '2023'
                 },
                 {
@@ -316,7 +317,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER_IR',
+                    'StorageClass': GLACIER_IR,
                     'LastModified': '2023'
                 }
             ],
@@ -331,7 +332,7 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD_IA',
+                    'StorageClass': STANDARD_IA,
                     'LastModified': '2023'
                 }
             ],
@@ -355,7 +356,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER',
+                    'StorageClass': GLACIER,
                     'LastModified': '2023'
                 }
             ],
@@ -370,7 +371,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'DEEP_ARCHIVE',
+                    'StorageClass': DEEP_ARCHIVE,
                     'LastModified': '2023'
                 }
             ],
@@ -394,7 +395,7 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD',
+                    'StorageClass': STANDARD,
                     'LastModified': '2023'
                 },
                 {
@@ -403,7 +404,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'STANDARD',
+                    'StorageClass': STANDARD,
                     'LastModified': '2023'
                 }
             ],
@@ -418,7 +419,7 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD',
+                    'StorageClass': STANDARD,
                     'LastModified': '2023'
                 },
             ],
@@ -530,7 +531,7 @@ class TestGlacierUtils:
                     s3.upload_file(key_name, Bucket=bucket_name, Key=key_name)
                     with io.open(key2_name, 'w') as fp:
                         fp.write("second contents")
-                    s3.upload_file(key2_name, Bucket=bucket_name, Key=key2_name, ExtraArgs={'StorageClass': 'GLACIER'})
+                    s3.upload_file(key2_name, Bucket=bucket_name, Key=key2_name, ExtraArgs={'StorageClass': GLACIER})
                     with io.open(key2_name, 'w') as fp:  # add a second version
                         fp.write("second contents 2")
                     s3.upload_file(key2_name, Bucket=bucket_name, Key=key2_name)

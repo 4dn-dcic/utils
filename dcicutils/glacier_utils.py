@@ -1,9 +1,10 @@
 import boto3
-from typing import Union, List, Tuple
+
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
+from typing import Union, List, Tuple, Optional
 from .common import (
-    S3_GLACIER_CLASSES, S3StorageClass, MAX_MULTIPART_CHUNKS, MAX_STANDARD_COPY_SIZE,
+    S3_GLACIER_CLASSES, S3StorageClass, STANDARD, MAX_MULTIPART_CHUNKS, MAX_STANDARD_COPY_SIZE,
     ENCODED_LIFECYCLE_TAG_KEY
 )
 from .command_utils import require_confirmation
@@ -168,17 +169,21 @@ class GlacierUtils:
             PRINT(f'Error restoring object {key} from Glacier storage class: {get_error_message(e)}')
             return None
 
-    def is_restore_finished(self, bucket: str, key: str) -> bool:
+    def is_restore_finished(self, bucket: str, key: str, version_id: Optional[str] = None) -> bool:
         """ Heads the object to see if it has been restored - note that from the POV of the API,
             the object is still in Glacier, but it has been restored to its original location and
             can be downloaded immediately
 
         :param bucket: bucket of original file location
         :param key: key of original file location
+        :param version_id: (optional) a VersionId string for the file
         :return: boolean whether the restore was successful yet
         """
         try:  # extract temporary location by heading object
-            response = self.s3.head_object(Bucket=bucket, Key=key)
+            maybe_version_id = {}
+            if version_id:
+                maybe_version_id['VersionId'] = version_id
+            response = self.s3.head_object(Bucket=bucket, Key=key, **maybe_version_id)
             restore = response.get('Restore')
             if restore is None:
                 PRINT(f'Object Bucket={bucket!r} Key={key!r} is not currently being restored from Glacier')
@@ -188,7 +193,8 @@ class GlacierUtils:
                 return False
             return True
         except Exception as e:
-            PRINT(f'Error checking restore status of object Bucket={bucket!r} Key={key!r} in S3: {get_error_message(e)}')
+            PRINT(f'Error checking restore status of object Bucket={bucket!r} Key={key!r} in S3:'
+                  f' {get_error_message(e)}')
             return False
 
     def patch_file_lifecycle_status(self, atid: str, status: str = 'uploaded',
@@ -273,7 +279,7 @@ class GlacierUtils:
     ALLOW_PART_UPLOAD_ATTEMPTS = 3
 
     def _do_multipart_upload(self, bucket: str, key: str, total_size: int, part_size: int = 200,
-                             storage_class: str = 'STANDARD', tags: str = '',
+                             storage_class: str = STANDARD, tags: str = '',
                              version_id: Union[str, None] = None) -> Union[dict, None]:
         """ Helper function for copy_object_back_to_original_location, not intended to
             be called directly, will arrange for a multipart copy of large updates
@@ -342,7 +348,7 @@ class GlacierUtils:
         return self.s3.complete_multipart_upload(Bucket=bucket, Key=key, MultipartUpload={'Parts': parts},
                                                  UploadId=mpu_upload_id)
 
-    def copy_object_back_to_original_location(self, bucket: str, key: str, storage_class: S3StorageClass = 'STANDARD',
+    def copy_object_back_to_original_location(self, bucket: str, key: str, storage_class: S3StorageClass = STANDARD,
                                               part_size: int = 200,  # MB
                                               preserve_lifecycle_tag: bool = False,
                                               version_id: Union[str, None] = None) -> Union[dict, None]:
@@ -424,7 +430,7 @@ class GlacierUtils:
         return success, errors
 
     def restore_glacier_phase_two_copy(self, atid_list: List[Union[str, dict]], versioning: bool = False,
-                                       storage_class: S3StorageClass = 'STANDARD',
+                                       storage_class: S3StorageClass = STANDARD,
                                        parallel: bool = False, num_threads: int = 4) -> (List[str], List[str]):
         """ Triggers a copy operation for all restored objects passed in @id list
 
@@ -549,7 +555,7 @@ class GlacierUtils:
     @require_confirmation
     def restore_all_from_search(self, *, search_query: str, page_limit: int = 50, search_generator: bool = False,
                                 restore_length: int = 7, new_status: str = 'uploaded',
-                                storage_class: S3StorageClass = 'STANDARD', versioning: bool = False,
+                                storage_class: S3StorageClass = STANDARD, versioning: bool = False,
                                 parallel: bool = False, num_threads: int = 4, delete_all_versions: bool = False,
                                 phase: int = 1) -> (List[str], List[str]):
         """ Overarching method that will take a search query and loop through all files in the
