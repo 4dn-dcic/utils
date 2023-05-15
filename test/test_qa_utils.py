@@ -15,6 +15,7 @@ import time
 import uuid
 
 from dcicutils import qa_utils
+from dcicutils.common import STANDARD, GLACIER
 from dcicutils.exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix
 from dcicutils.ff_mocks import mocked_s3utils
 from dcicutils.lang_utils import there_are
@@ -26,7 +27,7 @@ from dcicutils.qa_utils import (
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
     logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually, Timer,
     MockObjectBasicAttributeBlock, MockObjectAttributeBlock, MockObjectDeleteMarker, MockTemporaryRestoration,
-    MockBigContent, is_abstract_content, add_coverage, simplify_coverage,
+    MockBigContent, is_abstract_content, add_coverage, simplify_coverage, MockMultiPartUpload,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -2246,14 +2247,210 @@ def test_mock_big_content():
 def test_validate_parts_complete():
 
     content = MockBigContent(size=5000)
-    part1 = content.part_etag("bytes=0-1000")
+    part1 = content.part_etag("bytes=1-1000")
     part2 = content.part_etag("bytes=1001-4500")
-    part3 = content.part_etag("bytes=4501-4999")
+    part3 = content.part_etag("bytes=4501-5000")
     MockBigContent.validate_parts_complete([part1, part3, part2])
 
     content = MockBigContent(size=5000)
     part1 = content.part_etag("bytes=0-1000")
     part2 = content.part_etag("bytes=1001-4500")
-    part3 = content.part_etag("bytes=4501-4998")
+    part3 = content.part_etag("bytes=4501-4999")
     with pytest.raises(Exception):
         MockBigContent.validate_parts_complete([part1, part3, part2])
+
+
+def test_multipart_upload():
+
+    file1 = 'file1.txt'
+    file1_content = 'data1'
+    bucket1 = 'foo'
+    key1a = 's3_file1a.txt'
+
+    file1x = 'file1x.txt'
+    key1x = 's3_file1x.txt'
+    file1x_content = 'this is alternate date'
+    key1_prefix = 's3_file'
+
+    file2 = 'file2.txt'
+    file2_content = ''  # Empty
+    bucket2 = 'bar'
+    key2 = 's3_file2.txt'
+
+    mfs = MockFileSystem()
+    with mocked_s3utils(environments=['fourfront-mastertest']) as mock_boto3:
+        with mfs.mock_exists_open_remove():
+            assert isinstance(mock_boto3, MockBoto3)
+            s3 = mock_boto3.client('s3')
+            assert isinstance(s3, MockBotoS3Client)
+
+            # ==================== Scenario 1 ====================
+
+            with io.open(file1, 'w') as fp:
+                fp.write(file1_content)
+            s3.upload_file(Filename=file1, Bucket=bucket1, Key=key1a)
+            attribute_block_1 = s3._object_attribute_block(f"{bucket1}/{key1a}")
+            source_version_id_1 = attribute_block_1.version_id
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1a,
+                                                  context="After upload to S3 (scenario 1)",
+                                                  version_names={source_version_id_1: 'source_version_id_1'})
+            result = s3.create_multipart_upload(Bucket=bucket1, Key=key1a)
+            upload1_id = result['UploadId']
+            upload = MockMultiPartUpload.lookup(upload1_id)
+            assert upload.upload_id == upload1_id
+            assert upload.source is None
+            assert upload.target == {'Bucket': bucket1, 'Key': key1a, 'VersionId': None}
+            assert upload.storage_class == STANDARD
+            assert upload.tagging == []
+            assert upload.parts == []
+            assert upload.action is None
+            assert upload.is_complete is False
+            scenario1_part1_res = s3.upload_part_copy(CopySource={'Bucket': bucket1, 'Key': key1a},
+                                                      Bucket=bucket1, Key=key1a,
+                                                      PartNumber=1, CopySourceRange="bytes=1-2", UploadId=upload1_id)
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1a,
+                                                  context="After scenario 1 upload part 1",
+                                                  version_names={source_version_id_1: 'source_version_id_1'})
+            scenario1_part1_etag = scenario1_part1_res['CopyPartResult']['ETag']
+            n = len(file1_content)
+            scenario1_part1_res = s3.upload_part_copy(CopySource={'Bucket': bucket1, 'Key': key1a},
+                                                      Bucket=bucket1, Key=key1a,
+                                                      PartNumber=2, CopySourceRange=f"bytes=3-{n}", UploadId=upload1_id)
+
+            with pytest.raises(Exception):
+                # This copy is incomplete, so the attempt to complete it will fail.
+                # We need to do one more part copy before it can succeed.
+                upload_desc = {
+                    'Parts': [
+                        {'PartNumber': 1, 'ETag': scenario1_part1_etag}
+                    ]
+                }
+                s3.complete_multipart_upload(Bucket=bucket1, Key=key1a,
+                                             MultipartUpload=upload_desc, UploadId=upload1_id)
+
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1a,
+                                                  context="After scenario 1 upload part 2",
+                                                  version_names={source_version_id_1: 'source_version_id_1'})
+            scenario1_part2_etag = scenario1_part1_res['CopyPartResult']['ETag']
+            upload_desc = {
+                'Parts': [
+                    {'PartNumber': 1, 'ETag': scenario1_part1_etag},
+                    {'PartNumber': 2, 'ETag': scenario1_part2_etag}
+                ]
+            }
+            s3.complete_multipart_upload(Bucket=bucket1, Key=key1a, MultipartUpload=upload_desc, UploadId=upload1_id)
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1a, context="After scenario 1 complete",
+                                                  version_names={source_version_id_1: 'source_version_id_1'})
+
+            # ==================== Scenario 2 ====================
+
+            with io.open(file2, 'w') as fp:
+                fp.write(file2_content)
+            s3.upload_file(Filename=file2, Bucket=bucket2, Key=key2)
+            attribute_block_2 = s3._object_attribute_block(f"{bucket2}/{key2}")
+            source_version_id_2 = attribute_block_2.version_id
+            s3.show_object_versions_for_debugging(bucket=bucket2, prefix=key2,
+                                                  context="After upload to S3 (scenario 2)",
+                                                  version_names={source_version_id_2: 'source_version_id_2'})
+            result = s3.create_multipart_upload(Bucket=bucket2, Key=key2,
+                                                StorageClass=GLACIER,
+                                                Tagging="abc=123&xyz=something")
+            upload2_id = result['UploadId']
+            upload2 = MockMultiPartUpload.lookup(upload2_id)
+            assert upload2.upload_id == upload2_id
+            assert upload2.source is None
+            assert upload2.target == {'Bucket': bucket2, 'Key': key2, 'VersionId': None}
+            assert upload2.storage_class == GLACIER
+            assert upload2.tagging == [{'Key': 'abc', 'Value': '123'}, {'Key': 'xyz', 'Value': 'something'}]
+            assert upload2.parts == []
+            assert upload2.action is None
+            assert upload2.is_complete is False
+            scenario2_part1_res = s3.upload_part_copy(CopySource={'Bucket': bucket2, 'Key': key2},
+                                                      Bucket=bucket2, Key=key2,
+                                                      # Note here that a range of 1-0 means "no bytes", it's empty
+                                                      PartNumber=1, CopySourceRange="bytes=1-0", UploadId=upload2_id)
+            s3.show_object_versions_for_debugging(bucket=bucket2, prefix=key2, context="After scenario 2 upload part",
+                                                  version_names={source_version_id_2: 'source_version_id_2'})
+            scenario2_part1_etag = scenario2_part1_res['CopyPartResult']['ETag']
+            upload_desc = {
+                'Parts': [
+                    {'PartNumber': 1, 'ETag': scenario2_part1_etag}
+                ]
+            }
+            s3.complete_multipart_upload(Bucket=bucket2, Key=key2, MultipartUpload=upload_desc, UploadId=upload2_id)
+            s3.show_object_versions_for_debugging(bucket=bucket2, prefix=key2, context="After scenario 2 complete",
+                                                  version_names={source_version_id_2: 'source_version_id_2'})
+
+            # ==================== Scenario 3 ====================
+
+            with io.open(file1x, 'w') as fp:
+                fp.write(file1x_content)
+            s3.upload_file(Filename=file1x, Bucket=bucket1, Key=key1x)
+            attribute_block_1x = s3._object_attribute_block(f"{bucket1}/{key1x}")
+            source_version_id_1x = attribute_block_1x.version_id
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1_prefix,
+                                                  context="After upload to S3 (scenario 3)",
+                                                  version_names={
+                                                      source_version_id_1: 'source_version_id_1',
+                                                      source_version_id_1x: 'source_version_id_1x'
+                                                  })
+            result = s3.create_multipart_upload(Bucket=bucket1, Key=key1x)
+            upload1x_id = result['UploadId']
+            upload = MockMultiPartUpload.lookup(upload1x_id)
+            assert upload.upload_id == upload1x_id
+            assert upload.source is None
+            assert upload.target == {'Bucket': bucket1, 'Key': key1x, 'VersionId': None}
+            assert upload.storage_class == STANDARD
+            assert upload.tagging == []
+            assert upload.parts == []
+            assert upload.action is None
+            assert upload.is_complete is False
+            scenario1x_part1_res = s3.upload_part_copy(CopySource={'Bucket': bucket1, 'Key': key1a,
+                                                                   'VersionId': source_version_id_1},
+                                                       Bucket=bucket1, Key=key1x,
+                                                       PartNumber=1, CopySourceRange="bytes=1-2", UploadId=upload1x_id)
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1_prefix,
+                                                  context="After scenario 3 upload part 1",
+                                                  version_names={
+                                                      source_version_id_1: 'source_version_id_1',
+                                                      source_version_id_1x: 'source_version_id_1x'
+                                                  })
+            scenario1x_part1_etag = scenario1x_part1_res['CopyPartResult']['ETag']
+            n = len(file1_content)
+            scenario1x_part1_res = s3.upload_part_copy(CopySource={'Bucket': bucket1, 'Key': key1a,
+                                                                   'VersionId': source_version_id_1},
+                                                       Bucket=bucket1, Key=key1x,
+                                                       PartNumber=2, CopySourceRange=f"bytes=3-{n}",
+                                                       UploadId=upload1x_id)
+
+            with pytest.raises(Exception):
+                # This copy is incomplete, so the attempt to complete it will fail.
+                # We need to do one more part copy before it can succeed.
+                upload_desc = {
+                    'Parts': [
+                        {'PartNumber': 1, 'ETag': scenario1x_part1_etag}
+                    ]
+                }
+                s3.complete_multipart_upload(Bucket=bucket1, Key=key1x,
+                                             MultipartUpload=upload_desc, UploadId=upload1x_id)
+
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1_prefix,
+                                                  context="After scenario 3 upload part 2",
+                                                  version_names={
+                                                      source_version_id_1: 'source_version_id_1',
+                                                      source_version_id_1x: 'source_version_id_1x'
+                                                  })
+            scenario1x_part2_etag = scenario1x_part1_res['CopyPartResult']['ETag']
+            upload_desc = {
+                'Parts': [
+                    {'PartNumber': 1, 'ETag': scenario1x_part1_etag},
+                    {'PartNumber': 2, 'ETag': scenario1x_part2_etag}
+                ]
+            }
+            s3.complete_multipart_upload(Bucket=bucket1, Key=key1x, MultipartUpload=upload_desc, UploadId=upload1x_id)
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1_prefix,
+                                                  context="After scenario 3 complete",
+                                                  version_names={
+                                                      source_version_id_1: 'source_version_id_1',
+                                                      source_version_id_1x: 'source_version_id_1x'
+                                                  })

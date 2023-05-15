@@ -28,14 +28,15 @@ from json import dumps as json_dumps, loads as json_loads
 from typing import Any, DefaultDict, Dict, Iterable, List, Optional, Type, Union
 from typing_extensions import Literal
 from unittest import mock
+from urllib.parse import parse_qsl
 from . import misc_utils as misc_utils_module, command_utils as command_utils_module
-from .common import S3StorageClass, S3ObjectNameSpec, STANDARD
+from .common import S3StorageClass, S3ObjectNameSpec, STANDARD, KeyValuestringDictList, KeyValuestringDict
 from .env_utils import short_env_name
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
 from .glacier_utils import GlacierUtils
 from .lang_utils import there_are
 from .misc_utils import (
-    PRINT, INPUT, ignorable, ignored, Retry, remove_prefix, REF_TZ, builtin_print,
+    PRINT, INPUT, ignorable, ignored, Retry, remove_prefix, REF_TZ, builtin_print, make_counter,
     environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name,
     find_associations, get_error_message, remove_suffix, format_in_radix, future_datetime,
     _mockable_input,  # noQA - need this to keep mocking consistent
@@ -433,25 +434,37 @@ class MockAbstractContent:
 
 class MockPartableContent(MockAbstractContent):
 
-    ID_COUNTER = 0
+    @classmethod
+    def start_cloning_from(cls, content):
+        if isinstance(content, bytes):
+            return MockPartableBytes(content_to_copy=content, empty=True)
+        elif isinstance(content, MockBigContent):
+            return content.start_cloning()
+        else:
+            raise ValueError(f"No method defined for cloning: {content!r}")
+
+    ID_COUNTER = make_counter()
     CONTENT_ID_SIZE = {}
 
-    def __init__(self, size, preparing_to_copy=None):
+    def __init__(self, size, empty=False, content_id=None):
         self.size = size
-        if preparing_to_copy is None:
-            self.__class__.ID_COUNTER = new_counter = self.__class__.ID_COUNTER + 1
-            content_id = str(new_counter)
-            declared_size = self.CONTENT_ID_SIZE.get(content_id)
-            if declared_size is not None and declared_size != size:
-                # This is just a consistency check.
-                raise RuntimeError(f"The MockBigContent id {content_id} (size={size!r})"
-                                   f" is already taken with a different size, {declared_size!r}.")
-            self.CONTENT_ID_SIZE[content_id] = size
-            self._content_id = content_id
-            self.coverage = [[0, size]]
-        else:
-            self._content_id = preparing_to_copy
-            self.coverage = [[0, 0]]
+        orig_content_id = content_id
+        content_id = content_id or str(self.new_counter_id())
+        print("=" * 40, f"init(size={size} empty={empty} content_id={orig_content_id!r}) # defaulted to {content_id!r}")
+        declared_size = self.CONTENT_ID_SIZE.get(content_id)
+        if declared_size is not None and declared_size != size:
+            # This is just a consistency check.
+            raise RuntimeError(f"The MockPartableContent id {content_id} (size={size!r})"
+                               f" is already taken with a different size, {declared_size!r}.")
+        print("=" * 40, f"Storing {size} for content id {content_id!r}.")
+
+        self.CONTENT_ID_SIZE[content_id] = size
+        self._content_id = content_id
+        self.coverage = [[0, 0]] if empty else [[0, size]]
+
+    @classmethod
+    def new_counter_id(cls):
+        return cls.ID_COUNTER()
 
     def __str__(self):
         if self.coverage == [[0, self.size]]:
@@ -483,8 +496,11 @@ class MockPartableContent(MockAbstractContent):
         if not match:
             raise ValueError(f"{range_spec} does not match pattern {self.BYTES_PATTERN_STRING}")
         lower_inclusive, upper_inclusive = match.groups()
-        upper_exclusive = int(upper_inclusive) + 1
-        return f"{self.ETAG_PREFIX}{self._content_id}.{lower_inclusive}.{upper_exclusive}"
+        lower_inclusive = int(lower_inclusive) - 1
+        upper_exclusive = int(upper_inclusive)
+        result = f"{self.ETAG_PREFIX}{self._content_id}.{lower_inclusive}.{upper_exclusive}"
+        print(f"Issuing part_etag {result} for {self} range_spec {range_spec}")
+        return result
 
     @classmethod
     def part_etag_byte_range(cls, spec: str) -> [int, int]:
@@ -497,17 +513,21 @@ class MockPartableContent(MockAbstractContent):
 
     @classmethod
     def validate_parts_complete(cls, parts_etags: List[str]):
+        print("in validate_parts_complete")
         assert parts_etags, f"There must be at least one part: {parts_etags}"
+        print("parts_etags=", parts_etags)
         parent_ids = list(map(cls.part_etag_parent_id, parts_etags))
+        print("parent_ids=", parent_ids)
         parts_parent_id = parent_ids[0]
         parts_parent_size = cls.CONTENT_ID_SIZE[parts_parent_id]
-        assert parts_parent_size is not None
-        assert all(parts_parent_id == parent_id for parent_id in parent_ids[1:]), f"Parental mismatch: {parts_etags}"
-        coverage = simplify_coverage(list(map(cls.part_etag_byte_range, parts_etags)))
-        assert len(coverage) == 1, "Parts did not resolve: {coverage}"
+        assert parts_parent_size is not None, f"Bookkeeping error. No source size for content_id {parts_parent_id}."
+        assert all(parts_parent_id == parent_id for parent_id in parent_ids[1:]), (
+            f"Some parts came from unrelated uploads: {parts_etags}")
+        coverage = simplify_coverage(list(map(cls.part_etag_byte_range, parts_etags))) or [[0, 0]]
+        assert len(coverage) == 1, f"Parts did not resolve: {coverage}"
         [[lo, hi]] = coverage
         assert lo == 0, "Parts do not start from 0."
-        assert parts_parent_size == hi
+        assert parts_parent_size == hi, f"Coverage is {coverage} but expected size was {parts_parent_size}"
 
     @classmethod
     def part_etag_range(cls, part_etag):
@@ -515,29 +535,32 @@ class MockPartableContent(MockAbstractContent):
         return [start, end]
 
     def start_partial_copy(self):
-        return self.__class__(preparing_to_copy=self._content_id, size=0)
+        return self.__class__(size=self.size, empty=True, content_id=self._content_id)
 
     def copy_portion(self, start, end, target):
-        if not isinstance(target, MockBigContent) or self._content_id != target._content_id:
-            raise Exception("You cannot copy part of {self} into {target}.")
+        if not isinstance(target, MockBigContent):  # or self._content_id != target._content_id:
+            raise Exception(f"You cannot copy part of {self} into {target}.")
         target.coverage = add_coverage(coverage=target.coverage, start=start, end=end)
 
     def copied_content(self):
         raise NotImplementedError("Method copied_content must be customized in subclasses of MockPartableContent.")
 
 
-class MockPartableText(MockPartableContent):
+class MockPartableBytes(MockPartableContent):
 
-    def __init__(self, text, preparing_to_copy=None):
-        size = len(text)
-        super().__init__(size=size, preparing_to_copy=preparing_to_copy)
-        self.text = text
+    def __init__(self, content_to_copy, empty=False):
+        size = len(content_to_copy)
+        super().__init__(size=size, empty=empty)
+        self.byte_string = content_to_copy
 
     def copied_content(self):
-        return self.text
+        return self.byte_string
 
 
 class MockBigContent(MockPartableContent):
+
+    def start_cloning(self):
+        return MockBigContent(size=self.size, empty=True, content_id=self._content_id)
 
     def copied_content(self):
         return self
@@ -546,6 +569,7 @@ class MockBigContent(MockPartableContent):
 IntPair = List[int]  # it's a list of ints, but for now we know no way to type hint a list of exactly 2 integers
 
 
+# I'm not sure we need this function. We're doing this a different way. -kmp 15-May-2023
 def add_coverage(coverage: List[IntPair], start: int, end: int):
     return simplify_coverage(coverage + [[start, end]])
 
@@ -2411,30 +2435,46 @@ class MockObjectAttributeBlock(MockObjectBasicAttributeBlock):
 
 class MockMultiPartUpload:
 
+    STATE_LOCK = threading.Lock()
+
     ALL_UPLOADS = {}
 
-    def __init__(self, *, content, bucket: str, key: str, storage_class: S3StorageClass = STANDARD,
-                 version_id: Optional[str] = None):
+    def __init__(self, *, s3, bucket: str, key: str, storage_class: S3StorageClass = STANDARD,
+                 version_id: Optional[str] = None, tagging: Optional[KeyValuestringDictList] = None):
+        self.s3 = s3
         self.upload_id = upload_id = make_unique_token(monotonic=True)
         self.parts = []
-        self.data: MockPartableContent
-        self.source: S3ObjectNameSpec = {'Bucket': bucket, 'Key': key, 'VersionId': version_id}
-        self.target: Optional[S3ObjectNameSpec] = None  # This gets set later
+        # .source is set and .target is reset later (since target might acquire a VersionId)
+        self.source: Optional[S3ObjectNameSpec] = None  # initialized on first part upload
+        self.target: S3ObjectNameSpec = {  # re-initialized on first part upload
+            'Bucket': bucket,
+            'Key': key,
+            'VersionId': version_id  # the version_id isn't actually known until first part upload
+        }
+        self.source_attribute_block: Optional[MockObjectAttributeBlock] = None  # initialized on first part upload
+        self._data: Optional[MockPartableContent] = None  # initialized on first part upload
         self.storage_class = storage_class
-        self._action: Optional[callable] = None
-        if isinstance(content, str):
-            self.data = MockPartableText(content, preparing_to_copy=True)
-        elif isinstance(content, MockBigContent):
-            self.data = content
-        else:
-            raise ValueError(f"Expected content to be a string or MockBigContent: {content!r}")
+        self.tagging = tagging or []
+        self.action: Optional[callable] = None
         self.ALL_UPLOADS[upload_id]: MockMultiPartUpload = self
         self.is_complete = False
 
     @property
-    def action(self):
-        # By default, our mock action is to do nothing, but this allows a hook to throw errors in testing
-        return self.action or (lambda *args, **kwargs: None)
+    def data(self):
+        data = self._data
+        if data is None:
+            raise ValueError("No upload attempt has yet been made.")
+        data: MockPartableContent
+        return data
+
+    def initialize_source_attribute_block(self, attribute_block):
+        if self.source_attribute_block is not None and self.source_attribute_block != attribute_block:
+            raise RuntimeError(f"You're already copying to a different location."
+                               f" Previously: {self.source_attribute_block} Attempted: {attribute_block}")
+        self.source_attribute_block = attribute_block
+        content = attribute_block.content or self.s3.s3_files.files.get(attribute_block.filename)
+        if self._data is None:
+            self._data = MockPartableContent.start_cloning_from(content)
 
     @classmethod
     def set_action(cls, upload_id, action: callable):
@@ -2457,7 +2497,7 @@ class MockMultiPartUpload:
         which is subprimitive to MockBotoS3Client.upload_part_copy.
         """
         upload = cls.lookup(upload_id)
-        upload._action = action
+        upload.action = action
 
     @classmethod
     def lookup(cls, upload_id):
@@ -2472,17 +2512,18 @@ class MockMultiPartUpload:
     def check_part_consistency(self, source: S3ObjectNameSpec, target: S3ObjectNameSpec,
                                part_number: int, range_spec: str):
         ignored(target)
-        assert source == self.source, (
-            f"A MultiPartUpload must always transfer from the same source. Promised={self.source} Actual={source}")
-        if self.target is None:
-            self.target = target  # Initialize on first use
+        if self.source is None:
+            self.source = source  # Initialize on first use
         else:
-            assert target == self.target, (
-                f"A MultiPartUpload must always transfer to the same target. First={self.target} Later={target}")
+            assert source == self.source, (
+                f"A MultiPartUpload must always transfer from the same source. First={self.source} Later={source}")
+        assert target['Bucket'] == self.target['Bucket'] and target['Key'] == self.target['Key'], (
+            f"A MultiPartUpload must always transfer from the same source. Promised={self.target} Actual={target}")
         part_etag = self.part_etag(range_spec)
         lower_inclusive, upper_exclusive = self.data.part_etag_byte_range(part_etag)
-        self.action(source=source, target=target, part_number=part_number,
-                    lower=lower_inclusive, upper=upper_exclusive)
+        if self.action is not None:
+            self.action(source=source, target=target, part_number=part_number,
+                        lower=lower_inclusive, upper=upper_exclusive)
         return part_etag
 
     def check_upload_complete(self, target: S3ObjectNameSpec, etags: List[str]):
@@ -2490,16 +2531,24 @@ class MockMultiPartUpload:
         self.data.validate_parts_complete(parts_etags=etags)
         self.is_complete = True
 
-    def move_content(self, s3):
+    def move_content(self, s3) -> S3ObjectNameSpec:
         assert isinstance(s3, MockBotoS3Client)
         assert self.is_complete, (
             f"Upload {self.upload_id} tried to .move_content() before calling .check_upload_complete().")
-        s3_filename = f"{self.target['Bucket']}/{self.target['Key']}"
-        s3.s3_files.set_file_content_for_testing(s3_filename, self.data)
-        attribute_block = s3._object_attribute_block(**self.source)
+        source_s3_filename = f"{self.source['Bucket']}/{self.source['Key']}"
+        target_s3_filename = f"{self.target['Bucket']}/{self.target['Key']}"
+        if not self.target.get('VersionId'):
+            # If a VersionId was supplied, we are copying in-place only to change the storage type, so there's
+            # no actual change to mock content that's needed. We only change it if we're generating a new version.
+            s3.maybe_archive_current_version(bucket=self.target['Bucket'], key=self.target['Key'],
+                                             replacement_class=MockObjectAttributeBlock)
+            s3.s3_files.set_file_content_for_testing(target_s3_filename, self.data.copied_content())
+        attribute_block = s3._object_attribute_block(source_s3_filename, version_id=self.source.get('VersionId'))
         assert isinstance(attribute_block, MockObjectAttributeBlock), "The referenced file is deleted."
         attribute_block.set_storage_class(self.storage_class)
+        attribute_block.set_tagset(self.tagging)
         # raise NotImplementedError(f"Just need to copy {self.data} for into {s3} at {self.target}.")
+        return self.target
 
 
 @MockBoto3.register_client(kind='s3')
@@ -2805,6 +2854,12 @@ class MockBotoS3Client(MockBoto3Client):
         attribute_block = attribute_block or self._object_attribute_block(s3_filename, version_id=version_id)
         assert isinstance(attribute_block, MockObjectAttributeBlock)
         attribute_block.hurry_restoration_expiry()
+
+    def maybe_archive_current_version(self, bucket: str, key: str,
+                                      replacement_class: Type[MockObjectBasicAttributeBlock] = MockObjectAttributeBlock,
+                                      init: Optional[callable] = None) -> Optional[MockObjectBasicAttributeBlock]:
+        if self.s3_files.bucket_uses_versioning(bucket):
+            return self.archive_current_version(f"{bucket}/{key}", replacement_class=replacement_class, init=init)
 
     def archive_current_version(self, filename,
                                 replacement_class: Type[MockObjectBasicAttributeBlock] = MockObjectAttributeBlock,
@@ -3168,6 +3223,7 @@ class MockBotoS3Client(MockBoto3Client):
                 most_recent_version = all_versions[-1]
                 for version in all_versions:
                     if isinstance(version, MockObjectAttributeBlock):
+                        etag = self._content_etag(content if version.content is None else version.content)
                         version_descriptions.append({
                             # 'Owner': {
                             #     "DisplayName": "4dn-dcic-technical",
@@ -3176,7 +3232,7 @@ class MockBotoS3Client(MockBoto3Client):
                             'Key': key,
                             'VersionId': version.version_id,
                             'IsLatest': version == most_recent_version,
-                            'ETag': self._content_etag(content if version.content is None else version.content),
+                            'ETag': etag,
                             'Size': len(content if version.content is None else version.content),
                             'StorageClass': version.storage_class,
                             'LastModified': version.last_modified,  # type datetime.datetime
@@ -3211,18 +3267,21 @@ class MockBotoS3Client(MockBoto3Client):
         return MockMultiPartUpload.lookup(upload_id)
 
     def create_multipart_upload(self, *, Bucket, Key, StorageClass: S3StorageClass = STANDARD,
-                                Tagging=None, **unimplemented_keyargs):
+                                Tagging: Optional[str] = None, **unimplemented_keyargs):
         assert not unimplemented_keyargs, (f"The mock for list_object_versions needs to be extended."
                                            f" {there_are(unimplemented_keyargs, kind='unimplemented key')}")
-        version_id = None  # TODO: Need a way to get this as a parameter in the mock
-        s3_filename = f"{Bucket}/{Key}"
-        attribute_block = self._object_attribute_block(filename=s3_filename)  # TODO: VersionId?
-        assert isinstance(attribute_block, MockObjectAttributeBlock), f"Not an ordinary S3 file: {s3_filename}"
-        content = attribute_block.content
-        upload = MockMultiPartUpload(content=content, bucket=Bucket, key=Key, version_id=version_id,
-                                     storage_class=StorageClass)
-        # Many other things this could return, but this is the thing we most need
-        return {'UploadId': upload.upload_id}
+        # Weird that Tagging here is a string but in other situations it's a {TagSet: [{Key: ..., Value: ...}]} dict
+        tagging: KeyValuestringDictList = []
+        for k, v in parse_qsl(Tagging or ""):
+            entry: KeyValuestringDict = {'Key': k, 'Value': v}
+            tagging.append(entry)
+        upload = MockMultiPartUpload(s3=self, bucket=Bucket, key=Key, storage_class=StorageClass, tagging=tagging)
+        return {
+            'Bucket': Bucket,
+            'Key': Key,
+            'UploadId': upload.upload_id,
+            'ResponseMetadata': self.compute_mock_response_metadata()
+        }
 
     def upload_part_copy(self, *, CopySource, PartNumber, CopySourceRange, UploadId, Bucket, Key,
                          CopySourceVersionId=None, **unimplemented_keyargs):
@@ -3232,9 +3291,20 @@ class MockBotoS3Client(MockBoto3Client):
         # is CopySourceRange, but it's constrained to be there and have a certain value, so we'll check that.
         assert 1 <= PartNumber <= 10000
         upload = self.lookup_upload_id(UploadId)
-        source: S3ObjectNameSpec = {'Bucket': CopySource['Bucket'],
-                                    'Key': CopySource['Key'],
-                                    'VersionId': CopySource.get('VersionId')}
+
+        source_bucket = CopySource['Bucket']
+        source_key = CopySource['Key']
+        source_version_id = CopySource.get('VersionId')
+        if CopySourceVersionId:
+            assert source_bucket == Bucket
+            assert source_key == Key
+            assert source_version_id == CopySourceVersionId
+        s3_filename = f"{source_bucket}/{source_key}"
+        version_id = CopySourceVersionId
+        attribute_block = self._object_attribute_block(filename=s3_filename, version_id=version_id)
+        assert isinstance(attribute_block, MockObjectAttributeBlock), f"Not an ordinary S3 file: {s3_filename}"
+        upload.initialize_source_attribute_block(attribute_block)
+        source: S3ObjectNameSpec = {'Bucket': source_bucket, 'Key': source_key, 'VersionId': source_version_id}
         target: S3ObjectNameSpec = {'Bucket': Bucket, 'Key': Key, 'VersionId': CopySourceVersionId}
         part_etag = upload.check_part_consistency(source=source, target=target,
                                                   part_number=PartNumber, range_spec=CopySourceRange)
