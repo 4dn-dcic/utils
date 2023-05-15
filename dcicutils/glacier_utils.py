@@ -368,6 +368,8 @@ class GlacierUtils:
                 tags = self.s3.get_object_tagging(Bucket=bucket, Key=key).get('TagSet', [])
                 tags = [tag for tag in tags if tag['Key'] != ENCODED_LIFECYCLE_TAG_KEY]
                 tags = self._format_tags(tags)
+                if not tags:
+                    self.s3.delete_object_tagging(Bucket=bucket, Key=key)
             else:
                 tags = ''
         except Exception as e:
