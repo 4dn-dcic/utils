@@ -2,7 +2,10 @@ import boto3
 from typing import Union, List, Tuple
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
-from .common import S3_GLACIER_CLASSES, S3StorageClass, MAX_MULTIPART_CHUNKS, MAX_STANDARD_COPY_SIZE
+from .common import (
+    S3_GLACIER_CLASSES, S3StorageClass, MAX_MULTIPART_CHUNKS, MAX_STANDARD_COPY_SIZE,
+    ENCODED_LIFECYCLE_TAG_KEY
+)
 from .command_utils import require_confirmation
 from .misc_utils import PRINT
 from .ff_utils import get_metadata, search_metadata, get_health_page, patch_metadata
@@ -255,8 +258,19 @@ class GlacierUtils:
             PRINT(f'Error deleting Glacier versions of object {bucket}/{key}: {str(e)}')
             return False
 
+    @staticmethod
+    def _format_tags(tags: List[dict]) -> str:
+        """ Helper method that formats tags so that they match the format expected by the boto3 API
+
+        :param tags: array of dictionaries containing Key, Value mappings to be reformatted
+        :return: String formatted tag list ie:
+            [{Key: key1, Value: value1}, Key: key2, Value: value2}] --> 'key1=value1&key2=value2'
+        """
+        return '&'.join([f'{tag["Key"]}={tag["Value"]}' for tag in tags])
+
     def _do_multipart_upload(self, bucket: str, key: str, total_size: int, part_size: int = 200,
-                             storage_class: str = 'STANDARD', version_id: Union[str, None] = None) -> Union[dict, None]:
+                             storage_class: str = 'STANDARD', tags: str = '',
+                             version_id: Union[str, None] = None) -> Union[dict, None]:
         """ Helper function for copy_object_back_to_original_location, not intended to
             be called directly, will arrange for a multipart copy of large updates
             to change storage class
@@ -266,6 +280,7 @@ class GlacierUtils:
         :param total_size: total size of object
         :param part_size: what size to divide the object into when uploading the chunks
         :param storage_class: new storage class to use
+        :param tags: string of tags to apply
         :param version_id: object version ID, if applicable
         :return: response, if successful, or else None
         """
@@ -275,7 +290,12 @@ class GlacierUtils:
             if num_parts > MAX_MULTIPART_CHUNKS:
                 raise GlacierRestoreException(f'Must user a part_size larger than {part_size}'
                                               f' that will result in fewer than {MAX_MULTIPART_CHUNKS} chunks')
-            mpu = self.s3.create_multipart_upload(Bucket=bucket, Key=key, StorageClass=storage_class)
+            cmu = {
+                'Bucket': bucket, 'Key': key, 'StorageClass': storage_class
+            }
+            if tags:
+                cmu['Tagging'] = tags
+            mpu = self.s3.create_multipart_upload(**cmu)
             mpu_upload_id = mpu['UploadId']
         except Exception as e:
             PRINT(f'Error creating multipart upload for {bucket}/{key} : {str(e)}')
@@ -327,6 +347,7 @@ class GlacierUtils:
 
     def copy_object_back_to_original_location(self, bucket: str, key: str, storage_class: str = 'STANDARD',
                                               part_size: int = 200,  # MB
+                                              preserve_lifecycle_tag: bool = False,
                                               version_id: Union[str, None] = None) -> Union[dict, None]:
         """ Reads the temporary location from the restored object and copies it back to the original location
 
@@ -334,6 +355,7 @@ class GlacierUtils:
         :param key: key within bucket where object is stored
         :param storage_class: new storage class for this object
         :param part_size: if doing a large copy, size of chunks to upload (in MB)
+        :param preserve_lifecycle_tag: whether to keep existing lifecycle tag on the object
         :param version_id: version of object, if applicable
         :return: boolean whether the copy was successful
         """
@@ -342,12 +364,20 @@ class GlacierUtils:
             response = self.s3.head_object(Bucket=bucket, Key=key)
             size = response['ContentLength']
             multipart = (size >= MAX_STANDARD_COPY_SIZE)
+            if not preserve_lifecycle_tag:  # default: preserve tags except 'Lifecycle'
+                tags = self.s3.get_object_tagging(Bucket=bucket, Key=key).get('TagSet', [])
+                tags = [tag for tag in tags if tag['Key'] != ENCODED_LIFECYCLE_TAG_KEY]
+                tags = self._format_tags(tags)
+                if not tags:
+                    self.s3.delete_object_tagging(Bucket=bucket, Key=key)
+            else:
+                tags = ''
         except Exception as e:
             PRINT(f'Could not retrieve metadata on file {bucket}/{key} : {str(e)}')
             return None
         try:
             if multipart:
-                return self._do_multipart_upload(bucket, key, size, part_size, storage_class, version_id)
+                return self._do_multipart_upload(bucket, key, size, part_size, storage_class, tags, version_id)
             else:
                 # Force copy the object into standard in a single operation
                 copy_source = {'Bucket': bucket, 'Key': key}
@@ -358,6 +388,8 @@ class GlacierUtils:
                 if version_id:
                     copy_source['VersionId'] = version_id
                     copy_target['CopySourceVersionId'] = version_id
+                if tags:
+                    copy_target['Tagging'] = tags
                 response = self.s3.copy_object(CopySource=copy_source, **copy_target)
                 PRINT(f'Response from boto3 copy:\n{response}')
                 PRINT(f'Object {bucket}/{key} copied back to its original location in S3')

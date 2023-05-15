@@ -2,6 +2,7 @@ import botocore.client
 import botocore.exceptions
 import contextlib
 import datetime
+import hashlib
 import io
 import json
 import os
@@ -23,8 +24,8 @@ from dcicutils.env_utils_legacy import (
      _CGAP_MGB_PUBLIC_URL_PRD,  # noQA - Yes, we do want to import a protected member (for testing)
 )
 from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs
-from dcicutils.ff_mocks import make_mock_es_url, make_mock_portal_url
-from dcicutils.misc_utils import ignored, ignorable, override_environ, exported
+from dcicutils.ff_mocks import make_mock_es_url, make_mock_portal_url, mocked_s3utils
+from dcicutils.misc_utils import ignored, ignorable, override_environ, exported, file_contents
 from dcicutils.qa_utils import MockBoto3, MockResponse, known_bug_expected, MockBotoS3Client
 from dcicutils.s3_utils import s3Utils, HealthPageKey
 from requests.exceptions import ConnectionError
@@ -499,6 +500,48 @@ def test_s3utils_delete_key():
 
 @pytest.mark.unit
 @using_fresh_ff_state_for_testing()
+def test_s3utils_s3_put_with_mock_boto_s3():
+
+    with mocked_s3utils():
+
+        s3u = s3Utils(env='fourfront-mastertest')
+        assert isinstance(s3u, s3Utils)
+        assert isinstance(s3u.s3, MockBotoS3Client)
+        s3 = s3u.s3
+
+        some_key = 'some-key.json'
+        some_file = f'downloaded-{some_key}'
+
+        for item in [{'a': 1, 'b': 2}, "some string"]:
+            for i, content_type in enumerate(['text/plain', 'application/json']):
+                for acl in [None, 'some-acl']:
+                    print(f"Case {i} using item={item!r} content_type={content_type}")
+                    item_to_etag = json.dumps(item) if isinstance(item, dict) else item
+                    expected_etag = f'"{hashlib.md5(item_to_etag.encode("utf-8")).hexdigest()}"'
+                    print(f"expected_etag={expected_etag}")
+                    expected_result = {
+                        "Body": item,
+                        "Bucket": s3u.outfile_bucket,
+                        "Key": some_key,
+                        "ContentType": content_type,
+                    }
+                    if acl:
+                        expected_result['ACL'] = acl
+                    print(f"expected_result={expected_result}")
+                    actual_result = s3u.s3_put(item, upload_key=some_key)
+                    print(f"actual_result={actual_result}")
+                    # assert actual_result == expected_result
+                    assert actual_result['ETag'] == expected_etag
+                    s3.download_file(Bucket=s3u.outfile_bucket, Key=some_key, Filename=some_file)
+                    expected_file_contents = item_to_etag
+                    print(f"Expected file contents: {expected_file_contents!r}")
+                    actual_file_contents = file_contents(some_file)
+                    print(f"Actual file contents: {actual_file_contents!r}")
+                    assert actual_file_contents == expected_file_contents
+
+
+@pytest.mark.unit
+@using_fresh_ff_state_for_testing()
 def test_s3utils_s3_put():
 
     util = s3Utils(env='fourfront-mastertest')
@@ -513,14 +556,14 @@ def test_s3utils_s3_put():
             item = {'a': 1, 'b': 2}
             some_key = 'some-key'
             assert util.s3_put(item, upload_key=some_key) == {
-                "Body": item,
+                "Body": json.dumps(item),
                 "Bucket": util.outfile_bucket,
                 "Key": some_key,
                 "ContentType": some_content_type,
             }
             some_acl = 'some-acl'
             assert util.s3_put(item, upload_key=some_key, acl=some_acl) == {
-                "Body": item,
+                "Body": json.dumps(item),
                 "Bucket": util.outfile_bucket,
                 "Key": some_key,
                 "ContentType": some_content_type,
@@ -544,7 +587,7 @@ def test_s3utils_s3_put_secret():
             some_key = 'some-key'
             some_secret = 'some-secret'
             assert util.s3_put_secret(item, keyname=some_key) == {
-                "Body": item,
+                "Body": json.dumps(item),
                 "Bucket": util.sys_bucket,
                 "Key": some_key,
                 "SSECustomerKey": environmental_key,
@@ -552,14 +595,14 @@ def test_s3utils_s3_put_secret():
             }
             some_bucket = 'some-bucket'
             assert util.s3_put_secret(item, keyname=some_key, bucket=some_bucket) == {
-                "Body": item,
+                "Body": json.dumps(item),
                 "Bucket": some_bucket,
                 "Key": some_key,
                 "SSECustomerKey": environmental_key,
                 "SSECustomerAlgorithm": standard_algorithm,
             }
             assert util.s3_put_secret(item, keyname=some_key, secret=some_secret) == {
-                "Body": item,
+                "Body": json.dumps(item),
                 "Bucket": util.sys_bucket,
                 "Key": some_key,
                 "SSECustomerKey": some_secret,
