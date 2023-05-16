@@ -30,7 +30,10 @@ from typing_extensions import Literal
 from unittest import mock
 from urllib.parse import parse_qsl
 from . import misc_utils as misc_utils_module, command_utils as command_utils_module
-from .common import S3StorageClass, S3ObjectNameSpec, STANDARD, KeyValuestringDictList, KeyValuestringDict
+from .bucket_utils import parse_s3_object_name
+from .common import (
+    S3StorageClass, S3ObjectNameDict, S3ObjectNameSpec, STANDARD, KeyValuestringDictList, KeyValuestringDict,
+)
 from .env_utils import short_env_name
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
 from .glacier_utils import GlacierUtils
@@ -2436,12 +2439,13 @@ class MockMultiPartUpload:
 
     def __init__(self, *, s3, bucket: str, key: str, storage_class: S3StorageClass = STANDARD,
                  version_id: Optional[str] = None, tagging: Optional[KeyValuestringDictList] = None):
+        self.initiated = datetime.datetime.now()
         self.s3 = s3
         self.upload_id = upload_id = make_unique_token(monotonic=True)
         self.parts = []
         # .source is set and .target is reset later (since target might acquire a VersionId)
-        self.source: Optional[S3ObjectNameSpec] = None  # initialized on first part upload
-        self.target: S3ObjectNameSpec = {  # re-initialized on first part upload
+        self.source: Optional[S3ObjectNameDict] = None  # initialized on first part upload
+        self.target: S3ObjectNameDict = {  # re-initialized on first part upload
             'Bucket': bucket,
             'Key': key,
             'VersionId': version_id  # the version_id isn't actually known until first part upload
@@ -2504,7 +2508,7 @@ class MockMultiPartUpload:
     def part_etag(self, range_spec):
         return self.data.part_etag(range_spec)
 
-    def check_part_consistency(self, source: S3ObjectNameSpec, target: S3ObjectNameSpec,
+    def check_part_consistency(self, source: S3ObjectNameDict, target: S3ObjectNameDict,
                                part_number: int, range_spec: str):
         ignored(target)
         if self.source is None:
@@ -2521,12 +2525,12 @@ class MockMultiPartUpload:
                         lower=lower_inclusive, upper=upper_exclusive)
         return part_etag
 
-    def check_upload_complete(self, target: S3ObjectNameSpec, etags: List[str]):
+    def check_upload_complete(self, target: S3ObjectNameDict, etags: List[str]):
         assert target == self.target, f"Filename when completing upload didn't match: {target}"
         self.data.validate_parts_complete(parts_etags=etags)
         self.is_complete = True
 
-    def move_content(self, s3) -> S3ObjectNameSpec:
+    def move_content(self, s3) -> S3ObjectNameDict:
         assert isinstance(s3, MockBotoS3Client)
         assert self.is_complete, (
             f"Upload {self.upload_id} tried to .move_content() before calling .check_upload_complete().")
@@ -2538,7 +2542,8 @@ class MockMultiPartUpload:
             s3.maybe_archive_current_version(bucket=self.target['Bucket'], key=self.target['Key'],
                                              replacement_class=MockObjectAttributeBlock)
             s3.s3_files.set_file_content_for_testing(target_s3_filename, self.data.copied_content())
-        attribute_block = s3._object_attribute_block(source_s3_filename, version_id=self.source.get('VersionId'))
+        attribute_block = s3._object_attribute_block(  # noQA - access to protected member, but this is easiest way
+            source_s3_filename, version_id=self.source.get('VersionId'))
         assert isinstance(attribute_block, MockObjectAttributeBlock), "The referenced file is deleted."
         attribute_block.set_storage_class(self.storage_class)
         attribute_block.set_tagset(self.tagging)
@@ -3305,7 +3310,7 @@ class MockBotoS3Client(MockBoto3Client):
             'ResponseMetadata': self.compute_mock_response_metadata()
         }
 
-    def upload_part_copy(self, *, CopySource, PartNumber, CopySourceRange, UploadId, Bucket, Key,
+    def upload_part_copy(self, *, CopySource: S3ObjectNameSpec, PartNumber, CopySourceRange, UploadId, Bucket, Key,
                          CopySourceVersionId=None, **unimplemented_keyargs):
         assert not unimplemented_keyargs, (f"The mock for list_object_versions needs to be extended."
                                            f" {there_are(unimplemented_keyargs, kind='unimplemented key')}")
@@ -3313,6 +3318,9 @@ class MockBotoS3Client(MockBoto3Client):
         # is CopySourceRange, but it's constrained to be there and have a certain value, so we'll check that.
         assert 1 <= PartNumber <= 10000
         upload = self.lookup_upload_id(UploadId)
+
+        if isinstance(CopySource, str):  # Tolerate bucket/key or bucket/key?versionId=xxx
+            CopySource = parse_s3_object_name(CopySource)
 
         source_bucket = CopySource['Bucket']
         source_key = CopySource['Key']
@@ -3326,8 +3334,8 @@ class MockBotoS3Client(MockBoto3Client):
         attribute_block = self._object_attribute_block(filename=s3_filename, version_id=version_id)
         assert isinstance(attribute_block, MockObjectAttributeBlock), f"Not an ordinary S3 file: {s3_filename}"
         upload.initialize_source_attribute_block(attribute_block)
-        source: S3ObjectNameSpec = {'Bucket': source_bucket, 'Key': source_key, 'VersionId': source_version_id}
-        target: S3ObjectNameSpec = {'Bucket': Bucket, 'Key': Key, 'VersionId': CopySourceVersionId}
+        source: S3ObjectNameDict = {'Bucket': source_bucket, 'Key': source_key, 'VersionId': source_version_id}
+        target: S3ObjectNameDict = {'Bucket': Bucket, 'Key': Key, 'VersionId': CopySourceVersionId}
         part_etag = upload.check_part_consistency(source=source, target=target,
                                                   part_number=PartNumber, range_spec=CopySourceRange)
         return {'CopyPartResult': {'ETag': part_etag}}
@@ -3342,11 +3350,30 @@ class MockBotoS3Client(MockBoto3Client):
         if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
             PRINT(f"Attempting to complete multipart upload with etags: {etags}")
         upload.check_upload_complete(target={'Bucket': Bucket, 'Key': Key, 'VersionId': version_id}, etags=etags)
-        spec: S3ObjectNameSpec = upload.move_content(s3=self)
+        spec: S3ObjectNameDict = upload.move_content(s3=self)
         return {
             'Bucket': spec['Bucket'],
             'Key': spec['Key'],
             'VersionId': spec['VersionId']
+        }
+
+    def list_multipart_uploads(self, Bucket, **unimplemented_keyargs):
+        assert not unimplemented_keyargs, (f"The mock for list_multipart_uploads needs to be extended."
+                                           f" {there_are(unimplemented_keyargs, kind='unimplemented key')}")
+        upload_id: str
+        upload: MockMultiPartUpload
+        return {
+            'Bucket': Bucket,
+            'Uploads': [
+                {
+                    'UploadId': upload_id,
+                    'Key': upload.target['Key'],
+                    'Initiated': upload.initiated,
+                    'StorageClass': upload.storage_class,
+                }
+                for upload_id, upload in MockMultiPartUpload.ALL_UPLOADS.items()
+            ],
+            'ResponseMetadata': self.compute_mock_response_metadata()
         }
 
     def show_object_versions_for_debugging(self, bucket, prefix, context=None, version_names=None):

@@ -179,7 +179,8 @@ S3StorageClass = Union[
 #     Key: str
 #     VersionId: Optional[str]
 
-S3ObjectNameSpec = Dict[Literal['Bucket', 'Key', 'VersionId'], Optional[str]]
+S3ObjectNameDict = Dict[Literal['Bucket', 'Key', 'VersionId'], Optional[str]]
+S3ObjectNameSpec = Union[str, S3ObjectNameDict]
 
 
 # This constant is used in our Lifecycle management system to automatically transition objects
