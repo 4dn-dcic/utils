@@ -2284,7 +2284,11 @@ def test_multipart_upload():
             s3 = mock_boto3.client('s3')
             assert isinstance(s3, MockBotoS3Client)
 
-            # ==================== Scenario 1 ====================
+            def scenario(n):
+                print("=" * 50, "SCENARIO", n, "=" * 50)
+
+            # ====================
+            scenario(1)
 
             with io.open(file1, 'w') as fp:
                 fp.write(file1_content)
@@ -2342,7 +2346,8 @@ def test_multipart_upload():
             s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1a, context="After scenario 1 complete",
                                                   version_names={source_version_id_1: 'source_version_id_1'})
 
-            # ==================== Scenario 2 ====================
+            # ====================
+            scenario(2)
 
             with io.open(file2, 'w') as fp:
                 fp.write(file2_content)
@@ -2381,7 +2386,8 @@ def test_multipart_upload():
             s3.show_object_versions_for_debugging(bucket=bucket2, prefix=key2, context="After scenario 2 complete",
                                                   version_names={source_version_id_2: 'source_version_id_2'})
 
-            # ==================== Scenario 3 ====================
+            # ====================
+            scenario(3)
 
             with io.open(file1x, 'w') as fp:
                 fp.write(file1x_content)
@@ -2454,3 +2460,53 @@ def test_multipart_upload():
                                                       source_version_id_1: 'source_version_id_1',
                                                       source_version_id_1x: 'source_version_id_1x'
                                                   })
+
+            # ====================
+            scenario(4)
+
+            KB = 1000
+            MB = KB * KB
+
+            source_4_key = 'key_in'
+            target_4_key = 'key_out'
+            prefix_4 = 'key_'
+            size_4 = 120 * MB
+            incr_4 = 25 * MB
+
+            source_version_id_4 = s3.create_big_file(Bucket=bucket1, Key=source_4_key, size=120 * MB).version_id
+
+            def show_progress(context):
+                s3.show_object_versions_for_debugging(bucket=bucket1, prefix=prefix_4, context=context,
+                                                      version_names={source_version_id_4: 'source_version_id_4'})
+            show_progress("After creating mock big file (scenario 4)")
+            result_4 = s3.create_multipart_upload(Bucket=bucket1, Key=target_4_key)
+            upload_id_4 = result_4['UploadId']
+            upload_4 = MockMultiPartUpload.lookup(upload_id_4)
+            assert upload_4.upload_id == upload_id_4
+            assert upload_4.source is None
+            assert upload_4.target == {'Bucket': bucket1, 'Key': target_4_key, 'VersionId': None}
+            assert upload_4.storage_class == STANDARD
+            assert upload_4.tagging == []
+            assert upload_4.parts == []
+            assert upload_4.action is None
+            assert upload_4.is_complete is False
+            i = 0
+            n = 0
+            parts = []
+            while n < size_4:
+                i = i + 1
+                part_size = min(incr_4, size_4 - n)
+                range_spec = f"bytes={n + 1}-{n + part_size}"
+                part_res = s3.upload_part_copy(CopySource={'Bucket': bucket1, 'Key': source_4_key},
+                                               Bucket=bucket1, Key=target_4_key,
+                                               PartNumber=i, CopySourceRange=range_spec,
+                                               UploadId=upload_id_4)
+                show_progress(f"After scenario 4 upload part {i}")
+                part_etag = part_res['CopyPartResult']['ETag']
+                parts.append({'PartNumber': i, 'ETag': part_etag})
+                n = n + incr_4
+            upload_desc = {'Parts': parts}
+            s3.complete_multipart_upload(Bucket=bucket1, Key=target_4_key,
+                                         MultipartUpload=upload_desc, UploadId=upload_id_4)
+            show_progress("After scenario 4 complete")
+            assert upload_4.is_complete

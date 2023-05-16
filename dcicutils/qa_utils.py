@@ -448,15 +448,12 @@ class MockPartableContent(MockAbstractContent):
 
     def __init__(self, size, empty=False, content_id=None):
         self.size = size
-        orig_content_id = content_id
         content_id = content_id or str(self.new_counter_id())
-        print("=" * 40, f"init(size={size} empty={empty} content_id={orig_content_id!r}) # defaulted to {content_id!r}")
         declared_size = self.CONTENT_ID_SIZE.get(content_id)
         if declared_size is not None and declared_size != size:
             # This is just a consistency check.
             raise RuntimeError(f"The MockPartableContent id {content_id} (size={size!r})"
                                f" is already taken with a different size, {declared_size!r}.")
-        print("=" * 40, f"Storing {size} for content id {content_id!r}.")
 
         self.CONTENT_ID_SIZE[content_id] = size
         self._content_id = content_id
@@ -499,7 +496,8 @@ class MockPartableContent(MockAbstractContent):
         lower_inclusive = int(lower_inclusive) - 1
         upper_exclusive = int(upper_inclusive)
         result = f"{self.ETAG_PREFIX}{self._content_id}.{lower_inclusive}.{upper_exclusive}"
-        print(f"Issuing part_etag {result} for {self} range_spec {range_spec}")
+        if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
+            print(f"Issuing part_etag {result} for {self} range_spec {range_spec}")
         return result
 
     @classmethod
@@ -513,11 +511,8 @@ class MockPartableContent(MockAbstractContent):
 
     @classmethod
     def validate_parts_complete(cls, parts_etags: List[str]):
-        print("in validate_parts_complete")
         assert parts_etags, f"There must be at least one part: {parts_etags}"
-        print("parts_etags=", parts_etags)
         parent_ids = list(map(cls.part_etag_parent_id, parts_etags))
-        print("parent_ids=", parent_ids)
         parts_parent_id = parent_ids[0]
         parts_parent_size = cls.CONTENT_ID_SIZE[parts_parent_id]
         assert parts_parent_size is not None, f"Bookkeeping error. No source size for content_id {parts_parent_id}."
@@ -2684,10 +2679,29 @@ class MockBotoS3Client(MockBoto3Client):
         # doublequotes, so an example from
         # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/list_object_versions.html
         # shows:  'ETag': '"6805f2cfc46c0f04559748bb039d69ae"',
-        res = f'"{hashlib.md5(content).hexdigest()}"'
+        if isinstance(content, bytes):
+            res = f'"{hashlib.md5(content).hexdigest()}"'
+        elif isinstance(content, MockPartableContent):
+            res = content.etag
+        else:
+            raise ValueError(f"Cannot compute etag for {content!r}.")
         # print(f"content={content} ETag={res}")
         return res
 
+    @staticmethod
+    def _content_len(content):
+        # For reasons known only to AWS, the ETag, though described as an MD5 hash, begins and ends with
+        # doublequotes, so an example from
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/list_object_versions.html
+        # shows:  'ETag': '"6805f2cfc46c0f04559748bb039d69ae"',
+        if isinstance(content, bytes):
+            res = len(content)
+        elif isinstance(content, MockPartableContent):
+            res = content.size
+        else:
+            raise ValueError(f"Cannot compute length of {content!r}.")
+        # print(f"content={content} ETag={res}")
+        return res
 
     def Bucket(self, name):  # noQA - AWS function naming style
         return MockBotoS3Bucket(s3=self, name=name)
@@ -2706,7 +2720,7 @@ class MockBotoS3Client(MockBoto3Client):
                 'Bucket': Bucket,
                 'Key': Key,
                 'ETag': self._content_etag(content),
-                'ContentLength': len(content),
+                'ContentLength': self._content_len(content),
                 'StorageClass': attribute_block.storage_class,  # self._object_storage_class(filename=pseudo_filename)
                 'VersionId': attribute_block.version_id or '',  # it should never be null, but still be careful of type
                 # Numerous others, but this is enough to make the dictionary non-empty and to satisfy some of our tools
@@ -2879,6 +2893,13 @@ class MockBotoS3Client(MockBoto3Client):
                 init()  # caller can supply an init function to be run while still inside lock
             return new_block
 
+    def create_big_file(self, Bucket, Key, size):
+        s3_filename = f"{Bucket}/{Key}"
+        self.s3_files.set_file_content_for_testing(s3_filename, MockBigContent(size=size))
+        attribute_block = self._object_attribute_block(s3_filename)
+        assert isinstance(attribute_block, MockObjectAttributeBlock)
+        return attribute_block
+
     def _check_versions_registered(self, filename, *versions: Optional[MockObjectBasicAttributeBlock]):
         """
         Performs a useful consistency check to identify problems early, but has no functional effect on other code
@@ -2997,7 +3018,7 @@ class MockBotoS3Client(MockBoto3Client):
                     'ETag': self._content_etag(content),
                     'LastModified': self._object_last_modified(filename=filename),
                     # "Owner": {"DisplayName": ..., "ID"...},
-                    "Size": len(content),
+                    "Size": self._content_len(content),
                     "StorageClass": self._object_storage_class(filename=filename),
                 })
         return {
@@ -3224,6 +3245,7 @@ class MockBotoS3Client(MockBoto3Client):
                 for version in all_versions:
                     if isinstance(version, MockObjectAttributeBlock):
                         etag = self._content_etag(content if version.content is None else version.content)
+                        content_length = self._content_len(content if version.content is None else version.content)
                         version_descriptions.append({
                             # 'Owner': {
                             #     "DisplayName": "4dn-dcic-technical",
@@ -3233,7 +3255,7 @@ class MockBotoS3Client(MockBoto3Client):
                             'VersionId': version.version_id,
                             'IsLatest': version == most_recent_version,
                             'ETag': etag,
-                            'Size': len(content if version.content is None else version.content),
+                            'Size': content_length,
                             'StorageClass': version.storage_class,
                             'LastModified': version.last_modified,  # type datetime.datetime
                         })
@@ -3317,6 +3339,8 @@ class MockBotoS3Client(MockBoto3Client):
         upload = MockMultiPartUpload.lookup(UploadId)
         parts: List[dict] = MultipartUpload['Parts']   # each element a dictionary containing PartNumber and ETag
         etags = [part['ETag'] for part in parts]
+        if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
+            PRINT(f"Attempting to complete multipart upload with etags: {etags}")
         upload.check_upload_complete(target={'Bucket': Bucket, 'Key': Key, 'VersionId': version_id}, etags=etags)
         spec: S3ObjectNameSpec = upload.move_content(s3=self)
         return {
