@@ -15,6 +15,7 @@ import time
 import uuid
 
 from dcicutils import qa_utils
+from dcicutils.common import STANDARD, GLACIER
 from dcicutils.exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix
 from dcicutils.ff_mocks import mocked_s3utils
 from dcicutils.lang_utils import there_are
@@ -26,6 +27,7 @@ from dcicutils.qa_utils import (
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
     logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually, Timer,
     MockObjectBasicAttributeBlock, MockObjectAttributeBlock, MockObjectDeleteMarker, MockTemporaryRestoration,
+    MockBigContent, is_abstract_content, add_coverage, simplify_coverage, MockMultiPartUpload,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -185,7 +187,7 @@ class MockLocalTimezone:  # Technically should return pytz.tzinfo but doesn't
         self._winter_tz = winter_tz
 
     def tzname(self, dt: datetime.datetime):
-        # The exact time that daylight time runs varies from year to year. For testing we'll say that
+        # The exact time that daylight time runs varies from year to year. For testing, we'll say that
         # daylight time is April 1 to Oct 31.  In practice, we recommend times close to Dec 31 for winter
         # and Jun 30 for summer, so the precise transition date doesn't matter. -kmp 9-Mar-2021
         if 3 < dt.month < 11:
@@ -321,7 +323,7 @@ def test_controlled_time_utcnow():
     t1 = t.now()     # initial time + 1 second
     t.set_datetime(t0)
     t2 = t.utcnow()  # initial time UTC + 1 second
-    # This might be 5 hours in US/Eastern at HMS or it might be 0 hours in UTC on AWS or GitHub Actions.
+    # This might be 5 hours in US/Eastern at HMS, or it might be 0 hours in UTC on AWS or GitHub Actions.
     assert (t2 - t1).total_seconds() == abs(local_time.utcoffset(t0).total_seconds())
 
 
@@ -620,7 +622,7 @@ def test_retry_manager():
         return rarely_add3(x)
 
     # We have to access a random place out of a tuple structure for mock data on time.sleep's arg.
-    # Documentation says we should be able to access the call with .call_args[n] but that doesn't work
+    # Documentation says we should be able to access the call with .call_args[n] but that doesn't work,
     # and it's also documented to work by tuple, so .mock_calls[n][1][m] substitutes for
     # .mock_calls[n].call_args[m], but using .mock_calls[n][ARGS][m] as the compromise. -kmp 20-May-2020
 
@@ -797,7 +799,7 @@ def test_mock_file_system_simple():
                 filename2 = "pre-existing-file.txt"
                 assert os.path.exists(filename2)
 
-                assert len(mfs.files) == 1
+                mfs.assert_file_count(1)
 
                 with io.open(filename, 'w') as fp:
                     fp.write("foo")
@@ -808,17 +810,18 @@ def test_mock_file_system_simple():
                 with io.open(filename, 'r') as fp:
                     assert fp.read() == 'foobar\nbaz\n'
 
-                assert len(mfs.files) == 2
+                mfs.assert_file_count(2)
 
                 with io.open(filename2, 'r') as fp:
                     assert fp.read() == "stuff from yesterday"
 
-                assert sorted(mfs.files.keys()) == ['no.such.file', 'pre-existing-file.txt']
+                # assert sorted(mfs.files.keys()) == ['no.such.file', 'pre-existing-file.txt']
+                assert mfs.all_filenames_for_testing() == ['no.such.file', 'pre-existing-file.txt']
 
-                assert mfs.files == {
+                mfs.assert_file_system_state({
                     'no.such.file': b'foobar\nbaz\n',
                     'pre-existing-file.txt': b'stuff from yesterday'
-                }
+                })
 
 
 def test_mock_file_system_auto():
@@ -836,13 +839,14 @@ def test_mock_file_system_auto():
         with open(temp_filename, 'w') as outfile:
             outfile.write(temp_file_text)
 
+        mfs: MockFileSystem
         with MockFileSystem(auto_mirror_files_for_read=True).mock_exists_open_remove() as mfs:
 
-            assert len(mfs.files) == 0
+            mfs.assert_file_count(0)
 
             assert os.path.exists(temp_filename)
 
-            assert len(mfs.files) == 1
+            mfs.assert_file_count(1)  # auto-mirroring has pulled in a file
 
             with open(temp_filename) as infile:
                 content = infile.read()
@@ -851,13 +855,13 @@ def test_mock_file_system_auto():
 
             os.remove(temp_filename)
 
-            assert len(mfs.files) == 0
+            mfs.assert_file_count(0)
 
             # Removing the file in the mock does not cause us to auto-mirror anew.
             assert not os.path.exists(temp_filename)
 
             # This is just confirmation
-            assert len(mfs.files) == 0
+            mfs.assert_file_count(0)
 
         # But now we are outside the mock again, so the file should be visible.
         assert os.path.exists(temp_filename)
@@ -1151,10 +1155,11 @@ def test_mock_boto3_client_use():
         # No matter what clients you get, they all share the same MockFileSystem, which we can get from s3_files
         s3fs = s3.s3_files
         # We saved an s3 file to bucket "foo" and key "bar", so it will be in the s3fs as "foo/bar"
-        assert sorted(s3fs.files.keys()) == ['foo/bar', 'foo/baz']
+        assert s3fs.all_filenames_for_testing() == ['foo/bar', 'foo/baz']
+        # assert sorted(s3fs.files.keys()) == ['foo/bar', 'foo/baz']
         # The content is stored in binary format
-        assert s3fs.files['foo/bar'] == b'some content'
-        assert s3fs.files['foo/baz'] == b'other content'
+        s3fs.assert_file_content('foo/bar', b'some content')
+        s3fs.assert_file_content('foo/baz', b'other content')
 
         assert isinstance(s3, MockBotoS3Client)
 
@@ -1212,21 +1217,28 @@ def test_mock_boto_s3_client_upload_file_and_download_file_positional():
         with io.open("file1.txt", 'w') as fp:
             fp.write('Hello!\n')
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {}
+        # assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        local_mfs.assert_file_system_state({"file1.txt": b"Hello!\n"})
+        # assert mock_s3_client.s3_files.files == {}
+        mock_s3_client.s3_files.assert_file_system_state({})
 
         mock_s3_client.upload_file("file1.txt", "MyBucket", "MyFile")
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        local_mfs.assert_file_system_state({"file1.txt": b"Hello!\n"})
+        # assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+
+        mock_s3_client.s3_files.assert_file_system_state({'MyBucket/MyFile': b"Hello!\n"})
+        # assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
 
         mock_s3_client.download_file("MyBucket", "MyFile", "file2.txt")
 
-        assert local_mfs.files == {
+        # assert local_mfs.files == {...}
+        local_mfs.assert_file_system_state({
             "file1.txt": b"Hello!\n",
             "file2.txt": b"Hello!\n",
-        }
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        })
+        mock_s3_client.s3_files.assert_file_system_state({'MyBucket/MyFile': b"Hello!\n"})
+        # assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
 
         assert file_contents("file1.txt") == file_contents("file2.txt")
 
@@ -1241,21 +1253,23 @@ def test_mock_boto_s3_client_upload_file_and_download_file_keyworded():
         with io.open("file1.txt", 'w') as fp:
             fp.write('Hello!\n')
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {}
+        local_mfs.assert_file_content("file1.txt", b"Hello!\n")
+        mock_s3_client.s3_files.assert_file_count(0)
 
         mock_s3_client.upload_file(Filename="file1.txt", Bucket="MyBucket", Key="MyFile")
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        local_mfs.assert_file_content("file1.txt", b"Hello!\n")
+        mock_s3_client.s3_files.assert_file_system_state({'MyBucket/MyFile': b"Hello!\n"})
 
         mock_s3_client.download_file(Bucket="MyBucket", Key="MyFile", Filename="file2.txt")
 
-        assert local_mfs.files == {
+        local_mfs.assert_file_system_state({
             "file1.txt": b"Hello!\n",
             "file2.txt": b"Hello!\n",
-        }
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        })
+        mock_s3_client.s3_files.assert_file_system_state({
+            'MyBucket/MyFile': b"Hello!\n"
+        })
 
         assert file_contents("file1.txt") == file_contents("file2.txt")
 
@@ -1272,23 +1286,29 @@ def test_mock_boto_s3_client_upload_fileobj_and_download_fileobj_positional():
         with io.open("file1.txt", 'w') as fp:
             fp.write('Hello!\n')
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {}
+        # assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        local_mfs.assert_file_system_state({"file1.txt": b"Hello!\n"})
+        # assert mock_s3_client.s3_files.files == {}
+        mock_s3_client.s3_files.assert_file_system_state({})
 
         with io.open("file1.txt", 'rb') as fp:
             mock_s3_client.upload_fileobj(fp, "MyBucket", "MyFile")
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        # assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        local_mfs.assert_file_system_state({"file1.txt": b"Hello!\n"})
+        # assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        mock_s3_client.s3_files.assert_file_system_state({'MyBucket/MyFile': b"Hello!\n"})
 
         with io.open("file2.txt", 'wb') as fp:
             mock_s3_client.download_fileobj("MyBucket", "MyFile", fp)
 
-        assert local_mfs.files == {
+        # assert local_mfs.files == { ... }
+        local_mfs.assert_file_system_state({
             "file1.txt": b"Hello!\n",
             "file2.txt": b"Hello!\n",
-        }
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        })
+        # assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        mock_s3_client.s3_files.assert_file_system_state({'MyBucket/MyFile': b"Hello!\n"})
 
         assert file_contents("file1.txt") == file_contents("file2.txt")
 
@@ -1303,23 +1323,29 @@ def test_mock_boto_s3_client_upload_fileobj_and_download_fileobj_keyworded():
         with io.open("file1.txt", 'w') as fp:
             fp.write('Hello!\n')
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {}
+        # assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        local_mfs.assert_file_system_state({"file1.txt": b"Hello!\n"})
+        # assert mock_s3_client.s3_files.files == {}
+        mock_s3_client.s3_files.assert_file_system_state({})
 
         with io.open("file1.txt", 'rb') as fp:
             mock_s3_client.upload_fileobj(Fileobj=fp, Bucket="MyBucket", Key="MyFile")
 
-        assert local_mfs.files == {"file1.txt": b"Hello!\n"}
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        # assert local_mfs.files == {"file1.txt": b"Hello!\n"}
+        local_mfs.assert_file_system_state({"file1.txt": b"Hello!\n"})
+        # assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        mock_s3_client.s3_files.assert_file_system_state({'MyBucket/MyFile': b"Hello!\n"})
 
         with io.open("file2.txt", 'wb') as fp:
             mock_s3_client.download_fileobj(Bucket="MyBucket", Key="MyFile", Fileobj=fp)
 
-        assert local_mfs.files == {
+        # assert local_mfs.files == { ... }
+        local_mfs.assert_file_system_state({
             "file1.txt": b"Hello!\n",
             "file2.txt": b"Hello!\n",
-        }
-        assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        })
+        # assert mock_s3_client.s3_files.files == {'MyBucket/MyFile': b"Hello!\n"}
+        mock_s3_client.s3_files.assert_file_system_state({'MyBucket/MyFile': b"Hello!\n"})
 
         assert file_contents("file1.txt") == file_contents("file2.txt")
 
@@ -1378,7 +1404,7 @@ def test_object_basic_attribute_block():
         ignored(x)
 
     with pytest.raises(NotImplementedError):
-        b.initialize_storage_class('STANDARD')
+        b.set_storage_class('STANDARD')
 
     with pytest.raises(NotImplementedError):
         x = b.tagset
@@ -1405,7 +1431,7 @@ def test_object_delete_marker():
         ignored(x)
 
     with pytest.raises(Exception):
-        b.initialize_storage_class('STANDARD')
+        b.set_storage_class('STANDARD')
 
     with pytest.raises(Exception):
         x = b.tagset
@@ -1432,7 +1458,7 @@ def test_object_attribute_block():
     assert b.filename == sample_filename
     assert isinstance(b.version_id, str)
     assert b.storage_class == 'STANDARD'
-    b.initialize_storage_class('GLACIER')
+    b.set_storage_class('GLACIER')
     assert b.storage_class == 'GLACIER'
     assert b.tagset == []
     b.set_tagset(sample_tagset)
@@ -1492,7 +1518,7 @@ def test_raises_regexp():
     with pytest.raises(Exception):
         # This will fail because the inner error is a KeyError, not a RuntimeError.
         # I WISH this would raise AssertionError, but pytest lets the KeyError through.
-        # I am not sure that's the same as what unittest does in this case but it will
+        # I am not sure that's the same as what unittest does in this case, but it will
         # suffice for now. -kmp 6-Oct-2020
         with raises_regexp(RuntimeError, "This.*test!"):
             raise KeyError('This is a test!')
@@ -1974,7 +2000,8 @@ def test_timer():
 
 def show_s3_debugging_data(mfs, s3, bucket_name):
     print("file system:")
-    for file, data in mfs.files.items():
+    # for file, data in mfs.files.items():
+    for file, data in mfs.all_filenames_with_content_for_testing():
         s3_filename = f'{bucket_name}/{file}'
         all_versions = s3._object_all_versions(s3_filename)  # noQA - internal method needed for testing
         print(f" {file}[{s3._object_attribute_block(s3_filename).version_id}]:"  # noQA - ditto
@@ -2151,3 +2178,335 @@ def test_s3_list_object_versions():
             assert version3['Key'] == key2_name
             assert version3['IsLatest'] is True
             assert all(version['StorageClass'] == 'STANDARD' for version in versions)
+
+
+def test_is_abstract_content():
+
+    content = MockBigContent(size=5000)
+    assert is_abstract_content(content)
+
+
+def test_simplify_coverage():
+
+    assert simplify_coverage([[0, 0]]) == []
+    assert simplify_coverage([[100, 100]]) == []
+
+    assert simplify_coverage([[0, 100]]) == [[0, 100]]
+    assert simplify_coverage([[100, 500]]) == [[100, 500]]
+
+    assert simplify_coverage([[0, 100], [100, 200]]) == [[0, 200]]
+    assert simplify_coverage([[0, 100], [101, 200]]) == [[0, 100], [101, 200]]
+
+    assert simplify_coverage([[0, 100], [100, 101], [101, 200]]) == [[0, 200]]
+    assert simplify_coverage([[0, 100], [100, 101], [90, 200]]) == [[0, 200]]
+    assert simplify_coverage([[100, 200], [225, 250], [90, 300]]) == [[90, 300]]
+    assert simplify_coverage([[100, 200], [225, 250], [200, 227], [0, 0]]) == [[100, 250]]
+
+
+def test_add_coverage():
+    assert add_coverage([], 0, 0) == []
+    assert add_coverage([], 100, 100) == []
+
+    assert add_coverage([], 0, 100) == [[0, 100]]
+    assert add_coverage([], 100, 500) == [[100, 500]]
+
+    assert add_coverage([[0, 100]], 100, 200) == [[0, 200]]
+    assert add_coverage([[0, 100]], 101, 200) == [[0, 100], [101, 200]]
+
+    assert add_coverage([[0, 100], [100, 101]], 101, 200) == [[0, 200]]
+    assert add_coverage([[0, 100], [100, 101]], 90, 200) == [[0, 200]]
+    assert add_coverage([[100, 200], [225, 250]], 90, 300) == [[90, 300]]
+    assert add_coverage([[100, 200], [225, 250], [200, 227]], 0, 0) == [[100, 250]]
+
+
+def test_mock_big_content():
+
+    print()  # start on a fresh line
+
+    size = 5005
+    increment = 1000
+
+    content = MockBigContent(size=size)
+    assert isinstance(content._content_id, str)
+    assert content.coverage == [[0, size]]
+
+    content_copy = content.start_partial_copy()
+    assert content_copy != content
+    pos = 0
+    print(f"content={content}")
+    print(f"content_copy={content_copy}")
+    while pos < size:
+        assert content_copy != content
+        new_pos = min(pos + increment, size)
+        print(f"pos={pos} new_pos={new_pos} content_copy={content_copy}")
+        content.copy_portion(start=pos, end=new_pos, target=content_copy)
+        pos = new_pos
+    assert content_copy == content
+
+
+def test_validate_parts_complete():
+
+    content = MockBigContent(size=5000)
+    part1 = content.part_etag("bytes=1-1000")
+    part2 = content.part_etag("bytes=1001-4500")
+    part3 = content.part_etag("bytes=4501-5000")
+    MockBigContent.validate_parts_complete([part1, part3, part2])
+
+    content = MockBigContent(size=5000)
+    part1 = content.part_etag("bytes=0-1000")
+    part2 = content.part_etag("bytes=1001-4500")
+    part3 = content.part_etag("bytes=4501-4999")
+    with pytest.raises(Exception):
+        MockBigContent.validate_parts_complete([part1, part3, part2])
+
+
+def test_multipart_upload():
+
+    file1 = 'file1.txt'
+    file1_content = 'data1'
+    bucket1 = 'foo'
+    key1a = 's3_file1a.txt'
+
+    file1x = 'file1x.txt'
+    key1x = 's3_file1x.txt'
+    file1x_content = 'this is alternate date'
+    key1_prefix = 's3_file'
+
+    file2 = 'file2.txt'
+    file2_content = ''  # Empty
+    bucket2 = 'bar'
+    key2 = 's3_file2.txt'
+
+    mfs = MockFileSystem()
+    with mocked_s3utils(environments=['fourfront-mastertest']) as mock_boto3:
+        with mfs.mock_exists_open_remove():
+            assert isinstance(mock_boto3, MockBoto3)
+            s3 = mock_boto3.client('s3')
+            assert isinstance(s3, MockBotoS3Client)
+
+            def scenario(n):
+                print("=" * 50, "SCENARIO", n, "=" * 50)
+
+            # ====================
+            scenario(1)
+
+            with io.open(file1, 'w') as fp:
+                fp.write(file1_content)
+            s3.upload_file(Filename=file1, Bucket=bucket1, Key=key1a)
+            attribute_block_1 = s3._object_attribute_block(f"{bucket1}/{key1a}")
+            source_version_id_1 = attribute_block_1.version_id
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1a,
+                                                  context="After upload to S3 (scenario 1)",
+                                                  version_names={source_version_id_1: 'source_version_id_1'})
+            result = s3.create_multipart_upload(Bucket=bucket1, Key=key1a)
+            upload1_id = result['UploadId']
+            upload = MockMultiPartUpload.lookup(upload1_id)
+            assert upload.upload_id == upload1_id
+            assert upload.source is None
+            assert upload.target == {'Bucket': bucket1, 'Key': key1a, 'VersionId': None}
+            assert upload.storage_class == STANDARD
+            assert upload.tagging == []
+            assert upload.parts == []
+            assert upload.action is None
+            assert upload.is_complete is False
+            scenario1_part1_res = s3.upload_part_copy(CopySource={'Bucket': bucket1, 'Key': key1a},
+                                                      Bucket=bucket1, Key=key1a,
+                                                      PartNumber=1, CopySourceRange="bytes=1-2", UploadId=upload1_id)
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1a,
+                                                  context="After scenario 1 upload part 1",
+                                                  version_names={source_version_id_1: 'source_version_id_1'})
+            scenario1_part1_etag = scenario1_part1_res['CopyPartResult']['ETag']
+            n = len(file1_content)
+            scenario1_part1_res = s3.upload_part_copy(CopySource={'Bucket': bucket1, 'Key': key1a},
+                                                      Bucket=bucket1, Key=key1a,
+                                                      PartNumber=2, CopySourceRange=f"bytes=3-{n}", UploadId=upload1_id)
+
+            with pytest.raises(Exception):
+                # This copy is incomplete, so the attempt to complete it will fail.
+                # We need to do one more part copy before it can succeed.
+                upload_desc = {
+                    'Parts': [
+                        {'PartNumber': 1, 'ETag': scenario1_part1_etag}
+                    ]
+                }
+                s3.complete_multipart_upload(Bucket=bucket1, Key=key1a,
+                                             MultipartUpload=upload_desc, UploadId=upload1_id)
+
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1a,
+                                                  context="After scenario 1 upload part 2",
+                                                  version_names={source_version_id_1: 'source_version_id_1'})
+            scenario1_part2_etag = scenario1_part1_res['CopyPartResult']['ETag']
+            upload_desc = {
+                'Parts': [
+                    {'PartNumber': 1, 'ETag': scenario1_part1_etag},
+                    {'PartNumber': 2, 'ETag': scenario1_part2_etag}
+                ]
+            }
+            s3.complete_multipart_upload(Bucket=bucket1, Key=key1a, MultipartUpload=upload_desc, UploadId=upload1_id)
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1a, context="After scenario 1 complete",
+                                                  version_names={source_version_id_1: 'source_version_id_1'})
+
+            # ====================
+            scenario(2)
+
+            with io.open(file2, 'w') as fp:
+                fp.write(file2_content)
+            s3.upload_file(Filename=file2, Bucket=bucket2, Key=key2)
+            attribute_block_2 = s3._object_attribute_block(f"{bucket2}/{key2}")
+            source_version_id_2 = attribute_block_2.version_id
+            s3.show_object_versions_for_debugging(bucket=bucket2, prefix=key2,
+                                                  context="After upload to S3 (scenario 2)",
+                                                  version_names={source_version_id_2: 'source_version_id_2'})
+            result = s3.create_multipart_upload(Bucket=bucket2, Key=key2,
+                                                StorageClass=GLACIER,
+                                                Tagging="abc=123&xyz=something")
+            upload2_id = result['UploadId']
+            upload2 = MockMultiPartUpload.lookup(upload2_id)
+            assert upload2.upload_id == upload2_id
+            assert upload2.source is None
+            assert upload2.target == {'Bucket': bucket2, 'Key': key2, 'VersionId': None}
+            assert upload2.storage_class == GLACIER
+            assert upload2.tagging == [{'Key': 'abc', 'Value': '123'}, {'Key': 'xyz', 'Value': 'something'}]
+            assert upload2.parts == []
+            assert upload2.action is None
+            assert upload2.is_complete is False
+            scenario2_part1_res = s3.upload_part_copy(CopySource={'Bucket': bucket2, 'Key': key2},
+                                                      Bucket=bucket2, Key=key2,
+                                                      # Note here that a range of 1-0 means "no bytes", it's empty
+                                                      PartNumber=1, CopySourceRange="bytes=1-0", UploadId=upload2_id)
+            s3.show_object_versions_for_debugging(bucket=bucket2, prefix=key2, context="After scenario 2 upload part",
+                                                  version_names={source_version_id_2: 'source_version_id_2'})
+            scenario2_part1_etag = scenario2_part1_res['CopyPartResult']['ETag']
+            upload_desc = {
+                'Parts': [
+                    {'PartNumber': 1, 'ETag': scenario2_part1_etag}
+                ]
+            }
+            s3.complete_multipart_upload(Bucket=bucket2, Key=key2, MultipartUpload=upload_desc, UploadId=upload2_id)
+            s3.show_object_versions_for_debugging(bucket=bucket2, prefix=key2, context="After scenario 2 complete",
+                                                  version_names={source_version_id_2: 'source_version_id_2'})
+
+            # ====================
+            scenario(3)
+
+            with io.open(file1x, 'w') as fp:
+                fp.write(file1x_content)
+            s3.upload_file(Filename=file1x, Bucket=bucket1, Key=key1x)
+            attribute_block_1x = s3._object_attribute_block(f"{bucket1}/{key1x}")
+            source_version_id_1x = attribute_block_1x.version_id
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1_prefix,
+                                                  context="After upload to S3 (scenario 3)",
+                                                  version_names={
+                                                      source_version_id_1: 'source_version_id_1',
+                                                      source_version_id_1x: 'source_version_id_1x'
+                                                  })
+            result = s3.create_multipart_upload(Bucket=bucket1, Key=key1x)
+            upload1x_id = result['UploadId']
+            upload = MockMultiPartUpload.lookup(upload1x_id)
+            assert upload.upload_id == upload1x_id
+            assert upload.source is None
+            assert upload.target == {'Bucket': bucket1, 'Key': key1x, 'VersionId': None}
+            assert upload.storage_class == STANDARD
+            assert upload.tagging == []
+            assert upload.parts == []
+            assert upload.action is None
+            assert upload.is_complete is False
+            scenario1x_part1_res = s3.upload_part_copy(CopySource={'Bucket': bucket1, 'Key': key1a,
+                                                                   'VersionId': source_version_id_1},
+                                                       Bucket=bucket1, Key=key1x,
+                                                       PartNumber=1, CopySourceRange="bytes=1-2", UploadId=upload1x_id)
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1_prefix,
+                                                  context="After scenario 3 upload part 1",
+                                                  version_names={
+                                                      source_version_id_1: 'source_version_id_1',
+                                                      source_version_id_1x: 'source_version_id_1x'
+                                                  })
+            scenario1x_part1_etag = scenario1x_part1_res['CopyPartResult']['ETag']
+            n = len(file1_content)
+            scenario1x_part1_res = s3.upload_part_copy(CopySource={'Bucket': bucket1, 'Key': key1a,
+                                                                   'VersionId': source_version_id_1},
+                                                       Bucket=bucket1, Key=key1x,
+                                                       PartNumber=2, CopySourceRange=f"bytes=3-{n}",
+                                                       UploadId=upload1x_id)
+
+            with pytest.raises(Exception):
+                # This copy is incomplete, so the attempt to complete it will fail.
+                # We need to do one more part copy before it can succeed.
+                upload_desc = {
+                    'Parts': [
+                        {'PartNumber': 1, 'ETag': scenario1x_part1_etag}
+                    ]
+                }
+                s3.complete_multipart_upload(Bucket=bucket1, Key=key1x,
+                                             MultipartUpload=upload_desc, UploadId=upload1x_id)
+
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1_prefix,
+                                                  context="After scenario 3 upload part 2",
+                                                  version_names={
+                                                      source_version_id_1: 'source_version_id_1',
+                                                      source_version_id_1x: 'source_version_id_1x'
+                                                  })
+            scenario1x_part2_etag = scenario1x_part1_res['CopyPartResult']['ETag']
+            upload_desc = {
+                'Parts': [
+                    {'PartNumber': 1, 'ETag': scenario1x_part1_etag},
+                    {'PartNumber': 2, 'ETag': scenario1x_part2_etag}
+                ]
+            }
+            s3.complete_multipart_upload(Bucket=bucket1, Key=key1x, MultipartUpload=upload_desc, UploadId=upload1x_id)
+            s3.show_object_versions_for_debugging(bucket=bucket1, prefix=key1_prefix,
+                                                  context="After scenario 3 complete",
+                                                  version_names={
+                                                      source_version_id_1: 'source_version_id_1',
+                                                      source_version_id_1x: 'source_version_id_1x'
+                                                  })
+
+            # ====================
+            scenario(4)
+
+            KB = 1000
+            MB = KB * KB
+
+            source_4_key = 'key_in'
+            target_4_key = 'key_out'
+            prefix_4 = 'key_'
+            size_4 = 120 * MB
+            incr_4 = 25 * MB
+
+            source_version_id_4 = s3.create_big_file(Bucket=bucket1, Key=source_4_key, size=120 * MB).version_id
+
+            def show_progress(context):
+                s3.show_object_versions_for_debugging(bucket=bucket1, prefix=prefix_4, context=context,
+                                                      version_names={source_version_id_4: 'source_version_id_4'})
+            show_progress("After creating mock big file (scenario 4)")
+            result_4 = s3.create_multipart_upload(Bucket=bucket1, Key=target_4_key)
+            upload_id_4 = result_4['UploadId']
+            upload_4 = MockMultiPartUpload.lookup(upload_id_4)
+            assert upload_4.upload_id == upload_id_4
+            assert upload_4.source is None
+            assert upload_4.target == {'Bucket': bucket1, 'Key': target_4_key, 'VersionId': None}
+            assert upload_4.storage_class == STANDARD
+            assert upload_4.tagging == []
+            assert upload_4.parts == []
+            assert upload_4.action is None
+            assert upload_4.is_complete is False
+            i = 0
+            n = 0
+            parts = []
+            while n < size_4:
+                i = i + 1
+                part_size = min(incr_4, size_4 - n)
+                range_spec = f"bytes={n + 1}-{n + part_size}"
+                part_res = s3.upload_part_copy(CopySource={'Bucket': bucket1, 'Key': source_4_key},
+                                               Bucket=bucket1, Key=target_4_key,
+                                               PartNumber=i, CopySourceRange=range_spec,
+                                               UploadId=upload_id_4)
+                show_progress(f"After scenario 4 upload part {i}")
+                part_etag = part_res['CopyPartResult']['ETag']
+                parts.append({'PartNumber': i, 'ETag': part_etag})
+                n = n + incr_4
+            upload_desc = {'Parts': parts}
+            s3.complete_multipart_upload(Bucket=bucket1, Key=target_4_key,
+                                         MultipartUpload=upload_desc, UploadId=upload_id_4)
+            show_progress("After scenario 4 complete")
+            assert upload_4.is_complete

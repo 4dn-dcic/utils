@@ -1,12 +1,22 @@
 import os
 
-from typing import Dict, Union, Tuple, List, Any
+from typing import (
+    Any, Dict, List, Optional, Tuple, Union,
+    # Notes on use of Final and TypedDict available at:  https://peps.python.org/pep-0589/
+    # TODO: Available in Python 3.8 (i.e., when we drop Python 3.7 support)
+    # Final, TypedDict,
+)
 from typing_extensions import Literal
 
 
 # ===== Useful constants =====
 
 REGION = 'us-east-1'
+
+# TODO: Available in Python 3.8 (i.e., when we drop Python 3.7 support)
+#
+# APP_CGAP: Final = 'cgap'
+# APP_FOURFRONT: Final = 'fourfront'
 
 APP_CGAP = 'cgap'
 APP_FOURFRONT = 'fourfront'
@@ -17,6 +27,11 @@ LEGACY_CGAP_GLOBAL_ENV_BUCKET = 'foursight-cgap-envs'
 DEFAULT_ECOSYSTEM = 'main'
 
 ORCHESTRATED_APPS = [APP_CGAP, APP_FOURFRONT]
+
+# TODO: Available in Python 3.8 (i.e., when we drop Python 3.7 support)
+#
+# CHALICE_STAGE_DEV: Final = 'dev'
+# CHALICE_STAGE_PROD: Final = 'prod'
 
 CHALICE_STAGE_DEV = 'dev'
 CHALICE_STAGE_PROD = 'prod'
@@ -30,7 +45,14 @@ EnvName = str
 # Nicknames for enumerated sets of symbols. Note that these values must be syntactic literals,
 # so they can't use the variables defined above.
 
+# TODO: Available in Python 3.8 (i.e., when we drop Python 3.7 support)
+# ChaliceStage = Literal[CHALICE_STAGE_DEV, CHALICE_STAGE_PROD]
+
 ChaliceStage = Literal['dev', 'prod']
+
+# TODO: Available in Python 3.8 (i.e., when we drop Python 3.7 support)
+# OrchestratedApp = Literal[APP_CGAP, APP_FOURFRONT]
+
 OrchestratedApp = Literal['cgap', 'fourfront']
 
 LIBRARY_DIR = os.path.dirname(__file__)
@@ -39,8 +61,24 @@ LIBRARY_DIR = os.path.dirname(__file__)
 
 AuthStr = str
 
+
+# TODO: Available in Python 3.8 (i.e., when we drop Python 3.7 support)
+# class SimpleAuthDict(TypedDict):
+#     key: str
+#     secret: str
+
 SimpleAuthDict = Dict[Literal['key', 'secret'], str]
+
+
+# TODO: Available in Python 3.8 (i.e., when we drop Python 3.7 support)
+# class ServerAuthDict(TypedDict):
+#     key: str
+#     secret: str
+#     server: str
+
 ServerAuthDict = Dict[Literal['key', 'secret', 'server'], str]
+
+
 AuthDict = Union[SimpleAuthDict, ServerAuthDict]
 
 LegacyAuthDict = Dict[Literal['default'], AuthDict]
@@ -54,6 +92,12 @@ AnyAuthData = Union[LegacyAuthDict, AuthData]
 # ===== JSON Data =====
 
 AnyJsonData = Union[Dict[str, 'AnyJsonData'], List['AnyJsonData'], str, bool, int, float, None]
+
+
+# TODO: Available in Python 3.8 (i.e., when we drop Python 3.7 support)
+# class KeyValueDict(TypedDict):
+#     Key: str
+#     Value: Any
 
 KeyValueDict = Dict[Literal['Key', 'Value'], Any]
 KeyValueDictList = List[KeyValueDict]
@@ -80,6 +124,18 @@ PortalEnvName = str
 # isn't related to the storage class. In practice that's the two standard storage classes
 # plus the intelligent tiering.  Most of the others have a latency issue or are otherwise
 # fragile. In practice, we just want to not overly warn about normal kinds of storage.
+
+# Commonly used storage classes
+STANDARD = 'STANDARD'
+REDUCED_REDUNDANCY = 'REDUCED_REDUNDANCY'
+STANDARD_IA = 'STANDARD_IA'
+ONEZONE_IA = 'ONEZONE_IA'
+INTELLIGENT_TIERING = 'INTELLIGENT_TIERING'
+GLACIER = 'GLACIER'
+DEEP_ARCHIVE = 'DEEP_ARCHIVE'
+OUTPOSTS = 'OUTPOSTS'
+GLACIER_IR = 'GLACIER_IR'
+
 
 ALL_S3_STORAGE_CLASSES = [
     'STANDARD', 'REDUCED_REDUNDANCY', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING',
@@ -115,6 +171,16 @@ S3StorageClass = Union[
     Literal['OUTPOSTS'],
     Literal['GLACIER_IR'],
 ]
+
+
+# TODO: Available in Python 3.8 (i.e., when we drop Python 3.7 support)
+# class S3ObjectNameSpec(TypedDict):
+#     Bucket: str
+#     Key: str
+#     VersionId: Optional[str]
+
+S3ObjectNameDict = Dict[Literal['Bucket', 'Key', 'VersionId'], Optional[str]]
+S3ObjectNameSpec = Union[str, S3ObjectNameDict]
 
 
 # This constant is used in our Lifecycle management system to automatically transition objects

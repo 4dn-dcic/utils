@@ -3,9 +3,10 @@ import pytest
 
 from unittest import mock
 
+from dcicutils.common import STANDARD, STANDARD_IA, DEEP_ARCHIVE, GLACIER, GLACIER_IR
 from dcicutils.ff_mocks import mocked_s3utils
 from dcicutils.glacier_utils import GlacierUtils, GlacierRestoreException
-from dcicutils.qa_utils import MockFileSystem
+from dcicutils.qa_utils import MockFileSystem, MockBotoS3Client
 
 
 def mock_keydict() -> dict:
@@ -193,7 +194,7 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD',
+                    'StorageClass': STANDARD,
                     'LastModified': '2023'
                 },
                 {
@@ -202,7 +203,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER',
+                    'StorageClass': GLACIER,
                     'LastModified': '2023'
                 }
             ],
@@ -217,7 +218,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER',
+                    'StorageClass': GLACIER,
                     'LastModified': '2023'
                 }
             ],
@@ -232,7 +233,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER_IR',
+                    'StorageClass': GLACIER_IR,
                     'LastModified': '2023'
                 }
             ],
@@ -247,7 +248,7 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD',
+                    'StorageClass': STANDARD,
                     'LastModified': '2023'
                 },
                 {
@@ -256,7 +257,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'DEEP_ARCHIVE',
+                    'StorageClass': DEEP_ARCHIVE,
                     'LastModified': '2023'
                 }
             ],
@@ -283,7 +284,7 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD',
+                    'StorageClass': STANDARD,
                     'LastModified': '2023'
                 },
                 {
@@ -292,7 +293,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER',
+                    'StorageClass': GLACIER,
                     'LastModified': '2023'
                 }
             ],
@@ -307,7 +308,7 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD',
+                    'StorageClass': STANDARD,
                     'LastModified': '2023'
                 },
                 {
@@ -316,7 +317,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER_IR',
+                    'StorageClass': GLACIER_IR,
                     'LastModified': '2023'
                 }
             ],
@@ -331,7 +332,7 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD_IA',
+                    'StorageClass': STANDARD_IA,
                     'LastModified': '2023'
                 }
             ],
@@ -355,7 +356,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'GLACIER',
+                    'StorageClass': GLACIER,
                     'LastModified': '2023'
                 }
             ],
@@ -370,7 +371,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'DEEP_ARCHIVE',
+                    'StorageClass': DEEP_ARCHIVE,
                     'LastModified': '2023'
                 }
             ],
@@ -394,7 +395,7 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD',
+                    'StorageClass': STANDARD,
                     'LastModified': '2023'
                 },
                 {
@@ -403,7 +404,7 @@ class TestGlacierUtils:
                     'IsLatest': False,
                     'ETag': '"def456"',
                     'Size': 2048,
-                    'StorageClass': 'STANDARD',
+                    'StorageClass': STANDARD,
                     'LastModified': '2023'
                 }
             ],
@@ -418,7 +419,7 @@ class TestGlacierUtils:
                     'IsLatest': True,
                     'ETag': '"abc123"',
                     'Size': 1024,
-                    'StorageClass': 'STANDARD',
+                    'StorageClass': STANDARD,
                     'LastModified': '2023'
                 },
             ],
@@ -519,21 +520,32 @@ class TestGlacierUtils:
         with mocked_s3utils(environments=['fourfront-mastertest']) as mock_boto3:
             with mfs.mock_exists_open_remove():
                 s3 = mock_boto3.client('s3')
+                assert isinstance(s3, MockBotoS3Client)
                 with mock.patch.object(gu, 's3', s3):
                     bucket_name = 'foo'
                     key_name = 'file.txt'
                     key2_name = 'file2.txt'
+                    s3_filename2 = f"{bucket_name}/{key2_name}"
                     with io.open(key_name, 'w') as fp:
                         fp.write("first contents")
                     s3.upload_file(key_name, Bucket=bucket_name, Key=key_name)
                     with io.open(key2_name, 'w') as fp:
                         fp.write("second contents")
-                    s3.upload_file(key2_name, Bucket=bucket_name, Key=key2_name)
+                    s3.upload_file(key2_name, Bucket=bucket_name, Key=key2_name, ExtraArgs={'StorageClass': GLACIER})
                     with io.open(key2_name, 'w') as fp:  # add a second version
                         fp.write("second contents 2")
                     s3.upload_file(key2_name, Bucket=bucket_name, Key=key2_name)
                     versions = s3.list_object_versions(Bucket=bucket_name, Prefix=key2_name)
-                    version_1 = versions['Versions'][0]['VersionId']
-                    assert gu.restore_s3_from_glacier(bucket_name, key2_name, version_id=version_1)
-                    assert gu.copy_object_back_to_original_location(bucket_name, key2_name, version_id=version_1,
+                    version_1 = versions['Versions'][0]
+                    version_1_id = version_1['VersionId']
+                    version_names = {version_1_id: 'version_1'}
+                    s3.show_object_versions_for_debugging(bucket=bucket_name, prefix=key2_name,
+                                                          context="BEFORE RESTORE", version_names=version_names)
+                    assert gu.restore_s3_from_glacier(bucket_name, key2_name, version_id=version_1_id)
+                    s3.show_object_versions_for_debugging(bucket=bucket_name, prefix=key2_name,
+                                                          context="AFTER RESTORE", version_names=version_names)
+                    s3.hurry_restoration_for_testing(s3_filename=s3_filename2, version_id=version_1_id)
+                    assert gu.copy_object_back_to_original_location(bucket_name, key2_name, version_id=version_1_id,
                                                                     preserve_lifecycle_tag=True)
+                    s3.show_object_versions_for_debugging(bucket=bucket_name, prefix=key2_name,
+                                                          context="FINAL STATE", version_names=version_names)

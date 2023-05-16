@@ -179,7 +179,8 @@ def test_fix_for_jira_ticket_c4_278():
                 input_filename = 'test1.fastq.gz'
                 generated_filename = generate_sample_fastq_file(input_filename, num=20, length=25, compressed=True)
                 assert generated_filename == input_filename  # The bug was that it generated a different name
-                assert mfs.files.get(generated_filename) == expected_content_1
+                assert mfs.get_file_content_for_testing(generated_filename) == expected_content_1
+                # assert mfs.files.get(generated_filename) == expected_content_1
 
                 # The bug report specifies that this gives a wrong result, too,
                 with pytest.raises(RuntimeError):

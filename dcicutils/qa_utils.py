@@ -10,6 +10,7 @@ import dateutil.tz as dateutil_tz
 import functools
 import hashlib
 import io
+import json
 import logging
 import os
 import pytest
@@ -24,17 +25,21 @@ from botocore.credentials import Credentials as Boto3Credentials
 from botocore.exceptions import ClientError
 from collections import defaultdict
 from json import dumps as json_dumps, loads as json_loads
-from typing import Any, Optional, List, DefaultDict, Union, Type, Dict
+from typing import Any, DefaultDict, Dict, Iterable, List, Optional, Type, Union
 from typing_extensions import Literal
 from unittest import mock
+from urllib.parse import parse_qsl
 from . import misc_utils as misc_utils_module, command_utils as command_utils_module
-from .common import S3StorageClass
+from .bucket_utils import parse_s3_object_name
+from .common import (
+    S3StorageClass, S3ObjectNameDict, S3ObjectNameSpec, STANDARD, KeyValuestringDictList, KeyValuestringDict,
+)
 from .env_utils import short_env_name
 from .exceptions import ExpectedErrorNotSeen, WrongErrorSeen, UnexpectedErrorAfterFix, WrongErrorSeenAfterFix
 from .glacier_utils import GlacierUtils
 from .lang_utils import there_are
 from .misc_utils import (
-    PRINT, INPUT, ignored, Retry, remove_prefix, REF_TZ, builtin_print,
+    PRINT, INPUT, ignorable, ignored, Retry, remove_prefix, REF_TZ, builtin_print, make_counter,
     environ_bool, exported, override_environ, override_dict, local_attrs, full_class_name,
     find_associations, get_error_message, remove_suffix, format_in_radix, future_datetime,
     _mockable_input,  # noQA - need this to keep mocking consistent
@@ -45,6 +50,13 @@ from .qa_checkers import QA_EXCEPTION_PATTERN, find_uses, confirm_no_uses, Versi
 # Using these names via qa_utils is deprecated. Their proper, supported home is now in qa_checkers.
 # Please rewrite imports to get them from qa_checkers, not qa_utils. -kmp 21-Sep-2022
 exported(QA_EXCEPTION_PATTERN, find_uses, confirm_no_uses, VersionChecker, ChangeLogChecker)
+
+
+def make_unique_token(monotonic=False):  # effectively a guid but for things that don't promise specifically a guid
+    if monotonic:
+        return format_in_radix(time.time_ns(), radix=36)
+    else:
+        return str(uuid.uuid4()).replace('-', '.').lower()
 
 
 def show_elapsed_time(start, end):
@@ -412,24 +424,247 @@ class MockFileWriter:
             file_system.prepare_for_overwrite(self.file)
         if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
             PRINT(f"Writing {content!r} to {self.file}.")
-        file_system.files[self.file] = content if isinstance(content, bytes) else content.encode(self.encoding)
+        file_system.set_file_content_for_testing(self.file,
+                                                 (content
+                                                  if isinstance(content, bytes)
+                                                  else content.encode(self.encoding)))
+        # file_system.files[self.file] = content if isinstance(content, bytes) else content.encode(self.encoding)
+
+
+class MockAbstractContent:
+    pass
+
+
+class MockPartableContent(MockAbstractContent):
+
+    @classmethod
+    def start_cloning_from(cls, content):
+        if isinstance(content, bytes):
+            return MockPartableBytes(content_to_copy=content, empty=True)
+        elif isinstance(content, MockBigContent):
+            return content.start_cloning()
+        else:
+            raise ValueError(f"No method defined for cloning: {content!r}")
+
+    ID_COUNTER = make_counter()
+    CONTENT_ID_SIZE = {}
+
+    def __init__(self, size, empty=False, content_id=None):
+        self.size = size
+        content_id = content_id or str(self.new_counter_id())
+        declared_size = self.CONTENT_ID_SIZE.get(content_id)
+        if declared_size is not None and declared_size != size:
+            # This is just a consistency check.
+            raise RuntimeError(f"The MockPartableContent id {content_id} (size={size!r})"
+                               f" is already taken with a different size, {declared_size!r}.")
+
+        self.CONTENT_ID_SIZE[content_id] = size
+        self._content_id = content_id
+        self.coverage = [[0, 0]] if empty else [[0, size]]
+
+    @classmethod
+    def new_counter_id(cls):
+        return cls.ID_COUNTER()
+
+    def __str__(self):
+        if self.coverage == [[0, self.size]]:
+            return f"<{self.__class__.__name__} content_id={self._content_id} size={self.size}>"
+        else:
+            return f"<{self.__class__.__name__} content_id={self._content_id} coverage={self.coverage}>"
+
+    def __repr__(self):
+        if self.coverage == [[0, self.size]]:
+            return f"{full_class_name(self)}(content_id={self._content_id}, size={self.size})"
+        else:
+            return f"<{full_class_name(self)} content_id={self._content_id} coverage={self.coverage}>"
+
+    def __eq__(self, other):
+        if not isinstance(other, MockBigContent):
+            return False
+        return self.coverage == other.coverage and self._content_id == other._content_id
+
+    ETAG_PREFIX = "etag."
+    BYTES_PATTERN_STRING = f"bytes=([0-9]+)-(-?[0-9]+)"
+    BYTES_PATTERN = re.compile(BYTES_PATTERN_STRING)
+
+    @property
+    def etag(self):
+        return f"{self.ETAG_PREFIX}{self._content_id}"
+
+    def part_etag(self, range_spec):
+        match = self.BYTES_PATTERN.match(range_spec)
+        if not match:
+            raise ValueError(f"{range_spec} does not match pattern {self.BYTES_PATTERN_STRING}")
+        lower_inclusive, upper_inclusive = match.groups()
+        lower_inclusive = int(lower_inclusive) - 1
+        upper_exclusive = int(upper_inclusive)
+        result = f"{self.ETAG_PREFIX}{self._content_id}.{lower_inclusive}.{upper_exclusive}"
+        if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
+            print(f"Issuing part_etag {result} for {self} range_spec {range_spec}")
+        return result
+
+    @classmethod
+    def part_etag_byte_range(cls, spec: str) -> [int, int]:
+        lower_inclusive, upper_exclusive = spec.split('.')[2:]
+        return [int(lower_inclusive), int(upper_exclusive)]
+
+    @classmethod
+    def part_etag_parent_id(cls, spec: str) -> str:
+        return spec.split('.')[1]
+
+    @classmethod
+    def validate_parts_complete(cls, parts_etags: List[str]):
+        assert parts_etags, f"There must be at least one part: {parts_etags}"
+        parent_ids = list(map(cls.part_etag_parent_id, parts_etags))
+        parts_parent_id = parent_ids[0]
+        parts_parent_size = cls.CONTENT_ID_SIZE[parts_parent_id]
+        assert parts_parent_size is not None, f"Bookkeeping error. No source size for content_id {parts_parent_id}."
+        assert all(parts_parent_id == parent_id for parent_id in parent_ids[1:]), (
+            f"Some parts came from unrelated uploads: {parts_etags}")
+        coverage = simplify_coverage(list(map(cls.part_etag_byte_range, parts_etags))) or [[0, 0]]
+        assert len(coverage) == 1, f"Parts did not resolve: {coverage}"
+        [[lo, hi]] = coverage
+        assert lo == 0, "Parts do not start from 0."
+        assert parts_parent_size == hi, f"Coverage is {coverage} but expected size was {parts_parent_size}"
+
+    @classmethod
+    def part_etag_range(cls, part_etag):
+        start, end = part_etag.split('.')[2:]
+        return [start, end]
+
+    def start_partial_copy(self):
+        return self.__class__(size=self.size, empty=True, content_id=self._content_id)
+
+    def copy_portion(self, start, end, target):
+        if not isinstance(target, MockBigContent):  # or self._content_id != target._content_id:
+            raise Exception(f"You cannot copy part of {self} into {target}.")
+        target.coverage = add_coverage(coverage=target.coverage, start=start, end=end)
+
+    def copied_content(self):
+        raise NotImplementedError("Method copied_content must be customized in subclasses of MockPartableContent.")
+
+
+class MockPartableBytes(MockPartableContent):
+
+    def __init__(self, content_to_copy, empty=False):
+        size = len(content_to_copy)
+        super().__init__(size=size, empty=empty)
+        self.byte_string = content_to_copy
+
+    def copied_content(self):
+        return self.byte_string
+
+
+class MockBigContent(MockPartableContent):
+
+    def start_cloning(self):
+        return MockBigContent(size=self.size, empty=True, content_id=self._content_id)
+
+    def copied_content(self):
+        return self
+
+
+IntPair = List[int]  # it's a list of ints, but for now we know no way to type hint a list of exactly 2 integers
+
+
+# I'm not sure we need this function. We're doing this a different way. -kmp 15-May-2023
+def add_coverage(coverage: List[IntPair], start: int, end: int):
+    return simplify_coverage(coverage + [[start, end]])
+
+
+def simplify_coverage(coverage: Iterable[IntPair]) -> List[IntPair]:
+    current = [0, 0]
+    result = []
+    for item in sorted(coverage):
+        [s, e] = item
+        if e < s:
+            raise ValueError(f"Consistency problem: {item} is out of order.")
+        elif s > current[1]:
+            if current[0] != current[1]:
+                result.append(current)
+            current = [s, e]
+        elif e > current[1]:
+            current[1] = e
+    if current[0] != current[1]:
+        result.append(current)
+    return result
+
+
+def is_abstract_content(content):
+    return isinstance(content, MockAbstractContent)
 
 
 class MockFileSystem:
     """Extremely low-tech mock file system."""
 
     def __init__(self, files=None, default_encoding='utf-8', auto_mirror_files_for_read=False, do_not_auto_mirror=()):
+        files = files or {}
         self.default_encoding = default_encoding
         # Setting this dynamically will make things inconsistent
         self._auto_mirror_files_for_read = auto_mirror_files_for_read
         self._do_not_auto_mirror = set(do_not_auto_mirror or [])
-        self.files = {filename: content.encode(default_encoding) for filename, content in (files or {}).items()}
-        for filename in self.files:
+        # self.files = {filename: content.encode(default_encoding) for filename, content in (files or {}).items()}
+        for filename in files:
             self._do_not_mirror(filename)
+        self.files = {}
+        for filename, content in files.items():
+            self.set_file_content_for_testing(filename, content.encode(default_encoding))
 
     IO_OPEN = staticmethod(io.open)
     OS_PATH_EXISTS = staticmethod(os.path.exists)
     OS_REMOVE = staticmethod(os.remove)
+
+    def assert_file_count(self, n):
+        assert len(self.files) == n
+
+    def _set_file_content_for_testing(self, filename, content):
+        # This is subprimitive to set_file_content_for_testing or others that need to do auxiliary actions as well.
+        self.files[filename] = content
+
+    def set_file_content_for_testing(self, filename, content):
+        # We might at some future point want to consider whether callers of this function should
+        # see auto-mirroring or versioning.
+        self._set_file_content_for_testing(filename, content)
+
+    def restore_file_content_for_testing(self, filename, content):
+        # This interface is for things like undelete and restore that are restoring prior state and don't want to
+        # get caught up in mirroring or versioning. In the future, this might need information about versioning
+        # that needs to be threaded together. -kmp 26-Apr-2023
+        self._set_file_content_for_testing(filename, content)
+
+    def initialize_file_entry_testing(self, filename):
+        # This interface is for things like undelete and restore that are restoring prior state and don't want to
+        # get caught up in mirroring or versioning. In the future, this might need information about versioning
+        # that needs to be threaded together. -kmp 26-Apr-2023
+        self._set_file_content_for_testing(filename, None)
+
+    def remove_file_entry_for_testing(self, filename):
+        # This interface is for things like undelete and restore that are restoring prior state and don't want to
+        # get caught up in mirroring or versioning. In the future, this might need information about versioning
+        # that needs to be threaded together. -kmp 26-Apr-2023
+        del self.files[filename]
+
+    def get_file_content_for_testing(self, filename, required=False):
+        content = self.files.get(filename)
+        if required and content is None:
+            raise Exception(f"Mocked file not found: {filename}")
+        elif is_abstract_content(content):
+            raise Exception(f"Mock for file {filename} cannot be opened for specific content: {content}")
+        return content
+
+    def assert_file_content(self, filename, expected_content):
+        assert filename in self.files, f"Mock file {filename} not found in {self}."
+        actual_content = self.files[filename]
+        assert actual_content == expected_content, (
+            f"Mock file {filename} does not have the expected content."
+            f" Actual={actual_content} Expected={expected_content}"
+        )
+
+    def assert_file_system_state(self, expected_file_dictionary):
+        actual_files = self.files
+        assert self.files == expected_file_dictionary, (
+            f"Mock file system not in expected state. Actual={actual_files} Expected={expected_file_dictionary}"
+        )
 
     def _do_not_mirror(self, file):
         if self._auto_mirror_files_for_read:
@@ -440,9 +675,10 @@ class MockFileSystem:
             if file not in self._do_not_auto_mirror:
                 if (self.OS_PATH_EXISTS(file)
                         # file might be in files if someone has been manipulating the file structure directly
-                        and file not in self.files):
+                        and not self._file_is_mocked(file)):  # file not in self.files
                     with open(file, 'rb') as fp:
-                        self.files[file] = fp.read()
+                        self.set_file_content_for_testing(file, fp.read())
+                        # self.files[file] = fp.read()
                 self._do_not_mirror(file)
 
     def prepare_for_overwrite(self, file):
@@ -451,12 +687,25 @@ class MockFileSystem:
 
     def exists(self, file):
         self._maybe_auto_mirror_file(file)
+        # return self.files.get(file) is not None  # don't want an empty file to pass for missing
+        return self._file_is_mocked(file)
+
+    def _file_is_mocked(self, file):
+        """
+        This checks the state of the file now, independent of auto-mirroring.
+        """
         return self.files.get(file) is not None  # don't want an empty file to pass for missing
 
     def remove(self, file):
         self._maybe_auto_mirror_file(file)
         if self.files.pop(file, None) is None:
             raise FileNotFoundError("No such file or directory: %s" % file)
+
+    def all_filenames_for_testing(self):
+        return sorted(self.files.keys())
+
+    def all_filenames_with_content_for_testing(self):
+        return self.files.items()
 
     def open(self, file, mode='r', encoding=None):
         if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
@@ -474,7 +723,8 @@ class MockFileSystem:
 
     def _open_for_read(self, file, binary=False, encoding=None):
         self._maybe_auto_mirror_file(file)
-        content = self.files.get(file)
+        content = self.get_file_content_for_testing(file)
+        # content = self.files.get(file)
         if content is None:
             raise FileNotFoundError("No such file or directory: %s" % file)
         if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
@@ -677,7 +927,7 @@ class _PrintCapturer:
         texts = remove_suffix('\n', text).split('\n')
         last_text = texts[-1]
         result = wrapped_action(text, **kwargs)  # noQA - This call to print is low-level implementation
-        # This only captures non-file output output.
+        # This only captures non-file output.
         file = kwargs.get('file')
         if file is None:
             file = sys.stdout
@@ -810,7 +1060,7 @@ class MockBoto3Session:
         self._aws_secret_access_key = kwargs.get("aws_secret_access_key")
         self._aws_region = region_name
 
-        # These is specific for testing.
+        # This is specific to testing.
         self._aws_credentials_dir = None
 
     # FYI: Some things to note about how boto3 (and probably any AWS client) reads AWS credentials/region.
@@ -872,7 +1122,7 @@ class MockBoto3Session:
         self._aws_secret_access_key = aws_secret_access_key
         self._aws_region = region_name
 
-        # These is specific for testing.
+        # This is specific to testing.
         self._aws_credentials_dir = aws_credentials_dir
 
     @staticmethod
@@ -2021,9 +2271,11 @@ class MockTemporaryRestoration:
 
     def hurry_restoration(self):
         self._available_after = datetime.datetime.now()
+        PRINT(f"The restoration availability of {self} has been hurried.")
 
     def hurry_restoration_expiry(self):
         self._available_until = datetime.datetime.now()
+        PRINT(f"The restoration expiry of {self} has been hurried.")
 
 
 class MockObjectBasicAttributeBlock:
@@ -2047,18 +2299,15 @@ class MockObjectBasicAttributeBlock:
 
     @classmethod
     def _generate_version_id(cls):
-        if cls.MONTONIC_VERSIONS:
-            return format_in_radix(time.time_ns(), radix=36)
-        else:
-            return str(uuid.uuid4()).replace('-', '.').lower()
+        return make_unique_token(monotonic=cls.MONTONIC_VERSIONS)
 
     @property
     def storage_class(self) -> S3StorageClass:
         raise NotImplementedError(f"The method 'storage_class' is expected to be implemented"
                                   f" in subclasses of MockObjectBasicAttributeBlock: {self}")
 
-    def initialize_storage_class(self, value: S3StorageClass):
-        raise NotImplementedError(f"The method 'initialize_storage_class' is expected to be implemented"
+    def set_storage_class(self, value: S3StorageClass):
+        raise NotImplementedError(f"The method 'set_storage_class' is expected to be implemented"
                                   f" in subclasses of MockObjectBasicAttributeBlock: {self}")
 
     @property
@@ -2083,7 +2332,7 @@ class MockObjectDeleteMarker(MockObjectBasicAttributeBlock):
     def storage_class(self) -> S3StorageClass:
         raise Exception(f"Attempt to find storage class for mock-deleted S3 filename {self.filename}")
 
-    def initialize_storage_class(self, value: S3StorageClass):
+    def set_storage_class(self, value: S3StorageClass):
         raise Exception(f"Attempt to initialize storage class for mock-deleted S3 filename {self.filename}")
 
     @property
@@ -2126,13 +2375,19 @@ class MockObjectAttributeBlock(MockObjectBasicAttributeBlock):
         restoration = self.restoration
         return restoration.storage_class if restoration else self._storage_class
 
-    def initialize_storage_class(self, value):
-        if self.restoration:
-            # It's ambiguous what is intended, but also this interface is really intended only for initialization
-            # and should not be used in the middle of a mock operation. The storage class is not dynamically mutable.
-            # You need to use the mock operations to make new versions with the right storage class after that.
-            raise Exception("Tried to set storage class in an attribute block"
-                            " while a temporary restoration is ongoing.")
+    DISCARD_RESTORATIONS_ON_STORAGE_OVERWRITE = True
+
+    def set_storage_class(self, value):
+        restoration = self.restoration
+        if restoration and self._storage_class != value:
+            if self.DISCARD_RESTORATIONS_ON_STORAGE_OVERWRITE:
+                PRINT(f"Storage class changed in attribute block {self} while a temporary restoration is ongoing.")
+                PRINT(f"The temporary block {restoration} will be discarded.")
+                self.restoration.hurry_restoration()
+                self.restoration.hurry_restoration_expiry()
+            else:
+                raise Exception("Tried to set storage class in an attribute block"
+                                " while a temporary restoration is ongoing.")
         self._storage_class = value
 
     _RESTORATION_LOCK = threading.Lock()
@@ -2176,6 +2431,126 @@ class MockObjectAttributeBlock(MockObjectBasicAttributeBlock):
                                                          storage_class=storage_class)
 
 
+class MockMultiPartUpload:
+
+    STATE_LOCK = threading.Lock()
+
+    ALL_UPLOADS = {}
+
+    def __init__(self, *, s3, bucket: str, key: str, storage_class: S3StorageClass = STANDARD,
+                 version_id: Optional[str] = None, tagging: Optional[KeyValuestringDictList] = None):
+        self.initiated = datetime.datetime.now()
+        self.s3 = s3
+        self.upload_id = upload_id = make_unique_token(monotonic=True)
+        self.parts = []
+        # .source is set and .target is reset later (since target might acquire a VersionId)
+        self.source: Optional[S3ObjectNameDict] = None  # initialized on first part upload
+        self.target: S3ObjectNameDict = {  # re-initialized on first part upload
+            'Bucket': bucket,
+            'Key': key,
+            'VersionId': version_id  # the version_id isn't actually known until first part upload
+        }
+        self.source_attribute_block: Optional[MockObjectAttributeBlock] = None  # initialized on first part upload
+        self._data: Optional[MockPartableContent] = None  # initialized on first part upload
+        self.storage_class = storage_class
+        self.tagging = tagging or []
+        self.action: Optional[callable] = None
+        self.ALL_UPLOADS[upload_id]: MockMultiPartUpload = self
+        self.is_complete = False
+
+    @property
+    def data(self):
+        data = self._data
+        if data is None:
+            raise ValueError("No upload attempt has yet been made.")
+        data: MockPartableContent
+        return data
+
+    def initialize_source_attribute_block(self, attribute_block):
+        if self.source_attribute_block is not None and self.source_attribute_block != attribute_block:
+            raise RuntimeError(f"You're already copying to a different location."
+                               f" Previously: {self.source_attribute_block} Attempted: {attribute_block}")
+        self.source_attribute_block = attribute_block
+        content = attribute_block.content or self.s3.s3_files.files.get(attribute_block.filename)
+        if self._data is None:
+            self._data = MockPartableContent.start_cloning_from(content)
+
+    @classmethod
+    def set_action(cls, upload_id, action: callable):
+        """
+        As an example, in a test, doing
+            def testing_hook(*, part_number, **_):
+                if part_number > 1:
+                    raise Exception("Simulated error on any part other than the first one.")
+            MockMultipartAction.set_action(upload_id, testing_hook)
+        allows the testing_hook to run on each part_upload attempt, so that in this case it raises an
+        error on any part other than part 1.
+
+        Keyword args that all action functions will receive are:
+          * source: an S3ObjectNameSpec
+          * target: an S3ObjectNameSpec
+          * part_number: a 1-based int index
+          * lower: a 0-based lower-inclusive index
+          * upper: a 0-based upper-exclusive index
+        The action function is called from check_part_consistency,
+        which is subprimitive to MockBotoS3Client.upload_part_copy.
+        """
+        upload = cls.lookup(upload_id)
+        upload.action = action
+
+    @classmethod
+    def lookup(cls, upload_id):
+        found: Optional[MockMultiPartUpload] = cls.ALL_UPLOADS.get(upload_id)
+        if found is None:
+            ValueError(f"Unknown UploadId: {upload_id}")
+        return found
+
+    def part_etag(self, range_spec):
+        return self.data.part_etag(range_spec)
+
+    def check_part_consistency(self, source: S3ObjectNameDict, target: S3ObjectNameDict,
+                               part_number: int, range_spec: str):
+        ignored(target)
+        if self.source is None:
+            self.source = source  # Initialize on first use
+        else:
+            assert source == self.source, (
+                f"A MultiPartUpload must always transfer from the same source. First={self.source} Later={source}")
+        assert target['Bucket'] == self.target['Bucket'] and target['Key'] == self.target['Key'], (
+            f"A MultiPartUpload must always transfer from the same source. Promised={self.target} Actual={target}")
+        part_etag = self.part_etag(range_spec)
+        lower_inclusive, upper_exclusive = self.data.part_etag_byte_range(part_etag)
+        if self.action is not None:
+            self.action(source=source, target=target, part_number=part_number,
+                        lower=lower_inclusive, upper=upper_exclusive)
+        return part_etag
+
+    def check_upload_complete(self, target: S3ObjectNameDict, etags: List[str]):
+        assert target == self.target, f"Filename when completing upload didn't match: {target}"
+        self.data.validate_parts_complete(parts_etags=etags)
+        self.is_complete = True
+
+    def move_content(self, s3) -> S3ObjectNameDict:
+        assert isinstance(s3, MockBotoS3Client)
+        assert self.is_complete, (
+            f"Upload {self.upload_id} tried to .move_content() before calling .check_upload_complete().")
+        source_s3_filename = f"{self.source['Bucket']}/{self.source['Key']}"
+        target_s3_filename = f"{self.target['Bucket']}/{self.target['Key']}"
+        if not self.target.get('VersionId'):
+            # If a VersionId was supplied, we are copying in-place only to change the storage type, so there's
+            # no actual change to mock content that's needed. We only change it if we're generating a new version.
+            s3.maybe_archive_current_version(bucket=self.target['Bucket'], key=self.target['Key'],
+                                             replacement_class=MockObjectAttributeBlock)
+            s3.s3_files.set_file_content_for_testing(target_s3_filename, self.data.copied_content())
+        attribute_block = s3._object_attribute_block(  # noQA - access to protected member, but this is easiest way
+            source_s3_filename, version_id=self.source.get('VersionId'))
+        assert isinstance(attribute_block, MockObjectAttributeBlock), "The referenced file is deleted."
+        attribute_block.set_storage_class(self.storage_class)
+        attribute_block.set_tagset(self.tagging)
+        # raise NotImplementedError(f"Just need to copy {self.data} for into {s3} at {self.target}.")
+        return self.target
+
+
 @MockBoto3.register_client(kind='s3')
 class MockBotoS3Client(MockBoto3Client):
     """
@@ -2215,8 +2590,11 @@ class MockBotoS3Client(MockBoto3Client):
         self.other_required_arguments = other_required_arguments
         self.storage_class: S3StorageClass = storage_class or self.DEFAULT_STORAGE_CLASS
 
-    def check_for_kwargs_required_by_mock(self, operation, Bucket, Key, **kwargs):
-        ignored(Bucket, Key)
+    def check_for_kwargs_required_by_mock(self, operation, Bucket, Key, ExtraArgs=None, VersionId=None, **kwargs):
+        ignored(Bucket, Key, ExtraArgs, VersionId)
+        # Some SS3-related required args we're looking for might be in ExtraArgs, but this mock is not presently
+        # complex enough to decode that. We could add such checks here later, using a more sophisticated check
+        # than a simple "!=" test, but for now this test is conservative. -kmp 11-May-2023
         if kwargs != self.other_required_arguments:
             raise MockKeysNotImplemented(operation, self.other_required_arguments.keys())
 
@@ -2224,29 +2602,42 @@ class MockBotoS3Client(MockBoto3Client):
         assert isinstance(object_content, str)
         self.upload_fileobj(Fileobj=io.BytesIO(object_content.encode('utf-8')), Bucket=Bucket, Key=Key)
 
-    def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
-        self.check_for_kwargs_required_by_mock("upload_fileobj", Bucket=Bucket, Key=Key, **kwargs)
+    def upload_fileobj(self, Fileobj, Bucket, Key, *, ExtraArgs=None, **kwargs): # noQA - AWS CamelCase args
+        self.check_for_kwargs_required_by_mock("upload_fileobj", Bucket=Bucket, Key=Key, ExtraArgs=ExtraArgs, **kwargs)
+        # See ALLOWED_UPLOAD_ARGS
+        # https://boto3.amazonaws.com/v1/documentation/api/1.9.42/reference/customizations/s3.html
+        ExtraArgs = ExtraArgs or {}
+        storage_class = ExtraArgs.get('StorageClass', self.DEFAULT_STORAGE_CLASS)
         data = Fileobj.read()
         PRINT("Uploading %s (%s bytes) to bucket %s key %s"
               % (Fileobj, len(data), Bucket, Key))
-        with self.s3_files.open(os.path.join(Bucket, Key), 'wb') as fp:
+        s3_filename = f"{Bucket}/{Key}"
+        with self.s3_files.open(s3_filename, 'wb') as fp:
             fp.write(data)
+        if storage_class != self.DEFAULT_STORAGE_CLASS:
+            attribute_block = self._object_attribute_block(filename=s3_filename)
+            attribute_block.set_storage_class(storage_class)
 
-    def upload_file(self, Filename, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
-        self.check_for_kwargs_required_by_mock("upload_file", Bucket=Bucket, Key=Key, **kwargs)
+    def upload_file(self, Filename, Bucket, Key, *, ExtraArgs=None, **kwargs):  # noQA - AWS CamelCase args
+        self.check_for_kwargs_required_by_mock("upload_file", Bucket=Bucket, Key=Key, ExtraArgs=ExtraArgs, **kwargs)
         with io.open(Filename, 'rb') as fp:
-            self.upload_fileobj(Fileobj=fp, Bucket=Bucket, Key=Key)
+            self.upload_fileobj(Fileobj=fp, Bucket=Bucket, Key=Key, ExtraArgs=ExtraArgs)
 
-    def download_fileobj(self, Bucket, Key, Fileobj, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
-        self.check_for_kwargs_required_by_mock("download_fileobj", Bucket=Bucket, Key=Key, **kwargs)
+    def download_fileobj(self, Bucket, Key, Fileobj, *, ExtraArgs=None, **kwargs):  # noQA - AWS CamelCase args
+        self.check_for_kwargs_required_by_mock("download_fileobj", Bucket=Bucket, Key=Key, ExtraArgs=ExtraArgs,
+                                               **kwargs)
+        ExtraArgs = ExtraArgs or {}
+        version_id = ExtraArgs.get('VersionId')
+        if version_id:
+            raise ValueError(f"VersionId is not supported by this mock: {version_id}")
         with self.s3_files.open(os.path.join(Bucket, Key), 'rb') as fp:
             data = fp.read()
         PRINT("Downloading bucket %s key %s (%s bytes) to %s"
               % (Bucket, Key, len(data), Fileobj))
         Fileobj.write(data)
 
-    def download_file(self, Bucket, Key, Filename, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
-        self.check_for_kwargs_required_by_mock("download_file", Bucket=Bucket, Key=Key, **kwargs)
+    def download_file(self, Bucket, Key, Filename, *, ExtraArgs=None, **kwargs): # noQA - AWS CamelCase args
+        self.check_for_kwargs_required_by_mock("download_file", Bucket=Bucket, Key=Key, ExtraArgs=ExtraArgs, **kwargs)
         with io.open(Filename, 'wb') as fp:
             self.download_fileobj(Bucket=Bucket, Key=Key, Fileobj=fp)
 
@@ -2268,7 +2659,7 @@ class MockBotoS3Client(MockBoto3Client):
         "binary/octet-stream": [".fo"],
     }
 
-    def put_object(self, *, Bucket, Key, Body, ContentType=None, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
+    def put_object(self, *, Bucket, Key, Body, ContentType=None, **kwargs):  # noQA - AWS CamelCase args
         # TODO: This is not mocking other args like ACL that we might use ACL='public-read' or ACL='private'
         #       grep for ACL= in tibanna, tibanna_ff, or dcicutils for examples of these values.
         # TODO: Shouldn't this be checking for required arguments (e.g., for SSE)? -kmp 9-May-2022
@@ -2280,9 +2671,11 @@ class MockBotoS3Client(MockBoto3Client):
         assert not kwargs, "put_object mock doesn't support %s." % kwargs
         if isinstance(Body, str):
             Body = Body.encode('utf-8')  # we just assume utf-8, which AWS seems to as well
-        self.s3_files.files[Bucket + "/" + Key] = Body
+        self.s3_files.set_file_content_for_testing(Bucket + "/" + Key, Body)
+        # self.s3_files.files[Bucket + "/" + Key] = Body
+        etag = self._content_etag(Body)
         return {
-            'ETag': self._content_etag(Body)
+            'ETag': etag
         }
 
     @staticmethod
@@ -2291,26 +2684,50 @@ class MockBotoS3Client(MockBoto3Client):
         # doublequotes, so an example from
         # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/list_object_versions.html
         # shows:  'ETag': '"6805f2cfc46c0f04559748bb039d69ae"',
-        return f'"{hashlib.md5(content).hexdigest()}"'
+        if isinstance(content, bytes):
+            res = f'"{hashlib.md5(content).hexdigest()}"'
+        elif isinstance(content, MockPartableContent):
+            res = content.etag
+        else:
+            raise ValueError(f"Cannot compute etag for {content!r}.")
+        # print(f"content={content} ETag={res}")
+        return res
+
+    @staticmethod
+    def _content_len(content):
+        # For reasons known only to AWS, the ETag, though described as an MD5 hash, begins and ends with
+        # doublequotes, so an example from
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/list_object_versions.html
+        # shows:  'ETag': '"6805f2cfc46c0f04559748bb039d69ae"',
+        if isinstance(content, bytes):
+            res = len(content)
+        elif isinstance(content, MockPartableContent):
+            res = content.size
+        else:
+            raise ValueError(f"Cannot compute length of {content!r}.")
+        # print(f"content={content} ETag={res}")
+        return res
 
     def Bucket(self, name):  # noQA - AWS function naming style
         return MockBotoS3Bucket(s3=self, name=name)
 
-    def head_object(self, Bucket, Key, **kwargs):  # noQA - AWS argument naming style
-        self.check_for_kwargs_required_by_mock("head_object", Bucket=Bucket, Key=Key, **kwargs)
+    def head_object(self, Bucket, Key, VersionId=None, **kwargs):  # noQA - AWS argument naming style
+        self.check_for_kwargs_required_by_mock("head_object", Bucket=Bucket, Key=Key, VersionId=VersionId, **kwargs)
 
         pseudo_filename = os.path.join(Bucket, Key)
 
         if self.s3_files.exists(pseudo_filename):
-            content = self.s3_files.files[pseudo_filename]
-            attribute_block = self._object_attribute_block(filename=pseudo_filename)
+            content = self.s3_files.get_file_content_for_testing(pseudo_filename, required=True)
+            # content = self.s3_files.files[pseudo_filename]
+            attribute_block = self._object_attribute_block(filename=pseudo_filename, version_id=VersionId)
             assert isinstance(attribute_block, MockObjectAttributeBlock)  # if file exists, should be normal block
             result = {
                 'Bucket': Bucket,
                 'Key': Key,
                 'ETag': self._content_etag(content),
-                'ContentLength': len(content),
+                'ContentLength': self._content_len(content),
                 'StorageClass': attribute_block.storage_class,  # self._object_storage_class(filename=pseudo_filename)
+                'VersionId': attribute_block.version_id or '',  # it should never be null, but still be careful of type
                 # Numerous others, but this is enough to make the dictionary non-empty and to satisfy some of our tools
             }
             restoration = attribute_block.restoration
@@ -2328,18 +2745,19 @@ class MockBotoS3Client(MockBoto3Client):
             # since it might be a 404 (not found) or a 403 (permissions), depending on various details.
             # For now, just fail in any way since maybe our code doesn't care.
             raise Exception(f"Mock File Not Found: {pseudo_filename}."
-                            f" Existing files: {list(self.s3_files.files.keys())}")
+                            f" Existing files: {self.s3_files.all_filenames_for_testing()}")
 
     def head_bucket(self, Bucket):  # noQA - AWS argument naming style
         bucket_prefix = Bucket + "/"
-        for filename, content in self.s3_files.files.items():
+        # for filename, content in self.s3_files.files.items():
+        for filename, content in self.s3_files.all_filenames_with_content_for_testing():
             if filename.startswith(bucket_prefix):
                 # Returns other things probably, but this will do to start for our mocking.
                 return {"ResponseMetadata": {"HTTPStatusCode": 200}}
         raise ClientError(operation_name='HeadBucket',
                           error_response={  # noQA - PyCharm wrongly complains about this dictionary
                               "Error": {"Code": "404", "Message": "Not Found"},
-                              "ResponseMetadata": {"HTTPStatusCode": 404},
+                              "ResponseMetadata": {"HTTPStatusCode": 404},  # noQA - some fields omitted
                           })
 
     def get_object_tagging(self, Bucket, Key):
@@ -2410,7 +2828,7 @@ class MockBotoS3Client(MockBoto3Client):
         #     print(f"NOT AUTOCREATING {filename} for {self} because {self.s3_files.files}")
         return attribute_blocks
 
-    def _object_attribute_block(self, filename) -> MockObjectBasicAttributeBlock:
+    def _object_attribute_block(self, filename, version_id=None) -> MockObjectBasicAttributeBlock:
         """
         Returns the attribute_block for an S3 object.
         This contains information like storage class and tagsets.
@@ -2424,30 +2842,43 @@ class MockBotoS3Client(MockBoto3Client):
         if not all_versions:
             # This situation and usually we should not be calling this function at this point,
             # but try to help developer debug what's going on...
-            if filename in self.s3_files.files:
+            # if filename in self.s3_files.files:
+            if filename in self.s3_files.all_filenames_for_testing():
                 context = f"mock special non-file (bucket?) s3 item: {filename}"
             else:
                 context = f"mock non-existent S3 file: {filename}"
             raise ValueError(f"Attempt to obtain object attribute block for {context}.")
-        return all_versions[-1]
+        if version_id:
+            for version in all_versions:
+                if version.version_id == version_id:
+                    return version
+            raise ValueError(f"The file {filename} has no version {version_id!r}.")
+        else:
+            return all_versions[-1]
 
     _ARCHIVE_LOCK = threading.Lock()
 
-    def hurry_restoration_for_testing(self, s3_filename, attribute_block=None):
+    def hurry_restoration_for_testing(self, s3_filename, version_id=None, attribute_block=None):
         """
         This can be used in testing to hurry up the wait for a temporary restore to become available.
         """
-        attribute_block = attribute_block or self._object_attribute_block(s3_filename)
+        attribute_block = attribute_block or self._object_attribute_block(s3_filename, version_id=version_id)
         assert isinstance(attribute_block, MockObjectAttributeBlock)
         attribute_block.hurry_restoration()
 
-    def hurry_restoration_expiry_for_testing(self, s3_filename, attribute_block=None):
+    def hurry_restoration_expiry_for_testing(self, s3_filename, version_id=None, attribute_block=None):
         """
         This can be used in testing to hurry up the wait for a temporary restore to expire.
         """
-        attribute_block = attribute_block or self._object_attribute_block(s3_filename)
+        attribute_block = attribute_block or self._object_attribute_block(s3_filename, version_id=version_id)
         assert isinstance(attribute_block, MockObjectAttributeBlock)
         attribute_block.hurry_restoration_expiry()
+
+    def maybe_archive_current_version(self, bucket: str, key: str,
+                                      replacement_class: Type[MockObjectBasicAttributeBlock] = MockObjectAttributeBlock,
+                                      init: Optional[callable] = None) -> Optional[MockObjectBasicAttributeBlock]:
+        if self.s3_files.bucket_uses_versioning(bucket):
+            return self.archive_current_version(f"{bucket}/{key}", replacement_class=replacement_class, init=init)
 
     def archive_current_version(self, filename,
                                 replacement_class: Type[MockObjectBasicAttributeBlock] = MockObjectAttributeBlock,
@@ -2466,6 +2897,13 @@ class MockBotoS3Client(MockBoto3Client):
             if init is not None:
                 init()  # caller can supply an init function to be run while still inside lock
             return new_block
+
+    def create_big_file(self, Bucket, Key, size):
+        s3_filename = f"{Bucket}/{Key}"
+        self.s3_files.set_file_content_for_testing(s3_filename, MockBigContent(size=size))
+        attribute_block = self._object_attribute_block(s3_filename)
+        assert isinstance(attribute_block, MockObjectAttributeBlock)
+        return attribute_block
 
     def _check_versions_registered(self, filename, *versions: Optional[MockObjectBasicAttributeBlock]):
         """
@@ -2499,7 +2937,8 @@ class MockBotoS3Client(MockBoto3Client):
         #            about to write new data anyway, after having archived previous data, which means it should
         #            really only be called by archive_current_version after it has done any necessary saving away
         #            of a prior version (depending on whether versioning is enabled).
-        self.s3_files.files[filename] = None
+        # self.s3_files.files[filename] = None
+        self.s3_files.initialize_file_entry_testing(filename)
         return new_block
 
     def _object_tagset(self, filename):
@@ -2520,7 +2959,7 @@ class MockBotoS3Client(MockBoto3Client):
 
         Presently the value is not error-checked. That might change.
         By special exception, passing value=None will revert the storage class to the default for the given mock,
-        for which the default default is 'STANDARD'.
+        for which the default default is STANDARD.
 
         Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
         so that if another client is created by that same boto3 mock, it will see the same storage classes.
@@ -2562,13 +3001,13 @@ class MockBotoS3Client(MockBoto3Client):
 
         Presently the value is not error-checked. That might change.
         By special exception, passing value=None will revert the storage class to the default for the given mock,
-        for which the default default is 'STANDARD'.
+        for which the default default is STANDARD.
 
         Note that this is a property of the boto3 instance (through its .shared_reality) not of the s3 mock itself
         so that if another client is created by that same boto3 mock, it will see the same storage classes.
         """
         attribute_block = self._object_attribute_block(s3_filename)
-        attribute_block.initialize_storage_class(value)
+        attribute_block.set_storage_class(value)
 
     def list_objects(self, Bucket, Prefix=None):  # noQA - AWS argument naming style
         # Ref: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects
@@ -2576,14 +3015,15 @@ class MockBotoS3Client(MockBoto3Client):
         bucket_prefix_length = len(bucket_prefix)
         search_prefix = bucket_prefix + (Prefix or '')
         found = []
-        for filename, content in self.s3_files.files.items():
+        # for filename, content in self.s3_files.files.items():
+        for filename, content in self.s3_files.all_filenames_with_content_for_testing():
             if filename.startswith(search_prefix):
                 found.append({
                     'Key': filename[bucket_prefix_length:],
                     'ETag': self._content_etag(content),
                     'LastModified': self._object_last_modified(filename=filename),
                     # "Owner": {"DisplayName": ..., "ID"...},
-                    "Size": len(content),
+                    "Size": self._content_len(content),
                     "StorageClass": self._object_storage_class(filename=filename),
                 })
         return {
@@ -2602,7 +3042,7 @@ class MockBotoS3Client(MockBoto3Client):
         }
 
     def list_objects_v2(self, Bucket):  # noQA - AWS argument naming style
-        # This is different but similar to list_objects. However we don't really care about that.
+        # This is different but similar to list_objects. However, we don't really care about that.
         return self.list_objects(Bucket=Bucket)
 
     def copy_object(self, CopySource, Bucket, Key, CopySourceVersionId=None,
@@ -2622,6 +3062,9 @@ class MockBotoS3Client(MockBoto3Client):
         target_version_id = CopySourceVersionId
         target_s3_filename = f"{target_bucket}/{target_key}"
         copy_in_place = False  # might be overridden below
+        PRINT(f"Copying {source_bucket}/{source_key} ({source_version_id})"
+              f" to {target_bucket}/{target_key}"
+              f" ({'same' if target_version_id == source_version_id else target_version_id})")
         if CopySourceVersionId:
             if CopySourceVersionId != source_version_id or source_bucket != Bucket or source_key != Key:
                 raise AssertionError(f"This mock expected that if CopySourceVersionId is given,"
@@ -2629,7 +3072,8 @@ class MockBotoS3Client(MockBoto3Client):
                                      f" CopySource={CopySource!r} Bucket={Bucket!r} Key={Key!r}"
                                      f" CopySourceVersionId={CopySourceVersionId!r}")
             copy_in_place = True
-        source_data = self.s3_files.files.get(source_s3_filename)
+        # source_data = self.s3_files.files.get(source_s3_filename)
+        source_data = self.s3_files.get_file_content_for_testing(source_s3_filename)
         if source_version_id:
             source_version = self._get_versioned_object(source_s3_filename, source_version_id)
             source_data = source_data if source_version.content is None else source_version.content
@@ -2650,22 +3094,25 @@ class MockBotoS3Client(MockBoto3Client):
             self.archive_current_version(target_s3_filename)
             # In this case, we've made a new version and it will be current.
             # In that case, the files dictionary needs the content copied.
-            self.s3_files.files[target_s3_filename] = source_data
+            # self.s3_files.files[target_s3_filename] = source_data
+            self.s3_files.set_file_content_for_testing(target_s3_filename, source_data)
         target_attribute_block = self._get_versioned_object(target_s3_filename, target_version_id)
         new_storage_class = target_storage_class
         if (copy_in_place
                 and GlacierUtils.transition_involves_glacier_restoration(source_storage_class, target_storage_class)):
-            new_storage_class = None  # For a restoration, the don't update the glacier data. It's restored elsewhere.
+            new_storage_class = None  # For a restoration, we don't update the glacier data. It's restored elsewhere.
             target_attribute_block.restore_temporarily(delay_seconds=self.RESTORATION_DELAY_SECONDS,
-                                                       duration_days=1, storage_class=target_storage_class)
-            PRINT(f"Set up restoration {target_attribute_block.restoration}")
+                                                       duration_days=self.RESTORATION_DEFAULT_DURATION_DAYS,
+                                                       storage_class=target_storage_class)
+            PRINT(f"Copy made was a temporary restoration {target_attribute_block.restoration}")
         else:
-            PRINT(f"The copy was not a temporary restoration.")
+            PRINT(f"Copy made was not a temporary restoration.")
         if new_storage_class:
-            target_attribute_block.initialize_storage_class(new_storage_class)
+            target_attribute_block.set_storage_class(new_storage_class)
         return {'Success': True}
 
     RESTORATION_DELAY_SECONDS = 2
+    RESTORATION_DEFAULT_DURATION_DAYS = 1
 
     def delete_object(self, Bucket, Key, VersionId, **unimplemented_keyargs):
         # Doc:
@@ -2738,8 +3185,8 @@ class MockBotoS3Client(MockBoto3Client):
                                   "Error": {
                                       "Code": "InvalidArgument",
                                       "Message": "Invalid version id specified",
-                                      "ArgumentName": "versionId",
-                                      "ArgumentValue": version_id
+                                      "ArgumentName": "versionId",  # noQA - PyCharm says not wanted, but not so sure
+                                      "ArgumentValue": version_id   # noQA - ditto
                                   }})
         # Delete the old version
         all_versions = self._object_all_versions(s3_filename)
@@ -2755,21 +3202,30 @@ class MockBotoS3Client(MockBoto3Client):
             new_current_version: MockObjectBasicAttributeBlock = all_versions[-1]
             if isinstance(new_current_version, MockObjectAttributeBlock):
                 new_content = new_current_version.content
-            self.s3_files.files[s3_filename] = new_content
+            # This isn't really creating the file, it's restoring the data cache in the file dictionary.
+            # The file version, in a sense, already existed.
+            self.s3_files.restore_file_content_for_testing(s3_filename, new_content)
+            # self.s3_files.files[s3_filename] = new_content
         else:
             # If there are no versions remaining, we've completely deleted the thing. Just remove all record.
-            del self.s3_files.files[s3_filename]
+            # del self.s3_files.files[s3_filename]
+            self.s3_files.remove_file_entry_for_testing(s3_filename)
         return result
 
     def restore_object(self, Bucket, Key, RestoreRequest, VersionId: Optional[str] = None,
                        StorageClass: Optional[S3StorageClass] = None):
-        duration_days: int = RestoreRequest.get('Days')
+        duration_days = RestoreRequest.get('Days')
+        # NOTE: Dcoumentation says "Days element is required for regular restores, and must not be provided
+        #       for select requests." but we don't quite implement that.
+        assert isinstance(duration_days, int), (
+            "This mock doesn't know what to do if 'Days' is not specified in the RestoreRequest."
+        )
         storage_class: S3StorageClass = StorageClass or self.storage_class
         s3_filename = f"{Bucket}/{Key}"
         if not self.s3_files.exists(s3_filename):
             raise Exception(f"S3 file at Bucket={Bucket!r} Key={Key!r} does not exist,"
                             f" so cannot be restored from glacier.")
-        attribute_block = self._object_attribute_block(s3_filename)
+        attribute_block = self._object_attribute_block(s3_filename, version_id=VersionId)
         assert isinstance(attribute_block, MockObjectAttributeBlock)  # since the file exists, this should be good
         attribute_block.restore_temporarily(delay_seconds=self.RESTORATION_DELAY_SECONDS,
                                             duration_days=duration_days,
@@ -2785,13 +3241,16 @@ class MockBotoS3Client(MockBoto3Client):
         bucket_prefix_length = len(bucket_prefix)
         search_prefix = bucket_prefix + (Prefix or '')
         aws_file_system = self.s3_files
-        for filename, content in aws_file_system.files.items():
+        # for filename, content in aws_file_system.files.items():
+        for filename, content in aws_file_system.all_filenames_with_content_for_testing():
             key = filename[bucket_prefix_length:]
             if filename.startswith(search_prefix):
                 all_versions = self._object_all_versions(filename)
                 most_recent_version = all_versions[-1]
                 for version in all_versions:
                     if isinstance(version, MockObjectAttributeBlock):
+                        etag = self._content_etag(content if version.content is None else version.content)
+                        content_length = self._content_len(content if version.content is None else version.content)
                         version_descriptions.append({
                             # 'Owner': {
                             #     "DisplayName": "4dn-dcic-technical",
@@ -2800,8 +3259,8 @@ class MockBotoS3Client(MockBoto3Client):
                             'Key': key,
                             'VersionId': version.version_id,
                             'IsLatest': version == most_recent_version,
-                            'ETag': self._content_etag(content),
-                            'Size': len(content if version.content is None else version.content),
+                            'ETag': etag,
+                            'Size': content_length,
                             'StorageClass': version.storage_class,
                             'LastModified': version.last_modified,  # type datetime.datetime
                         })
@@ -2830,6 +3289,126 @@ class MockBotoS3Client(MockBoto3Client):
             # 'EncodingType': "url",
         }
 
+    @classmethod
+    def lookup_upload_id(cls, upload_id) -> MockMultiPartUpload:
+        return MockMultiPartUpload.lookup(upload_id)
+
+    def create_multipart_upload(self, *, Bucket, Key, StorageClass: S3StorageClass = STANDARD,
+                                Tagging: Optional[str] = None, **unimplemented_keyargs):
+        assert not unimplemented_keyargs, (f"The mock for list_object_versions needs to be extended."
+                                           f" {there_are(unimplemented_keyargs, kind='unimplemented key')}")
+        # Weird that Tagging here is a string but in other situations it's a {TagSet: [{Key: ..., Value: ...}]} dict
+        tagging: KeyValuestringDictList = []
+        for k, v in parse_qsl(Tagging or ""):
+            entry: KeyValuestringDict = {'Key': k, 'Value': v}
+            tagging.append(entry)
+        upload = MockMultiPartUpload(s3=self, bucket=Bucket, key=Key, storage_class=StorageClass, tagging=tagging)
+        return {
+            'Bucket': Bucket,
+            'Key': Key,
+            'UploadId': upload.upload_id,
+            'ResponseMetadata': self.compute_mock_response_metadata()
+        }
+
+    def upload_part_copy(self, *, CopySource: S3ObjectNameSpec, PartNumber, CopySourceRange, UploadId, Bucket, Key,
+                         CopySourceVersionId=None, **unimplemented_keyargs):
+        assert not unimplemented_keyargs, (f"The mock for list_object_versions needs to be extended."
+                                           f" {there_are(unimplemented_keyargs, kind='unimplemented key')}")
+        # It is not at all obvious why PartNumber has to be supplied, since really all that matters
+        # is CopySourceRange, but it's constrained to be there and have a certain value, so we'll check that.
+        assert 1 <= PartNumber <= 10000
+        upload = self.lookup_upload_id(UploadId)
+
+        if isinstance(CopySource, str):  # Tolerate bucket/key or bucket/key?versionId=xxx
+            CopySource = parse_s3_object_name(CopySource)
+
+        source_bucket = CopySource['Bucket']
+        source_key = CopySource['Key']
+        source_version_id = CopySource.get('VersionId')
+        if CopySourceVersionId:
+            assert source_bucket == Bucket
+            assert source_key == Key
+            assert source_version_id == CopySourceVersionId
+        s3_filename = f"{source_bucket}/{source_key}"
+        version_id = CopySourceVersionId
+        attribute_block = self._object_attribute_block(filename=s3_filename, version_id=version_id)
+        assert isinstance(attribute_block, MockObjectAttributeBlock), f"Not an ordinary S3 file: {s3_filename}"
+        upload.initialize_source_attribute_block(attribute_block)
+        source: S3ObjectNameDict = {'Bucket': source_bucket, 'Key': source_key, 'VersionId': source_version_id}
+        target: S3ObjectNameDict = {'Bucket': Bucket, 'Key': Key, 'VersionId': CopySourceVersionId}
+        part_etag = upload.check_part_consistency(source=source, target=target,
+                                                  part_number=PartNumber, range_spec=CopySourceRange)
+        return {'CopyPartResult': {'ETag': part_etag}}
+
+    def complete_multipart_upload(self, *, Bucket, Key, MultipartUpload, UploadId, **unimplemented_keyargs):
+        assert not unimplemented_keyargs, (f"The mock for list_object_versions needs to be extended."
+                                           f" {there_are(unimplemented_keyargs, kind='unimplemented key')}")
+        version_id = None  # TODO: Need a way to pass this
+        upload = MockMultiPartUpload.lookup(UploadId)
+        parts: List[dict] = MultipartUpload['Parts']   # each element a dictionary containing PartNumber and ETag
+        etags = [part['ETag'] for part in parts]
+        if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
+            PRINT(f"Attempting to complete multipart upload with etags: {etags}")
+        upload.check_upload_complete(target={'Bucket': Bucket, 'Key': Key, 'VersionId': version_id}, etags=etags)
+        spec: S3ObjectNameDict = upload.move_content(s3=self)
+        return {
+            'Bucket': spec['Bucket'],
+            'Key': spec['Key'],
+            'VersionId': spec['VersionId']
+        }
+
+    def list_multipart_uploads(self, Bucket, **unimplemented_keyargs):
+        assert not unimplemented_keyargs, (f"The mock for list_multipart_uploads needs to be extended."
+                                           f" {there_are(unimplemented_keyargs, kind='unimplemented key')}")
+        upload_id: str
+        upload: MockMultiPartUpload
+        return {
+            'Bucket': Bucket,
+            'Uploads': [
+                {
+                    'UploadId': upload_id,
+                    'Key': upload.target['Key'],
+                    'Initiated': upload.initiated,
+                    'StorageClass': upload.storage_class,
+                }
+                for upload_id, upload in MockMultiPartUpload.ALL_UPLOADS.items()
+            ],
+            'ResponseMetadata': self.compute_mock_response_metadata()
+        }
+
+    def show_object_versions_for_debugging(self, bucket, prefix, context=None, version_names=None):
+        ignorable(json)  # json library is imported, so acknowledge it might get used here if lines were uncommented
+        versions = self.list_object_versions(Bucket=bucket, Prefix=prefix)
+        prefix_len = len(prefix)
+        hrule_width = 80
+        if context:
+            margin = 3
+            n = len(context) + 2 * margin
+            PRINT(f"+{n * '-'}+")
+            PRINT(f"|{margin * ' '}{context}{margin * ' '}|")
+            PRINT(f"|{n * ' '}+{(hrule_width - n - 1) * '-'}")
+        else:
+            PRINT(f"+{hrule_width * '-'}")
+        # print("versions  = ", json.dumps(versions, indent=2, default=str))
+        for version in versions.get('Versions', []):
+            version_id = version['VersionId']
+            extra = []
+            version_name = (version_names or {}).get(version_id)
+            if version_name:
+                extra.append(version_name)
+            if version['IsLatest']:
+                extra.append('LATEST')
+            PRINT(f"|"
+                  f" {version['Key'].ljust(max(prefix_len, 12))}"
+                  f" {version['StorageClass'].ljust(8)}"
+                  f" {str(version['Size']).rjust(4)}"
+                  f" VersionId={version_id}"
+                  f" ETag={version['ETag']}"
+                  f" {version['LastModified']}"
+                  f" {','.join(extra)}"
+                  )
+        PRINT(f"+{hrule_width * '-'}")
+
 
 class MockBotoS3Bucket:
 
@@ -2841,23 +3420,28 @@ class MockBotoS3Bucket:
 
     def _delete(self, delete_bucket_too=False):
         prefix = self.name + "/"
-        files = self.s3.s3_files.files
+        s3_files: MockAWSFileSystem = self.s3.s3_files
+        # files = self.s3.s3_files.files
         to_delete = set()
-        for pseudo_filename, _ in [files.items()]:
+        # for pseudo_filename, _ in [s3_files.files.items()]:
+        for pseudo_filename, _ in s3_files.all_filenames_with_content_for_testing():
             if pseudo_filename.startswith(prefix):
                 if pseudo_filename != prefix:
                     to_delete.add(pseudo_filename)
         for pseudo_filename in to_delete:
-            del files[pseudo_filename]
+            # del s3_files.files[pseudo_filename]
+            s3_files.remove_file_entry_for_testing(pseudo_filename)
         if not delete_bucket_too:
-            files[prefix] = b''
+            s3_files.set_file_content_for_testing(prefix, b'')
+            # s3_files.files[prefix] = b''
         # TODO: Does anything need to be returned here?
 
     def _keys(self):
         found = False
         keys = set()  # In real S3, this would be cached info, but for testing we just create it on demand
         prefix = self.name + "/"
-        for pseudo_filename, content in self.s3.s3_files.files.items():
+        # for pseudo_filename, content in self.s3.s3_files.files.items():
+        for pseudo_filename, content in self.s3.s3_files.all_filenames_with_content_for_testing():
             if pseudo_filename.startswith(prefix):
                 found = True
                 key = remove_prefix(prefix, pseudo_filename)
@@ -3004,7 +3588,7 @@ def known_bug_expected(jira_ticket=None, fixed=False, error_class=None):
         with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError, fixed=True):
             ... stuff that fails ...
 
-    If the previously-expected error (now thought to be fixed) happens, an error will result so it's easy to tell
+    If the previously-expected error (now thought to be fixed) happens, an error will result, so it's easy to tell
     if there's been a regression.
 
     Parameters:
@@ -3045,7 +3629,7 @@ def client_failer(operation_name, code=400):
     def fail(message, code=code):
         raise ClientError(
             {  # noQA - PyCharm wrongly complains about this dictionary
-                "Error": {"Message": message, "Code": code}
+                "Error": {"Message": message, "Code": code}  # noQA - PyCharm things code should be a string
             },
             operation_name=operation_name)
     return fail

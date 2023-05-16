@@ -183,7 +183,8 @@ def test_abstract_test_recorder_recording(recording_enabled):
             else:
                 expected = {f"{recordings_dir}/{test_name}": f"{json.dumps(initial_data)}\n".encode('utf-8')}
 
-            assert mfs.files == expected
+            # assert mfs.files == expected
+            mfs.assert_file_system_state(expected)
 
         recording = "Recording" if recording_enabled else "NOT recording"
         assert printed.lines == [
@@ -234,7 +235,8 @@ def test_abstract_test_recorder_playback():
                     raise AssertionError("Should not get here.")
                 assert str(exc.value) == datum4['error_message']  # 'yikes'
 
-            assert mfs.files == {}  # no files created on playback
+            # assert mfs.files == {}  # no files created on playback
+            mfs.assert_file_system_state({})  # no files created on playback
 
         assert printed.lines == [
             f"Replaying GET {datum1['url']}",  # http://foo

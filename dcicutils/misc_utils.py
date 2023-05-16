@@ -15,6 +15,7 @@ import pytz
 import re
 import rfc3986.validators
 import rfc3986.exceptions
+import threading
 import time
 import warnings
 import webtest  # importing the library makes it easier to mock testing
@@ -1424,6 +1425,9 @@ class StorageCell:
         self.value = initial_value
 
 
+COUNTER_LOCK = threading.Lock()
+
+
 def make_counter(start=0, step=1):
     """
     Creates a counter that generates values counting from a given start (default 0) by a given step (default 1).
@@ -1431,9 +1435,10 @@ def make_counter(start=0, step=1):
     storage = StorageCell(start)
 
     def counter():
-        old_value = storage.value
-        storage.value += step
-        return old_value
+        with COUNTER_LOCK:
+            old_value = storage.value
+            storage.value += step
+            return old_value
 
     return counter
 

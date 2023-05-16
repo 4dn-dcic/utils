@@ -6,6 +6,59 @@ dcicutils
 Change Log
 ----------
 
+7.5.0
+=====
+
+* In new module ``bucket_utils.py``:
+
+  * ``parse_s3_object_name``
+
+* In ``common.py``:
+
+  * New glacier-related constants:
+
+    * ``STANDARD``
+    * ``REDUCED_REDUNDANCY``
+    * ``STANDARD_IA``
+    * ``ONEZONE_IA``
+    * ``INTELLIGENT_TIERING``
+    * ``GLACIER``
+    * ``DEEP_ARCHIVE``
+    * ``OUTPOSTS``
+    * ``GLACIER_IR``
+
+  * New type hint ``S3ObjectNameSpec``
+
+* In ``glacier_utils.py``:
+
+  * Allow a ``version_id=`` argument to ``GlacierUtils.is_restore_finished``
+
+  * Some improved error messages.
+
+  * Some small code refactors.
+
+* In ``misc_utils.py``:
+
+  * Make ``make_counter`` threadsafe so that threaded functionality can call it.
+
+* In ``qa_utils.py``:
+
+  * Support for mock glacier testing in ``MockBotoS3Client`` for methods:
+
+    * ``create_multipart_upload``
+    * ``upload_part_copy``
+    * ``complete_multipart_upload``
+
+  * Revamp the abstractions for managing MockFileSystem to allow for centralized
+    changes that might be needed to handle new file content types, such as
+
+    * ``MockAbstractContent``
+
+      * ``MockBigContent`` for mocking large files quickly and space-efficiently.
+
+      * ``MockPartableBytes`` for mocking small content that still wants to test
+        piecewise-copying in support of the multipart upload protocol.
+
 
 7.4.1
 =====
