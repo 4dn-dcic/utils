@@ -6,6 +6,9 @@ dcicutils
 Change Log
 ----------
 
+7.4.3
+=====
+Removed ``scripts`` from ``packages`` directory list in ``pyproject.toml``; not necessary.
 
 7.4.2
 =====
