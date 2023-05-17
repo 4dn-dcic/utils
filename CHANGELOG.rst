@@ -7,6 +7,12 @@ Change Log
 ----------
 
 
+7.4.2
+=====
+
+* Rewrite test ``test_get_response_json`` as a unit test to get around its flakiness.
+
+
 7.4.1
 =====
 

@@ -121,7 +121,27 @@ def test_generate_rand_accession():
     assert '0' not in test_cgap
 
 
-def test_get_response_json():
+@pytest.mark.integratedx
+@pytest.mark.flaky
+def test_get_response_json_integrated():
+    check_get_response_json()
+
+
+@pytest.mark.unit
+def test_get_response_json_unit():
+    def mocked_get(url):
+        if url == "http://httpbin.org/json":
+            return MockResponse(200, content='{"one": 1, "two": 2, "three": 3}')
+        elif url == "http://httpbin.org/status/500":
+            return MockResponse(500, content="<html>Simulated failure</html>")
+        else:
+            raise Exception(f"Mock needs to be extended. URL argument to requests.get was {url!r}")
+    with mock.patch.object(requests, "get") as mock_get:
+        mock_get.side_effect = mocked_get
+        check_get_response_json()
+
+
+def check_get_response_json():
     # use responses from http://httpbin.org
     good_res = requests.get('http://httpbin.org/json')
     good_res_json = ff_utils.get_response_json(good_res)
