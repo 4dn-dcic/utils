@@ -140,7 +140,7 @@ class ProjectRegistry:
         cls._app_project = cls._make_project()
         if cls.SHOW_HERALD_WHEN_INITIALIZED:
             cls.show_herald()
-        app_project: Project = cls.app_project
+        app_project: Project = cls.app_project  # Now that it's initialized, make sure it comes from the right place
         return app_project
 
     @classmethod
