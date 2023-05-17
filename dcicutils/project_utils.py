@@ -186,7 +186,7 @@ class ProjectRegistry:
         print(f"{the_app_project_class_name}.app_project == Project.app_project == app_project() == {app_project()!r}")
         the_app = app_project()
         for attr in sorted(dir(the_app)):
-            if attr.isupper():
+            if attr.isupper() and not attr.startswith("_"):
                 print(f"app_project().{attr} == {getattr(the_app, attr)!r}")
         print("=" * 80)
 
