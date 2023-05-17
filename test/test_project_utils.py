@@ -10,7 +10,18 @@ def test_project_registry_register():
 
         @ProjectRegistry.register('foo')
         class FooProject(Project):
-            pass
+            NAME = "foo"
+            PRETTY_NAME = "Fu"
+
+        assert FooProject.NAME == 'foo'
+        assert FooProject.PRETTY_NAME == 'Fu'
+
+        @ProjectRegistry.register('foobar')
+        class FooBarProject(Project):
+            NAME = "foobar"
+
+        assert FooBarProject.NAME == 'foobar'
+        assert FooBarProject.PRETTY_NAME == 'Foobar'
 
         assert FooProject.PYPROJECT_NAME == 'foo'
 

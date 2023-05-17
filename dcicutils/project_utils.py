@@ -62,6 +62,12 @@ class ProjectRegistry:
 
             cls._PYPROJECT_NAME = declared_pyproject_name or inferred_pyproject_name
 
+    REQUIRED_PROJECT_ATTRS = ['NAME']
+
+    NON_INHERITED_PROJECT_ATTRS = [
+        'REPO_NAME', 'PYPI_NAME', 'PACKAGE_NAME', 'PRETTY_NAME', 'APP_NAME', 'APP_PRETTY_NAME'
+    ]
+
     @classmethod
     def register(cls, pyproject_name):
         """
@@ -79,7 +85,10 @@ class ProjectRegistry:
             the_class_name = the_class.__name__
             if not issubclass(the_class, Project):
                 raise ValueError(f"The class {the_class_name} must inherit from Project.")
-            explicit_pyproject_name = the_class.__dict__.get('PYPROJECT_NAME')
+
+            explicit_attrs = the_class.__dict__
+
+            explicit_pyproject_name = explicit_attrs.get('PYPROJECT_NAME')
             if explicit_pyproject_name:
                 message = f"Explicit {the_class_name}.PYPROJECT_NAME={explicit_pyproject_name!r} is not permitted."
                 if explicit_pyproject_name != pyproject_name:
@@ -89,6 +98,14 @@ class ProjectRegistry:
                 raise ValueError(message)
             else:
                 the_class._PYPROJECT_NAME = pyproject_name  # no need for the caller to say this redundantly
+
+            for attr in cls.REQUIRED_PROJECT_ATTRS:
+                if attr not in explicit_attrs:
+                    raise ValueError(f".{attr} is required")
+
+            for attr in cls.NON_INHERITED_PROJECT_ATTRS:
+                if attr not in explicit_attrs:
+                    setattr(cls, attr, Project.__dict__[attr])
 
             lower_registry_name = pyproject_name.lower()
             for x in ['cgap-portal', 'fourfront', 'smaht']:
@@ -197,8 +214,9 @@ class Project:
 
     All such classes have these names:
       .PYPROJECT_NAME - The name used in the .register decorator on the class, and in pyproject.toml
-      .NAME - The name of the project in pypi
+      .NAME - The customary name of the project
       .REPO_NAME - The name of the repo
+      .PYPI_NAME - The name of the project in pypi (if any), else None
       .PACKAGE_NAME - The installed name of the project as a package in a venv, for use with pkg_resources
       .PRETTY_NAME - The pretty name of the package name
       .APP_NAME - The ame of the project application (see dcicutils.common and the orchestrated app in EnvUtils)
@@ -207,27 +225,26 @@ class Project:
     Some sample usess of pre-defined attributes of a Project that may help motivate the choice of attribute names,
     though how these get initialized is easier if you're basing your package on C4Project,
 
-     registered name |   pypi name   |   repo name    |  name in venv |              |  env utils | pretty env utils
-          and        |     and       |      and       |     a.k.a.    |              |  name and  |   name and
-     PYPROJECT_NAME  |     NAME      |   REPO_NAME    |  PACKAGE_NAME |  PRETTY NAME |  APP_NAME  | APP_PRETTY_NAME
-     ----------------+---------------+----------------+---------------+--------------+------------+------------------
-     dcicsnovault    | dcicsnovault  |  snovault      |  snovault     | Snovault     | snovault   | Snovault
-     encoded-core    | encoded-core  |  encoded-core  |  encoded-core | Encoded Core | core       | Core
-     encoded         | cgap-portal   |  cgap-portal   |  encoded      | CGAP Portal  | cgap       | CGAP
-     encoded         | fourfront     |  fourfront     |  encoded      | Fourfront    | fourfront  | Fourfront
-     encoded         | smaht-portal  |  smaht-portal  |  encoded      | SMaHT Portal | smaht      | SMaHT
+    PYPROJECT_NAME | NAME        |REPO_NAME    |PYPI_NAME    |PACKAGE_NAME  |PRETTY_NAME  |APP_NAME  |APP_PRETTY_NAME
+    ---------------+-------------+-------------+-------------+--------------+-------------+----------+----------------
+    dcicsnovault   |snovault     |snovault     |snovault     |snovault      |Snovault     |snovault  |Snovault
+    encoded-core   |encoded-core |encoded-core |encoded-core |encoded-core  |Encoded Core |core      |Core
+    encoded        |cgap-portal  |cgap-portal  |None         |encoded       |CGAP Portal  |cgap      |CGAP
+    encoded        |fourfront    |fourfront    |None         |encoded       |Fourfront    |fourfront |Fourfront
+    encoded        |smaht-portal |smaht-portal |None         |encoded       |SMaHT Portal |smaht     |SMaHT
 
      The registered name is the one used with the ProjectRegistry.register() decorator.
     """
 
     NAME = 'project'
+    PYPI_NAME = None
 
     _PYPROJECT_NAME = None
     _PACKAGE_NAME = None
 
     @classmethod
     def _prettify(cls, name):
-        return name.replace("-", " ")
+        return name.title().replace("-", " ")
 
     @classproperty
     def REPO_NAME(cls):  # noQA - PyCharm wants the variable name to be self
@@ -313,4 +330,4 @@ class C4Project(Project):
 
     @classmethod
     def _prettify(cls, name):
-        return super()._prettify(name.title().replace("Cgap", "CGAP").replace("Smaht", "SMaHT"))
+        return super()._prettify(name).replace("Cgap", "CGAP").replace("Smaht", "SMaHT")
