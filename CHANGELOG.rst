@@ -16,6 +16,8 @@ Change Log
 
   * New class ``Project``
 
+  * New class ``C4Project``
+
 
 7.4.2
 =====

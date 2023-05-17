@@ -196,23 +196,26 @@ class Project:
     A class that should be a superclass of all classes registered using ProjectRegistry.register
 
     All such classes have these names:
-      .NAME - The name of the project in pyproject.toml
-      .PACKAGE_NAME - The pypi name of the project, useful for pkg_resources, for example.
+      .PYPROJECT_NAME - The name used in the .register decorator on the class, and in pyproject.toml
+      .NAME - The name of the project in pypi
+      .REPO_NAME - The name of the repo
+      .PACKAGE_NAME - The installed name of the project as a package in a venv, for use with pkg_resources
       .PRETTY_NAME - The pretty name of the package name
       .APP_NAME - The ame of the project application (see dcicutils.common and the orchestrated app in EnvUtils)
       .APP_PRETTY_NAME - The pretty name of the project application.
 
-    Some sample usess of pre-defined attributes of a Project that may help motivate the choice of attribute names:
+    Some sample usess of pre-defined attributes of a Project that may help motivate the choice of attribute names,
+    though how these get initialized is easier if you're basing your package on C4Project,
 
-     registered name |
-          and        |
-     PYPROJECT_NAME  |    name     |     NAME     |  PACKAGE_NAME  |  PRETTY NAME |  APP_NAME | APP_PRETTY_NAME
-     ----------------+--------------+----------------+--------------+-----------+----------------
-     snovault        | dcicsnovault |  snovault      | Snovault     | snovault  | Snovault
-     encoded-core    | encoded-core |  encoded-core  | Encoded Core | core      | Core
-     encoded         | cgap-portal  |  cgap-portal   | CGAP Portal  | cgap      | CGAP
-     encoded         | fourfront    |  fourfront     | Fourfront    | fourfront | Fourfront
-     encoded         | smaht-portal |  smaht-portal  | SMaHT Portal | smaht     | SMaHT
+     registered name |   pypi name   |   repo name    |  name in venv |              |  env utils | pretty env utils
+          and        |     and       |      and       |     a.k.a.    |              |  name and  |   name and
+     PYPROJECT_NAME  |     NAME      |   REPO_NAME    |  PACKAGE_NAME |  PRETTY NAME |  APP_NAME  | APP_PRETTY_NAME
+     ----------------+---------------+----------------+---------------+--------------+------------+------------------
+     dcicsnovault    | dcicsnovault  |  snovault      |  snovault     | Snovault     | snovault   | Snovault
+     encoded-core    | encoded-core  |  encoded-core  |  encoded-core | Encoded Core | core       | Core
+     encoded         | cgap-portal   |  cgap-portal   |  encoded      | CGAP Portal  | cgap       | CGAP
+     encoded         | fourfront     |  fourfront     |  encoded      | Fourfront    | fourfront  | Fourfront
+     encoded         | smaht-portal  |  smaht-portal  |  encoded      | SMaHT Portal | smaht      | SMaHT
 
      The registered name is the one used with the ProjectRegistry.register() decorator.
     """
@@ -220,14 +223,29 @@ class Project:
     NAME = 'project'
 
     _PYPROJECT_NAME = None
+    _PACKAGE_NAME = None
 
     @classmethod
     def _prettify(cls, name):
-        return name.title().replace("Cgap", "CGAP").replace("Smaht", "SMaHT").replace("-", " ")
+        return name.replace("-", " ")
+
+    @classproperty
+    def REPO_NAME(cls):  # noQA - PyCharm wants the variable name to be self
+        return cls.NAME
 
     @classproperty
     def PACKAGE_NAME(cls):  # noQA - PyCharm wants the variable name to be self
-        return cls.NAME.replace('dcic', '')
+        if cls._PACKAGE_NAME:
+            return cls._PACKAGE_NAME
+        poetry_data = ProjectRegistry.POETRY_DATA
+        if poetry_data:
+            # We expect the first package in the declared packages to be the primary export
+            # Other exported dirs, such as scripts or tests should be in later entries.
+            package_name = poetry_data['packages'][0]['include']
+        else:
+            package_name = cls.PYPROJECT_NAME
+        cls._PACKAGE_NAME = package_name
+        return package_name
 
     @classproperty
     def PYPROJECT_NAME(cls) -> str:  # noQA - PyCharm wants the variable name to be self
@@ -281,3 +299,18 @@ class Project:
             raise RuntimeError(f"{self}.project_filename invoked,"
                                f" but {self} is not the app_project, {self.app_project}.")
         return resource_filename(self.PYPROJECT_NAME, filename)
+
+
+class C4Project(Project):
+    """
+    Collect C4-specific functionality so that outside organizations don't have to use these heuristics
+    if they don't want to.
+    """
+
+    @classproperty
+    def REPO_NAME(cls):  # noQA - PyCharm wants the variable name to be self
+        return cls.NAME.replace('dcic', '')
+
+    @classmethod
+    def _prettify(cls, name):
+        return super()._prettify(name.title().replace("Cgap", "CGAP").replace("Smaht", "SMaHT"))
