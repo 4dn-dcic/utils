@@ -180,10 +180,7 @@ class ProjectRegistry:
         Once the project is initialized, ProjectRegistry.app_project returns the application object
         that should be used to dispatch project-dependent behavior.
         """
-        if cls._app_project is None:
-            # You need to put a call to
-            raise RuntimeError(f"Attempt to access {cls.__name__}.project before .initialize() called.")
-        app_project: Project = cls._app_project
+        app_project: Project = cls._app_project or cls.initialize()
         return app_project
 
     @classmethod
@@ -207,14 +204,15 @@ class Project:
 
     Some sample usess of pre-defined attributes of a Project that may help motivate the choice of attribute names:
 
-      registered  |
-         name     |     NAME     |  PACKAGE_NAME  |  PRETTY NAME |  APP_NAME | APP_PRETTY_NAME
-     -------------+--------------+----------------+--------------+-----------+----------------
-     snovault     | dcicsnovault |  snovault      | Snovault     | snovault  | Snovault
-     encoded-core | encoded-core |  encoded-core  | Encoded Core | core      | Core
-     encoded      | cgap-portal  |  cgap-portal   | CGAP Portal  | cgap      | CGAP
-     encoded      | fourfront    |  fourfront     | Fourfront    | fourfront | Fourfront
-     encoded      | smaht-portal |  smaht-portal  | SMaHT Portal | smaht     | SMaHT
+     registered name |
+          and        |
+     PYPROJECT_NAME  |    name     |     NAME     |  PACKAGE_NAME  |  PRETTY NAME |  APP_NAME | APP_PRETTY_NAME
+     ----------------+--------------+----------------+--------------+-----------+----------------
+     snovault        | dcicsnovault |  snovault      | Snovault     | snovault  | Snovault
+     encoded-core    | encoded-core |  encoded-core  | Encoded Core | core      | Core
+     encoded         | cgap-portal  |  cgap-portal   | CGAP Portal  | cgap      | CGAP
+     encoded         | fourfront    |  fourfront     | Fourfront    | fourfront | Fourfront
+     encoded         | smaht-portal |  smaht-portal  | SMaHT Portal | smaht     | SMaHT
 
      The registered name is the one used with the ProjectRegistry.register() decorator.
     """
