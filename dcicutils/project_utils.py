@@ -132,18 +132,16 @@ class ProjectRegistry:
         return project  # instantiate and return
 
     _app_project = None
-    _initialized = False
 
     @classmethod
-    def initialize(cls):
-        if cls._initialized:
-            raise RuntimeError(f"{cls.__name__}.initialize() was called more than once.")
+    def initialize(cls, force=False):
+        if cls._app_project and not force:
+            return cls._app_project
         cls._app_project = cls._make_project()
-        cls._initalized = True
         if cls.SHOW_HERALD_WHEN_INITIALIZED:
             cls.show_herald()
         app_project: Project = cls.app_project
-        return app_project  # It's initialized now, so we use the proper interface
+        return app_project
 
     @classmethod
     def show_herald(cls):
@@ -179,7 +177,8 @@ class ProjectRegistry:
         if cls._app_project is None:
             # You need to put a call to
             raise RuntimeError(f"Attempt to access {cls.__name__}.project before .initialize() called.")
-        return cls._app_project
+        app_project: Project = cls._app_project
+        return app_project
 
 
 class Project:
