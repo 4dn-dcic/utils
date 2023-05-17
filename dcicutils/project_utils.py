@@ -187,7 +187,7 @@ class ProjectRegistry:
         the_app = app_project()
         for attr in sorted(dir(the_app)):
             val = getattr(the_app, attr)
-            if attr.isupper() and not attr.startswith("_") and isinstance(val, str):
+            if attr.isupper() and not attr.startswith("_") and (val is None or isinstance(val, str)):
                 print(f"app_project().{attr} == {val!r}")
         print("=" * 80)
 
