@@ -7,6 +7,16 @@ Change Log
 ----------
 
 
+7.5.0
+=====
+
+* New module ``project_utils`` with support for Project mechanism.
+
+  * New decorator ``ProjectRegistry``
+
+  * New class ``Project``
+
+
 7.4.2
 =====
 
