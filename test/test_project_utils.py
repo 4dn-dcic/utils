@@ -39,4 +39,4 @@ def test_project_registry_register():
                 PYPROJECT_NAME = 'foo'
             ignorable(FooProject)  # It won't get this far.
         assert str(exc.value) == ("Explicit FooProject.PYPROJECT_NAME='foo' is not permitted."
-                                  " An assignment to 'foobar' is intended to be managed implicitly.")
+                                  " This assignment is intended to be managed implicitly.")

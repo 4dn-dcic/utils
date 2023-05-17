@@ -65,7 +65,8 @@ class ProjectRegistry:
     REQUIRED_PROJECT_ATTRS = ['NAME']
 
     NON_INHERITED_PROJECT_ATTRS = [
-        'REPO_NAME', 'PYPI_NAME', 'PACKAGE_NAME', 'PRETTY_NAME', 'APP_NAME', 'APP_PRETTY_NAME'
+        # PYPROJECT_NAME and PACKAGE_NAME are also in this set but handled by special case.
+        'REPO_NAME', 'PYPI_NAME', 'PRETTY_NAME', 'APP_NAME', 'APP_PRETTY_NAME'
     ]
 
     @classmethod
@@ -81,6 +82,10 @@ class ProjectRegistry:
 
         Since fourfront and cgap-portal don't occupy the same space, no confusion should result.
         """
+
+        protected_project_bindings = [('PYPROJECT_NAME', '_PYPROJECT_NAME', pyproject_name, False),
+                                      ('PACKAGE_NAME', '_PACKAGE_NAME', None, True)]
+
         def _wrap_class(the_class):
             the_class_name = the_class.__name__
             if not issubclass(the_class, Project):
@@ -88,16 +93,19 @@ class ProjectRegistry:
 
             explicit_attrs = the_class.__dict__
 
-            explicit_pyproject_name = explicit_attrs.get('PYPROJECT_NAME')
-            if explicit_pyproject_name:
-                message = f"Explicit {the_class_name}.PYPROJECT_NAME={explicit_pyproject_name!r} is not permitted."
-                if explicit_pyproject_name != pyproject_name:
-                    message += f" An assignment to {pyproject_name!r} is intended to be managed implicitly."
+            for public_attr, private_attr, default_val, assign_ok in protected_project_bindings:
+                if private_attr in explicit_attrs:
+                    raise ValueError(f"{private_attr} is an internally managed variable. You must not set it.")
+                if public_attr in explicit_attrs:
+                    explicit_val = explicit_attrs[public_attr]
+                    if assign_ok:
+                        setattr(the_class, public_attr, getattr(Project, public_attr))
+                        setattr(the_class, private_attr, explicit_val)
+                    else:
+                        raise ValueError(f"Explicit {the_class_name}.{public_attr}={explicit_val!r} is not permitted."
+                                         f" This assignment is intended to be managed implicitly.")
                 else:
-                    message += " This assignment is intended to be managed implicitly."
-                raise ValueError(message)
-            else:
-                the_class._PYPROJECT_NAME = pyproject_name  # no need for the caller to say this redundantly
+                    setattr(the_class, private_attr, default_val)
 
             for attr in cls.REQUIRED_PROJECT_ATTRS:
                 if attr not in explicit_attrs:
@@ -260,7 +268,7 @@ class Project:
             # Other exported dirs, such as scripts or tests should be in later entries.
             package_name = poetry_data['packages'][0]['include']
         else:
-            package_name = cls.PYPROJECT_NAME
+            package_name = cls.PYPI_NAME or cls.PYPROJECT_NAME
         cls._PACKAGE_NAME = package_name
         return package_name
 
