@@ -147,7 +147,7 @@ class ProjectRegistry:
 
     @classmethod
     def show_herald(cls):
-        app_project = cls.app_project_maker()
+        app_project = Project.app_project_maker()
 
         print("=" * 80)
         print(f"APPLICATION_PROJECT_HOME == {cls.APPLICATION_PROJECT_HOME!r}")
@@ -180,16 +180,6 @@ class ProjectRegistry:
             # You need to put a call to
             raise RuntimeError(f"Attempt to access {cls.__name__}.project before .initialize() called.")
         return cls._app_project
-
-    @classmethod
-    def app_project_maker(cls):
-
-        def app_project(initialize=False, initialization_options: Optional[dict] = None):
-            if initialize:
-                Project.initialize_app_project(**(initialization_options or {}))
-            return ProjectRegistry.app_project
-
-        return app_project
 
 
 class Project:
@@ -255,3 +245,13 @@ class Project:
             EnvUtils.init()
         project: Project = ProjectRegistry.initialize()
         return project
+
+    @classmethod
+    def app_project_maker(cls):
+
+        def app_project(initialize=False, initialization_options: Optional[dict] = None):
+            if initialize:
+                Project.initialize_app_project(**(initialization_options or {}))
+            return Project.app_project
+
+        return app_project
