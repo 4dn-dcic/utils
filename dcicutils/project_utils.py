@@ -184,11 +184,10 @@ class ProjectRegistry:
             "Project consistency check failed."
         )
         print(f"{the_app_project_class_name}.app_project == Project.app_project == app_project() == {app_project()!r}")
-        print(f"app_project().NAME == {app_project().NAME!r}")
-        print(f"app_project().PRETTY_NAME == {app_project().PRETTY_NAME!r}")
-        print(f"app_project().PACKAGE_NAME == {app_project().PACKAGE_NAME!r}")
-        print(f"app_project().APP_NAME == {app_project().APP_NAME!r}")
-        print(f"app_project().APP_PRETTY_NAME == {app_project().APP_PRETTY_NAME!r}")
+        the_app = app_project()
+        for attr in sorted(dir(the_app)):
+            if attr.isupper():
+                print(f"app_project().{attr} == {getattr(the_app, attr)!r}")
         print("=" * 80)
 
     @classproperty
@@ -315,7 +314,7 @@ class Project:
         if self != self.app_project:
             raise RuntimeError(f"{self}.project_filename invoked,"
                                f" but {self} is not the app_project, {self.app_project}.")
-        return resource_filename(self.PYPROJECT_NAME, filename)
+        return resource_filename(self.PACKAGE_NAME, filename)
 
 
 class C4Project(Project):
