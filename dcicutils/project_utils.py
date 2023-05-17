@@ -277,7 +277,9 @@ class Project:
 
         return app_project
 
-    @classmethod
-    def app_project_filename(cls, filename):
-        """Returns a filename relative to the current app_project."""
-        return resource_filename(cls.app_project.PYPROJECT_NAME, filename)
+    def project_filename(self, filename):
+        """Returns a filename relative to given instance."""
+        if self != self.app_project:
+            raise RuntimeError(f"{self}.project_filename invoked,"
+                               f" but {self} is not the app_project, {self.app_project}.")
+        return resource_filename(self.PYPROJECT_NAME, filename)
