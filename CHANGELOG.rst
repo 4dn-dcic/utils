@@ -13,6 +13,22 @@ Change Log
 * Rewrite test ``test_get_response_json`` as a unit test to get around its flakiness.
 
 
+7.4.1.1
+=======
+
+The ``glacier2`` branch did not bump the version. It continues to call itself version 7.4.1 even though the ``v7.4.1`` does not contain its functionality, so the point of change is retroactiely tagged ``v7.4.1.1``.
+
+* In ``common.py``
+
+  * Add constant ``ENCODED_LIFECYCLE_TAG_KEY``
+
+* In ``glacier_utils.py``:
+
+  * Accept support for url-encoded tags for GlacierUtils multipart uploads.
+
+  * Add support for removing lifecycle tag when copying object.
+
+
 7.4.1
 =====
 
