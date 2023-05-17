@@ -1,16 +1,11 @@
+import contextlib
 import os
 import toml
 
 from pkg_resources import resource_filename
 from typing import Optional
 from .env_utils import EnvUtils
-from .misc_utils import classproperty
-
-
-def project_filename(filename):
-    # TODO: In fact we should do this based on the working dir so that when this is imported to another repo,
-    #       it gets the inserts out of that repo's tests, not our own.
-    return resource_filename(Project.PACKAGE_NAME, filename)
+from .misc_utils import classproperty, local_attrs
 
 
 class ProjectRegistry:
@@ -68,9 +63,9 @@ class ProjectRegistry:
             cls._PYPROJECT_NAME = declared_pyproject_name or inferred_pyproject_name
 
     @classmethod
-    def register(cls, name):
+    def register(cls, pyproject_name):
         """
-        Registers a class to be used based on the name in the top of pyproject.toml.
+        Registers a class to be used based on pyproject_name (the name in the top of pyproject.toml).
         Note that this means that cgap-portal and fourfront will both register as 'encoded',
         as in:
 
@@ -84,7 +79,18 @@ class ProjectRegistry:
             the_class_name = the_class.__name__
             if not issubclass(the_class, Project):
                 raise ValueError(f"The class {the_class_name} must inherit from Project.")
-            lower_registry_name = name.lower()
+            explicit_pyproject_name = the_class.__dict__.get('PYPROJECT_NAME')
+            if explicit_pyproject_name:
+                message = f"Explicit {the_class_name}.PYPROJECT_NAME={explicit_pyproject_name!r} is not permitted."
+                if explicit_pyproject_name != pyproject_name:
+                    message += f" An assignment to {pyproject_name!r} is intended to be managed implicitly."
+                else:
+                    message += " This assignment is intended to be managed implicitly."
+                raise ValueError(message)
+            else:
+                the_class._PYPROJECT_NAME = pyproject_name  # no need for the caller to say this redundantly
+
+            lower_registry_name = pyproject_name.lower()
             for x in ['cgap-portal', 'fourfront', 'smaht']:
                 if x in lower_registry_name:
                     # It's an easy error to make, but the name of the project from which we're gaining foothold
@@ -92,10 +98,10 @@ class ProjectRegistry:
                     # needed for bootstrapping. So it should look like
                     # -kmp 15-May-2023
                     raise ValueError(f"Please use ProjectRegistry.register('encoded'),"
-                                     f" not ProjectRegistry.register({name!r})."
+                                     f" not ProjectRegistry.register({pyproject_name!r})."
                                      f" This registration is just for bootstrapping."
                                      f" The class can still be {the_class_name}.")
-            cls.REGISTERED_PROJECTS[name] = the_class
+            cls.REGISTERED_PROJECTS[pyproject_name] = the_class
             return the_class
         return _wrap_class
 
@@ -180,6 +186,13 @@ class ProjectRegistry:
         app_project: Project = cls._app_project
         return app_project
 
+    @classmethod
+    @contextlib.contextmanager
+    def project_registry_test_context(cls):
+        with local_attrs(cls, REGISTERED_PROJECTS={}):
+            assert cls.REGISTERED_PROJECTS == {}
+            yield
+
 
 class Project:
     """
@@ -208,6 +221,8 @@ class Project:
 
     NAME = 'project'
 
+    _PYPROJECT_NAME = None
+
     @classmethod
     def _prettify(cls, name):
         return name.title().replace("Cgap", "CGAP").replace("Smaht", "SMaHT").replace("-", " ")
@@ -215,6 +230,13 @@ class Project:
     @classproperty
     def PACKAGE_NAME(cls):  # noQA - PyCharm wants the variable name to be self
         return cls.NAME.replace('dcic', '')
+
+    @classproperty
+    def PYPROJECT_NAME(cls) -> str:  # noQA - PyCharm wants the variable name to be self
+        pyproject_name = cls._PYPROJECT_NAME
+        if not pyproject_name:
+            raise RuntimeError(f"Class {cls} was not defined with ProjectRegistry.register")
+        return pyproject_name
 
     @classproperty
     def PRETTY_NAME(cls):  # noQA - PyCharm wants the variable name to be self
@@ -254,3 +276,8 @@ class Project:
             return Project.app_project
 
         return app_project
+
+    @classmethod
+    def app_project_filename(cls, filename):
+        """Returns a filename relative to the current app_project."""
+        return resource_filename(cls.app_project.PYPROJECT_NAME, filename)
