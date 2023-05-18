@@ -11,15 +11,15 @@ from dcicutils.project_utils import ProjectRegistry, Project, C4Project
 @contextlib.contextmanager
 def project_registry_test_context(registry=True):
     if registry:
-        with local_attrs(ProjectRegistry, REGISTERED_PROJECTS={}, APPLICATION_PROJECT_HOME=None, PYPROJECT_TOML_FILE=None,
-                         PYPROJECT_TOML=None, POETRY_DATA=None, _app_project=None, _PYPROJECT_NAME=None):
+        with local_attrs(ProjectRegistry, REGISTERED_PROJECTS={}, APPLICATION_PROJECT_HOME=None,
+                         PYPROJECT_TOML_FILE=None, PYPROJECT_TOML=None, POETRY_DATA=None,
+                         _app_project=None, _PYPROJECT_NAME=None):
             yield
     else:
-        with local_attrs(ProjectRegistry, APPLICATION_PROJECT_HOME=None, PYPROJECT_TOML_FILE=None,
-                         PYPROJECT_TOML=None, POETRY_DATA=None, _app_project=None, _PYPROJECT_NAME=None):
+        with local_attrs(ProjectRegistry, APPLICATION_PROJECT_HOME=None,
+                         PYPROJECT_TOML_FILE=None, PYPROJECT_TOML=None, POETRY_DATA=None,
+                         _app_project=None, _PYPROJECT_NAME=None):
             yield
-
-
 
 
 def test_project_registry_register():
@@ -172,7 +172,7 @@ def test_project_registry_register_cgap_scenario():
                 assert app_project().NAME == 'cgap-portal'
                 assert app_project().PACKAGE_NAME == 'encoded'
                 assert app_project().PRETTY_NAME == 'CGAP Portal'
-                assert app_project().PYPI_NAME == None
+                assert app_project().PYPI_NAME is None
                 assert app_project().PYPROJECT_NAME == 'encoded'
                 assert app_project().REPO_NAME == 'cgap-portal'
 

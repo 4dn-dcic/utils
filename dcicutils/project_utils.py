@@ -4,7 +4,7 @@ import toml
 from pkg_resources import resource_filename
 from typing import Optional
 from .env_utils import EnvUtils
-from .misc_utils import classproperty, check_true, PRINT
+from .misc_utils import classproperty, check_true, ignorable, PRINT
 
 
 class ProjectRegistry:
@@ -112,6 +112,7 @@ class ProjectRegistry:
                         found_class = c
                         val = class_dict[attr]
                         break
+                ignorable(found_class)
                 # print(f"Resetting {the_class}.{attr} to {val!r} from {found_class!r}.")
                 setattr(the_class, attr, val)
 
