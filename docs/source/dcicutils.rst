@@ -211,6 +211,13 @@ opensearch_utils
    :members:
 
 
+project_utils
+^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.project_utils
+   :members:
+
+
 redis_utils
 ^^^^^^^^^^^
 
