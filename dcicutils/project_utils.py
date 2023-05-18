@@ -113,7 +113,7 @@ class ProjectRegistry:
 
             for attr in cls.NON_INHERITED_PROJECT_ATTRS:
                 if attr not in explicit_attrs:
-                    setattr(cls, attr, Project.__dict__[attr])
+                    delattr(the_class, attr)
 
             lower_registry_name = pyproject_name.lower()
             for x in ['cgap-portal', 'fourfront', 'smaht']:
@@ -285,7 +285,7 @@ class Project:
 
     @classproperty
     def APP_NAME(cls):  # noQA - PyCharm wants the variable name to be self
-        return cls.PACKAGE_NAME.replace('-portal', '').replace('encoded-', '')
+        return cls.REPO_NAME.replace('-portal', '').replace('encoded-', '')
 
     @classproperty
     def APP_PRETTY_NAME(cls):  # noQA - PyCharm wants the variable name to be self
