@@ -1,11 +1,10 @@
-import contextlib
 import os
 import toml
 
 from pkg_resources import resource_filename
 from typing import Optional
 from .env_utils import EnvUtils
-from .misc_utils import classproperty, local_attrs
+from .misc_utils import classproperty, check_true, PRINT
 
 
 class ProjectRegistry:
@@ -34,9 +33,10 @@ class ProjectRegistry:
     @classmethod
     def initialize_pyproject_name(cls, project_home=None, pyproject_toml_file=None):
         if cls._PYPROJECT_NAME is None:
-            # This isn't the home of snovault, but the home of the snovault-based application.
+            # This isn't the home of Project, but the home of the Project-based application.
             # So in CGAP, for example, this would want to be the home of the CGAP application.
             # If not set, it will be assumed that the current working directory is that.
+            # print("Setting up data.")
             if not project_home:
                 project_home = os.environ.get("APPLICATION_PROJECT_HOME", os.path.abspath(os.curdir))
             cls.APPLICATION_PROJECT_HOME = project_home
@@ -46,12 +46,15 @@ class ProjectRegistry:
                                        if os.path.exists(expected_pyproject_toml_file)
                                        else None)
             cls.PYPROJECT_TOML_FILE = pyproject_toml_file
+            # print(f"Loading toml file {cls.PYPROJECT_TOML_FILE}")
             cls.PYPROJECT_TOML = pyproject_toml = (toml.load(cls.PYPROJECT_TOML_FILE)
                                                    if cls.PYPROJECT_TOML_FILE
                                                    else None)
-            cls.POETRY_DATA = (pyproject_toml['tool']['poetry']
-                               if pyproject_toml
-                               else None)
+            poetry_data = (pyproject_toml['tool']['poetry']
+                           if pyproject_toml
+                           else None)
+            # print(f"Setting POETRY_DATA = {poetry_data}")
+            cls.POETRY_DATA = poetry_data
 
             declared_pyproject_name = os.environ.get("APPLICATION_PYPROJECT_NAME")
             inferred_pyproject_name = cls.POETRY_DATA['name'] if cls.POETRY_DATA else None
@@ -88,8 +91,32 @@ class ProjectRegistry:
 
         def _wrap_class(the_class):
             the_class_name = the_class.__name__
-            if not issubclass(the_class, Project):
-                raise ValueError(f"The class {the_class_name} must inherit from Project.")
+
+            base_class = Project
+            registered_classes = set(cls.REGISTERED_PROJECTS.values())
+            for c in the_class.__mro__[1:]:
+                # Prefer an unregistered subclass of Project if one was used (such as C4Project)
+                if c not in registered_classes and issubclass(c, base_class):
+                    # print(f"Using base_class = {c}")
+                    base_class = c
+                    break
+
+            def reset_attr(the_class, attr):
+                # We can't just delete the property because an inherited value might show through.
+                # We need to actually force a local copy of the base class value.
+                val = None
+                found_class = None
+                for c in the_class.__mro__[1:]:
+                    class_dict = c.__dict__
+                    if attr in class_dict and c not in registered_classes:
+                        found_class = c
+                        val = class_dict[attr]
+                        break
+                # print(f"Resetting {the_class}.{attr} to {val!r} from {found_class!r}.")
+                setattr(the_class, attr, val)
+
+            if not issubclass(the_class, base_class):
+                raise ValueError(f"The class {the_class_name} must inherit from {base_class.__name__}.")
 
             explicit_attrs = the_class.__dict__
 
@@ -99,7 +126,7 @@ class ProjectRegistry:
                 if public_attr in explicit_attrs:
                     explicit_val = explicit_attrs[public_attr]
                     if assign_ok:
-                        setattr(the_class, public_attr, getattr(Project, public_attr))
+                        reset_attr(the_class, public_attr)
                         setattr(the_class, private_attr, explicit_val)
                     else:
                         raise ValueError(f"Explicit {the_class_name}.{public_attr}={explicit_val!r} is not permitted."
@@ -113,7 +140,7 @@ class ProjectRegistry:
 
             for attr in cls.NON_INHERITED_PROJECT_ATTRS:
                 if attr not in explicit_attrs:
-                    delattr(the_class, attr)
+                    reset_attr(the_class, attr)
 
             lower_registry_name = pyproject_name.lower()
             for x in ['cgap-portal', 'fourfront', 'smaht']:
@@ -158,7 +185,10 @@ class ProjectRegistry:
               done automatically by this class.
         """
         project_class = cls._lookup(cls.PYPROJECT_NAME)
-        assert issubclass(project_class, Project)
+        check_true(project_class is not None, error_class=RuntimeError,
+                   message=f"Missing project class {cls.PYPROJECT_NAME}.",)
+        check_true(issubclass(project_class, Project), error_class=ValueError,
+                   message=f"Registered project class is not a subclass of Project.")
         project: Project = project_class()
         return project  # instantiate and return
 
@@ -178,10 +208,10 @@ class ProjectRegistry:
     def show_herald(cls):
         app_project = Project.app_project_maker()
 
-        print("=" * 80)
-        print(f"APPLICATION_PROJECT_HOME == {cls.APPLICATION_PROJECT_HOME!r}")
-        print(f"PYPROJECT_TOML_FILE == {cls.PYPROJECT_TOML_FILE!r}")
-        print(f"PYPROJECT_NAME == {cls.PYPROJECT_NAME!r}")
+        PRINT("=" * 80)
+        PRINT(f"APPLICATION_PROJECT_HOME == {cls.APPLICATION_PROJECT_HOME!r}")
+        PRINT(f"PYPROJECT_TOML_FILE == {cls.PYPROJECT_TOML_FILE!r}")
+        PRINT(f"PYPROJECT_NAME == {cls.PYPROJECT_NAME!r}")
         the_app_project = Project.app_project
         the_app_project_class = the_app_project.__class__
         the_app_project_class_name = the_app_project_class.__name__
@@ -191,13 +221,13 @@ class ProjectRegistry:
                 == the_app_project.app_project), (
             "Project consistency check failed."
         )
-        print(f"{the_app_project_class_name}.app_project == Project.app_project == app_project() == {app_project()!r}")
+        PRINT(f"{the_app_project_class_name}.app_project == Project.app_project == app_project() == {app_project()!r}")
         the_app = app_project()
         for attr in sorted(dir(the_app)):
             val = getattr(the_app, attr)
             if attr.isupper() and not attr.startswith("_") and (val is None or isinstance(val, str)):
-                print(f"app_project().{attr} == {val!r}")
-        print("=" * 80)
+                PRINT(f"app_project().{attr} == {val!r}")
+        PRINT("=" * 80)
 
     @classproperty
     def app_project(cls):  # noQA - PyCharm thinks we should use 'self'
@@ -207,13 +237,6 @@ class ProjectRegistry:
         """
         app_project: Project = cls._app_project or cls.initialize()
         return app_project
-
-    @classmethod
-    @contextlib.contextmanager
-    def project_registry_test_context(cls):
-        with local_attrs(cls, REGISTERED_PROJECTS={}):
-            assert cls.REGISTERED_PROJECTS == {}
-            yield
 
 
 class Project:
@@ -264,10 +287,12 @@ class Project:
             return cls._PACKAGE_NAME
         poetry_data = ProjectRegistry.POETRY_DATA
         if poetry_data:
+            # print(f"There is poetry data: {ProjectRegistry.POETRY_DATA}")
             # We expect the first package in the declared packages to be the primary export
             # Other exported dirs, such as scripts or tests should be in later entries.
             package_name = poetry_data['packages'][0]['include']
         else:
+            # print(f"No poetry data. cls.PYPI_NAME={cls.PYPI_NAME} cls.PYPROJECT_NAME={cls.PYPROJECT_NAME}")
             package_name = cls.PYPI_NAME or cls.PYPROJECT_NAME
         cls._PACKAGE_NAME = package_name
         return package_name
@@ -281,7 +306,7 @@ class Project:
 
     @classproperty
     def PRETTY_NAME(cls):  # noQA - PyCharm wants the variable name to be self
-        return cls._prettify(cls.PACKAGE_NAME)
+        return cls._prettify(cls.NAME)
 
     @classproperty
     def APP_NAME(cls):  # noQA - PyCharm wants the variable name to be self
