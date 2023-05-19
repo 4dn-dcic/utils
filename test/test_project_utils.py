@@ -7,7 +7,7 @@ from dcicutils.env_utils import EnvUtils
 from dcicutils.misc_utils import ignorable, override_environ, local_attrs, StorageCell
 from dcicutils.qa_utils import MockFileSystem
 from dcicutils.project_utils import (
-    ProjectIdentity, C4ProjectIdentity, Project, C4Project, ProjectRegistry, C4ProjectRegistry,
+    ProjectNames, C4ProjectNames, Project, C4Project, ProjectRegistry, C4ProjectRegistry,
 )
 from unittest import mock
 from dcicutils import project_utils as project_utils_module
@@ -32,7 +32,7 @@ def test_project_registry_register():
 
             @ProjectRegistry.register('foo')
             class FooProject(Project):
-                IDENTITY = {"NAME": "foo", "PRETTY_NAME": "Fu"}
+                NAMES = {"NAME": "foo", "PRETTY_NAME": "Fu"}
 
             foo_project = FooProject()
 
@@ -43,7 +43,7 @@ def test_project_registry_register():
 
             @ProjectRegistry.register('foobar')
             class FooBarProject(Project):
-                IDENTITY = {"NAME": "foobar"}
+                NAMES = {"NAME": "foobar"}
 
             foobar_project = FooBarProject()
 
@@ -55,46 +55,46 @@ def test_project_registry_register():
             with pytest.raises(Exception) as exc:
                 @ProjectRegistry.register('foo')
                 class FooProject:
-                    IDENTITY = {"NAME": 'foo'}
+                    NAMES = {"NAME": 'foo'}
                 ignorable(FooProject)  # It won't get this far.
             assert str(exc.value) == "The class FooProject must inherit from Project."
 
             with pytest.raises(Exception) as exc:
                 @C4ProjectRegistry.register('foo')
                 class FooProject(Project):
-                    IDENTITY = {"NAME": 'foo'}
+                    NAMES = {"NAME": 'foo'}
                 ignorable(FooProject)  # It won't get this far.
             assert str(exc.value) == "The class FooProject must inherit from C4Project."
 
             with pytest.raises(Exception) as exc:
                 @ProjectRegistry.register('foo')
                 class FooProject(Project):
-                    IDENTITY = {}
+                    NAMES = {}
                 ignorable(FooProject)  # It won't get this far.
-            assert str(exc.value) == "Declaration of FooProject must have a non-empty IDENTITY= specification."
+            assert str(exc.value) == "Declaration of FooProject must have a non-empty NAMES= specification."
 
             with pytest.raises(Exception) as exc:
                 @ProjectRegistry.register('foo')
                 class FooProject(Project):
-                    IDENTITY = {"APP_NAME": 'foo'}
+                    NAMES = {"APP_NAME": 'foo'}
                 ignorable(FooProject)  # It won't get this far.
-            assert str(exc.value) == "Declaration of FooProject IDENTITY= is missing 'NAME'."
+            assert str(exc.value) == "Declaration of FooProject NAMES= is missing 'NAME'."
 
             with pytest.raises(Exception) as exc:
                 @ProjectRegistry.register('foo')
                 class FooProject(Project):
-                    IDENTITY = {"PYPROJECT_NAME": 'foox'}
+                    NAMES = {"PYPROJECT_NAME": 'foox'}
                 ignorable(FooProject)  # It won't get this far.
-            assert str(exc.value) == ("Explicitly specifying IDENTITY={'PYPROJECT_NAME': ...} is not allowed."
+            assert str(exc.value) == ("Explicitly specifying NAMES={'PYPROJECT_NAME': ...} is not allowed."
                                       " The PYPROJECT_NAME is managed implicitly"
                                       " using information given in the ProjectRegistry.register decorator.")
 
             with pytest.raises(Exception) as exc:
                 @ProjectRegistry.register('foobar')
                 class FooProject(Project):
-                    IDENTITY = {"PYPROJECT_NAME": 'foox'}
+                    NAMES = {"PYPROJECT_NAME": 'foox'}
                 ignorable(FooProject)  # It won't get this far.
-            assert str(exc.value) == ("Explicitly specifying IDENTITY={'PYPROJECT_NAME': ...} is not allowed."
+            assert str(exc.value) == ("Explicitly specifying NAMES={'PYPROJECT_NAME': ...} is not allowed."
                                       " The PYPROJECT_NAME is managed implicitly"
                                       " using information given in the ProjectRegistry.register decorator.")
 
@@ -123,7 +123,7 @@ def test_project_registry_register_snovault_scenario():
 
             @ProjectRegistry.register('dcicsnovault')
             class SnovaultProject(C4Project):
-                IDENTITY = {"NAME": 'snovault', "PYPI_NAME": 'dcicsnovault'}
+                NAMES = {"NAME": 'snovault', "PYPI_NAME": 'dcicsnovault'}
                 ACCESSION_PREFIX = 'SNO'
 
             def test_it(package_name):
@@ -185,12 +185,12 @@ def test_project_registry_register_cgap_scenario():
 
             @ProjectRegistry.register('dcicsnovault')
             class SnovaultProject(C4Project):
-                IDENTITY = {"NAME": 'snovault', "PYPI_NAME": 'dcicsnovault'}
+                NAMES = {"NAME": 'snovault', "PYPI_NAME": 'dcicsnovault'}
                 ACCESSION_PREFIX = 'SNO'
 
             @ProjectRegistry.register('encoded')
             class CGAPProject(SnovaultProject):
-                IDENTITY = {"NAME": 'cgap-portal'}
+                NAMES = {"NAME": 'cgap-portal'}
                 ACCESSION_PREFIX = 'GAP'
 
             def test_it():
@@ -219,72 +219,72 @@ def test_project_registry_register_cgap_scenario():
                 test_it()
 
 
-def test_project_identity_prettify():
+def test_project_names_prettify():
 
-    assert ProjectIdentity.prettify('foo') == 'Foo'
-    assert ProjectIdentity.prettify('foo-bar') == 'Foo Bar'
+    assert ProjectNames.prettify('foo') == 'Foo'
+    assert ProjectNames.prettify('foo-bar') == 'Foo Bar'
 
-    assert ProjectIdentity.prettify('cgap-portal') == 'Cgap Portal'
-    assert ProjectIdentity.prettify('smaht-portal') == 'Smaht Portal'
-
-
-def test_c4_project_identity_prettify():
-
-    assert C4ProjectIdentity.prettify('foo') == 'Foo'
-    assert C4ProjectIdentity.prettify('foo-bar') == 'Foo Bar'
-
-    assert C4ProjectIdentity.prettify('cgap-portal') == 'CGAP Portal'
-    assert C4ProjectIdentity.prettify('smaht-portal') == 'SMaHT Portal'
+    assert ProjectNames.prettify('cgap-portal') == 'Cgap Portal'
+    assert ProjectNames.prettify('smaht-portal') == 'Smaht Portal'
 
 
-def test_project_identity_appify():
+def test_c4_project_names_prettify():
 
-    # Just an identity function in the ProjectIdentity class
+    assert C4ProjectNames.prettify('foo') == 'Foo'
+    assert C4ProjectNames.prettify('foo-bar') == 'Foo Bar'
 
-    assert ProjectIdentity.appify('snovault') == 'snovault'
-    assert ProjectIdentity.appify('dcicsnovault') == 'dcicsnovault'
-    assert ProjectIdentity.appify('cgap-portal') == 'cgap-portal'
-    assert ProjectIdentity.appify('encoded-core') == 'encoded-core'
-
-
-def test_c4_project_identity_appify():
-
-    assert C4ProjectIdentity.appify('snovault') == 'snovault'
-    assert C4ProjectIdentity.appify('dcicsnovault') == 'dcicsnovault'
-
-    assert C4ProjectIdentity.appify('cgap-portal') == 'cgap'
-    assert C4ProjectIdentity.appify('encoded-core') == 'core'
+    assert C4ProjectNames.prettify('cgap-portal') == 'CGAP Portal'
+    assert C4ProjectNames.prettify('smaht-portal') == 'SMaHT Portal'
 
 
-def test_project_identity_repofy():
+def test_project_names_appify():
 
-    # Just an identity function in the ProjectIdentity class
+    # Just an identity function in the ProjectNames class
 
-    assert ProjectIdentity.repofy('snovault') == 'snovault'
-    assert ProjectIdentity.repofy('dcicsnovault') == 'dcicsnovault'
-    assert ProjectIdentity.repofy('cgap-portal') == 'cgap-portal'
-    assert ProjectIdentity.repofy('encoded-core') == 'encoded-core'
-
-
-def test_c4_project_identity_repofy():
-
-    assert C4ProjectIdentity.repofy('snovault') == 'snovault'
-    assert C4ProjectIdentity.repofy('dcicsnovault') == 'snovault'
-
-    assert C4ProjectIdentity.repofy('cgap-portal') == 'cgap-portal'
-    assert C4ProjectIdentity.repofy('encoded-core') == 'encoded-core'
+    assert ProjectNames.appify('snovault') == 'snovault'
+    assert ProjectNames.appify('dcicsnovault') == 'dcicsnovault'
+    assert ProjectNames.appify('cgap-portal') == 'cgap-portal'
+    assert ProjectNames.appify('encoded-core') == 'encoded-core'
 
 
-def test_project_identity_infer_package_name():
+def test_c4_project_names_appify():
 
-    assert ProjectIdentity.infer_package_name(poetry_data={}, pypi_name='foo', pyproject_name='bar') == 'foo'
-    assert ProjectIdentity.infer_package_name(poetry_data=None, pypi_name='foo', pyproject_name='bar') == 'foo'
+    assert C4ProjectNames.appify('snovault') == 'snovault'
+    assert C4ProjectNames.appify('dcicsnovault') == 'dcicsnovault'
 
-    assert ProjectIdentity.infer_package_name(poetry_data={}, pypi_name=None, pyproject_name='bar') == 'bar'
-    assert ProjectIdentity.infer_package_name(poetry_data=None, pypi_name=None, pyproject_name='bar') == 'bar'
+    assert C4ProjectNames.appify('cgap-portal') == 'cgap'
+    assert C4ProjectNames.appify('encoded-core') == 'core'
+
+
+def test_project_names_repofy():
+
+    # Just an identity function in the ProjectNames class
+
+    assert ProjectNames.repofy('snovault') == 'snovault'
+    assert ProjectNames.repofy('dcicsnovault') == 'dcicsnovault'
+    assert ProjectNames.repofy('cgap-portal') == 'cgap-portal'
+    assert ProjectNames.repofy('encoded-core') == 'encoded-core'
+
+
+def test_c4_project_names_repofy():
+
+    assert C4ProjectNames.repofy('snovault') == 'snovault'
+    assert C4ProjectNames.repofy('dcicsnovault') == 'snovault'
+
+    assert C4ProjectNames.repofy('cgap-portal') == 'cgap-portal'
+    assert C4ProjectNames.repofy('encoded-core') == 'encoded-core'
+
+
+def test_project_names_infer_package_name():
+
+    assert ProjectNames.infer_package_name(poetry_data={}, pypi_name='foo', pyproject_name='bar') == 'foo'
+    assert ProjectNames.infer_package_name(poetry_data=None, pypi_name='foo', pyproject_name='bar') == 'foo'
+
+    assert ProjectNames.infer_package_name(poetry_data={}, pypi_name=None, pyproject_name='bar') == 'bar'
+    assert ProjectNames.infer_package_name(poetry_data=None, pypi_name=None, pyproject_name='bar') == 'bar'
 
     def test_package_name_from_poetry_data(*, poetry_data, expected):
-        actual = ProjectIdentity.infer_package_name(poetry_data=poetry_data, pypi_name=None, pyproject_name='fallback')
+        actual = ProjectNames.infer_package_name(poetry_data=poetry_data, pypi_name=None, pyproject_name='fallback')
         assert actual == expected
 
     test_package_name_from_poetry_data(poetry_data={'name': 'whatever'},
@@ -306,7 +306,7 @@ def test_project_registry_find_pyproject():
 
             @ProjectRegistry.register('foo')
             class FooProject(Project):
-                IDENTITY = {"NAME": "foo"}
+                NAMES = {"NAME": "foo"}
 
             assert ProjectRegistry.find_pyproject('foo') == FooProject
             assert ProjectRegistry.find_pyproject('bar') is None
@@ -322,7 +322,7 @@ def test_project_registry_make_project():
 
             @ProjectRegistry.register('foo')
             class FooProject(Project):
-                IDENTITY = {"NAME": "foo"}
+                NAMES = {"NAME": "foo"}
 
             with pytest.raises(Exception) as exc:
                 ProjectRegistry._make_project()
@@ -368,14 +368,14 @@ def test_app_project_bad_initialization():
 
             @ProjectRegistry.register('foo')
             class FooProject(Project):
-                IDENTITY = {"NAME": "foo"}
+                NAMES = {"NAME": "foo"}
 
             ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
             app_project = FooProject.app_project_maker()
             project = app_project()
-            project._identity = None  # simulate screwing up of initialization
+            project._names = None  # simulate screwing up of initialization
             with pytest.raises(Exception) as exc:
-                print(project.identity)
+                print(project.names)
             assert str(exc.value) == "<FooProject> failed to initialize correctly."
 
 
@@ -391,7 +391,7 @@ def test_project_registry_class():
 
                 @ProjectRegistry.register('foo')
                 class FooProject(Project):
-                    IDENTITY = {"NAME": "foo"}
+                    NAMES = {"NAME": "foo"}
                 ignorable(FooProject)
 
                 Project._PROJECT_REGISTRY_CLASS = None  # Let's just mock up the problem
@@ -415,7 +415,7 @@ def test_project_filename():
 
             @ProjectRegistry.register('foo')
             class FooProject(Project):
-                IDENTITY = {"NAME": "foo"}
+                NAMES = {"NAME": "foo"}
 
             ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
             app_project = FooProject.app_project_maker()
@@ -445,7 +445,7 @@ def test_project_registry_register_bad_name():
             with pytest.raises(Exception) as exc:
                 @ProjectRegistry.register(17)
                 class FooProject(Project):
-                    IDENTITY = {"NAME": "foo"}
+                    NAMES = {"NAME": "foo"}
                 ignorable(FooProject)
             assert str(exc.value) == "The pyprjoect_name given to ProjectRegistry.register must be a string: 17"
 
@@ -459,7 +459,7 @@ def test_bad_pyproject_names():
             with pytest.raises(Exception) as exc:
                 @C4ProjectRegistry.register('cgap-portal')
                 class CGAPProject(C4Project):
-                    IDENTITY = {"NAME": "cgap-portal"}
+                    NAMES = {"NAME": "cgap-portal"}
                 ignorable(CGAPProject)
             assert str(exc.value) == ("Please use C4ProjectRegistry.register('encoded'),"
                                       " not C4ProjectRegistry.register('cgap-portal')."
@@ -469,7 +469,7 @@ def test_bad_pyproject_names():
             with pytest.raises(Exception) as exc:
                 @C4ProjectRegistry.register('fourfront')
                 class FourfrontProject(C4Project):
-                    IDENTITY = {"NAME": "fourfront"}
+                    NAMES = {"NAME": "fourfront"}
                 ignorable(FourfrontProject)
             assert str(exc.value) == ("Please use C4ProjectRegistry.register('encoded'),"
                                       " not C4ProjectRegistry.register('fourfront')."
@@ -479,7 +479,7 @@ def test_bad_pyproject_names():
             with pytest.raises(Exception) as exc:
                 @C4ProjectRegistry.register('smaht-portal')
                 class SMaHTProject(C4Project):
-                    IDENTITY = {"NAME": "smaht-portal"}
+                    NAMES = {"NAME": "smaht-portal"}
                 ignorable(SMaHTProject)
             assert str(exc.value) == ("Please use C4ProjectRegistry.register('encoded'),"
                                       " not C4ProjectRegistry.register('smaht-portal')."
@@ -495,7 +495,7 @@ def test_project_registry_initialize():
 
             @ProjectRegistry.register('foo')
             class FooProject(Project):
-                IDENTITY = {"NAME": "foo"}
+                NAMES = {"NAME": "foo"}
 
             ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
             app_project = FooProject.app_project_maker()
@@ -537,7 +537,7 @@ def test_project_initialize_app_project():
 
             @C4ProjectRegistry.register('super')
             class SuperProject(C4Project):
-                IDENTITY = {"NAME": "super"}
+                NAMES = {"NAME": "super"}
 
             ProjectRegistry.initialize_pyproject_name(pyproject_name='super')
             project = SuperProject.initialize_app_project()

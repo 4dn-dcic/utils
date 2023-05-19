@@ -7,18 +7,39 @@ from .env_utils import EnvUtils
 from .misc_utils import PRINT, StorageCell, classproperty
 
 
-class ProjectIdentity:
+class ProjectNames:
 
     @classmethod
     def prettify(cls, name: str) -> str:
+        """
+        Turns a token name (possibly hyphenated) into a pretty name with capitalized words.
+        e.g, "foo-bar" => "Foo Bar"
+
+        :param name: the string to transform
+        :return: the pretty version of the name
+        """
         return name.title().replace("-", " ")
 
     @classmethod
     def appify(cls, name: str) -> str:
+        """
+        Turns a repo name into an app name.
+        This method is an identity operation in this class, but might be subclassed in subclasses.
+        For example, it might remove superfluous modifiers that are not distinguishing characteristics of the app.
+        e.g., in this class "cgap-portal" is like "foo-bar-baz" and is just returned directly,
+        but in a subclass this method might be customized to shorten "cgap-portal" to "cgap".
+        Or if there was a "cgap-support" repo, it might also want to refer to an app name of "cgap".
+        """
         return name
 
     @classmethod
     def repofy(cls, name: str) -> str:
+        """
+        Turns a pypi name into a repo name.
+        In this class, this is just an identity, but it might be customized in a subclass.
+        For example, in the C4 projects, "dcicutils" uses the repo name "utils", and "dcicsnovault" uses
+        the repo "snovault", so a subclass of this class might be customized to strip "dcic" from the name.
+        """
         return name
 
     @classmethod
@@ -77,13 +98,13 @@ class Project:
      The registered name is the one used with the ProjectRegistry.register() decorator.
     """
 
-    # This contains only the initial spec and is NOT used after initialization. See .identity (and ._identity).
+    # This contains only the initial spec and is NOT used after initialization. See .names (and ._names).
     # It is declared in this way so that actual declarations of project classes don't show up as syntax errors.
-    IDENTITY: Optional[dict] = None
+    NAMES: Optional[dict] = None
 
-    IDENTITY_CLASS: Type[ProjectIdentity] = ProjectIdentity
+    NAMES_CLASS: Type[ProjectNames] = ProjectNames
 
-    _identity: Optional[ProjectIdentity] = None  # Class-level default, overridden in instances as a ProjectIdentity
+    _names: Optional[ProjectNames] = None  # Class-level default, overridden in instances as a ProjectNames
 
     _PROJECT_REGISTRY_CLASS = None
 
@@ -109,51 +130,51 @@ class Project:
         cls._PROJECT_REGISTRY_CLASS = registry_class
 
     def __init__(self):
-        self._identity: ProjectIdentity = self.IDENTITY_CLASS(**self.IDENTITY)
+        self._names: ProjectNames = self.NAMES_CLASS(**self.NAMES)
 
     def __str__(self):
         return f"<{self.__class__.__name__} {id(self):x}>"
 
     def __repr__(self):
-        return f"{self.__class__.__name__}()"
+        return self.__str__()
 
     @property
-    def identity(self) -> ProjectIdentity:
-        if self._identity is None:
+    def names(self) -> ProjectNames:
+        if self._names is None:
             raise ValueError(f"<{self.__class__.__name__}> failed to initialize correctly.")
-        return self._identity
+        return self._names
 
     @property
     def PYPROJECT_NAME(self) -> str:
-        return self.identity.PYPROJECT_NAME
+        return self.names.PYPROJECT_NAME
 
     @property
     def NAME(self):
-        return self.identity.NAME
+        return self.names.NAME
 
     @property
     def REPO_NAME(self) -> str:
-        return self.identity.REPO_NAME
+        return self.names.REPO_NAME
 
     @property
     def PYPI_NAME(self):
-        return self.identity.PYPI_NAME
+        return self.names.PYPI_NAME
 
     @property
     def PACKAGE_NAME(self) -> str:
-        return self.identity.PACKAGE_NAME
+        return self.names.PACKAGE_NAME
 
     @property
     def PRETTY_NAME(self):
-        return self.identity.PRETTY_NAME
+        return self.names.PRETTY_NAME
 
     @property
     def APP_NAME(self):
-        return self.identity.APP_NAME
+        return self.names.APP_NAME
 
     @property
     def APP_PRETTY_NAME(self):
-        return self.identity.APP_PRETTY_NAME
+        return self.names.APP_PRETTY_NAME
 
     @classproperty
     def app_project(cls):  # noQA - PyCharm wants the variable name to be self
@@ -259,11 +280,11 @@ class ProjectRegistry:
                 pyproject_name = declared_pyproject_name or inferred_pyproject_name
             ProjectRegistry._PYPROJECT_NAME = pyproject_name
 
-    REQUIRED_IDENTITY_PARAMETERS = ['NAME']
+    REQUIRED_NAMES_KEYS = ['NAME']
 
-    PROTECTED_IDENTITY_PARAMETERS = ['PYPROJECT_NAME']
+    PROTECTED_NAMES_KEYS = ['PYPROJECT_NAME']
 
-    BAD_PYPROJECT_NAMES = []
+    DISALLOWED_PYPROJECT_NAME_HINTS = []
 
     @classmethod
     def register(cls, pyproject_name):
@@ -292,30 +313,30 @@ class ProjectRegistry:
 
             explicit_attrs = the_class.__dict__
 
-            identity_spec = explicit_attrs.get('IDENTITY')
+            names_spec = explicit_attrs.get('NAMES')
 
-            if not identity_spec:
-                raise ValueError(f"Declaration of {the_class_name} must have a non-empty IDENTITY= specification.")
+            if not names_spec:
+                raise ValueError(f"Declaration of {the_class_name} must have a non-empty NAMES= specification.")
 
-            if 'PYPROJECT_NAME' in identity_spec:
-                raise ValueError(f"Explicitly specifying IDENTITY={{'PYPROJECT_NAME': ...}} is not allowed."
+            if 'PYPROJECT_NAME' in names_spec:
+                raise ValueError(f"Explicitly specifying NAMES={{'PYPROJECT_NAME': ...}} is not allowed."
                                  f" The PYPROJECT_NAME is managed implicitly using information"
                                  f" given in the {cls.__name__}.register decorator.")
 
-            for attr in cls.REQUIRED_IDENTITY_PARAMETERS:
-                if attr not in identity_spec:
-                    raise ValueError(f"Declaration of {the_class_name} IDENTITY= is missing {attr!r}.")
+            for attr in cls.REQUIRED_NAMES_KEYS:
+                if attr not in names_spec:
+                    raise ValueError(f"Declaration of {the_class_name} NAMES= is missing {attr!r}.")
 
-            identity_spec['PYPROJECT_NAME'] = pyproject_name
+            names_spec['PYPROJECT_NAME'] = pyproject_name
 
-            lower_registry_name = pyproject_name.lower()
-            for bad, better in cls.BAD_PYPROJECT_NAMES:
-                if bad in lower_registry_name:  # substring check
+            lower_pyproject_name = pyproject_name.lower()
+            for disallowed, hint in cls.DISALLOWED_PYPROJECT_NAME_HINTS:
+                if disallowed.lower() == lower_pyproject_name:  # substring check
                     # It's an easy error to make, but the name of the project from which we're gaining foothold
                     # in pyproject.toml is 'encoded', not 'cgap-portal', etc., so the name 'encoded' will be
                     # needed for bootstrapping. So it should look like
                     # -kmp 15-May-2023
-                    raise ValueError(f"Please use {cls.__name__}.register({better!r}),"
+                    raise ValueError(f"Please use {cls.__name__}.register({hint!r}),"
                                      f" not {cls.__name__}.register({pyproject_name!r})."
                                      f" This name choice in project registration is just for bootstrapping."
                                      f" The class can still be {the_class_name}.")
@@ -416,19 +437,43 @@ Project.declare_project_registry_class(ProjectRegistry)  # Finalize a circular d
 # --------------------------------------------------------------------------------
 
 
-class C4ProjectIdentity(ProjectIdentity):
+class C4ProjectNames(ProjectNames):
+
+    @classmethod
+    def prettify(cls, name: str) -> str:
+        """
+        Tries to prettify a string name within the C4 world.
+
+        C4 is the shorthand name for 4DN, CGAP, and other projects at DBMI.
+
+        :param name: the name to transform
+        :return: the pretty name
+        """
+        return super().prettify(name).replace("Cgap", "CGAP").replace("Smaht", "SMaHT")
 
     @classmethod
     def appify(cls, name: str) -> str:
+        """
+        Tries to transform a C4 repo name into a C4 app name.
+
+        C4 is the shorthand name for 4DN, CGAP, and other projects at DBMI.
+
+        :param name: the name to transform
+        :return: the app-style name
+        """
         return name.replace('-portal', '').replace('encoded-', '')
 
     @classmethod
     def repofy(cls, name: str) -> str:
-        return name.replace('dcic', '')
+        """
+        Tries to transform a C4 pypi name into a C4 repo name.
 
-    @classmethod
-    def prettify(cls, name: str) -> str:
-        return super().prettify(name).replace("Cgap", "CGAP").replace("Smaht", "SMaHT")
+        C4 is the shorthand name for 4DN, CGAP, and other projects at DBMI.
+
+        :param name: the name to transform
+        :return: the repo-style name
+        """
+        return name.replace('dcic', '')
 
 
 class C4Project(Project):
@@ -436,16 +481,16 @@ class C4Project(Project):
     Uses C4 functionality for naming. Outside organizations may not want such heuristics.
     """
 
-    IDENTITY_CLASS = C4ProjectIdentity
+    NAMES_CLASS = C4ProjectNames
 
 
 class C4ProjectRegistry(ProjectRegistry):
 
     PROJECT_BASE_CLASS = C4Project
 
-    BAD_PYPROJECT_NAMES = [('cgap-portal', 'encoded'),
-                           ('fourfront', 'encoded'),
-                           ('smaht', 'encoded')]
+    DISALLOWED_PYPROJECT_NAME_HINTS = [('cgap-portal', 'encoded'),
+                                       ('fourfront', 'encoded'),
+                                       ('smaht-portal', 'encoded')]
 
 
 # Finalize a circular dependency
