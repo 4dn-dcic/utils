@@ -4,7 +4,7 @@ import toml
 from pkg_resources import resource_filename
 from typing import Optional, Type
 from .env_utils import EnvUtils
-from .misc_utils import classproperty, check_true, PRINT
+from .misc_utils import PRINT, StorageCell, classproperty
 
 
 class ProjectIdentity:
@@ -42,6 +42,9 @@ class ProjectIdentity:
         self.APP_NAME = APP_NAME = APP_NAME or self.appify(REPO_NAME)
         self.APP_PRETTY_NAME = APP_PRETTY_NAME or self.prettify(APP_NAME)
         self.PACKAGE_NAME = (PACKAGE_NAME
+                             # This uses ProjectRegistry (not cls) because that part of the protocol is common to all
+                             # classes and subclasses of that class. No need to worry about specialized classes.
+                             # -kmp 19-May-2023
                              or self.infer_package_name(poetry_data=ProjectRegistry.POETRY_DATA,
                                                         pypi_name=PYPI_NAME, pyproject_name=PYPROJECT_NAME))
 
@@ -81,6 +84,29 @@ class Project:
     IDENTITY_CLASS: Type[ProjectIdentity] = ProjectIdentity
 
     _identity: Optional[ProjectIdentity] = None  # Class-level default, overridden in instances as a ProjectIdentity
+
+    _PROJECT_REGISTRY_CLASS = None
+
+    @classproperty
+    def PROJECT_REGISTRY_CLASS(cls):  # noQA - PyCharm thinks this should use 'self'
+        registry_class: Optional[Type[ProjectRegistry]] = cls._PROJECT_REGISTRY_CLASS
+        if registry_class is None:
+            raise ValueError(f"Cannot compute {cls.__name__}.PROJECT_REGISTRY_CLASS"
+                             f" because {cls.__name__}.declare_project_registry_class(...) has not been done.")
+        return registry_class
+
+    @classmethod
+    def declare_project_registry_class(cls, registry_class: Type):
+        """
+        This function is needed to complete a circularity where project classes need to know the appropriate
+        registry class and registry classes need to know the appropriate project class, so by convention when
+        the registry class (which is defined after the project class) is fully defined, this method on the project
+        class should be called with the registry class.
+        """
+        if not isinstance(registry_class, type) or not issubclass(registry_class, ProjectRegistry):
+            raise ValueError(f"The registry_class,{registry_class} is not a subclass of ProjectRegistry.")
+        registry_class: Type[ProjectRegistry]
+        cls._PROJECT_REGISTRY_CLASS = registry_class
 
     def __init__(self):
         self._identity: ProjectIdentity = self.IDENTITY_CLASS(**self.IDENTITY)
@@ -131,21 +157,25 @@ class Project:
 
         This access will fail if the project has not been initialized.
         """
+        # This is a shared cell, so it doesn't matter whether we read this from ProjectRegistry
+        # or one of its subclasses. -kmp 19-May-2023
         return ProjectRegistry.app_project
 
     @classmethod
     def initialize_app_project(cls, initialize_env_utils=True):
         if initialize_env_utils:
             EnvUtils.init()
-        project: Project = ProjectRegistry.initialize()
+        project: Project = cls.PROJECT_REGISTRY_CLASS.initialize()
         return project
 
     @classmethod
     def app_project_maker(cls):
 
-        def app_project(initialize=False, initialization_options: Optional[dict] = None):
+        registry_class: ProjectRegistry = cls.PROJECT_REGISTRY_CLASS
+
+        def app_project(initialize: bool = False, initialization_options: Optional[dict] = None) -> Project:
             if initialize:
-                Project.initialize_app_project(**(initialization_options or {}))
+                registry_class.PROJECT_BASE_CLASS.initialize_app_project(**(initialization_options or {}))
             return Project.app_project
 
         return app_project
@@ -160,7 +190,7 @@ class Project:
 
 class ProjectRegistry:
 
-    PROJECT_BASE_CLASS = Project
+    PROJECT_BASE_CLASS: Type[Project] = Project
 
     SHOW_HERALD_WHEN_INITIALIZED = True
 
@@ -184,39 +214,43 @@ class ProjectRegistry:
         return result
 
     @classmethod
-    def initialize_pyproject_name(cls, project_home=None, pyproject_toml_file=None):
-        if cls._PYPROJECT_NAME is None:
+    def initialize_pyproject_name(cls, project_home=None, pyproject_toml_file=None,
+                                  pyproject_toml=None, poetry_data=None, pyproject_name=None):
+        if ProjectRegistry._PYPROJECT_NAME is None:
             # This isn't the home of Project, but the home of the Project-based application.
             # So in CGAP, for example, this would want to be the home of the CGAP application.
             # If not set, it will be assumed that the current working directory is that.
             # print("Setting up data.")
             if not project_home:
                 project_home = os.environ.get("APPLICATION_PROJECT_HOME", os.path.abspath(os.curdir))
-            cls.APPLICATION_PROJECT_HOME = project_home
+            ProjectRegistry.APPLICATION_PROJECT_HOME = project_home
             if not pyproject_toml_file:
                 expected_pyproject_toml_file = os.path.join(project_home, "pyproject.toml")
                 pyproject_toml_file = (expected_pyproject_toml_file
                                        if os.path.exists(expected_pyproject_toml_file)
                                        else None)
-            cls.PYPROJECT_TOML_FILE = pyproject_toml_file
+            ProjectRegistry.PYPROJECT_TOML_FILE = pyproject_toml_file
             # print(f"Loading toml file {cls.PYPROJECT_TOML_FILE}")
-            cls.PYPROJECT_TOML = pyproject_toml = (toml.load(cls.PYPROJECT_TOML_FILE)
-                                                   if cls.PYPROJECT_TOML_FILE
-                                                   else None)
-            poetry_data = (pyproject_toml['tool']['poetry']
-                           if pyproject_toml
-                           else None)
+            if not pyproject_toml:
+                ProjectRegistry.PYPROJECT_TOML = pyproject_toml = (toml.load(ProjectRegistry.PYPROJECT_TOML_FILE)
+                                                       if ProjectRegistry.PYPROJECT_TOML_FILE
+                                                       else None)
+            if not poetry_data:
+                poetry_data = (pyproject_toml['tool']['poetry']
+                               if pyproject_toml
+                               else None)
             # print(f"Setting POETRY_DATA = {poetry_data}")
-            cls.POETRY_DATA = poetry_data
+            ProjectRegistry.POETRY_DATA = poetry_data
 
-            declared_pyproject_name = os.environ.get("APPLICATION_PYPROJECT_NAME")
-            inferred_pyproject_name = cls.POETRY_DATA['name'] if cls.POETRY_DATA else None
-            if (declared_pyproject_name and inferred_pyproject_name
-                    and declared_pyproject_name != inferred_pyproject_name):
-                raise RuntimeError(f"APPLICATION_PYPROJECT_NAME={declared_pyproject_name!r},"
-                                   f" but {pyproject_toml_file} says it should be {inferred_pyproject_name!r}")
-
-            cls._PYPROJECT_NAME = declared_pyproject_name or inferred_pyproject_name
+            if not pyproject_name:
+                declared_pyproject_name = os.environ.get("APPLICATION_PYPROJECT_NAME")
+                inferred_pyproject_name = ProjectRegistry.POETRY_DATA['name'] if ProjectRegistry.POETRY_DATA else None
+                if (declared_pyproject_name and inferred_pyproject_name
+                        and declared_pyproject_name != inferred_pyproject_name):
+                    raise RuntimeError(f"APPLICATION_PYPROJECT_NAME={declared_pyproject_name!r},"
+                                       f" but {pyproject_toml_file} says it should be {inferred_pyproject_name!r}")
+                pyproject_name = declared_pyproject_name or inferred_pyproject_name
+            ProjectRegistry._PYPROJECT_NAME = pyproject_name
 
     REQUIRED_IDENTITY_PARAMETERS = ['NAME']
 
@@ -282,7 +316,7 @@ class ProjectRegistry:
         return _wrap_class
 
     @classmethod
-    def _lookup(cls, name):
+    def find_pyproject(cls, name) -> Optional[Type[Project]]:
         """
         Returns the project object with the given name.
 
@@ -292,11 +326,11 @@ class ProjectRegistry:
               Really only one of these should be instantiated per running application, and that's
               done automatically by this class.
         """
-        project_class = cls.REGISTERED_PROJECTS.get(name)
+        project_class: Optional[Type[Project]] = cls.REGISTERED_PROJECTS.get(name)
         return project_class
 
     @classmethod
-    def _make_project(cls):
+    def _make_project(cls) -> Project:
         """
         Creates and returns an instantiated project object for the current project.
 
@@ -308,21 +342,23 @@ class ProjectRegistry:
               Really only one of these should be instantiated per running application, and that's
               done automatically by this class.
         """
-        project_class = cls._lookup(cls.PYPROJECT_NAME)
-        check_true(project_class is not None, error_class=RuntimeError,
-                   message=f"Missing project class {cls.PYPROJECT_NAME}.",)
-        check_true(issubclass(project_class, Project), error_class=ValueError,
-                   message=f"Registered project class is not a subclass of Project.")
+        project_class: Optional[Type[Project]] = cls.find_pyproject(cls.PYPROJECT_NAME)
+        if project_class is None:
+            raise ValueError(f"Missing project class for pyproject {cls.PYPROJECT_NAME!r}.")
+        if not issubclass(project_class, cls.PROJECT_BASE_CLASS):
+            raise ValueError(f"Registered pyproject {cls.PYPROJECT_NAME!r} ({project_class.__name__})"
+                             f" is not a subclass of {cls.PROJECT_BASE_CLASS.__name__}.")
         project: Project = project_class()
         return project  # instantiate and return
 
-    _app_project = None
+    _shared_app_project_cell = StorageCell(initial_value=None)
 
     @classmethod
-    def initialize(cls, force=False):
-        if cls._app_project and not force:
-            return cls._app_project
-        cls._app_project = cls._make_project()
+    def initialize(cls, force=False) -> Project:
+        shared_app_project: Optional[Project] = ProjectRegistry._shared_app_project_cell.value
+        if shared_app_project and not force:
+            return shared_app_project
+        ProjectRegistry._shared_app_project_cell.value = cls._make_project()
         if cls.SHOW_HERALD_WHEN_INITIALIZED:
             cls.show_herald()
         app_project: Project = cls.app_project  # Now that it's initialized, make sure it comes from the right place
@@ -330,16 +366,16 @@ class ProjectRegistry:
 
     @classmethod
     def show_herald(cls):
-        app_project = Project.app_project_maker()
+        app_project = cls.PROJECT_BASE_CLASS.app_project_maker()
 
         PRINT()  # start on a fresh line
         PRINT("=" * 80)
         PRINT(f"APPLICATION_PROJECT_HOME == {cls.APPLICATION_PROJECT_HOME!r}")
         PRINT(f"PYPROJECT_TOML_FILE == {cls.PYPROJECT_TOML_FILE!r}")
         PRINT(f"PYPROJECT_NAME == {cls.PYPROJECT_NAME!r}")
-        the_app_project = Project.app_project
-        the_app_project_class = the_app_project.__class__
-        the_app_project_class_name = the_app_project_class.__name__
+        the_app_project: Project = Project.app_project
+        the_app_project_class: Type[Project] = the_app_project.__class__
+        the_app_project_class_name: str = the_app_project_class.__name__
         assert (Project.app_project
                 == app_project()
                 == the_app_project_class.app_project
@@ -347,7 +383,7 @@ class ProjectRegistry:
             "Project consistency check failed."
         )
         PRINT(f"{the_app_project_class_name}.app_project == Project.app_project == app_project() == {app_project()!r}")
-        the_app = app_project()
+        the_app: Project = app_project()
         for attr in sorted(dir(the_app)):
             val = getattr(the_app, attr)
             if attr.isupper() and not attr.startswith("_") and (val is None or isinstance(val, str)):
@@ -355,13 +391,16 @@ class ProjectRegistry:
         PRINT("=" * 80)
 
     @classproperty
-    def app_project(cls):  # noQA - PyCharm thinks we should use 'self'
+    def app_project(cls) -> Project:  # noQA - PyCharm thinks we should use 'self'
         """
         Once the project is initialized, ProjectRegistry.app_project returns the application object
         that should be used to dispatch project-dependent behavior.
         """
-        app_project: Project = cls._app_project or cls.initialize()
+        app_project: Project = cls._shared_app_project_cell.value or cls.initialize()
         return app_project
+
+
+Project.declare_project_registry_class(ProjectRegistry)  # Finalize a circular dependency
 
 
 # --------------------------------------------------------------------------------
@@ -399,3 +438,8 @@ class C4ProjectRegistry(ProjectRegistry):
     BAD_PYPROJECT_NAMES = [('cgap-portal', 'encoded'),
                            ('fourfront', 'encoded'),
                            ('smaht', 'encoded')]
+
+
+# Finalize a circular dependency
+
+C4Project.declare_project_registry_class(C4ProjectRegistry)  # Finalize a circular dependency

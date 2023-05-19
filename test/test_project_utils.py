@@ -3,7 +3,7 @@ import io
 import os
 import pytest
 
-from dcicutils.misc_utils import ignorable, override_environ, local_attrs
+from dcicutils.misc_utils import ignorable, override_environ, local_attrs, StorageCell
 from dcicutils.qa_utils import MockFileSystem
 from dcicutils.project_utils import (
     ProjectIdentity, C4ProjectIdentity, Project, C4Project, ProjectRegistry, C4ProjectRegistry,
@@ -13,7 +13,8 @@ from dcicutils.project_utils import (
 @contextlib.contextmanager
 def project_registry_test_context(registry=True):
     attrs = {'APPLICATION_PROJECT_HOME': None, 'PYPROJECT_TOML_FILE': None, 'PYPROJECT_TOML': None,
-             'POETRY_DATA': None, '_app_project': None, '_PYPROJECT_NAME': None}
+             'POETRY_DATA': None, '_shared_app_project_cell': StorageCell(initial_value=None),
+             '_PYPROJECT_NAME': None}
     if registry:
         attrs['REGISTERED_PROJECTS'] = {}
     with local_attrs(ProjectRegistry, **attrs):
@@ -292,3 +293,44 @@ def test_project_identity_infer_package_name():
     test_package_name_from_poetry_data(poetry_data={'packages': [{'include': 'something'},
                                                                  {'include': 'something-else'}]},
                                        expected='something')
+
+
+def test_project_registry_find_pyproject():
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with project_registry_test_context():
+
+            @ProjectRegistry.register('foo')
+            class FooProject(Project):
+                IDENTITY = {"NAME": "foo"}
+
+            assert ProjectRegistry.find_pyproject('foo') == FooProject
+            assert ProjectRegistry.find_pyproject('bar') is None
+
+
+def test_project_registry_make_project():
+
+    old_project_name = ProjectRegistry._PYPROJECT_NAME
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with project_registry_test_context():
+
+            @ProjectRegistry.register('foo')
+            class FooProject(Project):
+                IDENTITY = {"NAME": "foo"}
+
+            with pytest.raises(Exception) as exc:
+                ProjectRegistry._make_project()
+            assert str(exc.value) == "ProjectRegistry.PROJECT_NAME not initialized properly."
+
+            ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
+            assert isinstance(ProjectRegistry._make_project(), FooProject)
+
+            ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
+            with pytest.raises(Exception) as exc:
+                C4ProjectRegistry._make_project()
+            assert str(exc.value) == "Registered pyproject 'foo' (FooProject) is not a subclass of C4Project."
+
+    assert ProjectRegistry._PYPROJECT_NAME == old_project_name
