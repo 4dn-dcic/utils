@@ -439,4 +439,66 @@ def test_project_registry_register_bad_name():
                 @ProjectRegistry.register(17)
                 class FooProject(Project):
                     IDENTITY = {"NAME": "foo"}
+                ignorable(FooProject)
             assert str(exc.value) == "The pyprjoect_name given to ProjectRegistry.register must be a string: 17"
+
+
+def test_bad_pyproject_names():
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with project_registry_test_context():
+
+            with pytest.raises(Exception) as exc:
+                @C4ProjectRegistry.register('cgap-portal')
+                class CGAPProject(C4Project):
+                    IDENTITY = {"NAME": "cgap-portal"}
+                ignorable(CGAPProject)
+            assert str(exc.value) == ("Please use C4ProjectRegistry.register('encoded'),"
+                                      " not C4ProjectRegistry.register('cgap-portal')."
+                                      " This name choice in project registration is just for bootstrapping."
+                                      " The class can still be CGAPProject.")
+
+            with pytest.raises(Exception) as exc:
+                @C4ProjectRegistry.register('fourfront')
+                class FourfrontProject(C4Project):
+                    IDENTITY = {"NAME": "fourfront"}
+                ignorable(FourfrontProject)
+            assert str(exc.value) == ("Please use C4ProjectRegistry.register('encoded'),"
+                                      " not C4ProjectRegistry.register('fourfront')."
+                                      " This name choice in project registration is just for bootstrapping."
+                                      " The class can still be FourfrontProject.")
+
+            with pytest.raises(Exception) as exc:
+                @C4ProjectRegistry.register('smaht-portal')
+                class SMaHTProject(C4Project):
+                    IDENTITY = {"NAME": "smaht-portal"}
+                ignorable(SMaHTProject)
+            assert str(exc.value) == ("Please use C4ProjectRegistry.register('encoded'),"
+                                      " not C4ProjectRegistry.register('smaht-portal')."
+                                      " This name choice in project registration is just for bootstrapping."
+                                      " The class can still be SMaHTProject.")
+
+
+def test_project_registry_initialize():
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with project_registry_test_context():
+
+            @ProjectRegistry.register('foo')
+            class FooProject(Project):
+                IDENTITY = {"NAME": "foo"}
+
+            ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
+            app_project = FooProject.app_project_maker()
+            project = app_project()
+
+            assert ProjectRegistry.initialize() == project
+            assert ProjectRegistry.initialize() == project
+
+            new_project = ProjectRegistry.initialize(force=True)  # Creates a new instance of the app_project()
+
+            assert isinstance(new_project, Project)
+            assert new_project != project
+            assert new_project.NAME == project.NAME
