@@ -104,7 +104,7 @@ class Project:
         class should be called with the registry class.
         """
         if not isinstance(registry_class, type) or not issubclass(registry_class, ProjectRegistry):
-            raise ValueError(f"The registry_class,{registry_class} is not a subclass of ProjectRegistry.")
+            raise ValueError(f"The registry_class, {registry_class!r}, is not a subclass of ProjectRegistry.")
         registry_class: Type[ProjectRegistry]
         cls._PROJECT_REGISTRY_CLASS = registry_class
 
@@ -114,7 +114,7 @@ class Project:
     @property
     def identity(self) -> ProjectIdentity:
         if self._identity is None:
-            raise ValueError(f"{self} failed to initialize correctly.")
+            raise ValueError(f"<{self.__class__.__name__}> failed to initialize correctly.")
         return self._identity
 
     @property

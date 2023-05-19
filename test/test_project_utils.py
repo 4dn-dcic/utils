@@ -334,3 +334,38 @@ def test_project_registry_make_project():
             assert str(exc.value) == "Registered pyproject 'foo' (FooProject) is not a subclass of C4Project."
 
     assert ProjectRegistry._PYPROJECT_NAME == old_project_name
+
+
+def test_declare_project_registry_class_wrongly():
+
+    old_value = Project._PROJECT_REGISTRY_CLASS
+
+    try:
+
+        with pytest.raises(Exception) as exc:
+            Project.declare_project_registry_class('this is not a registry')  # noQA - we're testing a bug
+        assert str(exc.value) == "The registry_class, 'this is not a registry', is not a subclass of ProjectRegistry."
+
+    finally:
+
+        # We were supposed to get an error before any side-effect happened, but we'll be careful just in case.
+        Project._PROJECT_REGISTRY_CLASS = old_value
+
+
+def test_app_project_bad_initialization():
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with project_registry_test_context():
+
+            @ProjectRegistry.register('foo')
+            class FooProject(Project):
+                IDENTITY = {"NAME": "foo"}
+
+            ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
+            app_project = FooProject.app_project_maker()
+            project = app_project()
+            project._identity = None  # simulate screwing up of initialization
+            with pytest.raises(Exception) as exc:
+                print(project.identity)
+            assert str(exc.value) == "<FooProject> failed to initialize correctly."
