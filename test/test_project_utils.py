@@ -540,17 +540,38 @@ def test_project_initialize_app_project():
                 IDENTITY = {"NAME": "super"}
 
             ProjectRegistry.initialize_pyproject_name(pyproject_name='super')
-            app_project = SuperProject.initialize_app_project()
+            project = SuperProject.initialize_app_project()
 
             with mock.patch.object(EnvUtils, "init") as mock_init:
-                proj1 = app_project.initialize_app_project()
+                proj1 = project.initialize_app_project()
                 assert isinstance(proj1, SuperProject)
                 mock_init.assert_called_with()
 
                 mock_init.reset_mock()
 
                 ProjectRegistry._shared_app_project_cell.value = None   # decache
-                proj2 = app_project.initialize_app_project(initialize_env_utils=False)
+                proj2 = project.initialize_app_project(initialize_env_utils=False)
                 assert isinstance(proj2, SuperProject)
                 assert proj1 is not proj2
                 mock_init.assert_not_called()
+
+                mock_init.reset_mock()
+
+                ProjectRegistry._shared_app_project_cell.value = None   # decache
+                # Essentially the same as project.initialize_app_project
+                app_project = project.app_project_maker()
+                app_project(initialize=True, initialization_options={'initialize_env_utils': False})
+                assert isinstance(proj2, SuperProject)
+                assert proj1 is not proj2
+                mock_init.assert_not_called()
+
+                mock_init.reset_mock()
+
+                ProjectRegistry._shared_app_project_cell.value = None   # decache
+                # Essentially the same as project.initialize_app_project
+                app_project = project.app_project_maker()
+                app_project(initialize=True, initialization_options={'initialize_env_utils': True})
+                assert isinstance(proj2, SuperProject)
+                assert proj1 is not proj2
+                mock_init.assert_called_with()
+
