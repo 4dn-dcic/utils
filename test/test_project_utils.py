@@ -574,4 +574,3 @@ def test_project_initialize_app_project():
                 assert isinstance(proj2, SuperProject)
                 assert proj1 is not proj2
                 mock_init.assert_called_with()
-
