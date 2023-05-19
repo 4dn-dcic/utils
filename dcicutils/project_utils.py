@@ -190,8 +190,6 @@ class Project:
         """Returns a filename relative to given instance."""
         current_project = self.app_project
         if self is not current_project:
-            print(f"self = {self}")
-            print(f"self.app_project = {current_project}")
             raise RuntimeError(f"{self}.project_filename invoked,"
                                f" but {self} is not the app_project, {current_project}.")
         return resource_filename(self.PACKAGE_NAME, filename)
