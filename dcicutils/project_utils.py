@@ -111,6 +111,12 @@ class Project:
     def __init__(self):
         self._identity: ProjectIdentity = self.IDENTITY_CLASS(**self.IDENTITY)
 
+    def __str__(self):
+        return f"<{self.__class__.__name__} {id(self):x}>"
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}()"
+
     @property
     def identity(self) -> ProjectIdentity:
         if self._identity is None:
@@ -182,9 +188,12 @@ class Project:
 
     def project_filename(self, filename):
         """Returns a filename relative to given instance."""
-        if self != self.app_project:
+        current_project = self.app_project
+        if self is not current_project:
+            print(f"self = {self}")
+            print(f"self.app_project = {current_project}")
             raise RuntimeError(f"{self}.project_filename invoked,"
-                               f" but {self} is not the app_project, {self.app_project}.")
+                               f" but {self} is not the app_project, {current_project}.")
         return resource_filename(self.PACKAGE_NAME, filename)
 
 
@@ -273,7 +282,8 @@ class ProjectRegistry:
         """
 
         if not isinstance(pyproject_name, str):
-            raise ValueError(f"The pyprjoect_name given to {cls.__name__}.register must be a string.")
+            raise ValueError(f"The pyprjoect_name given to {cls.__name__}.register must be a string:"
+                             f" {pyproject_name!r}")
 
         def _wrap_class(the_class):
 

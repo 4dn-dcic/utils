@@ -8,6 +8,8 @@ from dcicutils.qa_utils import MockFileSystem
 from dcicutils.project_utils import (
     ProjectIdentity, C4ProjectIdentity, Project, C4Project, ProjectRegistry, C4ProjectRegistry,
 )
+from unittest import mock
+from dcicutils import project_utils as project_utils_module
 
 
 @contextlib.contextmanager
@@ -369,3 +371,72 @@ def test_app_project_bad_initialization():
             with pytest.raises(Exception) as exc:
                 print(project.identity)
             assert str(exc.value) == "<FooProject> failed to initialize correctly."
+
+
+def test_project_registry_class():
+
+    old_registry_class = Project.PROJECT_REGISTRY_CLASS
+
+    try:
+
+        mfs = MockFileSystem()
+        with mfs.mock_exists_open_remove():
+            with project_registry_test_context():
+
+                @ProjectRegistry.register('foo')
+                class FooProject(Project):
+                    IDENTITY = {"NAME": "foo"}
+
+                Project._PROJECT_REGISTRY_CLASS = None  # Let's just mock up the problem
+
+                with pytest.raises(Exception) as exc:
+                    print(Project.PROJECT_REGISTRY_CLASS)
+                assert str(exc.value) == ('Cannot compute Project.PROJECT_REGISTRY_CLASS'
+                                          ' because Project.declare_project_registry_class(...) has not been done.')
+
+    finally:
+
+        # We were supposed to get an error before any side-effect happened, but we'll be careful just in case.
+        Project.PROJECT_REGISTRY_CLASS = old_registry_class
+
+
+def test_project_filename():
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with project_registry_test_context():
+
+            @ProjectRegistry.register('foo')
+            class FooProject(Project):
+                IDENTITY = {"NAME": "foo"}
+
+            ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
+            app_project = FooProject.app_project_maker()
+            project = app_project()
+
+            with mock.patch.object(project_utils_module, "resource_filename") as mock_resource_filename:
+
+                def mocked_resource_filename(project, filename):
+                    return os.path.join(f"<{project}-home>", filename)
+
+                mock_resource_filename.side_effect = mocked_resource_filename
+                assert project.project_filename('xyz') == "<foo-home>/xyz"
+
+            ProjectRegistry._shared_app_project_cell.value = None  # Mock failure to initialize
+
+            with pytest.raises(Exception) as exc:
+                print(project.project_filename("foo"))
+            assert "is not the app_project" in str(exc.value)
+
+
+def test_project_registry_register_bad_name():
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with project_registry_test_context():
+
+            with pytest.raises(Exception) as exc:
+                @ProjectRegistry.register(17)
+                class FooProject(Project):
+                    IDENTITY = {"NAME": "foo"}
+            assert str(exc.value) == "The pyprjoect_name given to ProjectRegistry.register must be a string: 17"
