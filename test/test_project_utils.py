@@ -3,6 +3,7 @@ import io
 import os
 import pytest
 
+from dcicutils.env_utils import EnvUtils
 from dcicutils.misc_utils import ignorable, override_environ, local_attrs, StorageCell
 from dcicutils.qa_utils import MockFileSystem
 from dcicutils.project_utils import (
@@ -330,10 +331,15 @@ def test_project_registry_make_project():
             ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
             assert isinstance(ProjectRegistry._make_project(), FooProject)
 
-            ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
             with pytest.raises(Exception) as exc:
                 C4ProjectRegistry._make_project()
             assert str(exc.value) == "Registered pyproject 'foo' (FooProject) is not a subclass of C4Project."
+
+            ProjectRegistry._PYPROJECT_NAME = 'bogus'  # Mock up a bad initialization
+            ProjectRegistry._shared_app_project_cell.value = None  # Clear cache
+            with pytest.raises(Exception) as exc:
+                ProjectRegistry._make_project()
+            assert str(exc.value) == "Missing project class for pyproject 'bogus'."
 
     assert ProjectRegistry._PYPROJECT_NAME == old_project_name
 
@@ -350,7 +356,7 @@ def test_declare_project_registry_class_wrongly():
 
     finally:
 
-        # We were supposed to get an error before any side-effect happened, but we'll be careful just in case.
+        # We were supposed to get an error before any side effect happened, but we'll be careful just in case.
         Project._PROJECT_REGISTRY_CLASS = old_value
 
 
@@ -386,6 +392,7 @@ def test_project_registry_class():
                 @ProjectRegistry.register('foo')
                 class FooProject(Project):
                     IDENTITY = {"NAME": "foo"}
+                ignorable(FooProject)
 
                 Project._PROJECT_REGISTRY_CLASS = None  # Let's just mock up the problem
 
@@ -396,7 +403,7 @@ def test_project_registry_class():
 
     finally:
 
-        # We were supposed to get an error before any side-effect happened, but we'll be careful just in case.
+        # We were supposed to get an error before any side effect happened, but we'll be careful just in case.
         Project.PROJECT_REGISTRY_CLASS = old_registry_class
 
 
@@ -502,3 +509,48 @@ def test_project_registry_initialize():
             assert isinstance(new_project, Project)
             assert new_project != project
             assert new_project.NAME == project.NAME
+
+
+def test_initialize_pyproject_name_ambiguity():
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with project_registry_test_context():
+
+            with io.open("pyproject.toml", 'w') as fp:
+                fp.write('[tool.poetry]\n'
+                         'name = "bar"\n')
+
+            with pytest.raises(Exception) as exc:
+                with override_environ(APPLICATION_PYPROJECT_NAME='alpha'):
+                    ProjectRegistry.initialize_pyproject_name(pyproject_toml_file='pyproject.toml',
+                                                              poetry_data={'name': 'omega',
+                                                                           'packages': [{'include': 'omega'}]})
+            assert str(exc.value) == "APPLICATION_PYPROJECT_NAME='alpha', but pyproject.toml says it should be 'omega'"
+
+
+def test_project_initialize_app_project():
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with project_registry_test_context():
+
+            @C4ProjectRegistry.register('super')
+            class SuperProject(C4Project):
+                IDENTITY = {"NAME": "super"}
+
+            ProjectRegistry.initialize_pyproject_name(pyproject_name='super')
+            app_project = SuperProject.initialize_app_project()
+
+            with mock.patch.object(EnvUtils, "init") as mock_init:
+                proj1 = app_project.initialize_app_project()
+                assert isinstance(proj1, SuperProject)
+                mock_init.assert_called_with()
+
+                mock_init.reset_mock()
+
+                ProjectRegistry._shared_app_project_cell.value = None   # decache
+                proj2 = app_project.initialize_app_project(initialize_env_utils=False)
+                assert isinstance(proj2, SuperProject)
+                assert proj1 is not proj2
+                mock_init.assert_not_called()
