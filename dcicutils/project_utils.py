@@ -233,8 +233,8 @@ class ProjectRegistry:
             # print(f"Loading toml file {cls.PYPROJECT_TOML_FILE}")
             if not pyproject_toml:
                 ProjectRegistry.PYPROJECT_TOML = pyproject_toml = (toml.load(ProjectRegistry.PYPROJECT_TOML_FILE)
-                                                       if ProjectRegistry.PYPROJECT_TOML_FILE
-                                                       else None)
+                                                                   if ProjectRegistry.PYPROJECT_TOML_FILE
+                                                                   else None)
             if not poetry_data:
                 poetry_data = (pyproject_toml['tool']['poetry']
                                if pyproject_toml
