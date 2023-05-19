@@ -12,11 +12,9 @@ Change Log
 
 * New module ``project_utils`` with support for Project mechanism.
 
-  * New decorator ``ProjectRegistry``
+  * New decorators ``ProjectRegistry`` and ``C4ProjectRegistry``
 
-  * New class ``Project``
-
-  * New class ``C4Project``
+  * New class ``Project`` and ``C4Project``
 
 
 7.4.2
