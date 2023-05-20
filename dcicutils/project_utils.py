@@ -69,6 +69,9 @@ class ProjectNames:
         return pypi_name or pyproject_name
 
 
+_shared_app_project_cell = StorageCell(initial_value=None)
+
+
 class Project:
     """
     A class that should be a superclass of all classes registered using ProjectRegistry.register
@@ -180,27 +183,14 @@ class Project:
         """
         Project.app_project returns the actual instantiated project for app-specific behavior,
         which might be of this class or one of its subclasses.
-
-        This access will fail if the project has not been initialized.
         """
-        # This is a shared cell, so it doesn't matter whether we read this from ProjectRegistry
-        # or one of its subclasses. -kmp 19-May-2023
-        return ProjectRegistry.app_project
+        return cls.PROJECT_REGISTRY_CLASS.app_project
 
-    @classmethod
-    def initialize_app_project(cls, force=False):
-        project: Project = cls.PROJECT_REGISTRY_CLASS.initialize(force=force)
-        return project
+    @classmethod  # Type signature cannot be declared due to a circularity. Method body allows it to be inferred.
+    def app_project_maker(cls):  # -> Callable[[], Callable[[], Project]]
 
-    @classmethod
-    def app_project_maker(cls):
-
-        registry_class: ProjectRegistry = cls.PROJECT_REGISTRY_CLASS
-
-        def app_project(initialize: bool = False, force_initialize: bool = False) -> Project:
-            if initialize:
-                registry_class.PROJECT_BASE_CLASS.initialize_app_project(force=force_initialize)
-            return Project.app_project
+        def app_project() -> Project:
+            return cls.app_project
 
         return app_project
 
@@ -377,15 +367,12 @@ class ProjectRegistry:
         project: Project = project_class()
         return project  # instantiate and return
 
-    _shared_app_project_cell = StorageCell(initial_value=None)
-
     @classmethod
     def initialize(cls, force=False) -> Project:
-        shared_app_project: Optional[Project] = ProjectRegistry._shared_app_project_cell.value
-        print(f"In {cls.__name__}.initialize(force={force}, with shared_app_project={shared_app_project}")
+        shared_app_project: Optional[Project] = _shared_app_project_cell.value
         if shared_app_project and not force:
             return shared_app_project
-        ProjectRegistry._shared_app_project_cell.value = cls._make_project()
+        _shared_app_project_cell.value = cls._make_project()
         if cls.SHOW_HERALD_WHEN_INITIALIZED:
             cls.show_herald()
         app_project: Project = cls.app_project  # Now that it's initialized, make sure it comes from the right place
@@ -423,7 +410,7 @@ class ProjectRegistry:
         Once the project is initialized, ProjectRegistry.app_project returns the application object
         that should be used to dispatch project-dependent behavior.
         """
-        app_project: Project = cls._shared_app_project_cell.value or cls.initialize()
+        app_project: Project = _shared_app_project_cell.value or cls.initialize()
         return app_project
 
 

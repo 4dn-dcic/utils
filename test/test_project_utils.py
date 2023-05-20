@@ -12,15 +12,24 @@ from unittest import mock
 from dcicutils import project_utils as project_utils_module
 
 
+def app_project_cell_value():
+    return project_utils_module._shared_app_project_cell.value  # noQA - testing access to protected member
+
+
+def set_app_project_cell_value(value):
+    project_utils_module._shared_app_project_cell.value = value  # noQA - testing access to protected member
+
+
 @contextlib.contextmanager
 def project_registry_test_context(registry=True):
+    temp_cell = StorageCell(initial_value=None)
     attrs = {'APPLICATION_PROJECT_HOME': None, 'PYPROJECT_TOML_FILE': None, 'PYPROJECT_TOML': None,
-             'POETRY_DATA': None, '_shared_app_project_cell': StorageCell(initial_value=None),
-             '_PYPROJECT_NAME': None}
+             'POETRY_DATA': None, '_PYPROJECT_NAME': None}
     if registry:
         attrs['REGISTERED_PROJECTS'] = {}
     with local_attrs(ProjectRegistry, **attrs):
-        yield
+        with mock.patch.object(project_utils_module, '_shared_app_project_cell', temp_cell):
+            yield
 
 
 def test_project_registry_register():
@@ -335,7 +344,7 @@ def test_project_registry_make_project():
             assert str(exc.value) == "Registered pyproject 'foo' (FooProject) is not a subclass of C4Project."
 
             ProjectRegistry._PYPROJECT_NAME = 'bogus'  # Mock up a bad initialization
-            ProjectRegistry._shared_app_project_cell.value = None  # Clear cache
+            set_app_project_cell_value(None)  # Clear cache
             with pytest.raises(Exception) as exc:
                 ProjectRegistry._make_project()
             assert str(exc.value) == "Missing project class for pyproject 'bogus'."
@@ -357,25 +366,6 @@ def test_declare_project_registry_class_wrongly():
 
         # We were supposed to get an error before any side effect happened, but we'll be careful just in case.
         Project._PROJECT_REGISTRY_CLASS = old_value
-
-
-def test_app_project_bad_initialization():
-
-    mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
-        with project_registry_test_context():
-
-            @ProjectRegistry.register('foo')
-            class FooProject(Project):
-                NAMES = {"NAME": "foo"}
-
-            ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
-            app_project = FooProject.app_project_maker()
-            project = app_project()
-            project._names = None  # simulate screwing up of initialization
-            with pytest.raises(Exception) as exc:
-                print(project.names)
-            assert str(exc.value) == "<FooProject> failed to initialize correctly."
 
 
 def test_project_registry_class():
@@ -428,7 +418,7 @@ def test_project_filename():
                 mock_resource_filename.side_effect = mocked_resource_filename
                 assert project.project_filename('xyz') == "<foo-home>/xyz"
 
-            ProjectRegistry._shared_app_project_cell.value = None  # Mock failure to initialize
+            set_app_project_cell_value(None)  # Mock failure to initialize
 
             with pytest.raises(Exception) as exc:
                 print(project.project_filename("foo"))
@@ -528,7 +518,7 @@ def test_initialize_pyproject_name_ambiguity():
             assert str(exc.value) == "APPLICATION_PYPROJECT_NAME='alpha', but pyproject.toml says it should be 'omega'"
 
 
-def test_project_initialize_app_project():
+def test_app_project():
 
     mfs = MockFileSystem()
     with mfs.mock_exists_open_remove():
@@ -538,26 +528,30 @@ def test_project_initialize_app_project():
             class SuperProject(C4Project):
                 NAMES = {"NAME": "super"}
 
-            assert ProjectRegistry._shared_app_project_cell is C4ProjectRegistry._shared_app_project_cell
+            app_project = SuperProject.app_project_maker()
 
-            ProjectRegistry.initialize_pyproject_name(pyproject_name='super')
+            C4ProjectRegistry.initialize_pyproject_name(pyproject_name='super')
 
-            print(f"shared cell value (before 1) = {ProjectRegistry._shared_app_project_cell.value}")
-            proj1 = SuperProject.initialize_app_project()
-            assert isinstance(proj1, SuperProject)
-            print(f"proj1 = {proj1}")
-
-            print(f"shared cell value (before 2) = {ProjectRegistry._shared_app_project_cell.value}")
-            proj2 = SuperProject.initialize_app_project()
-            print(f"proj2 = {proj2}")
-            assert isinstance(proj2, SuperProject)
+            proj1 = app_project()
+            assert app_project_cell_value() is not None
+            proj2 = app_project()
             assert proj1 is proj2
 
-            print(f"shared cell value (before 3) = {ProjectRegistry._shared_app_project_cell.value}")
-            ProjectRegistry._shared_app_project_cell.value = None   # decache
-            print(f"shared cell value (after set 3) = {ProjectRegistry._shared_app_project_cell.value}")
-            proj3 = SuperProject.initialize_app_project()
-            print(f"proj3 = {proj3}")
-            assert isinstance(proj3, SuperProject)
-            assert proj3 is not proj1
-            assert proj3 is not proj2  # well, of course! (since proj1 is proj2)
+
+def test_app_project_bad_initialization():
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with project_registry_test_context():
+
+            @ProjectRegistry.register('foo')
+            class FooProject(Project):
+                NAMES = {"NAME": "foo"}
+
+            ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
+            app_project = FooProject.app_project_maker()
+            project = app_project()
+            project._names = None  # simulate screwing up of initialization
+            with pytest.raises(Exception) as exc:
+                print(project.names)
+            assert str(exc.value) == "<FooProject> failed to initialize correctly."
