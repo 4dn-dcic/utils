@@ -3,7 +3,6 @@ import io
 import os
 import pytest
 
-from dcicutils.env_utils import EnvUtils
 from dcicutils.misc_utils import ignorable, override_environ, local_attrs, StorageCell
 from dcicutils.qa_utils import MockFileSystem
 from dcicutils.project_utils import (
@@ -539,38 +538,26 @@ def test_project_initialize_app_project():
             class SuperProject(C4Project):
                 NAMES = {"NAME": "super"}
 
+            assert ProjectRegistry._shared_app_project_cell is C4ProjectRegistry._shared_app_project_cell
+
             ProjectRegistry.initialize_pyproject_name(pyproject_name='super')
-            project = SuperProject.initialize_app_project()
 
-            with mock.patch.object(EnvUtils, "init") as mock_init:
-                proj1 = project.initialize_app_project()
-                assert isinstance(proj1, SuperProject)
-                mock_init.assert_called_with()
+            print(f"shared cell value (before 1) = {ProjectRegistry._shared_app_project_cell.value}")
+            proj1 = SuperProject.initialize_app_project()
+            assert isinstance(proj1, SuperProject)
+            print(f"proj1 = {proj1}")
 
-                mock_init.reset_mock()
+            print(f"shared cell value (before 2) = {ProjectRegistry._shared_app_project_cell.value}")
+            proj2 = SuperProject.initialize_app_project()
+            print(f"proj2 = {proj2}")
+            assert isinstance(proj2, SuperProject)
+            assert proj1 is proj2
 
-                ProjectRegistry._shared_app_project_cell.value = None   # decache
-                proj2 = project.initialize_app_project(initialize_env_utils=False)
-                assert isinstance(proj2, SuperProject)
-                assert proj1 is not proj2
-                mock_init.assert_not_called()
-
-                mock_init.reset_mock()
-
-                ProjectRegistry._shared_app_project_cell.value = None   # decache
-                # Essentially the same as project.initialize_app_project
-                app_project = project.app_project_maker()
-                app_project(initialize=True, initialization_options={'initialize_env_utils': False})
-                assert isinstance(proj2, SuperProject)
-                assert proj1 is not proj2
-                mock_init.assert_not_called()
-
-                mock_init.reset_mock()
-
-                ProjectRegistry._shared_app_project_cell.value = None   # decache
-                # Essentially the same as project.initialize_app_project
-                app_project = project.app_project_maker()
-                app_project(initialize=True, initialization_options={'initialize_env_utils': True})
-                assert isinstance(proj2, SuperProject)
-                assert proj1 is not proj2
-                mock_init.assert_called_with()
+            print(f"shared cell value (before 3) = {ProjectRegistry._shared_app_project_cell.value}")
+            ProjectRegistry._shared_app_project_cell.value = None   # decache
+            print(f"shared cell value (after set 3) = {ProjectRegistry._shared_app_project_cell.value}")
+            proj3 = SuperProject.initialize_app_project()
+            print(f"proj3 = {proj3}")
+            assert isinstance(proj3, SuperProject)
+            assert proj3 is not proj1
+            assert proj3 is not proj2  # well, of course! (since proj1 is proj2)

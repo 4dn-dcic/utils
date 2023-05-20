@@ -3,11 +3,26 @@ import toml
 
 from pkg_resources import resource_filename
 from typing import Optional, Type
-from .env_utils import EnvUtils
 from .misc_utils import PRINT, StorageCell, classproperty
 
 
 class ProjectNames:
+
+    def __init__(self, *, PYPROJECT_NAME, NAME, PRETTY_NAME=None, REPO_NAME=None, PYPI_NAME=None,
+                 PACKAGE_NAME=None, APP_NAME=None, APP_PRETTY_NAME=None):
+        self.PYPROJECT_NAME = PYPROJECT_NAME
+        self.NAME = NAME
+        self.PRETTY_NAME = PRETTY_NAME or self.prettify(NAME)
+        self.PYPI_NAME = PYPI_NAME or None  # canonicalize '' to None, just in case
+        self.REPO_NAME = REPO_NAME = REPO_NAME or self.repofy(NAME)
+        self.APP_NAME = APP_NAME = APP_NAME or self.appify(REPO_NAME)
+        self.APP_PRETTY_NAME = APP_PRETTY_NAME or self.prettify(APP_NAME)
+        self.PACKAGE_NAME = (PACKAGE_NAME
+                             # This uses ProjectRegistry (not cls) because that part of the protocol is common to all
+                             # classes and subclasses of that class. No need to worry about specialized classes.
+                             # -kmp 19-May-2023
+                             or self.infer_package_name(poetry_data=ProjectRegistry.POETRY_DATA,
+                                                        pypi_name=PYPI_NAME, pyproject_name=PYPROJECT_NAME))
 
     @classmethod
     def prettify(cls, name: str) -> str:
@@ -53,22 +68,6 @@ class ProjectNames:
             pass
         return pypi_name or pyproject_name
 
-    def __init__(self, *, PYPROJECT_NAME, NAME, PRETTY_NAME=None, REPO_NAME=None, PYPI_NAME=None,
-                 PACKAGE_NAME=None, APP_NAME=None, APP_PRETTY_NAME=None):
-        self.PYPROJECT_NAME = PYPROJECT_NAME
-        self.NAME = NAME
-        self.PRETTY_NAME = PRETTY_NAME or self.prettify(NAME)
-        self.PYPI_NAME = PYPI_NAME or None  # canonicalize '' to None, just in case
-        self.REPO_NAME = REPO_NAME = REPO_NAME or self.repofy(NAME)
-        self.APP_NAME = APP_NAME = APP_NAME or self.appify(REPO_NAME)
-        self.APP_PRETTY_NAME = APP_PRETTY_NAME or self.prettify(APP_NAME)
-        self.PACKAGE_NAME = (PACKAGE_NAME
-                             # This uses ProjectRegistry (not cls) because that part of the protocol is common to all
-                             # classes and subclasses of that class. No need to worry about specialized classes.
-                             # -kmp 19-May-2023
-                             or self.infer_package_name(poetry_data=ProjectRegistry.POETRY_DATA,
-                                                        pypi_name=PYPI_NAME, pyproject_name=PYPROJECT_NAME))
-
 
 class Project:
     """
@@ -108,6 +107,15 @@ class Project:
 
     _PROJECT_REGISTRY_CLASS = None
 
+    def __init__(self):
+        self._names: ProjectNames = self.NAMES_CLASS(**self.NAMES)
+
+    def __str__(self):
+        return f"<{self.__class__.__name__} {id(self):x}>"
+
+    def __repr__(self):
+        return self.__str__()
+
     @classproperty
     def PROJECT_REGISTRY_CLASS(cls):  # noQA - PyCharm thinks this should use 'self'
         registry_class: Optional[Type[ProjectRegistry]] = cls._PROJECT_REGISTRY_CLASS
@@ -128,15 +136,6 @@ class Project:
             raise ValueError(f"The registry_class, {registry_class!r}, is not a subclass of ProjectRegistry.")
         registry_class: Type[ProjectRegistry]
         cls._PROJECT_REGISTRY_CLASS = registry_class
-
-    def __init__(self):
-        self._names: ProjectNames = self.NAMES_CLASS(**self.NAMES)
-
-    def __str__(self):
-        return f"<{self.__class__.__name__} {id(self):x}>"
-
-    def __repr__(self):
-        return self.__str__()
 
     @property
     def names(self) -> ProjectNames:
@@ -189,10 +188,8 @@ class Project:
         return ProjectRegistry.app_project
 
     @classmethod
-    def initialize_app_project(cls, initialize_env_utils=True):
-        if initialize_env_utils:
-            EnvUtils.init()
-        project: Project = cls.PROJECT_REGISTRY_CLASS.initialize()
+    def initialize_app_project(cls, force=False):
+        project: Project = cls.PROJECT_REGISTRY_CLASS.initialize(force=force)
         return project
 
     @classmethod
@@ -200,9 +197,9 @@ class Project:
 
         registry_class: ProjectRegistry = cls.PROJECT_REGISTRY_CLASS
 
-        def app_project(initialize: bool = False, initialization_options: Optional[dict] = None) -> Project:
+        def app_project(initialize: bool = False, force_initialize: bool = False) -> Project:
             if initialize:
-                registry_class.PROJECT_BASE_CLASS.initialize_app_project(**(initialization_options or {}))
+                registry_class.PROJECT_BASE_CLASS.initialize_app_project(force=force_initialize)
             return Project.app_project
 
         return app_project
@@ -385,6 +382,7 @@ class ProjectRegistry:
     @classmethod
     def initialize(cls, force=False) -> Project:
         shared_app_project: Optional[Project] = ProjectRegistry._shared_app_project_cell.value
+        print(f"In {cls.__name__}.initialize(force={force}, with shared_app_project={shared_app_project}")
         if shared_app_project and not force:
             return shared_app_project
         ProjectRegistry._shared_app_project_cell.value = cls._make_project()
