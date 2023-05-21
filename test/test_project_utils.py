@@ -653,6 +653,33 @@ def test_project_registry_show_herald_detailed(options_to_test, expected_caveats
                 assert printed.lines == [f"FoobarProject initialized {expected_caveats}."]
 
 
+def test_project_registry_show_herald_consistency():
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove_abspath():
+        with project_registry_test_context():
+
+            @ProjectRegistry.register('foobar')
+            class FoobarProject(Project):
+                NAMES = {"NAME": "foobar"}
+            ignorable(FoobarProject)
+
+            ProjectRegistry._initialize_pyproject_name(pyproject_name='foobar')
+
+            rogue_project = FoobarProject()
+
+            # We have to work pretty hard to mess up the consistency, but this should do it.
+            # The value of app_project as an instance property here overrides the class property
+            # that is supposed implement sharing between all the clasess.
+            rogue_project.app_project = rogue_project
+
+            with pytest.raises(Exception) as exc:
+
+                rogue_project.show_herald()
+
+            assert str(exc.value) == "Project consistency check failed."
+
+
 def test_project_names_items():
 
     names_object = ProjectNames(PYPROJECT_NAME='foo', NAME='foo')
