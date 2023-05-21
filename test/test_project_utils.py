@@ -35,7 +35,7 @@ def project_registry_test_context(registry=True):
 def test_project_registry_register():
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove_abspath():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             @ProjectRegistry.register('foo')
@@ -112,7 +112,7 @@ def test_project_registry_register_snovault_scenario():
     # These values don't have to be precisely what snovault uses, just plausibly things it might
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove_abspath():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             # Initialization code expects this filename to be precise
@@ -173,7 +173,7 @@ def test_project_registry_register_cgap_scenario():
     # These values don't have to be precisely what snovault and cgap-portal use, just plausibly things they might
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove_abspath():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             # Initialization code expects this filename to be precise
@@ -567,7 +567,7 @@ def test_project_registry_show_herald(verbose, detailed):
     print(f"Testing verbose={verbose}, detailed={detailed}")
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove_abspath():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             @ProjectRegistry.register('foo')
@@ -636,7 +636,7 @@ def test_project_registry_show_herald(verbose, detailed):
 def test_project_registry_show_herald_detailed(options_to_test, expected_caveats):
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove_abspath():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             @ProjectRegistry.register('foobar')
@@ -656,7 +656,7 @@ def test_project_registry_show_herald_detailed(options_to_test, expected_caveats
 def test_project_registry_show_herald_consistency():
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove_abspath():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             @ProjectRegistry.register('foobar')

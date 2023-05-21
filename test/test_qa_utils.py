@@ -821,6 +821,42 @@ def test_mock_file_system_simple():
                 }
 
 
+def test_mock_exists_open_remove_abspath_getcwd_chdir():
+
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
+
+        assert os.path.abspath(".") == "/home/mock"
+        assert os.path.abspath("./foo") == "/home/mock/foo"
+        assert os.path.abspath("foo") == "/home/mock/foo"
+        assert os.path.abspath("foo/bar") == "/home/mock/foo/bar"
+        assert os.path.abspath("/foo") == "/foo"
+
+        assert os.getcwd() == "/home/mock"
+        os.chdir('bin')
+        assert os.getcwd() == "/home/mock/bin"
+        assert os.path.abspath(os.curdir) == "/home/mock/bin"
+        os.chdir('/bin')
+        assert os.getcwd() == "/bin"
+        assert os.path.abspath(os.curdir) == "/bin"
+
+
+def test_mock_expanduser():
+
+    mfs = MockFileSystem()
+
+    with mock.patch("os.path.expanduser", mfs.expanduser):
+
+        assert os.path.expanduser("~") == "/home/mock"
+        assert os.path.expanduser("~root") == "/root"
+        assert os.path.expanduser("~foo") == "~foo"
+
+        assert os.path.expanduser("~/x") == "/home/mock/x"
+        assert os.path.expanduser("~root/x") == "/root/x"
+        assert os.path.expanduser("~foo/x") == "~foo/x"
+
+
 def test_mock_file_system_auto():
 
     temp_filename = "IF_YOU_SEE_THIS_FILE_DELETE_IT.txt"
