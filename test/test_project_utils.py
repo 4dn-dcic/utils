@@ -4,7 +4,7 @@ import os
 import pytest
 
 from dcicutils.misc_utils import ignorable, override_environ, local_attrs, StorageCell
-from dcicutils.qa_utils import MockFileSystem
+from dcicutils.qa_utils import MockFileSystem, printed_output
 from dcicutils.project_utils import (
     ProjectNames, C4ProjectNames, Project, C4Project, ProjectRegistry, C4ProjectRegistry,
 )
@@ -13,11 +13,11 @@ from dcicutils import project_utils as project_utils_module
 
 
 def app_project_cell_value():
-    return project_utils_module._shared_app_project_cell.value  # noQA - testing access to protected member
+    return project_utils_module._SHARED_APP_PROJECT_CELL.value  # noQA - testing access to protected member
 
 
 def set_app_project_cell_value(value):
-    project_utils_module._shared_app_project_cell.value = value  # noQA - testing access to protected member
+    project_utils_module._SHARED_APP_PROJECT_CELL.value = value  # noQA - testing access to protected member
 
 
 @contextlib.contextmanager
@@ -28,14 +28,14 @@ def project_registry_test_context(registry=True):
     if registry:
         attrs['REGISTERED_PROJECTS'] = {}
     with local_attrs(ProjectRegistry, **attrs):
-        with mock.patch.object(project_utils_module, '_shared_app_project_cell', temp_cell):
+        with mock.patch.object(project_utils_module, '_SHARED_APP_PROJECT_CELL', temp_cell):
             yield
 
 
 def test_project_registry_register():
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
+    with mfs.mock_exists_open_remove_abspath():
         with project_registry_test_context():
 
             @ProjectRegistry.register('foo')
@@ -112,7 +112,7 @@ def test_project_registry_register_snovault_scenario():
     # These values don't have to be precisely what snovault uses, just plausibly things it might
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
+    with mfs.mock_exists_open_remove_abspath():
         with project_registry_test_context():
 
             # Initialization code expects this filename to be precise
@@ -173,7 +173,7 @@ def test_project_registry_register_cgap_scenario():
     # These values don't have to be precisely what snovault and cgap-portal use, just plausibly things they might
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
+    with mfs.mock_exists_open_remove_abspath():
         with project_registry_test_context():
 
             # Initialization code expects this filename to be precise
@@ -336,7 +336,7 @@ def test_project_registry_make_project():
                 ProjectRegistry._make_project()
             assert str(exc.value) == "ProjectRegistry.PROJECT_NAME not initialized properly."
 
-            ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
+            ProjectRegistry._initialize_pyproject_name(pyproject_name='foo')
             assert isinstance(ProjectRegistry._make_project(), FooProject)
 
             with pytest.raises(Exception) as exc:
@@ -406,7 +406,7 @@ def test_project_filename():
             class FooProject(Project):
                 NAMES = {"NAME": "foo"}
 
-            ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
+            ProjectRegistry._initialize_pyproject_name(pyproject_name='foo')
             app_project = FooProject.app_project_maker()
             project = app_project()
 
@@ -486,7 +486,7 @@ def test_project_registry_initialize():
             class FooProject(Project):
                 NAMES = {"NAME": "foo"}
 
-            ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
+            ProjectRegistry._initialize_pyproject_name(pyproject_name='foo')
             app_project = FooProject.app_project_maker()
             project = app_project()
 
@@ -512,9 +512,9 @@ def test_initialize_pyproject_name_ambiguity():
 
             with pytest.raises(Exception) as exc:
                 with override_environ(APPLICATION_PYPROJECT_NAME='alpha'):
-                    ProjectRegistry.initialize_pyproject_name(pyproject_toml_file='pyproject.toml',
-                                                              poetry_data={'name': 'omega',
-                                                                           'packages': [{'include': 'omega'}]})
+                    ProjectRegistry._initialize_pyproject_name(pyproject_toml_file='pyproject.toml',
+                                                               poetry_data={'name': 'omega',
+                                                                            'packages': [{'include': 'omega'}]})
             assert str(exc.value) == "APPLICATION_PYPROJECT_NAME='alpha', but pyproject.toml says it should be 'omega'"
 
 
@@ -530,7 +530,7 @@ def test_app_project():
 
             app_project = SuperProject.app_project_maker()
 
-            C4ProjectRegistry.initialize_pyproject_name(pyproject_name='super')
+            C4ProjectRegistry._initialize_pyproject_name(pyproject_name='super')
 
             proj1 = app_project()
             assert app_project_cell_value() is not None
@@ -548,10 +548,168 @@ def test_app_project_bad_initialization():
             class FooProject(Project):
                 NAMES = {"NAME": "foo"}
 
-            ProjectRegistry.initialize_pyproject_name(pyproject_name='foo')
+            ProjectRegistry._initialize_pyproject_name(pyproject_name='foo')
             app_project = FooProject.app_project_maker()
             project = app_project()
             project._names = None  # simulate screwing up of initialization
             with pytest.raises(Exception) as exc:
                 print(project.names)
             assert str(exc.value) == "<FooProject> failed to initialize correctly."
+
+
+MISSING = '<missing>'
+
+
+@pytest.mark.parametrize("verbose", [MISSING, None, True, False])
+@pytest.mark.parametrize("detailed", [MISSING, None, True, False])
+def test_project_registry_show_herald(verbose, detailed):
+
+    print(f"Testing verbose={verbose}, detailed={detailed}")
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove_abspath():
+        with project_registry_test_context():
+
+            @ProjectRegistry.register('foo')
+            class FooProject(Project):
+                NAMES = {"NAME": "foo"}
+            ignorable(FooProject)
+
+            ProjectRegistry._initialize_pyproject_name(pyproject_name='foo')
+
+            with printed_output() as printed:
+
+                options = {}
+                if detailed is not MISSING:
+                    options['detailed'] = detailed
+                if verbose is not MISSING:
+                    options['verbose'] = verbose
+                print(f" Initialization options: {options}")
+                ProjectRegistry.initialize(**options)
+
+                if verbose is MISSING or verbose is None:
+                    verbose = ProjectRegistry.INITIALIZE_VERBOSE
+
+                if detailed is MISSING or detailed is None:
+                    detailed = ProjectRegistry.INITIALIZE_DETAILED
+
+                print(f" Expected behavior as if verbose={verbose}, detailed={detailed}")
+
+                if not verbose:
+                    assert printed.lines == []
+                elif detailed:
+                    assert printed.lines == [
+                        "",
+                        "==========================================================================================",
+                        "APPLICATION_PROJECT_HOME == '/home/mock'",
+                        "PYPROJECT_TOML_FILE == None",
+                        "PYPROJECT_NAME == 'foo'",
+                        "Project.app_project == ProjectRegistry.app_project == app_project() == <FooProject>",
+                        "app_project().APP_NAME == 'foo'",
+                        "app_project().APP_PRETTY_NAME == 'Foo'",
+                        "app_project().NAME == 'foo'",
+                        "app_project().PACKAGE_NAME == 'foo'",
+                        "app_project().PRETTY_NAME == 'Foo'",
+                        'app_project().PYPI_NAME == None',
+                        "app_project().PYPROJECT_NAME == 'foo'",
+                        "app_project().REPO_NAME == 'foo'",
+                        "==========================================================================================",
+                    ]
+                else:
+                    assert printed.lines == ["FooProject initialized with name 'foo'."]
+
+
+@pytest.mark.parametrize("options_to_test,expected_caveats", [
+    ({},
+     "with name 'foobar'"),
+    ({"PRETTY_NAME": "FooBar"},  # FooBar differs only in case, so won't be flagged
+     "with name 'foobar'"),
+    ({"PRETTY_NAME": "Foo+Bar"},  # Foo+Bar differs only in special characters, so won't be flagged
+     "with name 'foobar'"),
+    ({"PRETTY_NAME": "Fubar"},  # 'Fubar' uses a different spelling so will be noted as different
+     "with name 'foobar' and notable alias 'Fubar'"),
+    ({"PRETTY_NAME": "Fubar", "REPO_NAME": "foo_bar"},  # 'Fubar' uses different spelling but 'foo_bar' does not.
+     "with name 'foobar' and notable alias 'Fubar'"),
+    ({"PRETTY_NAME": "Super Foobar", "REPO_NAME": "FuBar"},  # Both 'FuBar' and 'Super Foobar' are spelled differently.
+     "with name 'foobar' and notable aliases 'FuBar' and 'Super Foobar'"),
+])
+def test_project_registry_show_herald_detailed(options_to_test, expected_caveats):
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove_abspath():
+        with project_registry_test_context():
+
+            @ProjectRegistry.register('foobar')
+            class FoobarProject(Project):
+                NAMES = {"NAME": "foobar", **options_to_test}
+            ignorable(FoobarProject)
+
+            ProjectRegistry._initialize_pyproject_name(pyproject_name='foobar')
+
+            with printed_output() as printed:
+
+                ProjectRegistry.initialize(verbose=True, detailed=False)
+
+                assert printed.lines == [f"FoobarProject initialized {expected_caveats}."]
+
+
+def test_project_names_items():
+
+    names_object = ProjectNames(PYPROJECT_NAME='foo', NAME='foo')
+    items = names_object.items()
+    actual_keys = []
+    for k, v in items:
+        assert isinstance(k, str)
+        assert isinstance(v, str) or (k == 'PYPI_NAME' and v is None)
+        actual_keys.append(k)
+    expected_keys = ['APP_NAME', 'APP_PRETTY_NAME', 'NAME', 'PACKAGE_NAME',
+                     'PRETTY_NAME', 'PYPI_NAME', 'PYPROJECT_NAME', 'REPO_NAME']
+    assert actual_keys == expected_keys
+
+
+def test_find_notable_aliases():
+
+    names = ProjectNames(PYPROJECT_NAME='foo', NAME='foo')
+    actual_notable_aliases = names.find_notable_aliases()
+    expected_notable_aliases = []
+    assert actual_notable_aliases == expected_notable_aliases
+
+    names = ProjectNames(PYPROJECT_NAME='foobar', NAME='foobar', PRETTY_NAME='FuBar')
+    actual_notable_aliases = names.find_notable_aliases()
+    expected_notable_aliases = ['FuBar']
+    assert actual_notable_aliases == expected_notable_aliases
+
+    names = ProjectNames(PYPROJECT_NAME='foobar', NAME='foobar', PRETTY_NAME='FuBar', PYPI_NAME='Foo Bar')
+    actual_notable_aliases = names.find_notable_aliases()
+    expected_notable_aliases = ['FuBar']
+    assert actual_notable_aliases == expected_notable_aliases
+
+    names = ProjectNames(PYPROJECT_NAME='encoded', NAME='cgap-portal')
+    actual_notable_aliases = names.find_notable_aliases()
+    expected_notable_aliases = ['encoded']
+    assert actual_notable_aliases == expected_notable_aliases
+
+    names = C4ProjectNames(PYPROJECT_NAME='encoded', NAME='cgap-portal')
+    actual_notable_aliases = names.find_notable_aliases()
+    expected_notable_aliases = ['cgap', 'encoded']
+    assert actual_notable_aliases == expected_notable_aliases
+
+    names = ProjectNames(PYPROJECT_NAME='dcicsnovault', NAME='snovault')
+    actual_notable_aliases = names.find_notable_aliases()
+    expected_notable_aliases = ['dcicsnovault']
+    assert actual_notable_aliases == expected_notable_aliases
+
+    names = C4ProjectNames(PYPROJECT_NAME='dcicsnovault', NAME='snovault')
+    actual_notable_aliases = names.find_notable_aliases()
+    expected_notable_aliases = ['dcicsnovault']
+    assert actual_notable_aliases == expected_notable_aliases
+
+    names = ProjectNames(PYPROJECT_NAME='encoded-core', NAME='encoded-core')
+    actual_notable_aliases = names.find_notable_aliases()
+    expected_notable_aliases = []
+    assert actual_notable_aliases == expected_notable_aliases
+
+    names = C4ProjectNames(PYPROJECT_NAME='encoded-core', NAME='encoded-core')
+    actual_notable_aliases = names.find_notable_aliases()
+    expected_notable_aliases = ['core']
+    assert actual_notable_aliases == expected_notable_aliases

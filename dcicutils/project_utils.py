@@ -3,7 +3,8 @@ import toml
 
 from pkg_resources import resource_filename
 from typing import Optional, Type
-from .misc_utils import PRINT, StorageCell, classproperty
+from .misc_utils import PRINT, StorageCell, classproperty, environ_bool, ignored
+from .lang_utils import conjoined_list, maybe_pluralize
 
 
 class ProjectNames:
@@ -68,8 +69,45 @@ class ProjectNames:
             pass
         return pypi_name or pyproject_name
 
+    def items(self):
+        """
+        Given a ProjectNames instance, this returns a list of the form [(name_key1, name_val1), ...].
+        """
+        result = []
+        for attr in sorted(dir(self)):
+            val = getattr(self, attr)
+            if attr.isupper() and not attr.startswith("_") and (val is None or isinstance(val, str)):
+                result.append((attr, val))
+        return sorted(result)
 
-_shared_app_project_cell = StorageCell(initial_value=None)
+    def find_notable_aliases(self):
+        """
+        This function is intended to call out unexpected name variations so that if inheritance goes wrong,
+        or there's a typo, it will get noticed for review.
+
+        :return: a representative list of aliases that are substantively distinct from the main name
+        """
+        def shorten(name):
+            return "".join([ch for ch in name.lower() if ch.isalnum()])
+        short_name = shorten(self.NAME)
+        seen = set()
+        notable_aliases = []
+        for attr, val in self.items():
+            ignored(attr)
+            # We assume the shortened name (removing weird syntax characters) of this project is a canonical form
+            # that is included in the other names. Where this is not so is not necessarily an error, but it's
+            # worth calling out in case it's a configuration problem of some sort.
+            if val:
+                short_val = shorten(val)
+                if short_name != short_val:
+                    if short_val not in seen:
+                        seen.add(short_val)
+                        notable_aliases.append(val)
+        notable_aliases = sorted(notable_aliases)
+        return notable_aliases
+
+
+_SHARED_APP_PROJECT_CELL = StorageCell(initial_value=None)
 
 
 class Project:
@@ -114,7 +152,7 @@ class Project:
         self._names: ProjectNames = self.NAMES_CLASS(**self.NAMES)
 
     def __str__(self):
-        return f"<{self.__class__.__name__} {id(self):x}>"
+        return f"<{self.__class__.__name__}>"
 
     def __repr__(self):
         return self.__str__()
@@ -188,6 +226,14 @@ class Project:
 
     @classmethod  # Type signature cannot be declared due to a circularity. Method body allows it to be inferred.
     def app_project_maker(cls):  # -> Callable[[], Callable[[], Project]]
+        """
+        Returns a function that, when invoked, will yield the proper app project,
+        initializing that value in demand if it has not been previously initialized.
+
+        Note that by the time of first call to that function, the appropriate environment must be in place.
+        If you want advance control of the specific environment in which the initialization will occur,
+        use cls.PROJECT_REGISTRY_CLASS.initialize().
+        """
 
         def app_project() -> Project:
             return cls.app_project
@@ -202,12 +248,103 @@ class Project:
                                f" but {self} is not the app_project, {current_project}.")
         return resource_filename(self.PACKAGE_NAME, filename)
 
+    def show_herald(self, detailed: bool = False):
+
+        app_project = self.app_project_maker()
+
+        the_app_project: Project = self.app_project
+        the_app_project_class: Type[Project] = the_app_project.__class__
+        the_app_project_class_name: str = the_app_project_class.__name__
+
+        # Take this moment to do some important consistency checks to make sure all is well.
+        if not (self
+                == self.__class__.app_project
+                == Project.app_project
+                == ProjectRegistry.app_project
+                == self.PROJECT_REGISTRY_CLASS.app_project
+                == app_project()
+                == the_app_project_class.app_project
+                == the_app_project.app_project):
+            raise RuntimeError("Project consistency check failed.")
+
+        if detailed:
+            PRINT()  # start on a fresh line
+            PRINT("=" * 90)
+            PRINT(f"APPLICATION_PROJECT_HOME == {self.PROJECT_REGISTRY_CLASS.APPLICATION_PROJECT_HOME!r}")
+            PRINT(f"PYPROJECT_TOML_FILE == {self.PROJECT_REGISTRY_CLASS.PYPROJECT_TOML_FILE!r}")
+            PRINT(f"PYPROJECT_NAME == {self.PROJECT_REGISTRY_CLASS.PYPROJECT_NAME!r}")
+            PRINT(f"Project.app_project == ProjectRegistry.app_project == app_project() == {app_project()!r}")
+            for attr, val in self.names.items():
+                PRINT(f"app_project().{attr} == {val!r}")
+            PRINT("=" * 90)
+        else:
+            aliases = self.names.find_notable_aliases()
+            extra = (f" and {maybe_pluralize(aliases, 'notable alias')} {conjoined_list(sorted(map(repr, aliases)))}"
+                     if aliases
+                     else "")
+            PRINT(f"{the_app_project_class_name} initialized with name {self.NAME!r}{extra}.")
+
+
+"""
+
+Design Notes relating to Project.app_project_maker
+---------------------------------------------------
+
+In your `project_defs.rst` file, you should write something like::
+
+    from dcicutils.project_utils import C4ProjectRegistry, C4Project
+
+    @C4ProjectRegistry.register('dcicsnovault')
+    class SnovaultProject(C4Project):
+        NAMES = {'NAME': 'snovault', 'PYPI_NAME': 'dcicsnovault'}
+        ACCESSION_PREFIX = 'SNO'
+
+    app_project = SnovaultProject.app_project_maker()
+
+You might very reasonably ask, why isn't `app_project` a method on this class.
+There are several conspiring reasons:
+
+* Invoking it would then involve more text than we want. We would have to write
+  Project.app_project, for example, rather than app_project().
+
+* If it's a C4Project, not a Project, we'd need to use C4Project.app_project in
+  case demand-initialization happens, because that needs to call C4ProjectRegistry.initialize(),
+  NOT ProjectRegistry.initialize(), to get appropriate initialization methods.
+  Since we're already presumably importing just C4Project to make our SnovaultProject,
+  or importing SnovaultProject to make EncodedCoreProject, or importing EncodedCoreProject
+  or SnovaultProject to make a portal project, it's best to just call that class
+  to make the maker, and then you can't accidentally do it wrong.
+
+* If the method is already on the class, you might be tempted in another file to import the
+  method from that file, without loading your repository's own project definition. By putting
+  the creation of this function in the same file as the class definition, you are assured that
+  all appropriate support will be loaded. Fortunately, there is another cross-check on this as
+  well, since the computation of what class to load will compute a name that is only defined in
+  the .register() call, and if you haven't already loaded that file, the lookup of the proper
+  class should efail because things are undefined.
+
+Note that if you don't a pyproject.toml and you also have not yet set the environment variable
+APPLICATION_PROJECT_NAME to an appropriate value by time of first call, initialization will (rightly)
+fail, so you'll know there is a problem. At least in a production system.
+
+The primary thing to worry about is in development if you have globally assigned APPLICATION_PROJECT_NAME
+because if it's set to something more low-level than you want, like to snovault, that's what's going
+to launch. That risk is small and it should be easy to notice that problem. If you've set it to 'encoded',
+it should launch the portal for whatever repo you're in, which won't be that terrible. If you meant
+fourfront but are in a cgap-portal repo, you it's not clear what would have been better.
+
+"""
+
 
 class ProjectRegistry:
 
     PROJECT_BASE_CLASS: Type[Project] = Project
 
-    SHOW_HERALD_WHEN_INITIALIZED = True
+    # If true, a herald will be shown; otherwise (if false), no herald will be shown
+    INITIALIZE_VERBOSE = environ_bool("PROJECT_INITIALIZE_VERBOSE", default=True)
+
+    # If true, any herald shown will have multi-line details; otherwise (if false), it'll be a single-line summary.
+    INITIALIZE_DETAILED = environ_bool("PROJECT_INITIALIZE_DETAILED", default=False)
 
     REGISTERED_PROJECTS = {}
 
@@ -216,21 +353,22 @@ class ProjectRegistry:
     PYPROJECT_TOML_FILE = None
     PYPROJECT_TOML = None
     POETRY_DATA = None
-    # This is expected to ultimately be set properly.
+
+    # This is expected to ultimately be set properly. It is only None while bootstrapping.
     _PYPROJECT_NAME = None
 
     @classproperty
     def PYPROJECT_NAME(cls) -> str:  # noQA - PyCharm thinks this should be 'self'
         if cls._PYPROJECT_NAME is None:
-            cls.initialize_pyproject_name()
+            cls._initialize_pyproject_name()
         result: Optional[str] = cls._PYPROJECT_NAME
         if result is None:
             raise ValueError(f"{cls.__name__}.PROJECT_NAME not initialized properly.")
         return result
 
     @classmethod
-    def initialize_pyproject_name(cls, project_home=None, pyproject_toml_file=None,
-                                  pyproject_toml=None, poetry_data=None, pyproject_name=None):
+    def _initialize_pyproject_name(cls, project_home=None, pyproject_toml_file=None,
+                                   pyproject_toml=None, poetry_data=None, pyproject_name=None):
         if ProjectRegistry._PYPROJECT_NAME is None:
             # This isn't the home of Project, but the home of the Project-based application.
             # So in CGAP, for example, this would want to be the home of the CGAP application.
@@ -368,41 +506,17 @@ class ProjectRegistry:
         return project  # instantiate and return
 
     @classmethod
-    def initialize(cls, force=False) -> Project:
-        shared_app_project: Optional[Project] = _shared_app_project_cell.value
+    def initialize(cls, force=False, verbose: Optional[bool] = None, detailed: Optional[bool] = None) -> Project:
+        show_herald = cls.INITIALIZE_VERBOSE if verbose is None else verbose
+        detailed = cls.INITIALIZE_DETAILED if detailed is None else detailed
+        shared_app_project: Optional[Project] = _SHARED_APP_PROJECT_CELL.value
         if shared_app_project and not force:
             return shared_app_project
-        _shared_app_project_cell.value = cls._make_project()
-        if cls.SHOW_HERALD_WHEN_INITIALIZED:
-            cls.show_herald()
+        _SHARED_APP_PROJECT_CELL.value = cls._make_project()
         app_project: Project = cls.app_project  # Now that it's initialized, make sure it comes from the right place
+        if show_herald:
+            app_project.show_herald(detailed=detailed)
         return app_project
-
-    @classmethod
-    def show_herald(cls):
-        app_project = cls.PROJECT_BASE_CLASS.app_project_maker()
-
-        PRINT()  # start on a fresh line
-        PRINT("=" * 80)
-        PRINT(f"APPLICATION_PROJECT_HOME == {cls.APPLICATION_PROJECT_HOME!r}")
-        PRINT(f"PYPROJECT_TOML_FILE == {cls.PYPROJECT_TOML_FILE!r}")
-        PRINT(f"PYPROJECT_NAME == {cls.PYPROJECT_NAME!r}")
-        the_app_project: Project = Project.app_project
-        the_app_project_class: Type[Project] = the_app_project.__class__
-        the_app_project_class_name: str = the_app_project_class.__name__
-        assert (Project.app_project
-                == app_project()
-                == the_app_project_class.app_project
-                == the_app_project.app_project), (
-            "Project consistency check failed."
-        )
-        PRINT(f"{the_app_project_class_name}.app_project == Project.app_project == app_project() == {app_project()!r}")
-        the_app: Project = app_project()
-        for attr in sorted(dir(the_app)):
-            val = getattr(the_app, attr)
-            if attr.isupper() and not attr.startswith("_") and (val is None or isinstance(val, str)):
-                PRINT(f"app_project().{attr} == {val!r}")
-        PRINT("=" * 80)
 
     @classproperty
     def app_project(cls) -> Project:  # noQA - PyCharm thinks we should use 'self'
@@ -410,16 +524,22 @@ class ProjectRegistry:
         Once the project is initialized, ProjectRegistry.app_project returns the application object
         that should be used to dispatch project-dependent behavior.
         """
-        app_project: Project = _shared_app_project_cell.value or cls.initialize()
+        app_project: Project = _SHARED_APP_PROJECT_CELL.value or cls.initialize()
         return app_project
 
 
 Project.declare_project_registry_class(ProjectRegistry)  # Finalize a circular dependency
 
 
-# --------------------------------------------------------------------------------
-# C4-specific tools follow
-# --------------------------------------------------------------------------------
+"""
+
+C4-specific Subclasses
+======================
+
+The above classes are general-purpose for all potential users, which their C4-specific
+subclasses add additional policy detailing that is specific to the work of the C4 team.
+
+"""
 
 
 class C4ProjectNames(ProjectNames):
@@ -470,6 +590,11 @@ class C4Project(Project):
 
 
 class C4ProjectRegistry(ProjectRegistry):
+    """
+    Allows the same kinds of registration operations that its parent, ProjectRegistry, would
+    allow, but with additional error-checks that are C4-specific. Also, this is expected to be
+    used in conjunction with C4Project, rather than just Project.
+    """
 
     PROJECT_BASE_CLASS = C4Project
 
@@ -481,3 +606,16 @@ class C4ProjectRegistry(ProjectRegistry):
 # Finalize a circular dependency
 
 C4Project.declare_project_registry_class(C4ProjectRegistry)  # Finalize a circular dependency
+
+
+"""
+
+About the name "C4"
+-------------------
+
+The name C4 originally was used as a way of speaking about the combined efforts of the CGAP and 4DN
+teams at Harvard's Park Lab, part of Harvard Medical School (HMS) / Department of Biomedical Informatics (DBMI).
+The mission of that team of of people has broadened further to include work on SMaHT, but we continue to use
+the term C4 to refer to the space of tools that span all of these projects because they all use a common base of tools.
+
+"""

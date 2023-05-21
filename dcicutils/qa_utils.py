@@ -424,6 +424,7 @@ class MockFileSystem:
         self._auto_mirror_files_for_read = auto_mirror_files_for_read
         self._do_not_auto_mirror = set(do_not_auto_mirror or [])
         self.files = {filename: content.encode(default_encoding) for filename, content in (files or {}).items()}
+        self.working_dir = "/home/mock"
         for filename in self.files:
             self._do_not_mirror(filename)
 
@@ -457,6 +458,16 @@ class MockFileSystem:
         self._maybe_auto_mirror_file(file)
         if self.files.pop(file, None) is None:
             raise FileNotFoundError("No such file or directory: %s" % file)
+
+    def abspath(self, file):
+        if file.startswith("/"):
+            return file
+        elif file == ".":
+            return self.working_dir
+        elif file == "./":
+            return os.path.join(self.working_dir, file[2:])
+        else:
+            return os.path.join(self.working_dir, file)
 
     def open(self, file, mode='r', encoding=None):
         if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
@@ -492,6 +503,14 @@ class MockFileSystem:
             with mock.patch("io.open", self.open):
                 with mock.patch("os.remove", self.remove):
                     yield self
+
+    @contextlib.contextmanager
+    def mock_exists_open_remove_abspath(self):
+        with mock.patch("os.path.exists", self.exists):
+            with mock.patch("io.open", self.open):
+                with mock.patch("os.remove", self.remove):
+                    with mock.patch("os.path.abspath", self.abspath):
+                        yield self
 
 
 class MockAWSFileSystem(MockFileSystem):
