@@ -476,6 +476,29 @@ def test_bad_pyproject_names():
                                       " The class can still be SMaHTProject.")
 
 
+def test_project_initialize():
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with project_registry_test_context():
+
+            @ProjectRegistry.register('foo')
+            class FooProject(Project):
+                NAMES = {"NAME": "foo"}
+
+            ProjectRegistry._initialize_pyproject_name(pyproject_name='foo')
+            project = FooProject.initialize()
+            assert isinstance(project, FooProject)
+
+            assert FooProject.initialize() == project  # Doing it again gets the same one
+
+            new_project = Project.initialize(force=True)  # Creates a new instance of the app_project()
+
+            assert isinstance(new_project, FooProject)
+            assert new_project is not project
+            assert new_project.NAME == project.NAME
+
+
 def test_project_registry_initialize():
 
     mfs = MockFileSystem()
@@ -487,11 +510,10 @@ def test_project_registry_initialize():
                 NAMES = {"NAME": "foo"}
 
             ProjectRegistry._initialize_pyproject_name(pyproject_name='foo')
-            app_project = FooProject.app_project_maker()
-            project = app_project()
+            project = ProjectRegistry.initialize()
+            assert isinstance(project, FooProject)
 
-            assert ProjectRegistry.initialize() == project
-            assert ProjectRegistry.initialize() == project
+            assert ProjectRegistry.initialize() == project  # Doing it again gets the same one
 
             new_project = ProjectRegistry.initialize(force=True)  # Creates a new instance of the app_project()
 

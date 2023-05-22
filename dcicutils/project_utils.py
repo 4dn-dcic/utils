@@ -248,6 +248,11 @@ class Project:
                                f" but {self} is not the app_project, {current_project}.")
         return resource_filename(self.PACKAGE_NAME, filename)
 
+    @classmethod
+    def initialize(cls, force=False, verbose: Optional[bool] = None, detailed: Optional[bool] = None):  # -> Project
+        app_project: Project = cls.PROJECT_REGISTRY_CLASS.initialize(force=force, verbose=verbose, detailed=detailed)
+        return app_project
+
     def show_herald(self, detailed: bool = False):
 
         app_project = self.app_project_maker()
