@@ -588,10 +588,10 @@ def test_project_registry_show_herald(verbose, detailed):
                 ProjectRegistry.initialize(**options)
 
                 if verbose is MISSING or verbose is None:
-                    verbose = ProjectRegistry.INITIALIZE_VERBOSE
+                    verbose = ProjectRegistry.PROJECT_INITIALIZE_VERBOSE
 
                 if detailed is MISSING or detailed is None:
-                    detailed = ProjectRegistry.INITIALIZE_DETAILED
+                    detailed = ProjectRegistry.PROJECT_INITIALIZE_DETAILED
 
                 print(f" Expected behavior as if verbose={verbose}, detailed={detailed}")
 

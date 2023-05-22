@@ -341,10 +341,10 @@ class ProjectRegistry:
     PROJECT_BASE_CLASS: Type[Project] = Project
 
     # If true, a herald will be shown; otherwise (if false), no herald will be shown
-    INITIALIZE_VERBOSE = environ_bool("PROJECT_INITIALIZE_VERBOSE", default=True)
+    PROJECT_INITIALIZE_VERBOSE = environ_bool("PROJECT_INITIALIZE_VERBOSE", default=True)
 
     # If true, any herald shown will have multi-line details; otherwise (if false), it'll be a single-line summary.
-    INITIALIZE_DETAILED = environ_bool("PROJECT_INITIALIZE_DETAILED", default=False)
+    PROJECT_INITIALIZE_DETAILED = environ_bool("PROJECT_INITIALIZE_DETAILED", default=False)
 
     REGISTERED_PROJECTS = {}
 
@@ -507,8 +507,8 @@ class ProjectRegistry:
 
     @classmethod
     def initialize(cls, force=False, verbose: Optional[bool] = None, detailed: Optional[bool] = None) -> Project:
-        show_herald = cls.INITIALIZE_VERBOSE if verbose is None else verbose
-        detailed = cls.INITIALIZE_DETAILED if detailed is None else detailed
+        show_herald = cls.PROJECT_INITIALIZE_VERBOSE if verbose is None else verbose
+        detailed = cls.PROJECT_INITIALIZE_DETAILED if detailed is None else detailed
         shared_app_project: Optional[Project] = _SHARED_APP_PROJECT_CELL.value
         if shared_app_project and not force:
             return shared_app_project
