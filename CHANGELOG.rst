@@ -16,6 +16,16 @@ Change Log
 
   * New class ``Project`` and ``C4Project``
 
+* In ``qa_utils``:
+
+  * In class ``MockFileSystem``:
+
+    * New method ``abspath``
+    * New method ``chdir``
+    * New method ``expanduser``
+    * New method ``getcwd``
+    * New method ``mock_exists_open_remove_abspath_getcwd_chdir`` (context manager)
+
 
 7.4.3
 =====
