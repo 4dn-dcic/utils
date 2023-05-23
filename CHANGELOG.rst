@@ -6,9 +6,15 @@ dcicutils
 Change Log
 ----------
 
+7.4.4
+=====
+Fixed the ``publish-to-pypi`` script to ignore the ``.gitignore`` file when looking for untracked files.
+
+
 7.4.3
 =====
 Removed ``scripts`` from ``packages`` directory list in ``pyproject.toml``; not necessary.
+
 
 7.4.2
 =====
