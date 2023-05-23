@@ -207,7 +207,7 @@ def get_untracked_files() -> list:
     package_directories = get_package_directories()
     untracked_files = []
     for package_directory in package_directories:
-        # The --ignored option ignored the .gitignore file.
+        # The --ignored option ignores the .gitignore file.
         git_status_results, _ = execute_command(["git", "status", "-s", "--ignored", package_directory])
         for git_status_result in git_status_results:
             if git_status_result and (git_status_result.startswith("??") or git_status_result.startswith("!!")):
