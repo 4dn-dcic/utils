@@ -203,6 +203,8 @@ def verify_not_already_published(package_name: str, package_version: str) -> boo
 def get_untracked_files() -> list:
     """
     Returns a list of untracked files for the current git repo; empty list of no untracked changes.
+    We ignore __pycache__ directories which are excluded by poetry publish.
+    We ignore the .gitignore file for this.
     """
     package_directories = get_package_directories()
     untracked_files = []
@@ -213,6 +215,9 @@ def get_untracked_files() -> list:
             if git_status_result and (git_status_result.startswith("??") or git_status_result.startswith("!!")):
                 untracked_file = git_status_result[2:].strip()
                 if untracked_file:
+                    # Ignore any __pycache__ directories as the are ignored by poetry publish.
+                    if os.path.isdir(untracked_file) and os.path.basename(untracked_file.rstrip("/")) == "__pycache__":
+                        continue
                     untracked_files.append(untracked_file)
     return untracked_files
 
