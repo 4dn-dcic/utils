@@ -108,6 +108,7 @@ def publish_package(pypi_username: str = None, pypi_password: str = None) -> boo
     poetry_publish_results, status_code = execute_command(poetry_publish_command)
     PRINT("\n".join(poetry_publish_results))
     if status_code != 0:
+        # TODO: Maybe retry once or twice (with prompt) if (perhaps spurious) failure.
         PRINT(f"Publish to PyPi failed!")
         return False
     return True
