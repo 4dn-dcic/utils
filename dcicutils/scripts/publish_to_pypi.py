@@ -42,6 +42,8 @@ def main() -> None:
     argp = argparse.ArgumentParser()
     argp.add_argument("--noconfirm", required=False, dest="noconfirm", action="store_true")
     argp.add_argument("--debug", required=False, dest="debug", action="store_true")
+    argp.add_argument("--username", required=False, dest="username")
+    argp.add_argument("--password", required=False, dest="password")
     args = argp.parse_args()
 
     if args.debug:
@@ -82,7 +84,7 @@ def main() -> None:
 
     PRINT(f"Publishing {package_name} {package_version} to PyPi ...")
 
-    if not publish_package():
+    if not publish_package(args.username, args.password):
         exit_with_no_action()
 
     PRINT(f"Publishing {package_name} {package_version} to PyPi complete.")
@@ -96,6 +98,8 @@ def publish_package(pypi_username: str = None, pypi_password: str = None) -> boo
     if not pypi_username or not pypi_password:
         PRINT(f"No PyPi credentials. You must have PYPI_USER and PYPI_PASSWORD environment variables set.")
         return False
+    if pypi_username != "__token__":
+        PRINT(f"Warning: Publishing with username/pasword is deprecated; should use be using API token instead.")
     poetry_publish_command = [
         "poetry", "publish",
         "--no-interaction", "--build",
@@ -193,7 +197,10 @@ def verify_not_already_published(package_name: str, package_version: str) -> boo
     If the given package and version has not already been published to PyPi then returns True,
     otherwise prints a warning and returns False.
     """
-    response = requests.get(f"https://pypi.org/project/{package_name}/{package_version}/")
+    url = f"https://pypi.org/project/{package_name}/{package_version}/"
+    if DEBUG:
+        PRINT(f"DEBUG: {url}")
+    response = requests.get(url)
     if response.status_code == 200:
         PRINT(f"Package {package_name} {package_version} has already been published to PyPi.")
         return False
