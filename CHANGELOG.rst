@@ -10,6 +10,10 @@ Change Log
 7.5.0
 =====
 
+* In ``lang_utils``:
+
+  * Teach ``EnglishUtils.string_pluralize`` about words ending in ``-ses`` because ``cgap-portal`` needs this.
+
 * New module ``project_utils`` with support for Project mechanism.
 
   * New decorators ``ProjectRegistry`` and ``C4ProjectRegistry``

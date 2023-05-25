@@ -370,7 +370,7 @@ def test_declare_project_registry_class_wrongly():
 
 def test_project_registry_class():
 
-    old_registry_class = Project.PROJECT_REGISTRY_CLASS
+    old_registry_class = Project._PROJECT_REGISTRY_CLASS
 
     try:
 
@@ -393,7 +393,7 @@ def test_project_registry_class():
     finally:
 
         # We were supposed to get an error before any side effect happened, but we'll be careful just in case.
-        Project.PROJECT_REGISTRY_CLASS = old_registry_class
+        Project._PROJECT_REGISTRY_CLASS = old_registry_class
 
 
 def test_project_filename():
@@ -540,7 +540,7 @@ def test_initialize_pyproject_name_ambiguity():
             assert str(exc.value) == "APPLICATION_PYPROJECT_NAME='alpha', but pyproject.toml says it should be 'omega'"
 
 
-def test_app_project():
+def test_app_project_via_registry_method():
 
     mfs = MockFileSystem()
     with mfs.mock_exists_open_remove():
@@ -550,7 +550,36 @@ def test_app_project():
             class SuperProject(C4Project):
                 NAMES = {"NAME": "super"}
 
-            app_project = SuperProject.app_project_maker()
+            with printed_output() as printed:
+                app_project = C4ProjectRegistry.app_project_maker()
+                assert printed.lines == []
+
+            C4ProjectRegistry._initialize_pyproject_name(pyproject_name='super')
+
+            proj1 = app_project()
+            assert app_project_cell_value() is not None
+            proj2 = app_project()
+            assert proj1 is proj2
+
+
+def test_app_project_via_project_method():
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with project_registry_test_context():
+
+            @C4ProjectRegistry.register('super')
+            class SuperProject(C4Project):
+                NAMES = {"NAME": "super"}
+
+            print(f"SuperProject.PROJECT_REGISTRY_CLASS={SuperProject.PROJECT_REGISTRY_CLASS.__name__}")
+
+            with printed_output() as printed:
+                app_project = SuperProject.app_project_maker()
+                assert printed.lines == [
+                    ('SuperProject.app_project_maker() called. This class method has been deprecated.'
+                     ' Please use C4ProjectRegistry.app_project_maker() instead.')
+                ]
 
             C4ProjectRegistry._initialize_pyproject_name(pyproject_name='super')
 

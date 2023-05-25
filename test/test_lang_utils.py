@@ -37,6 +37,18 @@ def test_string_pluralize():
     assert EnglishUtils.string_pluralize("human") == "humans"
     assert EnglishUtils.string_pluralize("superhuman") == "superhumans"
 
+    # There are a LOT of these, but here are some common ones:
+    # https://wordtoolbox.com/nouns-ending-with/sis?common
+    assert EnglishUtils.string_pluralize("sis") == "sisses"          # informal / irregular - both sises and sisses OK
+    assert EnglishUtils.string_pluralize("stepsis") == "stepsisses"  # ditto
+    assert EnglishUtils.string_pluralize("analysis") == "analyses"
+    assert EnglishUtils.string_pluralize("basis") == "bases"
+    assert EnglishUtils.string_pluralize("crisis") == "crises"
+    assert EnglishUtils.string_pluralize("diagnosis") == "diagnoses"
+    assert EnglishUtils.string_pluralize("emphasis") == "emphases"
+    assert EnglishUtils.string_pluralize("hypothesis") == "hypotheses"
+    assert EnglishUtils.string_pluralize("sepsis") == "sepses"
+
     assert EnglishUtils.string_pluralize("box") == "boxes"
 
     assert EnglishUtils.string_pluralize("index") == "indexes"  # but see CustomEnglishUtils below

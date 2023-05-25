@@ -2,7 +2,7 @@ import os
 import toml
 
 from pkg_resources import resource_filename
-from typing import Optional, Type
+from typing import Callable, Optional, Type
 from .misc_utils import PRINT, StorageCell, classproperty, environ_bool, ignored
 from .lang_utils import conjoined_list, maybe_pluralize
 
@@ -224,21 +224,22 @@ class Project:
         """
         return cls.PROJECT_REGISTRY_CLASS.app_project
 
-    @classmethod  # Type signature cannot be declared due to a circularity. Method body allows it to be inferred.
-    def app_project_maker(cls):  # -> Callable[[], Callable[[], Project]]
+    @classmethod
+    def app_project_maker(cls):
         """
-        Returns a function that, when invoked, will yield the proper app project,
-        initializing that value in demand if it has not been previously initialized.
+        Makes an app_project function, a function of no arguments that returns the current app_project,
+        creating it on demand if necessary.
 
-        Note that by the time of first call to that function, the appropriate environment must be in place.
-        If you want advance control of the specific environment in which the initialization will occur,
-        use cls.PROJECT_REGISTRY_CLASS.initialize().
+        NOTES:
+        * When using C4Project classes, please always use C4ProjectRegistry.app_project_maker() so that C4
+          policies will be applied upon demand-creation.
+
+        * The Project.app_project_maker() class method is deprecated. Please use
+          Please use Projectregistry.app_project_maker() or C4ProjectRegistry.app_project_maker(), instead.
         """
-
-        def app_project() -> Project:
-            return cls.app_project
-
-        return app_project
+        PRINT(f"{cls.__name__}.app_project_maker() called. This class method has been deprecated."
+              f" Please use {cls.PROJECT_REGISTRY_CLASS.__name__}.app_project_maker() instead.")
+        return cls.PROJECT_REGISTRY_CLASS.app_project_maker()
 
     def project_filename(self, filename):
         """Returns a filename relative to given instance."""
@@ -255,7 +256,7 @@ class Project:
 
     def show_herald(self, detailed: bool = False):
 
-        app_project = self.app_project_maker()
+        app_project = self.PROJECT_REGISTRY_CLASS.app_project_maker()
 
         the_app_project: Project = self.app_project
         the_app_project_class: Type[Project] = the_app_project.__class__
@@ -530,6 +531,27 @@ class ProjectRegistry:
         that should be used to dispatch project-dependent behavior.
         """
         app_project: Project = _SHARED_APP_PROJECT_CELL.value or cls.initialize()
+        return app_project
+
+    @classmethod
+    def app_project_maker(cls) -> Callable[[], Project]:
+        """
+        Returns a function that, when invoked, will yield the proper app project,
+        initializing that value in demand if it has not been previously initialized.
+
+        Note that by the time of first call to that function, the appropriate environment must be in place.
+        If you want advance control of the specific environment in which the initialization will occur,
+        use <registry-class>.initialize().
+        """
+
+        def app_project() -> Project:
+            if cls == Project:
+                raise Exception("Please do not use ProjectRegistry.app_project_maker()."
+                                " For DBMI users, use C4ProjectRegistry."
+                                " For others, make a subclass of ProjectRegistry and use that.")
+
+            return cls.app_project
+
         return app_project
 
 
