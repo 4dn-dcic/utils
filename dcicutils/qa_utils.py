@@ -418,12 +418,16 @@ class MockFileWriter:
 class MockFileSystem:
     """Extremely low-tech mock file system."""
 
+    MOCK_USER_HOME = "/home/mock"
+    MOCK_ROOT_HOME = "/root"
+
     def __init__(self, files=None, default_encoding='utf-8', auto_mirror_files_for_read=False, do_not_auto_mirror=()):
         self.default_encoding = default_encoding
         # Setting this dynamically will make things inconsistent
         self._auto_mirror_files_for_read = auto_mirror_files_for_read
         self._do_not_auto_mirror = set(do_not_auto_mirror or [])
         self.files = {filename: content.encode(default_encoding) for filename, content in (files or {}).items()}
+        self.working_dir = self.MOCK_USER_HOME
         for filename in self.files:
             self._do_not_mirror(filename)
 
@@ -457,6 +461,35 @@ class MockFileSystem:
         self._maybe_auto_mirror_file(file)
         if self.files.pop(file, None) is None:
             raise FileNotFoundError("No such file or directory: %s" % file)
+
+    def expanduser(self, file):
+        if file.startswith("~/"):
+            return os.path.join(self.MOCK_USER_HOME, file[2:])
+        elif file.startswith("~root/"):
+            return os.path.join(self.MOCK_ROOT_HOME, file[6:])
+        elif file == "~":
+            return self.MOCK_USER_HOME
+        elif file == "~root":
+            return self.MOCK_ROOT_HOME
+        else:
+            return file
+
+    def chdir(self, dirname):
+        assert isinstance(dirname, str), f"The argument to chdir must be a string: {dirname}"
+        self.working_dir = os.path.join(self.working_dir, dirname)
+
+    def getcwd(self):
+        return self.working_dir
+
+    def abspath(self, file):
+        if file.startswith("/"):
+            return file
+        elif file == ".":
+            return self.working_dir
+        elif file.startswith("./"):
+            return os.path.join(self.working_dir, file[2:])
+        else:
+            return os.path.join(self.working_dir, file)
 
     def open(self, file, mode='r', encoding=None):
         if FILE_SYSTEM_VERBOSE:  # pragma: no cover - Debugging option. Doesn't need testing.
@@ -492,6 +525,16 @@ class MockFileSystem:
             with mock.patch("io.open", self.open):
                 with mock.patch("os.remove", self.remove):
                     yield self
+
+    @contextlib.contextmanager
+    def mock_exists_open_remove_abspath_getcwd_chdir(self):
+        with mock.patch("os.path.exists", self.exists):
+            with mock.patch("io.open", self.open):
+                with mock.patch("os.remove", self.remove):
+                    with mock.patch("os.path.abspath", self.abspath):
+                        with mock.patch("os.getcwd", self.getcwd):
+                            with mock.patch("os.chdir", self.chdir):
+                                yield self
 
 
 class MockAWSFileSystem(MockFileSystem):
