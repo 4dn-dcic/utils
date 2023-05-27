@@ -36,6 +36,7 @@ def test_project_registry_register():
 
     mfs = MockFileSystem()
     with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
+
         with project_registry_test_context():
 
             @ProjectRegistry.register('foo')
@@ -285,14 +286,15 @@ def test_c4_project_names_repofy():
 
 def test_project_names_infer_package_name():
 
-    assert ProjectNames.infer_package_name(poetry_data={}, pypi_name='foo', pyproject_name='bar') == 'foo'
-    assert ProjectNames.infer_package_name(poetry_data=None, pypi_name='foo', pyproject_name='bar') == 'foo'
+    assert ProjectNames.infer_package_name(poetry_data={}, pyproject_name='bar') == 'bar'
+    assert ProjectNames.infer_package_name(poetry_data=None, pyproject_name='bar') == 'bar'
 
-    assert ProjectNames.infer_package_name(poetry_data={}, pypi_name=None, pyproject_name='bar') == 'bar'
-    assert ProjectNames.infer_package_name(poetry_data=None, pypi_name=None, pyproject_name='bar') == 'bar'
+    with pytest.raises(Exception) as exc:
+        assert ProjectNames.infer_package_name(poetry_data={}, pyproject_name=None)
+    assert str(exc.value) == ("Unable to infer package name given poetry_data={} and pyproject_name=None.")
 
     def test_package_name_from_poetry_data(*, poetry_data, expected):
-        actual = ProjectNames.infer_package_name(poetry_data=poetry_data, pypi_name=None, pyproject_name='fallback')
+        actual = ProjectNames.infer_package_name(poetry_data=poetry_data, pyproject_name='fallback')
         assert actual == expected
 
     test_package_name_from_poetry_data(poetry_data={'name': 'whatever'},
@@ -309,7 +311,7 @@ def test_project_names_infer_package_name():
 def test_project_registry_find_pyproject():
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             @ProjectRegistry.register('foo')
@@ -320,36 +322,102 @@ def test_project_registry_find_pyproject():
             assert ProjectRegistry.find_pyproject('bar') is None
 
 
-def test_project_registry_make_project():
+def test_project_registry_make_project_autoload():
+
+    print()  # Start on a fresh line.
 
     old_project_name = ProjectRegistry._PYPROJECT_NAME
+    assert old_project_name is None
 
-    mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
-        with project_registry_test_context():
+    with printed_output() as printed:
 
-            @ProjectRegistry.register('foo')
-            class FooProject(Project):
-                NAMES = {"NAME": "foo"}
+        mfs = MockFileSystem()
+        with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
+            with project_registry_test_context():
+                with mock.patch("importlib.import_module") as mock_import_module:
 
-            with pytest.raises(Exception) as exc:
-                ProjectRegistry._make_project()
-            assert str(exc.value) == "ProjectRegistry.PROJECT_NAME not initialized properly."
+                    cell = StorageCell()
 
-            ProjectRegistry._initialize_pyproject_name(pyproject_name='foo')
-            assert isinstance(ProjectRegistry._make_project(), FooProject)
+                    def mocked_import_module(name, package):
+                        assert name == '.project_defs'
+                        assert package == 'whatever/bogosity'
 
-            with pytest.raises(Exception) as exc:
-                C4ProjectRegistry._make_project()
-            assert str(exc.value) == "Registered pyproject 'foo' (FooProject) is not a subclass of C4Project."
+                        # This ends up in the wrong environment, but really all we wanted it to do was to
+                        # register a class for side-effect. -kmp 26-May-2023
 
-            ProjectRegistry._PYPROJECT_NAME = 'bogus'  # Mock up a bad initialization
-            set_app_project_cell_value(None)  # Clear cache
-            with pytest.raises(Exception) as exc:
-                ProjectRegistry._make_project()
-            assert str(exc.value) == "Missing project class for pyproject 'bogus'."
+                        @C4ProjectRegistry.register('boguslib')
+                        class BogusProject(C4Project):
+                            NAMES = {"NAME": "bogus"}
 
-    assert ProjectRegistry._PYPROJECT_NAME == old_project_name
+                        cell.value = BogusProject
+
+                    mock_import_module.side_effect = mocked_import_module
+
+                    root_dir = os.getcwd()
+                    assert root_dir == "/home/mock"
+
+                    pyproject_path = os.path.abspath("./pyproject.toml")
+                    assert pyproject_path == '/home/mock/pyproject.toml'
+
+                    with io.open(pyproject_path, 'w') as fp:
+                        fp.write(
+                            """[tool.poetry]\n"""
+                            """name = "boguslib"\n"""
+                            """packages = [{include = "bogosity", from = "whatever"}]\n""")
+
+                    app_project = C4ProjectRegistry.app_project_maker()
+                    project = app_project()
+                    assert isinstance(project, cell.value)
+                    assert C4ProjectRegistry.APPLICATION_PROJECT_HOME == root_dir
+
+                    assert printed.lines == [
+                        "Autoloading pyproject 'boguslib' from inferred package 'whatever/bogosity'.",
+                        "BogusProject initialized with name 'bogus' and notable aliases 'bogosity' and 'boguslib'."
+                    ]
+
+    assert ProjectRegistry._PYPROJECT_NAME is None
+
+
+def test_project_registry_make_project():
+
+    print()  # Start on a fresh line.
+
+    old_project_name = ProjectRegistry._PYPROJECT_NAME
+    assert old_project_name is None
+
+    with printed_output() as printed:
+
+        mfs = MockFileSystem()
+        with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
+            with project_registry_test_context():
+
+                @ProjectRegistry.register('foo')
+                class FooProject(Project):
+                    NAMES = {"NAME": "foo"}
+
+                with pytest.raises(Exception) as exc:
+                    ProjectRegistry._make_project()
+                assert str(exc.value) == "ProjectRegistry.PYPROJECT_NAME not initialized properly."
+
+                ProjectRegistry._initialize_pyproject_name(pyproject_name='foo')
+                assert isinstance(ProjectRegistry._make_project(), FooProject)
+
+                with pytest.raises(Exception) as exc:
+                    C4ProjectRegistry._make_project()
+                assert str(exc.value) == "Registered pyproject 'foo' (FooProject) is not a subclass of C4Project."
+
+                ProjectRegistry._PYPROJECT_NAME = 'bogus'  # Mock up a bad initialization
+                set_app_project_cell_value(None)  # Clear cache
+                with pytest.raises(Exception) as exc:
+                    ProjectRegistry._make_project()
+                exc_msg = str(exc.value)
+                assert printed.lines == [
+                    "Autoloading pyproject 'bogus' from inferred package 'bogus'.",
+                    "Autoload failed: ModuleNotFoundError: No module named 'bogus'"
+                ]
+                assert exc_msg == "Missing project class for pyproject 'bogus'."
+
+    assert ProjectRegistry._PYPROJECT_NAME is None
 
 
 def test_declare_project_registry_class_wrongly():
@@ -375,7 +443,7 @@ def test_project_registry_class():
     try:
 
         mfs = MockFileSystem()
-        with mfs.mock_exists_open_remove():
+        with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
             with project_registry_test_context():
 
                 @ProjectRegistry.register('foo')
@@ -399,7 +467,7 @@ def test_project_registry_class():
 def test_project_filename():
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             @ProjectRegistry.register('foo')
@@ -428,7 +496,7 @@ def test_project_filename():
 def test_project_registry_register_bad_name():
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             with pytest.raises(Exception) as exc:
@@ -442,7 +510,7 @@ def test_project_registry_register_bad_name():
 def test_bad_pyproject_names():
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             with pytest.raises(Exception) as exc:
@@ -479,7 +547,7 @@ def test_bad_pyproject_names():
 def test_project_initialize():
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             @ProjectRegistry.register('foo')
@@ -502,7 +570,7 @@ def test_project_initialize():
 def test_project_registry_initialize():
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             @ProjectRegistry.register('foo')
@@ -525,7 +593,7 @@ def test_project_registry_initialize():
 def test_initialize_pyproject_name_ambiguity():
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             with io.open("pyproject.toml", 'w') as fp:
@@ -543,7 +611,7 @@ def test_initialize_pyproject_name_ambiguity():
 def test_app_project_via_registry_method():
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             @C4ProjectRegistry.register('super')
@@ -565,7 +633,7 @@ def test_app_project_via_registry_method():
 def test_app_project_via_project_method():
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             @C4ProjectRegistry.register('super')
@@ -592,7 +660,7 @@ def test_app_project_via_project_method():
 def test_app_project_bad_initialization():
 
     mfs = MockFileSystem()
-    with mfs.mock_exists_open_remove():
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
         with project_registry_test_context():
 
             @ProjectRegistry.register('foo')

@@ -1,9 +1,10 @@
+import importlib
 import os
 import toml
 
 from pkg_resources import resource_filename
 from typing import Callable, Optional, Type
-from .misc_utils import PRINT, StorageCell, classproperty, environ_bool, ignored
+from .misc_utils import PRINT, StorageCell, classproperty, environ_bool, ignored, get_error_message
 from .lang_utils import conjoined_list, maybe_pluralize
 
 
@@ -23,7 +24,7 @@ class ProjectNames:
                              # classes and subclasses of that class. No need to worry about specialized classes.
                              # -kmp 19-May-2023
                              or self.infer_package_name(poetry_data=ProjectRegistry.POETRY_DATA,
-                                                        pypi_name=PYPI_NAME, pyproject_name=PYPROJECT_NAME))
+                                                        pyproject_name=PYPROJECT_NAME))
 
     @classmethod
     def prettify(cls, name: str) -> str:
@@ -59,15 +60,22 @@ class ProjectNames:
         return name
 
     @classmethod
-    def infer_package_name(cls, poetry_data, pypi_name, pyproject_name):
+    def infer_package_name(cls, poetry_data, pyproject_name, as_dir=False):
         try:
             if poetry_data:
                 # We expect the first package in the declared packages to be the primary export
                 # Other exported dirs, such as scripts or tests should be in later entries.
-                return poetry_data['packages'][0]['include']
+                entry = poetry_data['packages'][0]
+                include = entry['include']
+                from_dir = entry.get('from', '.')
+                return os.path.join(from_dir, include) if as_dir else include
         except Exception:
             pass
-        return pypi_name or pyproject_name
+        result = pyproject_name
+        if not result:
+            raise ValueError(f"Unable to infer package name given"
+                             f" poetry_data={poetry_data!r} and pyproject_name={pyproject_name!r}.")
+        return result
 
     def items(self):
         """
@@ -235,7 +243,7 @@ class Project:
           policies will be applied upon demand-creation.
 
         * The Project.app_project_maker() class method is deprecated. Please use
-          Please use Projectregistry.app_project_maker() or C4ProjectRegistry.app_project_maker(), instead.
+          Projectregistry.app_project_maker() or C4ProjectRegistry.app_project_maker(), instead.
         """
         PRINT(f"{cls.__name__}.app_project_maker() called. This class method has been deprecated."
               f" Please use {cls.PROJECT_REGISTRY_CLASS.__name__}.app_project_maker() instead.")
@@ -369,7 +377,7 @@ class ProjectRegistry:
             cls._initialize_pyproject_name()
         result: Optional[str] = cls._PYPROJECT_NAME
         if result is None:
-            raise ValueError(f"{cls.__name__}.PROJECT_NAME not initialized properly.")
+            raise ValueError(f"{cls.__name__}.PYPROJECT_NAME not initialized properly.")
         return result
 
     @classmethod
@@ -384,7 +392,9 @@ class ProjectRegistry:
                 project_home = os.environ.get("APPLICATION_PROJECT_HOME", os.path.abspath(os.curdir))
             ProjectRegistry.APPLICATION_PROJECT_HOME = project_home
             if not pyproject_toml_file:
-                expected_pyproject_toml_file = os.path.join(project_home, "pyproject.toml")
+                expected_pyproject_toml_file = (os.path.join(project_home, "pyproject.toml")
+                                                if project_home
+                                                else "pyproject.toml")
                 pyproject_toml_file = (expected_pyproject_toml_file
                                        if os.path.exists(expected_pyproject_toml_file)
                                        else None)
@@ -503,6 +513,16 @@ class ProjectRegistry:
               done automatically by this class.
         """
         project_class: Optional[Type[Project]] = cls.find_pyproject(cls.PYPROJECT_NAME)
+        if project_class is None:
+            inferred_package = ProjectNames.infer_package_name(poetry_data=cls.POETRY_DATA,
+                                                               pyproject_name=cls.PYPROJECT_NAME,
+                                                               as_dir=True)
+            PRINT(f"Autoloading pyproject {cls.PYPROJECT_NAME!r} from inferred package {inferred_package!r}.")
+            try:
+                importlib.import_module(name=".project_defs", package=inferred_package)
+            except Exception as e:
+                PRINT(f"Autoload failed: {get_error_message(e)}")
+            project_class: Optional[Type[Project]] = cls.find_pyproject(cls.PYPROJECT_NAME)
         if project_class is None:
             raise ValueError(f"Missing project class for pyproject {cls.PYPROJECT_NAME!r}.")
         if not issubclass(project_class, cls.PROJECT_BASE_CLASS):
