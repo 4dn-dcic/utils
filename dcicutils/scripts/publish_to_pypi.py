@@ -35,7 +35,6 @@ import requests
 import subprocess
 import toml
 
-from dcicutils.misc_utils import PRINT
 from typing import Tuple, Union
 
 
@@ -320,6 +319,9 @@ def exit_with_no_action() -> None:
     """
     PRINT("Exiting without taking action.")
     exit(1)
+
+
+PRINT = print
 
 
 def WARNING_PRINT(s):
