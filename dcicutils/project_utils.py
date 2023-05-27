@@ -235,18 +235,18 @@ class Project:
     @classmethod
     def app_project_maker(cls):
         """
-        Makes an app_project function, a function of no arguments that returns the current app_project,
-        creating it on demand if necessary.
+        Returns a function that, when invoked, will yield the proper app project,
+        initializing that value in demand if it has not been previously initialized.
 
         NOTES:
-        * When using C4Project classes, please always use C4ProjectRegistry.app_project_maker() so that C4
-          policies will be applied upon demand-creation.
+        * When using C4Project classes, please always use <your-class>.app_project_maker() or
+          C4ProjectRegistry.app_project_maker() so that C4 policies will be applied upon demand-creation.
 
-        * The Project.app_project_maker() class method is deprecated. Please use
-          Projectregistry.app_project_maker() or C4ProjectRegistry.app_project_maker(), instead.
+        * Note that by the time of first call to that function, the appropriate environment must be in place,
+          or an autoload will be attempted from your project's project_defs.py file.
+          If you want advance control of the specific environment in which the initialization will occur,
+          use <registry-class>.initialize().
         """
-        PRINT(f"{cls.__name__}.app_project_maker() called. This class method has been deprecated."
-              f" Please use {cls.PROJECT_REGISTRY_CLASS.__name__}.app_project_maker() instead.")
         return cls.PROJECT_REGISTRY_CLASS.app_project_maker()
 
     def project_filename(self, filename):
@@ -559,17 +559,16 @@ class ProjectRegistry:
         Returns a function that, when invoked, will yield the proper app project,
         initializing that value in demand if it has not been previously initialized.
 
-        Note that by the time of first call to that function, the appropriate environment must be in place.
-        If you want advance control of the specific environment in which the initialization will occur,
-        use <registry-class>.initialize().
+        NOTES:
+        * When using C4Project classes, please always use <your-class>.app_project_maker() or
+          C4ProjectRegistry.app_project_maker() so that C4 policies will be applied upon demand-creation.
+
+        * Note that by the time of first call to that function, the appropriate environment must be in place,
+          or an autoload will be attempted from your project's project_defs.py file.
+          If you want advance control of the specific environment in which the initialization will occur,
+          use <registry-class>.initialize().
         """
-
         def app_project() -> Project:
-            if cls == Project:
-                raise Exception("Please do not use ProjectRegistry.app_project_maker()."
-                                " For DBMI users, use C4ProjectRegistry."
-                                " For others, make a subclass of ProjectRegistry and use that.")
-
             return cls.app_project
 
         return app_project

@@ -618,9 +618,7 @@ def test_app_project_via_registry_method():
             class SuperProject(C4Project):
                 NAMES = {"NAME": "super"}
 
-            with printed_output() as printed:
-                app_project = C4ProjectRegistry.app_project_maker()
-                assert printed.lines == []
+            app_project = C4ProjectRegistry.app_project_maker()
 
             C4ProjectRegistry._initialize_pyproject_name(pyproject_name='super')
 
@@ -640,14 +638,7 @@ def test_app_project_via_project_method():
             class SuperProject(C4Project):
                 NAMES = {"NAME": "super"}
 
-            print(f"SuperProject.PROJECT_REGISTRY_CLASS={SuperProject.PROJECT_REGISTRY_CLASS.__name__}")
-
-            with printed_output() as printed:
-                app_project = SuperProject.app_project_maker()
-                assert printed.lines == [
-                    ('SuperProject.app_project_maker() called. This class method has been deprecated.'
-                     ' Please use C4ProjectRegistry.app_project_maker() instead.')
-                ]
+            app_project = SuperProject.app_project_maker()
 
             C4ProjectRegistry._initialize_pyproject_name(pyproject_name='super')
 
