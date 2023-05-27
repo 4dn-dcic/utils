@@ -26,6 +26,8 @@ from dcicutils.qa_utils import (
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
     logged_messages, input_mocked, ChangeLogChecker, MockLog, MockId, Eventually, Timer,
     MockObjectBasicAttributeBlock, MockObjectAttributeBlock, MockObjectDeleteMarker, MockTemporaryRestoration,
+    MockBoto3IamUserAccessKeyPair, MockBoto3IamUserAccessKeyPairCollection,
+    MockBoto3IamUser, MockBoto3IamUserCollection, MockBoto3IamRoleCollection, MockBoto3IamRole,
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
@@ -185,7 +187,7 @@ class MockLocalTimezone:  # Technically should return pytz.tzinfo but doesn't
         self._winter_tz = winter_tz
 
     def tzname(self, dt: datetime.datetime):
-        # The exact time that daylight time runs varies from year to year. For testing we'll say that
+        # The exact time that daylight time runs varies from year to year. For testing, we'll say that
         # daylight time is April 1 to Oct 31.  In practice, we recommend times close to Dec 31 for winter
         # and Jun 30 for summer, so the precise transition date doesn't matter. -kmp 9-Mar-2021
         if 3 < dt.month < 11:
@@ -321,7 +323,7 @@ def test_controlled_time_utcnow():
     t1 = t.now()     # initial time + 1 second
     t.set_datetime(t0)
     t2 = t.utcnow()  # initial time UTC + 1 second
-    # This might be 5 hours in US/Eastern at HMS or it might be 0 hours in UTC on AWS or GitHub Actions.
+    # This might be 5 hours in US/Eastern at HMS, or it might be 0 hours in UTC on AWS or GitHub Actions.
     assert (t2 - t1).total_seconds() == abs(local_time.utcoffset(t0).total_seconds())
 
 
@@ -620,7 +622,7 @@ def test_retry_manager():
         return rarely_add3(x)
 
     # We have to access a random place out of a tuple structure for mock data on time.sleep's arg.
-    # Documentation says we should be able to access the call with .call_args[n] but that doesn't work
+    # Documentation says we should be able to access the call with .call_args[n] but that doesn't work,
     # and it's also documented to work by tuple, so .mock_calls[n][1][m] substitutes for
     # .mock_calls[n].call_args[m], but using .mock_calls[n][ARGS][m] as the compromise. -kmp 20-May-2020
 
@@ -1528,7 +1530,7 @@ def test_raises_regexp():
     with pytest.raises(Exception):
         # This will fail because the inner error is a KeyError, not a RuntimeError.
         # I WISH this would raise AssertionError, but pytest lets the KeyError through.
-        # I am not sure that's the same as what unittest does in this case but it will
+        # I am not sure that's the same as what unittest does in this case, but it will
         # suffice for now. -kmp 6-Oct-2020
         with raises_regexp(RuntimeError, "This.*test!"):
             raise KeyError('This is a test!')
@@ -2187,3 +2189,70 @@ def test_s3_list_object_versions():
             assert version3['Key'] == key2_name
             assert version3['IsLatest'] is True
             assert all(version['StorageClass'] == 'STANDARD' for version in versions)
+
+
+def test_mock_boto3_iam_user_access_key_pair():
+
+    pair = MockBoto3IamUserAccessKeyPair()
+
+    creation_date = pair._create_date  # noQA - access to protected member for testing
+
+    assert isinstance(pair.id, str)
+    assert isinstance(pair.secret, str)
+    assert isinstance(creation_date, datetime.datetime)
+    assert pair['something_else'] is None
+
+    assert pair['AccessKeyId'] == pair._id
+    assert pair['CreateDate'] == creation_date
+
+
+def test_mock_boto3_iam_user_access_key_pair_collection():
+
+    collection = MockBoto3IamUserAccessKeyPairCollection()
+
+    pair1 = MockBoto3IamUserAccessKeyPair()
+    pair2 = MockBoto3IamUserAccessKeyPair()
+
+    assert collection['AccessKeyMetadata'] == []
+    assert collection.add(pair1) is None
+    assert collection['AccessKeyMetadata'] == [pair1]
+    assert collection.add(pair2) is None
+    assert collection['AccessKeyMetadata'] == [pair1, pair2]
+
+
+def test_mock_boto3_iam_user():
+
+    user_name = 'JDoe'
+
+    user = MockBoto3IamUser(name=user_name)
+
+    assert user.name == user_name
+
+    assert user.mocked_access_keys["AccessKeyMetadata"] == []
+
+    pair = user.create_access_key_pair()
+    assert isinstance(pair, MockBoto3IamUserAccessKeyPair)
+
+    assert user.mocked_access_keys["AccessKeyMetadata"] == [pair]
+
+
+def test_mock_boto3_iam_user_collection():
+
+    collection = MockBoto3IamUserCollection()
+
+    assert collection.all() == []
+
+
+def test_mock_boto3_iam_role():
+
+    arn = "arn:some:role"
+    role = MockBoto3IamRole(arn)
+    assert role["Arn"] == arn
+    assert role["Foo"] is None
+
+
+def test_mock_boto3_iam_role_collection():
+
+    collection = MockBoto3IamRoleCollection()
+    assert collection["Roles"] == []
+    assert collection["Foo"] is None
