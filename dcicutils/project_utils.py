@@ -514,14 +514,11 @@ class ProjectRegistry:
         """
         project_class: Optional[Type[Project]] = cls.find_pyproject(cls.PYPROJECT_NAME)
         if project_class is None:
-            inferred_package = ProjectNames.infer_package_name(poetry_data=cls.POETRY_DATA,
-                                                               pyproject_name=cls.PYPROJECT_NAME,
-                                                               as_dir=True)
-            PRINT(f"Autoloading pyproject {cls.PYPROJECT_NAME!r} from inferred package {inferred_package!r}.")
+            PRINT(f"Autoloading project_defs.py for pyproject {cls.PYPROJECT_NAME!r}.")
             try:
-                importlib.import_module(name=".project_defs", package=inferred_package)
+                importlib.import_module(name=".project_defs", package=cls.PYPROJECT_NAME)
             except Exception as e:
-                PRINT(f"Autoload failed: {get_error_message(e)}")
+                PRINT(f"Autoload failed for project_defs in pyproject {cls.PYPROJECT_NAME!r}. {get_error_message(e)}")
             project_class: Optional[Type[Project]] = cls.find_pyproject(cls.PYPROJECT_NAME)
         if project_class is None:
             raise ValueError(f"Missing project class for pyproject {cls.PYPROJECT_NAME!r}.")

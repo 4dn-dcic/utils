@@ -1,9 +1,10 @@
 import contextlib
+import importlib
 import io
 import os
 import pytest
 
-from dcicutils.misc_utils import ignorable, override_environ, local_attrs, StorageCell
+from dcicutils.misc_utils import ignored, ignorable, override_environ, local_attrs, StorageCell, get_error_message
 from dcicutils.qa_utils import MockFileSystem, printed_output
 from dcicutils.project_utils import (
     ProjectNames, C4ProjectNames, Project, C4Project, ProjectRegistry, C4ProjectRegistry,
@@ -291,7 +292,7 @@ def test_project_names_infer_package_name():
 
     with pytest.raises(Exception) as exc:
         assert ProjectNames.infer_package_name(poetry_data={}, pyproject_name=None)
-    assert str(exc.value) == ("Unable to infer package name given poetry_data={} and pyproject_name=None.")
+    assert str(exc.value) == f"Unable to infer package name given poetry_data={{}} and pyproject_name=None."
 
     def test_package_name_from_poetry_data(*, poetry_data, expected):
         actual = ProjectNames.infer_package_name(poetry_data=poetry_data, pyproject_name='fallback')
@@ -340,10 +341,14 @@ def test_project_registry_make_project_autoload():
 
                     def mocked_import_module(name, package):
                         assert name == '.project_defs'
-                        assert package == 'whatever/bogosity'
+                        assert package == 'boguslib'
 
-                        # This ends up in the wrong environment, but really all we wanted it to do was to
-                        # register a class for side-effect. -kmp 26-May-2023
+                        # The definition here in the mock ends up in environment of this mock function,
+                        # but that's really OK because all we wanted it to do was to register some class
+                        # as part of its side effect, which is the same as the side effect that would
+                        # be seen if an actual call to importlib.import_module reached out into the
+                        # file system and parsed a file. (Because that operation is a low-level primitive,
+                        # it cannot be mocked with our usual MockFileSystem tools.) -kmp 30-May-2023
 
                         @C4ProjectRegistry.register('boguslib')
                         class BogusProject(C4Project):
@@ -371,7 +376,7 @@ def test_project_registry_make_project_autoload():
                     assert C4ProjectRegistry.APPLICATION_PROJECT_HOME == root_dir
 
                     assert printed.lines == [
-                        "Autoloading pyproject 'boguslib' from inferred package 'whatever/bogosity'.",
+                        "Autoloading project_defs.py for pyproject 'boguslib'.",
                         "BogusProject initialized with name 'bogus' and notable aliases 'bogosity' and 'boguslib'."
                     ]
 
@@ -390,32 +395,44 @@ def test_project_registry_make_project():
         mfs = MockFileSystem()
         with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
             with project_registry_test_context():
+                with mock.patch.object(importlib, "import_module") as mock_import_module:
 
-                @ProjectRegistry.register('foo')
-                class FooProject(Project):
-                    NAMES = {"NAME": "foo"}
+                    mocked_import_error = Exception("No module named 'bogus'.")
 
-                with pytest.raises(Exception) as exc:
-                    ProjectRegistry._make_project()
-                assert str(exc.value) == "ProjectRegistry.PYPROJECT_NAME not initialized properly."
+                    def mocked_import_module(name, package):
+                        ignored(name, package)
+                        # Because importlib.import_module is a low-level primitive,
+                        # it cannot be mocked with our usual MockFileSystem tools. -kmp 30-May-2023
+                        raise mocked_import_error
 
-                ProjectRegistry._initialize_pyproject_name(pyproject_name='foo')
-                assert isinstance(ProjectRegistry._make_project(), FooProject)
+                    mock_import_module.side_effect = mocked_import_module
 
-                with pytest.raises(Exception) as exc:
-                    C4ProjectRegistry._make_project()
-                assert str(exc.value) == "Registered pyproject 'foo' (FooProject) is not a subclass of C4Project."
+                    @ProjectRegistry.register('foo')
+                    class FooProject(Project):
+                        NAMES = {"NAME": "foo"}
 
-                ProjectRegistry._PYPROJECT_NAME = 'bogus'  # Mock up a bad initialization
-                set_app_project_cell_value(None)  # Clear cache
-                with pytest.raises(Exception) as exc:
-                    ProjectRegistry._make_project()
-                exc_msg = str(exc.value)
-                assert printed.lines == [
-                    "Autoloading pyproject 'bogus' from inferred package 'bogus'.",
-                    "Autoload failed: ModuleNotFoundError: No module named 'bogus'"
-                ]
-                assert exc_msg == "Missing project class for pyproject 'bogus'."
+                    with pytest.raises(Exception) as exc:
+                        ProjectRegistry._make_project()
+                    assert str(exc.value) == "ProjectRegistry.PYPROJECT_NAME not initialized properly."
+
+                    ProjectRegistry._initialize_pyproject_name(pyproject_name='foo')
+                    assert isinstance(ProjectRegistry._make_project(), FooProject)
+
+                    with pytest.raises(Exception) as exc:
+                        C4ProjectRegistry._make_project()
+                    assert str(exc.value) == "Registered pyproject 'foo' (FooProject) is not a subclass of C4Project."
+
+                    ProjectRegistry._PYPROJECT_NAME = 'bogus'  # Mock up a bad initialization
+                    set_app_project_cell_value(None)  # Clear cache
+                    with pytest.raises(Exception) as exc:
+                        ProjectRegistry._make_project()
+                    exc_msg = str(exc.value)
+                    assert printed.lines == [
+                        f"Autoloading project_defs.py for pyproject 'bogus'.",
+                        f"Autoload failed for project_defs in pyproject 'bogus'."
+                        f" {get_error_message(mocked_import_error)}"
+                    ]
+                    assert exc_msg == "Missing project class for pyproject 'bogus'."
 
     assert ProjectRegistry._PYPROJECT_NAME is None
 
@@ -617,6 +634,8 @@ def test_app_project_via_registry_method():
             @C4ProjectRegistry.register('super')
             class SuperProject(C4Project):
                 NAMES = {"NAME": "super"}
+
+            ignorable(SuperProject)  # information passed about it is not by-name
 
             app_project = C4ProjectRegistry.app_project_maker()
 
