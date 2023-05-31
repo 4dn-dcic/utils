@@ -1,5 +1,5 @@
 # Script to publish the Python package in the CURRENT git repo to PyPi.
-# Does the following checks before allowing a publish:
+# Does the following checks before allowing poetry to publish:
 #
 # 0. Current directory MUST be a git repo.
 # 1. The git repo MUST NOT contain unstaged changes.
@@ -34,6 +34,7 @@ import os
 import requests
 import subprocess
 import toml
+
 from typing import Tuple, Union
 
 
@@ -320,8 +321,7 @@ def exit_with_no_action() -> None:
     exit(1)
 
 
-def PRINT(s):
-    print(s)
+PRINT = print
 
 
 def WARNING_PRINT(s):

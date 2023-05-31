@@ -26,7 +26,7 @@ from dcicutils.env_utils_legacy import (
 from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs
 from dcicutils.ff_mocks import make_mock_es_url, make_mock_portal_url, mocked_s3utils
 from dcicutils.misc_utils import ignored, ignorable, override_environ, exported, file_contents
-from dcicutils.qa_utils import MockBoto3, MockResponse, known_bug_expected, MockBotoS3Client
+from dcicutils.qa_utils import MockBoto3, MockResponse, known_bug_expected, MockBotoS3Client, MockFileSystem
 from dcicutils.s3_utils import s3Utils, HealthPageKey
 from requests.exceptions import ConnectionError
 from typing import Optional, Callable, Dict
@@ -502,42 +502,45 @@ def test_s3utils_delete_key():
 @using_fresh_ff_state_for_testing()
 def test_s3utils_s3_put_with_mock_boto_s3():
 
-    with mocked_s3utils():
+    mfs = MockFileSystem()
 
-        s3u = s3Utils(env='fourfront-mastertest')
-        assert isinstance(s3u, s3Utils)
-        assert isinstance(s3u.s3, MockBotoS3Client)
-        s3 = s3u.s3
+    with mfs.mock_exists_open_remove():
+        with mocked_s3utils():
 
-        some_key = 'some-key.json'
-        some_file = f'downloaded-{some_key}'
+            s3u = s3Utils(env='fourfront-mastertest')
+            assert isinstance(s3u, s3Utils)
+            assert isinstance(s3u.s3, MockBotoS3Client)
+            s3 = s3u.s3
 
-        for item in [{'a': 1, 'b': 2}, "some string"]:
-            for i, content_type in enumerate(['text/plain', 'application/json']):
-                for acl in [None, 'some-acl']:
-                    print(f"Case {i} using item={item!r} content_type={content_type}")
-                    item_to_etag = json.dumps(item) if isinstance(item, dict) else item
-                    expected_etag = f'"{hashlib.md5(item_to_etag.encode("utf-8")).hexdigest()}"'
-                    print(f"expected_etag={expected_etag}")
-                    expected_result = {
-                        "Body": item,
-                        "Bucket": s3u.outfile_bucket,
-                        "Key": some_key,
-                        "ContentType": content_type,
-                    }
-                    if acl:
-                        expected_result['ACL'] = acl
-                    print(f"expected_result={expected_result}")
-                    actual_result = s3u.s3_put(item, upload_key=some_key)
-                    print(f"actual_result={actual_result}")
-                    # assert actual_result == expected_result
-                    assert actual_result['ETag'] == expected_etag
-                    s3.download_file(Bucket=s3u.outfile_bucket, Key=some_key, Filename=some_file)
-                    expected_file_contents = item_to_etag
-                    print(f"Expected file contents: {expected_file_contents!r}")
-                    actual_file_contents = file_contents(some_file)
-                    print(f"Actual file contents: {actual_file_contents!r}")
-                    assert actual_file_contents == expected_file_contents
+            some_key = 'some-key.json'
+            some_file = f'downloaded-{some_key}'
+
+            for item in [{'a': 1, 'b': 2}, "some string"]:
+                for i, content_type in enumerate(['text/plain', 'application/json']):
+                    for acl in [None, 'some-acl']:
+                        print(f"Case {i} using item={item!r} content_type={content_type}")
+                        item_to_etag = json.dumps(item) if isinstance(item, dict) else item
+                        expected_etag = f'"{hashlib.md5(item_to_etag.encode("utf-8")).hexdigest()}"'
+                        print(f"expected_etag={expected_etag}")
+                        expected_result = {
+                            "Body": item,
+                            "Bucket": s3u.outfile_bucket,
+                            "Key": some_key,
+                            "ContentType": content_type,
+                        }
+                        if acl:
+                            expected_result['ACL'] = acl
+                        print(f"expected_result={expected_result}")
+                        actual_result = s3u.s3_put(item, upload_key=some_key)
+                        print(f"actual_result={actual_result}")
+                        # assert actual_result == expected_result
+                        assert actual_result['ETag'] == expected_etag
+                        s3.download_file(Bucket=s3u.outfile_bucket, Key=some_key, Filename=some_file)
+                        expected_file_contents = item_to_etag
+                        print(f"Expected file contents: {expected_file_contents!r}")
+                        actual_file_contents = file_contents(some_file)
+                        print(f"Actual file contents: {actual_file_contents!r}")
+                        assert actual_file_contents == expected_file_contents
 
 
 @pytest.mark.unit

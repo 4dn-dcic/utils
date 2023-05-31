@@ -6,13 +6,40 @@ dcicutils
 Change Log
 ----------
 
+
+7.5.0
+=====
+
+* In ``lang_utils``:
+
+  * Teach ``EnglishUtils.string_pluralize`` about words ending in ``-ses`` because ``cgap-portal`` needs this.
+
+* New module ``project_utils`` with support for Project mechanism.
+
+  * New decorators ``ProjectRegistry`` and ``C4ProjectRegistry``
+
+  * New class ``Project`` and ``C4Project``
+
+* In ``qa_utils``:
+
+  * In class ``MockFileSystem``:
+
+    * New method ``abspath``
+    * New method ``chdir``
+    * New method ``expanduser``
+    * New method ``getcwd``
+    * New method ``mock_exists_open_remove_abspath_getcwd_chdir`` (context manager)
+
+
 7.4.4
 =====
+
 Fixed the ``publish-to-pypi`` script to ignore the ``.gitignore`` file when looking for untracked files.
 
 
 7.4.3
 =====
+
 Removed ``scripts`` from ``packages`` directory list in ``pyproject.toml``; not necessary.
 
 

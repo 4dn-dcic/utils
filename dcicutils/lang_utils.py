@@ -32,6 +32,8 @@ class EnglishUtils:
         "ox": "oxen",
         'datum': 'data',
         'metadatum': 'metadata',
+        'sis': 'sisses',
+        'stepsis': 'stepsisses',
     }
 
     @classmethod
@@ -39,11 +41,14 @@ class EnglishUtils:
         """Returns either a special case plural of its argument, or the empty string if it doesn't know."""
         return cls._SPECIAL_PLURALS.get(word, "")
 
+    # There are some other rules in https://languagetool.org/insights/post/plural-nouns/
+    # that we might want to consider at some point.
     _ENDS_IN_FE = re.compile(r".*[aeiou]fe$", flags=re.IGNORECASE)
     _ENDS_IN_F = re.compile(r".*[aeoul]f$", flags=re.IGNORECASE)
     _ENDS_IN_MAN = re.compile(r".*man$", flags=re.IGNORECASE)
     _ENDS_IN_HUMAN = re.compile(r".*human$", flags=re.IGNORECASE)
     _ENDS_IN_CHILD = re.compile(r".*child$", flags=re.IGNORECASE)
+    _ENDS_IN_SIS = re.compile(r".*sis$", flags=re.IGNORECASE)
     _ENDS_IN_VOWEL_Z = re.compile(r".*[aeiou]z$", flags=re.IGNORECASE)
     _ENDS_IN_XSZ_OR_SH_OR_CH = re.compile(r".*([xsz]|[cs]h)$", flags=re.IGNORECASE)
     _ENDS_IN_NONVOWEL_Y = re.compile(r".*[^aeiou]y$", flags=re.IGNORECASE)
@@ -170,6 +175,8 @@ class EnglishUtils:
             result = cls._adjust_ending(word, 2, "e" + charn)
         elif cls._ENDS_IN_CHILD.match(word):
             result = cls._adjust_ending(word, 0, "ren")
+        elif cls._ENDS_IN_SIS.match(word):
+            result = cls._adjust_ending(word, 2, "es")
         elif cls._ENDS_IN_VOWEL_Z.match(word):
             result = cls._adjust_ending(word, 0, "zes")
         elif cls._ENDS_IN_XSZ_OR_SH_OR_CH.match(word):
