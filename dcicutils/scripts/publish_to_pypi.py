@@ -39,6 +39,7 @@ from typing import Tuple, Union
 
 
 PYPI_BASE_URL = "https://pypi.org"
+PYPI_API_TOKEN_USERNAME = "__token__"
 DEBUG = False
 
 
@@ -52,6 +53,7 @@ def main() -> None:
     argp.add_argument("--debug", required=False, dest="debug", action="store_true")
     argp.add_argument("--username", required=False, dest="username")
     argp.add_argument("--password", required=False, dest="password")
+    argp.add_argument("--force-allow-username", required=False, action="store_true")
     args = argp.parse_args()
 
     if args.debug:
@@ -92,13 +94,13 @@ def main() -> None:
 
     PRINT(f"Publishing {package_name} {package_version} to PyPi ...")
 
-    if not publish_package(args.username, args.password):
+    if not publish_package(args.username, args.password, args.force_allow_username):
         exit_with_no_action()
 
     PRINT(f"Publishing {package_name} {package_version} to PyPi complete.")
 
 
-def publish_package(pypi_username: str = None, pypi_password: str = None) -> bool:
+def publish_package(pypi_username: str = None, pypi_password: str = None, force_allow_username: bool = False) -> bool:
     if not pypi_username:
         pypi_username = os.environ.get("PYPI_USER")
     if not pypi_password:
@@ -106,8 +108,13 @@ def publish_package(pypi_username: str = None, pypi_password: str = None) -> boo
     if not pypi_username or not pypi_password:
         ERROR_PRINT(f"No PyPi credentials; you should set the PYPI_USER and PYPI_PASSWORD environment variables.")
         return False
-    if pypi_username != "__token__":
-        WARNING_PRINT(f"Publishing with username/pasword is deprecated; should use be using API token instead.")
+    if pypi_username != PYPI_API_TOKEN_USERNAME:
+        if not force_allow_username:
+            # Just in case someone really really needs this we will allow for now: --force-allow-username
+            ERROR_PRINT(f"Publishing with username/pasword is no longer allowed; must use API token instead.")
+            return False
+        WARNING_PRINT(f"Publishing with username/pasword is NOT recommmended; use API token instead;"
+                      f"only allowing because you said: --force-allow-username")
     poetry_publish_command = [
         "poetry", "publish",
         "--no-interaction", "--build",
@@ -256,11 +263,14 @@ def get_package_name() -> str:
     """
     Returns the base name of the current git repo name.
     """
-    package_name, _ = execute_command("git config --get remote.origin.url")
-    package_name = os.path.basename(package_name[0])
-    if package_name.endswith(".git"):
-        package_name = package_name[:-4]
-    return package_name
+    # No, the package name should come from pyproject.toml not from the git repo name ...
+    # package_name, _ = execute_command("git config --get remote.origin.url")
+    # package_name = os.path.basename(package_name[0])
+    # if package_name.endswith(".git"):
+    #     package_name = package_name[:-4]
+    # return package_name
+    pyproject_toml = get_pyproject_toml()
+    return pyproject_toml["tool"]["poetry"]["name"]
 
 
 def get_package_directories() -> list:
@@ -269,8 +279,7 @@ def get_package_directories() -> list:
     according to the pyproject.toml file.
     """
     package_directories = []
-    with open("pyproject.toml", "r") as f:
-        pyproject_toml = toml.load(f)
+    pyproject_toml = get_pyproject_toml()
     pyproject_package_directories = pyproject_toml["tool"]["poetry"]["packages"]
     for pyproject_package_directory in pyproject_package_directories:
         package_directory = pyproject_package_directory.get("include")
@@ -280,6 +289,11 @@ def get_package_directories() -> list:
                 package_directory = os.path.join(package_directory_from, package_directory)
             package_directories.append(package_directory)
     return package_directories
+
+
+def get_pyproject_toml() -> list:
+    with open("pyproject.toml", "r") as f:
+        return toml.load(f)
 
 
 def execute_command(command_argv: Union[list, str], lines_containing: str = None) -> Tuple[list, int]:

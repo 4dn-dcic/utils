@@ -7,6 +7,13 @@ Change Log
 ----------
 
 
+7.5.1
+=====
+* In ``scripts/publish_to_pypi`` default to not allowing publish using (non-API-token) username,
+  and fixed package name to come from pyproject.toml rather than git repo name (used only for
+  display purposes and checking if version already pushed).
+
+
 7.5.0
 =====
 
