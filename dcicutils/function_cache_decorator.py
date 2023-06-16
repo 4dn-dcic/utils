@@ -15,7 +15,7 @@ def function_cache(*decorator_args, **decorator_kwargs):
     Exactly analogous to the functools.lru_cache decorator, but also allows specifying
     that if the return value of the function is None then no caching is to be done;
     use the nocache_none decorator kwarg set to True to do this. And more generally, use
-    the nocache decorator kwart set to anything to not cache any value which equals that.
+    the nocache decorator kwarg set to anything to not cache any value which equals that.
 
     Also like @lru_cache, this supports the maxsize decorator argument, as well
     as the cache_info and cache_clear functions on the decorated function.

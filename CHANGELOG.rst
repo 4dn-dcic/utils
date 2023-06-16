@@ -6,6 +6,11 @@ dcicutils
 Change Log
 ----------
 
+7.5.2
+=====
+* Added ``boto_s3`` module to create boto3 S3 client/resource so we can centrally use the S3_URL
+  environment variable to globally set S3 usage for a locally running ersatz instance of S3 like localstack.
+
 
 7.5.1
 =====

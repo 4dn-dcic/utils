@@ -19,6 +19,7 @@ from .base import (
     beanstalk_info, describe_beanstalk_environments, get_beanstalk_real_url,
     compute_ff_prd_env, compute_ff_stg_env, compute_cgap_prd_env, compute_cgap_stg_env, compute_prd_env_for_env,
 )
+from .boto_s3 import boto_s3_client, boto_s3_resource
 from .common import REGION
 from .env_utils import is_stg_or_prd_env, is_orchestrated
 from .misc_utils import PRINT, exported, obsolete, remove_suffix, prompt_for_input
@@ -1056,7 +1057,7 @@ def create_s3_buckets(new):
         'elasticbeanstalk-%s-wfoutput' % new,
         'elasticbeanstalk-%s-system' % new,
     ]
-    s3 = boto3.client('s3', region_name=REGION)
+    s3 = boto_s3_client(region_name=REGION)
     for bucket in new_buckets:
         s3.create_bucket(Bucket=bucket)
     PRINT('=== CREATED NEW S3 BUCKETS ===' % new)
@@ -1083,7 +1084,7 @@ def delete_s3_buckets(env_name):
         # note that tibanna logs are shared so are not so easy to delete
     ]
 
-    s3 = boto3.resource('s3')
+    s3 = boto_s3_resource()
     for bucket in buckets:
         PRINT("deleting content for " + bucket)
         try:
@@ -1281,7 +1282,7 @@ def copy_s3_buckets(new, old):
         'elasticbeanstalk-%s-files' % old,
         'elasticbeanstalk-%s-wfoutput' % old,
     ]
-    s3 = boto3.client('s3', region_name=REGION)
+    s3 = boto_s3_client(region_name=REGION)
     for bucket in new_buckets:
         try:
             s3.create_bucket(Bucket=bucket)

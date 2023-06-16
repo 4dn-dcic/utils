@@ -1,7 +1,7 @@
-import boto3
 from typing import Union, List, Tuple
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
+from .boto_s3 import boto_s3_client
 from .common import (
     S3_GLACIER_CLASSES, S3StorageClass, MAX_MULTIPART_CHUNKS, MAX_STANDARD_COPY_SIZE,
     ENCODED_LIFECYCLE_TAG_KEY
@@ -52,7 +52,7 @@ class GlacierUtils:
                        * patch_file_lifecycle_status
                        * delete_glaciered_object_versions
         """
-        self.s3 = boto3.client('s3')
+        self.s3 = boto_s3_client()
         self.env_name = env_name
         self.key_manager = CGAPKeyManager()
         self.env_key = self.key_manager.get_keydict_for_env(env_name)

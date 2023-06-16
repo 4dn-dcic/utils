@@ -1,4 +1,3 @@
-import boto3
 import json
 import logging
 import mimetypes
@@ -9,6 +8,7 @@ from typing import Optional, Any, Union
 from typing_extensions import Literal
 from zipfile import ZipFile
 from .base import get_beanstalk_real_url
+from .boto_s3 import boto_s3_client, boto_s3_resource
 from .common import (
     EnvName,
     # LegacyAuthDict, AnyAuthDict, AuthDict,
@@ -100,7 +100,7 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
         self.url = ''
         self._health_json_url = None
         self._health_json = None
-        self.s3 = boto3.client('s3', region_name='us-east-1')
+        self.s3 = boto_s3_client(region_name='us-east-1')
         global_bucket = EnvManager.global_env_bucket_name()
         self.env_manager = None  # In a legacy environment, this will continue to be None
         if sys_bucket is None:
@@ -446,7 +446,7 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
     @classmethod
     def size(cls, bucket: str) -> int:
         """Slowly and expensively (if there are a lot of them), count the number of items in a bucket."""
-        sbuck = boto3.resource('s3').Bucket(bucket)  # get only head of objects so we can count them
+        sbuck = boto_s3_resource().Bucket(bucket)  # get only head of objects so we can count them
         # There is apparently no sbuck.objects.count(), so one has to enumerate them all.
         # Although one avenue we didn't try that is mentioned in StackOverflow is to go to the billing department
         # in the AWS console, whch knows how many objects there are.
