@@ -1,6 +1,7 @@
 import os
 import pytest
 
+from dcicutils.license_utils import C4InfrastructureLicenseChecker
 from dcicutils.qa_checkers import DocsChecker, DebuggingArtifactChecker, ChangeLogChecker
 
 from .conftest_settings import REPOSITORY_ROOT_DIR
@@ -41,3 +42,9 @@ def test_changelog_consistency():
         CHANGELOG = os.path.join(REPOSITORY_ROOT_DIR, "CHANGELOG.rst")
 
     MyChangeLogChecker.check_version()
+
+
+@pytest.mark.static
+def test_license_compatibility():
+
+    C4InfrastructureLicenseChecker.validate()
