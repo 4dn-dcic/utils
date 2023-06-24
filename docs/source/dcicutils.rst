@@ -183,6 +183,13 @@ lang_utils
    :members:
 
 
+license_utils
+^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.license_utils
+   :members:
+
+
 log_utils
 ^^^^^^^^^
 
