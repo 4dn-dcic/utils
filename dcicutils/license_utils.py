@@ -2,7 +2,7 @@ import logging
 
 try:
     import piplicenses
-except ImportError:
+except ImportError:  # pragma: no cover - not worth unit testing this case
     raise Exception("The dcicutils.license_utils module is intended for use at development time, not runtime."
                     " It does not export a requirement for the pip-licenses library,"
                     " but to use this in your unit tests, you are expected to assure a dev dependency on that library"
@@ -191,8 +191,8 @@ class UnacceptableLicenseFailure(Exception):
         if not message:
             if unacceptable_licenses:
                 message = there_are(unacceptable_licenses, kind='unacceptable license')
-            else:
-                message = "One or more licenses are unacceptable."
+            else:  # any null value, even things like [] or {}, which is odd, but not likely to happen
+                message = "Licenses are unacceptable."
         super().__init__(message)
 
 

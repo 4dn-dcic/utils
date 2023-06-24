@@ -8,6 +8,42 @@ from dcicutils.qa_utils import printed_output
 from unittest import mock
 
 
+def test_unacceptable_license_failure():
+
+    x = UnacceptableLicenseFailure()
+
+    assert str(x) == "Licenses are unacceptable."
+
+    x = UnacceptableLicenseFailure(unacceptable_licenses=[])
+
+    assert str(x) == "Licenses are unacceptable."
+
+    x = UnacceptableLicenseFailure(message="Something went wrong.")
+
+    assert str(x) == "Something went wrong."
+
+    x = UnacceptableLicenseFailure(unacceptable_licenses=['license1'])
+
+    assert str(x) == "There is 1 unacceptable license: license1"
+
+    x = UnacceptableLicenseFailure(unacceptable_licenses=['license1'])
+
+    assert str(x) == "There is 1 unacceptable license: license1"
+
+    x = UnacceptableLicenseFailure(unacceptable_licenses=['license1', 'license2'])
+
+    assert str(x) == "There are 2 unacceptable licenses: license1, license2"
+
+    x = UnacceptableLicenseFailure(
+        unacceptable_licenses={
+            'license1': ['library1'],
+            'license2': ['library2', 'library3']
+        }
+    )
+
+    assert str(x) == "There are 2 unacceptable licenses: license1, license2"
+
+
 def test_license_status():
 
     for attr in dir(LicenseStatus):
