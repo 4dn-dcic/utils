@@ -410,7 +410,7 @@ class IniFileManager:
     # Default auth0 domain
     DEFAULT_AUTH0_DOMAIN = 'hms-dbmi.auth0.com'
 
-    # For APP, a subclass may optionally declare a value of 'cgap' or 'fourfront'
+    # For APP, a subclass may optionally declare a value of 'cgap' or 'fourfront' or 'smaht'
     APP_KIND = None
 
     # For ORCHESTRATED, a subclass may optinally declare a value of True or False,
@@ -764,7 +764,7 @@ class IniFileManager:
         index_server = "true" if index_server else ""  # this will omit the line if it's going to be False
 
         extra_vars = {
-            'APP_KIND': app_kind,  # "cgap" or "fourfront"
+            'APP_KIND': app_kind,  # "cgap" or "fourfront" or "smaht"
             'APP_DEPLOYMENT': app_deployment,  # "orchestrated" or "elasticbeanstalk"
             'APP_VERSION': app_version,
             'PROJECT_VERSION': toml.load(cls.PYPROJECT_FILE_NAME)['tool']['poetry']['version'],
@@ -1104,7 +1104,7 @@ class BasicLegacyCGAPIniFileManager(BasicCGAPIniFileManager):
 
 class BasicOrchestratedCGAPIniFileManager(BasicCGAPIniFileManager):
     """
-    A class of IniFileManager for producing a CGAP-style production.ini in a CloudFormation-orechstrated context.
+    A class of IniFileManager for producing a CGAP-style production.ini in a CloudFormation-orchestrated context.
     """
     APP_ORCHESTRATED = True
 
@@ -1127,8 +1127,23 @@ class BasicLegacyFourfrontIniFileManager(BasicFourfrontIniFileManager):
 
 class BasicOrchestratedFourfrontIniFileManager(BasicFourfrontIniFileManager):
     """
-    A class of IniFileManager for producing a Fourfront-style production.ini in a CloudFormation-orechstrated context.
+    A class of IniFileManager for producing a Fourfront-style production.ini in a CloudFormation-orchestrated context.
     NOTE: For now there is no such context, but this is intended to be thinking forward.
+    """
+    APP_ORCHESTRATED = True
+
+
+class BasicSMAHTIniFileManager(IniFileManager):
+    """
+    Any IniFileManager used by SMaHT should use this class to get better defaulting.
+    This class exists mostly for type inclusion. For actual use, you probably want one of its subclasses.
+    """
+    APP_KIND = 'smaht'
+
+
+class BasicOrchestratedSMAHTIniFileManager(BasicSMAHTIniFileManager):
+    """
+    A class of IniFileManager for producing a ECS-style production.ini in a CloudFormation-orchestrated context.
     """
     APP_ORCHESTRATED = True
 
