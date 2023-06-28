@@ -6,6 +6,11 @@ dcicutils
 Change Log
 ----------
 
+7.5.2
+=====
+
+* Add deployer class for ``smaht-portal``
+
 
 7.5.1
 =====
