@@ -1,7 +1,7 @@
 from typing import Union, List, Tuple
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
-from .boto_s3 import boto_s3_client
+from .boto_s3 import boto3, boto_s3_client
 from .common import (
     S3_GLACIER_CLASSES, S3StorageClass, MAX_MULTIPART_CHUNKS, MAX_STANDARD_COPY_SIZE,
     ENCODED_LIFECYCLE_TAG_KEY

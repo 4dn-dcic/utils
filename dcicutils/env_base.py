@@ -2,7 +2,7 @@ import contextlib
 import os
 
 from typing import Optional
-from .boto_s3 import boto_s3_resource
+from .boto_s3 import boto3, boto_s3_resource
 from .common import LEGACY_GLOBAL_ENV_BUCKET, S3BucketName
 from .exceptions import (
     # CannotInferEnvFromManyGlobalEnvs,

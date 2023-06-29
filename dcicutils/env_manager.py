@@ -4,7 +4,7 @@ import logging
 import urllib.request
 
 from typing import Optional
-from .boto_s3 import boto_s3_client
+from .boto_s3 import boto3, boto_s3_client
 from .env_base import EnvBase
 from .env_utils import full_env_name
 from .exceptions import CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv

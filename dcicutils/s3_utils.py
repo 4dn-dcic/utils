@@ -8,7 +8,7 @@ from typing import Optional, Any, Union
 from typing_extensions import Literal
 from zipfile import ZipFile
 from .base import get_beanstalk_real_url
-from .boto_s3 import boto_s3_client, boto_s3_resource
+from .boto_s3 import boto3, boto_s3_client, boto_s3_resource
 from .common import (
     EnvName,
     # LegacyAuthDict, AnyAuthDict, AuthDict,
