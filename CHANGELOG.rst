@@ -8,13 +8,9 @@ Change Log
 
 7.6.0
 =====
-* Added ``boto_s3`` module to create boto3 S3 client/resource so we can centrally use the S3_URL
-  environment variable to globally set S3 usage for a locally running ersatz instance of S3 like localstack.
-* Added ``boto_sqs`` module to create boto3 SQS client/resource so we can centrally use the SQS_URL
-  environment variable to globally set SQS usage for a locally running ersatz instance of SQS like localstack.
-* TODO: Maybe a better way to do the above, globally setting endpoint URLs (to localstack versions)
-  without having to change existing boto3 calls to create client/resource objects; ChatGPT has
-  this to say about this process: https://chat.openai.com/share/49417c2c-0b99-4040-b38c-5ada37e080f5
+* Added ``boto_monkey_patching`` module to use monkey patching to override the endpoint URLs for
+  for S3 or SQS boto3 client/resource creation using the S3_URL or SQS_URL environment variables
+  to specify that these services should use a locally running ersatz instance of S3 or SQS via localstack.
 
 
 7.5.2
