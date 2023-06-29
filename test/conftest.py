@@ -1,4 +1,11 @@
 import os
+
+# Disable any AWS endpoint-url environment variables overrides for testing.
+if "S3_URL" in os.environ:
+    os.environ.pop("S3_URL")
+if "SQS_URL" in os.environ:
+    os.environ.pop("SQS_URL")
+
 import pytest
 import requests
 
@@ -9,6 +16,7 @@ from .conftest_settings import TEST_DIR, INTEGRATED_ENV
 
 
 IntegratedFixture.verify_portal_access()
+
 
 
 def _portal_health_get(namespace, portal_url, key):

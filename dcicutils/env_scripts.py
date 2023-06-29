@@ -1,7 +1,8 @@
 import argparse
+import boto3
 import json
 import yaml
-from .boto_s3 import boto_s3_client
+
 from .lang_utils import disjoined_list
 from .misc_utils import PRINT, print_error_message
 
@@ -10,7 +11,7 @@ EPILOG = __doc__
 
 
 def get_envs_buckets(client=None):
-    client = client or boto_s3_client()
+    client = client or boto3.client('s3')
     all_buckets = [bucket['Name'] for bucket in client.list_buckets()['Buckets']]
     envs_buckets = [bucket for bucket in all_buckets if bucket.endswith("-envs")]
     return envs_buckets
@@ -42,7 +43,7 @@ def show_global_env_bucket(bucket, mode='json', key=None):
     single_key = key
     # print(f"bucket={bucket} mode={mode} single_key={single_key}")
 
-    client = boto_s3_client()
+    client = boto3.client('s3')
 
     if bucket is None:
         envs_buckets = get_envs_buckets(client=client)

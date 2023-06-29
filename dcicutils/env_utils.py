@@ -1,3 +1,4 @@
+import boto3
 import contextlib
 import copy
 import functools
@@ -9,7 +10,6 @@ from botocore.exceptions import HTTPClientError, ClientError
 from typing import Optional
 from urllib.parse import urlparse
 from . import env_utils_legacy as legacy
-from .boto_s3 import boto3, boto_s3_client
 from .common import (
     EnvName, OrchestratedApp, APP_FOURFRONT, APP_CGAP, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD, UrlString,
 )
@@ -455,7 +455,7 @@ class EnvUtils:
         :param config_key: the name of a key (the name of a configuration - an ff_env or ecosystem)
         """
         try:
-            s3 = boto_s3_client()
+            s3 = boto3.client('s3')
             metadata = s3.get_object(Bucket=env_bucket, Key=config_key)
             data = json.load(metadata['Body'])
             return data

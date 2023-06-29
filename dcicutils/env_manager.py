@@ -1,10 +1,10 @@
+import boto3
 import botocore.client
 import json
 import logging
 import urllib.request
 
 from typing import Optional
-from .boto_s3 import boto3, boto_s3_client
 from .env_base import EnvBase
 from .env_utils import full_env_name
 from .exceptions import CannotInferEnvFromManyGlobalEnvs, MissingGlobalEnv
@@ -67,7 +67,7 @@ class EnvManager(EnvBase):
         object, you should pass that.
         """
 
-        self.s3 = s3 or boto_s3_client()
+        self.s3 = s3 or boto3.client('s3')
         if env_name and env_description:
             raise ValueError("You may only specify an env_name or an env_description")
         if env_description:

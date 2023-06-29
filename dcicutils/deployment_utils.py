@@ -34,7 +34,6 @@ import boto3
 from git import Repo
 
 from .base import compute_ff_prd_env, compute_cgap_prd_env
-from .boto_s3 import boto_s3_client
 from .common import LEGACY_GLOBAL_ENV_BUCKET, LEGACY_CGAP_GLOBAL_ENV_BUCKET, DEFAULT_ECOSYSTEM
 from .env_utils import (
     get_standard_mirror_env, data_set_for_env, get_bucket_env,
@@ -114,7 +113,7 @@ class EBDeployer:
         :param zip_location: where to find zip file to upload
         :return: True in success, False otherwise
         """
-        s3_client = boto_s3_client()
+        s3_client = boto3.client('s3')
         return s3_client.put_object(
             ACL='public-read',
             Body=open(zip_location, 'rb'),

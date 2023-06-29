@@ -11,7 +11,6 @@ from elasticsearch.exceptions import AuthorizationException
 from typing import Optional, Dict, List
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from . import s3_utils, es_utils
-from .boto_sqs import boto_sqs_client
 from .common import (
     # KeyValuestringDictList, KeyValuestringDict,
     AnyAuthDict, AuthDict, SimpleAuthPair, AuthData, AnyAuthData, PortalEnvName,
@@ -1342,7 +1341,7 @@ def internal_compute_stuff_in_queues(ff_env_index_namespace, check_secondary) ->
         raise ValueError(f"Must provide a full fourfront environment name to this function"
                          f" (such as 'fourfront-webdev'). You gave: {ff_env_index_namespace!r}")
     stuff_in_queue = False
-    client = boto_sqs_client(region_name='us-east-1')
+    client = boto3.client('sqs', region_name='us-east-1')
     queue_names = ['-indexer-queue']
     if check_secondary:
         queue_names.append('-secondary-indexer-queue')

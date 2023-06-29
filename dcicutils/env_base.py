@@ -1,8 +1,8 @@
+import boto3
 import contextlib
 import os
 
 from typing import Optional
-from .boto_s3 import boto3, boto_s3_resource
 from .common import LEGACY_GLOBAL_ENV_BUCKET, S3BucketName
 from .exceptions import (
     # CannotInferEnvFromManyGlobalEnvs,
@@ -72,7 +72,7 @@ class EnvBase:
             or cls.global_env_bucket_name()
             # but failing that, for legacy system, just use legacy name
             or cls._legacy_global_env_bucket_for_testing())
-        s3_resource = boto_s3_resource()
+        s3_resource = boto3.resource('s3')
         env_bucket_model = s3_resource.Bucket(env_bucket_name)
         key_names = [key_obj.key for key_obj in env_bucket_model.objects.all()]
         configs = cls.filter_config_names(key_names, kind=kind)
