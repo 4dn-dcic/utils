@@ -1,1 +1,1 @@
-from . import boto_monkey_patching
+from . import boto_monkey_patching  # noqa
