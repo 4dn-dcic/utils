@@ -117,3 +117,5 @@ ENV/
 # PyCharm metadata
 .idea/
 
+# Vim
+*.swp
