@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: 3.9
       - name: Install Python dependencies for publish
-        run: pip boto3 install requests toml
+        run: pip install boto3 requests toml
       - name: Publish
         env:
           PYPI_USER: ${{ secrets.PYPI_USER }}
