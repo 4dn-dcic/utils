@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "7.5.1.2b1"  # TODO: To become 7.6.0
+version = "7.6.0.1b1"  # TODO: To become 7.6.0
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"

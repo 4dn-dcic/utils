@@ -12,6 +12,15 @@ Change Log
   environment variable to globally set S3 usage for a locally running ersatz instance of S3 like localstack.
 * Added ``boto_sqs`` module to create boto3 SQS client/resource so we can centrally use the SQS_URL
   environment variable to globally set SQS usage for a locally running ersatz instance of SQS like localstack.
+* TODO: Maybe a better way to do the above, globally setting endpoint URLs (to localstack versions)
+  without having to change existing boto3 calls to create client/resource objects; ChatGPT has
+  this to say about this process: https://chat.openai.com/share/49417c2c-0b99-4040-b38c-5ada37e080f5
+
+
+7.5.2
+=====
+
+* Add deployer class for ``smaht-portal``
 
 
 7.5.1
