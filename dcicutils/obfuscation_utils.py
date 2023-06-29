@@ -3,8 +3,9 @@
 import copy
 import re
 
-from dcicutils.misc_utils import check_true
-from typing import Optional
+from .common import AnyJsonData
+from .misc_utils import check_true, StorageCell
+from typing import Optional, Any, Union
 
 
 # The _SENSITIVE_KEY_NAMES_REGEX regex defines key names representing sensitive values, case-insensitive.
@@ -24,7 +25,7 @@ _SENSITIVE_KEY_NAMES_REGEX = re.compile(
     """, re.VERBOSE | re.IGNORECASE)
 
 
-def should_obfuscate(key: str) -> bool:
+def should_obfuscate(key: str, value: Any = None) -> bool:
     """
     Returns True if the given key looks as if it represents a sensitive value.
     Just sees if it contains "secret" or "password" or "crypt" some obvious variants,
@@ -32,11 +33,12 @@ def should_obfuscate(key: str) -> bool:
     containing regular expressions; add more to if/when needed.
 
     :param key: Key name of some property which may or may not need to be obfuscated.
+    :param value: (optional) value of item to be obfuscated, just in case it already is obfuscated
     :return: True if the given key name looks as if it represents a sensitive value.
     """
-    if not key or not isinstance(key, str):
-        return False
-    return _SENSITIVE_KEY_NAMES_REGEX.match(key) is not None
+    obfuscate_because_of_key = isinstance(key, str) and bool(_SENSITIVE_KEY_NAMES_REGEX.match(key))
+    not_obfuscated_already = not isinstance(value, str) or not is_obfuscated(value)
+    return obfuscate_because_of_key and not_obfuscated_already
 
 
 def obfuscate(value: str, show: bool = False, obfuscated: Optional[str] = None) -> str:
@@ -75,8 +77,8 @@ def is_obfuscated(value: str) -> bool:
     return isinstance(value, str) and bool(OBFUSCATED_VALUE.match(value))
 
 
-def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False,
-                   obfuscated: Optional[str] = None) -> dict:
+def obfuscate_json(item: Union[AnyJsonData, tuple], inplace: bool = False, show: bool = False,
+                   obfuscated: Optional[str] = None) -> Union[AnyJsonData, tuple]:
     """
     Obfuscates all STRING values within the given dictionary, RECURSIVELY, for all key names which look
     as if they represent sensitive values (based on the should_obfuscate function). By default, if the
@@ -87,34 +89,44 @@ def obfuscate_dict(dictionary: dict, inplace: bool = False, show: bool = False,
     the given dictionary itself in place (NOT a copy). In either case the resultant dictionary is returned.
     If the show argument is True then does not actually obfuscate and simply returns the given dictionary.
 
-    :param dictionary: Given dictionary whose senstive values obfuscate.
+    :param item: Any JSON object that might be or contain a dictionary whose senstive values are to be obfuscated.
     :param inplace: If True obfuscate the given dictionary in place; else a COPY is returned, if modified.
     :param show: If True does not actually obfuscate and simply returns the given dictionary.
+    :param obfuscated: The obfuscation string to use if one is not to be generated dynamically.
     :return: Resultant dictionary.
     """
 
     check_true(not obfuscated or is_obfuscated(obfuscated),
                message=f"If obfuscated= is supplied, it must be {OBFUSCATED_VALUE_DESCRIPTION}.")
 
-    def has_values_to_obfuscate(dictionary: dict) -> bool:
-        for key, value in dictionary.items():
-            if isinstance(value, dict):
-                if has_values_to_obfuscate(value):
-                    return True
-            elif isinstance(value, str) and should_obfuscate(key) and not is_obfuscated(value):
-                return True
-        return False
+    if show:
+        return item
 
-    if dictionary is None or not isinstance(dictionary, dict):
-        return {}
-    if isinstance(show, bool) and show:
-        return dictionary
-    if not isinstance(inplace, bool) or not inplace:
-        if has_values_to_obfuscate(dictionary):
-            dictionary = copy.deepcopy(dictionary)
-    for key, value in dictionary.items():
-        if isinstance(value, dict):
-            dictionary[key] = obfuscate_dict(value, show=False, inplace=False, obfuscated=obfuscated)
-        elif isinstance(value, str) and should_obfuscate(key) and not is_obfuscated(value):
-            dictionary[key] = obfuscate(value, show=False, obfuscated=obfuscated)
-    return dictionary
+    orig_item = item
+
+    changed = StorageCell(False)
+
+    if not inplace:
+        item = copy.deepcopy(item)
+
+    def process_recursively(item: Union[AnyJsonData, tuple]):
+        # We only need to process non-atomic items recursively, since they are the only things
+        # that might conceivably be or contain a dictionary in need of obfuscation.
+        if isinstance(item, dict):
+            for key, value in item.items():
+                if should_obfuscate(key, value):
+                    changed.value = True
+                    item[key] = obfuscate(value, obfuscated=obfuscated)
+                else:
+                    process_recursively(value)
+        elif isinstance(item, list) or isinstance(item, tuple):
+            for element in item:
+                process_recursively(element)
+
+    process_recursively(item)
+
+    return item if changed.value else orig_item
+
+
+# The function obfuscate_dict is deprecated and will go away in a future major release.
+obfuscate_dict = obfuscate_json

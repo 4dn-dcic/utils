@@ -163,6 +163,19 @@ ff_utils
    :members:
 
 
+function_cache_decorator
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.function_cache_decorator
+
+
+glacier_utils
+^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.glacier_utils
+   :members:
+
+
 lang_utils
 ^^^^^^^^^^
 
@@ -198,6 +211,27 @@ opensearch_utils
    :members:
 
 
+project_utils
+^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.project_utils
+   :members:
+
+
+redis_utils
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.redis_utils
+   :members:
+
+
+redis_tools
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.redis_tools
+   :members:
+
+
 qa_checkers
 ^^^^^^^^^^^
 
@@ -230,4 +264,25 @@ snapshot_utils
 ^^^^^^^^^^^^^^
 
 .. automodule:: dcicutils.snapshot_utils
+  :members:
+
+
+ssl_certificate_utils
+^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.ssl_certificate_utils
+   :members:
+
+
+task_utils
+^^^^^^^^^^
+
+.. automodule:: dcicutils.task_utils
+  :members:
+
+
+trace_utils
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.trace_utils
   :members:

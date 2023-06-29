@@ -1,4 +1,3 @@
-import contextlib
 import copy
 import json
 import os
@@ -9,11 +8,10 @@ import time
 
 from botocore.exceptions import ClientError
 from dcicutils import es_utils, ff_utils, s3_utils
-from dcicutils.ff_mocks import mocked_s3utils, TestScenarios, RequestsTestRecorder
+from dcicutils.ff_mocks import mocked_s3utils_with_sse, TestScenarios, RequestsTestRecorder
 from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true
 from dcicutils.qa_utils import (
     check_duplicated_items_by_key, ignored, raises_regexp, MockResponse, MockBoto3, MockBotoSQSClient,
-    MockBotoS3Client,
 )
 from types import GeneratorType
 from unittest import mock
@@ -123,7 +121,27 @@ def test_generate_rand_accession():
     assert '0' not in test_cgap
 
 
-def test_get_response_json():
+@pytest.mark.integratedx
+@pytest.mark.flaky
+def test_get_response_json_integrated():
+    check_get_response_json()
+
+
+@pytest.mark.unit
+def test_get_response_json_unit():
+    def mocked_get(url):
+        if url == "http://httpbin.org/json":
+            return MockResponse(200, content='{"one": 1, "two": 2, "three": 3}')
+        elif url == "http://httpbin.org/status/500":
+            return MockResponse(500, content="<html>Simulated failure</html>")
+        else:
+            raise Exception(f"Mock needs to be extended. URL argument to requests.get was {url!r}")
+    with mock.patch.object(requests, "get") as mock_get:
+        mock_get.side_effect = mocked_get
+        check_get_response_json()
+
+
+def check_get_response_json():
     # use responses from http://httpbin.org
     good_res = requests.get('http://httpbin.org/json')
     good_res_json = ff_utils.get_response_json(good_res)
@@ -197,10 +215,8 @@ def test_unified_authentication_decoding(integrated_ff):
 
             # This error can be raised without using s3Utils because we don't know what env to use anyway.
 
-            with pytest.raises(Exception) as exec_info:
+            with pytest.raises(ff_utils.UnifiedAuthenticator.AuthenticationError):
                 ff_utils.unified_authentication(None, None)
-
-            assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
         class MockS3Utils:
 
@@ -221,9 +237,8 @@ def test_unified_authentication_decoding(integrated_ff):
     for any_bogus_key in [any_old_bogus_key1, any_old_bogus_key2, any_old_bogus_key3, any_old_bogus_key4]:
 
         with mock.patch.object(s3_utils, "s3Utils", UnusedS3Utils):
-            with pytest.raises(Exception) as exec_info:
+            with pytest.raises(ff_utils.UnifiedAuthenticator.AuthenticationError):
                 ff_utils.unified_authentication(any_bogus_key, None)
-            assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
         class MockS3Utils:
 
@@ -235,20 +250,54 @@ def test_unified_authentication_decoding(integrated_ff):
                 return any_bogus_key
 
         with mock.patch.object(s3_utils, "s3Utils", MockS3Utils):
-            with pytest.raises(Exception) as exec_info:
+            with pytest.raises(ff_utils.UnifiedAuthenticator.AuthenticationError):
                 ff_utils.unified_authentication(None, any_env)
-            assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
 
-@contextlib.contextmanager
-def mocked_s3utils_with_sse(beanstalks=None, require_sse=True, files=None):
-    with mocked_s3utils(environments=beanstalks or ['fourfront-foo', 'fourfront-bar'],
-                        require_sse=require_sse) as mock_boto3:
-        s3 = mock_boto3.client('s3')
-        assert isinstance(s3, MockBotoS3Client)
-        for filename, string in (files or {}).items():
-            s3.s3_files.files[filename] = string.encode('utf-8')
-        yield mock_boto3
+def test_unified_authenticator_get_auth_from_s3():
+    # TODO: Write test of UnifiedAuthenticator.get_auth_from_s3
+    pass
+
+
+def test_unified_authenticator_maybe_unwrap_legacy_auth():
+    key_tuple = ('foo', 'bar')
+    key_dict = {'key': 'foo', 'secret': 'bar'}
+
+    # All this function does is unwrap legacy keys
+    legacy_key_dict = {'default': key_dict}
+    assert ff_utils.UnifiedAuthenticator.maybe_unwrap_legacy_auth(legacy_key_dict) == key_dict
+
+    # Things that are not wrapped get returned.
+    assert ff_utils.UnifiedAuthenticator.maybe_unwrap_legacy_auth(key_tuple) == key_tuple
+    assert ff_utils.UnifiedAuthenticator.maybe_unwrap_legacy_auth(key_dict) == key_dict
+    bogus_legacy = {'default': key_tuple}
+    assert ff_utils.UnifiedAuthenticator.maybe_unwrap_legacy_auth(bogus_legacy) == bogus_legacy
+
+    # Really ANYTHING that isn't the specifically wrapped dictionary just gets returned.
+    assert ff_utils.UnifiedAuthenticator.maybe_unwrap_legacy_auth(666) == 666
+
+
+def test_unified_authenticator_normalize_auth():
+    key_tuple = ('foo', 'bar')
+    key_dict = {'key': 'foo', 'secret': 'bar'}
+
+    assert ff_utils.UnifiedAuthenticator.normalize_auth(key_tuple) == key_tuple
+    assert ff_utils.UnifiedAuthenticator.normalize_auth(key_dict) == key_tuple
+
+    # Things that don't match the format just cause None to be returned.
+    assert ff_utils.UnifiedAuthenticator.normalize_auth(666) is None
+
+# moved to ff_mocks.py
+#
+# @contextlib.contextmanager
+# def mocked_s3utils_with_sse(beanstalks=None, require_sse=True, files=None):
+#     with mocked_s3utils(environments=beanstalks or ['fourfront-foo', 'fourfront-bar'],
+#                         require_sse=require_sse) as mock_boto3:
+#         s3 = mock_boto3.client('s3')
+#         assert isinstance(s3, MockBotoS3Client)
+#         for filename, string in (files or {}).items():
+#             s3.s3_files.files[filename] = string.encode('utf-8')
+#         yield mock_boto3
 
 
 def test_unified_authentication_unit():
@@ -280,15 +329,19 @@ def test_unified_authentication_unit():
         # Check that the auth dict fetched from server is canonicalized to an auth tuple...
         assert auth5 == ts.bar_env_auth_tuple
 
-        with raises_regexp(ValueError, "Must provide a valid authorization key or ff environment."):
+        with raises_regexp(ff_utils.UnifiedAuthenticator.AuthenticationError,
+                           "Must provide a valid authorization key or ff environment."):
             # The .unified_authentication operation checks that an auth given as a tuple has length 2.
             ff_utils.unified_authentication(ts.some_badly_formed_auth_tuple, ts.foo_env)
 
-        with raises_regexp(ValueError, "Must provide a valid authorization key or ff environment."):
+        with raises_regexp(ff_utils.UnifiedAuthenticator.AuthenticationError,
+                           "Must provide a valid authorization key or ff environment."):
             # The .unified_authentication operation checks that an auth given as a dict has keys 'key' and 'secret'.
             ff_utils.unified_authentication(ts.some_badly_formed_auth_dict, ts.foo_env)
 
-        with raises_regexp(ValueError, "Must provide a valid authorization key or ff environment."):
+        with raises_regexp(ff_utils.UnifiedAuthenticator.AuthenticationError,
+                           "unified_authentication requires either auth or an ff_env."
+                           " You gave auth=None, ff_env=None"):
             # If the first arg (auth) is None, the second arg (ff_env) must not be.
             ff_utils.unified_authentication(None, None)
 
@@ -306,9 +359,8 @@ def test_unified_authentication_integrated(integrated_ff):
     assert key1 == key3
     key4 = ff_utils.unified_authentication(key1, None)
     assert key1 == key4
-    with pytest.raises(Exception) as exec_info:
+    with pytest.raises(ff_utils.UnifiedAuthenticator.AuthenticationError):
         ff_utils.unified_authentication(None, None)
-    assert 'Must provide a valid authorization key or ff' in str(exec_info.value)
 
 
 @pytest.mark.stg_or_prd_testing_needs_repair

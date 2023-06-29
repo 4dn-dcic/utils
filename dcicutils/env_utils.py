@@ -11,7 +11,7 @@ from typing import Optional
 from urllib.parse import urlparse
 from . import env_utils_legacy as legacy
 from .common import (
-    EnvName, OrchestratedApp, APP_FOURFRONT, APP_CGAP, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD,
+    EnvName, OrchestratedApp, APP_FOURFRONT, APP_CGAP, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD, UrlString,
 )
 from .env_base import EnvBase, LegacyController
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
@@ -197,7 +197,7 @@ class EnvUtils:
     ORCHESTRATED_APP = None  # This allows us to tell 'cgap' from 'fourfront', in case there ever is one.
     PRD_ENV_NAME = None  # the name of the prod env
     PRODUCTION_ECR_REPOSITORY = None  # the name of an ecr repository shared between stg and prd
-    PUBLIC_URL_TABLE = None  # dictionary mapping envnames & pseudo_envnames to public urls
+    PUBLIC_URL_TABLE = None  # list of dictionaries mapping envnames & pseudo_envnames to public urls
     STG_ENV_NAME = None  # the name of the stage env (or None)
     TEST_ENVS = None  # a list of environments that are for testing
     WEBPROD_PSEUDO_ENV = None
@@ -690,8 +690,18 @@ def _find_public_url_entry(envname):
         return entry
 
 
+def get_portal_url(envname: EnvName) -> UrlString:
+    """
+    Returns the Portal URL for the given environment name.
+    Effectively same as get_env_real_url (below) but does not actually access
+    the URL (to get the health page is that function does); i.e. so we can get
+    the URL without exception even if there is a problem with the Portal.
+    """
+    return get_env_real_url(full_env_name(envname))
+
+
 @if_orchestrated
-def get_env_real_url(envname):
+def get_env_real_url(envname: EnvName) -> UrlString:
 
     entry = _find_public_url_entry(envname)
     if entry:

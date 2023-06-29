@@ -4,7 +4,7 @@ clear-poetry-cache:  # clear poetry/pypi cache. for user to do explicitly, never
 	poetry cache clear pypi --all
 
 configure:  # does any pre-requisite installs
-	pip install poetry
+	pip install poetry==1.3.2
 
 lint:
 	@echo "Running flake8..."
@@ -85,10 +85,17 @@ update:  # updates dependencies
 	poetry update
 
 publish:
-	scripts/publish
+	# New Python based publish script (2023-04-25).
+	poetry run publish-to-pypi
 
 publish-for-ga:
-	scripts/publish --noconfirm
+	# New Python based publish script (2023-04-25).
+	# For some reason, have NOT been able to get the required pip install of
+	# requests and toml to "take" - when using with the poetry run publish
+	# command - either here or in .main-publish.yml; still get module not
+	# found error for requests in GA; so invoking directly with python.
+	# poetry run publish-to-pypi --noconfirm
+	python -m dcicutils.scripts.publish_to_pypi --noconfirm
 
 help:
 	@make info

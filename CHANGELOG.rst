@@ -6,6 +6,292 @@ dcicutils
 Change Log
 ----------
 
+7.5.2
+=====
+
+* Add deployer class for ``smaht-portal``
+
+
+7.5.1
+=====
+* In ``scripts/publish_to_pypi`` default to not allowing publish using (non-API-token) username,
+  and fixed package name to come from pyproject.toml rather than git repo name (used only for
+  display purposes and checking if version already pushed).
+
+
+7.5.0
+=====
+
+* In ``lang_utils``:
+
+  * Teach ``EnglishUtils.string_pluralize`` about words ending in ``-ses`` because ``cgap-portal`` needs this.
+
+* New module ``project_utils`` with support for Project mechanism.
+
+  * New decorators ``ProjectRegistry`` and ``C4ProjectRegistry``
+
+  * New class ``Project`` and ``C4Project``
+
+* In ``qa_utils``:
+
+  * In class ``MockFileSystem``:
+
+    * New method ``abspath``
+    * New method ``chdir``
+    * New method ``expanduser``
+    * New method ``getcwd``
+    * New method ``mock_exists_open_remove_abspath_getcwd_chdir`` (context manager)
+
+
+7.4.4
+=====
+
+Fixed the ``publish-to-pypi`` script to ignore the ``.gitignore`` file when looking for untracked files.
+
+
+7.4.3
+=====
+
+Removed ``scripts`` from ``packages`` directory list in ``pyproject.toml``; not necessary.
+
+
+7.4.2
+=====
+
+* Rewrite test ``test_get_response_json`` as a unit test to get around its flakiness.
+
+
+7.4.1.1
+=======
+
+The ``glacier2`` branch did not bump the version. It continues to call itself version 7.4.1 even though the ``v7.4.1`` does not contain its functionality, so the point of change is retroactiely tagged ``v7.4.1.1``.
+
+* In ``common.py``
+
+  * Add constant ``ENCODED_LIFECYCLE_TAG_KEY``
+
+* In ``glacier_utils.py``:
+
+  * Accept support for url-encoded tags for GlacierUtils multipart uploads.
+
+  * Add support for removing lifecycle tag when copying object.
+
+
+7.4.1
+=====
+
+* In ``glacier_utils.py``:
+
+  * Fix calls to ``self.copy_object_back_to_original_location``
+    in ``restore_glacier_phase_two_copy``.
+
+* In ``qa_utils.py``:
+
+  * Make ``boto3.client('s3').put_object`` handle either a string
+    or bytes object correctly.
+
+* Actively mark tests that are already marked with
+  ``pytest.mark.beanstalk_failure`` to also use ``pytest.mark.skip``
+  so they don't run and confuse things even when markers are not in play.
+
+* Update some live ecosystem expectations to match present real world state.
+
+* Separate tests of live ecosystem so that the parts that are supposed
+  to pass reliably are in a separate function from the parts that are
+  thought to be in legit transition.
+
+* Misc changes to satisfy various syntax checkers.
+
+  * One stray call to `print` changed to `PRINT`.
+
+  * Various grammar errors fixed in comment strings because
+    PyCharm now whines about that, and the suggestions seemed reasonable.
+
+
+7.4.0
+=====
+
+* In ``dcicutils.env_utils`` added function ``get_portal_url`` which is
+  the same as ``get_env_real_url`` but does not access the URL (via the
+  health page); first usage of which was in foursight-core. 2023-04-16.
+
+* Added ``dcicutils.ssl_certificate_utils``;
+  first usage of which was in foursight-core. 2023-04-16.
+
+* Added ``dcicutils.scripts.publish_to_pypi``; 2023-04-24.
+
+* Added ``dcicutils.function_cache_decorator``; 2023-04-24;
+  future help in simplifying some caching in foursight-core APIs.
+
+* Updated ``test/test_task_utils.py`` (``test_pmap_parallelism``):
+  to increase ``margin_of_error`` to 1.1333.
+  
+
+7.3.1
+=====
+
+Add LICENSE.txt (MIT Licenses). The ``pyproject.toml`` already declared that lic
+ense, so no real change. Just pro forma.
+
+
+7.3.0
+=====
+
+* In ``dcicutils.command_utils``:
+
+  * New decorator ``require_confirmation``
+
+* In ``dcicutils.common``:
+
+  * New variable ``ALL_S3_STORAGE_CLASSES``
+  * New variable ``AVAILABLE_S3_STORAGE_CLASSES``
+  * New variable ``S3_GLACIER_CLASSES``
+  * New type hint ``S3GlacierClass``
+  * New type hint ``S3StorageClass``
+
+* New module ``dcicutils.glacier_utils``:
+
+    * Class for interacting with/restoring files from Glacier
+
+* In ``dcicutils.misc_utils``:
+
+  * New function ``INPUT``
+  * New function ``future_datetime``
+  * New decorator ``managed_property``
+  * New function ``map_chunked``
+  * New function ``format_in_radix``
+  * New function ``parse_in_radix``
+
+* In ``dcicutils.qa_checkers``:
+
+  * Fix bug in ``print`` statement recognizer
+
+* In ``dcicutils.qa_utils``:
+
+  * Support for Glacier-related operations in ``MockBotoS3Client``:
+
+    * Method ``copy_object``
+    * Method ``delete_object``
+    * Method ``list_object_versions``
+    * Method ``restore_object``
+
+* Load ``coveralls`` dependency only dynamically in GA workflow, not in poetry,
+  because it implicates ``docopt`` library, which needs ``2to3``, and would fail.
+
+
+
+7.2.0
+=====
+
+* In ``exceptions``:
+
+  * New class ``MultiError``
+
+* In ``qa_utils``:
+
+  * New class ``Timer``
+
+* In ``misc_utils``:
+
+  * New generator function ``chunked``
+
+* New module ``task_utils``:
+
+  * New class ``Task``
+  * New class ``TaskManager``
+  * New function ``pmap``
+  * New function ``pmap_list``
+  * New function ``pmap_chunked``
+
+* Adjust expectations for environment ``hotseat``
+  in live ecosystem integration testing by ``tests/test_s3_utils.py``
+
+
+7.1.0
+=====
+
+* New ``trace_utils`` module
+
+  * New decorator ``@Trace``
+
+  * New function ``make_trace_decorator`` to make similar ones.
+
+* Fix to ``obfuscation_utils`` relating to dicts containing lists.
+
+* In ``dcicutils.misc_utils``:
+
+  * New function ``deduplicate_list``
+
+* In ``dcicutils.qa_utils``:
+
+  * Fixes to the ``printed_output`` context manager relating to multi-line ``PRINT`` statements.
+
+
+7.0.0
+=====
+
+* New files: ``dcicutils.redis_utils`` and ``dcicutils.redis_tools`` plus associated test files
+
+* In ``dcicutils.redis_utils``:
+
+  * Implement the ``RedisBase`` object, which takes the output of ``create_redis_client`` and returns
+    an object that implements some base APIs for interacting with Redis.
+
+* In ``dcicutils.redis_tools``:
+
+  * Implement the ``RedisSessionToken`` object, which creates higher level APIs for creating session
+    tokens that are backed by Redis. This object operates on the ``RedisBase`` class.
+  * Session tokens are 32 bytes and expire automatically after 3 hours by default, but can be tuned
+    otherwise.
+
+* In ``dcicutils.command_utils``:
+
+  * Make ``script_catch_errors`` context manager return a ``fail``
+    function that can be called to bypass the warning that an error
+    needs to be reported.
+
+* In ``dcicutils.common``:
+
+  * Add a number of type hints.
+
+* In ``dcicutils.ff_utils``:
+
+  * Refactor ``unified_authentication`` to be object-oriented.
+
+  * Add some type hinting.
+
+* In ``dcicutisl.env_base`` and ``dcicutils.s3_utils``:
+
+  * Add some error checks if stored s3 credentials are not in the right form. (**BREAKING CHANGE**)
+    This is not expected to break anything, but users should be on the lookout for problems.
+
+  * Add a new argument (``require_key=``, default ``True``) to ``s3Utils.get_access_keys()`` so that checking
+    of the key name can be relaxed if only ``secret`` and ``server`` are needed, as might happen for Jupyterhub creds.
+    This is a possible way of addressing unexpected problems that could come up due to added error checks.
+
+  * Add some type hinting.
+
+  * Add comments about other possible future error checking.
+
+* In ``dcicutils.misc_utils``:
+
+  * New function ``utc_now_str``
+
+* Misc PEP8
+
+
+6.10.1
+======
+
+* Various test adjustments to accommodate health page changes related to
+  `C4-853 <https://hms-dbmi.atlassian.net/browse/C4-853>`_.
+
+
+6.10.0
+=====
+
+* Move ``mocked_s3utils_with_sse`` from ``test_ff_utils.py`` to ``ff_mocks.py``.
+
 
 6.9.0
 =====
@@ -18,10 +304,9 @@ Change Log
 6.8.0
 =====
 
-* In `dcicutils.deployment_utils``
+* In ``dcicutils.deployment_utils``:
 
   * Add support for ``Auth0Domain`` and ``Auth0AllowedConnections``
-
 
 
 6.7.0

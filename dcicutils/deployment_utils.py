@@ -410,7 +410,7 @@ class IniFileManager:
     # Default auth0 domain
     DEFAULT_AUTH0_DOMAIN = 'hms-dbmi.auth0.com'
 
-    # For APP, a subclass may optionally declare a value of 'cgap' or 'fourfront'
+    # For APP, a subclass may optionally declare a value of 'cgap' or 'fourfront' or 'smaht'
     APP_KIND = None
 
     # For ORCHESTRATED, a subclass may optinally declare a value of True or False,
@@ -428,6 +428,8 @@ class IniFileManager:
                                      application_bucket_prefix=None, foursight_bucket_prefix=None,
                                      auth0_domain=DEFAULT_AUTH0_DOMAIN, auth0_client=None, auth0_secret=None,
                                      auth0_allowed_connections=None,
+                                     re_captcha_key=None, re_captcha_secret=None,
+                                     redis_server=None,
                                      file_upload_bucket=None, file_wfout_bucket=None,
                                      blob_bucket=None, system_bucket=None, metadata_bundles_bucket=None):
 
@@ -465,6 +467,9 @@ class IniFileManager:
             auth0_client (str): A string identifying the auth0 client application.
             auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
             auth0_allowed_connections (str): A comma separated string of allowed connections that can be used via auth0.
+            re_captcha_key (str): key used for reCaptcha for throttling/detecting humans on login
+            re_captcha_secret (str): secret used for reCaptcha
+            redis_server (str): A server URL to a Redis cluster, for use with sessions
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
             file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
             blob_bucket (str): Specific name of the bucket to use on S3 for blob data.
@@ -498,6 +503,9 @@ class IniFileManager:
                                                auth0_client=auth0_client,
                                                auth0_secret=auth0_secret,
                                                auth0_allowed_connections=auth0_allowed_connections,
+                                               re_captcha_key=re_captcha_key,
+                                               re_captcha_secret=re_captcha_secret,
+                                               redis_server=redis_server,
                                                file_upload_bucket=file_upload_bucket,
                                                file_wfout_bucket=file_wfout_bucket,
                                                blob_bucket=blob_bucket,
@@ -566,6 +574,8 @@ class IniFileManager:
                                        application_bucket_prefix=None, foursight_bucket_prefix=None,
                                        auth0_domain=None, auth0_client=None, auth0_secret=None,
                                        auth0_allowed_connections=None,
+                                       re_captcha_key=None, re_captcha_secret=None,
+                                       redis_server=None,
                                        file_upload_bucket=None,
                                        file_wfout_bucket=None, blob_bucket=None, system_bucket=None,
                                        metadata_bundles_bucket=None):
@@ -600,6 +610,9 @@ class IniFileManager:
             auth0_client (str): A string identifying the auth0 client application.
             auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
             auth0_allowed_connections (str): A comma separated string of allowed connections that can be used via auth0.
+            re_captcha_key (str): key used for reCaptcha for throttling/detecting humans on login
+            re_captcha_secret (str): secret used for reCaptcha
+            redis_server (str): A server URL to a Redis cluster, for use with sessions
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
             file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
             blob_bucket (str): Specific name of the bucket to use on S3 for blob data.
@@ -618,6 +631,7 @@ class IniFileManager:
 
         higlass_server = higlass_server or os.environ.get('ENCODED_HIGLASS_SERVER', "MISSING_ENCODED_HIGLASS_SERVER")
         es_server = es_server or os.environ.get('ENCODED_ES_SERVER', "MISSING_ENCODED_ES_SERVER")
+        redis_server = redis_server or os.environ.get('ENCODED_REDIS_SERVER', '')  # optional
         env_bucket = (env_bucket
                       or EnvBase.global_env_bucket_name()
                       or ("MISSING_GLOBAL_ENV_BUCKET"
@@ -664,10 +678,16 @@ class IniFileManager:
         es_namespace = es_namespace or os.environ.get("ENCODED_ES_NAMESPACE", env_name)
         identity = identity or os.environ.get("ENCODED_IDENTITY", "")
         sentry_dsn = sentry_dsn or os.environ.get("ENCODED_SENTRY_DSN", "")
+
+        # Auth0 Configuration
         auth0_domain = auth0_domain or os.environ.get("ENCODED_AUTH0_DOMAIN", "")
         auth0_client = auth0_client or os.environ.get("ENCODED_AUTH0_CLIENT", "")
         auth0_secret = auth0_secret or os.environ.get("ENCODED_AUTH0_SECRET", "")
         auth0_allowed_connections = auth0_allowed_connections or os.environ.get("ENCODED_AUTH0_ALLOWED_CONNECTIONS", "")
+
+        # reCatpcha Configuration
+        re_captcha_key = re_captcha_key or os.environ.get('reCaptchaKey', '')
+        re_captcha_secret = re_captcha_secret or os.environ.get('reCaptchaSecret', '')
 
         create_mapping_on_deploy_skip = os.environ.get("ENCODED_CREATE_MAPPING_SKIP",
                                                        cls.PRD_DEFAULT_CREATE_MAPPING_ON_DEPLOY_SKIP)
@@ -744,7 +764,7 @@ class IniFileManager:
         index_server = "true" if index_server else ""  # this will omit the line if it's going to be False
 
         extra_vars = {
-            'APP_KIND': app_kind,  # "cgap" or "fourfront"
+            'APP_KIND': app_kind,  # "cgap" or "fourfront" or "smaht"
             'APP_DEPLOYMENT': app_deployment,  # "orchestrated" or "elasticbeanstalk"
             'APP_VERSION': app_version,
             'PROJECT_VERSION': toml.load(cls.PYPROJECT_FILE_NAME)['tool']['poetry']['version'],
@@ -752,6 +772,7 @@ class IniFileManager:
             'UTILS_VERSION': pkg_resources.get_distribution("dcicutils").version,
             'HIGLASS_SERVER': higlass_server,
             'ES_SERVER': es_server,
+            'REDIS_SERVER': redis_server,
             'ENV_BUCKET': env_bucket,
             'ENV_ECOSYSTEM': env_ecosystem,
             'ENV_NAME': env_name,
@@ -772,9 +793,11 @@ class IniFileManager:
             'AUTH0_CLIENT': auth0_client,
             'AUTH0_SECRET': auth0_secret,
             'AUTH0_ALLOWED_CONNECTIONS': auth0_allowed_connections,
-            "CREATE_MAPPING_SKIP": create_mapping_on_deploy_skip,
-            "CREATE_MAPPING_WIPE_ES": create_mapping_on_deploy_wipe_es,
-            "CREATE_MAPPING_STRICT": create_mapping_on_deploy_strict,
+            'g.recaptcha.key': re_captcha_key,
+            'g.recaptcha.secret': re_captcha_secret,
+            'CREATE_MAPPING_SKIP': create_mapping_on_deploy_skip,
+            'CREATE_MAPPING_WIPE_ES': create_mapping_on_deploy_wipe_es,
+            'CREATE_MAPPING_STRICT': create_mapping_on_deploy_strict,
             'FILE_UPLOAD_BUCKET': file_upload_bucket,
             'FILE_WFOUT_BUCKET': file_wfout_bucket,
             'BLOB_BUCKET': blob_bucket,
@@ -919,6 +942,9 @@ class IniFileManager:
             parser.add_argument("--sentry_dsn",
                                 help="a sentry DSN",
                                 default=None)
+            parser.add_argument("--redis_server",
+                                help="server URL to a Redis Cluster",
+                                default=None)
             parser.add_argument("--tibanna_cwls_bucket",
                                 help="the name of a Tibanna CWLs bucket to use",
                                 default=None)
@@ -942,6 +968,12 @@ class IniFileManager:
                                 default=None)
             parser.add_argument("--auth0_allowed_connections",
                                 help="a comma separated list of compatible auth0 connections to use",
+                                default=None)
+            parser.add_argument("--recaptcha-key",
+                                help="key for use with recaptcha",
+                                default=None)
+            parser.add_argument("--recaptcha-secret",
+                                help="secret for use with recaptcha",
                                 default=None)
             parser.add_argument("--file_upload_bucket",
                                 help="the name of the file upload bucket to use",
@@ -990,6 +1022,8 @@ class IniFileManager:
                                              auth0_client=args.auth0_client,
                                              auth0_secret=args.auth0_secret,
                                              auth0_allowed_connections=args.auth0_allowed_connections,
+                                             re_captcha_key=args.recaptcha_key, re_captcha_secret=args.recaptcha_secret,
+                                             redis_server=args.redis_server,
                                              file_upload_bucket=args.file_upload_bucket,
                                              file_wfout_bucket=args.file_wfout_bucket,
                                              blob_bucket=args.blob_bucket, system_bucket=args.system_bucket,
@@ -1070,7 +1104,7 @@ class BasicLegacyCGAPIniFileManager(BasicCGAPIniFileManager):
 
 class BasicOrchestratedCGAPIniFileManager(BasicCGAPIniFileManager):
     """
-    A class of IniFileManager for producing a CGAP-style production.ini in a CloudFormation-orechstrated context.
+    A class of IniFileManager for producing a CGAP-style production.ini in a CloudFormation-orchestrated context.
     """
     APP_ORCHESTRATED = True
 
@@ -1093,8 +1127,23 @@ class BasicLegacyFourfrontIniFileManager(BasicFourfrontIniFileManager):
 
 class BasicOrchestratedFourfrontIniFileManager(BasicFourfrontIniFileManager):
     """
-    A class of IniFileManager for producing a Fourfront-style production.ini in a CloudFormation-orechstrated context.
+    A class of IniFileManager for producing a Fourfront-style production.ini in a CloudFormation-orchestrated context.
     NOTE: For now there is no such context, but this is intended to be thinking forward.
+    """
+    APP_ORCHESTRATED = True
+
+
+class BasicSMAHTIniFileManager(IniFileManager):
+    """
+    Any IniFileManager used by SMaHT should use this class to get better defaulting.
+    This class exists mostly for type inclusion. For actual use, you probably want one of its subclasses.
+    """
+    APP_KIND = 'smaht'
+
+
+class BasicOrchestratedSMAHTIniFileManager(BasicSMAHTIniFileManager):
+    """
+    A class of IniFileManager for producing a ECS-style production.ini in a CloudFormation-orchestrated context.
     """
     APP_ORCHESTRATED = True
 

@@ -35,7 +35,10 @@ jobs:
 
       - name: Install Deps
         run: |
-          pip install poetry
+          sudo apt install redis-server
+          sudo ln -s /usr/bin/redis-server /usr/local/bin/redis-server
+          sudo ln -s /usr/bin/redis-cli /usr/local/bin/redis-cli
+          make build
           # show loaded versions of various poetry-related libraries
           pip freeze --all | egrep '(pip|poetry(.[a-z]+)?|tomlkit)=='
 
@@ -46,7 +49,6 @@ jobs:
           S3_ENCRYPT_KEY: ${{ secrets.S3_ENCRYPT_KEY }}
           GLOBAL_ENV_BUCKET: foursight-envs
         run: |
-          poetry install
           make test-for-ga
 
       - name: Coveralls
@@ -54,4 +56,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: ${{ matrix.python_version == '3.9' }}
         run: |
+          pip install coveralls
           poetry run coveralls --service=github

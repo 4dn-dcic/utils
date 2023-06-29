@@ -21,7 +21,7 @@ from dcicutils.qa_utils import (
 from dcicutils.s3_utils import EnvManager
 from typing import Optional, TextIO
 from unittest import mock
-from . import beanstalk_utils, ff_utils, s3_utils, env_utils, env_base, env_manager
+from . import beanstalk_utils, ff_utils, s3_utils, env_utils, env_base, env_manager, glacier_utils
 from .common import LEGACY_GLOBAL_ENV_BUCKET
 
 
@@ -148,46 +148,60 @@ def mocked_s3utils(environments=None, require_sse=False, other_access_key_names=
         write_config(environment, record)
     write_config(ecosystem_file, {"is_legacy": True})
     # Now we arrange that s3_utils, ff_utils, etc. modules share the illusion that our mock IS the boto3 library
-    with mock.patch.object(s3_utils, "boto3", mock_boto3):
-        with mock.patch.object(ff_utils, "boto3", mock_boto3):
-            with mock.patch.object(beanstalk_utils, "boto3", mock_boto3):
-                with mock.patch.object(env_utils, "boto3", mock_boto3):
-                    with mock.patch.object(env_base, "boto3", mock_boto3):
-                        with mock.patch.object(env_manager, "boto3", mock_boto3):
-                            with mock.patch.object(s3_utils.EnvManager, "fetch_health_page_json") as mock_fetcher:
-                                # This is all that's needed for s3Utils to initialize an EnvManager.
-                                # We might have to add more later.
-                                def mocked_fetch_health_page_json(url, use_urllib=True):
-                                    ignored(use_urllib)  # we don't test this
-                                    m = re.match(r'.*(fourfront-[a-z0-9-]+)(?:[.]|$)', url)
-                                    if m:
-                                        env_name = m.group(1)  # we found it with a fourfront-prefix, so use as is
-                                        return make_mock_health_page(env_name)
-                                    m = re.match(r'(?:https?://)?([a-z0-9-]+)'
-                                                 r'(?:[.](4dnucleome[.]org|hms.harvard.edu)([/].*)|$)', url)
-                                    if m:
-                                        env_name = full_env_name(m.group(1))  # no fourfront- prefix, so add one
-                                        return make_mock_health_page(env_name)
-                                    raise NotImplementedError(f"Mock can't handle URL: {url}")
+    with mock.patch.object(glacier_utils, "boto3", mock_boto3):
+        with mock.patch.object(s3_utils, "boto3", mock_boto3):
+            with mock.patch.object(ff_utils, "boto3", mock_boto3):
+                with mock.patch.object(beanstalk_utils, "boto3", mock_boto3):
+                    with mock.patch.object(env_utils, "boto3", mock_boto3):
+                        with mock.patch.object(env_base, "boto3", mock_boto3):
+                            with mock.patch.object(env_manager, "boto3", mock_boto3):
+                                with mock.patch.object(s3_utils.EnvManager, "fetch_health_page_json") as mock_fetcher:
+                                    # This is all that's needed for s3Utils to initialize an EnvManager.
+                                    # We might have to add more later.
+                                    def mocked_fetch_health_page_json(url, use_urllib=True):
+                                        ignored(use_urllib)  # we don't test this
+                                        m = re.match(r'.*(fourfront-[a-z0-9-]+)(?:[.]|$)', url)
+                                        if m:
+                                            env_name = m.group(1)  # we found it with a fourfront-prefix, so use as is
+                                            return make_mock_health_page(env_name)
+                                        m = re.match(r'(?:https?://)?([a-z0-9-]+)'
+                                                     r'(?:[.](4dnucleome[.]org|hms.harvard.edu)([/].*)|$)', url)
+                                        if m:
+                                            env_name = full_env_name(m.group(1))  # no fourfront- prefix, so add one
+                                            return make_mock_health_page(env_name)
+                                        raise NotImplementedError(f"Mock can't handle URL: {url}")
 
-                                mock_fetcher.side_effect = mocked_fetch_health_page_json
-                                # The mocked encrypt key is expected by various tools in the s3_utils module
-                                # to be supplied as an environment variable (i.e., in os.environ), so this
-                                # sets up that environment variable.
-                                if require_sse:
-                                    with override_environ(S3_ENCRYPT_KEY=s3_class.SSE_ENCRYPT_KEY):
+                                    mock_fetcher.side_effect = mocked_fetch_health_page_json
+                                    # The mocked encrypt key is expected by various tools in the s3_utils module
+                                    # to be supplied as an environment variable (i.e., in os.environ), so this
+                                    # sets up that environment variable.
+                                    overrides = {}
+                                    if require_sse:
+                                        overrides['S3_ENCRYPT_KEY'] = s3_class.SSE_ENCRYPT_KEY
+                                    with override_environ(**overrides):
                                         with EnvUtils.local_env_utils_for_testing(
                                                 global_env_bucket=os.environ.get('GLOBAL_ENV_BUCKET'),
-                                                env_name=(
-                                                        environments[0]
-                                                        if environments else
-                                                        os.environ.get('ENV_NAME'))):
+                                                env_name=(environments[0]
+                                                          if environments
+                                                          else os.environ.get('ENV_NAME'))):
                                             yield mock_boto3
-                                else:
-                                    with EnvUtils.local_env_utils_for_testing(
-                                            global_env_bucket=os.environ.get('GLOBAL_ENV_BUCKET'),
-                                            env_name=os.environ.get('ENV_NAME')):
-                                        yield mock_boto3
+
+
+DEFAULT_SSE_ENVIRONMENTS_TO_MOCK = ['fourfront-foo', 'fourfront-bar']
+
+
+@contextlib.contextmanager
+def mocked_s3utils_with_sse(beanstalks=None, environments=None, require_sse=True, files=None):
+    # beanstalks= is deprecated. Use environments= instead.
+    environments = (DEFAULT_SSE_ENVIRONMENTS_TO_MOCK
+                    if beanstalks is None and environments is None
+                    else (beanstalks or []) + (environments or []))
+    with mocked_s3utils(environments=environments, require_sse=require_sse) as mock_boto3:
+        s3 = mock_boto3.client('s3')
+        assert isinstance(s3, MockBotoS3Client)
+        for filename, string in (files or {}).items():
+            s3.s3_files.files[filename] = string.encode('utf-8')
+        yield mock_boto3
 
 
 # Here we set up some variables, auxiliary functions, and mocks containing common values needed for testing

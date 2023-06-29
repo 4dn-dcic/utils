@@ -30,13 +30,25 @@ from typing import Optional
 logging.basicConfig()
 
 
+class NamedObject(object):
+
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return f"<{self.name}>"
+
+    def __repr__(self):
+        return f"<{self.name}@{id(self):x}>"
+
+
 # Using PRINT(...) for debugging, rather than its more familiar lowercase form) for intended programmatic output,
 # makes it easier to find stray print statements that were left behind in debugging. -kmp 30-Mar-2020
 
-class _PRINT:
+class _MOCKABLE_IO:
 
-    def __init__(self):
-        self._printer = print  # necessary indirection for sake of qa_utils.printed_output
+    def __init__(self, wrapped_action):
+        self.wrapped_action = wrapped_action  # necessary indirection for sake of qa_utils.printed_output
 
     def __call__(self, *args, timestamped=False, **kwargs):
         """
@@ -47,15 +59,24 @@ class _PRINT:
         """
         if timestamped:
             hh_mm_ss = str(datetime.datetime.now().strftime("%H:%M:%S"))
-            self._printer(hh_mm_ss, *args, **kwargs)
+            return self.wrapped_action(' '.join(map(str, (hh_mm_ss, *args))), **kwargs)
         else:
-            self._printer(*args, **kwargs)
+            return self.wrapped_action(' '.join(map(str, args)), **kwargs)
 
 
-prompt_for_input = input  # In Python 3, this does 'safe' input reading.
+def _mockable_input(*args):
+    return input(*args)
 
-PRINT = _PRINT()
+
+builtin_print = print
+
+PRINT = _MOCKABLE_IO(wrapped_action=print)
 PRINT.__name__ = 'PRINT'
+
+INPUT = _MOCKABLE_IO(wrapped_action=_mockable_input)
+INPUT.__name__ = 'INPUT'
+
+prompt_for_input = INPUT  # In Python 3, input does 'safe' input reading. INPUT is our mockable alternative
 
 
 @contextlib.contextmanager
@@ -152,19 +173,17 @@ class VirtualAppError(Exception):
         return self.__repr__()
 
 
-class TestApp(webtest.TestApp):
-    """
-    Equivalent to webtest.TestApp, but pytest will not let the name confuse into thinking it's a test case.
+# So whether people import this from webtest or here, they will get the same object.
+TestApp = webtest.TestApp
 
-    A test case in PyTest is something that contains "test" in its name. We didn't pick the name TestApp,
-    but there may be tools that want to use TestApp for testing, and so this is a better place to inherit from,
-    since we've added an appropriate declaration to keep PyTest from confusing it with a TestCase.
-    """
+# This ("monkey patch") side-effect will affect webtest.TestApp, too, but that's OK for us.
+# https://en.wikipedia.org/wiki/Monkey_patch
+# We want any use of WebTest.TestApp to NOT be seen as a test for the purposes of PyTest.
 
-    __test__ = False  # This declaration asserts to PyTest that this is not a test case.
+TestApp.__test__ = False
 
 
-class _VirtualAppHelper(TestApp):
+class _VirtualAppHelper(webtest.TestApp):
     """
     A helper class equivalent to webtest.TestApp, except that it isn't intended for test use.
     """
@@ -569,6 +588,11 @@ def apply_dict_overrides(dictionary: dict, **overrides) -> dict:
     return dictionary
 
 
+def utc_now_str():
+    # from jsonschema_serialize_fork date-time format requires a timezone
+    return datetime.datetime.utcnow().isoformat() + '+00:00'
+
+
 def utc_today_str():
     """Returns a YYYY-mm-dd date string, relative to the UTC timezone."""
     return datetime.datetime.strftime(datetime.datetime.utcnow(), "%Y-%m-%d")
@@ -595,6 +619,16 @@ def as_seconds(*, seconds=0, minutes=0, hours=0, days=0, weeks=0, milliseconds=0
     if as_type is not None:
         seconds = as_type(seconds)
     return seconds
+
+
+MIN_DATETIME = datetime.datetime(datetime.MINYEAR, 1, 1, 0, 0, 0)
+MIN_DATETIME_UTC = datetime.datetime(datetime.MINYEAR, 1, 1, 0, 0, 0, tzinfo=pytz.UTC)
+
+
+def future_datetime(*, now=None, seconds=0, minutes=0, hours=0, days=0, weeks=0, milliseconds=0):
+    delta = datetime.timedelta(seconds=seconds, minutes=minutes, hours=hours,
+                               days=days, weeks=weeks, milliseconds=milliseconds)
+    return (now or datetime.datetime.now()) + delta
 
 
 REF_TZ = pytz.timezone(os.environ.get("REF_TZ") or "US/Eastern")
@@ -1384,16 +1418,22 @@ class CachedField:
         return f"CachedField(name={self.name!r},update_function={updater_name},timeout={self.timeout!r})"
 
 
+class StorageCell:
+
+    def __init__(self, initial_value=None):
+        self.value = initial_value
+
+
 def make_counter(start=0, step=1):
     """
     Creates a counter that generates values counting from a given start (default 0) by a given step (default 1).
     """
-    storage = [start]
+    storage = StorageCell(start)
 
     def counter():
-        value = storage[0]
-        storage[0] += step
-        return value
+        old_value = storage.value
+        storage.value += step
+        return old_value
 
     return counter
 
@@ -1689,6 +1729,52 @@ class classproperty(object):
         return self.getter(instance_class)
 
 
+class managed_property(object):
+    """
+    Sample use:
+
+        class Temperature:
+
+            def __init__(self, fahrenheit=32):
+                self.fahrenheit = fahrenheit
+
+            @managed_property
+            def centigrade(self, degrees):
+                if degrees == managed_property.MISSING:
+                    return (self.fahrenheit - 32) * 5 / 9.0
+                else:
+                    self.fahrenheit = degrees * 9 / 5.0 + 32
+
+        t1 = Temperature()
+        assert t1.fahrenheit == 32
+        assert t1.centigrade == 0.0
+
+        t2 = Temperature(fahrenheit=68)
+        assert t2.fahrenheit == 68.0
+        assert t2.centigrade == 20.0
+        t2.centigrade = 5
+        assert t2.centigrade == 5.0
+        assert t2.fahrenheit == 41.0
+
+        t2.fahrenheit = -40
+        assert t2.centigrade == -40.0
+
+    """
+
+    MISSING = NamedObject("missing")
+
+    def __init__(self, handler):
+
+        self.handler = handler
+
+    def __get__(self, instance, instance_class):
+        ignored(instance_class)
+        return self.handler(instance, self.MISSING)
+
+    def __set__(self, instance, value):
+        self.handler(instance, value)
+
+
 class classproperty_cached(object):
     """
     This decorator is like 'classproperty', but the function is run only on first use, not every time, and then cached.
@@ -1886,18 +1972,6 @@ class Singleton:
     @classproperty_cached_each_subclass
     def singleton(cls):  # noQA - PyCharm wrongly thinks the argname should be 'self'
         return cls()     # noQA - PyCharm flags a bogus warning for this
-
-
-class NamedObject(object):
-
-    def __init__(self, name):
-        self.name = name
-
-    def __str__(self):
-        return f"<{self.name}>"
-
-    def __repr__(self):
-        return f"<{self.name}@{id(self):x}>"
 
 
 def key_value_dict(key, value):
@@ -2160,3 +2234,69 @@ class TopologicalSorter:
             node_group = self.get_ready()
             yield from node_group
             self.done(*node_group)
+
+
+def deduplicate_list(lst):
+    """ De-duplicates the given list by converting it to a set then back to a list.
+    NOTES:
+    * The list must contain 'hashable' type elements that can be used in sets.
+    * The result list might not be ordered the same as the input list.
+    * This will also take tuples as input, though the result will be a list.
+    :param lst: list to de-duplicate
+    :return: de-duplicated list
+    """
+    return list(set(lst))
+
+
+def chunked(seq, *, chunk_size=1):
+    if not isinstance(chunk_size, int) or chunk_size < 1:
+        raise ValueError(f"The chunk_size, {chunk_size}, must be a positive integer.")
+    chunk = []
+    i = 0
+    for item in seq:
+        chunk.append(item)
+        i = (i + 1) % chunk_size
+        if i == 0:
+            yield chunk
+            chunk = []
+    if chunk:
+        yield chunk
+
+
+def map_chunked(fn, seq, *, chunk_size=1, reduce=None):
+    result = (fn(chunk) for chunk in chunked(seq, chunk_size=chunk_size))
+    return reduce(result) if reduce is not None else result
+
+
+_36_DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def format_in_radix(n: int, *, radix: int):
+
+    if not isinstance(n, int) or n < 0:
+        raise ValueError(f"Expected n to be a non-negative integer {n}")
+    if radix < 2 or radix > 36:
+        raise ValueError(f"Expected radix to be an integer between 2 and 36, inclusive: {radix}")
+    buffer = []
+    while n > 0:
+        quo = n // radix
+        rem = n % radix
+        buffer += _36_DIGITS[rem]
+        n = quo
+    buffer.reverse()
+    return "".join(buffer) or "0"
+
+
+def parse_in_radix(text: str, *, radix: int):
+    if not (text and isinstance(text, str)):
+        raise ValueError(f"Expected a string to parse: {text}")
+    if radix < 2 or radix > 36:
+        raise ValueError(f"Expected radix to be an integer between 2 and 36, inclusive: {radix}")
+    res = 0
+    try:
+        for c in text:
+            res = res * radix + _36_DIGITS.index(c.upper())
+        return res
+    except Exception:
+        pass
+    raise ValueError(f"Unable to parse: {text!r}")

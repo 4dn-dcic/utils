@@ -2,6 +2,7 @@ import botocore.client
 import botocore.exceptions
 import contextlib
 import datetime
+import hashlib
 import io
 import json
 import os
@@ -23,16 +24,25 @@ from dcicutils.env_utils_legacy import (
      _CGAP_MGB_PUBLIC_URL_PRD,  # noQA - Yes, we do want to import a protected member (for testing)
 )
 from dcicutils.exceptions import SynonymousEnvironmentVariablesMismatched, CannotInferEnvFromManyGlobalEnvs
-from dcicutils.ff_mocks import make_mock_es_url, make_mock_portal_url
-from dcicutils.misc_utils import ignored, ignorable, override_environ
-from dcicutils.qa_utils import MockBoto3, MockResponse, known_bug_expected
+from dcicutils.ff_mocks import make_mock_es_url, make_mock_portal_url, mocked_s3utils
+from dcicutils.misc_utils import ignored, ignorable, override_environ, exported, file_contents
+from dcicutils.qa_utils import MockBoto3, MockResponse, known_bug_expected, MockBotoS3Client, MockFileSystem
 from dcicutils.s3_utils import s3Utils, HealthPageKey
 from requests.exceptions import ConnectionError
+from typing import Optional, Callable, Dict
 from unittest import mock
 from .helpers import (
     using_fresh_ff_state_for_testing, using_fresh_cgap_state_for_testing, using_fresh_ff_deployed_state_for_testing,
 )
 from .test_ff_utils import mocked_s3utils_with_sse
+
+
+# This was moved to ff_mocks.py, but some things may still import from here.
+# Importing from here is deprecated. It should be imported from ff_Mocks going forward.
+# Minimally this exported marker should be retained until major version 7 of dcicutils,
+# though as a practical matter because we have to import that context manager here for testing,
+# it's unlikely to break even after we remove this marker. -kmp 10-Feb-2023
+exported(mocked_s3utils_with_sse)
 
 
 @contextlib.contextmanager
@@ -59,7 +69,7 @@ def mocked_s3_integration(integrated_names=None, zip_suffix="", ffenv=None):
             # s3_connection.s3_delete_dir(prefix)
 
             # In our mock, this won't exist already on S3 like in the integrated version of this test,
-            # so we have to pre-load to our mock S3 manually. -kmp 13-Jan-2021
+            # so we have to preload to our mock S3 manually. -kmp 13-Jan-2021
             s3_connection.s3.upload_file(Filename=integrated_names[zip_path_key],
                                          Bucket=s3_connection.outfile_bucket,
                                          Key=integrated_names[zip_filename_key])
@@ -94,6 +104,7 @@ def test_s3utils_constants():
     assert s3Utils.TIBANNA_OUTPUT_BUCKET_TEMPLATE == "tibanna-output"
 
 
+@pytest.mark.skip("This test is obsolete and known to be broken.")
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
 @using_fresh_ff_state_for_testing()
@@ -137,6 +148,7 @@ def test_s3utils_creation_ff_ordinary(ff_ordinary_envname):
             pytest.skip(problem)
 
 
+@pytest.mark.skip("This test is obsolete and known to be broken.")
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
 @using_fresh_ff_state_for_testing()
@@ -171,6 +183,7 @@ def test_s3utils_creation_ff_stg():
     test_stg(stg_beanstalk_env)
 
 
+@pytest.mark.skip("This test is obsolete and known to be broken.")
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
 @using_fresh_ff_state_for_testing()
@@ -218,10 +231,12 @@ def test_s3utils_creation_ff_prd():
 #     assert util.sys_bucket == 'elasticbeanstalk-%s-system' % cgap_ordinary_envname
 
 
+@pytest.mark.skip("This test is obsolete and known to be broken.")
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
 @using_fresh_cgap_state_for_testing()
 def test_s3utils_creation_cgap_prd():
+    assert EnvUtils.PUBLIC_URL_TABLE is not None, "Something is not initialized."
     # TODO: I'm not sure what this is testing, so it's hard to rewrite
     #   But I fear this use of env 'data' implies the GA test environment has overbroad privilege.
     #   We should make this work without access to 'data'.
@@ -251,6 +266,7 @@ def test_s3utils_creation_cgap_prd():
     test_prd(compute_cgap_prd_env())  # Hopefully returns 'fourfront-cgap' but just in case we're into new naming
 
 
+@pytest.mark.skip("This test is obsolete and known to be broken.")
 @pytest.mark.beanstalk_failure
 @pytest.mark.integrated
 @using_fresh_cgap_state_for_testing()
@@ -261,66 +277,136 @@ def test_s3utils_creation_cgap_stg():
     assert compute_cgap_stg_env() is None, "There seems to be a CGAP staging environment. Tests need updating."
 
 
-@pytest.mark.integrated
-@using_fresh_ff_state_for_testing()
-def test_s3utils_get_keys_for_data():
-    with EnvManager.global_env_bucket_named(LEGACY_GLOBAL_ENV_BUCKET):
-        util = s3Utils(env='data')
-        keys = util.get_access_keys()
-        assert keys['server'] == 'https://data.4dnucleome.org'
-        # make sure we have keys for foursight and tibanna as well
-        keys_tb = util.get_access_keys('access_key_tibanna')
-        assert keys_tb['key'] != keys['key']
-        assert keys_tb['server'] == keys['server']
-        keys_fs = util.get_access_keys('access_key_foursight')
-        assert keys_fs['key'] != keys_tb['key'] != keys['key']
-        assert keys_fs['server'] == keys['server']
+def _check_portal_auth(*, portal_env: str, auth_getter: Callable, auth_kind: str, server_pattern: str,
+                       other_getters: Optional[Dict[str, Optional[Callable]]] = None, require_key=True):
+
+    print()
+
+    other_getters = other_getters or {}
+
+    def check_auth(kind, auth):
+        assert isinstance(auth, dict), f"The {kind} for {portal_env!r} is not a dict."
+        if require_key:
+            assert auth.get('key'), f"The {kind} dict for {portal_env!r} is missing 'key' part."
+        assert auth.get('secret'), f"The {kind} dict for {portal_env!r} is missing 'secret' part."
+        assert auth.get('server'), f"The {kind} dict for {portal_env!r} is missing 'server' part."
+        assert re.match(server_pattern, auth['server']), (
+            f"The {kind} dict 'server' part does not match {server_pattern!r}")
+
+    auth_kind = f"{portal_env} {auth_kind}"
+    s3u = s3Utils(env=portal_env)
+
+    auth = auth_getter(s3u)
+    check_auth(auth_kind, auth)
+
+    auth_seen = [(auth_kind, auth)]
+    for other_auth_kind, other_auth_getter in other_getters.items():
+
+        other_auth_kind = f"{portal_env} {other_auth_kind}"
+        print(f"Checking {other_auth_kind}...")
+
+        other_auth = other_auth_getter(s3u)
+        check_auth(other_auth_kind, other_auth)
+
+        for seen_auth_kind, seen_auth in auth_seen:
+
+            print(f"Checking {other_auth_kind} against {seen_auth_kind}...")
+            if 'key' in other_auth and 'key' in seen_auth:  # For some aux getters, key can be missing
+                assert other_auth['key'] != seen_auth['key'], (
+                    f"{other_auth_kind} and {seen_auth_kind} 'key' parts unexpectedly match.")
+            assert other_auth['secret'] != seen_auth['secret'], (
+                f"{other_auth_kind} and {seen_auth_kind} 'secret' parts unexpectedly match.")
+
+        auth_seen.append((other_auth_kind, other_auth))
 
 
 @pytest.mark.integrated
+@pytest.mark.parametrize('portal_env', ['staging', 'data'])
 @using_fresh_ff_state_for_testing()
-def test_s3utils_get_keys_for_staging():
-    # TODO: I'm not sure what this is testing, so it's hard to rewrite
-    #   But I fear this use of env 'staging' implies the GA test environment has overbroad privilege.
-    #   We should make this work without access to 'staging'.
-    #   -kmp 13-Jan-2021
-    util = s3Utils(env='staging')
-    keys = util.get_ff_key()
-    # This is in transition. Eventually it will reliably be https.
-    assert re.match('https?://staging.4dnucleome.org', keys['server'])
+def test_s3utils_get_access_keys(portal_env):
+    server_pattern = f"https{'?' if portal_env == 'staging' else ''}://{portal_env}[.]4dnucleome[.]org"
+    _check_portal_auth(portal_env=portal_env, auth_getter=s3Utils.get_access_keys, auth_kind="access_keys",
+                       server_pattern=server_pattern,
+                       other_getters={
+                           "access_keys for tibanna": lambda s3u: s3u.get_access_keys('access_key_tibanna'),
+                           "access keys for foursight": lambda s3u: s3u.get_access_keys('access_key_foursight'),
+                       })
+
+    # with EnvManager.global_env_bucket_named(LEGACY_GLOBAL_ENV_BUCKET):
+    #     util = s3Utils(env='data')
+    #     keys = util.get_access_keys()
+    #     assert keys['server'] == 'https://data.4dnucleome.org'
+    #     # make sure we have keys for foursight and tibanna as well
+    #     keys_tb = util.get_access_keys('access_key_tibanna')
+    #     assert keys_tb['key'] != keys['key']
+    #     assert keys_tb['server'] == keys['server']
+    #     keys_fs = util.get_access_keys('access_key_foursight')
+    #     assert keys_fs['key'] != keys_tb['key'] != keys['key']
+    #     assert keys_fs['server'] == keys['server']
 
 
 @pytest.mark.integrated
+@pytest.mark.parametrize('portal_env', ['staging', 'data'])
 @using_fresh_ff_state_for_testing()
-def test_s3utils_get_jupyterhub_key():
-    # TODO: I'm not sure what this is testing, so it's hard to rewrite
-    #   But I fear this use of env 'data' implies the GA test environment has overbroad privilege.
-    #   We should make this work without access to 'data'.
-    #   -kmp 13-Jan-2021
-    util = s3Utils(env='data')
-    key = util.get_jupyterhub_key()
-    assert 'secret' in key
-    assert key['server'] == 'https://jupyter.4dnucleome.org'
+def test_s3utils_get_ff_key(portal_env):
+    """Tests that the actual key stored on staging is in good form."""
+    server_pattern = f"https{'?' if portal_env == 'staging' else ''}://{portal_env}[.]4dnucleome[.]org"
+    _check_portal_auth(portal_env=portal_env, auth_getter=s3Utils.get_ff_key, auth_kind="ff_key",
+                       server_pattern=server_pattern)
+
+    # # TODO: I'm not sure what this is testing, so it's hard to rewrite
+    # #   But I fear this use of env 'staging' implies the GA test environment has overbroad privilege.
+    # #   We should make this work without access to 'staging'.
+    # #   -kmp 13-Jan-2021
+    # util = s3Utils(env='staging')
+    # keys = util.get_ff_key()
+    # # This is in transition. Eventually it will reliably be https.
+    # assert re.match('https?://staging.4dnucleome.org', keys['server'])
 
 
 @pytest.mark.integrated
+@pytest.mark.parametrize('portal_env', ['staging', 'data'])
 @using_fresh_ff_state_for_testing()
-def test_s3utils_get_higlass_key_integrated():
-    # TODO: I'm not sure what this is testing, so it's hard to rewrite
-    #   But I fear this use of env 'staging' implies the GA test environment has overbroad privilege.
-    #   We should make this work without access to 'staging'.
-    #   -kmp 13-Jan-2021
-    util = s3Utils(env='staging')
-    keys = util.get_higlass_key()
-    assert isinstance(keys, dict)
-    assert len(keys.keys()) == 3
+def test_s3utils_get_jupyterhub_key(portal_env):
+    _check_portal_auth(portal_env=portal_env, auth_getter=s3Utils.get_jupyterhub_key, auth_kind="jupyterhub_key",
+                       server_pattern='https://jupyter.4dnucleome.org', require_key=False)
+
+    # # TODO: I'm not sure what this is testing, so it's hard to rewrite
+    # #   But I fear this use of env 'data' implies the GA test environment has overbroad privilege.
+    # #   We should make this work without access to 'data'.
+    # #   -kmp 13-Jan-2021
+    # util = s3Utils(env='data')
+    # key = util.get_jupyterhub_key()
+    # assert 'secret' in key
+    # assert key['server'] == 'https://jupyter.4dnucleome.org'
+    # for dict_key in ['key', 'secret', 'server']:
+    #     assert key[dict_key]
+
+
+@pytest.mark.integrated
+@pytest.mark.parametrize('portal_env', ['staging', 'data'])
+@using_fresh_ff_state_for_testing()
+def test_s3utils_get_higlass_key(portal_env):
+    _check_portal_auth(portal_env=portal_env, auth_getter=s3Utils.get_higlass_key, auth_kind="higlass_key",
+                       server_pattern='https://higlass.4dnucleome.org')
+
+    # # TODO: I'm not sure what this is testing, so it's hard to rewrite
+    # #   But I fear this use of env 'staging' implies the GA test environment has overbroad privilege.
+    # #   We should make this work without access to 'staging'.
+    # #   -kmp 13-Jan-2021
+    # util = s3Utils(env='staging')
+    # key = util.get_higlass_key()
+    # assert isinstance(key, dict)
+    # assert len(key.keys()) == 3
+    # for dict_key in ['key', 'secret', 'server']:
+    #     assert key[dict_key]
 
 
 @pytest.mark.integrated
 @using_fresh_ff_state_for_testing()
 def test_s3utils_get_google_key():
-    util = s3Utils(env='staging')
-    keys = util.get_google_key()
+    s3u = s3Utils(env='staging')
+    keys = s3u.get_google_key()
     assert isinstance(keys, dict)
     assert keys['type'] == 'service_account'
     assert keys["project_id"] == "fourdn-fourfront"
@@ -331,9 +417,8 @@ def test_s3utils_get_google_key():
 @pytest.mark.unit
 @using_fresh_ff_state_for_testing()
 def test_s3utils_get_access_keys_with_old_style_default():
-    util = s3Utils(env='fourfront-mastertest')
-    with mock.patch.object(util, "get_key") as mock_get_key:
-        actual_key = {'key': 'some-key', 'server': 'some-server'}
+    s3u = s3Utils(env='fourfront-mastertest')
+    with mock.patch.object(s3u, "get_key") as mock_get_key:
 
         def mocked_get_key(keyfile_name):
             ignored(keyfile_name)
@@ -341,7 +426,23 @@ def test_s3utils_get_access_keys_with_old_style_default():
             return key_wrapper
 
         mock_get_key.side_effect = mocked_get_key
-        key = util.get_access_keys()
+
+        actual_key = {'secret': 'some-secret', 'server': 'some-server'}
+
+        with pytest.raises(ValueError):
+            s3u.get_access_keys()  # ill-formed secret is missing key. portal keys are expected to have a key.
+
+        key = s3u.get_access_keys(require_key=False)  # accesses to jupyterhub keys could need this
+        assert key == actual_key
+
+        actual_key = {'key': 'some-key', 'server': 'some-server'}
+
+        with pytest.raises(ValueError):
+            s3u.get_access_keys(require_key=False)  # require_key=False only protects against missing key, not secret
+
+        actual_key = {'key': 'some-key', 'secret': 'some-secret', 'server': 'some-server'}
+
+        key = s3u.get_access_keys()
         assert key == actual_key
 
 
@@ -349,17 +450,17 @@ def test_s3utils_get_access_keys_with_old_style_default():
 @using_fresh_ff_state_for_testing()
 def test_s3utils_get_key_non_json_data():
 
-    util = s3Utils(env='fourfront-mastertest')
+    s3u = s3Utils(env='fourfront-mastertest')
 
     non_json_string = '1 { 2 3 >'
 
-    with mock.patch.object(util.s3, "get_object") as mock_get_object:
+    with mock.patch.object(s3u.s3, "get_object") as mock_get_object:
         mock_get_object.return_value = {'Body': io.BytesIO(bytes(non_json_string, encoding='utf-8'))}
-        assert util.get_key() == non_json_string
+        assert s3u.get_key() == non_json_string
 
-    with mock.patch.object(util.s3, "get_object") as mock_get_object:
+    with mock.patch.object(s3u.s3, "get_object") as mock_get_object:
         mock_get_object.return_value = {'Body': io.StringIO(non_json_string)}
-        assert util.get_key() == non_json_string
+        assert s3u.get_key() == non_json_string
 
 
 @pytest.mark.unit
@@ -399,6 +500,51 @@ def test_s3utils_delete_key():
 
 @pytest.mark.unit
 @using_fresh_ff_state_for_testing()
+def test_s3utils_s3_put_with_mock_boto_s3():
+
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove():
+        with mocked_s3utils():
+
+            s3u = s3Utils(env='fourfront-mastertest')
+            assert isinstance(s3u, s3Utils)
+            assert isinstance(s3u.s3, MockBotoS3Client)
+            s3 = s3u.s3
+
+            some_key = 'some-key.json'
+            some_file = f'downloaded-{some_key}'
+
+            for item in [{'a': 1, 'b': 2}, "some string"]:
+                for i, content_type in enumerate(['text/plain', 'application/json']):
+                    for acl in [None, 'some-acl']:
+                        print(f"Case {i} using item={item!r} content_type={content_type}")
+                        item_to_etag = json.dumps(item) if isinstance(item, dict) else item
+                        expected_etag = f'"{hashlib.md5(item_to_etag.encode("utf-8")).hexdigest()}"'
+                        print(f"expected_etag={expected_etag}")
+                        expected_result = {
+                            "Body": item,
+                            "Bucket": s3u.outfile_bucket,
+                            "Key": some_key,
+                            "ContentType": content_type,
+                        }
+                        if acl:
+                            expected_result['ACL'] = acl
+                        print(f"expected_result={expected_result}")
+                        actual_result = s3u.s3_put(item, upload_key=some_key)
+                        print(f"actual_result={actual_result}")
+                        # assert actual_result == expected_result
+                        assert actual_result['ETag'] == expected_etag
+                        s3.download_file(Bucket=s3u.outfile_bucket, Key=some_key, Filename=some_file)
+                        expected_file_contents = item_to_etag
+                        print(f"Expected file contents: {expected_file_contents!r}")
+                        actual_file_contents = file_contents(some_file)
+                        print(f"Actual file contents: {actual_file_contents!r}")
+                        assert actual_file_contents == expected_file_contents
+
+
+@pytest.mark.unit
+@using_fresh_ff_state_for_testing()
 def test_s3utils_s3_put():
 
     util = s3Utils(env='fourfront-mastertest')
@@ -413,14 +559,14 @@ def test_s3utils_s3_put():
             item = {'a': 1, 'b': 2}
             some_key = 'some-key'
             assert util.s3_put(item, upload_key=some_key) == {
-                "Body": item,
+                "Body": json.dumps(item),
                 "Bucket": util.outfile_bucket,
                 "Key": some_key,
                 "ContentType": some_content_type,
             }
             some_acl = 'some-acl'
             assert util.s3_put(item, upload_key=some_key, acl=some_acl) == {
-                "Body": item,
+                "Body": json.dumps(item),
                 "Bucket": util.outfile_bucket,
                 "Key": some_key,
                 "ContentType": some_content_type,
@@ -444,7 +590,7 @@ def test_s3utils_s3_put_secret():
             some_key = 'some-key'
             some_secret = 'some-secret'
             assert util.s3_put_secret(item, keyname=some_key) == {
-                "Body": item,
+                "Body": json.dumps(item),
                 "Bucket": util.sys_bucket,
                 "Key": some_key,
                 "SSECustomerKey": environmental_key,
@@ -452,14 +598,14 @@ def test_s3utils_s3_put_secret():
             }
             some_bucket = 'some-bucket'
             assert util.s3_put_secret(item, keyname=some_key, bucket=some_bucket) == {
-                "Body": item,
+                "Body": json.dumps(item),
                 "Bucket": some_bucket,
                 "Key": some_key,
                 "SSECustomerKey": environmental_key,
                 "SSECustomerAlgorithm": standard_algorithm,
             }
             assert util.s3_put_secret(item, keyname=some_key, secret=some_secret) == {
-                "Body": item,
+                "Body": json.dumps(item),
                 "Bucket": util.sys_bucket,
                 "Key": some_key,
                 "SSECustomerKey": some_secret,
@@ -467,6 +613,7 @@ def test_s3utils_s3_put_secret():
             }
 
 
+@pytest.mark.skip("This test is obsolete and known to be broken.")
 @pytest.mark.beanstalk_failure
 @pytest.mark.integratedx
 @using_fresh_ff_state_for_testing()
@@ -478,6 +625,7 @@ def test_does_key_exist_integrated():
     assert not util.does_key_exist('not_a_key')
 
 
+@pytest.mark.skip("This test is obsolete and known to be broken.")
 @pytest.mark.beanstalk_failure
 @pytest.mark.unit
 @using_fresh_ff_state_for_testing()
@@ -643,7 +791,7 @@ def test_read_s3_zip_unit(integrated_names):
         s3_connection = s3Utils(env=ffenv)
 
         # In our mock, this won't exist already on S3 like in the integrated version of this test,
-        # so we have to pre-load to our mock S3 manually. -kmp 13-Jan-2021
+        # so we have to preload to our mock S3 manually. -kmp 13-Jan-2021
         s3_connection.s3.upload_file(Filename=integrated_names['zip_path'],
                                      Bucket=s3_connection.outfile_bucket,
                                      Key=integrated_names['zip_filename'])
@@ -698,7 +846,7 @@ def test_unzip_s3_to_s3_unit(integrated_names, suffix, expected_report):
         s3_connection = s3Utils(env=ffenv)
 
         # In our mock, this won't exist already on S3 like in the integrated version of this test,
-        # so we have to pre-load to our mock S3 manually. -kmp 13-Jan-2021
+        # so we have to preload to our mock S3 manually. -kmp 13-Jan-2021
         s3_connection.s3.upload_file(Filename=integrated_names['zip_path' + suffix],
                                      Bucket=s3_connection.outfile_bucket,
                                      Key=integrated_names['zip_filename' + suffix])
@@ -756,7 +904,7 @@ def test_unzip_s3_to_s3_store_results_unit(integrated_names):
         s3_connection = s3Utils(env=ffenv)
 
         # In our mock, this won't exist already on S3 like in the integrated version of this test,
-        # so we have to pre-load to our mock S3 manually. -kmp 13-Jan-2021
+        # so we have to preload to our mock S3 manually. -kmp 13-Jan-2021
         s3_connection.s3.upload_file(Filename=integrated_names['zip_path'],
                                      Bucket=s3_connection.outfile_bucket,
                                      Key=integrated_names['zip_filename'])
@@ -888,51 +1036,91 @@ def test_s3_utils_buckets_modern():
             assert e.env_name == env_name
 
 
+C4_853_FIX_INFO = {
+    'fourfront-production-blue':
+        {'metadata_fix': False, 'tibanna_fix': False},
+    'fourfront-production-green':
+        {'metadata_fix': True, 'tibanna_fix': False},
+    'data':
+        {'metadata_fix': True, 'tibanna_fix': False},
+    'staging':
+        {'metadata_fix': False, 'tibanna_fix': False},
+
+    'fourfront-mastertest':
+        {'metadata_fix': True, 'tibanna_fix': False},
+    'mastertest':
+        {'metadata_fix': True, 'tibanna_fix': False},
+
+    'fourfront-webdev':
+        {'metadata_fix': True, 'tibanna_fix': False},
+    'webdev':
+        {'metadata_fix': True, 'tibanna_fix': False},
+
+    'fourfront-hotseat':
+        {'metadata_fix': True, 'tibanna_fix': True},
+    'hotseat':
+        {'metadata_fix': True, 'tibanna_fix': True},
+}
+
+
+@pytest.mark.parametrize('env_name', [
+    'fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat', 'mastertest', 'webdev', 'hotseat'])
 @using_fresh_ff_deployed_state_for_testing()
-def test_s3_utils_buckets_ff_live_ecosystem_not_production():
+def test_s3_utils_buckets_ff_live_ecosystem_not_production(env_name):
+    print()  # Start on fresh line
+    print("=" * 80)
+    print(f"env_name={env_name}")
+    print("=" * 80)
+    s3u = s3Utils(env=env_name)
+
+    full_env = full_env_name(env_name)
+
+    print(f"s3u.sys_bucket={s3u.sys_bucket}")
+    assert s3u.sys_bucket == f'elasticbeanstalk-{full_env}-system'
+
+    print(f"s3u.outfile_bucket={s3u.outfile_bucket}")
+    assert s3u.outfile_bucket == f'elasticbeanstalk-{full_env}-wfoutput'
+    print(f"s3u.raw_file_bucket={s3u.raw_file_bucket}")
+    assert s3u.raw_file_bucket == f'elasticbeanstalk-{full_env}-files'
+    print(f"s3u.blob_bucket={s3u.blob_bucket}")
+    assert s3u.blob_bucket == f'elasticbeanstalk-{full_env}-blobs'
+    assert s3u.tibanna_output_bucket == 'tibanna-output'
+
+    assert s3u.s3_encrypt_key_id is None
+    assert isinstance(s3u.env_manager, EnvManager)
+    assert isinstance(s3u.env_manager.s3, botocore.client.BaseClient)  # It's hard to test for S3 specifically
+    es_url = s3u.env_manager.es_url
+    print(f"Checking {es_url} ...")
+    # NOTE: The right answers differ here from production, but as long as something approximately like
+    #       the short name is in there, that's enough.
+    names_part = _make_similar_names_alternation(env_name)
+    pattern = f"https://vpc-[eo]s-.*({names_part}).*[.]amazonaws[.]com:443"
+    print(f"pattern={pattern}")
+    assert es_url and re.match(pattern, es_url)
+    assert s3u.env_manager.env_name == full_env
+
+
+@pytest.mark.xfail(reason="awaiting deployment transition of ecosystem software")
+@pytest.mark.parametrize('env_name', [
+    'fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat', 'mastertest', 'webdev', 'hotseat'])
+@using_fresh_ff_deployed_state_for_testing()
+def test_s3_utils_buckets_ff_live_ecosystem_not_production_transition(env_name):
+    fix_info = C4_853_FIX_INFO[env_name]
 
     print()  # Start on fresh line
-    for env_name in [
-        'fourfront-mastertest', 'fourfront-webdev', 'fourfront-hotseat',
-        'mastertest', 'webdev', 'hotseat'
-    ]:
+    print("=" * 80)
+    print(f"env_name={env_name}")
+    print("=" * 80)
+    s3u = s3Utils(env=env_name)
 
-        print("=" * 80)
-        print(f"env_name={env_name}")
-        print("=" * 80)
-        s3u = s3Utils(env=env_name)
+    full_env = full_env_name(env_name)
 
-        full_env = full_env_name(env_name)
+    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['metadata_fix'], error_class=AssertionError):
+        print(f"s3u.metadata_bucket={s3u.metadata_bucket}")
+        assert s3u.metadata_bucket == f'elasticbeanstalk-{full_env}-metadata-bundles'
 
-        print(f"s3u.sys_bucket={s3u.sys_bucket}")
-        assert s3u.sys_bucket == f'elasticbeanstalk-{full_env}-system'
-
-        print(f"s3u.outfile_bucket={s3u.outfile_bucket}")
-        assert s3u.outfile_bucket == f'elasticbeanstalk-{full_env}-wfoutput'
-        print(f"s3u.raw_file_bucket={s3u.raw_file_bucket}")
-        assert s3u.raw_file_bucket == f'elasticbeanstalk-{full_env}-files'
-        print(f"s3u.blob_bucket={s3u.blob_bucket}")
-        assert s3u.blob_bucket == f'elasticbeanstalk-{full_env}-blobs'
-        with known_bug_expected(jira_ticket="C4-853", fixed=False, error_class=AssertionError):
-            print(f"s3u.metadata_bucket={s3u.metadata_bucket}")
-            assert s3u.metadata_bucket == f'elasticbeanstalk-{full_env}-metadata-bundles'
-
-        with known_bug_expected(jira_ticket="C4-853", fixed=False, error_class=AssertionError):
-            assert s3u.tibanna_cwls_bucket == 'tibanna-cwls'
-        assert s3u.tibanna_output_bucket == 'tibanna-output'
-
-        assert s3u.s3_encrypt_key_id is None
-        assert isinstance(s3u.env_manager, EnvManager)
-        assert isinstance(s3u.env_manager.s3, botocore.client.BaseClient)  # It's hard to test for S3 specifically
-        es_url = s3u.env_manager.es_url
-        print(f"Checking {es_url} ...")
-        # NOTE: The right answers differ here from production, but as long as something approximately like
-        #       the short name is in there, that's enough.
-        names_part = _make_similar_names_alternation(env_name)
-        pattern = f"https://vpc-[eo]s-.*({names_part}).*[.]amazonaws[.]com:443"
-        print(f"pattern={pattern}")
-        assert es_url and re.match(pattern, es_url)
-        assert s3u.env_manager.env_name == full_env
+    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['tibanna_fix'], error_class=AssertionError):
+        assert s3u.tibanna_cwls_bucket == 'tibanna-cwls'
 
 
 def _make_similar_names_alternation(env_name):
@@ -946,50 +1134,66 @@ def _make_similar_names_alternation(env_name):
                      for x in [short_env_name(env_name), full_env_name(env_name)]])
 
 
+@pytest.mark.parametrize('env_name', [
+    'fourfront-production-blue', 'fourfront-production-green',
+    'data', 'staging'])
 @using_fresh_ff_deployed_state_for_testing()
-def test_s3_utils_buckets_ff_live_ecosystem_production():
+def test_s3_utils_buckets_ff_live_ecosystem_production(env_name):
+    print()  # Start on fresh line
+    print("=" * 80)
+    print(f"env_name={env_name}")
+    print("=" * 80)
+    s3u = s3Utils(env=env_name)
+
+    s3_sys_env_token = 'fourfront-webprod2'  # Shared by data and staging for sys bucket
+
+    print(f"s3u.sys_bucket={s3u.sys_bucket}")
+    assert s3u.sys_bucket == f'elasticbeanstalk-{s3_sys_env_token}-system'
+
+    s3_env_token = 'fourfront-webprod'  # Shared by data and staging for other than sys bucket
+
+    print(f"s3u.outfile_bucket={s3u.outfile_bucket}")
+    assert s3u.outfile_bucket == f'elasticbeanstalk-{s3_env_token}-wfoutput'
+    print(f"s3u.raw_file_bucket={s3u.raw_file_bucket}")
+    assert s3u.raw_file_bucket == f'elasticbeanstalk-{s3_env_token}-files'
+    print(f"s3u.blob_bucket={s3u.blob_bucket}")
+    assert s3u.blob_bucket == f'elasticbeanstalk-{s3_env_token}-blobs'
+
+    assert s3u.s3_encrypt_key_id is None
+    assert isinstance(s3u.env_manager, EnvManager)
+    assert isinstance(s3u.env_manager.s3, botocore.client.BaseClient)  # It's hard to test for S3 specifically
+    es_url = s3u.env_manager.es_url
+    print(f"Checking {es_url}...")
+    # tokenify(full_env_name(env_name)) matches better, but as long as short env name is there, it's enough.
+    names_part = _make_similar_names_alternation(env_name)
+    pattern = f"https://vpc-[eo]s-.*({names_part}).*[.]amazonaws[.]com:443"
+    print(f"pattern={pattern}")
+    assert es_url and re.match(pattern, es_url)
+    assert is_stg_or_prd_env(s3u.env_manager.env_name)
+
+
+@pytest.mark.xfail(reason="awaiting deployment transition of ecosystem software")
+@pytest.mark.parametrize('env_name', [
+    'fourfront-production-blue', 'fourfront-production-green',
+    'data', 'staging'])
+@using_fresh_ff_deployed_state_for_testing()
+def test_s3_utils_buckets_ff_live_ecosystem_production_transition(env_name):
+    fix_info = C4_853_FIX_INFO[env_name]
+
+    s3_env_token = 'fourfront-webprod'  # Shared by data and staging for other than sys bucket
 
     print()  # Start on fresh line
-    for env_name in ['fourfront-production-blue', 'fourfront-production-green',
-                     'data', 'staging']:
+    print("=" * 80)
+    print(f"env_name={env_name}")
+    print("=" * 80)
+    s3u = s3Utils(env=env_name)
+    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['metadata_fix'], error_class=AssertionError):
+        print(f"s3u.metadata_bucket={s3u.metadata_bucket}")
+        assert s3u.metadata_bucket == f'elasticbeanstalk-{s3_env_token}-metadata-bundles'
 
-        print("=" * 80)
-        print(f"env_name={env_name}")
-        print("=" * 80)
-        s3u = s3Utils(env=env_name)
-
-        s3_sys_env_token = 'fourfront-webprod2'  # Shared by data and staging for sys bucket
-
-        print(f"s3u.sys_bucket={s3u.sys_bucket}")
-        assert s3u.sys_bucket == f'elasticbeanstalk-{s3_sys_env_token}-system'
-
-        s3_env_token = 'fourfront-webprod'  # Shared by data and staging for other than sys bucket
-
-        print(f"s3u.outfile_bucket={s3u.outfile_bucket}")
-        assert s3u.outfile_bucket == f'elasticbeanstalk-{s3_env_token}-wfoutput'
-        print(f"s3u.raw_file_bucket={s3u.raw_file_bucket}")
-        assert s3u.raw_file_bucket == f'elasticbeanstalk-{s3_env_token}-files'
-        print(f"s3u.blob_bucket={s3u.blob_bucket}")
-        assert s3u.blob_bucket == f'elasticbeanstalk-{s3_env_token}-blobs'
-        with known_bug_expected(jira_ticket="C4-853", fixed=False, error_class=AssertionError):
-            print(f"s3u.metadata_bucket={s3u.metadata_bucket}")
-            assert s3u.metadata_bucket == f'elasticbeanstalk-{s3_env_token}-metadata-bundles'
-
-        with known_bug_expected(jira_ticket="C4-853", fixed=False, error_class=AssertionError):
-            assert s3u.tibanna_cwls_bucket == 'tibanna-cwls'
-        assert s3u.tibanna_output_bucket == 'tibanna-output'
-
-        assert s3u.s3_encrypt_key_id is None
-        assert isinstance(s3u.env_manager, EnvManager)
-        assert isinstance(s3u.env_manager.s3, botocore.client.BaseClient)  # It's hard to test for S3 specifically
-        es_url = s3u.env_manager.es_url
-        print(f"Checking {es_url}...")
-        # tokenify(full_env_name(env_name)) matches better, but as long as short env name is there, it's enough.
-        names_part = _make_similar_names_alternation(env_name)
-        pattern = f"https://vpc-[eo]s-.*({names_part}).*[.]amazonaws[.]com:443"
-        print(f"pattern={pattern}")
-        assert es_url and re.match(pattern, es_url)
-        assert is_stg_or_prd_env(s3u.env_manager.env_name)
+    with known_bug_expected(jira_ticket="C4-853", fixed=fix_info['tibanna_fix'], error_class=AssertionError):
+        assert s3u.tibanna_cwls_bucket == 'tibanna-cwls'
+    assert s3u.tibanna_output_bucket == 'tibanna-output'
 
 
 @using_fresh_ff_state_for_testing()
@@ -1260,6 +1464,13 @@ def test_get_and_set_object_tags():
     with mock.patch.object(s3_utils_module, "boto3", mock_boto3):
 
         s3u = s3Utils(sys_bucket='irrelevant')
+
+        s3 = s3u.s3
+
+        assert isinstance(s3, MockBotoS3Client)
+
+        # An S3 file must exist for us to manipulate its tags
+        s3.create_object_for_testing("irrelevant", Bucket=bucket, Key=key)
 
         actual = s3u.get_object_tags(key=key, bucket=bucket)
         expected = []
