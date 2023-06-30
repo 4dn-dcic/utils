@@ -10,6 +10,7 @@ REGION = 'us-east-1'
 
 APP_CGAP = 'cgap'
 APP_FOURFRONT = 'fourfront'
+APP_SMAHT = 'smaht'
 
 LEGACY_GLOBAL_ENV_BUCKET = 'foursight-test-envs'
 LEGACY_CGAP_GLOBAL_ENV_BUCKET = 'foursight-cgap-envs'

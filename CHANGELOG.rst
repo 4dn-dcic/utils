@@ -6,6 +6,12 @@ dcicutils
 Change Log
 ----------
 
+7.5.3
+=====
+
+* EnvUtils updates to accommodate `smaht-portal`
+
+
 7.5.2
 =====
 
@@ -125,7 +131,7 @@ The ``glacier2`` branch did not bump the version. It continues to call itself ve
 
 * Updated ``test/test_task_utils.py`` (``test_pmap_parallelism``):
   to increase ``margin_of_error`` to 1.1333.
-  
+
 
 7.3.1
 =====
