@@ -1,40 +1,86 @@
+import datetime
+import io
 import pytest
 
+from collections import defaultdict
 from dcicutils.license_utils import (
-    LicenseAnalysis, LicenseChecker, LicenseStatus, UnacceptableLicenseFailure,
+    LicenseFrameworkRegistry, LicenseFramework, PythonLicenseFramework,
+    LicenseAnalysis, LicenseChecker, LicenseStatus,
+    LicenseCheckFailure, LicenseOwnershipCheckFailure, LicenseAcceptabilityCheckFailure,
     logger as license_logger,
 )
-from dcicutils.qa_utils import printed_output
+from dcicutils.misc_utils import ignored
+from dcicutils.qa_utils import printed_output, MockFileSystem
 from unittest import mock
 
 
-def test_unacceptable_license_failure():
+def test_license_check_failure():  # error class
 
-    x = UnacceptableLicenseFailure()
+    assert issubclass(LicenseCheckFailure, Exception)
+    assert isinstance(LicenseCheckFailure.DEFAULT_MESSAGE, str)
 
-    assert str(x) == "Licenses are unacceptable."
+    x = LicenseCheckFailure()
 
-    x = UnacceptableLicenseFailure(unacceptable_licenses=[])
+    assert str(x) == LicenseCheckFailure.DEFAULT_MESSAGE
 
-    assert str(x) == "Licenses are unacceptable."
+    alternate_error_message = "Hey! " + LicenseCheckFailure.DEFAULT_MESSAGE  # different from default
 
-    x = UnacceptableLicenseFailure(message="Something went wrong.")
+    x = LicenseCheckFailure(message=alternate_error_message)
 
-    assert str(x) == "Something went wrong."
+    assert str(x) == alternate_error_message
+    assert str(x) != LicenseCheckFailure.DEFAULT_MESSAGE
 
-    x = UnacceptableLicenseFailure(unacceptable_licenses=['license1'])
+
+def test_license_ownership_check_failure():  # error class
+
+    assert issubclass(LicenseOwnershipCheckFailure, LicenseCheckFailure)
+    assert LicenseOwnershipCheckFailure.DEFAULT_MESSAGE != LicenseCheckFailure.DEFAULT_MESSAGE
+
+    x = LicenseOwnershipCheckFailure()
+
+    assert str(x) == LicenseOwnershipCheckFailure.DEFAULT_MESSAGE
+
+    alternate_error_message = "Hey! " + LicenseOwnershipCheckFailure.DEFAULT_MESSAGE  # different from default
+
+    x = LicenseOwnershipCheckFailure(message=alternate_error_message)
+
+    assert str(x) == alternate_error_message
+    assert str(x) != LicenseOwnershipCheckFailure.DEFAULT_MESSAGE
+
+
+def test_license_acceptability_check_failure():  # error class
+
+    assert issubclass(LicenseAcceptabilityCheckFailure, LicenseCheckFailure)
+    assert LicenseAcceptabilityCheckFailure.DEFAULT_MESSAGE != LicenseCheckFailure.DEFAULT_MESSAGE
+
+    x = LicenseAcceptabilityCheckFailure()
+
+    assert str(x) == LicenseAcceptabilityCheckFailure.DEFAULT_MESSAGE
+
+    x = LicenseAcceptabilityCheckFailure(unacceptable_licenses=[])
+
+    assert str(x) == LicenseAcceptabilityCheckFailure.DEFAULT_MESSAGE
+
+    alternate_error_message = "Hey! " + LicenseAcceptabilityCheckFailure.DEFAULT_MESSAGE  # different from default
+
+    x = LicenseAcceptabilityCheckFailure(message=alternate_error_message)
+
+    assert str(x) == alternate_error_message
+    assert str(x) != LicenseAcceptabilityCheckFailure.DEFAULT_MESSAGE
+
+    x = LicenseAcceptabilityCheckFailure(unacceptable_licenses=['license1'])
 
     assert str(x) == "There is 1 unacceptable license: license1"
 
-    x = UnacceptableLicenseFailure(unacceptable_licenses=['license1'])
+    x = LicenseAcceptabilityCheckFailure(unacceptable_licenses=['license1'])
 
     assert str(x) == "There is 1 unacceptable license: license1"
 
-    x = UnacceptableLicenseFailure(unacceptable_licenses=['license1', 'license2'])
+    x = LicenseAcceptabilityCheckFailure(unacceptable_licenses=['license1', 'license2'])
 
     assert str(x) == "There are 2 unacceptable licenses: license1, license2"
 
-    x = UnacceptableLicenseFailure(
+    x = LicenseAcceptabilityCheckFailure(
         unacceptable_licenses={
             'license1': ['library1'],
             'license2': ['library2', 'library3']
@@ -44,90 +90,109 @@ def test_unacceptable_license_failure():
     assert str(x) == "There are 2 unacceptable licenses: license1, license2"
 
 
-def test_license_status():
+def test_license_status():  # index of status keywords
 
     for attr in dir(LicenseStatus):
         if attr.isupper() and not attr.startswith('_'):
             assert getattr(LicenseStatus, attr) == attr
 
 
-def test_license_analysis():
+def test_license_analysis():  # represents result of an analysis
 
-    x = LicenseAnalysis()
+    analysis = LicenseAnalysis()
 
-    assert x.details == []
-    assert x.unacceptable == {}
-    assert x.unexpected_missing == []
-    assert x.no_longer_missing == []
+    assert analysis.frameworks == []
 
-    some_analysis_item = {'name': 'mylib', 'classifiers': ['Foo License'], 'status': LicenseStatus.FAILED}
-    some_unacceptable_libs = {'Foo License': ['mylib']}
-    some_unexpected_missing = ['obscure_lib']
-    some_recently_documented_libs = ['newlib']
+    assert analysis.dependency_details == []
 
-    x = LicenseAnalysis(details=[some_analysis_item],
-                        unacceptable=some_unacceptable_libs,
-                        unexpected_missing=some_unexpected_missing,
-                        no_longer_missing=some_recently_documented_libs)
+    assert analysis.unacceptable == {}
+    assert isinstance(analysis.unacceptable, defaultdict)
+    analysis.unacceptable['some_license'].append('some_library')
+    assert analysis.unacceptable == {'some_license': ['some_library']}
 
-    assert x.details == [some_analysis_item]
-    assert x.unacceptable == some_unacceptable_libs
-    assert x.unexpected_missing == some_unexpected_missing
-    assert x.no_longer_missing == some_recently_documented_libs
+    assert analysis.unexpected_missing == []
+
+    assert analysis.no_longer_missing == []
+
+    assert analysis.miscellaneous == []
 
 
-def test_license_checker_piplicenses_args():
+def test_license_framework_registry_register():  # decorator
 
-    default_args = LicenseChecker._piplicenses_args()
+    with pytest.raises(ValueError):
+        @LicenseFrameworkRegistry.register(name='bogus_dummy')
+        class BogusDummyLicenseFramework:
+            pass
+        ignored(BogusDummyLicenseFramework)
+
+    try:
+        @LicenseFrameworkRegistry.register(name='dummy')
+        class DummyLicenseFramework(LicenseFramework):
+            pass
+
+        dummy_framework = LicenseFrameworkRegistry.LICENSE_FRAMEWORKS.get('dummy')
+        assert issubclass(dummy_framework, LicenseFramework)
+        assert dummy_framework is DummyLicenseFramework
+
+    finally:
+
+        # Clean up the mess we made...
+        for name in ['bogus_dummy', 'dummy']:
+            LicenseFrameworkRegistry.LICENSE_FRAMEWORKS.pop(name, None)
+
+
+def test_python_license_framework_piplicenses_args():
+
+    default_args = PythonLicenseFramework._piplicenses_args()
 
     assert default_args.order
     with pytest.raises(Exception):
         print(default_args.no_such_arg)
 
 
-def test_license_checker_get_licenses():
+def test_python_license_framework_get_dependencies():
 
-    licenses = LicenseChecker.get_licenses()
-
-    expected_languages = ['python']
+    licenses = PythonLicenseFramework.get_dependencies()
 
     assert licenses  # make ure it found some
 
     for entry in licenses:
         assert 'name' in entry
-        assert 'license_classifier' in entry
-        assert entry.get('language') in expected_languages
+        assert 'licenses' in entry
 
 
-def test_license_checker_get_license_analysis():
+def test_analyze_license_dependencies_for_framework_python():
 
-    analysis = LicenseChecker.get_license_analysis()
+    analysis = LicenseAnalysis()
 
-    # LicenseChecker defines nothing acceptable, so the analysis will describe failure,
-    # but we're not using that failure to fail this test. We just want to know we got
-    # back an analysis at all.
-    #
-    # TODO: To get full coverage we'll need to mock get_licenses to return more interesting stuff.
+    assert not analysis.dependency_details
 
-    assert isinstance(analysis, LicenseAnalysis)
+    LicenseChecker.analyze_license_dependencies_for_framework(analysis=analysis, framework=PythonLicenseFramework)
+
+    assert analysis.dependency_details
 
 
 def test_license_checker_show_unacceptable_licenses():
 
     print()  # start on a fresh line
 
-    with mock.patch.object(LicenseChecker, "get_licenses") as mock_get_licenses:
+    with mock.patch.object(PythonLicenseFramework, "get_dependencies") as mock_get_dependencies:
 
-        mock_get_licenses.return_value = [
-            {'name': 'something', 'license_classifier': ['Foo License'], 'language': 'python'}
+        mock_get_dependencies.return_value = [
+            {'name': 'something', 'licenses': ['Foo License']}
         ]
 
         with printed_output() as printed:
 
-            LicenseChecker.show_unacceptable_licenses()
+            analysis = LicenseAnalysis()
+
+            LicenseChecker.analyze_license_dependencies_for_framework(analysis=analysis,
+                                                                      framework=PythonLicenseFramework)
+
+            LicenseChecker.show_unacceptable_licenses(analysis=analysis)
 
             assert printed.lines == [
-                'Checked something: Foo License (FAILED)',
+                'Checked python something: Foo License (FAILED)',
                 'There is 1 unacceptable license:',
                 ' Foo License: something',
             ]
@@ -137,134 +202,177 @@ def test_license_checker_full_scenario_failing():
 
     print()  # start on a fresh line
 
-    with mock.patch.object(LicenseChecker, "get_licenses") as mock_get_licenses:
+    mfs = MockFileSystem()
 
-        with mock.patch.object(license_logger, 'warning') as mock_license_logger:
+    mfs = MockFileSystem()
 
-            license_warnings = []
+    license_title_for_testing = "Some License"
+    license_text_for_testing = ("Our license text\n"
+                                "would go here.\n")
+    copyright_owner_for_testing = "J Doe"
+    current_year = str(datetime.datetime.now().year)
 
-            def mocked_license_logger(message):
-                license_warnings.append(message)
+    with mfs.mock_exists_open_remove():
 
-            mock_license_logger.side_effect = mocked_license_logger
+        with mock.patch.object(PythonLicenseFramework, "get_dependencies") as mock_get_dependencies:
 
-            class MyLicenseChecker(LicenseChecker):
+            with io.open("LICENSE.txt", 'w') as fp:
+                print(license_title_for_testing, file=fp)
+                print(f"Copyright (c) 2015, 2018-{current_year} {copyright_owner_for_testing}. All Rights Reserved.",
+                      file=fp)
+                print(license_text_for_testing, file=fp)
 
-                EXPECTED_MISSING_LICENSES = ['library1', 'library5']
+            with mock.patch.object(license_logger, 'warning') as mock_license_logger:
 
-                ALLOWED = ['Foo License']
+                license_warnings = []
 
-                EXCEPTIONS = {
-                    'Big-Org-Approved': ['libraryA'],
-                    'Misc-Copyleft': ['libraryC'],
-                }
+                def mocked_license_logger(message):
+                    license_warnings.append(message)
 
-            mock_get_licenses.return_value = [
-                {'name': 'library1', 'license_classifier': ['Foo License'], 'language': 'python'},
-                {'name': 'library2', 'license_classifier': ['Bar License'], 'language': 'python'},
-                {'name': 'library3', 'license_classifier': ['Foo License'], 'language': 'python'},
-                {'name': 'library4', 'license_classifier': ['Baz License'], 'language': 'python'},
-                {'name': 'library5', 'license_classifier': [], 'language': 'python'},
-                {'name': 'library6', 'license_classifier': [], 'language': 'python'},
-                {'name': 'library7', 'license_classifier': ['Baz License'], 'language': 'python'},
-                {'name': 'library8', 'license_classifier': ['Foo License', 'Bar License'], 'language': 'python'},
-                {'name': 'library9', 'license_classifier': ['Baz License'], 'language': 'python'},
-                {'name': 'libraryA', 'license_classifier': ['Big-Org-Approved', 'Bar License'], 'language': 'python'},
-                {'name': 'libraryB', 'license_classifier': ['Big-Org-Approved', 'Bar License'], 'language': 'python'},
-                {'name': 'libraryC', 'license_classifier': ['Misc-Copyleft', 'Foo License'], 'language': 'python'},
-                {'name': 'libraryD', 'license_classifier': ['Misc-Copyleft'], 'language': 'python'},
-            ]
+                mock_license_logger.side_effect = mocked_license_logger
 
-            with printed_output() as printed:
+                class MyLicenseChecker(LicenseChecker):
 
-                with pytest.raises(UnacceptableLicenseFailure):
-                    MyLicenseChecker.validate()
+                    COPYRIGHT_OWNER = copyright_owner_for_testing
+                    LICENSE_TITLE = license_title_for_testing
+                    LICENSE_FRAMEWORKS = ['python', 'javascript']
 
-                assert printed.lines == ['Checked library1: Foo License (ALLOWED)',
-                                         'Checked library2: Bar License (FAILED)',
-                                         'Checked library3: Foo License (ALLOWED)',
-                                         'Checked library4: Baz License (FAILED)',
-                                         'Checked library5: --- (EXPECTED_MISSING)',
-                                         'Checked library6: --- (UNEXPECTED_MISSING)',
-                                         'Checked library7: Baz License (FAILED)',
-                                         'Checked library8: Foo License; Bar License (FAILED)',
-                                         'Checked library9: Baz License (FAILED)',
-                                         'Checked libraryA: Big-Org-Approved; Bar License (FAILED)',
-                                         'Checked libraryB: Big-Org-Approved; Bar License (FAILED)',
-                                         'Checked libraryC: Misc-Copyleft; Foo License (SPECIALLY_ALLOWED)',
-                                         'Checked libraryD: Misc-Copyleft (FAILED)',
-                                         'There are 4 unacceptable licenses:',
-                                         ' Bar License: library2, library8, libraryA, libraryB',
-                                         ' Baz License: library4, library7, library9',
-                                         ' Big-Org-Approved: libraryB',
-                                         ' Misc-Copyleft: libraryD']
+                    EXPECTED_MISSING_LICENSES = ['library1', 'library5']
 
-                assert license_warnings == [
-                    'There is 1 unexpectedly missing license: library6.',
-                    'There is 1 no-longer-missing license: library1.',
+                    ALLOWED = ['Foo License']
+
+                    EXCEPTIONS = {
+                        'Big-Org-Approved': ['libraryA'],
+                        'Misc-Copyleft': ['libraryC'],
+                    }
+
+                mock_get_dependencies.return_value = [
+                    {'name': 'library1', 'licenses': ['Foo License'], 'language': 'python'},
+                    {'name': 'library2', 'licenses': ['Bar License'], 'language': 'python'},
+                    {'name': 'library3', 'licenses': ['Foo License'], 'language': 'python'},
+                    {'name': 'library4', 'licenses': ['Baz License'], 'language': 'python'},
+                    {'name': 'library5', 'licenses': [], 'language': 'python'},
+                    {'name': 'library6', 'licenses': [], 'language': 'python'},
+                    {'name': 'library7', 'licenses': ['Baz License'], 'language': 'python'},
+                    {'name': 'library8', 'licenses': ['Foo License', 'Bar License'], 'language': 'python'},
+                    {'name': 'library9', 'licenses': ['Baz License'], 'language': 'python'},
+                    {'name': 'libraryA', 'licenses': ['Big-Org-Approved', 'Bar License'], 'language': 'python'},
+                    {'name': 'libraryB', 'licenses': ['Big-Org-Approved', 'Bar License'], 'language': 'python'},
+                    {'name': 'libraryC', 'licenses': ['Misc-Copyleft', 'Foo License'], 'language': 'python'},
+                    {'name': 'libraryD', 'licenses': ['Misc-Copyleft'], 'language': 'python'},
                 ]
+
+                with printed_output() as printed:
+
+                    with pytest.raises(LicenseAcceptabilityCheckFailure):
+                        MyLicenseChecker.validate()
+
+                    assert printed.lines == ['Checked python library1: Foo License (ALLOWED)',
+                                             'Checked python library2: Bar License (FAILED)',
+                                             'Checked python library3: Foo License (ALLOWED)',
+                                             'Checked python library4: Baz License (FAILED)',
+                                             'Checked python library5: --- (EXPECTED_MISSING)',
+                                             'Checked python library6: --- (UNEXPECTED_MISSING)',
+                                             'Checked python library7: Baz License (FAILED)',
+                                             'Checked python library8: Foo License; Bar License (FAILED)',
+                                             'Checked python library9: Baz License (FAILED)',
+                                             'Checked python libraryA: Big-Org-Approved; Bar License (FAILED)',
+                                             'Checked python libraryB: Big-Org-Approved; Bar License (FAILED)',
+                                             'Checked python libraryC: Misc-Copyleft; Foo License (SPECIALLY_ALLOWED)',
+                                             'Checked python libraryD: Misc-Copyleft (FAILED)',
+                                             'There are 4 unacceptable licenses:',
+                                             ' Bar License: library2, library8, libraryA, libraryB',
+                                             ' Baz License: library4, library7, library9',
+                                             ' Big-Org-Approved: libraryB',
+                                             ' Misc-Copyleft: libraryD']
+
+                    assert license_warnings == [
+                        "There is 1 unexpectedly missing license: library6.",
+                        "There is 1 no-longer-missing license: library1.",
+                        "License framework 'javascript' failed to get licenses."
+                    ]
 
 
 def test_license_checker_full_scenario_succeeding():
 
     print()  # start on a fresh line
 
-    with mock.patch.object(LicenseChecker, "get_licenses") as mock_get_licenses:
+    mfs = MockFileSystem()
 
-        with mock.patch.object(license_logger, 'warning') as mock_license_logger:
+    license_title_for_testing = "Some License"
+    license_text_for_testing = ("Our license text\n"
+                                "would go here.\n")
+    copyright_owner_for_testing = "J Doe"
+    current_year = str(datetime.datetime.now().year)
 
-            license_warnings = []
+    with mfs.mock_exists_open_remove():
 
-            def mocked_license_logger(message):
-                license_warnings.append(message)
+        with io.open("LICENSE.txt", 'w') as fp:
+            print(license_title_for_testing, file=fp)
+            print(f"Copyright (c) 2015, 2018-{current_year} {copyright_owner_for_testing}. All Rights Reserved.",
+                  file=fp)
+            print(license_text_for_testing, file=fp)
 
-            mock_license_logger.side_effect = mocked_license_logger
+        with mock.patch.object(PythonLicenseFramework, "get_dependencies") as mock_get_dependencies:
 
-            class MyLicenseChecker(LicenseChecker):
+            with mock.patch.object(license_logger, 'warning') as mock_license_logger:
 
-                EXPECTED_MISSING_LICENSES = ['library5', 'library6']
+                license_warnings = []
 
-                ALLOWED = ['Foo License', 'Bar License', 'Baz License']
+                def mocked_license_logger(message):
+                    license_warnings.append(message)
 
-                EXCEPTIONS = {
-                    'Big-Org-Approved': ['libraryA', 'libraryB'],
-                    'Misc-Copyleft': ['libraryC', 'libraryD'],
-                }
+                mock_license_logger.side_effect = mocked_license_logger
 
-            mock_get_licenses.return_value = [
-                {'name': 'library1', 'license_classifier': ['Foo License'], 'language': 'python'},
-                {'name': 'library2', 'license_classifier': ['Bar License'], 'language': 'python'},
-                {'name': 'library3', 'license_classifier': ['Foo License'], 'language': 'python'},
-                {'name': 'library4', 'license_classifier': ['Baz License'], 'language': 'python'},
-                {'name': 'library5', 'license_classifier': [], 'language': 'python'},
-                {'name': 'library6', 'license_classifier': [], 'language': 'python'},
-                {'name': 'library7', 'license_classifier': ['Baz License'], 'language': 'python'},
-                {'name': 'library8', 'license_classifier': ['Foo License', 'Bar License'], 'language': 'python'},
-                {'name': 'library9', 'license_classifier': ['Baz License'], 'language': 'python'},
-                {'name': 'libraryA', 'license_classifier': ['Big-Org-Approved', 'Bar License'], 'language': 'python'},
-                {'name': 'libraryB', 'license_classifier': ['Big-Org-Approved', 'Bar License'], 'language': 'python'},
-                {'name': 'libraryC', 'license_classifier': ['Misc-Copyleft', 'Foo License'], 'language': 'python'},
-                {'name': 'libraryD', 'license_classifier': ['Misc-Copyleft'], 'language': 'python'},
-            ]
+                class MyLicenseChecker(LicenseChecker):
 
-            with printed_output() as printed:
+                    COPYRIGHT_OWNER = copyright_owner_for_testing
+                    LICENSE_TITLE = license_title_for_testing
+                    LICENSE_FRAMEWORKS = ['python']
 
-                MyLicenseChecker.validate()  # not expected to raise an error
+                    EXPECTED_MISSING_LICENSES = ['library5', 'library6']
 
-                assert printed.lines == [
-                    'Checked library1: Foo License (ALLOWED)',
-                    'Checked library2: Bar License (ALLOWED)',
-                    'Checked library3: Foo License (ALLOWED)',
-                    'Checked library4: Baz License (ALLOWED)',
-                    'Checked library5: --- (EXPECTED_MISSING)',
-                    'Checked library6: --- (EXPECTED_MISSING)',
-                    'Checked library7: Baz License (ALLOWED)',
-                    'Checked library8: Foo License; Bar License (ALLOWED)',
-                    'Checked library9: Baz License (ALLOWED)',
-                    'Checked libraryA: Big-Org-Approved; Bar License (SPECIALLY_ALLOWED)',
-                    'Checked libraryB: Big-Org-Approved; Bar License (SPECIALLY_ALLOWED)',
-                    'Checked libraryC: Misc-Copyleft; Foo License (SPECIALLY_ALLOWED)',
-                    'Checked libraryD: Misc-Copyleft (SPECIALLY_ALLOWED)',
+                    ALLOWED = ['Foo License', 'Bar License', 'Baz License']
+
+                    EXCEPTIONS = {
+                        'Big-Org-Approved': ['libraryA', 'libraryB'],
+                        'Misc-Copyleft': ['libraryC', 'libraryD'],
+                    }
+
+                mock_get_dependencies.return_value = [
+                    {'name': 'library1', 'licenses': ['Foo License'], 'language': 'python'},
+                    {'name': 'library2', 'licenses': ['Bar License'], 'language': 'python'},
+                    {'name': 'library3', 'licenses': ['Foo License'], 'language': 'python'},
+                    {'name': 'library4', 'licenses': ['Baz License'], 'language': 'python'},
+                    {'name': 'library5', 'licenses': [], 'language': 'python'},
+                    {'name': 'library6', 'licenses': [], 'language': 'python'},
+                    {'name': 'library7', 'licenses': ['Baz License'], 'language': 'python'},
+                    {'name': 'library8', 'licenses': ['Foo License', 'Bar License'], 'language': 'python'},
+                    {'name': 'library9', 'licenses': ['Baz License'], 'language': 'python'},
+                    {'name': 'libraryA', 'licenses': ['Big-Org-Approved', 'Bar License'], 'language': 'python'},
+                    {'name': 'libraryB', 'licenses': ['Big-Org-Approved', 'Bar License'], 'language': 'python'},
+                    {'name': 'libraryC', 'licenses': ['Misc-Copyleft', 'Foo License'], 'language': 'python'},
+                    {'name': 'libraryD', 'licenses': ['Misc-Copyleft'], 'language': 'python'},
                 ]
 
-                assert license_warnings == []
+                with printed_output() as printed:
+
+                    MyLicenseChecker.validate()  # not expected to raise an error
+
+                    assert printed.lines == [
+                        'Checked python library1: Foo License (ALLOWED)',
+                        'Checked python library2: Bar License (ALLOWED)',
+                        'Checked python library3: Foo License (ALLOWED)',
+                        'Checked python library4: Baz License (ALLOWED)',
+                        'Checked python library5: --- (EXPECTED_MISSING)',
+                        'Checked python library6: --- (EXPECTED_MISSING)',
+                        'Checked python library7: Baz License (ALLOWED)',
+                        'Checked python library8: Foo License; Bar License (ALLOWED)',
+                        'Checked python library9: Baz License (ALLOWED)',
+                        'Checked python libraryA: Big-Org-Approved; Bar License (SPECIALLY_ALLOWED)',
+                        'Checked python libraryB: Big-Org-Approved; Bar License (SPECIALLY_ALLOWED)',
+                        'Checked python libraryC: Misc-Copyleft; Foo License (SPECIALLY_ALLOWED)',
+                        'Checked python libraryD: Misc-Copyleft (SPECIALLY_ALLOWED)',
+                    ]
+
+                    assert license_warnings == []

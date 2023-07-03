@@ -1,7 +1,7 @@
 import os
 import pytest
 
-from dcicutils.license_utils import C4InfrastructureLicenseChecker
+from dcicutils.license_utils import C4PythonInfrastructureLicenseChecker
 from dcicutils.qa_checkers import DocsChecker, DebuggingArtifactChecker, ChangeLogChecker
 
 from .conftest_settings import REPOSITORY_ROOT_DIR
@@ -47,4 +47,4 @@ def test_changelog_consistency():
 @pytest.mark.static
 def test_license_compatibility():
 
-    C4InfrastructureLicenseChecker.validate()
+    C4PythonInfrastructureLicenseChecker.validate()
