@@ -153,7 +153,21 @@ def test_license_framework_registry_register():  # decorator
             LicenseFrameworkRegistry.LICENSE_FRAMEWORKS.pop(name, None)
 
 
-def test_license_framework_registry_find_framework():  # decorator
+def test_license_framework_registry_all_frameworks():
+
+    frameworks = LicenseFrameworkRegistry.all_frameworks()
+
+    assert isinstance(frameworks, list)
+
+    assert all(isinstance(framework, type) and issubclass(framework, LicenseFramework) for framework in frameworks)
+
+    assert sorted(frameworks, key=lambda x: x.NAME) == [
+        JavascriptLicenseFramework,
+        PythonLicenseFramework,
+    ]
+
+
+def test_license_framework_registry_find_framework():
 
     try:
         @LicenseFrameworkRegistry.register(name='dummy1')
@@ -169,6 +183,9 @@ def test_license_framework_registry_find_framework():  # decorator
         assert isinstance(dummy1_instance, DummyLicenseFramework1)
 
         assert LicenseFrameworkRegistry.find_framework('dummy1') == DummyLicenseFramework1
+
+        with pytest.raises(ValueError):
+            LicenseFrameworkRegistry.find_framework(1)  # noQA - arg is intentionally of wrong type for testing
 
     finally:
 
@@ -218,6 +235,13 @@ def test_javascript_license_framework_get_licenses():
             assert printed.lines == [
                 "Rewriting '(MIT OR Apache-2.0)' as ['Apache-2.0', 'MIT']"
             ]
+
+        # A special case for missing data...
+        mock_check_output.return_value = "{}\n\n"
+        with pytest.raises(Exception) as esc:
+            # When no package data is available, {} gets returned, and we need to complain this is odd.
+            JavascriptLicenseFramework.get_dependencies()
+        assert str(esc.value) == "No javascript license data was found."
 
 
 def test_python_license_framework_piplicenses_args():
