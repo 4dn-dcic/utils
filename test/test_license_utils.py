@@ -1,3 +1,4 @@
+import copy
 import datetime
 import io
 import pytest
@@ -286,10 +287,21 @@ def test_license_checker_full_scenario_failing():
                                              ' Big-Org-Approved: libraryB',
                                              ' Misc-Copyleft: libraryD']
 
-                    assert license_warnings == [
+                    javascript_failure = None
+                    for warning in license_warnings:
+                        if warning.startswith("License framework 'javascript' failed to get licenses:"):
+                            javascript_failure = warning
+                            break
+
+                    assert javascript_failure, "No javascript failure was detected."
+
+                    edited_license_warnings = copy.copy(license_warnings)
+
+                    edited_license_warnings.remove(javascript_failure)
+
+                    assert edited_license_warnings == [
                         "There is 1 unexpectedly missing license: library6.",
                         "There is 1 no-longer-missing license: library1.",
-                        "License framework 'javascript' failed to get licenses."
                     ]
 
 
