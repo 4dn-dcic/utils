@@ -218,7 +218,7 @@ class LicenseFileParser:
             lines = []
             for i, line in enumerate(fp):
                 line = line.strip(' \t\n\r')
-                if cls.VERBOSE:
+                if cls.VERBOSE:  # pragma: no cover - this is just for debugging
                     PRINT(str(i).rjust(3), line)
                 m = cls.COPYRIGHT_LINE.match(line)
                 if m:
@@ -414,7 +414,7 @@ class LicenseChecker:
                 _LICENSES: license_names,
                 _STATUS: status
             })
-            if cls.VERBOSE:
+            if cls.VERBOSE:  # pragma: no cover - this is just for debugging
                 PRINT(f"Checked {framework.NAME} {name}:"
                       f" {'; '.join(license_names) if license_names else '---'} ({status})")
 
