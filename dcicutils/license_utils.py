@@ -117,13 +117,13 @@ class JavascriptLicenseFramework(LicenseFramework):
         # So for us, either (FOO AND BAR) or (FOO OR BAR) is the same because we want to treat it as "FOO,BAR".
         # If all of those licenses match, all is good. That _does_ mean some things like (MIT OR GPL-3.0) will
         # have trouble passing unless both MIT and GPL-3.0 are allowed.
-        licenses = list(map(lambda x: x.strip(),
-                            (licenses_spec
-                             .replace('(', '')
-                             .replace(')', '')
-                             .replace(' AND ', ',')
-                             .replace(' OR ', ',')
-                             ).split(',')))
+        licenses = sorted(map(lambda x: x.strip(),
+                              (licenses_spec
+                               .replace('(', '')
+                               .replace(')', '')
+                               .replace(' AND ', ',')
+                               .replace(' OR ', ',')
+                               ).split(',')))
         return licenses
 
     @classmethod

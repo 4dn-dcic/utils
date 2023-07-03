@@ -4,10 +4,11 @@ import io
 import json
 import os
 import pytest
+import subprocess as subprocess_module
 
 from collections import defaultdict
 from dcicutils.license_utils import (
-    LicenseFrameworkRegistry, LicenseFramework, PythonLicenseFramework,
+    LicenseFrameworkRegistry, LicenseFramework, PythonLicenseFramework, JavascriptLicenseFramework,
     LicenseAnalysis, LicenseChecker, LicenseStatus,
     LicenseCheckFailure, LicenseOwnershipCheckFailure, LicenseAcceptabilityCheckFailure,
     logger as license_logger,
@@ -120,6 +121,14 @@ def test_license_analysis():  # represents result of an analysis
     assert analysis.miscellaneous == []
 
 
+def test_license_framework():  # class
+
+    assert LicenseFramework.NAME is None
+
+    with pytest.raises(NotImplementedError):
+        LicenseFramework.get_dependencies()
+
+
 def test_license_framework_registry_register():  # decorator
 
     with pytest.raises(ValueError):
@@ -142,6 +151,73 @@ def test_license_framework_registry_register():  # decorator
         # Clean up the mess we made...
         for name in ['bogus_dummy', 'dummy']:
             LicenseFrameworkRegistry.LICENSE_FRAMEWORKS.pop(name, None)
+
+
+def test_license_framework_registry_find_framework():  # decorator
+
+    try:
+        @LicenseFrameworkRegistry.register(name='dummy1')
+        class DummyLicenseFramework1(LicenseFramework):
+            pass
+
+        assert LicenseFrameworkRegistry.find_framework(DummyLicenseFramework1) == DummyLicenseFramework1
+
+        # These only have class methods by default, so there's little point in instantiating them,
+        # but it's harmless, and we should accept it. -kmp 3-Jul-2023
+        dummy1_instance = DummyLicenseFramework1()
+        assert LicenseFrameworkRegistry.find_framework(dummy1_instance) == dummy1_instance
+        assert isinstance(dummy1_instance, DummyLicenseFramework1)
+
+        assert LicenseFrameworkRegistry.find_framework('dummy1') == DummyLicenseFramework1
+
+    finally:
+
+        # Clean up the mess we made...
+        for name in list(LicenseFrameworkRegistry.LICENSE_FRAMEWORKS.keys()):
+            if name.startswith('dummy'):
+                LicenseFrameworkRegistry.LICENSE_FRAMEWORKS.pop(name, None)
+
+
+def test_javascript_license_framework_implicated_licenses():
+
+    def check_implications(spec, implications):
+        assert JavascriptLicenseFramework.implicated_licenses(licenses_spec=spec) == implications
+
+    check_implications(spec='(MIT AND BSD-3-Clause)', implications=['BSD-3-Clause', 'MIT'])
+    check_implications(spec='(CC-BY-4.0 AND OFL-1.1 AND MIT)', implications=['CC-BY-4.0', 'MIT', 'OFL-1.1'])
+
+    check_implications(spec='(MIT OR Apache-2.0)', implications=['Apache-2.0', 'MIT'])
+
+    check_implications(spec='(FOO OR (BAR AND BAZ))', implications=['BAR', 'BAZ', 'FOO'])
+
+
+def test_javascript_license_framework_get_licenses():
+
+    print()  # start on a fresh line
+    packages = {}
+    for i, license in enumerate(['Apache-2.0', 'MIT', '(MIT OR Apache-2.0)', ''], start=1):
+        package = f'package{i}'
+        packages[f"package{i}"] = {
+            "licenses": license,
+            "repository": f"https://github.com/dummy/{package}",
+            "publisher": f"J Dummy{i}",
+            "email": f"jdummy{i}@dummyhost.example.com",
+            "path": f"/some/path/to/package{i}",
+            "licenseFile": f"/some/path/to/package{i}/license"
+        }
+    subprocess_output = json.dumps(packages)
+    with mock.patch.object(subprocess_module, "check_output") as mock_check_output:
+        mock_check_output.return_value = subprocess_output
+        with printed_output() as printed:
+            assert JavascriptLicenseFramework.get_dependencies() == [
+                {'licenses': ['Apache-2.0'], 'name': 'package1'},
+                {'licenses': ['MIT'], 'name': 'package2'},
+                {'licenses': ['Apache-2.0', 'MIT'], 'name': 'package3'},
+                {'licenses': [], 'name': 'package4'},
+            ]
+            assert printed.lines == [
+                "Rewriting '(MIT OR Apache-2.0)' as ['Apache-2.0', 'MIT']"
+            ]
 
 
 def test_python_license_framework_piplicenses_args():
