@@ -341,10 +341,12 @@ def test_license_checker_missing_license_file():
         os.remove("LICENSE.txt")
 
     def checker(printed, license_warnings):
+        ignored(printed)
         for warning in license_warnings:
             if 'Missing license file.' in warning:
                 return
-        raise AssertionError(f"Warning about missing file not found in warnings: {json.dumps(license_warnings, indent=2)}")
+        raise AssertionError(f"Warning about missing file not found in warnings:"
+                             f" {json.dumps(license_warnings, indent=2)}")
 
     check_license_checker_full_scenario_failing_generic(
         perturb_setup=perturb_setup,
@@ -381,7 +383,8 @@ def test_license_checker_bad_license_year():
                 # The call to str(...) is important because it makes it get proper quotation marks.
                 assert warning.endswith(f"should have {str(current_year)!r} at the end.")
                 return
-        raise AssertionError("Warning about copyright year is missing.")
+        raise AssertionError(f"Warning about copyright year is missing."
+                             f" {json.dumps(license_warnings, indent=2)}")
 
     check_license_checker_full_scenario_failing_generic(
         override_checker=checker,
