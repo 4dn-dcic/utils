@@ -307,8 +307,6 @@ def check_license_checker_full_scenario_failing_generic(*,
                                                         copyright_year=None,
                                                         copyright_owner=None):
 
-
-
     def do_it():
 
         check_license_checker_full_scenario_failing(
