@@ -657,3 +657,35 @@ def test_license_checker_analyze_license_file():
             analysis = LicenseAnalysis()
             LicenseChecker.analyze_license_file(analysis=analysis)
             assert any(LicenseChecker.MULTIPLE_LICENSE_FILE_ADVICE in warning for warning in analysis.miscellaneous)
+
+
+def test_validate_simple_license_file():
+
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove():
+
+        with mock.patch.object(license_logger, 'warning') as mock_license_logger:
+
+            license_warnings = []
+
+            def mocked_license_logger(message):
+                license_warnings.append(message)
+
+            mock_license_logger.side_effect = mocked_license_logger
+
+            with io.open('LICENSE.txt', 'w') as fp:
+                fp.write("Foo License\n"
+                         "Copyright 2020 Acme Inc.\n"
+                         "Some license text.\n")
+
+            # Test that with no analysis argument, problems get sent out as warnings
+            LicenseFileParser.validate_simple_license_file(filename='LICENSE.txt')
+            assert license_warnings == ["The copyright year, '2020', should have '2023' at the end."]
+
+            # Test that with an analysis argument, problems get summarized to that object
+            analysis = LicenseAnalysis()
+            license_warnings = []
+            LicenseFileParser.validate_simple_license_file(filename='LICENSE.txt', analysis=analysis)
+            assert analysis.miscellaneous == ["The copyright year, '2020', should have '2023' at the end."]
+            assert license_warnings == []
