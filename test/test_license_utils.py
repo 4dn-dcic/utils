@@ -619,3 +619,41 @@ def test_license_file_parser_errors():
         with pytest.raises(Exception) as exc:
             LicenseFileParser.parse_simple_license_file(filename="LICENSE.txt")
         assert str(exc.value) == "Missing copyright line."
+
+
+def test_license_checker_analyze_license_dependencies_by_framework():
+
+    # Most other cases of this get tested by other tests, but it's important in particular to test what
+    # happens if the checker's .LICENSE_FRAMEWORKS is None and the frameworks= kwarg is passed as None.
+
+    with mock.patch.object(LicenseChecker, "analyze_license_dependencies_for_framework") as mock_analyze:
+
+        analysis = LicenseAnalysis()
+        LicenseChecker.analyze_license_dependencies_by_framework(analysis=analysis, frameworks=None)
+        assert mock_analyze.mock_calls == [
+            mock.call(analysis=analysis, acceptable=None, exceptions=None, framework=JavascriptLicenseFramework),
+            mock.call(analysis=analysis, acceptable=None, exceptions=None, framework=PythonLicenseFramework),
+        ]
+
+
+def test_license_checker_analyze_license_file():
+
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove():
+
+        with mock.patch.object(LicenseFileParser, "validate_simple_license_file"):
+
+            # Check what happens if no license file
+            analysis = LicenseAnalysis()
+            LicenseChecker.analyze_license_file(analysis=analysis)
+            assert "Class LicenseChecker has no declared license owner." in analysis.miscellaneous
+
+            # Check what happens if there's more than one license file
+            with io.open("LICENSE.txt", 'w') as fp:
+                print("Foo License", file=fp)
+            with io.open("LICENSE.rst", 'w') as fp:
+                print("Foo License", file=fp)
+            analysis = LicenseAnalysis()
+            LicenseChecker.analyze_license_file(analysis=analysis)
+            assert any(LicenseChecker.MULTIPLE_LICENSE_FILE_ADVICE in warning for warning in analysis.miscellaneous)
