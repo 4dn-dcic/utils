@@ -9,7 +9,7 @@ import subprocess as subprocess_module
 from collections import defaultdict
 from dcicutils.license_utils import (
     LicenseFrameworkRegistry, LicenseFramework, PythonLicenseFramework, JavascriptLicenseFramework,
-    LicenseAnalysis, LicenseChecker, LicenseStatus,
+    LicenseAnalysis, LicenseChecker, LicenseStatus, LicenseFileParser,
     LicenseCheckFailure, LicenseOwnershipCheckFailure, LicenseAcceptabilityCheckFailure,
     logger as license_logger,
 )
@@ -304,7 +304,10 @@ def test_license_checker_show_unacceptable_licenses():
 def check_license_checker_full_scenario_failing_generic(*,
                                                         perturb_setup=None,
                                                         override_checker=None,
-                                                        copyright_year=None):
+                                                        copyright_year=None,
+                                                        copyright_owner=None):
+
+
 
     def do_it():
 
@@ -314,7 +317,7 @@ def check_license_checker_full_scenario_failing_generic(*,
             license_title_for_testing="Some License",
             license_text_for_testing=("Our license text\n"
                                       "would go here.\n"),
-            copyright_owner_for_testing="J Doe",
+            copyright_owner_for_testing=copyright_owner,
             copyright_year_for_testing=copyright_year)
 
     def checker(printed, license_warnings):
@@ -366,6 +369,8 @@ def check_license_checker_full_scenario_failing(*, perturb_setup, checker,
 
     print()  # start on a fresh line
 
+    copyright_owner_for_testing = copyright_owner_for_testing or DEFAULT_COPYRIGHT_OWNER_FOR_TESTING
+
     mfs = MockFileSystem()
 
     with mfs.mock_exists_open_remove():
@@ -390,7 +395,7 @@ def check_license_checker_full_scenario_failing(*, perturb_setup, checker,
 
                 class MyLicenseChecker(LicenseChecker):
 
-                    COPYRIGHT_OWNER = copyright_owner_for_testing
+                    COPYRIGHT_OWNER = DEFAULT_COPYRIGHT_OWNER_FOR_TESTING
                     LICENSE_TITLE = license_title_for_testing
                     LICENSE_FRAMEWORKS = ['python', 'javascript']
 
@@ -491,6 +496,21 @@ def test_license_checker_bad_license_year():
         copyright_year=f'2015-{copyright_year}')
 
 
+DEFAULT_COPYRIGHT_OWNER_FOR_TESTING = 'J Doe'
+
+
+def test_license_checker_bad_license_owner():
+
+    def checker(printed, license_warnings):
+        ignored(printed)  # tested elsewhere
+        assert (f"The copyright owner, 'Someone different', was expected to be {DEFAULT_COPYRIGHT_OWNER_FOR_TESTING!r}."
+                in license_warnings)
+
+    check_license_checker_full_scenario_failing_generic(
+        override_checker=checker,
+        copyright_owner=f'Someone different')
+
+
 def test_license_checker_full_scenario_succeeding():
 
     print()  # start on a fresh line
@@ -500,7 +520,7 @@ def test_license_checker_full_scenario_succeeding():
     license_title_for_testing = "Some License"
     license_text_for_testing = ("Our license text\n"
                                 "would go here.\n")
-    copyright_owner_for_testing = "J Doe"
+    copyright_owner_for_testing = DEFAULT_COPYRIGHT_OWNER_FOR_TESTING
     current_year = str(datetime.datetime.now().year)
 
     with mfs.mock_exists_open_remove():
@@ -574,3 +594,30 @@ def test_license_checker_full_scenario_succeeding():
                     ]
 
                     assert license_warnings == []
+
+
+def test_license_file_parser_errors():
+
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove():
+
+        # Our simpler parser expects just one copyright line.
+        with io.open('LICENSE.txt', 'w') as fp:
+            fp.write("Some License\n"
+                     "Copyright 2003 Somebody\n"
+                     "Some license text.\n"
+                     "Copyright 2005 Somebody else\n"
+                     "More license text.\n")
+        with pytest.raises(Exception) as exc:
+            LicenseFileParser.parse_simple_license_file(filename="LICENSE.txt")
+        assert str(exc.value) == "Too many copyright lines."
+
+        # The simpler parser needs at least one copyright line.
+        with io.open('LICENSE.txt', 'w') as fp:
+            fp.write("Some License\n"
+                     "Some license text.\n"
+                     "More license text.\n")
+        with pytest.raises(Exception) as exc:
+            LicenseFileParser.parse_simple_license_file(filename="LICENSE.txt")
+        assert str(exc.value) == "Missing copyright line."
