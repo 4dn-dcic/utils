@@ -1098,8 +1098,8 @@ def full_env_name(envname):
 
 @if_orchestrated
 def full_cgap_env_name(envname):
-    check_true(isinstance(envname, str) and EnvUtils.ORCHESTRATED_APP == APP_CGAP, "The envname is not a CGAP env name.",
-               error_class=ValueError)
+    check_true(isinstance(envname, str) and EnvUtils.ORCHESTRATED_APP == APP_CGAP,
+               "The envname is not a CGAP env name.", error_class=ValueError)
     return full_env_name(envname)
 
 
@@ -1113,8 +1113,8 @@ def full_fourfront_env_name(envname):
 
 @if_orchestrated
 def full_smaht_env_name(envname):
-    check_true(isinstance(envname, str) and EnvUtils.ORCHESTRATED_APP == APP_SMAHT, "The envname is not a SMAHT env name.",
-               error_class=ValueError)
+    check_true(isinstance(envname, str) and EnvUtils.ORCHESTRATED_APP == APP_SMAHT,
+               "The envname is not a SMAHT env name.", error_class=ValueError)
     return full_env_name(envname)
 
 
