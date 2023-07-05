@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from . import env_utils_legacy as legacy
 from .common import (
     EnvName, OrchestratedApp, APP_FOURFRONT, APP_CGAP, ChaliceStage, CHALICE_STAGE_DEV, CHALICE_STAGE_PROD, UrlString,
+    APP_SMAHT
 )
 from .env_base import EnvBase, LegacyController
 from .env_utils_legacy import ALLOW_ENVIRON_BY_DEFAULT
@@ -425,11 +426,15 @@ class EnvUtils:
             yield
 
     @classmethod
-    def app_case(self, *, if_cgap, if_fourfront):
+    def app_case(self, *, if_cgap, if_fourfront, if_smaht=None):
+        if if_smaht is None:
+            if_smaht = if_cgap  # default to CGAP behavior
         if EnvUtils.ORCHESTRATED_APP == APP_FOURFRONT:
             return if_fourfront
         elif EnvUtils.ORCHESTRATED_APP == APP_CGAP:
             return if_cgap
+        elif EnvUtils.ORCHESTRATED_APP == APP_SMAHT:  # = None to avoid incompatibility
+            return if_smaht
         else:
             raise ValueError(f"EnvUtils.ORCHESTRATED_APP has an unexpected value: {EnvUtils.ORCHESTRATED_APP}")
 
@@ -726,44 +731,26 @@ def get_env_real_url(envname: EnvName) -> UrlString:
 @if_orchestrated
 def is_cgap_server(server, allow_localhost=False) -> bool:
     ignored(server, allow_localhost)
-    return EnvUtils.ORCHESTRATED_APP == 'cgap'
-    #
-    # check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
-    # is_cgap = EnvUtils.ORCHESTRATED_APP == 'cgap'
-    # if not is_cgap:
-    #     return False
-    # kind = classify_server_url(server, raise_error=False).get(c.KIND)
-    # if kind == 'cgap':
-    #     return True
-    # elif allow_localhost and kind == 'localhost':
-    #     return True
-    # else:
-    #     return False
+    return EnvUtils.ORCHESTRATED_APP == APP_CGAP
 
 
 @if_orchestrated
 def is_fourfront_server(server, allow_localhost=False) -> bool:
     ignored(server, allow_localhost)
-    return EnvUtils.ORCHESTRATED_APP == 'fourfront'
-    #
-    # check_true(isinstance(server, str), "The 'url' argument must be a string.", error_class=ValueError)
-    # is_fourfront = EnvUtils.ORCHESTRATED_APP == 'fourfront'
-    # if not is_fourfront:
-    #     return False
-    # kind = classify_server_url(server, raise_error=False).get(c.KIND)
-    # if kind == 'fourfront':
-    #     return True
-    # elif allow_localhost and kind == 'localhost':
-    #     return True
-    # else:
-    #     return False
+    return EnvUtils.ORCHESTRATED_APP == APP_FOURFRONT
+
+
+@if_orchestrated
+def is_smaht_server(server, allow_localhost=False) -> bool:
+    ignored(server, allow_localhost)
+    return EnvUtils.ORCHESTRATED_APP == APP_SMAHT
 
 
 @if_orchestrated
 def is_cgap_env(envname: Optional[EnvName]) -> bool:
     if not isinstance(envname, str):
         return False
-    elif EnvUtils.ORCHESTRATED_APP != 'cgap':
+    elif EnvUtils.ORCHESTRATED_APP != APP_CGAP:
         return False
     elif envname.startswith(EnvUtils.FULL_ENV_PREFIX):
         return True
@@ -777,7 +764,21 @@ def is_cgap_env(envname: Optional[EnvName]) -> bool:
 def is_fourfront_env(envname: Optional[EnvName]) -> bool:
     if not isinstance(envname, str):
         return False
-    elif EnvUtils.ORCHESTRATED_APP != 'fourfront':
+    elif EnvUtils.ORCHESTRATED_APP != APP_FOURFRONT:
+        return False
+    elif envname.startswith(EnvUtils.FULL_ENV_PREFIX):
+        return True
+    elif find_association(EnvUtils.PUBLIC_URL_TABLE, **{p.NAME: envname}):
+        return True
+    else:
+        return False
+
+
+@if_orchestrated
+def is_smaht_env(envname: Optional[EnvName]) -> bool:
+    if not isinstance(envname, str):
+        return False
+    elif EnvUtils.ORCHESTRATED_APP != APP_SMAHT:
         return False
     elif envname.startswith(EnvUtils.FULL_ENV_PREFIX):
         return True
@@ -993,6 +994,8 @@ def infer_repo_from_env(envname):
         return 'cgap-portal'
     elif is_fourfront_env(envname):
         return 'fourfront'
+    elif is_smaht_env(envname):
+        return 'smaht-portal'
     else:
         return None
 
@@ -1097,16 +1100,23 @@ def full_env_name(envname):
 
 @if_orchestrated
 def full_cgap_env_name(envname):
-    check_true(isinstance(envname, str) and EnvUtils.ORCHESTRATED_APP == 'cgap', "The envname is not a CGAP env name.",
-               error_class=ValueError)
+    check_true(isinstance(envname, str) and EnvUtils.ORCHESTRATED_APP == APP_CGAP,
+               "The envname is not a CGAP env name.", error_class=ValueError)
     return full_env_name(envname)
 
 
 @if_orchestrated
 def full_fourfront_env_name(envname):
-    check_true(isinstance(envname, str) and EnvUtils.ORCHESTRATED_APP == 'fourfront',
+    check_true(isinstance(envname, str) and EnvUtils.ORCHESTRATED_APP == APP_FOURFRONT,
                "The envname is not a Fourfront env name.",
                error_class=ValueError)
+    return full_env_name(envname)
+
+
+@if_orchestrated
+def full_smaht_env_name(envname):
+    check_true(isinstance(envname, str) and EnvUtils.ORCHESTRATED_APP == APP_SMAHT,
+               "The envname is not a SMAHT env name.", error_class=ValueError)
     return full_env_name(envname)
 
 
