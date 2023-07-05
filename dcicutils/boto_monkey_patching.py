@@ -1,8 +1,8 @@
 # Module to monkey patch the boto3 client and resource functions to use a custom endpoint-url.
 # Originally introduced June 2023 for overriding certain boto3 services (e.g. s3, sqs) to use the
 # localstack utility, which provides a way to run some AWS services locally, for testing purposes.
-# Currently only supported for S3 and SQS. To use this set the environment variables S3_URL and/or
-# SQS_URL to the localstack URL, for example, http://localhost:4566.
+# Currently only supported for S3 and SQS. To use this set the environment variables LOCALSTACK_S3_URL
+# and/or LOCALSTACK_SQS_URL to the localstack URL, for example, http://localhost:4566.
 # Reference: https://localstack.cloud
 
 import boto3
@@ -13,8 +13,8 @@ from typing import Optional
 _boto_client_original = boto3.client
 _boto_resource_original = boto3.resource
 _boto_service_overrides_supported = [
-    {"service": "s3", "env": "S3_URL"},
-    {"service": "sqs", "env": "SQS_URL"}
+    {"service": "s3", "env": "LOCALSTACK_S3_URL"},
+    {"service": "sqs", "env": "LOCALSTACK_SQS_URL"}
 ]
 # This will entirely disable this feature; for troubleshooting only.
 _boto_monkey_patching_disabled = False

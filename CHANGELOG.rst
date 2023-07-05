@@ -9,8 +9,9 @@ Change Log
 7.6.0
 =====
 * Added ``boto_monkey_patching`` module to use monkey patching to override the endpoint URLs for
-  for S3 or SQS boto3 client/resource creation using the S3_URL or SQS_URL environment variables
-  to specify that these services should use a locally running ersatz instance of S3 or SQS via localstack.
+  for S3 or SQS boto3 client/resource creation using the LOCALSTACK_S3_URL or LOCALSTACK_SQS_URL
+  environment variables to specify that these services should use a locally running ersatz
+  instance of S3 or SQS via localstack.
 
 
 7.5.2
