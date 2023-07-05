@@ -427,6 +427,8 @@ class EnvUtils:
 
     @classmethod
     def app_case(self, *, if_cgap, if_fourfront, if_smaht=None):
+        if if_smaht is None:
+            if_smaht = if_cgap  # default to CGAP behavior
         if EnvUtils.ORCHESTRATED_APP == APP_FOURFRONT:
             return if_fourfront
         elif EnvUtils.ORCHESTRATED_APP == APP_CGAP:
