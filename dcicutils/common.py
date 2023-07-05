@@ -10,13 +10,14 @@ REGION = 'us-east-1'
 
 APP_CGAP = 'cgap'
 APP_FOURFRONT = 'fourfront'
+APP_SMAHT = 'smaht'
 
 LEGACY_GLOBAL_ENV_BUCKET = 'foursight-test-envs'
 LEGACY_CGAP_GLOBAL_ENV_BUCKET = 'foursight-cgap-envs'
 
 DEFAULT_ECOSYSTEM = 'main'
 
-ORCHESTRATED_APPS = [APP_CGAP, APP_FOURFRONT]
+ORCHESTRATED_APPS = [APP_CGAP, APP_FOURFRONT, APP_SMAHT]
 
 CHALICE_STAGE_DEV = 'dev'
 CHALICE_STAGE_PROD = 'prod'
@@ -31,7 +32,7 @@ EnvName = str
 # so they can't use the variables defined above.
 
 ChaliceStage = Literal['dev', 'prod']
-OrchestratedApp = Literal['cgap', 'fourfront']
+OrchestratedApp = Literal['cgap', 'fourfront', 'smaht']
 
 LIBRARY_DIR = os.path.dirname(__file__)
 
