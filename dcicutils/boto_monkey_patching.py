@@ -9,22 +9,32 @@ import boto3
 import os
 from typing import Optional
 
+LOCALSTACK_S3_URL_ENVIRON_NAME = "LOCALSTACK_S3_URL"
+LOCALSTACK_SQS_URL_ENVIRON_NAME = "LOCALSTACK_SQS_URL"
+
 
 _boto_client_original = boto3.client
 _boto_resource_original = boto3.resource
 _boto_service_overrides_supported = [
-    {"service": "s3", "env": "LOCALSTACK_S3_URL"},
-    {"service": "sqs", "env": "LOCALSTACK_SQS_URL"}
+    {"service": "s3", "env": LOCALSTACK_S3_URL_ENVIRON_NAME},
+    {"service": "sqs", "env": LOCALSTACK_SQS_URL_ENVIRON_NAME}
 ]
+
 # This will entirely disable this feature; for troubleshooting only.
 _boto_monkey_patching_disabled = False
 
-# For import only in test_boto_monkey_patching.
+# For import only in test_boto_monkey_patching;
+# the list of AWS services for which we support this monkey patching facility (e.g. ["s3", "sqs"]).
 _boto_monkey_patching_services = [item["service"] for item in _boto_service_overrides_supported]
 
 
 # For import only in test_boto_monkey_patching.
 def _boto_monkey_patching_endpoint_url_environ_name(service: str) -> Optional[str]:
+    """
+    For the given AWS service name (e.g. "s3" or "sqs") returns environment variable name which
+    needs to be set in order to use a different (e.g. localstack version of the) endpoint URL
+    when creating a boto3 client or resource. E.g. given "s3" this will return "LOCALSTACK_S3_URL".
+    """
     for item in _boto_service_overrides_supported:
         if item["service"] == service:
             return item["env"]
