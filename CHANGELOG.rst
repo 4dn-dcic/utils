@@ -6,10 +6,18 @@ dcicutils
 Change Log
 ----------
 
+7.6.0
+=====
+
+* In ``creds_utils``:
+
+  * Support for ``SMaHTKeyManager``
+
+
 7.5.3
 =====
 
-* EnvUtils updates to accommodate `smaht-portal`
+* EnvUtils updates to accommodate ``smaht-portal``
 
 
 7.5.2
