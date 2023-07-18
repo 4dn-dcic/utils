@@ -290,3 +290,8 @@ class CGAPKeyManager(KeyManager):
 @KeyManager.register(name='fourfront')
 class FourfrontKeyManager(KeyManager):
     pass
+
+
+@KeyManager.register(name='smaht')
+class SMaHTKeyManager(KeyManager):
+    pass
