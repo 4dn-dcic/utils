@@ -1,3 +1,4 @@
+import contextlib
 import datetime
 import io
 import json
@@ -26,7 +27,7 @@ from typing import Any, Dict, DefaultDict, List, Optional, Type, Union
 # For obscure reasons related to how this file is used for early prototyping, these must use absolute references
 # to modules, not relative references. Later when things are better installed, we can make refs relative again.
 from dcicutils.lang_utils import there_are
-from dcicutils.misc_utils import PRINT, get_error_message
+from dcicutils.misc_utils import PRINT, get_error_message, local_attrs
 
 
 logging.basicConfig()
@@ -75,6 +76,14 @@ FrameworkSpec = Union[str, LicenseFramework, Type[LicenseFramework]]
 class LicenseFrameworkRegistry:
 
     LICENSE_FRAMEWORKS: Dict[str, Type[LicenseFramework]] = {}
+
+    @classmethod
+    @contextlib.contextmanager
+    def temporary_registration_for_testing(cls):
+        # Enter dynamic context where any license frameworks that get registered during the context
+        # are discarded upon exiting the context.
+        with local_attrs(cls, LICENSE_FRAMEWORKS=cls.LICENSE_FRAMEWORKS.copy()):
+            yield
 
     @classmethod
     def register(cls, *, name):
@@ -214,33 +223,39 @@ class LicenseFileParser:
         """
         with io.open(filename, 'r') as fp:
             license_title = []
-            copyright_line = []
+            copyright_owners = []
+            primary_copyright_owner = None
+            copyright_seen = False
             lines = []
             for i, line in enumerate(fp):
                 line = line.strip(' \t\n\r')
                 if cls.VERBOSE:  # pragma: no cover - this is just for debugging
                     PRINT(str(i).rjust(3), line)
-                m = cls.COPYRIGHT_LINE.match(line)
-                if m:
-                    if copyright_line:
-                        raise Exception("Too many copyright lines.")
-                    else:
-                        copyright_line = line
-                        copyright_year = m.group(1).strip(cls.SEPARATORS_AND_WHITESPACE)
-                        copyright_owner = m.group(2).rstrip(cls.SEPARATORS_AND_WHITESPACE)
-                        m = cls.COPYRIGHT_OWNER_SANS_SUFFIX.match(copyright_owner)
-                        if m:
-                            copyright_owner = m.group(1)
+                m = cls.COPYRIGHT_LINE.match(line) if line[:1].isupper() else None
+                if not m:
+                    lines.append(line)
+                else:
+                    copyright_year = m.group(1).strip(cls.SEPARATORS_AND_WHITESPACE)
+                    copyright_owner = m.group(2).rstrip(cls.SEPARATORS_AND_WHITESPACE)
+                    m = cls.COPYRIGHT_OWNER_SANS_SUFFIX.match(copyright_owner)
+                    if m:
+                        copyright_owner = m.group(1)
+                    if not copyright_seen:
+                        primary_copyright_owner = copyright_owner
+                    copyright_owners.append(copyright_owner)
+                    if not copyright_seen:
                         license_title = '\n'.join(lines).strip('\n')
                         lines = []
-                else:
-                    lines.append(line)
-            if not copyright_line:
+                    else:
+                        lines.append(line)
+                    copyright_seen = True
+            if not copyright_seen:
                 raise Exception("Missing copyright line.")
             license_text = '\n'.join(lines).strip('\n')
             return {
                 'license-title': license_title,
-                'copyright-owner': copyright_owner,
+                'copyright-owner': primary_copyright_owner,
+                'copyright-owners': copyright_owners,
                 'copyright-year': copyright_year,
                 'license-text': license_text
             }
@@ -633,7 +648,7 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
 
         # This is a name we use for our C4 portals. And it isn't published.
         # We inherited the name from the Stanford ENCODE group, which had an MIT-licensed repo we forked
-        'encoded',
+        'encoded',  # cgap-portal, fourfront, and smaht-portal all call themselves this
 
         # We believe that since these next here are part of the Pylons project, they're covered under
         # the same license as the other Pylons projects. We're seeking clarification.
@@ -654,9 +669,30 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         # Ref: https://foss.heptapod.net/python-libs/passlib/-/blob/branch/stable/LICENSE
         'passlib',
 
+        # This seems to be a BSD-3-Clause license.
+        # Ref: https://github.com/protocolbuffers/protobuf/blob/main/LICENSE
+        # pypi agrees in the Meta section of protobuf's page, where it says "3-Clause BSD License"
+        # Ref: https://pypi.org/project/protobuf/
+        'protobuf',
+
         # The WTFPL license is permissive.
         # Ref: https://github.com/mk-fg/pretty-yaml/blob/master/COPYING
         'pyaml',
+
+        # The source repo for pyDes says this is under an MIT license
+        # Ref: https://github.com/twhiteman/pyDes/blob/master/LICENSE.txt
+        # pypi, probably wrongly, thinks this is in the public domain (as of 2023-07-21)
+        # Ref: https://pypi.org/project/pyDes/
+        'pyDes',
+
+        # The version of python-lambda that we forked calls itself this (and publishes at pypi under this name)
+        "python-lambda-4dn",
+
+        # This is MIT-licensed:
+        # Ref: https://github.com/themiurgo/ratelim/blob/master/LICENSE
+        # pypi agrees
+        # Ref: https://pypi.org/project/ratelim/
+        'ratelim',
 
         # This is a BSD-3-Clause-Modification license
         # Ref: https://github.com/repoze/repoze.debug/blob/master/LICENSE.txt
@@ -764,8 +800,10 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         # Linking = With Restrictions, Private Use = Yes
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
         'GNU Library or Lesser General Public License (LGPL)': [
+            'psycopg2',  # Used at runtime during server operation, but not modified or distributed
             'psycopg2-binary',  # Used at runtime during server operation, but not modified or distributed
             'chardet',  # Potentially used downstream in loadxl to detect charset for text files
+            'pyzmq',  # Used in post-deploy-perf-tests, not distributed, and not modified or distributed
         ],
 
         'MIT*': [

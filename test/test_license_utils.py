@@ -131,13 +131,14 @@ def test_license_framework():  # class
 
 def test_license_framework_registry_register():  # decorator
 
-    with pytest.raises(ValueError):
-        @LicenseFrameworkRegistry.register(name='bogus_dummy')
-        class BogusDummyLicenseFramework:
-            pass
-        ignored(BogusDummyLicenseFramework)
+    with LicenseFrameworkRegistry.temporary_registration_for_testing():
 
-    try:
+        with pytest.raises(ValueError):
+            @LicenseFrameworkRegistry.register(name='bogus_dummy')
+            class BogusDummyLicenseFramework:
+                pass
+            ignored(BogusDummyLicenseFramework)
+
         @LicenseFrameworkRegistry.register(name='dummy')
         class DummyLicenseFramework(LicenseFramework):
             pass
@@ -145,12 +146,6 @@ def test_license_framework_registry_register():  # decorator
         dummy_framework = LicenseFrameworkRegistry.LICENSE_FRAMEWORKS.get('dummy')
         assert issubclass(dummy_framework, LicenseFramework)
         assert dummy_framework is DummyLicenseFramework
-
-    finally:
-
-        # Clean up the mess we made...
-        for name in ['bogus_dummy', 'dummy']:
-            LicenseFrameworkRegistry.LICENSE_FRAMEWORKS.pop(name, None)
 
 
 def test_license_framework_registry_all_frameworks():
@@ -169,7 +164,8 @@ def test_license_framework_registry_all_frameworks():
 
 def test_license_framework_registry_find_framework():
 
-    try:
+    with LicenseFrameworkRegistry.temporary_registration_for_testing():
+
         @LicenseFrameworkRegistry.register(name='dummy1')
         class DummyLicenseFramework1(LicenseFramework):
             pass
@@ -186,13 +182,6 @@ def test_license_framework_registry_find_framework():
 
         with pytest.raises(ValueError):
             LicenseFrameworkRegistry.find_framework(1)  # noQA - arg is intentionally of wrong type for testing
-
-    finally:
-
-        # Clean up the mess we made...
-        for name in list(LicenseFrameworkRegistry.LICENSE_FRAMEWORKS.keys()):
-            if name.startswith('dummy'):
-                LicenseFrameworkRegistry.LICENSE_FRAMEWORKS.pop(name, None)
 
 
 def test_javascript_license_framework_implicated_licenses():
@@ -607,9 +596,10 @@ def test_license_file_parser_errors():
                      "Some license text.\n"
                      "Copyright 2005 Somebody else\n"
                      "More license text.\n")
-        with pytest.raises(Exception) as exc:
-            LicenseFileParser.parse_simple_license_file(filename="LICENSE.txt")
-        assert str(exc.value) == "Too many copyright lines."
+
+        parsed = LicenseFileParser.parse_simple_license_file(filename="LICENSE.txt")
+        assert parsed.get('copyright-owner') == 'Somebody'
+        assert parsed.get('copyright-owners') == ['Somebody', 'Somebody else']
 
         # The simpler parser needs at least one copyright line.
         with io.open('LICENSE.txt', 'w') as fp:
