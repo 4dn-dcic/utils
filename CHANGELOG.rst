@@ -6,7 +6,7 @@ dcicutils
 Change Log
 ----------
 
-7.6.0
+7.7.0
 =====
 * Added ``boto_monkey_patching`` module to use monkey patching to override the endpoint URLs for
   for S3 or SQS boto3 client/resource creation using the LOCALSTACK_S3_URL or LOCALSTACK_SQS_URL
@@ -14,10 +14,17 @@ Change Log
   instance of S3 or SQS via localstack.
 
 
+7.6.0
+=====
+* In ``creds_utils``:
+
+  * Support for ``SMaHTKeyManager``
+
+
 7.5.3
 =====
 
-* EnvUtils updates to accommodate `smaht-portal`
+* EnvUtils updates to accommodate ``smaht-portal``
 
 
 7.5.2
