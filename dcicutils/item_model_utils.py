@@ -135,7 +135,7 @@ class PortalItem:
 
     @classmethod
     def _make_hashable_auth(cls, auth: Mapping[str, str]) -> Tuple[Tuple[str, str]]:
-        """Assuming nothing nested here..."""
+        """Assuming nothing nested here."""
         return tuple(auth.items())
 
     @classmethod

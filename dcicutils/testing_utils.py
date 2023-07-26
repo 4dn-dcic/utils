@@ -1,5 +1,6 @@
 from contextlib import contextmanager
-from typing import Any, Iterator
+from types import ModuleType
+from typing import Any, Iterator, Optional
 from unittest import mock
 
 
@@ -10,6 +11,7 @@ AN_UNLIKELY_RETURN_VALUE = "unlikely return value"
 def patch_context(
     to_patch: object,
     return_value: Any = AN_UNLIKELY_RETURN_VALUE,
+    module: Optional[ModuleType] = None,
     **kwargs,
 ) -> Iterator[mock.MagicMock]:
     if isinstance(to_patch, property):
@@ -17,7 +19,10 @@ def patch_context(
         new_callable = mock.PropertyMock
     else:
         new_callable = mock.MagicMock
-    target = f"{to_patch.__module__}.{to_patch.__qualname__}"
+    if module is None:
+        target = f"{to_patch.__module__}.{to_patch.__qualname__}"
+    else:
+        target = f"{module.__name__}.{to_patch.__qualname__}"
     with mock.patch(target, new_callable=new_callable, **kwargs) as mocked_item:
         if return_value != AN_UNLIKELY_RETURN_VALUE:
             mocked_item.return_value = return_value
