@@ -1,4 +1,5 @@
 import contextlib
+import git
 import os
 import pytest
 
@@ -139,6 +140,18 @@ def test_git_analysis_iter_commits_scenario():  # Tests .iter_commits, .json_for
         assert foo_commits_as_json == list(GitAnalysis.git_commits('foo'))
 
 
+def test_contributor_create():
+
+    # This should execute without error
+    c1 = Contributor(name="John Doe", email="john@whatever")
+
+    with mock.patch.object(git, "Actor", MockGitActor):
+
+        c2 = Contributor.create(author=git.Actor(name="John Doe", email="john@whatever"))
+
+    assert c1.as_dict() == c2.as_dict()
+
+
 def test_contributor_str():
 
     with mock.patch.object(contribution_utils_module, "id", MockId(1000)):
@@ -228,6 +241,23 @@ def test_contributor_primary_name():
     assert make_contributor({"jdoe", "John Doe"}, primary_name="jdoe").primary_name == "jdoe"
     assert make_contributor({"jdoe", "John Doe", "jdoe123456789"}, primary_name="jdoe").primary_name == "jdoe"
     assert make_contributor({"jdoe123456789", "John Doe", "jdoe"}, primary_name="jdoe").primary_name == "jdoe"
+
+
+def test_contributor_from_dict():
+
+    joe_json = {'names': ["Joe"], "emails": ["joe@wherever"]}
+
+    joe_obj = Contributor.from_dict(joe_json)
+
+    assert isinstance(joe_obj, Contributor)
+    assert list(joe_obj.emails) == joe_json['emails']
+    assert list(joe_obj.names) == joe_json['names']
+
+    assert joe_obj.as_dict() == joe_json
+
+    joe_obj2 = Contributor.from_dict(joe_json, key="Joseph")
+    assert joe_obj.names != joe_obj2.names
+    assert joe_obj.names | {'Joseph'} == joe_obj2.names
 
 
 def test_contributor_notice_mention_as():
@@ -374,3 +404,14 @@ def test_contributions_by_name_from_by_email():
         email_b: betty_smith_json,
         email_beta: betty_smith_json,
     }
+
+    # You can't have conflicts between email addresses. That's supposed to have been resolved earlier by unification.
+
+    by_name_json_with_dups = {
+        "Art Jones": {"names": ["Art Jones"], "emails": ["ajones@somewhere"]},
+        "Arthur Jones": {"names": ["Arthur Jones"], "emails": ["ajones@somewhere"]}
+    }
+
+    with pytest.raises(Exception) as exc:
+        Contributions.by_email_from_by_name(by_name_json_with_dups)
+    assert str(exc.value) == "email address ajones@somewhere is used more than once."
