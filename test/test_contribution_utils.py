@@ -1,5 +1,6 @@
 import contextlib
 import os
+import pytest
 
 from dcicutils import contribution_utils as contribution_utils_module
 from dcicutils.contribution_utils import Contributor, Contributions, GitAnalysis
@@ -87,7 +88,7 @@ def test_git_analysis_git_commits():
             "message": "something else"
         }
     ]}):
-        foo_repo = GitAnalysis.find_repo("foo")
+        foo_repo = GitAnalysis.find_repo('foo')
         foo_commits = list(foo_repo.iter_commits())
         assert len(foo_commits) == 2
         assert all(isinstance(commit, MockGitCommit) for commit in foo_commits)
@@ -96,8 +97,10 @@ def test_git_analysis_git_commits():
         assert foo_commits[0].hexsha == 'aaaa'
         assert foo_commits[1].hexsha == 'bbbb'
 
+        assert [GitAnalysis.json_for_commit(commit) for commit in foo_commits] == list(GitAnalysis.git_commits('foo'))
 
-def test_git_analysis_iter_commits_scenario():  # This tests .iter_commits, .json_for_commit and .json_for_actor
+
+def test_git_analysis_iter_commits_scenario():  # Tests .iter_commits, .json_for_commit, .json_for_actor, .git_commits
 
     with git_context(mocked_commits={"foo": [
         {
@@ -115,7 +118,8 @@ def test_git_analysis_iter_commits_scenario():  # This tests .iter_commits, .jso
         }
     ]}):
         foo_repo = GitAnalysis.find_repo("foo")
-        assert [GitAnalysis.json_for_commit(commit) for commit in foo_repo.iter_commits()] == [
+        foo_commits_as_json = [GitAnalysis.json_for_commit(commit) for commit in foo_repo.iter_commits()]
+        assert foo_commits_as_json == [
             {
                 'author': {'email': 'jdoe@foo', 'name': 'Jdoe'},
                 'coauthors': [],
@@ -132,6 +136,8 @@ def test_git_analysis_iter_commits_scenario():  # This tests .iter_commits, .jso
             }
         ]
 
+        assert foo_commits_as_json == list(GitAnalysis.git_commits('foo'))
+
 
 def test_contributor_str():
 
@@ -144,6 +150,20 @@ def test_contributor_str():
         jdoe = Contributor(names={"John Doe", "jdoe"}, primary_name="jdoe", email="john@whatever")
 
         assert str(jdoe) == "<Contributor 'jdoe' emails='john@whatever' names='jdoe','John Doe' 1001>"
+
+        # Edge cases...
+
+        with pytest.raises(ValueError) as exc:
+            Contributor()
+        assert str(exc.value) == "One of email= or emails= is required."
+
+        with pytest.raises(ValueError) as exc:
+            Contributor(email='foo@bar', emails={'foo@bar'})
+        assert str(exc.value) == 'Only one of email= and emails= may be provided.'
+
+        with pytest.raises(ValueError) as exc:
+            Contributor(name='John', names={'John'}, email="foo@bar")
+        assert str(exc.value) == 'Only one of name= and names= may be provided.'
 
 
 def test_contributor_set_primary_name():

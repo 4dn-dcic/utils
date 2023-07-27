@@ -64,7 +64,7 @@ class Contributor:
         # even though email is not. The primary_name is not required, and defaults to None, so will
         # be heuristically computed based on available names.
         if not email and not emails:
-            raise ValueError("One of email= or emails= is required when initializing a Contributor.")
+            raise ValueError("One of email= or emails= is required.")
         if email and emails:
             raise ValueError("Only one of email= and emails= may be provided.")
         if not emails:
