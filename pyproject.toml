@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "7.6.0.2b3"
+version = "7.6.0.2b4"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -80,7 +80,7 @@ pytest-runner = ">=5.1"
 
 [tool.poetry.scripts]
 publish-to-pypi = "dcicutils.scripts.publish_to_pypi:main"
-
+show-contributors = "dcicutils.contribution_scripts:show_contributors_main"
 
 [tool.pytest.ini_options]
 addopts = "--basetemp=/tmp/pytest"
@@ -89,6 +89,7 @@ filterwarnings = [
     "ignore:distutils Version classes are deprecated. Use packaging.version instead.:DeprecationWarning",
     # This is a pip-licenses problem (still present in 3.5.5):
     "ignore:pkg_resources is deprecated as an API:DeprecationWarning",
+    "ignore:Boto3 will no longer support Python 3.7 starting December 13, 2023.*:",
 ]
 markers = [
     "working: test should work",

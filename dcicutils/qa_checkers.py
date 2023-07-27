@@ -8,6 +8,7 @@ import warnings
 from collections import defaultdict
 from typing import Optional, List, Dict, Type
 from typing_extensions import Literal
+from .contribution_utils import Contributions
 from .lang_utils import conjoined_list, n_of, there_are
 from .misc_utils import PRINT, remove_prefix, remove_suffix, getattr_customized, CustomizableProperty
 
@@ -436,3 +437,11 @@ def confirm_no_uses(*, where: str, patterns: Dict[str, str],
             detail += f"\n In {file}, {summarize(matches)}."
         message = f"{n_of(n, 'problem')} detected:" + detail
         raise AssertionError(message)
+
+
+class ContributionsChecker:
+
+    @classmethod
+    def validate(cls):
+        contributions = Contributions()  # no repo specified, so use current directory
+        contributions.show_repo_contributors(error_class=AssertionError)
