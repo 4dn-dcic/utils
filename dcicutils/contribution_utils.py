@@ -464,8 +464,13 @@ class Contributions(GitAnalysis):
     @classmethod
     def by_email_from_by_name(cls, contributors_by_email_json):
         result = {}
+        seen = set()
         for email_key, entry in contributors_by_email_json.items():
             ignored(email_key)
+            seen_key = id(entry)
+            if seen_key in seen:
+                continue
+            seen.add(seen_key)
             for email in entry.get("emails", []) if isinstance(entry, dict) else entry.emails:
                 if result.get(email):
                     raise Exception(f"email address {email} is used more than once.")

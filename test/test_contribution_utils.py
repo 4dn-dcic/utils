@@ -306,3 +306,71 @@ def test_contributor_index_by_primary_name():
         ("Jane Smith", jane),
         ("John Doe", john),
     ]
+
+
+def test_contributions_by_name_from_by_email():
+
+    email_a = "a@somewhere"
+    email_alpha = "alpha@somewhere"
+
+    email_b = "b@somewhere"
+    email_beta = "beta@somewhere"
+
+    name_ajones = "ajones"
+    name_art = "Art Jones"
+
+    name_bsmith = "bsmith"
+    name_betty = "Betty Smith"
+
+    art_jones = Contributor(names={name_art, name_ajones}, emails={email_a, email_alpha})
+    betty_smith = Contributor(names={name_betty, name_bsmith}, emails={email_b, email_beta})
+
+    # We should really just need one entry per each person
+
+    by_name_contributors_short = {
+        name_art: art_jones,
+        name_betty: betty_smith,
+    }
+
+    assert Contributions.by_email_from_by_name(by_name_contributors_short) == {
+        email_a: art_jones,
+        email_alpha: art_jones,
+        email_b: betty_smith,
+        email_beta: betty_smith,
+    }
+
+    # It's OK for there to be more than one entry, as long as the entries share a single contributor object
+    # (or contributor json dictionary)
+
+    by_name_contributors = {
+        name_ajones: art_jones,
+        name_art: art_jones,
+        name_bsmith: betty_smith,
+        name_betty: betty_smith,
+    }
+
+    assert Contributions.by_email_from_by_name(by_name_contributors) == {
+        email_a: art_jones,
+        email_alpha: art_jones,
+        email_b: betty_smith,
+        email_beta: betty_smith,
+    }
+
+    # It works for the targets of the dictionary to be either Contributors or JSON represented Contributors.
+
+    art_jones_json = art_jones.as_dict()
+    betty_smith_json = betty_smith.as_dict()
+
+    by_name_json = {
+        name_ajones: art_jones_json,
+        name_art: art_jones_json,
+        name_bsmith: betty_smith_json,
+        name_betty: betty_smith_json,
+    }
+
+    assert Contributions.by_email_from_by_name(by_name_json) == {
+        email_a: art_jones_json,
+        email_alpha: art_jones_json,
+        email_b: betty_smith_json,
+        email_beta: betty_smith_json,
+    }
