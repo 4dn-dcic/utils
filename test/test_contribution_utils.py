@@ -313,6 +313,33 @@ def test_contributor_as_dict():
     }
 
 
+def test_contributor_values_as_objects():
+
+    assert Contributions.contributor_values_as_objects(None) is None
+
+    idx_json = {'jdoe': {'names': ['jdoe'], 'emails': ['jdoe@somewhere']}}
+    idx = Contributions.contributor_values_as_objects(idx_json)
+    jdoe = idx['jdoe']
+
+    assert isinstance(jdoe, Contributor)
+    assert jdoe.names == set(idx_json['jdoe']['names'])
+    assert jdoe.emails == set(idx_json['jdoe']['emails'])
+
+
+def test_contributor_values_as_dicts():
+
+    assert Contributions.contributor_values_as_dicts(None) is None
+
+    jdoe = Contributor(names={'jdoe'}, emails={'jdoe@somewhere'})
+    idx = {'jdoe': jdoe}
+    idx_json = Contributions.contributor_values_as_dicts(idx)
+    jdoe_json = idx_json['jdoe']
+
+    assert isinstance(jdoe_json, dict)
+    assert set(jdoe_json['names']) == jdoe.names
+    assert set(jdoe_json['emails']) == jdoe.emails
+
+
 def test_contributor_index_by_primary_name():
 
     john = Contributor(names={"John Doe", "jdoe"}, emails={"jdoe@a.foo"})
@@ -339,6 +366,18 @@ def test_contributor_index_by_primary_name():
         ("Jane Smith", jane),
         ("John Doe", john),
     ]
+
+    idx3 = {
+        "John Doe": john,
+        "jdoe": john.copy(),  # if the info is here twice, it must be in a shared pointer, not a separate object
+        "jsmith": jane,
+    }
+
+    with pytest.raises(Exception) as exc:
+        # This should notice the improper duplication.
+        Contributions.contributor_index_by_primary_name(idx3)
+
+    assert str(exc.value).startswith("Name improperly shared")
 
 
 def test_contributions_by_name_from_by_email():
@@ -418,3 +457,18 @@ def test_contributions_by_name_from_by_email():
     with pytest.raises(Exception) as exc:
         Contributions.by_email_from_by_name(by_name_json_with_dups)
     assert str(exc.value) == "email address ajones@somewhere is used more than once."
+
+
+def test_contributions_traverse_terminal_node():
+
+    mariela = Contributor(names={'mari', 'mariela'}, emails={'mariela@somewhere', 'mari@elsewhere'})
+    mari = Contributor(names={'mari'}, emails={'mariela@somewhere', 'mari@elsewhere'})
+
+    seen = {mari, mariela}
+    originally_seen = seen.copy()
+
+    Contributions.traverse(root=mariela, contributors_by_name={}, contributors_by_email={},
+                           # We're testing the cursor=None case
+                           seen=seen, cursor=mari)
+
+    assert seen == originally_seen

@@ -368,14 +368,16 @@ class Contributions(GitAnalysis):
         :return: a contributor index
         """
         seen = set()
+        nicknames_seen = set()
         contributor_items = []
         contributors = {}
         for name, contributor in contributors_by_name.items():
             if contributor not in seen:
                 for nickname in contributor.names:
-                    if nickname in seen:
+                    if nickname in nicknames_seen:
                         raise Exception(f"Name improperly shared between {contributor}"
                                         f" and {contributors_by_name[nickname]}")
+                    nicknames_seen.add(nickname)
                 contributor_items.append((contributor.primary_name, contributor))
                 seen.add(contributor)
         for name, contributor in sorted(contributor_items,
@@ -384,15 +386,16 @@ class Contributions(GitAnalysis):
             contributors[name] = contributor
         return contributors
 
-    def traverse(self,
+    @classmethod
+    def traverse(cls,
                  root: Contributor,
-                 cursor: Contributor,
+                 cursor: Optional[Contributor],
                  contributors_by_email: ContributorIndex,
                  contributors_by_name: ContributorIndex,
                  seen: Optional[Set[Contributor]] = None):
         if seen is None:
             seen = set()
-        if cursor in seen:
+        if cursor in seen:  # It's slightly possible that a person has a name of None that slipped in. Ignore that.
             return
         seen.add(cursor)
         for name in list(cursor.names):
@@ -402,16 +405,16 @@ class Contributions(GitAnalysis):
         for name in list(cursor.names):
             contributor = contributors_by_name.get(name)
             if contributor and contributor not in seen:
-                self.traverse(root=root, cursor=contributor, contributors_by_email=contributors_by_email,
-                              contributors_by_name=contributors_by_name, seen=seen)
+                cls.traverse(root=root, cursor=contributor, contributors_by_email=contributors_by_email,
+                             contributors_by_name=contributors_by_name, seen=seen)
         for email in list(cursor.emails):
             contributor = contributors_by_email.get(email)
             if contributor and contributor not in seen:
-                self.traverse(root=root, cursor=contributor, contributors_by_email=contributors_by_email,
-                              contributors_by_name=contributors_by_name, seen=seen)
+                cls.traverse(root=root, cursor=contributor, contributors_by_email=contributors_by_email,
+                             contributors_by_name=contributors_by_name, seen=seen)
 
     @classmethod
-    def contributor_values_as_dicts(cls, contributor_index: ContributorIndex):
+    def contributor_values_as_dicts(cls, contributor_index: Optional[ContributorIndex]):
         if contributor_index is None:
             return None
         else:
@@ -421,7 +424,7 @@ class Contributions(GitAnalysis):
             }
 
     @classmethod
-    def contributor_values_as_objects(cls, contributor_index: Dict):
+    def contributor_values_as_objects(cls, contributor_index: Optional[Dict]):
         if contributor_index is None:
             return None
         else:
