@@ -1,12 +1,18 @@
+import io
+import json
 import os
 import pytest
 
+from dcicutils import contribution_utils as contribution_utils_module
+from dcicutils.contribution_utils import Contributions
 from dcicutils.misc_utils import lines_printed_to, remove_prefix
 from dcicutils.qa_checkers import (
     DebuggingArtifactChecker, DocsChecker, ChangeLogChecker, VersionChecker, confirm_no_uses, find_uses,
+    ContributionsChecker
 )
 from dcicutils.qa_utils import MockFileSystem, printed_output
 from unittest import mock
+from .test_contribution_utils import git_context, SAMPLE_PROJECT_HOME
 from .conftest_settings import TEST_DIR
 
 
@@ -252,7 +258,7 @@ def test_debugging_artifact_checker():
                 assert isinstance(exc.value, AssertionError)
                 assert str(exc.value) == "1 problem detected:\n In foo/bar.py, 1 call to print."
 
-                assert printed.lines == []  # We might at some point print the actual problems, but we don't now.
+                assert printed.lines == []  # We might at some point print the actual problems, but we don't know.
 
                 with lines_printed_to("foo/bar.py") as out:
                     out('x = 1')
@@ -262,4 +268,59 @@ def test_debugging_artifact_checker():
                 assert isinstance(exc.value, AssertionError)
                 assert str(exc.value) == "1 problem detected:\n In foo/bar.py, 1 active use of pdb.set_trace."
 
-                assert printed.lines == []  # We might at some point print the actual problems, but we don't now.
+                assert printed.lines == []  # We might at some point print the actual problems, but we don't know.
+
+
+@mock.patch.object(contribution_utils_module, "PROJECT_HOME", SAMPLE_PROJECT_HOME)
+def test_contribution_checker():
+
+    print()  # start on a fresh line
+    some_repo_name = 'foo'
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
+        contributions_cache_file = Contributions.contributors_json_file_for_repo(some_repo_name)
+        print(f"contributions_cache_file={contributions_cache_file}")
+        os.chdir(os.path.join(SAMPLE_PROJECT_HOME, some_repo_name))
+        print(f"working dir={os.getcwd()}")
+        with io.open(contributions_cache_file, 'w') as fp:
+            cache_data = {
+                "forked_at": "2015-01-01T12:34:56-05:00",
+                "excluded_fork": None,
+                "pre_fork_contributors_by_name": None,
+                "contributors_by_name": {
+                    "John Smith": {
+                        "emails": ["jsmith@somewhere"],
+                        "names": ["John Smith"],
+                    }
+                }
+            }
+            json.dump(cache_data, fp=fp)
+        mocked_commits = {
+            some_repo_name: [
+                {
+                    "hexsha": "aaaa",
+                    "committed_datetime": "2016-01-01T01:23:45-05:00",
+                    "author": {"name": "John Smith", "email": "jsmith@somewhere"},
+                    "message": "something"
+                },
+                {
+                    "hexsha": "bbbb",
+                    "committed_datetime": "2017-01-02T12:34:56-05:00",
+                    "author": {"name": "Sally", "email": "ssmith@elsewhere"},
+                    "message": "something else"
+                }
+            ]
+        }
+        with git_context(mocked_commits=mocked_commits):
+            with printed_output() as printed:
+                with pytest.raises(AssertionError) as exc:
+                    ContributionsChecker.validate()
+                assert str(exc.value) == "There are contributor cache discrepancies."
+                assert printed.lines == [
+                    "John Smith (jsmith@somewhere)",
+                    "Sally (ssmith@elsewhere)",
+                    "===== THERE ARE CONTRIBUTOR CACHE DISCREPANCIES =====",
+                    "To Add:",
+                    " * contributors.Sally.emails.ssmith@elsewhere",
+                    " * contributors.Sally.names.Sally",
+                ]

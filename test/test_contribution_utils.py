@@ -1,4 +1,5 @@
 import contextlib
+import datetime
 import git
 import os
 import pytest
@@ -18,10 +19,10 @@ class MockGitActor:
 
 
 class MockGitCommit:
-    def __init__(self, hexsha: str, authored_datetime: str, author: dict,
+    def __init__(self, hexsha: str, committed_datetime: str, author: dict,
                  message: str, co_authors: Optional[List[dict]] = None):
         self.hexsha = hexsha
-        self.authored_datetime = authored_datetime
+        self.committed_datetime = datetime.datetime.fromisoformat(committed_datetime)
         self.author = MockGitActor(**author)
         self.co_authors = [MockGitActor(**co_author) for co_author in (co_authors or [])]
         self.message = message
@@ -49,6 +50,8 @@ class MockGitModule:
     def Repo(self, path):
         repo_name = os.path.basename(path)
         return MockGitRepo(name=repo_name, path=path, mocked_commits=self._mocked_commits.get(repo_name, []))
+
+    Actor = MockGitActor
 
 
 SAMPLE_USER_HOME = "/home/jdoe"
@@ -78,13 +81,13 @@ def test_git_analysis_git_commits():
     with git_context(mocked_commits={"foo": [
         {
             "hexsha": "aaaa",
-            "authored_datetime": "2020-01-01 01:23:45",
+            "committed_datetime": "2020-01-01 01:23:45",
             "author": {"name": "Jdoe", "email": "jdoe@foo"},
             "message": "something"
         },
         {
             "hexsha": "bbbb",
-            "authored_datetime": "2020-01-02 12:34:56",
+            "committed_datetime": "2020-01-02 12:34:56",
             "author": {"name": "Sally", "email": "ssmith@foo"},
             "message": "something else"
         }
@@ -106,13 +109,13 @@ def test_git_analysis_iter_commits_scenario():  # Tests .iter_commits, .json_for
     with git_context(mocked_commits={"foo": [
         {
             "hexsha": "aaaa",
-            "authored_datetime": "2020-01-01 01:23:45",
+            "committed_datetime": "2020-01-01T01:23:45-05:00",
             "author": {"name": "Jdoe", "email": "jdoe@foo"},
             "message": "something"
         },
         {
             "hexsha": "bbbb",
-            "authored_datetime": "2020-01-02 12:34:56",
+            "committed_datetime": "2020-01-02T12:34:56-05:00",
             "author": {"name": "Sally", "email": "ssmith@foo"},
             "co_authors": [{"name": "William Simmons", "email": "bill@someplace"}],
             "message": "something else"
@@ -125,14 +128,14 @@ def test_git_analysis_iter_commits_scenario():  # Tests .iter_commits, .json_for
                 'author': {'email': 'jdoe@foo', 'name': 'Jdoe'},
                 'coauthors': [],
                 'commit': 'aaaa',
-                'date': '2020-01-01 01:23:45',
+                'date': '2020-01-01T01:23:45-05:00',
                 'message': 'something'
             },
             {
                 'author': {'email': 'ssmith@foo', 'name': 'Sally'},
                 'coauthors': [{'email': 'bill@someplace', 'name': 'William Simmons'}],
                 'commit': 'bbbb',
-                'date': '2020-01-02 12:34:56',
+                'date': '2020-01-02T12:34:56-05:00',
                 'message': 'something else'
             }
         ]

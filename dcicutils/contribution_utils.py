@@ -44,7 +44,7 @@ class GitAnalysis:
     def json_for_commit(cls, commit: git.Commit) -> Dict:
         return {
             'commit': commit.hexsha,
-            'date': commit.authored_datetime,
+            'date': commit.committed_datetime.isoformat(),
             'author': cls.json_for_actor(commit.author),
             'coauthors': [cls.json_for_actor(co_author) for co_author in commit.co_authors],
             'message': commit.message,
@@ -227,7 +227,11 @@ class Contributions(GitAnalysis):
         """
         Returns the name of the CONTRIBUTORS.json file for the repo associated with this class.
         """
-        return os.path.join(PROJECT_HOME, self.repo, self.CONTRIBUTORS_CACHE_FILE)
+        return self.contributors_json_file_for_repo(self.repo)
+
+    @classmethod
+    def contributors_json_file_for_repo(cls, repo):
+        return os.path.join(PROJECT_HOME, repo, cls.CONTRIBUTORS_CACHE_FILE)
 
     def existing_contributors_json_file(self):
         """
@@ -441,7 +445,9 @@ class Contributions(GitAnalysis):
     def load_from_dict(self, data: Dict):
         forked_at: Optional[str] = data.get('forked_at')
         excluded_fork = data.get('excluded_fork')
-        self.forked_at = None if forked_at is None else datetime.datetime.fromisoformat(forked_at)
+        self.forked_at: Optional[datetime.datetime] = (None
+                                                       if forked_at is None
+                                                       else datetime.datetime.fromisoformat(forked_at))
         self.exclude_fork = excluded_fork
 
         fork_contributors_by_name_json = data.get('pre_fork_contributors_by_name') or {}
