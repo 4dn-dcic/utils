@@ -137,13 +137,16 @@ class Contributor:
 ContributorIndex = Optional[Dict[str, Contributor]]
 
 
-class Contributions(GitAnalysis):
+class BasicContributions(GitAnalysis):
 
     VERBOSE = False
 
     def __init__(self, *, repo: Optional[str] = None,
                  exclude_fork: Optional[str] = None,
                  verbose: Optional[bool] = None):
+        self.email_timestamps: Dict[str, datetime.datetime] = {}
+        self.name_timestamps: Dict[str, datetime.datetime] = {}
+        self.exclude_fork: Optional[str] = exclude_fork
         if not repo:
             # Doing it this way gets around an ambiguity about '/foo/' vs '/foo' since both
             # os.path.join('/foo/', 'bar') and os.path.join('/foo', 'bar') yield '/foo/bar',
@@ -151,19 +154,58 @@ class Contributions(GitAnalysis):
             cache_file = os.path.join(os.path.abspath(os.path.curdir), self.CONTRIBUTORS_CACHE_FILE)
             dir = os.path.dirname(cache_file)
             repo = os.path.basename(dir)
-        self.email_timestamps: Dict[str, datetime.datetime] = {}
-        self.name_timestamps: Dict[str, datetime.datetime] = {}
         self.repo: str = repo
-        self.exclude_fork: Optional[str] = exclude_fork
         self.excluded_contributions = None
         self.forked_at: Optional[datetime.datetime] = None
         self.contributors_by_name: Optional[ContributorIndex] = None
         self.contributors_by_email: Optional[ContributorIndex] = None
         self.pre_fork_contributors_by_email: Optional[ContributorIndex] = None
         self.pre_fork_contributors_by_name: Optional[ContributorIndex] = None
-        self.verbose = self.VERBOSE if verbose is None else verbose
         self.loaded_contributor_data = None
         self.cache_discrepancies: Optional[dict] = None
+        self.verbose = self.VERBOSE if verbose is None else verbose
+
+    CONTRIBUTORS_CACHE_FILE = 'CONTRIBUTORS.json'
+
+    def contributors_json_file(self):
+        """
+        Returns the name of the CONTRIBUTORS.json file for the repo associated with this class.
+        """
+        return os.path.join(PROJECT_HOME, self.repo, self.CONTRIBUTORS_CACHE_FILE)
+
+    def existing_contributors_json_file(self):
+        """
+        Returns the name of the CONTRIBUTORS.json file for the repo associated with this class if that file exists,
+        or None if there is no such file.
+        """
+        file = self.contributors_json_file()
+        if os.path.exists(file):
+            return file
+        else:
+            return None
+
+    @classmethod
+    def notice_reference_time(cls, key: str, timestamp: datetime.datetime, timestamps: Dict[str, datetime.datetime]):
+        reference_timestamp: datetime.datetime = timestamps.get(key)
+        if not reference_timestamp:
+            timestamps[key] = timestamp
+        elif timestamp > reference_timestamp:
+            timestamps[key] = timestamp
+
+    def email_reference_time(self, email):
+        return self.email_timestamps.get(email)
+
+    def name_reference_time(self, name):
+        return self.name_timestamps.get(name)
+
+
+
+class Contributions(BasicContributions):
+
+    def __init__(self, *, repo: Optional[str] = None,
+                 exclude_fork: Optional[str] = None,
+                 verbose: Optional[bool] = None):
+        super().__init__(repo=repo, exclude_fork=exclude_fork, verbose=verbose)
         existing_contributor_data_file = self.existing_contributors_json_file()
         if existing_contributor_data_file:
             # This will set .loaded_contributor_data and other values from CONTRIBUTORS.json
@@ -208,54 +250,17 @@ class Contributions(GitAnalysis):
             return email
 
     @classmethod
-    def notice_reference_time(cls, key: str, timestamp: datetime.datetime, timestamps: Dict[str, datetime.datetime]):
-        reference_timestamp: datetime.datetime = timestamps.get(key)
-        if not reference_timestamp:
-            timestamps[key] = timestamp
-        elif timestamp > reference_timestamp:
-            timestamps[key] = timestamp
-
-    def email_reference_time(self, email):
-        return self.email_timestamps.get(email)
-
-    def name_reference_time(self, name):
-        return self.name_timestamps.get(name)
-
-    CONTRIBUTORS_CACHE_FILE = 'CONTRIBUTORS.json'
-
-    def contributors_json_file(self):
-        """
-        Returns the name of the CONTRIBUTORS.json file for the repo associated with this class.
-        """
-        return self.contributors_json_file_for_repo(self.repo)
-
-    @classmethod
-    def contributors_json_file_for_repo(cls, repo):
-        return os.path.join(PROJECT_HOME, repo, cls.CONTRIBUTORS_CACHE_FILE)
-
-    def existing_contributors_json_file(self):
-        """
-        Returns the name of the CONTRIBUTORS.json file for the repo associated with this class if that file exists,
-        or None if there is no such file.
-        """
-        self.existing_contributors_json_file_for_repo(self.repo)
-
-    @classmethod
-    def existing_contributors_json_file_for_repo(cls, repo):
-        file = cls.contributors_json_file_for_repo(repo)
-        if os.path.exists(file):
-            return file
-        else:
-            return None
-
-    def load_contributors_from_json_file_cache(self, filename):
+    def get_contributors_json_from_file_cache(cls, filename):
         try:
             with io.open(filename, 'r') as fp:
                 data = json.load(fp)
         except Exception:
             PRINT(f"Error while reading data from {filename!r}.")
             raise
-        self.loaded_contributor_data = data
+        return data
+
+    def load_contributors_from_json_file_cache(self, filename):
+        self.loaded_contributor_data = data = self.get_contributors_json_from_file_cache(filename)
         self.load_from_dict(data)
 
         if DEBUG_CONTRIBUTIONS:  # pragma: no cover - debugging only

@@ -2,13 +2,15 @@ import contextlib
 import datetime
 import git
 import io
+import json
 import os
 import pytest
+import re
 
 from dcicutils import contribution_utils as contribution_utils_module
-from dcicutils.contribution_utils import Contributor, Contributions, GitAnalysis
+from dcicutils.contribution_utils import Contributor, BasicContributions, Contributions, GitAnalysis
 from dcicutils.misc_utils import make_counter  # , override_environ
-from dcicutils.qa_utils import MockId, MockFileSystem
+from dcicutils.qa_utils import MockId, MockFileSystem, printed_output
 from typing import List, Optional
 from unittest import mock
 
@@ -500,15 +502,59 @@ def test_notice_reference_time():
     assert timestamps == {key: timestamp2}
 
 
-def test_existing_contributors_json_file_for_repo():
+def test_existing_contributors_json_file():
 
     mfs = MockFileSystem()
 
-    with mfs.mock_exists_open_remove():
-        assert Contributions.existing_contributors_json_file_for_repo('foo') is None
+    contributions = BasicContributions(repo='foo')  # don't need all the git history, etc. loaded for this test
 
-        cache_file = Contributions.contributors_json_file_for_repo('foo')
+    with mfs.mock_exists_open_remove():
+
+        assert contributions.existing_contributors_json_file() is None
+
+        cache_file = contributions.contributors_json_file()
+        print("cache_file=", cache_file)
         with io.open(cache_file, 'w') as fp:
             fp.write('something')
 
-        assert Contributions.existing_contributors_json_file_for_repo('foo') == cache_file
+        assert contributions.existing_contributors_json_file() == cache_file
+
+
+def test_contributions_email_reference_time():
+
+    contributions = BasicContributions()
+    now = datetime.datetime.now()
+    then = now - datetime.timedelta(seconds=10)
+    contributions.email_timestamps = {'foo@somewhere': now, 'bar@elsewhere': then}
+
+    assert contributions.email_reference_time('foo@somewhere') == now
+    assert contributions.email_reference_time('bar@elsewhere') == then
+    assert contributions.email_reference_time('baz@anywhere') is None
+
+
+def test_contributions_name_reference_time():
+
+    contributions = BasicContributions()
+    now = datetime.datetime.now()
+    then = now - datetime.timedelta(seconds=10)
+    contributions.name_timestamps = {'foo': now, 'bar': then}
+
+    assert contributions.name_reference_time('foo') == now
+    assert contributions.name_reference_time('bar') == then
+    assert contributions.name_reference_time('baz') is None
+
+
+def test_file_cache_error_reporting():
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+
+        with io.open(Contributions.CONTRIBUTORS_CACHE_FILE, 'w') as fp:
+            fp.write("{bad json}")
+
+        with printed_output() as printed:
+            with pytest.raises(json.JSONDecodeError) as exc:
+                Contributions.get_contributors_json_from_file_cache(Contributions.CONTRIBUTORS_CACHE_FILE,)
+            assert re.match("Expecting.*line 1 column 2.*", str(exc.value))
+            assert printed.lines == ["Error while reading data from 'CONTRIBUTORS.json'."]
+
