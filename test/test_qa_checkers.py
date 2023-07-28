@@ -4,7 +4,7 @@ import os
 import pytest
 
 from dcicutils import contribution_utils as contribution_utils_module
-from dcicutils.contribution_utils import Contributions
+from dcicutils.contribution_utils import BasicContributions, Contributions
 from dcicutils.misc_utils import lines_printed_to, remove_prefix
 from dcicutils.qa_checkers import (
     DebuggingArtifactChecker, DocsChecker, ChangeLogChecker, VersionChecker, confirm_no_uses, find_uses,
@@ -278,7 +278,7 @@ def test_contribution_checker():
     some_repo_name = 'foo'
     mfs = MockFileSystem()
     with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
-        contributions_cache_file = Contributions.contributors_json_file_for_repo(some_repo_name)
+        contributions_cache_file = BasicContributions(repo=some_repo_name).contributors_json_file()
         print(f"contributions_cache_file={contributions_cache_file}")
         os.chdir(os.path.join(SAMPLE_PROJECT_HOME, some_repo_name))
         print(f"working dir={os.getcwd()}")
