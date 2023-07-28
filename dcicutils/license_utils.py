@@ -491,7 +491,8 @@ class LicenseChecker:
         if analysis.unexpected_missing:
             warnings.warn(there_are(analysis.unexpected_missing, kind='unexpectedly missing license', punctuate=True))
         if analysis.no_longer_missing:
-            warnings.warn(there_are(analysis.no_longer_missing, kind='no-longer-missing license', punctuate=True))
+            # This is not so major as to need a warning, but it's still something that should show up somewhere.
+            PRINT(there_are(analysis.no_longer_missing, kind='no-longer-missing license', punctuate=True))
         for message in analysis.miscellaneous:
             warnings.warn(message)
         if analysis.unacceptable:
@@ -703,6 +704,11 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         # Ref: https://github.com/getsentry/responses/blob/master/LICENSE
         'responses',
 
+        # This seems to get flagged sometimes, but is not the pypi snovault library, it's what our dcicsnovault
+        # calls itself internally.. In any case, it's under MIT license and OK.
+        # Ref: https://github.com/4dn-dcic/snovault/blob/master/LICENSE.txt
+        'snovault',
+
         # PyPi identifies the supervisor library license as "BSD-derived (http://www.repoze.org/LICENSE.txt)"
         # Ref: https://pypi.org/project/supervisor/
         # In fact, though, the license is a bit more complicated, though apparently still permissive.
@@ -711,7 +717,7 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
 
         # This seems to be a BSD-3-Clause-Modification license.
         # Ref: https://github.com/Pylons/translationstring/blob/master/LICENSE.txt
-        'translationstring',
+        # 'translationstring',
 
         # This seems to be a BSD-3-Clause-Modification license.
         # Ref: https://github.com/Pylons/venusian/blob/master/LICENSE.txt

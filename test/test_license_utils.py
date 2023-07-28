@@ -326,7 +326,8 @@ def check_license_checker_full_scenario_failing_generic(*,
                                  ' Bar License: library2, library8, libraryA, libraryB',
                                  ' Baz License: library4, library7, library9',
                                  ' Big-Org-Approved: libraryB',
-                                 ' Misc-Copyleft: libraryD']
+                                 ' Misc-Copyleft: libraryD',
+                                 'There is 1 no-longer-missing license: library1.']
 
         javascript_failure = None
         for warning in license_warnings:
@@ -342,7 +343,7 @@ def check_license_checker_full_scenario_failing_generic(*,
 
         assert edited_license_warnings == [
             "There is 1 unexpectedly missing license: library6.",
-            "There is 1 no-longer-missing license: library1.",
+            # "There is 1 no-longer-missing license: library1.",
         ]
 
     do_it()
