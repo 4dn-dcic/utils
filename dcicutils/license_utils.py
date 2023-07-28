@@ -2,10 +2,11 @@ import contextlib
 import datetime
 import io
 import json
-import logging
+# import logging
 import os
 import re
 import subprocess
+import warnings
 
 try:
     import piplicenses
@@ -30,8 +31,8 @@ from dcicutils.lang_utils import there_are
 from dcicutils.misc_utils import PRINT, get_error_message, local_attrs
 
 
-logging.basicConfig()
-logger = logging.getLogger(__name__)
+# logging.basicConfig()
+# logger = logging.getLogger(__name__)
 
 _FRAMEWORK = 'framework'
 _LANGUAGE = 'language'
@@ -270,7 +271,7 @@ class LicenseFileParser:
             if analysis:
                 analysis.miscellaneous.append(message)
             else:
-                logger.warning(message)
+                warnings.warn(message)
         parsed = cls.parse_simple_license_file(filename=filename)
         if check_license_title:
             license_title = parsed['license-title']
@@ -488,11 +489,12 @@ class LicenseChecker:
         cls.analyze_license_file(analysis=analysis)
         cls.show_unacceptable_licenses(analysis=analysis)
         if analysis.unexpected_missing:
-            logger.warning(there_are(analysis.unexpected_missing, kind='unexpectedly missing license', punctuate=True))
+            warnings.warn(there_are(analysis.unexpected_missing, kind='unexpectedly missing license', punctuate=True))
         if analysis.no_longer_missing:
-            logger.warning(there_are(analysis.no_longer_missing, kind='no-longer-missing license', punctuate=True))
+            # This is not so major as to need a warning, but it's still something that should show up somewhere.
+            PRINT(there_are(analysis.no_longer_missing, kind='no-longer-missing license', punctuate=True))
         for message in analysis.miscellaneous:
-            logger.warning(message)
+            warnings.warn(message)
         if analysis.unacceptable:
             raise LicenseAcceptabilityCheckFailure(unacceptable_licenses=analysis.unacceptable)
 
@@ -702,6 +704,11 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         # Ref: https://github.com/getsentry/responses/blob/master/LICENSE
         'responses',
 
+        # This seems to get flagged sometimes, but is not the pypi snovault library, it's what our dcicsnovault
+        # calls itself internally.. In any case, it's under MIT license and OK.
+        # Ref: https://github.com/4dn-dcic/snovault/blob/master/LICENSE.txt
+        'snovault',
+
         # PyPi identifies the supervisor library license as "BSD-derived (http://www.repoze.org/LICENSE.txt)"
         # Ref: https://pypi.org/project/supervisor/
         # In fact, though, the license is a bit more complicated, though apparently still permissive.
@@ -710,7 +717,7 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
 
         # This seems to be a BSD-3-Clause-Modification license.
         # Ref: https://github.com/Pylons/translationstring/blob/master/LICENSE.txt
-        'translationstring',
+        # 'translationstring',
 
         # This seems to be a BSD-3-Clause-Modification license.
         # Ref: https://github.com/Pylons/venusian/blob/master/LICENSE.txt

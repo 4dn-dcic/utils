@@ -11,7 +11,7 @@ from dcicutils.license_utils import (
     LicenseFrameworkRegistry, LicenseFramework, PythonLicenseFramework, JavascriptLicenseFramework,
     LicenseAnalysis, LicenseChecker, LicenseStatus, LicenseFileParser,
     LicenseCheckFailure, LicenseOwnershipCheckFailure, LicenseAcceptabilityCheckFailure,
-    logger as license_logger,
+    warnings as license_utils_warnings_module,
 )
 from dcicutils.misc_utils import ignored, file_contents
 from dcicutils.qa_utils import printed_output, MockFileSystem
@@ -326,7 +326,8 @@ def check_license_checker_full_scenario_failing_generic(*,
                                  ' Bar License: library2, library8, libraryA, libraryB',
                                  ' Baz License: library4, library7, library9',
                                  ' Big-Org-Approved: libraryB',
-                                 ' Misc-Copyleft: libraryD']
+                                 ' Misc-Copyleft: libraryD',
+                                 'There is 1 no-longer-missing license: library1.']
 
         javascript_failure = None
         for warning in license_warnings:
@@ -342,7 +343,7 @@ def check_license_checker_full_scenario_failing_generic(*,
 
         assert edited_license_warnings == [
             "There is 1 unexpectedly missing license: library6.",
-            "There is 1 no-longer-missing license: library1.",
+            # "There is 1 no-longer-missing license: library1.",
         ]
 
     do_it()
@@ -371,7 +372,7 @@ def check_license_checker_full_scenario_failing(*, perturb_setup, checker,
                       file=fp)
                 print(license_text_for_testing, file=fp)
 
-            with mock.patch.object(license_logger, 'warning') as mock_license_logger:
+            with mock.patch.object(license_utils_warnings_module, 'warn') as mock_license_logger:
 
                 license_warnings = []
 
@@ -520,7 +521,7 @@ def test_license_checker_full_scenario_succeeding():
 
         with mock.patch.object(PythonLicenseFramework, "get_dependencies") as mock_get_dependencies:
 
-            with mock.patch.object(license_logger, 'warning') as mock_license_logger:
+            with mock.patch.object(license_utils_warnings_module, 'warn') as mock_license_logger:
 
                 license_warnings = []
 
@@ -655,7 +656,7 @@ def test_validate_simple_license_file():
 
     with mfs.mock_exists_open_remove():
 
-        with mock.patch.object(license_logger, 'warning') as mock_license_logger:
+        with mock.patch.object(license_utils_warnings_module, 'warn') as mock_license_logger:
 
             license_warnings = []
 
