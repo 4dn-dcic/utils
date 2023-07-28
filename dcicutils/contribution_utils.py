@@ -199,7 +199,6 @@ class BasicContributions(GitAnalysis):
         return self.name_timestamps.get(name)
 
 
-
 class Contributions(BasicContributions):
 
     def __init__(self, *, repo: Optional[str] = None,

@@ -557,4 +557,3 @@ def test_file_cache_error_reporting():
                 Contributions.get_contributors_json_from_file_cache(Contributions.CONTRIBUTORS_CACHE_FILE,)
             assert re.match("Expecting.*line 1 column 2.*", str(exc.value))
             assert printed.lines == ["Error while reading data from 'CONTRIBUTORS.json'."]
-
