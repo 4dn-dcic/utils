@@ -9,7 +9,7 @@ import re
 
 from dcicutils import contribution_utils as contribution_utils_module
 from dcicutils.contribution_utils import Contributor, BasicContributions, Contributions, GitAnalysis
-from dcicutils.misc_utils import make_counter  # , override_environ
+from dcicutils.misc_utils import make_counter, file_contents  # , override_environ
 from dcicutils.qa_utils import MockId, MockFileSystem, printed_output
 from typing import List, Optional
 from unittest import mock
@@ -557,3 +557,74 @@ def test_file_cache_error_reporting():
                 Contributions.get_contributors_json_from_file_cache(Contributions.CONTRIBUTORS_CACHE_FILE,)
             assert re.match("Expecting.*line 1 column 2.*", str(exc.value))
             assert printed.lines == ["Error while reading data from 'CONTRIBUTORS.json'."]
+
+
+def test_save_contributor_data():
+
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
+
+        contributions = BasicContributions()
+        cache_file = contributions.save_contributor_data()
+
+        assert file_contents(cache_file) == (
+            '{\n'
+            '  "forked_at": null,\n'
+            '  "excluded_fork": null,\n'
+            '  "pre_fork_contributors_by_name": null,\n'
+            '  "contributors_by_name": null\n'
+            '}\n'
+        )
+
+        cache_file_2 = contributions.save_contributor_data('some.file')
+        assert cache_file_2 == 'some.file'
+        assert file_contents(cache_file_2) == (
+            '{\n'
+            '  "forked_at": null,\n'
+            '  "excluded_fork": null,\n'
+            '  "pre_fork_contributors_by_name": null,\n'
+            '  "contributors_by_name": null\n'
+            '}\n'
+        )
+
+
+def test_repo_contributor_names():
+
+    contributions = BasicContributions()
+    tony = Contributor(names={"Tony", "Anthony"}, emails={"tony@foo"})
+    juan = Contributor(names={"Juan"}, emails={"juan@foo"})
+    contributions.contributors_by_name = {
+        "Tony": tony,
+        "Juan": juan,
+    }
+    assert list(contributions.repo_contributor_names(with_email=False)) == [
+        "Tony",
+        "Juan",
+    ]
+    assert list(contributions.repo_contributor_names(with_email=True)) == [
+        "Tony (tony@foo)",
+        "Juan (juan@foo)",
+    ]
+    # We assume de-duplication has already occurred, so something like this will happen.
+    # This behavior is not a feature, but then again, there's no reason to check/redo what should be done earlier.
+    contributions.contributors_by_name = {
+        "Tony": tony,
+        "Juan": juan,
+        "Anthony": tony,
+    }
+    assert list(contributions.repo_contributor_names(with_email=True)) == [
+        "Tony (tony@foo)",
+        "Juan (juan@foo)",
+        "Anthony (tony@foo)",
+    ]
+    # Note, too, that it's trusting the key because our save code puts the primary_key in the dictionary key,
+    # and if it's been edited by a human, we'll prefer that.
+    contributions.contributors_by_name = {
+        "Tony": tony,
+        "John": juan,
+    }
+    assert list(contributions.repo_contributor_names(with_email=True)) == [
+        "Tony (tony@foo)",
+        "John (juan@foo)",
+    ]

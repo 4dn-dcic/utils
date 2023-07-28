@@ -198,6 +198,71 @@ class BasicContributions(GitAnalysis):
     def name_reference_time(self, name):
         return self.name_timestamps.get(name)
 
+    @classmethod
+    def contributor_values_as_dicts(cls, contributor_index: Optional[ContributorIndex]):
+        if contributor_index is None:
+            return None
+        else:
+            return {
+                key: contributor.as_dict()
+                for key, contributor in contributor_index.items()
+            }
+
+    @classmethod
+    def contributor_values_as_objects(cls, contributor_index: Optional[Dict]):
+        if contributor_index is None:
+            return None
+        else:
+            return {
+                key: Contributor.from_dict(value, key=key)
+                for key, value in contributor_index.items()
+            }
+
+    def checkpoint_state(self):
+        return self.as_dict()
+
+    def as_dict(self):
+        data = {
+            "forked_at": self.forked_at.isoformat() if self.forked_at else None,
+            "excluded_fork": self.exclude_fork,
+            "pre_fork_contributors_by_name": self.contributor_values_as_dicts(self.pre_fork_contributors_by_name),
+            "contributors_by_name": self.contributor_values_as_dicts(self.contributors_by_name),
+        }
+        return data
+
+    def save_contributor_data(self, filename: Optional[str] = None) -> str:
+        if filename is None:
+            filename = self.contributors_json_file()
+        with io.open(filename, 'w') as fp:
+            PRINT(json.dumps(self.as_dict(), indent=2), file=fp)
+        return filename
+
+    def repo_contributor_names(self, with_email=False):
+        for name, contributor in self.contributors_by_name.items():
+            if with_email:
+                yield f"{name} ({', '.join([self.pretty_email(email) for email in contributor.emails])})"
+            else:
+                yield name
+
+    @classmethod
+    def pretty_email(cls, email):
+        m = GITHUB_USER_REGEXP.match(email)
+        if m:
+            user_name = m.group(1)
+            return f"{user_name}@github"
+        else:
+            return email
+
+    @classmethod
+    def get_contributors_json_from_file_cache(cls, filename):
+        try:
+            with io.open(filename, 'r') as fp:
+                data = json.load(fp)
+        except Exception:
+            PRINT(f"Error while reading data from {filename!r}.")
+            raise
+        return data
+
 
 class Contributions(BasicContributions):
 
@@ -238,25 +303,6 @@ class Contributions(BasicContributions):
                 cache_discrepancies['to_change'] = changed
             if removed:
                 cache_discrepancies['to_remove'] = removed
-
-    @classmethod
-    def pretty_email(cls, email):
-        m = GITHUB_USER_REGEXP.match(email)
-        if m:
-            user_name = m.group(1)
-            return f"{user_name}@github"
-        else:
-            return email
-
-    @classmethod
-    def get_contributors_json_from_file_cache(cls, filename):
-        try:
-            with io.open(filename, 'r') as fp:
-                data = json.load(fp)
-        except Exception:
-            PRINT(f"Error while reading data from {filename!r}.")
-            raise
-        return data
 
     def load_contributors_from_json_file_cache(self, filename):
         self.loaded_contributor_data = data = self.get_contributors_json_from_file_cache(filename)
@@ -421,38 +467,6 @@ class Contributions(BasicContributions):
                 cls.traverse(root=root, cursor=contributor, contributors_by_email=contributors_by_email,
                              contributors_by_name=contributors_by_name, seen=seen)
 
-    @classmethod
-    def contributor_values_as_dicts(cls, contributor_index: Optional[ContributorIndex]):
-        if contributor_index is None:
-            return None
-        else:
-            return {
-                key: contributor.as_dict()
-                for key, contributor in contributor_index.items()
-            }
-
-    @classmethod
-    def contributor_values_as_objects(cls, contributor_index: Optional[Dict]):
-        if contributor_index is None:
-            return None
-        else:
-            return {
-                key: Contributor.from_dict(value, key=key)
-                for key, value in contributor_index.items()
-            }
-
-    def checkpoint_state(self):
-        return self.as_dict()
-
-    def as_dict(self):
-        data = {
-            "forked_at": self.forked_at.isoformat() if self.forked_at else None,
-            "excluded_fork": self.exclude_fork,
-            "pre_fork_contributors_by_name": self.contributor_values_as_dicts(self.pre_fork_contributors_by_name),
-            "contributors_by_name": self.contributor_values_as_dicts(self.contributors_by_name),
-        }
-        return data
-
     def load_from_dict(self, data: Dict):
         forked_at: Optional[str] = data.get('forked_at')
         excluded_fork = data.get('excluded_fork')
@@ -493,19 +507,6 @@ class Contributions(BasicContributions):
                     raise Exception(f"email address {email} is used more than once.")
                 result[email] = entry
         return result
-
-    def save_contributor_data(self, filename: Optional[str] = None):
-        if filename is None:
-            filename = self.contributors_json_file()
-        with io.open(filename, 'w') as fp:
-            PRINT(json.dumps(self.as_dict(), indent=2), file=fp)
-
-    def repo_contributor_names(self, with_email=False):
-        for name, contributor in self.contributors_by_name.items():
-            if with_email:
-                yield f"{name} ({', '.join([self.pretty_email(email) for email in contributor.emails])})"
-            else:
-                yield name
 
     def show_repo_contributors(self, analyze_discrepancies: bool = True, with_email: bool = True,
                                error_class: Optional[Type[BaseException]] = None):
