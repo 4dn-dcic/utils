@@ -1,13 +1,14 @@
 import contextlib
 import datetime
 import git
+import io
 import os
 import pytest
 
 from dcicutils import contribution_utils as contribution_utils_module
 from dcicutils.contribution_utils import Contributor, Contributions, GitAnalysis
 from dcicutils.misc_utils import make_counter  # , override_environ
-from dcicutils.qa_utils import MockId
+from dcicutils.qa_utils import MockId, MockFileSystem
 from typing import List, Optional
 from unittest import mock
 
@@ -472,3 +473,42 @@ def test_contributions_traverse_terminal_node():
                            seen=seen, cursor=mari)
 
     assert seen == originally_seen
+
+
+def test_contributions_pretty_email():
+
+    assert Contributions.pretty_email('joe@foo.com') == 'joe@foo.com'
+    assert Contributions.pretty_email('joe@users.noreply.github.com') == 'joe@github'
+    assert Contributions.pretty_email('12345+joe@users.noreply.github.com') == 'joe@github'
+
+
+def test_notice_reference_time():
+
+    timestamps = {}
+    timestamp0 = datetime.datetime(2020, 7, 1, 12, 0, 0)
+    timestamp1 = datetime.datetime(2020, 7, 1, 12, 0, 1)
+    timestamp2 = datetime.datetime(2020, 7, 1, 12, 0, 2)
+    key = 'joe'
+
+    Contributions.notice_reference_time(key=key, timestamp=timestamp1, timestamps=timestamps)
+    assert timestamps == {key: timestamp1}
+
+    Contributions.notice_reference_time(key=key, timestamp=timestamp0, timestamps=timestamps)
+    assert timestamps == {key: timestamp1}
+
+    Contributions.notice_reference_time(key=key, timestamp=timestamp2, timestamps=timestamps)
+    assert timestamps == {key: timestamp2}
+
+
+def test_existing_contributors_json_file_for_repo():
+
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove():
+        assert Contributions.existing_contributors_json_file_for_repo('foo') is None
+
+        cache_file = Contributions.contributors_json_file_for_repo('foo')
+        with io.open(cache_file, 'w') as fp:
+            fp.write('something')
+
+        assert Contributions.existing_contributors_json_file_for_repo('foo') == cache_file

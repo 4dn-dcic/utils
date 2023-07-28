@@ -238,7 +238,11 @@ class Contributions(GitAnalysis):
         Returns the name of the CONTRIBUTORS.json file for the repo associated with this class if that file exists,
         or None if there is no such file.
         """
-        file = self.contributors_json_file()
+        self.existing_contributors_json_file_for_repo(self.repo)
+
+    @classmethod
+    def existing_contributors_json_file_for_repo(cls, repo):
+        file = cls.contributors_json_file_for_repo(repo)
         if os.path.exists(file):
             return file
         else:
