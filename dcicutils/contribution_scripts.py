@@ -14,7 +14,7 @@ def show_contributors(repo, exclude_fork=None, verbose=False, save_contributors=
     contributions.show_repo_contributors(error_class=ScriptFailure if test else None)
 
 
-def show_contributors_main():
+def show_contributors_main(*, simulated_args=None):
     parser = argparse.ArgumentParser(  # noqa - PyCharm wrongly thinks the formatter_class is specified wrong here.
         description=(f"Show authors of a specified repository, which will be presumed"
                      f" to have been cloned as a subdirectory of $PROJECT_HOME ({PROJECT_HOME})"),
@@ -31,7 +31,7 @@ def show_contributors_main():
                         help="whether to treat this as a test, erring if a cache update is needed")
     parser.add_argument('--verbose', '-v', action="store_true", default=False,
                         help="whether to do verbose output while working")
-    args = parser.parse_args()
+    args = parser.parse_args(args=simulated_args)
 
     with script_catch_errors():
 
