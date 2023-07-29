@@ -263,6 +263,54 @@ class BasicContributions(GitAnalysis):
             raise
         return data
 
+    @classmethod
+    def contributor_index_by_primary_name(cls, contributors_by_name: ContributorIndex) -> ContributorIndex:
+        """
+        Given a by-name contributor index:
+
+        * Makes sure that all contributors have only one name, indexed by the contributor's primary name
+        * Sorts the resulting index using a case-insensitive alphabetic sort
+
+        and then returns the result.
+
+        :param contributors_by_name: a contributor index indexed by human name
+        :return: a contributor index
+        """
+        seen = set()
+        nicknames_seen = set()
+        contributor_items = []
+        contributors = {}
+        for name, contributor in contributors_by_name.items():
+            if contributor not in seen:
+                for nickname in contributor.names:
+                    if nickname in nicknames_seen:
+                        raise Exception(f"Name improperly shared between {contributor}"
+                                        f" and {contributors_by_name[nickname]}")
+                    nicknames_seen.add(nickname)
+                contributor_items.append((contributor.primary_name, contributor))
+                seen.add(contributor)
+        for name, contributor in sorted(contributor_items,
+                                        # Having selected the longest names, now sort names ignoring case
+                                        key=lambda pair: pair[0].lower()):
+            contributors[name] = contributor
+        return contributors
+
+    @classmethod
+    def by_email_from_by_name(cls, contributors_by_email_json):
+        result = {}
+        seen = set()
+        for email_key, entry in contributors_by_email_json.items():
+            ignored(email_key)
+            seen_key = id(entry)
+            if seen_key in seen:
+                continue
+            seen.add(seen_key)
+            for email in entry.get("emails", []) if isinstance(entry, dict) else entry.emails:
+                if result.get(email):
+                    raise Exception(f"email address {email} is used more than once.")
+                result[email] = entry
+        return result
+
 
 class Contributions(BasicContributions):
 
@@ -314,6 +362,31 @@ class Contributions(BasicContributions):
             PRINT(f"{n_of(self.pre_fork_contributors_by_email, 'pre-fork contributor by email')}")
             PRINT(f"{n_of(self.contributors_by_name, 'contributor by name')}")
             PRINT(f"{n_of(self.contributors_by_email, 'contributor by email')}")
+
+    def load_from_dict(self, data: Dict):
+        forked_at: Optional[str] = data.get('forked_at')
+        excluded_fork = data.get('excluded_fork')
+        self.forked_at: Optional[datetime.datetime] = (None
+                                                       if forked_at is None
+                                                       else datetime.datetime.fromisoformat(forked_at))
+        self.exclude_fork = excluded_fork
+
+        fork_contributors_by_name_json = data.get('pre_fork_contributors_by_name') or {}
+        fork_contributors_by_name = self.contributor_values_as_objects(fork_contributors_by_name_json)
+        self.pre_fork_contributors_by_name = fork_contributors_by_name
+        fork_contributors_by_email_json = data.get('pre_fork_contributors_by_email') or {}
+        if fork_contributors_by_email_json:
+            self.pre_fork_contributors_by_email = self.contributor_values_as_objects(fork_contributors_by_email_json)
+        else:
+            self.pre_fork_contributors_by_email = self.by_email_from_by_name(fork_contributors_by_name)
+
+        contributors_by_name_json = data.get('contributors_by_name', {})
+        self.contributors_by_name = contributors_by_name = self.contributor_values_as_objects(contributors_by_name_json)
+        contributors_by_email_json = data.get('contributors_by_email', {})
+        if contributors_by_email_json:
+            self.contributors_by_email = self.contributor_values_as_objects(contributors_by_email_json)
+        else:
+            self.contributors_by_email = self.by_email_from_by_name(contributors_by_name)
 
     def reconcile_contributors_with_github_log(self):
         """
@@ -409,38 +482,6 @@ class Contributions(BasicContributions):
             PRINT(f"{n_of(self.contributors_by_email, 'contributor by email')}")
 
     @classmethod
-    def contributor_index_by_primary_name(cls, contributors_by_name: ContributorIndex) -> ContributorIndex:
-        """
-        Given a by-name contributor index:
-
-        * Makes sure that all contributors have only one name, indexed by the contributor's primary name
-        * Sorts the resulting index using a case-insensitive alphabetic sort
-
-        and then returns the result.
-
-        :param contributors_by_name: a contributor index indexed by human name
-        :return: a contributor index
-        """
-        seen = set()
-        nicknames_seen = set()
-        contributor_items = []
-        contributors = {}
-        for name, contributor in contributors_by_name.items():
-            if contributor not in seen:
-                for nickname in contributor.names:
-                    if nickname in nicknames_seen:
-                        raise Exception(f"Name improperly shared between {contributor}"
-                                        f" and {contributors_by_name[nickname]}")
-                    nicknames_seen.add(nickname)
-                contributor_items.append((contributor.primary_name, contributor))
-                seen.add(contributor)
-        for name, contributor in sorted(contributor_items,
-                                        # Having selected the longest names, now sort names ignoring case
-                                        key=lambda pair: pair[0].lower()):
-            contributors[name] = contributor
-        return contributors
-
-    @classmethod
     def traverse(cls,
                  root: Contributor,
                  cursor: Optional[Contributor],
@@ -466,47 +507,6 @@ class Contributions(BasicContributions):
             if contributor and contributor not in seen:
                 cls.traverse(root=root, cursor=contributor, contributors_by_email=contributors_by_email,
                              contributors_by_name=contributors_by_name, seen=seen)
-
-    def load_from_dict(self, data: Dict):
-        forked_at: Optional[str] = data.get('forked_at')
-        excluded_fork = data.get('excluded_fork')
-        self.forked_at: Optional[datetime.datetime] = (None
-                                                       if forked_at is None
-                                                       else datetime.datetime.fromisoformat(forked_at))
-        self.exclude_fork = excluded_fork
-
-        fork_contributors_by_name_json = data.get('pre_fork_contributors_by_name') or {}
-        fork_contributors_by_name = self.contributor_values_as_objects(fork_contributors_by_name_json)
-        self.pre_fork_contributors_by_name = fork_contributors_by_name
-        fork_contributors_by_email_json = data.get('pre_fork_contributors_by_email') or {}
-        if fork_contributors_by_email_json:
-            self.pre_fork_contributors_by_email = self.contributor_values_as_objects(fork_contributors_by_email_json)
-        else:
-            self.pre_fork_contributors_by_email = self.by_email_from_by_name(fork_contributors_by_name)
-
-        contributors_by_name_json = data.get('contributors_by_name', {})
-        self.contributors_by_name = contributors_by_name = self.contributor_values_as_objects(contributors_by_name_json)
-        contributors_by_email_json = data.get('contributors_by_email', {})
-        if contributors_by_email_json:
-            self.contributors_by_email = self.contributor_values_as_objects(contributors_by_email_json)
-        else:
-            self.contributors_by_email = self.by_email_from_by_name(contributors_by_name)
-
-    @classmethod
-    def by_email_from_by_name(cls, contributors_by_email_json):
-        result = {}
-        seen = set()
-        for email_key, entry in contributors_by_email_json.items():
-            ignored(email_key)
-            seen_key = id(entry)
-            if seen_key in seen:
-                continue
-            seen.add(seen_key)
-            for email in entry.get("emails", []) if isinstance(entry, dict) else entry.emails:
-                if result.get(email):
-                    raise Exception(f"email address {email} is used more than once.")
-                result[email] = entry
-        return result
 
     def show_repo_contributors(self, analyze_discrepancies: bool = True, with_email: bool = True,
                                error_class: Optional[Type[BaseException]] = None):
