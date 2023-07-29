@@ -142,11 +142,9 @@ class BasicContributions(GitAnalysis):
     VERBOSE = False
 
     def __init__(self, *, repo: Optional[str] = None,
-                 exclude_fork: Optional[str] = None,
                  verbose: Optional[bool] = None):
         self.email_timestamps: Dict[str, datetime.datetime] = {}
         self.name_timestamps: Dict[str, datetime.datetime] = {}
-        # self.exclude_fork: Optional[str] = exclude_fork
         if not repo:
             # Doing it this way gets around an ambiguity about '/foo/' vs '/foo' since both
             # os.path.join('/foo/', 'bar') and os.path.join('/foo', 'bar') yield '/foo/bar',
@@ -155,7 +153,6 @@ class BasicContributions(GitAnalysis):
             dir = os.path.dirname(cache_file)
             repo = os.path.basename(dir)
         self.repo: str = repo
-        # self.excluded_contributions = None
         self.forked_at: Optional[datetime.datetime] = None
         self.contributors_by_name: Optional[ContributorIndex] = None
         self.contributors_by_email: Optional[ContributorIndex] = None
@@ -224,7 +221,6 @@ class BasicContributions(GitAnalysis):
     def as_dict(self):
         data = {
             "forked_at": self.forked_at.isoformat() if self.forked_at else None,
-            # "excluded_fork": self.exclude_fork,
             "pre_fork_contributors_by_name": self.contributor_values_as_dicts(self.pre_fork_contributors_by_name),
             "contributors_by_name": self.contributor_values_as_dicts(self.contributors_by_name),
         }
@@ -317,14 +313,12 @@ class Contributions(BasicContributions):
     def __init__(self, *, repo: Optional[str] = None,
                  exclude_fork: Optional[str] = None,
                  verbose: Optional[bool] = None):
-        super().__init__(repo=repo, exclude_fork=exclude_fork, verbose=verbose)
+        super().__init__(repo=repo, verbose=verbose)
         existing_contributor_data_file = self.existing_contributors_json_file()
         if existing_contributor_data_file:
             # This will set .loaded_contributor_data and other values from CONTRIBUTORS.json
             self.load_contributors_from_json_file_cache(existing_contributor_data_file)
 
-        # if exclude_fork and not self.excluded_contributions:
-        #     self.excluded_contributions = Contributions(repo=exclude_fork)
         checkpoint1 = self.checkpoint_state()
         self.reconcile_contributors_with_github_log(exclude_fork=exclude_fork)
         checkpoint2 = self.checkpoint_state()
@@ -381,11 +375,9 @@ class Contributions(BasicContributions):
 
     def load_from_dict(self, data: Dict):
         forked_at: Optional[str] = data.get('forked_at')
-        # excluded_fork = data.get('excluded_fork')
         self.forked_at: Optional[datetime.datetime] = (None
                                                        if forked_at is None
                                                        else datetime.datetime.fromisoformat(forked_at))
-        # self.exclude_fork = excluded_fork
 
         pre_fork_contributors_by_name_json = data.get('pre_fork_contributors_by_name') or {}
         pre_fork_contributors_by_name = self.contributor_values_as_objects(pre_fork_contributors_by_name_json)
@@ -415,9 +407,8 @@ class Contributions(BasicContributions):
 
         if self.loaded_contributor_data:
             pre_fork_contributor_emails = set(self.pre_fork_contributors_by_email.keys())
-        elif exclude_fork:  #  and not self.excluded_contributions:
+        elif exclude_fork:
             excluded_contributions = Contributions(repo=exclude_fork)
-            # excluded_fork_contributors_by_email =
             self.pre_fork_contributors_by_email = excluded_contributions.contributors_by_email
             self.pre_fork_contributors_by_name = excluded_contributions.contributors_by_name
             pre_fork_contributor_emails = set(self.pre_fork_contributors_by_email.keys())

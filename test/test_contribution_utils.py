@@ -586,6 +586,7 @@ def test_save_contributor_data():
             '}\n'
         )
 
+
 def test_repo_contributor_names():
 
     contributions = BasicContributions()
@@ -625,6 +626,7 @@ def test_repo_contributor_names():
         "Tony (tony@foo)",
         "John (juan@foo)",
     ]
+
 
 def test_resummarize_discrepancies():
 
