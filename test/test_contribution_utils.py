@@ -571,7 +571,6 @@ def test_save_contributor_data():
         assert file_contents(cache_file) == (
             '{\n'
             '  "forked_at": null,\n'
-            '  "excluded_fork": null,\n'
             '  "pre_fork_contributors_by_name": null,\n'
             '  "contributors_by_name": null\n'
             '}\n'
@@ -582,12 +581,10 @@ def test_save_contributor_data():
         assert file_contents(cache_file_2) == (
             '{\n'
             '  "forked_at": null,\n'
-            '  "excluded_fork": null,\n'
             '  "pre_fork_contributors_by_name": null,\n'
             '  "contributors_by_name": null\n'
             '}\n'
         )
-
 
 def test_repo_contributor_names():
 
@@ -628,3 +625,15 @@ def test_repo_contributor_names():
         "Tony (tony@foo)",
         "John (juan@foo)",
     ]
+
+def test_resummarize_discrepancies():
+
+    assert Contributions.resummarize_discrepancies({
+        'added': ['a', 'b'],
+        'changed': ['c'],
+        'removed': ['d', 'e'],
+    }) == {
+        'to_add': ['a', 'b'],
+        'to_change': ['c'],
+        'to_remove': ['d', 'e'],
+    }

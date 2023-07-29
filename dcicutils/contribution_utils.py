@@ -146,7 +146,7 @@ class BasicContributions(GitAnalysis):
                  verbose: Optional[bool] = None):
         self.email_timestamps: Dict[str, datetime.datetime] = {}
         self.name_timestamps: Dict[str, datetime.datetime] = {}
-        self.exclude_fork: Optional[str] = exclude_fork
+        # self.exclude_fork: Optional[str] = exclude_fork
         if not repo:
             # Doing it this way gets around an ambiguity about '/foo/' vs '/foo' since both
             # os.path.join('/foo/', 'bar') and os.path.join('/foo', 'bar') yield '/foo/bar',
@@ -155,7 +155,7 @@ class BasicContributions(GitAnalysis):
             dir = os.path.dirname(cache_file)
             repo = os.path.basename(dir)
         self.repo: str = repo
-        self.excluded_contributions = None
+        # self.excluded_contributions = None
         self.forked_at: Optional[datetime.datetime] = None
         self.contributors_by_name: Optional[ContributorIndex] = None
         self.contributors_by_email: Optional[ContributorIndex] = None
@@ -224,7 +224,7 @@ class BasicContributions(GitAnalysis):
     def as_dict(self):
         data = {
             "forked_at": self.forked_at.isoformat() if self.forked_at else None,
-            "excluded_fork": self.exclude_fork,
+            # "excluded_fork": self.exclude_fork,
             "pre_fork_contributors_by_name": self.contributor_values_as_dicts(self.pre_fork_contributors_by_name),
             "contributors_by_name": self.contributor_values_as_dicts(self.contributors_by_name),
         }
@@ -323,10 +323,10 @@ class Contributions(BasicContributions):
             # This will set .loaded_contributor_data and other values from CONTRIBUTORS.json
             self.load_contributors_from_json_file_cache(existing_contributor_data_file)
 
-        if exclude_fork and not self.excluded_contributions:
-            self.excluded_contributions = Contributions(repo=exclude_fork)
+        # if exclude_fork and not self.excluded_contributions:
+        #     self.excluded_contributions = Contributions(repo=exclude_fork)
         checkpoint1 = self.checkpoint_state()
-        self.reconcile_contributors_with_github_log()
+        self.reconcile_contributors_with_github_log(exclude_fork=exclude_fork)
         checkpoint2 = self.checkpoint_state()
 
         def list_to_dict_normalizer(*, label, item):
@@ -341,16 +341,32 @@ class Contributions(BasicContributions):
             contributors1 = checkpoint1['contributors_by_name']
             contributors2 = checkpoint2['contributors_by_name']
             diffs = diff_manager.diffs(contributors1, contributors2, normalizer=list_to_dict_normalizer)
-            added = diffs.get('added')
-            changed = diffs.get('changed')
-            removed = diffs.get('removed')
-            self.cache_discrepancies = cache_discrepancies = {}
-            if added:
-                cache_discrepancies['to_add'] = added
-            if changed:
-                cache_discrepancies['to_change'] = changed
-            if removed:
-                cache_discrepancies['to_remove'] = removed
+            self.cache_discrepancies = self.resummarize_discrepancies(diffs)
+
+    @classmethod
+    def resummarize_discrepancies(cls, diffs: Dict) -> Dict:
+        """
+        Reformats the dictionary result from DiffManager.diffs in a way that's more appropriate to our situation.
+        In particular:
+
+        * the "added" key is renamed to "to add"
+        * the "changed" key is renamed to "to_change"
+        * the "removed" key is renamed to "to_remove"
+
+        This tense change is necessary because the labels are cues to the user about actions that need to be done
+        in the future, not actions already done.
+        """
+        added = diffs.get('added')
+        changed = diffs.get('changed')
+        removed = diffs.get('removed')
+        cache_discrepancies = {}
+        if added:
+            cache_discrepancies['to_add'] = added
+        if changed:
+            cache_discrepancies['to_change'] = changed
+        if removed:
+            cache_discrepancies['to_remove'] = removed
+        return cache_discrepancies
 
     def load_contributors_from_json_file_cache(self, filename):
         self.loaded_contributor_data = data = self.get_contributors_json_from_file_cache(filename)
@@ -365,20 +381,21 @@ class Contributions(BasicContributions):
 
     def load_from_dict(self, data: Dict):
         forked_at: Optional[str] = data.get('forked_at')
-        excluded_fork = data.get('excluded_fork')
+        # excluded_fork = data.get('excluded_fork')
         self.forked_at: Optional[datetime.datetime] = (None
                                                        if forked_at is None
                                                        else datetime.datetime.fromisoformat(forked_at))
-        self.exclude_fork = excluded_fork
+        # self.exclude_fork = excluded_fork
 
-        fork_contributors_by_name_json = data.get('pre_fork_contributors_by_name') or {}
-        fork_contributors_by_name = self.contributor_values_as_objects(fork_contributors_by_name_json)
-        self.pre_fork_contributors_by_name = fork_contributors_by_name
-        fork_contributors_by_email_json = data.get('pre_fork_contributors_by_email') or {}
-        if fork_contributors_by_email_json:
-            self.pre_fork_contributors_by_email = self.contributor_values_as_objects(fork_contributors_by_email_json)
+        pre_fork_contributors_by_name_json = data.get('pre_fork_contributors_by_name') or {}
+        pre_fork_contributors_by_name = self.contributor_values_as_objects(pre_fork_contributors_by_name_json)
+        self.pre_fork_contributors_by_name = pre_fork_contributors_by_name
+        pre_fork_contributors_by_email_json = data.get('pre_fork_contributors_by_email') or {}
+        if pre_fork_contributors_by_email_json:
+            pre_fork_contributors_by_email = self.contributor_values_as_objects(pre_fork_contributors_by_email_json)
         else:
-            self.pre_fork_contributors_by_email = self.by_email_from_by_name(fork_contributors_by_name)
+            pre_fork_contributors_by_email = self.by_email_from_by_name(pre_fork_contributors_by_name)
+        self.pre_fork_contributors_by_email = pre_fork_contributors_by_email
 
         contributors_by_name_json = data.get('contributors_by_name', {})
         self.contributors_by_name = contributors_by_name = self.contributor_values_as_objects(contributors_by_name_json)
@@ -388,20 +405,24 @@ class Contributions(BasicContributions):
         else:
             self.contributors_by_email = self.by_email_from_by_name(contributors_by_name)
 
-    def reconcile_contributors_with_github_log(self):
+    def reconcile_contributors_with_github_log(self, exclude_fork=None):
         """
         Rummages the GitHub log entries for contributors we don't know about.
         That data is merged against our existing structures.
         """
         if DEBUG_CONTRIBUTIONS:  # pragma: no cover - debugging only
             PRINT("Reconciling with git log.")
-        excluded_fork_contributors_by_email = (self.excluded_contributions.contributors_by_email
-                                               if self.excluded_contributions
-                                               else {})
-        # excluded_fork_contributors_by_name = (self.excluded_contributions.contributors_by_name
-        #                                       if self.excluded_contributions
-        #                                       else {})
-        fork_contributor_emails = set(excluded_fork_contributors_by_email.keys())
+
+        if self.loaded_contributor_data:
+            pre_fork_contributor_emails = set(self.pre_fork_contributors_by_email.keys())
+        elif exclude_fork:  #  and not self.excluded_contributions:
+            excluded_contributions = Contributions(repo=exclude_fork)
+            # excluded_fork_contributors_by_email =
+            self.pre_fork_contributors_by_email = excluded_contributions.contributors_by_email
+            self.pre_fork_contributors_by_name = excluded_contributions.contributors_by_name
+            pre_fork_contributor_emails = set(self.pre_fork_contributors_by_email.keys())
+        else:
+            pre_fork_contributor_emails = set()
 
         post_fork_contributors_seen = defaultdict(lambda: [])
 
@@ -413,12 +434,12 @@ class Contributions(BasicContributions):
                 if date < self.forked_at:
                     return
                     # raise Exception("Commits are out of order.")
-            elif author.email not in fork_contributor_emails:
+            elif author.email not in pre_fork_contributor_emails:
                 PRINT(f"Forked {self.repo} at {date} by {author.email}")
                 self.forked_at = date
 
             if self.forked_at and date >= self.forked_at:
-                if author.email in fork_contributor_emails:
+                if author.email in pre_fork_contributor_emails:
                     # PRINT(f"Post-fork contribution from {author.email} ({date})")
                     post_fork_contributors_seen[author.email].append(date)
                 self.notice_reference_time(key=author.email, timestamp=date, timestamps=self.email_timestamps)
@@ -461,15 +482,6 @@ class Contributions(BasicContributions):
                 contributors_by_name[name] = contributor_by_email
             for email in list(contributor_by_email.emails):
                 contributors_by_email[email] = contributor_by_email
-
-        # Note that the name table is somewhat unified, merging related cells, but the email table isn't.
-        # In part that's because I was lazy, but also we don't really need the email table to be so careful.
-        # It's the human names that really matter.
-        # if not self.pre_fork_contributors_by_name:
-        #     self.pre_fork_contributors_by_name = excluded_fork_contributors_by_name
-
-        # if not self.pre_fork_contributors_by_email:
-        #     self.pre_fork_contributors_by_email = excluded_fork_contributors_by_email
 
         self.contributors_by_name = self.contributor_index_by_primary_name(contributors_by_name)
         self.contributors_by_email = contributors_by_email
