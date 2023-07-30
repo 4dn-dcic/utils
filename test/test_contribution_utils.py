@@ -83,17 +83,17 @@ def test_git_analysis_git_commits():
 
     mocked_commits = [
         {
+            "hexsha": "bbbb",
+            "committed_datetime": "2020-01-02 12:34:56",
+            "author": {"name": "Sally", "email": "ssmith@foo"},
+            "message": "something else"
+        },
+        {
             "hexsha": "aaaa",
             "committed_datetime": "2020-01-01 01:23:45",
             "author": {"name": "Jdoe", "email": "jdoe@foo"},
             "message": "something"
         },
-        {
-            "hexsha": "bbbb",
-            "committed_datetime": "2020-01-02 12:34:56",
-            "author": {"name": "Sally", "email": "ssmith@foo"},
-            "message": "something else"
-        }
     ]
 
     with git_context(mocked_commits={"foo": mocked_commits}):
@@ -101,10 +101,10 @@ def test_git_analysis_git_commits():
         foo_commits = list(foo_repo.iter_commits())
         assert len(foo_commits) == 2
         assert all(isinstance(commit, MockGitCommit) for commit in foo_commits)
-        assert GitAnalysis.json_for_actor(foo_commits[0].author) == {'name': 'Jdoe', 'email': 'jdoe@foo'}
-        assert GitAnalysis.json_for_actor(foo_commits[1].author) == {'name': 'Sally', 'email': 'ssmith@foo'}
-        assert foo_commits[0].hexsha == 'aaaa'
-        assert foo_commits[1].hexsha == 'bbbb'
+        assert GitAnalysis.json_for_actor(foo_commits[0].author) == {'name': 'Sally', 'email': 'ssmith@foo'}
+        assert GitAnalysis.json_for_actor(foo_commits[1].author) == {'name': 'Jdoe', 'email': 'jdoe@foo'}
+        assert foo_commits[0].hexsha == 'bbbb'
+        assert foo_commits[1].hexsha == 'aaaa'
 
         assert [GitAnalysis.json_for_commit(commit) for commit in foo_commits] == list(GitAnalysis.git_commits('foo'))
 
@@ -113,18 +113,18 @@ def test_git_analysis_iter_commits_scenario():  # Tests .iter_commits, .json_for
 
     mocked_commits = [
         {
-            "hexsha": "aaaa",
-            "committed_datetime": "2020-01-01T01:23:45-05:00",
-            "author": {"name": "Jdoe", "email": "jdoe@foo"},
-            "message": "something"
-        },
-        {
             "hexsha": "bbbb",
             "committed_datetime": "2020-01-02T12:34:56-05:00",
             "author": {"name": "Sally", "email": "ssmith@foo"},
             "co_authors": [{"name": "William Simmons", "email": "bill@someplace"}],
             "message": "something else"
-        }
+        },
+        {
+            "hexsha": "aaaa",
+            "committed_datetime": "2020-01-01T01:23:45-05:00",
+            "author": {"name": "Jdoe", "email": "jdoe@foo"},
+            "message": "something"
+        },
     ]
 
     with git_context(mocked_commits={"foo": mocked_commits}):
@@ -132,19 +132,19 @@ def test_git_analysis_iter_commits_scenario():  # Tests .iter_commits, .json_for
         foo_commits_as_json = [GitAnalysis.json_for_commit(commit) for commit in foo_repo.iter_commits()]
         assert foo_commits_as_json == [
             {
+                'author': {'email': 'ssmith@foo', 'name': 'Sally'},
+                'coauthors': [{'email': 'bill@someplace', 'name': 'William Simmons'}],
+                'commit': 'bbbb',
+                'date': '2020-01-02T12:34:56-05:00',
+                'message': 'something else'
+            },
+            {
                 'author': {'email': 'jdoe@foo', 'name': 'Jdoe'},
                 'coauthors': [],
                 'commit': 'aaaa',
                 'date': '2020-01-01T01:23:45-05:00',
                 'message': 'something'
             },
-            {
-                'author': {'email': 'ssmith@foo', 'name': 'Sally'},
-                'coauthors': [{'email': 'bill@someplace', 'name': 'William Simmons'}],
-                'commit': 'bbbb',
-                'date': '2020-01-02T12:34:56-05:00',
-                'message': 'something else'
-            }
         ]
 
         assert foo_commits_as_json == list(GitAnalysis.git_commits('foo'))
@@ -680,18 +680,18 @@ def test_contributions_init_with_cached_pre_fork():
 
         mocked_commits = [
             {
-                "hexsha": "aaaa",
-                "committed_datetime": "2020-01-01T01:23:45-05:00",
-                "author": {"name": "Jessica", "email": "jdoe@foo"},
-                "message": "something"
-            },
-            {
                 "hexsha": "bbbb",
                 "committed_datetime": "2020-01-02T12:34:56-05:00",
                 "author": {"name": "Sally", "email": "ssmith@foo"},
                 "co_authors": [{"name": "William Simmons", "email": "bill@someplace"}],
                 "message": "something else"
-            }
+            },
+            {
+                "hexsha": "aaaa",
+                "committed_datetime": "2020-01-01T01:23:45-05:00",
+                "author": {"name": "Jessica", "email": "jdoe@foo"},
+                "message": "something"
+            },
         ]
 
         with git_context(mocked_commits={"foo": mocked_commits}):
@@ -733,18 +733,18 @@ def test_contributions_init_with_no_cached_pre_fork():
 
         mocked_commits = [
             {
-                "hexsha": "aaaa",
-                "committed_datetime": "2020-01-01T01:23:45-05:00",
-                "author": {"name": "Jessica", "email": "jdoe@foo"},
-                "message": "something"
-            },
-            {
                 "hexsha": "bbbb",
                 "committed_datetime": "2020-01-02T12:34:56-05:00",
                 "author": {"name": "Sally", "email": "ssmith@foo"},
                 "co_authors": [{"name": "William Simmons", "email": "bill@someplace"}],
                 "message": "something else"
-            }
+            },
+            {
+                "hexsha": "aaaa",
+                "committed_datetime": "2020-01-01T01:23:45-05:00",
+                "author": {"name": "Jessica", "email": "jdoe@foo"},
+                "message": "something"
+            },
         ]
 
         with git_context(mocked_commits={"foo": mocked_commits}):
