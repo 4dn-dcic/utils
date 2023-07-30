@@ -213,23 +213,30 @@ class BasicContributions(GitAnalysis):
         if contributor_index is None:
             return None
         else:
-            items = contributor_index.items()
-            key: str
-            result = {
+            return {
                 key: Contributor.from_dict(value)
-                for key, value in items
+                for key, value in contributor_index.items()
             }
-            return result
 
     def checkpoint_state(self):
         return self.as_dict()
 
     def as_dict(self):
-        data = {
-            "forked_at": self.forked_at.isoformat() if self.forked_at else None,
-            "pre_fork_contributors_by_name": self.contributor_values_as_dicts(self.pre_fork_contributors_by_name),
-            "contributors_by_name": self.contributor_values_as_dicts(self.contributors_by_name),
-        }
+
+        data = {}
+
+        forked_at = self.forked_at.isoformat() if self.forked_at else None
+        if forked_at is not None:
+            data["forked_at"] = forked_at
+
+        pre_fork_contributors_by_name = self.contributor_values_as_dicts(self.pre_fork_contributors_by_name)
+        if pre_fork_contributors_by_name is not None:
+            data["pre_fork_contributors_by_name"] = pre_fork_contributors_by_name
+
+        contributors_by_name = self.contributor_values_as_dicts(self.contributors_by_name)
+        if contributors_by_name is not None:
+            data["contributors_by_name"] = contributors_by_name
+
         return data
 
     def save_contributor_data(self, filename: Optional[str] = None) -> str:

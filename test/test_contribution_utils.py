@@ -578,24 +578,28 @@ def test_save_contributor_data():
 
         contributions = BasicContributions()
         cache_file = contributions.save_contributor_data()
+        assert json.loads(file_contents(cache_file)) == {}
 
-        assert file_contents(cache_file) == (
-            '{\n'
-            '  "forked_at": null,\n'
-            '  "pre_fork_contributors_by_name": null,\n'
-            '  "contributors_by_name": null\n'
-            '}\n'
-        )
+        contributions = BasicContributions()
+        contributions.forked_at = datetime.datetime(2020, 1, 1, 12, 34, 56)
+        contributions.pre_fork_contributors_by_name = {}
+        contributions.contributors_by_name = contributions.contributor_values_as_objects({
+            "Joe": {"names": ["Joe"], "emails": ["joe@foo"]}
+        })
+        cache_file = contributions.save_contributor_data()
+        assert json.loads(file_contents(cache_file)) == {
+            "forked_at": "2020-01-01T12:34:56",
+            "pre_fork_contributors_by_name": {},
+            "contributors_by_name": {"Joe": {"names": ["Joe"], "emails": ["joe@foo"]}}
+        }
 
         cache_file_2 = contributions.save_contributor_data('some.file')
         assert cache_file_2 == 'some.file'
-        assert file_contents(cache_file_2) == (
-            '{\n'
-            '  "forked_at": null,\n'
-            '  "pre_fork_contributors_by_name": null,\n'
-            '  "contributors_by_name": null\n'
-            '}\n'
-        )
+        assert json.loads(file_contents(cache_file_2)) == {
+            "forked_at": "2020-01-01T12:34:56",
+            "pre_fork_contributors_by_name": {},
+            "contributors_by_name": {"Joe": {"names": ["Joe"], "emails": ["joe@foo"]}}
+        }
 
 
 def test_repo_contributor_names():
