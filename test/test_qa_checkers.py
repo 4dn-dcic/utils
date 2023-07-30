@@ -286,7 +286,6 @@ def test_contribution_checker():
         with io.open(contributions_cache_file, 'w') as fp:
             cache_data = {
                 "forked_at": "2015-01-01T12:34:56-05:00",
-                "excluded_fork": None,
                 "pre_fork_contributors_by_name": None,
                 "contributors_by_name": {
                     "John Smith": {
