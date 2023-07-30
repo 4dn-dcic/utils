@@ -737,6 +737,20 @@ def test_contributions_init_with_fork_and_no_cache():
         mocked_foo_commits: List[Dict] = [
             {
                 "hexsha": "bbbb",
+                "committed_datetime": "2020-01-04T12:34:56-05:00",
+                "author": {"name": "Sally", "email": "sally.smith@foo"},
+                "co_authors": [{"name": "William Simmons", "email": "bill@someplace"}],
+                "message": "something else"
+            },
+            {
+                "hexsha": "bbbb",
+                "committed_datetime": "2020-01-03T12:34:56-05:00",
+                "author": {"name": "Sally Smith", "email": "ssmith@foo"},
+                "co_authors": [{"name": "William Simmons", "email": "bill@someplace"}],
+                "message": "something else"
+            },
+            {
+                "hexsha": "bbbb",
                 "committed_datetime": "2020-01-02T12:34:56-05:00",
                 "author": {"name": "Sally", "email": "ssmith@foo"},
                 "co_authors": [{"name": "William Simmons", "email": "bill@someplace"}],
@@ -773,11 +787,12 @@ def test_contributions_init_with_fork_and_no_cache():
             }
 
             assert contributions.contributor_values_as_dicts(contributions.contributors_by_email) == {
-                "ssmith@foo": {"names": ["Sally"], "emails": ["ssmith@foo"]},
+                "sally.smith@foo": {"names": ["Sally", "Sally Smith"], "emails": ["sally.smith@foo", "ssmith@foo"]},
+                "ssmith@foo": {"names": ["Sally", "Sally Smith"], "emails": ["sally.smith@foo", "ssmith@foo"]},
                 "bill@someplace": {"names": ["William Simmons"], "emails": ["bill@someplace"]},
             }
             assert contributions.contributor_values_as_dicts(contributions.contributors_by_name) == {
-                "Sally": {"names": ["Sally"], "emails": ["ssmith@foo"]},
+                "Sally Smith": {"names": ["Sally", "Sally Smith"], "emails": ["sally.smith@foo", "ssmith@foo"]},
                 "William Simmons": {"names": ["William Simmons"], "emails": ["bill@someplace"]},
             }
 
