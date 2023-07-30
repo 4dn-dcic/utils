@@ -115,14 +115,12 @@ class Contributor:
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict, *, key: Optional[str] = None) -> 'Contributor':
+    def from_dict(cls, data: Dict) -> 'Contributor':
         emails = data["emails"]
         names = data["names"]
         contributor = Contributor(email=emails[0], name=names[0])
         contributor.emails = set(emails)
         contributor.names = set(names)
-        if key:
-            contributor.set_primary_name(key)
         return contributor
 
     @classmethod
@@ -206,14 +204,17 @@ class BasicContributions(GitAnalysis):
             }
 
     @classmethod
-    def contributor_values_as_objects(cls, contributor_index: Optional[Dict]):
+    def contributor_values_as_objects(cls, contributor_index: Optional[Dict]) -> Optional[ContributorIndex]:
         if contributor_index is None:
             return None
         else:
-            return {
-                key: Contributor.from_dict(value, key=key)
-                for key, value in contributor_index.items()
+            items = contributor_index.items()
+            key: str
+            result = {
+                key: Contributor.from_dict(value)
+                for key, value in items
             }
+            return result
 
     def checkpoint_state(self):
         return self.as_dict()
@@ -315,11 +316,11 @@ class BasicContributions(GitAnalysis):
         return contributors
 
     @classmethod
-    def by_email_from_by_name(cls, contributors_by_email_json):
+    def by_email_from_by_name(cls, contributors_by_name_json):
         result = {}
         seen = set()
-        for email_key, entry in contributors_by_email_json.items():
-            ignored(email_key)
+        for name_key, entry in contributors_by_name_json.items():
+            ignored(name_key)
             seen_key = id(entry)
             if seen_key in seen:
                 continue
@@ -329,6 +330,12 @@ class BasicContributions(GitAnalysis):
                     raise Exception(f"email address {email} is used more than once.")
                 result[email] = entry
         return result
+
+    @classmethod
+    def set_keys_as_primary_names(cls, contributors_by_name: Optional[ContributorIndex]):
+        if contributors_by_name is not None:
+            for key, contributor in contributors_by_name.items():
+                contributor.set_primary_name(key)
 
 
 class Contributions(BasicContributions):
@@ -402,23 +409,35 @@ class Contributions(BasicContributions):
                                                        if forked_at is None
                                                        else datetime.datetime.fromisoformat(forked_at))
 
+        if 'excluded_fork' in data:
+            # We originally implemented this, but it isn't needed and supporting it leads to problems. -kmp 30-Jul-2023
+            raise ValueError('"excluded_fork" is no longer supported.')
+
         pre_fork_contributors_by_name_json = data.get('pre_fork_contributors_by_name') or {}
         pre_fork_contributors_by_name = self.contributor_values_as_objects(pre_fork_contributors_by_name_json)
+        self.set_keys_as_primary_names(pre_fork_contributors_by_name)
         self.pre_fork_contributors_by_name = pre_fork_contributors_by_name
-        pre_fork_contributors_by_email_json = data.get('pre_fork_contributors_by_email') or {}
-        if pre_fork_contributors_by_email_json:
-            pre_fork_contributors_by_email = self.contributor_values_as_objects(pre_fork_contributors_by_email_json)
-        else:
-            pre_fork_contributors_by_email = self.by_email_from_by_name(pre_fork_contributors_by_name)
+
+        if 'pre_fork_contributors_by_email' in data:
+            # We originally implemented this, but supporting it is unnecessarily complex
+            # because of redundancies of implementation and the possibility of ambiguities if both
+            # markers are present. -kmp 30-Jul-2023
+            raise ValueError('"pre_fork_contributors_by_email" is no longer supported.')
+        pre_fork_contributors_by_email = self.by_email_from_by_name(pre_fork_contributors_by_name)
         self.pre_fork_contributors_by_email = pre_fork_contributors_by_email
 
-        contributors_by_name_json = data.get('contributors_by_name', {})
-        self.contributors_by_name = contributors_by_name = self.contributor_values_as_objects(contributors_by_name_json)
-        contributors_by_email_json = data.get('contributors_by_email', {})
-        if contributors_by_email_json:
-            self.contributors_by_email = self.contributor_values_as_objects(contributors_by_email_json)
-        else:
-            self.contributors_by_email = self.by_email_from_by_name(contributors_by_name)
+        contributors_by_name_json = data.get('contributors_by_name') or {}
+        contributors_by_name = self.contributor_values_as_objects(contributors_by_name_json)
+        self.set_keys_as_primary_names(contributors_by_name)
+        self.contributors_by_name = contributors_by_name
+
+        if 'contributors_by_email' in data:
+            # We originally implemented this, but supporting it is unnecessarily complex
+            # because of redundancies of implementation and the possibility of ambiguities if both
+            # markers are present. -kmp 30-Jul-2023
+            raise ValueError('"contributors_by_email" is no longer supported.')
+        contributors_by_email = self.by_email_from_by_name(contributors_by_name)
+        self.contributors_by_email = contributors_by_email
 
     def reconcile_contributors_with_github_log(self, exclude_fork=None):
         """
@@ -497,7 +516,7 @@ class Contributions(BasicContributions):
                 contributors_by_email[email] = contributor_by_email
 
         self.contributors_by_name = self.contributor_index_by_primary_name(contributors_by_name)
-        self.contributors_by_email = contributors_by_email
+        self.contributors_by_email = self.by_email_from_by_name(self.contributors_by_name)  # contributors_by_email
 
         if DEBUG_CONTRIBUTIONS:  # pragma: no cover - debugging only
             PRINT("After reconcile_contributors_with_github_log...")

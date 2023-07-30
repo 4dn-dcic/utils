@@ -16,12 +16,17 @@ from unittest import mock
 
 
 class MockGitActor:
+
     def __init__(self, name: Optional[str], email: str):
         self.name = name
         self.email = email
 
+    def __str__(self):
+        return f"<~Actor {self.name} ({self.email})>"
+
 
 class MockGitCommit:
+
     def __init__(self, hexsha: str, committed_datetime: str, author: dict,
                  message: str, co_authors: Optional[List[dict]] = None):
         self.hexsha = hexsha
@@ -29,6 +34,12 @@ class MockGitCommit:
         self.author = MockGitActor(**author)
         self.co_authors = [MockGitActor(**co_author) for co_author in (co_authors or [])]
         self.message = message
+
+    def __str__(self):
+        return (f"<~Commit {self.hexsha}"
+                f" {self.committed_datetime.isoformat()}"
+                f" {self.author.email}"
+                f" {','.join(c.email for c in self.co_authors)}>")
 
 
 class MockGitRepo:
@@ -264,10 +275,6 @@ def test_contributor_from_dict():
     assert list(joe_obj.names) == joe_json['names']
 
     assert joe_obj.as_dict() == joe_json
-
-    joe_obj2 = Contributor.from_dict(joe_json, key="Joseph")
-    assert joe_obj.names != joe_obj2.names
-    assert joe_obj.names | {'Joseph'} == joe_obj2.names
 
 
 def test_contributor_notice_mention_as():
@@ -662,7 +669,7 @@ def test_show_repo_contributors_file_missing():
                 assert str(exc.value) == expected_message
 
 
-def test_contributions_init_with_cached_pre_fork():
+def test_contributions_init_with_cached_pre_fork_names():
 
     mfs = MockFileSystem()
 
@@ -764,3 +771,20 @@ def test_contributions_init_with_no_cached_pre_fork():
                 "Sally": {"names": ["Sally"], "emails": ["ssmith@foo"]},
                 "William Simmons": {"names": ["William Simmons"], "emails": ["bill@someplace"]},
             }
+
+
+@pytest.mark.parametrize('obsolete_key', ['excluded_fork', 'pre_fork_contributors_by_email', 'contributors_by_email'])
+def test_contributions_init_with_cached_obsolete_keys(obsolete_key):
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
+        os.chdir(SAMPLE_FOO_HOME)
+        with io.open(os.path.abspath(Contributions.CONTRIBUTORS_CACHE_FILE), 'w') as fp:
+            cache_data = {
+                "forked_at": "2020-01-02T12:34:56-05:00",
+                obsolete_key: None
+            }
+            json.dump(cache_data, fp=fp)
+        with git_context(mocked_commits={"foo": []}):  # mocked_commits
+            with pytest.raises(ValueError) as exc:
+                Contributions(repo='foo')
+            assert str(exc.value) == f'"{obsolete_key}" is no longer supported.'
