@@ -81,7 +81,7 @@ def test_git_analysis_find_repo():
 
 def test_git_analysis_git_commits():
 
-    with git_context(mocked_commits={"foo": [
+    mocked_commits = [
         {
             "hexsha": "aaaa",
             "committed_datetime": "2020-01-01 01:23:45",
@@ -94,7 +94,9 @@ def test_git_analysis_git_commits():
             "author": {"name": "Sally", "email": "ssmith@foo"},
             "message": "something else"
         }
-    ]}):
+    ]
+
+    with git_context(mocked_commits={"foo": mocked_commits}):
         foo_repo = GitAnalysis.find_repo('foo')
         foo_commits = list(foo_repo.iter_commits())
         assert len(foo_commits) == 2
@@ -109,7 +111,7 @@ def test_git_analysis_git_commits():
 
 def test_git_analysis_iter_commits_scenario():  # Tests .iter_commits, .json_for_commit, .json_for_actor, .git_commits
 
-    with git_context(mocked_commits={"foo": [
+    mocked_commits = [
         {
             "hexsha": "aaaa",
             "committed_datetime": "2020-01-01T01:23:45-05:00",
@@ -123,7 +125,9 @@ def test_git_analysis_iter_commits_scenario():  # Tests .iter_commits, .json_for
             "co_authors": [{"name": "William Simmons", "email": "bill@someplace"}],
             "message": "something else"
         }
-    ]}):
+    ]
+
+    with git_context(mocked_commits={"foo": mocked_commits}):
         foo_repo = GitAnalysis.find_repo("foo")
         foo_commits_as_json = [GitAnalysis.json_for_commit(commit) for commit in foo_repo.iter_commits()]
         assert foo_commits_as_json == [
@@ -656,3 +660,107 @@ def test_show_repo_contributors_file_missing():
                 with pytest.raises(AssertionError) as exc:
                     Contributions(repo='foo').show_repo_contributors(error_class=AssertionError)
                 assert str(exc.value) == expected_message
+
+
+def test_contributions_init_with_cached_pre_fork():
+
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
+
+        os.chdir(SAMPLE_FOO_HOME)
+
+        with io.open(os.path.abspath(Contributions.CONTRIBUTORS_CACHE_FILE), 'w') as fp:
+            cache_data = {
+                "forked_at": "2020-01-02T12:34:56-05:00",
+                "pre_fork_contributors_by_name": {"Jessica": {"names": ["Jessica"], "emails": ["jdoe@foo"]}},
+                "contributors_by_name": {}
+            }
+            json.dump(cache_data, fp=fp)
+
+        mocked_commits = [
+            {
+                "hexsha": "aaaa",
+                "committed_datetime": "2020-01-01T01:23:45-05:00",
+                "author": {"name": "Jessica", "email": "jdoe@foo"},
+                "message": "something"
+            },
+            {
+                "hexsha": "bbbb",
+                "committed_datetime": "2020-01-02T12:34:56-05:00",
+                "author": {"name": "Sally", "email": "ssmith@foo"},
+                "co_authors": [{"name": "William Simmons", "email": "bill@someplace"}],
+                "message": "something else"
+            }
+        ]
+
+        with git_context(mocked_commits={"foo": mocked_commits}):
+
+            contributions = Contributions(repo='foo')
+
+            assert contributions.contributor_values_as_dicts(contributions.pre_fork_contributors_by_email) == {
+                "jdoe@foo": {"names": ["Jessica"], "emails": ["jdoe@foo"]}
+            }
+            assert contributions.contributor_values_as_dicts(contributions.pre_fork_contributors_by_name) == {
+                "Jessica": {"names": ["Jessica"], "emails": ["jdoe@foo"]}
+            }
+
+            assert contributions.contributor_values_as_dicts(contributions.contributors_by_email) == {
+                "ssmith@foo": {"names": ["Sally"], "emails": ["ssmith@foo"]},
+                "bill@someplace": {"names": ["William Simmons"], "emails": ["bill@someplace"]},
+            }
+            assert contributions.contributor_values_as_dicts(contributions.contributors_by_name) == {
+                "Sally": {"names": ["Sally"], "emails": ["ssmith@foo"]},
+                "William Simmons": {"names": ["William Simmons"], "emails": ["bill@someplace"]},
+            }
+
+
+def test_contributions_init_with_no_cached_pre_fork():
+
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
+
+        os.chdir(SAMPLE_FOO_HOME)
+
+        with io.open(os.path.abspath(Contributions.CONTRIBUTORS_CACHE_FILE), 'w') as fp:
+            cache_data = {
+                "forked_at": None,
+                "pre_fork_contributors_by_name": None,
+                "contributors_by_name": {}
+            }
+            json.dump(cache_data, fp=fp)
+
+        mocked_commits = [
+            {
+                "hexsha": "aaaa",
+                "committed_datetime": "2020-01-01T01:23:45-05:00",
+                "author": {"name": "Jessica", "email": "jdoe@foo"},
+                "message": "something"
+            },
+            {
+                "hexsha": "bbbb",
+                "committed_datetime": "2020-01-02T12:34:56-05:00",
+                "author": {"name": "Sally", "email": "ssmith@foo"},
+                "co_authors": [{"name": "William Simmons", "email": "bill@someplace"}],
+                "message": "something else"
+            }
+        ]
+
+        with git_context(mocked_commits={"foo": mocked_commits}):
+
+            contributions = Contributions(repo='foo')
+
+            assert contributions.contributor_values_as_dicts(contributions.pre_fork_contributors_by_email) == {}
+            assert contributions.contributor_values_as_dicts(contributions.pre_fork_contributors_by_name) == {}
+
+            assert contributions.contributor_values_as_dicts(contributions.contributors_by_email) == {
+                "jdoe@foo": {"names": ["Jessica"], "emails": ["jdoe@foo"]},
+                "ssmith@foo": {"names": ["Sally"], "emails": ["ssmith@foo"]},
+                "bill@someplace": {"names": ["William Simmons"], "emails": ["bill@someplace"]},
+            }
+            assert contributions.contributor_values_as_dicts(contributions.contributors_by_name) == {
+                "Jessica": {"names": ["Jessica"], "emails": ["jdoe@foo"]},
+                "Sally": {"names": ["Sally"], "emails": ["ssmith@foo"]},
+                "William Simmons": {"names": ["William Simmons"], "emails": ["bill@someplace"]},
+            }
