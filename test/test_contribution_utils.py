@@ -736,17 +736,27 @@ def test_contributions_init_with_fork_and_no_cache():
 
         mocked_foo_commits: List[Dict] = [
             {
-                "hexsha": "bbbb",
-                "committed_datetime": "2020-01-04T12:34:56-05:00",
-                "author": {"name": "Sally", "email": "sally.smith@foo"},
-                "co_authors": [{"name": "William Simmons", "email": "bill@someplace"}],
+                "hexsha": "ffff",
+                "committed_datetime": "2020-01-05T12:34:56-05:00",
+                "author": {"name": None, "email": "sal@foo"},
                 "message": "something else"
             },
             {
-                "hexsha": "bbbb",
-                "committed_datetime": "2020-01-03T12:34:56-05:00",
+                "hexsha": "eeee",
+                "committed_datetime": "2020-01-05T12:34:56-05:00",
+                "author": {"name": "Sal", "email": "ssmith@foo"},
+                "message": "something else"
+            },
+            {
+                "hexsha": "dddd",
+                "committed_datetime": "2020-01-04T12:34:56-05:00",
                 "author": {"name": "Sally Smith", "email": "ssmith@foo"},
-                "co_authors": [{"name": "William Simmons", "email": "bill@someplace"}],
+                "message": "something else"
+            },
+            {
+                "hexsha": "cccc",
+                "committed_datetime": "2020-01-03T12:34:56-05:00",
+                "author": {"name": "Sally Smith", "email": "sally.smith@foo"},
                 "message": "something else"
             },
             {
@@ -787,12 +797,15 @@ def test_contributions_init_with_fork_and_no_cache():
             }
 
             assert contributions.contributor_values_as_dicts(contributions.contributors_by_email) == {
-                "sally.smith@foo": {"names": ["Sally", "Sally Smith"], "emails": ["sally.smith@foo", "ssmith@foo"]},
-                "ssmith@foo": {"names": ["Sally", "Sally Smith"], "emails": ["sally.smith@foo", "ssmith@foo"]},
+                "sal@foo": {"names": ["sal"], "emails": ["sal@foo"]},
+                "sally.smith@foo": {"names": ["Sal", "Sally", "Sally Smith"],
+                                    "emails": ["sally.smith@foo", "ssmith@foo"]},
+                "ssmith@foo": {"names": ["Sal", "Sally", "Sally Smith"], "emails": ["sally.smith@foo", "ssmith@foo"]},
                 "bill@someplace": {"names": ["William Simmons"], "emails": ["bill@someplace"]},
             }
             assert contributions.contributor_values_as_dicts(contributions.contributors_by_name) == {
-                "Sally Smith": {"names": ["Sally", "Sally Smith"], "emails": ["sally.smith@foo", "ssmith@foo"]},
+                "sal": {"names": ["sal"], "emails": ["sal@foo"]},
+                "Sally Smith": {"names": ["Sal", "Sally", "Sally Smith"], "emails": ["sally.smith@foo", "ssmith@foo"]},
                 "William Simmons": {"names": ["William Simmons"], "emails": ["bill@someplace"]},
             }
 

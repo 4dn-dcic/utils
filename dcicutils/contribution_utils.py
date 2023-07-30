@@ -4,6 +4,7 @@ import io
 import json
 import os
 import re
+import warnings
 
 from collections import defaultdict
 from dcicutils.diff_utils import DiffManager
@@ -34,9 +35,13 @@ class GitAnalysis:
             yield cls.json_for_commit(commit)
 
     @classmethod
+    def author_name(cls, actor: git.Actor) -> str:
+        return actor.name or actor.email.split('@')[0]
+
+    @classmethod
     def json_for_actor(cls, actor: git.Actor) -> Dict:
         return {
-            "name": actor.name,
+            "name": cls.author_name(actor),
             "email": actor.email,
         }
 
@@ -55,7 +60,7 @@ class Contributor:
 
     @classmethod
     def create(cls, *, author: git.Actor) -> 'Contributor':
-        return Contributor(email=author.email, name=author.name)
+        return Contributor(email=author.email, name=GitAnalysis.author_name(author))
 
     def __init__(self, *, email: Optional[str] = None, name: Optional[str] = None,
                  emails: Optional[Set[str]] = None, names: Optional[Set[str]] = None,
@@ -480,11 +485,12 @@ class Contributions(BasicContributions):
                         # PRINT(f"Post-fork contribution from {author.email} ({date})")
                         post_fork_contributors_seen[author.email].append(date)
                 self.notice_reference_time(key=author.email, timestamp=date, timestamps=self.email_timestamps)
-                self.notice_reference_time(key=author.name, timestamp=date, timestamps=self.name_timestamps)
+                self.notice_reference_time(key=GitAnalysis.author_name(author), timestamp=date,
+                                           timestamps=self.name_timestamps)
 
                 contributor_by_email = contributors_by_email.get(author.email)
                 if contributor_by_email:  # already exists, so update it
-                    contributor_by_email.notice_mention_as(email=author.email, name=author.name)
+                    contributor_by_email.notice_mention_as(email=author.email, name=GitAnalysis.author_name(author))
                 else:  # need to create it new
                     contributor_by_email = Contributor.create(author=author)
                     contributors_by_email[author.email] = contributor_by_email
@@ -551,6 +557,7 @@ class Contributions(BasicContributions):
                              contributors_by_name=contributors_by_name, seen=seen)
         for email in list(cursor.emails):
             contributor = contributors_by_email.get(email)
-            if contributor and contributor not in seen:
+            if contributor and contributor not in seen:  # pragma: no cover - shouldn't happen, included 'just in case'
+                warnings.warn(f"Unexpected stray email seen: {email}")
                 cls.traverse(root=root, cursor=contributor, contributors_by_email=contributors_by_email,
                              contributors_by_name=contributors_by_name, seen=seen)
