@@ -240,6 +240,29 @@ class BasicContributions(GitAnalysis):
             else:
                 yield name
 
+    def show_repo_contributors(self, analyze_discrepancies: bool = True, with_email: bool = True,
+                               error_class: Optional[Type[BaseException]] = None):
+        for author_name in self.repo_contributor_names(with_email=with_email):
+            PRINT(author_name)
+        if analyze_discrepancies:
+            file = self.existing_contributors_json_file()
+            if not file:
+                message = f"Need to create a {self.CONTRIBUTORS_CACHE_FILE} file for {self.repo}."
+                if error_class:
+                    raise error_class(message)
+                else:
+                    PRINT(message)
+            elif self.cache_discrepancies:
+                message = "There are contributor cache discrepancies."
+                PRINT(f"===== {message.rstrip('.').upper()} =====")
+                for action, items in self.cache_discrepancies.items():
+                    action: str
+                    PRINT(f"{action.replace('_', ' ').title()}:")
+                    for item in items:
+                        PRINT(f" * {item}")
+                if error_class:
+                    raise error_class(message)
+
     @classmethod
     def pretty_email(cls, email):
         m = GITHUB_USER_REGEXP.match(email)
@@ -453,14 +476,13 @@ class Contributions(BasicContributions):
             notice_author(author=commit.author, date=commit_date)
             for co_author in commit.co_authors:
                 notice_author(author=co_author, date=commit_date)
-        if DEBUG_CONTRIBUTIONS:
+        if DEBUG_CONTRIBUTIONS:  # pragma: no cover - debugging only
             PRINT(f"{n_of(n, 'commit')} processed.")
-
-        for email, dates in post_fork_contributors_seen.items():
-            when = str(dates[0].date())
-            if len(dates) > 1:
-                when += f" to {dates[-1].date()}"
-            PRINT(f"{n_of(dates, 'post-fork commit')} seen for {email} ({when}).")
+            for email, dates in post_fork_contributors_seen.items():
+                when = str(dates[0].date())
+                if len(dates) > 1:
+                    when += f" to {dates[-1].date()}"
+                PRINT(f"{n_of(dates, 'post-fork commit')} seen for {email} ({when}).")
 
         contributors_by_name: ContributorIndex = {}
 
@@ -510,26 +532,3 @@ class Contributions(BasicContributions):
             if contributor and contributor not in seen:
                 cls.traverse(root=root, cursor=contributor, contributors_by_email=contributors_by_email,
                              contributors_by_name=contributors_by_name, seen=seen)
-
-    def show_repo_contributors(self, analyze_discrepancies: bool = True, with_email: bool = True,
-                               error_class: Optional[Type[BaseException]] = None):
-        for author_name in self.repo_contributor_names(with_email=with_email):
-            PRINT(author_name)
-        if analyze_discrepancies:
-            file = self.existing_contributors_json_file()
-            if not file:
-                message = f"Need to create a {self.CONTRIBUTORS_CACHE_FILE} file for {self.repo}."
-                if error_class:
-                    raise error_class(message)
-                else:
-                    PRINT(message)
-            elif self.cache_discrepancies:
-                message = "There are contributor cache discrepancies."
-                PRINT(f"===== {message.rstrip('.').upper()} =====")
-                for action, items in self.cache_discrepancies.items():
-                    action: str
-                    PRINT(f"{action.replace('_', ' ').title()}:")
-                    for item in items:
-                        PRINT(f" * {item}")
-                if error_class:
-                    raise error_class(message)

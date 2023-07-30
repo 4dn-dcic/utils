@@ -639,3 +639,20 @@ def test_resummarize_discrepancies():
         'to_change': ['c'],
         'to_remove': ['d', 'e'],
     }
+
+
+def test_show_repo_contributors_file_missing():
+
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with printed_output() as printed:
+            with git_context(mocked_commits={'foo': []}):
+
+                expected_message = 'Need to create a CONTRIBUTORS.json file for foo.'
+
+                Contributions(repo='foo').show_repo_contributors(error_class=None)
+                assert printed.lines == [expected_message]
+
+                with pytest.raises(AssertionError) as exc:
+                    Contributions(repo='foo').show_repo_contributors(error_class=AssertionError)
+                assert str(exc.value) == expected_message
