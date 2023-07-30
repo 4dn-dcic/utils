@@ -457,10 +457,12 @@ class Contributions(BasicContributions):
         else:
             pre_fork_contributor_emails = set()
 
-        post_fork_contributors_seen = defaultdict(lambda: [])
+        post_fork_contributors_seen = defaultdict(lambda: [])  # pragma: no cover - for debugging only
 
         contributors_by_email: ContributorIndex = self.contributors_by_email or {}
         git_repo = self.find_repo(repo_name=self.repo)
+
+        n = 0
 
         def notice_author(*, author: git.Actor, date: datetime.datetime):
             if self.forked_at:
@@ -468,13 +470,15 @@ class Contributions(BasicContributions):
                     return
                     # raise Exception("Commits are out of order.")
             elif author.email not in pre_fork_contributor_emails:
-                PRINT(f"Forked {self.repo} at {date} by {author.email}")
+                action = "Created" if n == 1 else (f"Forked {exclude_fork} as" if exclude_fork else "Forked")
+                PRINT(f"{action} {self.repo} at {date} by {author.email}")
                 self.forked_at = date
 
             if self.forked_at and date >= self.forked_at:
-                if author.email in pre_fork_contributor_emails:
-                    # PRINT(f"Post-fork contribution from {author.email} ({date})")
-                    post_fork_contributors_seen[author.email].append(date)
+                if DEBUG_CONTRIBUTIONS:  # pragma: no cover - debugging only
+                    if author.email in pre_fork_contributor_emails:  # pragma: no cover - this is for debugging
+                        # PRINT(f"Post-fork contribution from {author.email} ({date})")
+                        post_fork_contributors_seen[author.email].append(date)
                 self.notice_reference_time(key=author.email, timestamp=date, timestamps=self.email_timestamps)
                 self.notice_reference_time(key=author.name, timestamp=date, timestamps=self.name_timestamps)
 
@@ -488,7 +492,6 @@ class Contributions(BasicContributions):
                 # print("skipped")
                 pass
 
-        n = 0
         for commit in reversed(list(git_repo.iter_commits())):
             n += 1
             commit_date = commit.committed_datetime

@@ -11,7 +11,7 @@ from dcicutils import contribution_utils as contribution_utils_module
 from dcicutils.contribution_utils import Contributor, BasicContributions, Contributions, GitAnalysis
 from dcicutils.misc_utils import make_counter, file_contents  # , override_environ
 from dcicutils.qa_utils import MockId, MockFileSystem, printed_output
-from typing import List, Optional
+from typing import Dict, List, Optional
 from unittest import mock
 
 
@@ -671,6 +671,8 @@ def test_show_repo_contributors_file_missing():
 
 def test_contributions_init_with_cached_pre_fork_names():
 
+    print()  # start on a fresh line
+
     mfs = MockFileSystem()
 
     with mfs.mock_exists_open_remove_abspath_getcwd_chdir():
@@ -722,7 +724,9 @@ def test_contributions_init_with_cached_pre_fork_names():
             }
 
 
-def test_contributions_init_with_no_cached_pre_fork():
+def test_contributions_init_with_fork_and_no_cache():
+
+    print()  # start on a fresh line
 
     mfs = MockFileSystem()
 
@@ -730,15 +734,7 @@ def test_contributions_init_with_no_cached_pre_fork():
 
         os.chdir(SAMPLE_FOO_HOME)
 
-        with io.open(os.path.abspath(Contributions.CONTRIBUTORS_CACHE_FILE), 'w') as fp:
-            cache_data = {
-                "forked_at": None,
-                "pre_fork_contributors_by_name": None,
-                "contributors_by_name": {}
-            }
-            json.dump(cache_data, fp=fp)
-
-        mocked_commits = [
+        mocked_foo_commits: List[Dict] = [
             {
                 "hexsha": "bbbb",
                 "committed_datetime": "2020-01-02T12:34:56-05:00",
@@ -746,6 +742,9 @@ def test_contributions_init_with_no_cached_pre_fork():
                 "co_authors": [{"name": "William Simmons", "email": "bill@someplace"}],
                 "message": "something else"
             },
+        ]
+
+        mocked_old_foo_commits: List[Dict] = [
             {
                 "hexsha": "aaaa",
                 "committed_datetime": "2020-01-01T01:23:45-05:00",
@@ -754,20 +753,30 @@ def test_contributions_init_with_no_cached_pre_fork():
             },
         ]
 
-        with git_context(mocked_commits={"foo": mocked_commits}):
+        with git_context(mocked_commits={
+            "old-foo": mocked_old_foo_commits,
+            "foo": mocked_foo_commits + mocked_old_foo_commits,
+        }):
 
-            contributions = Contributions(repo='foo')
+            with printed_output() as printed:
+                contributions = Contributions(repo='foo', exclude_fork='old-foo')
+                assert printed.lines == [
+                    'Created old-foo at 2020-01-01 01:23:45-05:00 by jdoe@foo',
+                    'Forked old-foo as foo at 2020-01-02 12:34:56-05:00 by ssmith@foo',
+                ]
 
-            assert contributions.contributor_values_as_dicts(contributions.pre_fork_contributors_by_email) == {}
-            assert contributions.contributor_values_as_dicts(contributions.pre_fork_contributors_by_name) == {}
+            assert contributions.contributor_values_as_dicts(contributions.pre_fork_contributors_by_email) == {
+                "jdoe@foo": {"names": ["Jessica"], "emails": ["jdoe@foo"]},
+            }
+            assert contributions.contributor_values_as_dicts(contributions.pre_fork_contributors_by_name) == {
+                "Jessica": {"names": ["Jessica"], "emails": ["jdoe@foo"]},
+            }
 
             assert contributions.contributor_values_as_dicts(contributions.contributors_by_email) == {
-                "jdoe@foo": {"names": ["Jessica"], "emails": ["jdoe@foo"]},
                 "ssmith@foo": {"names": ["Sally"], "emails": ["ssmith@foo"]},
                 "bill@someplace": {"names": ["William Simmons"], "emails": ["bill@someplace"]},
             }
             assert contributions.contributor_values_as_dicts(contributions.contributors_by_name) == {
-                "Jessica": {"names": ["Jessica"], "emails": ["jdoe@foo"]},
                 "Sally": {"names": ["Sally"], "emails": ["ssmith@foo"]},
                 "William Simmons": {"names": ["William Simmons"], "emails": ["bill@someplace"]},
             }
