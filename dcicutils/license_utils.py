@@ -667,6 +667,10 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         # Ref: https://github.com/xlwings/jsondiff/blob/master/LICENSE
         'jsondiff',
 
+        # This has an MIT license in its source repository
+        # Ref: https://github.com/pkerpedjiev/negspy/blob/master/LICENSE
+        'negspy',
+
         # This license statement is complicated, but seems adequately permissive.
         # Ref: https://foss.heptapod.net/python-libs/passlib/-/blob/branch/stable/LICENSE
         'passlib',
@@ -681,11 +685,19 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         # Ref: https://github.com/mk-fg/pretty-yaml/blob/master/COPYING
         'pyaml',
 
+        # This uses a BSD license
+        # Ref: https://github.com/eliben/pycparser/blob/master/LICENSE
+        'pycparser',
+
         # The source repo for pyDes says this is under an MIT license
         # Ref: https://github.com/twhiteman/pyDes/blob/master/LICENSE.txt
         # pypi, probably wrongly, thinks this is in the public domain (as of 2023-07-21)
         # Ref: https://pypi.org/project/pyDes/
         'pyDes',
+
+        # This uses an MIT license
+        # Ref: https://github.com/pysam-developers/pysam/blob/master/COPYING
+        'pysam',
 
         # The version of python-lambda that we forked calls itself this (and publishes at pypi under this name)
         "python-lambda-4dn",
