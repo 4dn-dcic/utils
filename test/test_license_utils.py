@@ -457,7 +457,7 @@ def test_license_checker_bad_license_title():
 
     def checker(printed, license_warnings):
         ignored(printed)  # tested elsewhere
-        assert "The license, 'BAD TITLE', was expected to be 'Some License'." in license_warnings
+        assert "The license, 'BAD TITLE', was expected to match 'Some License'." in license_warnings
 
     check_license_checker_full_scenario_failing_generic(
         perturb_setup=perturb_setup,
@@ -491,7 +491,8 @@ def test_license_checker_bad_license_owner():
 
     def checker(printed, license_warnings):
         ignored(printed)  # tested elsewhere
-        assert (f"The copyright owner, 'Someone different', was expected to be {DEFAULT_COPYRIGHT_OWNER_FOR_TESTING!r}."
+        assert ((f"The copyright owner, 'Someone different',"
+                 f" was expected to match {DEFAULT_COPYRIGHT_OWNER_FOR_TESTING!r}.")
                 in license_warnings)
 
     check_license_checker_full_scenario_failing_generic(

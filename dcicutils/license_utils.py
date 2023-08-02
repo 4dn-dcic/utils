@@ -275,8 +275,8 @@ class LicenseFileParser:
         parsed = cls.parse_simple_license_file(filename=filename)
         if check_license_title:
             license_title = parsed['license-title']
-            if license_title != check_license_title:
-                report(f"The license, {license_title!r}, was expected to be {check_license_title!r}.")
+            if not re.match(check_license_title, license_title):
+                report(f"The license, {license_title!r}, was expected to match {check_license_title!r}.")
         if check_copyright_year:
             if check_copyright_year is True:
                 check_copyright_year = str(datetime.datetime.now().year)
@@ -285,8 +285,8 @@ class LicenseFileParser:
                 report(f"The copyright year, {copyright_year!r}, should have {check_copyright_year!r} at the end.")
         if check_copyright_owner:
             copyright_owner = parsed['copyright-owner']
-            if copyright_owner != check_copyright_owner:
-                report(f"The copyright owner, {copyright_owner!r}, was expected to be {check_copyright_owner!r}.")
+            if not re.match(check_copyright_owner, copyright_owner):
+                report(f"The copyright owner, {copyright_owner!r}, was expected to match {check_copyright_owner!r}.")
 
 
 class LicenseChecker:
@@ -531,7 +531,7 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
     """
 
     COPYRIGHT_OWNER = "President and Fellows of Harvard College"
-    LICENSE_TITLE = "The MIT License"
+    LICENSE_TITLE = "(The )?MIT License"
     LICENSE_FRAMEWORKS = ['python', 'javascript']
 
     ALLOWED = [
@@ -729,7 +729,7 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
 
         # This seems to be a BSD-3-Clause-Modification license.
         # Ref: https://github.com/Pylons/translationstring/blob/master/LICENSE.txt
-        # 'translationstring',
+        'translationstring',
 
         # This seems to be a BSD-3-Clause-Modification license.
         # Ref: https://github.com/Pylons/venusian/blob/master/LICENSE.txt
