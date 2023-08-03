@@ -1,13 +1,12 @@
 from contextlib import contextmanager
 from random import random
-from typing import Any, Iterator, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, Optional, Tuple, Union
 from unittest import mock
 
 import pytest
 
 from dcicutils import item_model_utils as item_models_module
 from dcicutils.item_model_utils import (
-    JsonObject,
     LinkTo,
     get_item_identifier,
     get_link_to,
@@ -97,7 +96,7 @@ def mock_portal_item():
 
 
 def get_portal_item(
-    properties: Optional[JsonObject] = None,
+    properties: Optional[Dict[str, Any]] = None,
     fetch_links: Optional[bool] = False,
     auth: Optional[bool] = None,
     use_defaults: Optional[bool] = True,
@@ -151,7 +150,7 @@ def test_get_link_to(
         ({"uuid": "foo"}, "foo"),
     ],
 )
-def test_get_item_identifier(item: Union[str, JsonObject], expected: str) -> None:
+def test_get_item_identifier(item: Union[str, Dict[str, Any]], expected: str) -> None:
     result = get_item_identifier(item)
     assert result == expected
 
@@ -160,28 +159,28 @@ class TestPortalItem:
     @pytest.mark.parametrize(
         "properties,expected", [({}, ""), (SOME_ITEM_PROPERTIES, SOME_UUID)]
     )
-    def test_get_uuid(self, properties: JsonObject, expected: str) -> None:
+    def test_get_uuid(self, properties: Dict[str, Any], expected: str) -> None:
         portal_item = get_portal_item(properties=properties)
         assert portal_item.get_uuid() == expected
 
     @pytest.mark.parametrize(
         "properties,expected", [({}, ""), (SOME_ITEM_PROPERTIES, SOME_AT_ID)]
     )
-    def test_get_at_id(self, properties: JsonObject, expected: str) -> None:
+    def test_get_at_id(self, properties: Dict[str, Any], expected: str) -> None:
         portal_item = get_portal_item(properties=properties)
         assert portal_item.get_at_id() == expected
 
     @pytest.mark.parametrize(
         "properties,expected", [({}, ""), (SOME_ITEM_PROPERTIES, SOME_ACCESSION)]
     )
-    def test_get_accession(self, properties: JsonObject, expected: str) -> None:
+    def test_get_accession(self, properties: Dict[str, Any], expected: str) -> None:
         portal_item = get_portal_item(properties=properties)
         assert portal_item.get_accession() == expected
 
     @pytest.mark.parametrize(
         "properties,expected", [({}, []), (SOME_ITEM_PROPERTIES, SOME_TYPES)]
     )
-    def test_get_types(self, properties: JsonObject, expected: str) -> None:
+    def test_get_types(self, properties: Dict[str, Any], expected: str) -> None:
         portal_item = get_portal_item(properties=properties)
         assert portal_item.get_types() == expected
 
@@ -247,7 +246,7 @@ class TestPortalItem:
     @pytest.mark.parametrize(
         "auth,expected", [({}, tuple()), (SOME_AUTH, HASHABLE_SOME_AUTH)]
     )
-    def test_make_hashable_auth(self, auth: JsonObject, expected: Tuple) -> None:
+    def test_make_hashable_auth(self, auth: Dict[str, Any], expected: Tuple) -> None:
         portal_item = get_portal_item()
         result = portal_item._make_hashable_auth(auth)
         assert result == expected
@@ -256,7 +255,7 @@ class TestPortalItem:
         "hashable_auth,expected", [(tuple(), {}), (HASHABLE_SOME_AUTH, SOME_AUTH)]
     )
     def test_undo_make_hashable_auth(
-        self, hashable_auth: Tuple, expected: JsonObject
+        self, hashable_auth: Tuple, expected: Dict[str, Any]
     ) -> None:
         portal_item = get_portal_item()
         result = portal_item._undo_make_hashable_auth(hashable_auth)
@@ -266,7 +265,7 @@ class TestPortalItem:
         "raise_exception,expected", [(False, SOME_ITEM_PROPERTIES), (True, {})]
     )
     def test_get_and_cache_item_via_auth(
-        self, raise_exception: bool, expected: JsonObject
+        self, raise_exception: bool, expected: Dict[str, Any]
     ) -> None:
         side_effect = Exception if raise_exception else None
         random_add_on = str(random())  # To differentiate parametrized calls
@@ -299,7 +298,7 @@ class TestPortalItem:
         ],
     )
     def test_from_identifier_and_existing_item(
-        self, auth: JsonObject, fetch_links: bool, exception_expected: bool
+        self, auth: Dict[str, Any], fetch_links: bool, exception_expected: bool
     ) -> None:
         identifier = SOME_UUID
         portal_item = get_portal_item(
@@ -330,7 +329,8 @@ class TestPortalItem:
 
 
 def get_nested_property(
-    properties: Optional[JsonObject] = None, parent_item: Optional[PortalItem] = None
+    properties: Optional[Dict[str, Any]] = None,
+    parent_item: Optional[PortalItem] = None,
 ) -> NestedProperty:
     properties = properties or SOME_ITEM_PROPERTIES
     return NestedProperty(properties=properties, parent_item=parent_item)

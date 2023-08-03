@@ -14,6 +14,14 @@ def patch_context(
     module: Optional[ModuleType] = None,
     **kwargs,
 ) -> Iterator[mock.MagicMock]:
+    """Mock out the given object.
+
+    Essentially mock.patch_object with some hacks to enable linting
+    on the object to patch instead of providing as a string.
+
+    Depending on import structure, adding the module to patch may be
+    required.
+    """
     if isinstance(to_patch, property):
         to_patch = to_patch.fget
         new_callable = mock.PropertyMock
@@ -27,17 +35,3 @@ def patch_context(
         if return_value != AN_UNLIKELY_RETURN_VALUE:
             mocked_item.return_value = return_value
         yield mocked_item
-#
-#
-#
-# @contextmanager
-# def patch_context(
-#     object_to_patch: object,
-#     attribute_to_patch: str,
-#     return_value: Optional[Any] = None,
-#     **kwargs,
-# ) -> Iterator[mock.MagicMock]:
-#     with mock.patch.object(object_to_patch, attribute_to_patch, **kwargs) as mocked_item:
-#         if return_value is not None:
-#             mocked_item.return_value = return_value
-#         yield mocked_item

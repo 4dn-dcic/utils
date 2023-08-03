@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Iterable, List, Mapping, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple, Union
 
 import structlog
 
@@ -11,8 +11,7 @@ from . import ff_utils
 
 logger = structlog.getLogger(__name__)
 
-JsonObject = Mapping[str, Any]
-LinkTo = Union[str, JsonObject]
+LinkTo = Union[str, Dict[str, Any]]
 
 
 def get_link_to(
@@ -22,7 +21,7 @@ def get_link_to(
 ) -> Union[str, PortalItem]:
     """Create new item model from existing one for given linkTo.
 
-    LinkTos be identifiers (UUIDs) or (partially) embedded objects.
+    LinkTos be identifiers (e.g. UUIDs) or (partially) embedded objects.
 
     Follow rules of existing item model for fetching linkTo via
     request. If not fetching via request, then make item model from
@@ -53,8 +52,8 @@ class PortalItem:
     TYPE = "@type"
     UUID = "uuid"
 
-    properties: JsonObject
-    auth: Optional[JsonObject] = field(default=None, hash=False)
+    properties: Dict[str, Any]
+    auth: Optional[Dict[str, Any]] = field(default=None, hash=False)
     fetch_links: Optional[bool] = field(default=False, hash=False)
 
     def __repr__(self) -> str:
@@ -79,10 +78,10 @@ class PortalItem:
     def should_fetch_links(self) -> bool:
         return self.fetch_links
 
-    def get_auth(self) -> Union[JsonObject, None]:
+    def get_auth(self) -> Union[Dict[str, Any], None]:
         return self.auth
 
-    def get_properties(self) -> JsonObject:
+    def get_properties(self) -> Dict[str, Any]:
         return self.properties
 
     def get_accession(self) -> str:
@@ -112,24 +111,27 @@ class PortalItem:
     @classmethod
     def from_properties(
         cls,
-        properties: JsonObject,
+        properties: Dict[str, Any],
         fetch_links: bool = False,
-        auth: JsonObject = None,
+        auth: Dict[str, Any] = None,
         **kwargs: Any,
     ) -> PortalItem:
         return cls(properties, fetch_links=fetch_links, auth=auth)
 
     @classmethod
     def from_identifier_and_auth(
-        cls, identifier: str, auth: JsonObject, fetch_links=False, **kwargs: Any
+        cls, identifier: str, auth: Dict[str, Any], fetch_links=False, **kwargs: Any
     ) -> PortalItem:
         properties = cls._get_item_via_auth(identifier, auth)
         return cls.from_properties(properties, auth=auth, fetch_links=fetch_links)
 
     @classmethod
     def _get_item_via_auth(
-        cls, identifier: str, auth: JsonObject, add_on: Optional[str] = "frame=object"
-    ) -> JsonObject:
+        cls,
+        identifier: str,
+        auth: Dict[str, Any],
+        add_on: Optional[str] = "frame=object",
+    ) -> Dict[str, Any]:
         hashable_auth = cls._make_hashable_auth(auth)
         return cls._get_and_cache_item_via_auth(identifier, hashable_auth, add_on)
 
@@ -141,7 +143,7 @@ class PortalItem:
     @classmethod
     def _undo_make_hashable_auth(
         cls, hashable_auth: Tuple[Tuple[str, str]]
-    ) -> JsonObject:
+    ) -> Dict[str, Any]:
         return dict(hashable_auth)
 
     @classmethod
@@ -151,7 +153,7 @@ class PortalItem:
         identifier: str,
         hashable_auth: Tuple[Tuple[str, Any]],
         add_on: Optional[str] = None,
-    ) -> JsonObject:
+    ) -> Dict[str, Any]:
         """Save on requests by caching items."""
         auth = cls._undo_make_hashable_auth(hashable_auth)
         try:
@@ -175,7 +177,7 @@ class PortalItem:
 
     @classmethod
     def from_properties_and_existing_item(
-        cls, properties: JsonObject, existing_item: PortalItem, **kwargs: Any
+        cls, properties: Dict[str, Any], existing_item: PortalItem, **kwargs: Any
     ) -> PortalItem:
         fetch_links = existing_item.should_fetch_links()
         auth = existing_item.get_auth()
@@ -184,13 +186,13 @@ class PortalItem:
 
 @dataclass(frozen=True)
 class NestedProperty:
-    properties: JsonObject
+    properties: Dict[str, Any]
     parent_item: Optional[PortalItem] = field(default=None, hash=False)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(parent={self.parent_item.__repr__()})"
 
-    def get_properties(self) -> JsonObject:
+    def get_properties(self) -> Dict[str, Any]:
         return self.properties
 
     def get_parent_item(self) -> Union[PortalItem, None]:
@@ -215,7 +217,7 @@ class NestedProperty:
     @classmethod
     def from_properties(
         cls,
-        properties: JsonObject,
+        properties: Dict[str, Any],
         parent_item: Optional[PortalItem] = None,
         **kwargs: Any,
     ) -> NestedProperty:
