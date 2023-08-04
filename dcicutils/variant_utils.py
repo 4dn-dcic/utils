@@ -2,11 +2,13 @@ import json
 from dcicutils.ff_utils import get_metadata, search_metadata
 from dcicutils.creds_utils import CGAPKeyManager
 
+
 class VariantUtils:
 
     SEARCH_VARIANTS_BY_GENE = '/search/?type=VariantSample&limit=1&variant.genes.genes_most_severe_gene.display_title='
-    SEARCH_RARE_VARIANTS_BY_GENE = '/search/?samplegeno.samplegeno_role=proband&type=VariantSample&variant.csq_gnomadg_af_popmax.from=0\
-        &variant.csq_gnomadg_af_popmax.to=0.001&variant.genes.genes_most_severe_gene.display_title='
+    SEARCH_RARE_VARIANTS_BY_GENE = '/search/?samplegeno.samplegeno_role=proband&type=VariantSample\
+        &variant.csq_gnomadg_af_popmax.from=0&variant.csq_gnomadg_af_popmax.to=0.001\
+            &variant.genes.genes_most_severe_gene.display_title='
 
     def __init__(self, *, env_name) -> None:
         self._key_manager = CGAPKeyManager()
@@ -25,7 +27,7 @@ class VariantUtils:
 
     def find_number_of_sample_ids(self, gene):
         """returns the number of samples that have a mutation on the specified gene"""
-        return len(set(variant.get('CALL_INFO') 
+        return len(set(variant.get('CALL_INFO')
                        for variant in self.get_rare_variants_by_gene(gene=gene, sort='variant.ID')))
 
     def get_total_result_count_from_search(self, gene):
@@ -44,7 +46,7 @@ class VariantUtils:
         mutation_dict = {}
         unique_positions = set()
         for variant in self.get_rare_variants_by_gene(gene=gene, sort='variant.ID'):
-            pos = variant['variant']['POS'] 
+            pos = variant['variant']['POS']
             if pos not in unique_positions:
                 unique_positions.add(pos)
                 mutation_dict[pos] = 1
@@ -69,7 +71,7 @@ class VariantUtils:
         """creates list of all genes relating to the brain or nervous system (by 'neur' and 'nerv')"""
         genes = self.return_json('gene.json')
         return [gene['gene_symbol'] for gene in genes
-                if 'nerv' in gene.get('gene_summary', '') 
+                if 'nerv' in gene.get('gene_summary', '')
                 or 'neur' in gene.get('gene_summary', '')]
 
     def create_url(self, gene):
