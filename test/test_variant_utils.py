@@ -3,12 +3,12 @@ from unittest import mock
 from contextlib import contextmanager
 from dcicutils import variant_utils
 from dcicutils.variant_utils import VariantUtils
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
 
 
 def create_dummy_keydict():
     return {'cgap-dummy': {
-        'key': 'dummy', 'secret': 'dummy', 
+        'key': 'dummy', 'secret': 'dummy',
         'server': 'cgap-test.com'
     }}
 
@@ -17,20 +17,17 @@ class TestVariantUtils:
 
     class CGAPKeyManager:
         def get_keydict_for_env(self, *, env):
-            return create_dummy_keydict()['cgap-dummy'] 
-    
-    
+            return create_dummy_keydict()['cgap-dummy']
+
     @contextmanager
     def mock_key_manager(self):
         with mock.patch.object(variant_utils, 'CGAPKeyManager', new=self.CGAPKeyManager):
             yield
 
-
     def test_variant_utils_basic(self):
         """ Tests the instantiation of a VariantUtils object """
         with self.mock_key_manager():
             vu = VariantUtils(env_name='cgap-dummy')
-        
 
     @pytest.mark.parametrize('total_value', [
         100,
@@ -43,12 +40,13 @@ class TestVariantUtils:
         with self.mock_key_manager():
             vu = VariantUtils(env_name='cgap-dummy')
             mock_gene = 'GENE'
-            mock_get_metadata.return_value = {'total': total_value} 
+            mock_get_metadata.return_value = {'total': total_value}
             result = vu.get_total_result_count_from_search(mock_gene)
             expected_result = total_value
             assert result == expected_result
-            mock_get_metadata.assert_called_once_with(f'/search/?type=VariantSample&limit=1&variant.genes.genes_most_severe_gene.display_title={mock_gene}', key=vu.creds)
-
+            mock_get_metadata.assert_called_once_with(f'/search/?type=VariantSample&limit=1\
+                                                      &variant.genes.genes_most_severe_gene.display_title={mock_gene}',
+                                                      key=vu.creds)
 
     @pytest.mark.parametrize('returned_variants, expected_length', [
         ([{'variant': {'POS': 100000}}], 8),
@@ -70,11 +68,10 @@ class TestVariantUtils:
             assert result == expected_result
             mock_get_rare_variants_by_gene.assert_called_once_with(gene=mock_gene, sort='variant.ID')
 
-
     @patch('dcicutils.variant_utils.VariantUtils.return_json')
     def test_create_list_of_msa_genes(self, mock_return_json):
         with self.mock_key_manager():
-            vu = VariantUtils(env_name='cgap-dummy')       
+            vu = VariantUtils(env_name='cgap-dummy')
             mock_return_json.return_value = [
                 {'gene_symbol': 'GENE1', 'gene_summary': '...nerv...'},
                 {'gene_symbol': 'GENE2', 'gene_summary': '..........'},
@@ -84,7 +81,6 @@ class TestVariantUtils:
             expected_result = ['GENE1', 'GENE3']
             assert result == expected_result
             mock_return_json.assert_called_once_with('gene.json')
-
 
     @patch('dcicutils.variant_utils.VariantUtils.get_rare_variants_by_gene')
     def test_find_number_of_sample_ids(self, mock_get_rare_variants_by_gene):
@@ -102,7 +98,6 @@ class TestVariantUtils:
             assert result == expected_result
             mock_get_rare_variants_by_gene.assert_called_once_with(gene=mock_gene, sort='variant.ID')
 
-
     @pytest.mark.parametrize('pos', [
         '100000',
         '200000',
@@ -119,15 +114,15 @@ class TestVariantUtils:
                 'OTHER_GENE': {pos: 10}
             }
             result = vu.create_url(gene=mock_gene)
-            expected_result = vu.SEARCH_RARE_VARIANTS_BY_GENE + mock_gene + '&variant.POS.from={pos}&variant.POS.to={pos}&sort=-DP'
+            expected_result = vu.SEARCH_RARE_VARIANTS_BY_GENE + mock_gene + ('&variant.POS.from={pos}\
+                                                                             &variant.POS.to={pos}&sort=-DP')
             assert result == expected_result
             mock_create_dict_from_json_file.assert_called_once_with('10+sorted_msa_genes_and_mutations.json')
-    
 
     @patch('dcicutils.variant_utils.VariantUtils.return_json')
     def test_create_list_of_als_park_genes(self, mock_return_json):
         with self.mock_key_manager():
-            vu = VariantUtils(env_name='cgap-dummy')       
+            vu = VariantUtils(env_name='cgap-dummy')
             mock_return_json.return_value = [
                 {'gene_symbol': 'GENE1', 'gene_summary': '...Parkinson...'},
                 {'gene_symbol': 'GENE2', 'gene_summary': '...............'},
