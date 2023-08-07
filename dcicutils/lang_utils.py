@@ -198,13 +198,13 @@ class EnglishUtils:
     _PREFIX_PATTERN_FOR_A = re.compile("^(%s)" % "|".join({
         "[^aeioux]",  # Consonants other than x need 'a' (bicycle, dog, etc.)
         "x[aeiouy]",  # x followed by any vowel makes it pronounceable like a consonant (xylophone), so needs 'a'
-        "uni([^aeiuym]|[aeiuy][^aeiy])",  # things starting with with "uni" are pronounced like "yuni", so need "a"
+        "uni([^aeiuym]|[aeiuy][^aeiy])",  # things starting with "uni" are pronounced like "yuni", so need "a"
     }), flags=re.IGNORECASE)
 
     @classmethod
     def select_a_or_an(cls, word):
         """
-        Uses a heuristic to try to select the appropriate article ('a' or 'an') for a given English noun.
+        Uses a heuristic to try to select the appropriate article ("a" or "an") for a given English noun.
         select_a_or_an("gene") => 'a'
         select_a_or_an("accession") => 'an'
         """
@@ -278,7 +278,7 @@ class EnglishUtils:
         "Possible options are foo, bar and baz."
 
         :param items: the items to enumerate
-        :param possible: whether to use the word 'possible' before the given kind (default True), or an string to use
+        :param possible: whether to use the word 'possible' before the given kind (default True), or a string to use
         :param kind: the kind of items being enumerated (default "option")
         :param quote: whether to put quotes around each option
         :param capitalize: whether to capitalize the first letter of the sentence (default True)
@@ -351,7 +351,7 @@ class EnglishUtils:
     @classmethod
     def there_are(cls, items, *, kind: str = "thing", count: Optional[int] = None, there: str = "there",
                   capitalize=True, joiner=None, zero: object = "no", punctuate=None, punctuate_none=None,
-                  use_article=False, show=True, context=None, tense='present',
+                  use_article=False, show=True, context=None, tense='present', punctuation_mark: str = ".",
                   **joiner_options) -> str:
         """
         Constructs a sentence that enumerates a set of things.
@@ -366,6 +366,7 @@ class EnglishUtils:
         :param punctuate: in the case of one or more values (not zero), whether to end with a period (default False)
         :param punctuate_none: in the case of no values or not showing values, whether to end with a period
                (default True if show is True, and otherwise is the same as the value of punctuate)
+        :param punctuation_mark: if specified, something to use at the end if punctuating
         :param use_article: whether to put 'a' or 'an' in front of each option (default False)
         :param joiner_options: additional (keyword) options to be used with a joiner function if one is supplied
         :param show: whether to show the items if there are any (default True)
@@ -406,7 +407,7 @@ class EnglishUtils:
         if context:
             part1 += f" {context}"
         if n == 0 or not show:
-            punctuation = "." if punctuate_none else ""
+            punctuation = punctuation_mark if punctuate_none else ""
             return part1 + punctuation
         else:
             if use_article:
@@ -417,7 +418,7 @@ class EnglishUtils:
                 joined = ", ".join(items)
             else:
                 joined = joiner(items, **joiner_options)
-            punctuation = "." if punctuate else ""
+            punctuation = punctuation_mark if punctuate else ""
             return f"{part1}: {joined}{punctuation}"
 
     @classmethod
@@ -472,7 +473,7 @@ class EnglishUtils:
                              f" of the form '<n1> <unit1> <n2> <unit2>...': {s!r}")
         kwargs = {}
         for i in range(len(parts) // 2):
-            # Canonicalize "1 week" or "1 weeks" to "weeks": 1.0 for inclusion as kwarg to to timedelta
+            # Canonicalize "1 week" or "1 weeks" to "weeks": 1.0 for inclusion as kwarg to timedelta
             # Uses specialized knowledge that all time units don't end in "s" but pluralize with "+s"
             value = float(parts[2 * i])
             units = parts[2 * i + 1].rstrip(',s') + "s"

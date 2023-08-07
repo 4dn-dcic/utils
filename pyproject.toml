@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "7.6.0.1b6"  # TODO: To become 7.6.0
+version = "7.7.0.1b1"  # TODO: To become 7.8.0
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -71,6 +71,7 @@ coverage = ">=7.2.3"
 flake8 = ">=3.9.2"
 flaky = ">=3.7.0"
 localstack = "^2.1.0"
+pip-licenses = "^3.5.5"
 pytest = ">=4.5.0"
 pytest-cov = ">=2.7.1"
 pytest-mock = ">=1.11.0"
@@ -80,13 +81,18 @@ pytest-runner = ">=5.1"
 
 [tool.poetry.scripts]
 publish-to-pypi = "dcicutils.scripts.publish_to_pypi:main"
-
+show-contributors = "dcicutils.contribution_scripts:show_contributors_main"
 
 [tool.pytest.ini_options]
 addopts = "--basetemp=/tmp/pytest"
 redis_exec = "/usr/local/bin/redis-server"
 filterwarnings = [
-    "ignore::DeprecationWarning: distutils Version classes are deprecated. Use packaging.version instead.",
+    # TODO: These next two are about use of the Version class:
+    "ignore:distutils Version classes are deprecated. Use packaging.version instead.:DeprecationWarning",
+    "ignore:Setuptools is replacing distutils.:UserWarning",
+    # This is a pip-licenses problem (still present in 3.5.5):
+    "ignore:pkg_resources is deprecated as an API:DeprecationWarning",
+    "ignore:Boto3 will no longer support Python 3.7 starting December 13, 2023.*:",
 ]
 markers = [
     "working: test should work",
