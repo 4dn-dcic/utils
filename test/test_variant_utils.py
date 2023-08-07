@@ -28,6 +28,7 @@ class TestVariantUtils:
         """ Tests the instantiation of a VariantUtils object """
         with self.mock_key_manager():
             vu = VariantUtils(env_name='cgap-dummy')
+            assert isinstance(vu, VariantUtils)
 
     @pytest.mark.parametrize('total_value', [
         100,
