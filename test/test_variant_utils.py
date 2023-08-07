@@ -25,7 +25,7 @@ class TestVariantUtils:
             yield
 
     def test_variant_utils_basic(self):
-        """ Tests the instantiation of a VariantUtils object """
+        """Tests the instantiation of a VariantUtils object """
         with self.mock_key_manager():
             vu = VariantUtils(env_name='cgap-dummy')
             assert isinstance(vu, VariantUtils)
@@ -115,8 +115,8 @@ class TestVariantUtils:
                 'OTHER_GENE': {pos: 10}
             }
             result = vu.create_url(gene=mock_gene)
-            expected_result = vu.SEARCH_RARE_VARIANTS_BY_GENE + mock_gene + ('&variant.POS.from={pos}\
-                                                                             &variant.POS.to={pos}&sort=-DP')
+            expected_result = vu.SEARCH_RARE_VARIANTS_BY_GENE + mock_gene + (f'&variant.POS.from={pos}'
+                                                                             f'&variant.POS.to={pos}&sort=-DP')
             assert result == expected_result
             mock_create_dict_from_json_file.assert_called_once_with('10+sorted_msa_genes_and_mutations.json')
 
