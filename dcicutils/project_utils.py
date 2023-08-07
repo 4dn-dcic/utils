@@ -19,12 +19,16 @@ class ProjectNames:
         self.REPO_NAME = REPO_NAME = REPO_NAME or self.repofy(NAME)
         self.APP_NAME = APP_NAME = APP_NAME or self.appify(REPO_NAME)
         self.APP_PRETTY_NAME = APP_PRETTY_NAME or self.prettify(APP_NAME)
-        self.PACKAGE_NAME = (PACKAGE_NAME
-                             # This uses ProjectRegistry (not cls) because that part of the protocol is common to all
-                             # classes and subclasses of that class. No need to worry about specialized classes.
-                             # -kmp 19-May-2023
-                             or self.infer_package_name(poetry_data=ProjectRegistry.POETRY_DATA,
-                                                        pyproject_name=PYPROJECT_NAME))
+        # This uses ProjectRegistry (not cls) because that part of the protocol is common to all
+        # classes and subclasses of that class. No need to worry about specialized classes.
+        # -kmp 19-May-2023
+        inferred_package_name = self.infer_package_name(poetry_data=ProjectRegistry.POETRY_DATA,
+                                                        pyproject_name=PYPROJECT_NAME)
+        if PACKAGE_NAME:
+            if PACKAGE_NAME != inferred_package_name:
+                raise Exception(f"Explicit PACKAGE_NAME={PACKAGE_NAME}"
+                                f" does not match inferred name {inferred_package_name}.")
+        self.PACKAGE_NAME = inferred_package_name
 
     @classmethod
     def prettify(cls, name: str) -> str:
@@ -514,11 +518,18 @@ class ProjectRegistry:
         """
         project_class: Optional[Type[Project]] = cls.find_pyproject(cls.PYPROJECT_NAME)
         if project_class is None:
-            PRINT(f"Autoloading project_defs.py for pyproject {cls.PYPROJECT_NAME!r}.")
+            package_name = ProjectNames.infer_package_name(poetry_data=cls.POETRY_DATA,
+                                                           pyproject_name=cls.PYPROJECT_NAME)
+            clarification = ""
+            if package_name != cls.PYPROJECT_NAME:
+                clarification = f" (package {package_name})"
+            PRINT(f"Autoloading project_defs.py for pyproject {cls.PYPROJECT_NAME!r}{clarification}.")
             try:
-                importlib.import_module(name=".project_defs", package=cls.PYPROJECT_NAME)
+                # PRINT(f"package_name={package_name}")
+                importlib.import_module(name=".project_defs", package=package_name)
             except Exception as e:
-                PRINT(f"Autoload failed for project_defs in pyproject {cls.PYPROJECT_NAME!r}. {get_error_message(e)}")
+                PRINT(f"Autoload failed for project_defs in pyproject {cls.PYPROJECT_NAME!r}{clarification}."
+                      f" {get_error_message(e)}")
             project_class: Optional[Type[Project]] = cls.find_pyproject(cls.PYPROJECT_NAME)
         if project_class is None:
             raise ValueError(f"Missing project class for pyproject {cls.PYPROJECT_NAME!r}.")

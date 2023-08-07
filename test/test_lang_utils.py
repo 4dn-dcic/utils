@@ -485,6 +485,8 @@ def test_there_are():
     assert there_are([2, 3, 5, 7], kind="single-digit prime") == "There are 4 single-digit primes: 2, 3, 5, 7"
     assert there_are([2, 3, 5, 7], kind="single-digit prime", punctuate=True, joiner=conjoined_list,
                      ) == "There are 4 single-digit primes: 2, 3, 5 and 7."
+    assert there_are([2, 3, 5, 7], kind="single-digit prime",
+                     show=False, punctuation_mark=':') == "There are 4 single-digit primes:"
 
     # From the doc strings
 
