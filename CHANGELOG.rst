@@ -6,12 +6,32 @@ dcicutils
 Change Log
 ----------
 
-7.7.0
+7.8.0
 =====
+
 * Added ``boto_monkey_patching`` module to use monkey patching to override the endpoint URLs for
   for S3 or SQS boto3 client/resource creation using the LOCALSTACK_S3_URL or LOCALSTACK_SQS_URL
   environment variables to specify that these services should use a locally running ersatz
   instance of S3 or SQS via localstack.
+
+
+7.7.0
+=====
+
+* Add ``license_utils`` with tools to check license utilities.
+
+  .. note::
+
+     Using these utilities requires you to have a dev dependency on ``pip-licenses``.
+     If it's not there, you'll get an error telling you this fact.
+
+     Effectively, though, we're exporting a required dev dependency, since we did not
+     want to make this a runtime dependency.
+
+     (You can also attend to this dependency by arranging to ``pip install pip-licenses``
+     before running tests.)
+
+* Add ``contribution_utils`` with tools to track repository contributions.
 
 
 7.6.0
