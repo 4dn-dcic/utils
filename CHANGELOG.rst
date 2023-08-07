@@ -6,6 +6,25 @@ dcicutils
 Change Log
 ----------
 
+7.7.0
+=====
+
+* Add ``license_utils`` with tools to check license utilities.
+
+  .. note::
+
+     Using these utilities requires you to have a dev dependency on ``pip-licenses``.
+     If it's not there, you'll get an error telling you this fact.
+
+     Effectively, though, we're exporting a required dev dependency, since we did not
+     want to make this a runtime dependency.
+
+     (You can also attend to this dependency by arranging to ``pip install pip-licenses``
+     before running tests.)
+
+* Add ``contribution_utils`` with tools to track repository contributions.
+
+
 7.6.0
 =====
 
