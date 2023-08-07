@@ -45,8 +45,8 @@ class TestVariantUtils:
             result = vu.get_total_result_count_from_search(mock_gene)
             expected_result = total_value
             assert result == expected_result
-            mock_get_metadata.assert_called_once_with(f'/search/?type=VariantSample&limit=1\
-                                                      &variant.genes.genes_most_severe_gene.display_title={mock_gene}',
+            mock_get_metadata.assert_called_once_with(f'/search/?type=VariantSample&limit=1'
+                                                      f'&variant.genes.genes_most_severe_gene.display_title={mock_gene}',
                                                       key=vu.creds)
 
     @pytest.mark.parametrize('returned_variants, expected_length', [
