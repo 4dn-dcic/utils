@@ -657,6 +657,15 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         'pyramid-translogger',
         'subprocess-middleware',
 
+        # This appears to be a BSD 2-Clause "Simplified" License, according to GitHub.
+        # PyPi also says it's a BSD license.
+        # Ref: https://github.com/paulc/dnslib/blob/master/LICENSE
+        'dnslib',
+
+        # This says it wants an ISC License, which we already have approval for but just isn't showing up.
+        # Ref: https://github.com/rthalley/dnspython/blob/master/LICENSE
+        'dnspython',
+
         # This appears to be a mostly-MIT-style license.
         # There are references to parts being in the public domain, though it's not obvious if that's meaningful.
         # It's probably sufficient for our purposes to treat this as a permissive license.
