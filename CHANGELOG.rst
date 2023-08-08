@@ -6,13 +6,19 @@ dcicutils
 Change Log
 ----------
 
-7.8.0
+7.7.2
 =====
 
 * Added ``boto_monkey_patching`` module to use monkey patching to override the endpoint URLs for
   for S3 or SQS boto3 client/resource creation using the LOCALSTACK_S3_URL or LOCALSTACK_SQS_URL
   environment variables to specify that these services should use a locally running ersatz
   instance of S3 or SQS via localstack.
+
+
+7.7.1
+=====
+
+* Fix Tests are failing on utils master branch (`C4-1081 <https://hms-dbmi.atlassian.net/browse/C4-1081>`_), a problem with the ``project_utils`` test named ``test_project_registry_make_project_autoload``.
 
 
 7.7.0

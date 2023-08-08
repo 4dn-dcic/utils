@@ -4,6 +4,8 @@ import io
 import os
 import pytest
 
+from collections import namedtuple
+from dcicutils.lang_utils import maybe_pluralize, conjoined_list
 from dcicutils.misc_utils import ignored, ignorable, override_environ, local_attrs, StorageCell, get_error_message
 from dcicutils.qa_utils import MockFileSystem, printed_output
 from dcicutils.project_utils import (
@@ -323,7 +325,52 @@ def test_project_registry_find_pyproject():
             assert ProjectRegistry.find_pyproject('bar') is None
 
 
-def test_project_registry_make_project_autoload():
+tst_args = "project_name,app_name,repo_name,package_name,pypi_name,pyproject_name,notables"
+
+TstArgs = namedtuple("TestArgs", tst_args, defaults=(None,) * len(tst_args.split(",")))
+
+
+@pytest.mark.parametrize(tst_args,
+                         # PyCharm doesn't fully understand the syntax of namedtuple, hence all the #NoQA markers
+                         [
+                             TstArgs(project_name='bogus-lib', package_name='bogus_lib',
+                                     pypi_name='dcicbogosity', pyproject_name='bogosity',
+                                     notables=['bogosity', 'dcicbogosity']),  # noQA
+                             TstArgs(project_name='boguslib', package_name='boguslib',
+                                     pypi_name='dcicbogosity', pyproject_name='bogosity',
+                                     notables=['bogosity', 'dcicbogosity']),  # noQA
+                             TstArgs(project_name='kore', repo_name='encoded-kore', package_name='encoded_kore',
+                                     pypi_name='encoded_kore', pyproject_name='encoded-kore',
+                                     notables=['encoded_kore']),  # noQA
+                             TstArgs(project_name='kore', package_name='encoded_kore',
+                                     pypi_name='encoded_kore', pyproject_name='encoded-kore',
+                                     notables=['encoded_kore']),  # noQA
+                             TstArgs(project_name='encoded-kore', app_name="encoded-kore", repo_name='encoded-kore',
+                                     package_name='encoded_kore',
+                                     pypi_name='encoded_kore', pyproject_name='encoded-kore'),  # noQA
+                             TstArgs(project_name='encoded-kore', app_name='kore', repo_name='kore',
+                                     package_name='encoded_kore',
+                                     pypi_name='encoded_kore', pyproject_name='encoded-kore',
+                                     notables=['kore']),  # noQA
+                         ])
+def test_project_registry_make_project_autoload(project_name, app_name, repo_name, package_name, pypi_name,
+                                                pyproject_name, notables):
+
+    notables = notables or []
+    explicit_app = bool(app_name)  # Before defaulting, notice whether app_name was supplied
+    app_name = app_name or project_name
+    explicit_repo = bool(repo_name)  # Before defaulting, notice whether repo_name was supplied
+    repo_name = repo_name or project_name
+
+#     app_name = 'bogus-lib'
+#     package_name = 'bogus_lib'
+#     pypi_name = 'dcicbogosity'
+#     pyproject_name = 'bogosity'
+
+    app_pretty_name = app_name.replace('-', ' ').replace('_', ' ').title()  # e.g., 'bogus-lib' => 'Bogus Lib'
+    project_pretty_name = project_name.replace('-', ' ').replace('_', ' ').title()  # e.g., 'bogus_lib' => 'Bogus Lib'
+
+    dir_name = '/home/mock'
 
     print()  # Start on a fresh line.
 
@@ -341,7 +388,7 @@ def test_project_registry_make_project_autoload():
 
                     def mocked_import_module(name, package):
                         assert name == '.project_defs'
-                        assert package == 'boguslib'
+                        assert package == package_name
 
                         # The definition here in the mock ends up in environment of this mock function,
                         # but that's really OK because all we wanted it to do was to register some class
@@ -350,34 +397,66 @@ def test_project_registry_make_project_autoload():
                         # file system and parsed a file. (Because that operation is a low-level primitive,
                         # it cannot be mocked with our usual MockFileSystem tools.) -kmp 30-May-2023
 
-                        @C4ProjectRegistry.register('boguslib')
+                        names = {"NAME": project_name, "PYPI_NAME": pypi_name}
+                        if explicit_repo:
+                            names["REPO_NAME"] = repo_name
+                        if explicit_app:
+                            names["APP_NAME"] = app_name
+
+                        @C4ProjectRegistry.register(pyproject_name)
                         class BogusProject(C4Project):
-                            NAMES = {"NAME": "bogus"}
+                            NAMES = names
 
                         cell.value = BogusProject
 
                     mock_import_module.side_effect = mocked_import_module
 
                     root_dir = os.getcwd()
-                    assert root_dir == "/home/mock"
+                    assert root_dir == dir_name
 
                     pyproject_path = os.path.abspath("./pyproject.toml")
-                    assert pyproject_path == '/home/mock/pyproject.toml'
+                    assert pyproject_path == f'{dir_name}/pyproject.toml'
 
                     with io.open(pyproject_path, 'w') as fp:
                         fp.write(
-                            """[tool.poetry]\n"""
-                            """name = "boguslib"\n"""
-                            """packages = [{include = "bogosity", from = "whatever"}]\n""")
+                            f'[tool.poetry]\n'
+                            f'name = "{pyproject_name}"\n'
+                            f'packages = [{{include = "{package_name}", from = "whatever"}}]\n')
 
                     app_project = C4ProjectRegistry.app_project_maker()
                     project = app_project()
                     assert isinstance(project, cell.value)
                     assert C4ProjectRegistry.APPLICATION_PROJECT_HOME == root_dir
 
+                    app_project().show_herald(detailed=True)
+
+                    def and_notable_aliases():
+                        if not notables:
+                            return ""
+                        prefix = maybe_pluralize(notables, 'notable alias')
+                        itemization = conjoined_list(sorted(map(repr, notables)))
+                        return f" and {prefix} {itemization}"
+
+                    # notable_aliases = f"notable aliases {pyproject_name!r} and {pypi_name!r}."
+
                     assert printed.lines == [
-                        "Autoloading project_defs.py for pyproject 'boguslib'.",
-                        "BogusProject initialized with name 'bogus' and notable aliases 'bogosity' and 'boguslib'."
+                        f"Autoloading project_defs.py for pyproject {pyproject_name!r} (package {package_name!r}).",
+                        f"BogusProject initialized with name {project_name!r}{and_notable_aliases()}.",
+                        f"",
+                        f"==========================================================================================",
+                        f"APPLICATION_PROJECT_HOME == '/home/mock'",
+                        f"PYPROJECT_TOML_FILE == '/home/mock/pyproject.toml'",
+                        f"PYPROJECT_NAME == {pyproject_name!r}",
+                        f"Project.app_project == ProjectRegistry.app_project == app_project() == <BogusProject>",
+                        f"app_project().APP_NAME == {app_name!r}",
+                        f"app_project().APP_PRETTY_NAME == {app_pretty_name!r}",
+                        f"app_project().NAME == {project_name!r}",
+                        f"app_project().PACKAGE_NAME == {package_name!r}",
+                        f"app_project().PRETTY_NAME == {project_pretty_name!r}",
+                        f"app_project().PYPI_NAME == {pypi_name!r}",
+                        f"app_project().PYPROJECT_NAME == {pyproject_name!r}",
+                        f"app_project().REPO_NAME == {repo_name!r}",
+                        f"==========================================================================================",
                     ]
 
     assert ProjectRegistry._PYPROJECT_NAME is None
