@@ -10,7 +10,7 @@ Change Log
 7.7.1
 =====
 
-* Fix `Tests are failing on utils master branch (`C4-1081 <https://hms-dbmi.atlassian.net/browse/C4-1081>`_), a problem with the ``project_utils`` test named ``test_project_registry_make_project_autoload``.
+* Fix Tests are failing on utils master branch (`C4-1081 <https://hms-dbmi.atlassian.net/browse/C4-1081>`_), a problem with the ``project_utils`` test named ``test_project_registry_make_project_autoload``.
 
 
 7.7.0
