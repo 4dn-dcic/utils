@@ -862,6 +862,10 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
             'typed-function',  # LICENSE at https://www.npmjs.com/package/typed-function?activeTab=code
 
         ],
+
+        'Other/Proprietary License': [
+            'localstack-ext'
+        ]
     }
 
 
