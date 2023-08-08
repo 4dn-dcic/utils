@@ -522,7 +522,7 @@ class ProjectRegistry:
                                                            pyproject_name=cls.PYPROJECT_NAME)
             clarification = ""
             if package_name != cls.PYPROJECT_NAME:
-                clarification = f" (package {package_name})"
+                clarification = f" (package {package_name!r})"
             PRINT(f"Autoloading project_defs.py for pyproject {cls.PYPROJECT_NAME!r}{clarification}.")
             try:
                 # PRINT(f"package_name={package_name}")
