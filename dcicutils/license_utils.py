@@ -680,6 +680,15 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         # Ref: https://github.com/pkerpedjiev/negspy/blob/master/LICENSE
         'negspy',
 
+        # The license file for the node-forge javascript library says:
+        #
+        #   "You may use the Forge project under the terms of either the BSD License or the
+        #   GNU General Public License (GPL) Version 2."
+        #
+        # (We choose to use it under the BSD license.)
+        # Ref: https://www.npmjs.com/package/node-forge?activeTab=code
+        'node-forge',
+
         # This license statement is complicated, but seems adequately permissive.
         # Ref: https://foss.heptapod.net/python-libs/passlib/-/blob/branch/stable/LICENSE
         'passlib',
@@ -739,6 +748,10 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         # This seems to be a BSD-3-Clause-Modification license.
         # Ref: https://github.com/Pylons/translationstring/blob/master/LICENSE.txt
         'translationstring',
+
+        # The udn-browser library is our own and may show up in some contexts as UNLICENSED, when really it's MIT.
+        # Ref: https://github.com/dbmi-bgm/udn-browser/blob/main/LICENSE
+        'udn-browser',
 
         # This seems to be a BSD-3-Clause-Modification license.
         # Ref: https://github.com/Pylons/venusian/blob/master/LICENSE.txt
