@@ -878,7 +878,7 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
             # This is known to be offered under Apache-2.0 license.
 	        # Ref: https://github.com/localstack/localstack/blob/master/LICENSE.txt
             'localstack-ext'
-        ]
+        ],
 
         'UNLICENSED': [
             # The udn-browser library is our own and has been observed to sometimes show up in some contexts
