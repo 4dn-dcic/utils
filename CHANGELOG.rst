@@ -6,7 +6,7 @@ dcicutils
 Change Log
 ----------
 
-7.7.2
+7.7.3
 =====
 
 * Added ``boto_monkey_patching`` module to use monkey patching to override the endpoint URLs for
@@ -15,10 +15,19 @@ Change Log
   instance of S3 or SQS via localstack.
 
 
+7.7.2
+=====
+
+* In ``license_utils``:
+
+  * In ``license_utils.C4InfrastructureLicenseChecker``, allow exceptions for
+    libraries ``dnslib``, ``dnspython``, ``node-forge`` and ``udn-browser``.
+
+
 7.7.1
 =====
 
-* Fix Tests are failing on utils master branch (`C4-1081 <https://hms-dbmi.atlassian.net/browse/C4-1081>`_), a problem with the ``project_utils`` test named ``test_project_registry_make_project_autoload``.
+* Fix tests are failing on utils master branch (`C4-1081 <https://hms-dbmi.atlassian.net/browse/C4-1081>`_), a problem with the ``project_utils`` test named ``test_project_registry_make_project_autoload``.
 
 
 7.7.0

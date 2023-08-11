@@ -801,13 +801,6 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
             'turf-jsts'
         ],
 
-        # Linking = With Restrictions, Private Use = Yes
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'GNU Lesser General Public License v3 or later (LGPLv3+)': [
-            'pytest-redis',  # used only privately in testing, not used in server code, not modified, not distributed
-            'mirakuru',      # required by pytest-redis (used only where it's used)
-        ],
-
         # DFSG = Debian Free Software Guidelines
         # Ref: https://en.wikipedia.org/wiki/Debian_Free_Software_Guidelines
         # Used as an apparent modifier to other licenses, to say they are approved per Debian.
@@ -815,6 +808,13 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         # but is really just an MIT License that someone has checked is DFSG approved.
         'DFSG approved': [
             'pytest-timeout',  # MIT Licensed
+        ],
+
+        # Linking = With Restrictions, Private Use = Yes
+        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        'GNU Lesser General Public License v3 or later (LGPLv3+)': [
+            'pytest-redis',  # used only privately in testing, not used in server code, not modified, not distributed
+            'mirakuru',      # required by pytest-redis (used only where it's used)
         ],
 
         'GNU General Public License (GPL)': [
@@ -832,6 +832,17 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
             'psycopg2-binary',  # Used at runtime during server operation, but not modified or distributed
             'chardet',  # Potentially used downstream in loadxl to detect charset for text files
             'pyzmq',  # Used in post-deploy-perf-tests, not distributed, and not modified or distributed
+        ],
+
+        'GPL-2.0': [
+            # The license file for the node-forge javascript library says:
+            #
+            #   "You may use the Forge project under the terms of either the BSD License or the
+            #   GNU General Public License (GPL) Version 2."
+            #
+            # (We choose to use it under the BSD license.)
+            # Ref: https://www.npmjs.com/package/node-forge?activeTab=code
+            'node-forge',
         ],
 
         'MIT*': [
@@ -864,8 +875,17 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         ],
 
         'Other/Proprietary License': [
+            # This is known to be offered under Apache-2.0 license.
+	        # Ref: https://github.com/localstack/localstack/blob/master/LICENSE.txt
             'localstack-ext'
         ]
+
+        'UNLICENSED': [
+            # The udn-browser library is our own and has been observed to sometimes show up in some contexts
+            # as UNLICENSED, when really it's MIT.
+            # Ref: https://github.com/dbmi-bgm/udn-browser/blob/main/LICENSE
+            'udn-browser',
+        ],
     }
 
 
