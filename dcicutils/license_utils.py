@@ -876,7 +876,7 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
 
         'Other/Proprietary License': [
             # This is known to be offered under Apache-2.0 license.
-	        # Ref: https://github.com/localstack/localstack/blob/master/LICENSE.txt
+            # Ref: https://github.com/localstack/localstack/blob/master/LICENSE.txt
             'localstack-ext'
         ],
 
