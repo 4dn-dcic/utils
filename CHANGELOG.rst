@@ -13,6 +13,7 @@ Change Log
   for S3 or SQS boto3 client/resource creation using the LOCALSTACK_S3_URL or LOCALSTACK_SQS_URL
   environment variables to specify that these services should use a locally running ersatz
   instance of S3 or SQS via localstack.
+* Comment and typo cleanup in ``publish_to_pypi.py``.
 
 
 7.7.2
