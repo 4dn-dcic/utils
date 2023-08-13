@@ -10,10 +10,11 @@ Change Log
 =====
 
 * Added ``boto_monkey_patching`` module to use monkey patching to override the endpoint URLs for
-  for S3 or SQS boto3 client/resource creation using the LOCALSTACK_S3_URL or LOCALSTACK_SQS_URL
+  S3 or SQS boto3 client/resource creation using the ``LOCALSTACK_S3_URL`` or ``LOCALSTACK_SQS_URL``
   environment variables to specify that these services should use a locally running ersatz
-  instance of S3 or SQS via localstack.
+  instance of S3 or SQS via localstack (https://localstack.cloud).
 * Comment and typo cleanup in ``publish_to_pypi.py``.
+* Updates PyYAML to ^6.0.1 because Mac M1 (with Python 3.9) only likes 5.3.1 (not 5.4.1) or 6+.
 
 
 7.7.2
