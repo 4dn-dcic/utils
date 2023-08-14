@@ -62,29 +62,7 @@ class WorkbookManager:
         return row_dict
 
 
-class ItemManager(WorkbookManager):
-
-    def __init__(self, filename: str):
-        super().__init__(filename=filename)
-        self.patch_prototypes_by_sheetname: Dict[Dict] = {}
-        self.parsed_headers_by_sheetname: Dict[List[List[Union[int, str]]]] = {}
-
-    def sheet_patch_prototype(self, sheet: Worksheet) -> Dict:
-        return self.patch_prototypes_by_sheetname[sheet.title]
-
-    def sheet_parsed_headers(self, sheet: Worksheet) -> List[List[Union[int, str]]]:
-        return self.parsed_headers_by_sheetname[sheet.title]
-
-    def load_headers(self, sheet: Worksheet):
-        super().load_headers(sheet)
-        self.compile_sheet_headers(sheet)
-
-    def compile_sheet_headers(self, sheet: Worksheet):
-        headers = self.headers_by_sheetname[sheet.title]
-        parsed_headers = self.parse_sheet_headers(headers)
-        self.parsed_headers_by_sheetname[sheet.title] = parsed_headers
-        prototype = self.compute_patch_prototype(parsed_headers)
-        self.patch_prototypes_by_sheetname[sheet.title] = prototype
+class ItemTools:
 
     @classmethod
     def compute_patch_prototype(cls, parsed_headers):
@@ -140,15 +118,6 @@ class ItemManager(WorkbookManager):
             result.append(int(token) if token.isdigit() else token)
         return result
 
-    def load_row(self, *, sheet: Worksheet, row: int):
-        parsed_headers = self.sheet_parsed_headers(sheet)
-        patch_item = copy.deepcopy(self.sheet_patch_prototype(sheet))
-        for col in self.all_cols(sheet):
-            value = sheet.cell(row=row, column=col).value
-            parsed_value = self.parse_value(value)
-            self.set_path_value(patch_item, parsed_headers[col - 1], parsed_value)
-        return patch_item
-
     @classmethod
     def set_path_value(cls, datum, path, value, force=False):
         if (value is None or value == '') and not force:
@@ -186,3 +155,37 @@ class ItemManager(WorkbookManager):
                 return value
         else:  # probably a number
             return value
+
+
+class ItemManager(ItemTools, WorkbookManager):
+
+    def __init__(self, filename: str):
+        super().__init__(filename=filename)
+        self.patch_prototypes_by_sheetname: Dict[Dict] = {}
+        self.parsed_headers_by_sheetname: Dict[List[List[Union[int, str]]]] = {}
+
+    def sheet_patch_prototype(self, sheet: Worksheet) -> Dict:
+        return self.patch_prototypes_by_sheetname[sheet.title]
+
+    def sheet_parsed_headers(self, sheet: Worksheet) -> List[List[Union[int, str]]]:
+        return self.parsed_headers_by_sheetname[sheet.title]
+
+    def load_headers(self, sheet: Worksheet):
+        super().load_headers(sheet)
+        self.compile_sheet_headers(sheet)
+
+    def compile_sheet_headers(self, sheet: Worksheet):
+        headers = self.headers_by_sheetname[sheet.title]
+        parsed_headers = self.parse_sheet_headers(headers)
+        self.parsed_headers_by_sheetname[sheet.title] = parsed_headers
+        prototype = self.compute_patch_prototype(parsed_headers)
+        self.patch_prototypes_by_sheetname[sheet.title] = prototype
+
+    def load_row(self, *, sheet: Worksheet, row: int):
+        parsed_headers = self.sheet_parsed_headers(sheet)
+        patch_item = copy.deepcopy(self.sheet_patch_prototype(sheet))
+        for col in self.all_cols(sheet):
+            value = sheet.cell(row=row, column=col).value
+            parsed_value = self.parse_value(value)
+            self.set_path_value(patch_item, parsed_headers[col - 1], parsed_value)
+        return patch_item
