@@ -67,9 +67,9 @@ def test_item_manager_set_path_value():
     assert x == {'foo': [11, 22, 33], 'bar': {'x': 'something', 'y': 'yy'}}
 
 
-SAMPLE_FILE = os.path.join(TEST_DIR, 'data_files/sample_items.xlsx')
+SAMPLE_XLSX_FILE = os.path.join(TEST_DIR, 'data_files/sample_items.xlsx')
 
-SAMPLE_FILE_RAW_CONTENT = {
+SAMPLE_XLSX_FILE_RAW_CONTENT = {
     "Sheet1": [
         {"x": 1, "y.a": 1, "y.z": 1},
         {"x": 1, "y.a": 2, "y.z": 3},
@@ -93,7 +93,7 @@ SAMPLE_FILE_RAW_CONTENT = {
     ]
 }
 
-SAMPLE_FILE_ITEM_CONTENT = {
+SAMPLE_XLSX_FILE_ITEM_CONTENT = {
     "Sheet1": [
         {"x": 1, "y": {"a": 1, "z": 1}},
         {"x": 1, "y": {"a": 2, "z": 3}},
@@ -121,16 +121,28 @@ SAMPLE_FILE_ITEM_CONTENT = {
     ],
 }
 
+SAMPLE_CSV_FILE = os.path.join(TEST_DIR, 'data_files/sample_items_sheet2.csv')
+
+SAMPLE_CSV_FILE_RAW_CONTENT = SAMPLE_XLSX_FILE_RAW_CONTENT['Sheet2']
+
+SAMPLE_CSV_FILE_ITEM_CONTENT = SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']
+
 
 def test_workbook_manager_load_content():
 
-    wt = WorkbookManager(SAMPLE_FILE)
-    assert wt.load_content() == SAMPLE_FILE_RAW_CONTENT
+    wt = WorkbookManager(SAMPLE_XLSX_FILE)
+    assert wt.load_content() == SAMPLE_XLSX_FILE_RAW_CONTENT
 
 
 def test_workbook_manager_load_workbook():
 
-    assert WorkbookManager.load_workbook(SAMPLE_FILE) == SAMPLE_FILE_RAW_CONTENT
+    assert WorkbookManager.load_workbook(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_RAW_CONTENT
+
+
+def test_workbook_manager_load_csv():
+
+    with pytest.raises(Exception):
+        WorkbookManager.load_workbook(SAMPLE_CSV_FILE)
 
 
 def test_item_manager_parse_value():
@@ -170,10 +182,16 @@ def test_item_manager_parse_value():
 
 def test_item_manager_load_content():
 
-    it = ItemManager(SAMPLE_FILE)
-    assert it.load_content() == SAMPLE_FILE_ITEM_CONTENT
+    it = ItemManager(SAMPLE_XLSX_FILE)
+    assert it.load_content() == SAMPLE_XLSX_FILE_ITEM_CONTENT
 
 
 def test_item_manager_load_workbook():
 
-    assert ItemManager.load_workbook(SAMPLE_FILE) == SAMPLE_FILE_ITEM_CONTENT
+    assert ItemManager.load_workbook(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_ITEM_CONTENT
+
+
+def test_item_manager_load_csv():
+
+    with pytest.raises(Exception):
+        ItemManager.load_workbook(SAMPLE_CSV_FILE)
