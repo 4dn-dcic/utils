@@ -7,6 +7,16 @@ Change Log
 ----------
 
 
+7.8.0
+=====
+
+* New module ``sheet_utils`` for loading workbooks.
+
+  * class ``WorkbookManager`` for loading raw data
+
+  * class ``ItemManager`` for loading item data
+
+
 7.7.2
 =====
 
