@@ -281,10 +281,10 @@ secrets_utils
   :members:
 
 
-sheets_utils
-^^^^^^^^^^^^
+sheet_utils
+^^^^^^^^^^^
 
-.. automodule:: dcicutils.sheets_utils
+.. automodule:: dcicutils.sheet_utils
   :members:
 
 
