@@ -286,3 +286,10 @@ trace_utils
 
 .. automodule:: dcicutils.trace_utils
   :members:
+
+
+variant_utils
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.variant_utils
+  :members:
