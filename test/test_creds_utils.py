@@ -3,7 +3,7 @@ import json
 import os
 import pytest
 
-from dcicutils.creds_utils import KeyManager, CGAPKeyManager, FourfrontKeyManager
+from dcicutils.creds_utils import KeyManager, CGAPKeyManager, FourfrontKeyManager, SMaHTKeyManager
 from dcicutils.exceptions import AppEnvKeyMissing, AppServerKeyMissing  # , AppKeyMissing
 from dcicutils.misc_utils import override_environ
 from dcicutils.qa_utils import MockFileSystem
@@ -23,6 +23,13 @@ SAMPLE_FOURFRONT_PRODUCTION_SERVER = 'https://cgap-prod.hms.harvard.edu'
 SAMPLE_FOURFRONT_LOCAL_SERVER = "http://localhost:8002"
 SAMPLE_FOURFRONT_LOCAL_PSEUDOENV = 'fourfront-local'
 
+SAMPLE_SMAHT_DEFAULT_ENV = 'smaht-sample'
+SAMPLE_SMAHT_KEYS_FILE = 'smaht.keys'
+SAMPLE_SMAHT_PRODUCTION_ENV = 'smaht-production'
+SAMPLE_SMAHT_PRODUCTION_SERVER = 'https://smaht-prod.hms.harvard.edu'
+SAMPLE_SMAHT_LOCAL_SERVER = "http://localhost:8001"
+SAMPLE_SMAHT_LOCAL_PSEUDOENV = 'smaht-local'
+
 
 def _make_sample_cgap_key_manager():
     return CGAPKeyManager(keys_file=SAMPLE_CGAP_KEYS_FILE)
@@ -30,6 +37,10 @@ def _make_sample_cgap_key_manager():
 
 def _make_sample_fourfront_key_manager():
     return FourfrontKeyManager(keys_file=SAMPLE_FOURFRONT_KEYS_FILE)
+
+
+def _make_sample_smaht_key_manager():
+    return CGAPKeyManager(keys_file=SAMPLE_SMAHT_KEYS_FILE)
 
 
 def test_cgap_keymanager_creation():
@@ -86,6 +97,34 @@ def test_fourfront_keymanager_creation():
     sample_ff_key_manager_4 = MyFourfrontKeyManager()  # Tests that no error is raised
 
     assert sample_ff_key_manager_4.keys_file == other_keys_file
+
+
+def test_smaht_keymanager_creation():
+
+    sample_smaht_key_manager_1 = SMaHTKeyManager()
+
+    assert sample_smaht_key_manager_1.keys_file == SMaHTKeyManager._default_keys_file()
+
+    sample_smaht_key_manager_2 = _make_sample_smaht_key_manager()
+
+    assert sample_smaht_key_manager_2.keys_file == SAMPLE_SMAHT_KEYS_FILE
+
+    with override_environ(SMAHT_KEYS_FILE=SAMPLE_SMAHT_KEYS_FILE):
+
+        sample_smaht_key_manager_3 = SMaHTKeyManager()
+
+        assert sample_smaht_key_manager_3.keys_file == SAMPLE_SMAHT_KEYS_FILE
+        # Make sure class default is different than test value. More of a test-integrity test than an absolute need.
+        assert sample_smaht_key_manager_3.keys_file != SMaHTKeyManager._default_keys_file()
+
+    other_keys_file = "other-smaht-keys.json"
+
+    class MySMaHTKeyManager(SMaHTKeyManager):
+        KEYS_FILE = other_keys_file
+
+    sample_smaht_key_manager_4 = MySMaHTKeyManager()  # Tests that no error is raised
+
+    assert sample_smaht_key_manager_4.keys_file == other_keys_file
 
 
 def test_keymanager_keys_file():

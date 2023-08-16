@@ -37,6 +37,20 @@ command_utils
    :members:
 
 
+contribution_scripts
+^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.contribution_scripts
+   :members:
+
+
+contribution_utils
+^^^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.contribution_utils
+   :members:
+
+
 creds_utils
 ^^^^^^^^^^^
 
@@ -180,6 +194,13 @@ lang_utils
 ^^^^^^^^^^
 
 .. automodule:: dcicutils.lang_utils
+   :members:
+
+
+license_utils
+^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.license_utils
    :members:
 
 
