@@ -157,6 +157,11 @@ class ItemTools:
             cls.set_path_value(datum[key], more_path, value)
 
 
+# TODO: Consider whether this might want to be an abstract base class. Some change might be needed.
+# Doug thinks we might want (metaclass=ABCMeta) here to make this an abstract base class.
+# I am less certain but open to discussion. Among other things, as implemented now,
+# the __init__ method here needs to run and the documentation says that ABC's won't appear
+# in the method resolution order. -kmp 17-Aug-2023
 class AbstractTableSetManager:
     """
     The TableSetManager is the spanning class of anything that wants to be able to load a table set,
@@ -184,6 +189,7 @@ class AbstractTableSetManager:
         if kwargs:
             raise ValueError(f"Got unexpected keywords: {kwargs}")
 
+    # TODO: Consider whether this should be an abstractmethod (but first see detailed design note at top of class.)
     @classmethod
     def load(cls, filename: str) -> Dict[str, List[AnyJsonData]]:
         """
