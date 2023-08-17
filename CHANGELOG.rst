@@ -7,6 +7,12 @@ Change Log
 ----------
 
 
+7.8.0
+=====
+
+* Add ``variant_utils`` with tools to filter through CGAP data.
+
+
 7.7.2
 =====
 
