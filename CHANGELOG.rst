@@ -7,7 +7,7 @@ Change Log
 ----------
 
 
-7.8.0
+7.9.0
 =====
 
 * New module ``sheet_utils`` for loading workbooks.
@@ -15,6 +15,12 @@ Change Log
   * class ``WorkbookManager`` for loading raw data
 
   * class ``ItemManager`` for loading item data
+
+
+7.8.0
+=====
+
+* Add ``variant_utils`` with tools to filter through CGAP data.
 
 
 7.7.2
