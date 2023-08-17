@@ -44,6 +44,7 @@ botocore = "^1.20.39"
 # This value is intentionally pinned and must not be changed casually.
 elasticsearch = "7.13.4"
 aws-requests-auth = ">=0.4.2,<1"
+chardet = "^5.2.0"
 docker = "^4.4.4"
 gitpython = "^3.1.2"
 openpyxl = "^3.1.2"

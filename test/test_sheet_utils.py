@@ -1,7 +1,7 @@
 import os
 import pytest
 
-from dcicutils.sheet_utils import ItemTools, WorkbookManager, ItemManager
+from dcicutils.sheet_utils import ItemTools, XlsxManager, ItemXlsxManager, CsvManager, ItemCsvManager, ItemManager
 from .conftest_settings import TEST_DIR
 
 
@@ -52,39 +52,39 @@ def test_item_tools_compute_patch_prototype_errors(headers):
     assert str(exc.value) == "A header cannot begin with a numeric ref: 0"
 
 
-def test_item_tools_parse_value():
+def test_item_tools_parse_item_value():
 
     for x in [37, 19.3, True, False, None, 'simple text']:
-        assert ItemTools.parse_value(x) == x
+        assert ItemTools.parse_item_value(x) == x
 
-    assert ItemTools.parse_value('3') == 3
-    assert ItemTools.parse_value('+3') == 3
-    assert ItemTools.parse_value('-3') == -3
+    assert ItemTools.parse_item_value('3') == 3
+    assert ItemTools.parse_item_value('+3') == 3
+    assert ItemTools.parse_item_value('-3') == -3
 
-    assert ItemTools.parse_value('3.5') == 3.5
-    assert ItemTools.parse_value('+3.5') == 3.5
-    assert ItemTools.parse_value('-3.5') == -3.5
+    assert ItemTools.parse_item_value('3.5') == 3.5
+    assert ItemTools.parse_item_value('+3.5') == 3.5
+    assert ItemTools.parse_item_value('-3.5') == -3.5
 
-    assert ItemTools.parse_value('3.5e1') == 35.0
-    assert ItemTools.parse_value('+3.5e1') == 35.0
-    assert ItemTools.parse_value('-3.5e1') == -35.0
+    assert ItemTools.parse_item_value('3.5e1') == 35.0
+    assert ItemTools.parse_item_value('+3.5e1') == 35.0
+    assert ItemTools.parse_item_value('-3.5e1') == -35.0
 
-    assert ItemTools.parse_value('') is None
+    assert ItemTools.parse_item_value('') is None
 
-    assert ItemTools.parse_value('null') is None
-    assert ItemTools.parse_value('Null') is None
-    assert ItemTools.parse_value('NULL') is None
+    assert ItemTools.parse_item_value('null') is None
+    assert ItemTools.parse_item_value('Null') is None
+    assert ItemTools.parse_item_value('NULL') is None
 
-    assert ItemTools.parse_value('true') is True
-    assert ItemTools.parse_value('True') is True
-    assert ItemTools.parse_value('TRUE') is True
+    assert ItemTools.parse_item_value('true') is True
+    assert ItemTools.parse_item_value('True') is True
+    assert ItemTools.parse_item_value('TRUE') is True
 
-    assert ItemTools.parse_value('false') is False
-    assert ItemTools.parse_value('False') is False
-    assert ItemTools.parse_value('FALSE') is False
+    assert ItemTools.parse_item_value('false') is False
+    assert ItemTools.parse_item_value('False') is False
+    assert ItemTools.parse_item_value('FALSE') is False
 
-    assert ItemTools.parse_value('alpha|beta|gamma') == ['alpha', 'beta', 'gamma']
-    assert ItemTools.parse_value('alpha|true|false|null||7|1.5') == ['alpha', True, False, None, None, 7, 1.5]
+    assert ItemTools.parse_item_value('alpha|beta|gamma') == ['alpha', 'beta', 'gamma']
+    assert ItemTools.parse_item_value('alpha|true|false|null||7|1.5') == ['alpha', True, False, None, None, 7, 1.5]
 
 
 def test_item_tools_set_path_value():
@@ -158,40 +158,84 @@ SAMPLE_XLSX_FILE_ITEM_CONTENT = {
 
 SAMPLE_CSV_FILE = os.path.join(TEST_DIR, 'data_files/sample_items_sheet2.csv')
 
-SAMPLE_CSV_FILE_RAW_CONTENT = SAMPLE_XLSX_FILE_RAW_CONTENT['Sheet2']
+SAMPLE_CSV_FILE_RAW_CONTENT = {CsvManager.DEFAULT_SHEET_NAME: SAMPLE_XLSX_FILE_RAW_CONTENT['Sheet2']}
 
-SAMPLE_CSV_FILE_ITEM_CONTENT = SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']
+SAMPLE_CSV_FILE_ITEM_CONTENT = {ItemCsvManager.DEFAULT_SHEET_NAME: SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']}
 
 
-def test_workbook_manager_load_content():
+def test_xlsx_manager_load_content():
 
-    wt = WorkbookManager(SAMPLE_XLSX_FILE)
+    wt = XlsxManager(SAMPLE_XLSX_FILE)
     assert wt.load_content() == SAMPLE_XLSX_FILE_RAW_CONTENT
 
 
-def test_workbook_manager_load_workbook():
+def test_xlsx_manager_load_workbook():
 
-    assert WorkbookManager.load_workbook(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_RAW_CONTENT
+    assert XlsxManager.load_table_set(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_RAW_CONTENT
 
 
-def test_workbook_manager_load_csv():
+def test_xlsx_manager_load_csv():
 
     with pytest.raises(Exception):
-        WorkbookManager.load_workbook(SAMPLE_CSV_FILE)
+        XlsxManager.load_table_set(SAMPLE_CSV_FILE)
 
 
-def test_item_manager_load_content():
+def test_item_xlsx_manager_load_content():
 
-    it = ItemManager(SAMPLE_XLSX_FILE)
+    it = ItemXlsxManager(SAMPLE_XLSX_FILE)
     assert it.load_content() == SAMPLE_XLSX_FILE_ITEM_CONTENT
+
+
+def test_item_xlsx_manager_load_workbook():
+
+    assert ItemXlsxManager.load_table_set(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_ITEM_CONTENT
+
+
+def test_item_xlsx_manager_load_csv():
+
+    with pytest.raises(Exception):
+        ItemXlsxManager.load_table_set(SAMPLE_CSV_FILE)
+
+
+def test_csv_manager_load_content():
+
+    wt = CsvManager(SAMPLE_CSV_FILE)
+    assert wt.load_content() == SAMPLE_CSV_FILE_RAW_CONTENT
+
+
+def test_csv_manager_load_workbook():
+
+    assert CsvManager.load_table_set(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_RAW_CONTENT
+
+
+def test_csv_manager_load_csv():
+
+    with pytest.raises(Exception):
+        CsvManager.load_table_set(SAMPLE_XLSX_FILE)
+
+
+def test_item_csv_manager_load_content():
+
+    it = ItemCsvManager(SAMPLE_CSV_FILE)
+    assert it.load_content() == SAMPLE_CSV_FILE_ITEM_CONTENT
+
+
+def test_item_csv_manager_load_workbook():
+
+    assert ItemCsvManager.load_table_set(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_ITEM_CONTENT
+
+
+def test_item_csv_manager_load_csv():
+
+    with pytest.raises(Exception):
+        ItemCsvManager.load_table_set(SAMPLE_XLSX_FILE)
 
 
 def test_item_manager_load_workbook():
 
-    assert ItemManager.load_workbook(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_ITEM_CONTENT
+    assert ItemManager.load_table_set(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_ITEM_CONTENT
 
+    assert ItemManager.load_table_set(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_ITEM_CONTENT
 
-def test_item_manager_load_csv():
-
-    with pytest.raises(Exception):
-        ItemManager.load_workbook(SAMPLE_CSV_FILE)
+    with pytest.raises(ValueError):
+        ItemManager.load_table_set("something.else")
