@@ -172,7 +172,7 @@ class AbstractTableSetManager:
         }
     Note that at this level of abstraction, we take no position on what form of representation is used
     for the rows, as long as it is JSON data of some kind. It might be
-         {"col1": "val1", "col2", "val2", ...}
+         {"col1": "val1", "col2": "val2", ...}
     or it might be something more structured like
          {"something": "val1", {"something_else": ["val2"]}}
     Additionally, the values stored might be altered as well. In particular, the most likely alteration
