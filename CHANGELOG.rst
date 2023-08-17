@@ -12,9 +12,20 @@ Change Log
 
 * New module ``sheet_utils`` for loading workbooks.
 
-  * class ``WorkbookManager`` for loading raw data
+  * Important things of interest:
 
-  * class ``ItemManager`` for loading item data
+    * Class ``ItemManager`` for loading Item-style data
+      from either ``.xlsx`` or ``.csv`` files.
+
+    * Function ``load_items`` that does the same as ``ItemManager.load``.
+
+  * Various low-level implementation classes such as:
+
+    * Classes ``XlsxManager`` and ``CsvManager`` for loading raw data
+      from ``.xlsx`` and ``.csv`` files, respectively.
+
+    * Classes ``ItemXlsxManager`` and ``ItemCsvManager`` for loading Item-style data
+      from ``.xlsx`` and ``.csv`` files, respectively.
 
 
 7.7.2

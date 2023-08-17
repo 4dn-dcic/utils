@@ -1,7 +1,9 @@
 import os
 import pytest
 
-from dcicutils.sheet_utils import ItemTools, XlsxManager, ItemXlsxManager, CsvManager, ItemCsvManager, ItemManager
+from dcicutils.sheet_utils import (
+    ItemTools, XlsxManager, ItemXlsxManager, CsvManager, ItemCsvManager, ItemManager, load_items,
+)
 from .conftest_settings import TEST_DIR
 
 
@@ -169,7 +171,7 @@ def test_xlsx_manager_load_content():
     assert wt.load_content() == SAMPLE_XLSX_FILE_RAW_CONTENT
 
 
-def test_xlsx_manager_load_workbook():
+def test_xlsx_manager_load():
 
     assert XlsxManager.load(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_RAW_CONTENT
 
@@ -186,7 +188,7 @@ def test_item_xlsx_manager_load_content():
     assert it.load_content() == SAMPLE_XLSX_FILE_ITEM_CONTENT
 
 
-def test_item_xlsx_manager_load_workbook():
+def test_item_xlsx_manager_load():
 
     assert ItemXlsxManager.load(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_ITEM_CONTENT
 
@@ -203,7 +205,7 @@ def test_csv_manager_load_content():
     assert wt.load_content() == SAMPLE_CSV_FILE_RAW_CONTENT
 
 
-def test_csv_manager_load_workbook():
+def test_csv_manager_load():
 
     assert CsvManager.load(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_RAW_CONTENT
 
@@ -220,7 +222,7 @@ def test_item_csv_manager_load_content():
     assert it.load_content() == SAMPLE_CSV_FILE_ITEM_CONTENT
 
 
-def test_item_csv_manager_load_workbook():
+def test_item_csv_manager_load():
 
     assert ItemCsvManager.load(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_ITEM_CONTENT
 
@@ -231,7 +233,7 @@ def test_item_csv_manager_load_csv():
         ItemCsvManager.load(SAMPLE_XLSX_FILE)
 
 
-def test_item_manager_load_workbook():
+def test_item_manager_load():
 
     assert ItemManager.load(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_ITEM_CONTENT
 
@@ -239,3 +241,13 @@ def test_item_manager_load_workbook():
 
     with pytest.raises(ValueError):
         ItemManager.load("something.else")
+
+
+def test_load_items():
+
+    assert load_items(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_ITEM_CONTENT
+
+    assert load_items(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_ITEM_CONTENT
+
+    with pytest.raises(ValueError):
+        load_items("something.else")

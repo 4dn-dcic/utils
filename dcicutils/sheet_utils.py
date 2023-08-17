@@ -438,3 +438,6 @@ class ItemManager(AbstractTableSetManager):
     def load(cls, filename: str, tab_name=None) -> AnyJsonData:
         manager = cls.create_implementation_manager(filename, tab_name=tab_name)
         return manager.load_content()
+
+
+load_items = ItemManager.load
