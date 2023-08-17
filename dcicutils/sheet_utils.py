@@ -181,6 +181,11 @@ class AbstractTableSetManager:
     """
 
     @classmethod
+    def __init__(self, **kwargs):
+        if kwargs:
+            raise ValueError(f"Unexpectd keyword arguments initializing {self.__class__.__name__}: {kwargs}")
+
+    @classmethod
     def load_table_set(cls, filename: str) -> Dict[str, List[AnyJsonData]]:
         """
         Reads a filename and returns a dictionary that maps sheet names to rows of dictionary data.
@@ -197,27 +202,28 @@ class BasicTableSetManager(AbstractTableSetManager):
     of this where there's only one set of headers and only one block of content.
     """
 
-    def _create_sheet_processor_state(self, sheetname: str) -> Any:
+    def _create_sheet_processor_state(self, tabname: str) -> Any:
         """
         This method provides for the possibility that some parsers will want auxiliary state,
         (such as parsed headers or a line count or a table of temporary names for objects to cross-link
         or some other such feature) that it carries with it as it moves from line to line parsing things.
         Subclasses might therefore want to make this do something more interesting.
         """
-        ignored(sheetname)  # subclasses might need this, but we don't
+        ignored(tabname)  # subclasses might need this, but we don't
         return None
 
-    def __init__(self, filename: str):
+    def __init__(self, filename: str, **kwargs):
+        super().__init__(**kwargs)
         self.filename: str = filename
-        self.headers_by_sheetname: Dict[str, List[str]] = {}
-        self.content_by_sheetname: Dict[str, List[AnyJsonData]] = {}
+        self.headers_by_tabname: Dict[str, List[str]] = {}
+        self.content_by_tabname: Dict[str, List[AnyJsonData]] = {}
         self.reader_agent: Any = self._get_reader_agent()
 
-    def sheet_headers(self, sheetname: str) -> List[str]:
-        return self.headers_by_sheetname[sheetname]
+    def sheet_headers(self, tabname: str) -> List[str]:
+        return self.headers_by_tabname[tabname]
 
-    def sheet_content(self, sheetname: str) -> List[AnyJsonData]:
-        return self.content_by_sheetname[sheetname]
+    def sheet_content(self, tabname: str) -> List[AnyJsonData]:
+        return self.content_by_tabname[tabname]
 
     def _get_reader_agent(self) -> Any:
         """This function is responsible for opening the workbook and returning a workbook object."""
@@ -234,21 +240,21 @@ class TableSetManager(BasicTableSetManager):
         table_set_manager: TableSetManager = cls(filename)
         return table_set_manager.load_content()
 
-    def __init__(self, filename: str):
-        super().__init__(filename=filename)
+    def __init__(self, filename: str, **kwargs):
+        super().__init__(filename=filename, **kwargs)
 
     @property
-    def sheetnames(self) -> List[str]:
-        raise NotImplementedError(f".sheetnames is not implemented for {self.__class__.__name__}..")
+    def tabnames(self) -> List[str]:
+        raise NotImplementedError(f".tabnames is not implemented for {self.__class__.__name__}..")
 
-    def _raw_row_generator_for_sheetname(self, sheetname: str) -> Iterable[SheetRow]:
+    def _raw_row_generator_for_tabname(self, tabname: str) -> Iterable[SheetRow]:
         """
-        Given a sheetname and a state (returned by _sheet_loader_state), return a generator for a set of row values.
+        Given a tabname and a state (returned by _sheet_loader_state), return a generator for a set of row values.
         What constitutes a row is just something that _sheet_col_enumerator will be happy receiving.
         """
-        raise NotImplementedError(f"._rows_for_sheetname(...) is not implemented for {self.__class__.__name__}.")
+        raise NotImplementedError(f"._rows_for_tabname(...) is not implemented for {self.__class__.__name__}.")
 
-    def _process_row(self, sheetname: str, state: Any, row: List[SheetCellValue]) -> AnyJsonData:
+    def _process_row(self, tabname: str, state: Any, row: List[SheetCellValue]) -> AnyJsonData:
         """
         This needs to take a state and whatever represents a row and
         must return a list of objects representing column values.
@@ -257,14 +263,14 @@ class TableSetManager(BasicTableSetManager):
         raise NotImplementedError(f"._process_row(...) is not implemented for {self.__class__.__name__}.")
 
     def load_content(self) -> AnyJsonData:
-        for sheetname in self.sheetnames:
+        for tabname in self.tabnames:
             sheet_content = []
-            state = self._create_sheet_processor_state(sheetname)
-            for row_data in self._raw_row_generator_for_sheetname(sheetname):
-                processed_row_data: AnyJsonData = self._process_row(sheetname, state, row_data)
+            state = self._create_sheet_processor_state(tabname)
+            for row_data in self._raw_row_generator_for_tabname(tabname):
+                processed_row_data: AnyJsonData = self._process_row(tabname, state, row_data)
                 sheet_content.append(processed_row_data)
-            self.content_by_sheetname[sheetname] = sheet_content
-        return self.content_by_sheetname
+            self.content_by_tabname[tabname] = sheet_content
+        return self.content_by_tabname
 
     @classmethod
     def parse_cell_value(cls, value: SheetCellValue) -> AnyJsonData:
@@ -286,14 +292,14 @@ class XlsxManager(TableSetManager):
             yield col
 
     @property
-    def sheetnames(self) -> List[str]:
+    def tabnames(self) -> List[str]:
         return self.reader_agent.sheetnames
 
     def _get_reader_agent(self) -> Workbook:
         return openpyxl.load_workbook(self.filename)
 
-    def _raw_row_generator_for_sheetname(self, sheetname: str) -> Iterable[SheetRow]:
-        sheet = self.reader_agent[sheetname]
+    def _raw_row_generator_for_tabname(self, tabname: str) -> Iterable[SheetRow]:
+        sheet = self.reader_agent[tabname]
         return (self._get_raw_row_content_tuple(sheet, row)
                 for row in self._all_rows(sheet))
 
@@ -301,46 +307,46 @@ class XlsxManager(TableSetManager):
         return [sheet.cell(row=row, column=col).value
                 for col in self._all_cols(sheet)]
 
-    def _create_sheet_processor_state(self, sheetname: str) -> Headers:
-        sheet = self.reader_agent[sheetname]
+    def _create_sheet_processor_state(self, tabname: str) -> Headers:
+        sheet = self.reader_agent[tabname]
         headers: List[str] = [str(sheet.cell(row=1, column=col).value)
                               for col in self._all_cols(sheet)]
-        self.headers_by_sheetname[sheet.title] = headers
+        self.headers_by_tabname[sheet.title] = headers
         return headers
 
-    def _process_row(self, sheetname: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
-        ignored(sheetname)
+    def _process_row(self, tabname: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
+        ignored(tabname)
         return {headers[i]: self.parse_cell_value(row_datum)
                 for i, row_datum in enumerate(row_data)}
 
 
 class ItemManagerMixin(BasicTableSetManager):
 
-    def __init__(self, filename: str):
-        super().__init__(filename=filename)
-        self.patch_prototypes_by_sheetname: Dict[str, Dict] = {}
-        self.parsed_headers_by_sheetname: Dict[str, List[List[Union[int, str]]]] = {}
+    def __init__(self, filename: str, **kwargs):
+        super().__init__(filename=filename, **kwargs)
+        self.patch_prototypes_by_tabname: Dict[str, Dict] = {}
+        self.parsed_headers_by_tabname: Dict[str, List[List[Union[int, str]]]] = {}
 
-    def sheet_patch_prototype(self, sheetname: str) -> Dict:
-        return self.patch_prototypes_by_sheetname[sheetname]
+    def sheet_patch_prototype(self, tabname: str) -> Dict:
+        return self.patch_prototypes_by_tabname[tabname]
 
-    def sheet_parsed_headers(self, sheetname: str) -> List[List[Union[int, str]]]:
-        return self.parsed_headers_by_sheetname[sheetname]
+    def sheet_parsed_headers(self, tabname: str) -> List[List[Union[int, str]]]:
+        return self.parsed_headers_by_tabname[tabname]
 
-    def _create_sheet_processor_state(self, sheetname: str) -> ParsedHeaders:
-        super()._create_sheet_processor_state(sheetname)
-        self._compile_sheet_headers(sheetname)
-        return self.sheet_parsed_headers(sheetname)
+    def _create_sheet_processor_state(self, tabname: str) -> ParsedHeaders:
+        super()._create_sheet_processor_state(tabname)
+        self._compile_sheet_headers(tabname)
+        return self.sheet_parsed_headers(tabname)
 
-    def _compile_sheet_headers(self, sheetname: str):
-        headers = self.headers_by_sheetname[sheetname]
+    def _compile_sheet_headers(self, tabname: str):
+        headers = self.headers_by_tabname[tabname]
         parsed_headers = ItemTools.parse_sheet_headers(headers)
-        self.parsed_headers_by_sheetname[sheetname] = parsed_headers
+        self.parsed_headers_by_tabname[tabname] = parsed_headers
         prototype = ItemTools.compute_patch_prototype(parsed_headers)
-        self.patch_prototypes_by_sheetname[sheetname] = prototype
+        self.patch_prototypes_by_tabname[tabname] = prototype
 
-    def _process_row(self, sheetname: str, parsed_headers: ParsedHeaders, row_data: SheetRow) -> AnyJsonData:
-        patch_item = copy.deepcopy(self.sheet_patch_prototype(sheetname))
+    def _process_row(self, tabname: str, parsed_headers: ParsedHeaders, row_data: SheetRow) -> AnyJsonData:
+        patch_item = copy.deepcopy(self.sheet_patch_prototype(tabname))
         for i, value in enumerate(row_data):
             parsed_value = self.parse_cell_value(value)
             ItemTools.set_path_value(patch_item, parsed_headers[i], parsed_value)
@@ -357,15 +363,15 @@ class ItemXlsxManager(ItemManagerMixin, XlsxManager):
 
 class CsvManager(TableSetManager):
 
-    DEFAULT_SHEET_NAME = 'Sheet1'
+    DEFAULT_TAB_NAME = 'Sheet1'
 
-    def __init__(self, filename: str, sheet_name: str = None):
-        super().__init__(filename=filename)
-        self.sheet_name = sheet_name or self.DEFAULT_SHEET_NAME
+    def __init__(self, filename: str, sheet_name: str = None, **kwargs):
+        super().__init__(filename=filename, **kwargs)
+        self.tab_name = sheet_name or self.DEFAULT_TAB_NAME
 
     @property
-    def sheetnames(self) -> List[str]:
-        return [self.sheet_name]
+    def tabnames(self) -> List[str]:
+        return [self.tab_name]
 
     def _get_reader_agent(self) -> CsvReader:
         return self._get_csv_reader(self.filename)
@@ -374,17 +380,17 @@ class CsvManager(TableSetManager):
     def _get_csv_reader(cls, filename) -> CsvReader:
         return csv.reader(open_text_input_file_respecting_byte_order_mark(filename))
 
-    def _raw_row_generator_for_sheetname(self, sheetname: str) -> Iterable[SheetRow]:
+    def _raw_row_generator_for_tabname(self, tabname: str) -> Iterable[SheetRow]:
         return self.reader_agent
 
-    def _create_sheet_processor_state(self, sheetname: str) -> Headers:
-        headers: Headers = self.headers_by_sheetname.get(sheetname)
+    def _create_sheet_processor_state(self, tabname: str) -> Headers:
+        headers: Headers = self.headers_by_tabname.get(tabname)
         if headers is None:
-            self.headers_by_sheetname[sheetname] = headers = self.reader_agent.__next__()
+            self.headers_by_tabname[tabname] = headers = self.reader_agent.__next__()
         return headers
 
-    def _process_row(self, sheetname: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
-        ignored(sheetname)
+    def _process_row(self, tabname: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
+        ignored(tabname)
         return {headers[i]: self.parse_cell_value(row_datum)
                 for i, row_datum in enumerate(row_data)}
 
@@ -396,11 +402,11 @@ class ItemCsvManager(ItemManagerMixin, CsvManager):
 class ItemManager(AbstractTableSetManager):
 
     @classmethod
-    def create_implementation_manager(cls, filename: str) -> BasicTableSetManager:
+    def create_implementation_manager(cls, filename: str, **kwargs) -> BasicTableSetManager:
         if filename.endswith(".xlsx"):
-            reader_agent = ItemXlsxManager(filename)
+            reader_agent = ItemXlsxManager(filename, **kwargs)
         elif filename.endswith(".csv"):
-            reader_agent = ItemCsvManager(filename)
+            reader_agent = ItemCsvManager(filename, **kwargs)
         else:
             raise ValueError(f"Unknown file type: {filename}")
         return reader_agent
