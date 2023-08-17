@@ -211,7 +211,7 @@ class BasicTableSetManager(AbstractTableSetManager):
         self.filename: str = filename
         self.headers_by_sheetname: Dict[str, List[str]] = {}
         self.content_by_sheetname: Dict[str, List[AnyJsonData]] = {}
-        self.workbook: Any = self._initialize_workbook()
+        self.reader_agent: Any = self._get_reader_agent()
 
     def sheet_headers(self, sheetname: str) -> List[str]:
         return self.headers_by_sheetname[sheetname]
@@ -219,9 +219,9 @@ class BasicTableSetManager(AbstractTableSetManager):
     def sheet_content(self, sheetname: str) -> List[AnyJsonData]:
         return self.content_by_sheetname[sheetname]
 
-    def _initialize_workbook(self) -> Any:
+    def _get_reader_agent(self) -> Any:
         """This function is responsible for opening the workbook and returning a workbook object."""
-        raise NotImplementedError(f"._initialize_workbook() is not implemented for {self.__class__.__name__}.")
+        raise NotImplementedError(f"._get_reader_agent() is not implemented for {self.__class__.__name__}.")
 
     def load_content(self) -> Any:
         raise NotImplementedError(f".load_content() is not implemented for {self.__class__.__name__}.")
@@ -287,13 +287,13 @@ class XlsxManager(TableSetManager):
 
     @property
     def sheetnames(self) -> List[str]:
-        return self.workbook.sheetnames
+        return self.reader_agent.sheetnames
 
-    def _initialize_workbook(self) -> Workbook:
+    def _get_reader_agent(self) -> Workbook:
         return openpyxl.load_workbook(self.filename)
 
     def _raw_row_generator_for_sheetname(self, sheetname: str) -> Iterable[SheetRow]:
-        sheet = self.workbook[sheetname]
+        sheet = self.reader_agent[sheetname]
         return (self._get_raw_row_content_tuple(sheet, row)
                 for row in self._all_rows(sheet))
 
@@ -302,7 +302,7 @@ class XlsxManager(TableSetManager):
                 for col in self._all_cols(sheet)]
 
     def _create_sheet_processor_state(self, sheetname: str) -> Headers:
-        sheet = self.workbook[sheetname]
+        sheet = self.reader_agent[sheetname]
         headers: List[str] = [str(sheet.cell(row=1, column=col).value)
                               for col in self._all_cols(sheet)]
         self.headers_by_sheetname[sheet.title] = headers
@@ -367,7 +367,7 @@ class CsvManager(TableSetManager):
     def sheetnames(self) -> List[str]:
         return [self.sheet_name]
 
-    def _initialize_workbook(self) -> CsvReader:
+    def _get_reader_agent(self) -> CsvReader:
         return self._get_csv_reader(self.filename)
 
     @classmethod
@@ -375,12 +375,12 @@ class CsvManager(TableSetManager):
         return csv.reader(open_text_input_file_respecting_byte_order_mark(filename))
 
     def _raw_row_generator_for_sheetname(self, sheetname: str) -> Iterable[SheetRow]:
-        return self.workbook
+        return self.reader_agent
 
     def _create_sheet_processor_state(self, sheetname: str) -> Headers:
         headers: Headers = self.headers_by_sheetname.get(sheetname)
         if headers is None:
-            self.headers_by_sheetname[sheetname] = headers = self.workbook.__next__()
+            self.headers_by_sheetname[sheetname] = headers = self.reader_agent.__next__()
         return headers
 
     def _process_row(self, sheetname: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
@@ -396,16 +396,16 @@ class ItemCsvManager(ItemManagerMixin, CsvManager):
 class ItemManager(AbstractTableSetManager):
 
     @classmethod
-    def create_workbook(cls, filename: str) -> BasicTableSetManager:
+    def create_implementation_manager(cls, filename: str) -> BasicTableSetManager:
         if filename.endswith(".xlsx"):
-            workbook = ItemXlsxManager(filename)
+            reader_agent = ItemXlsxManager(filename)
         elif filename.endswith(".csv"):
-            workbook = ItemCsvManager(filename)
+            reader_agent = ItemCsvManager(filename)
         else:
-            raise ValueError("Unknown workbook type: ")
-        return workbook
+            raise ValueError(f"Unknown file type: {filename}")
+        return reader_agent
 
     @classmethod
     def load_table_set(cls, filename: str) -> AnyJsonData:
-        workbook = cls.create_workbook(filename)
-        return workbook.load_content()
+        manager = cls.create_implementation_manager(filename)
+        return manager.load_content()
