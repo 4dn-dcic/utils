@@ -2,7 +2,11 @@ import os
 import pytest
 
 from dcicutils.sheet_utils import (
-    ItemTools, XlsxManager, ItemXlsxManager, CsvManager, ItemCsvManager, ItemManager, load_items,
+    # High-level interfaces
+    ItemManager, load_items,
+    # Low-level implementation
+    ItemTools, XlsxManager, ItemXlsxManager,
+    CsvManager, ItemCsvManager, TsvManager, ItemTsvManager,
 )
 from .conftest_settings import TEST_DIR
 
@@ -164,6 +168,12 @@ SAMPLE_CSV_FILE_RAW_CONTENT = {CsvManager.DEFAULT_TAB_NAME: SAMPLE_XLSX_FILE_RAW
 
 SAMPLE_CSV_FILE_ITEM_CONTENT = {ItemCsvManager.DEFAULT_TAB_NAME: SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']}
 
+SAMPLE_TSV_FILE = os.path.join(TEST_DIR, 'data_files/sample_items_sheet2.tsv')
+
+SAMPLE_TSV_FILE_RAW_CONTENT = {TsvManager.DEFAULT_TAB_NAME: SAMPLE_XLSX_FILE_RAW_CONTENT['Sheet2']}
+
+SAMPLE_TSV_FILE_ITEM_CONTENT = {ItemTsvManager.DEFAULT_TAB_NAME: SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']}
+
 
 def test_xlsx_manager_load_content():
 
@@ -231,6 +241,40 @@ def test_item_csv_manager_load_csv():
 
     with pytest.raises(Exception):
         ItemCsvManager.load(SAMPLE_XLSX_FILE)
+
+
+def test_tsv_manager_load_content():
+
+    wt = TsvManager(SAMPLE_TSV_FILE)
+    assert wt.load_content() == SAMPLE_TSV_FILE_RAW_CONTENT
+
+
+def test_tsv_manager_load():
+
+    assert TsvManager.load(SAMPLE_TSV_FILE) == SAMPLE_TSV_FILE_RAW_CONTENT
+
+
+def test_tsv_manager_load_csv():
+
+    with pytest.raises(Exception):
+        TsvManager.load(SAMPLE_XLSX_FILE)
+
+
+def test_item_tsv_manager_load_content():
+
+    it = ItemTsvManager(SAMPLE_TSV_FILE)
+    assert it.load_content() == SAMPLE_TSV_FILE_ITEM_CONTENT
+
+
+def test_item_tsv_manager_load():
+
+    assert ItemTsvManager.load(SAMPLE_TSV_FILE) == SAMPLE_TSV_FILE_ITEM_CONTENT
+
+
+def test_item_tsv_manager_load_csv():
+
+    with pytest.raises(Exception):
+        ItemTsvManager.load(SAMPLE_XLSX_FILE)
 
 
 def test_item_manager_load():

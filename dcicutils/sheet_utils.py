@@ -158,10 +158,12 @@ class ItemTools:
 
 
 # TODO: Consider whether this might want to be an abstract base class. Some change might be needed.
+#
 # Doug thinks we might want (metaclass=ABCMeta) here to make this an abstract base class.
 # I am less certain but open to discussion. Among other things, as implemented now,
 # the __init__ method here needs to run and the documentation says that ABC's won't appear
 # in the method resolution order. -kmp 17-Aug-2023
+# See also discussion at https://github.com/4dn-dcic/utils/pull/276#discussion_r1297775535
 class AbstractTableSetManager:
     """
     The TableSetManager is the spanning class of anything that wants to be able to load a table set,
@@ -407,6 +409,7 @@ class CsvManager(TableSetManager):
         headers: Headers = self.headers_by_tabname.get(tabname)
         if headers is None:
             self.headers_by_tabname[tabname] = headers = self.reader_agent.__next__()
+            print(f"Headers={headers}")
         return headers
 
     def _process_row(self, tabname: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
@@ -418,6 +421,23 @@ class CsvManager(TableSetManager):
 class ItemCsvManager(ItemManagerMixin, CsvManager):
     """
     This layers item-style row processing functionality on a CSV file.
+    """
+    pass
+
+
+class TsvManager(CsvManager):
+    """
+    TSV files are just CSV files with tabs instead of commas as separators.
+    (We do not presently handle any escaping of strange characters. May need to add handling for backslash escaping.)
+    """
+    @classmethod
+    def _get_csv_reader(cls, filename) -> CsvReader:
+        return csv.reader(open_text_input_file_respecting_byte_order_mark(filename), delimiter='\t')
+
+
+class ItemTsvManager(ItemManagerMixin, TsvManager):
+    """
+    This layers item-style row processing functionality on a TSV file.
     """
     pass
 
@@ -436,6 +456,8 @@ class ItemManager(AbstractTableSetManager):
             reader_agent = ItemXlsxManager(filename)
         elif filename.endswith(".csv"):
             reader_agent = ItemCsvManager(filename, tab_name=tab_name)
+        elif filename.endswith(".tsv"):
+            reader_agent = ItemTsvManager(filename, tab_name=tab_name)
         else:
             raise ValueError(f"Unknown file type: {filename}")
         return reader_agent
