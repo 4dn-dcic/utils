@@ -15,17 +15,17 @@ Change Log
   * Important things of interest:
 
     * Class ``ItemManager`` for loading Item-style data
-      from either ``.xlsx`` or ``.csv`` files.
+      from any ``.xlsx``, ``.csv`` or ``.tsv`` files.
 
     * Function ``load_items`` that does the same as ``ItemManager.load``.
 
   * Various low-level implementation classes such as:
 
-    * Classes ``XlsxManager`` and ``CsvManager`` for loading raw data
-      from ``.xlsx`` and ``.csv`` files, respectively.
+    * Classes ``XlsxManager``, ``CsvManager`` and ``TsvManager`` for loading raw data
+      from ``.xlsx``, ``.csv``, and ``.tsv`` files, respectively.
 
-    * Classes ``ItemXlsxManager`` and ``ItemCsvManager`` for loading Item-style data
-      from ``.xlsx`` and ``.csv`` files, respectively.
+    * Classes ``ItemXlsxManager``, ``ItemCsvManager``, and ``ItemTsvManager`` for loading Item-style data
+      from ``.xlsx``, ``.csv``, and ``.tsv`` files, respectively.
 
 * Contains a fix for a bug in ``ff_utils.get_schema_names`` (`C4-1086 <https://hms-dbmi.atlassian.net/browse/C4-1086>`_).
 
