@@ -47,9 +47,9 @@
     },
     "David Michaels": {
       "emails": [
+        "105234079+dmichaels-harvard@users.noreply.github.com",
         "david_michaels@hms.harvard.edu",
-        "dmichaels@gmail.com",
-        "105234079+dmichaels-harvard@users.noreply.github.com"
+        "dmichaels@gmail.com"
       ],
       "names": [
         "David Michaels",
@@ -58,8 +58,8 @@
     },
     "Douglas Rioux": {
       "emails": [
-        "douglas_rioux@hms.harvard.edu",
-        "58236592+drio18@users.noreply.github.com"
+        "58236592+drio18@users.noreply.github.com",
+        "douglas_rioux@hms.harvard.edu"
       ],
       "names": [
         "Douglas Rioux",
@@ -85,8 +85,8 @@
     },
     "Kent M Pitman": {
       "emails": [
-        "netsettler@users.noreply.github.com",
-        "kent_pitman@hms.harvard.edu"
+        "kent_pitman@hms.harvard.edu",
+        "netsettler@users.noreply.github.com"
       ],
       "names": [
         "Kent M Pitman",
@@ -127,6 +127,16 @@
       "names": [
         "Soo Lee",
         "SooLee"
+      ]
+    },
+    "Tom Duraisingh": {
+      "emails": [
+        "Thomas_Duraisingh@hms.harvard.edu",
+        "contributors.TomDuraisingh.emails.138792649+TomDuraisingh@users.noreply.github.com"
+      ],
+      "names": [
+        "TomDuraisingh",
+        "Tom Duraisingh"
       ]
     },
     "Will Ronchetti": {

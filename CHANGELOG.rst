@@ -7,7 +7,7 @@ Change Log
 ----------
 
 
-7.8.0
+7.9.0
 =====
 
 * New module ``sheet_utils`` for loading workbooks.
@@ -28,6 +28,12 @@ Change Log
       from ``.xlsx`` and ``.csv`` files, respectively.
 
 * Contains a fix for a bug in ``ff_utils.get_schema_names`` (`C4-1086 <https://hms-dbmi.atlassian.net/browse/C4-1086>`_).
+
+
+7.8.0
+=====
+
+* Add ``variant_utils`` with tools to filter through CGAP data.
 
 
 7.7.2
