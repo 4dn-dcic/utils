@@ -160,7 +160,7 @@ class ItemTools:
 class AbstractTableSetManager:
     """
     The TableSetManager is the spanning class of anything that wants to be able to load a table set,
-    regardless of what it wants to load it from. To do this, it must support a load_table_set method
+    regardless of what it wants to load it from. To do this, it must support a load method
     that takes a filename and returns the file content in the form:
         {
             "Sheet1": [
@@ -180,13 +180,12 @@ class AbstractTableSetManager:
     happen is not constrained by this class.
     """
 
-    @classmethod
     def __init__(self, **kwargs):
         if kwargs:
-            raise ValueError(f"Unexpectd keyword arguments initializing {self.__class__.__name__}: {kwargs}")
+            raise ValueError(f"Got unexpected keywords: {kwargs}")
 
     @classmethod
-    def load_table_set(cls, filename: str) -> Dict[str, List[AnyJsonData]]:
+    def load(cls, filename: str) -> Dict[str, List[AnyJsonData]]:
         """
         Reads a filename and returns a dictionary that maps sheet names to rows of dictionary data.
         For more information, see documentation of AbstractTableSetManager.
@@ -202,7 +201,20 @@ class BasicTableSetManager(AbstractTableSetManager):
     of this where there's only one set of headers and only one block of content.
     """
 
-    def _create_sheet_processor_state(self, tabname: str) -> Any:
+    def __init__(self, filename: str, **kwargs):
+        super().__init__(**kwargs)
+        self.filename: str = filename
+        self.headers_by_tabname: Dict[str, List[str]] = {}
+        self.content_by_tabname: Dict[str, List[AnyJsonData]] = {}
+        self.reader_agent: Any = self._get_reader_agent()
+
+    def tab_headers(self, tabname: str) -> List[str]:
+        return self.headers_by_tabname[tabname]
+
+    def tab_content(self, tabname: str) -> List[AnyJsonData]:
+        return self.content_by_tabname[tabname]
+
+    def _create_tab_processor_state(self, tabname: str) -> Any:
         """
         This method provides for the possibility that some parsers will want auxiliary state,
         (such as parsed headers or a line count or a table of temporary names for objects to cross-link
@@ -211,19 +223,6 @@ class BasicTableSetManager(AbstractTableSetManager):
         """
         ignored(tabname)  # subclasses might need this, but we don't
         return None
-
-    def __init__(self, filename: str, **kwargs):
-        super().__init__(**kwargs)
-        self.filename: str = filename
-        self.headers_by_tabname: Dict[str, List[str]] = {}
-        self.content_by_tabname: Dict[str, List[AnyJsonData]] = {}
-        self.reader_agent: Any = self._get_reader_agent()
-
-    def sheet_headers(self, tabname: str) -> List[str]:
-        return self.headers_by_tabname[tabname]
-
-    def sheet_content(self, tabname: str) -> List[AnyJsonData]:
-        return self.content_by_tabname[tabname]
 
     def _get_reader_agent(self) -> Any:
         """This function is responsible for opening the workbook and returning a workbook object."""
@@ -236,12 +235,12 @@ class BasicTableSetManager(AbstractTableSetManager):
 class TableSetManager(BasicTableSetManager):
 
     @classmethod
-    def load_table_set(cls, filename: str) -> AnyJsonData:
+    def load(cls, filename: str) -> AnyJsonData:
         table_set_manager: TableSetManager = cls(filename)
         return table_set_manager.load_content()
 
-    def __init__(self, filename: str, **kwargs):
-        super().__init__(filename=filename, **kwargs)
+    def __init__(self, filename: str):
+        super().__init__(filename=filename)
 
     @property
     def tabnames(self) -> List[str]:
@@ -250,7 +249,6 @@ class TableSetManager(BasicTableSetManager):
     def _raw_row_generator_for_tabname(self, tabname: str) -> Iterable[SheetRow]:
         """
         Given a tabname and a state (returned by _sheet_loader_state), return a generator for a set of row values.
-        What constitutes a row is just something that _sheet_col_enumerator will be happy receiving.
         """
         raise NotImplementedError(f"._rows_for_tabname(...) is not implemented for {self.__class__.__name__}.")
 
@@ -258,14 +256,14 @@ class TableSetManager(BasicTableSetManager):
         """
         This needs to take a state and whatever represents a row and
         must return a list of objects representing column values.
-        What constitutes a row is just something that _sheet_col_enumerator will be happy receiving.
+        What constitutes a processed up to the class, but other than that the result must be a JSON dictionary.
         """
         raise NotImplementedError(f"._process_row(...) is not implemented for {self.__class__.__name__}.")
 
     def load_content(self) -> AnyJsonData:
         for tabname in self.tabnames:
             sheet_content = []
-            state = self._create_sheet_processor_state(tabname)
+            state = self._create_tab_processor_state(tabname)
             for row_data in self._raw_row_generator_for_tabname(tabname):
                 processed_row_data: AnyJsonData = self._process_row(tabname, state, row_data)
                 sheet_content.append(processed_row_data)
@@ -278,6 +276,9 @@ class TableSetManager(BasicTableSetManager):
 
 
 class XlsxManager(TableSetManager):
+    """
+    This implements the mechanism to get a series of rows out of the sheets in an XLSX file.
+    """
 
     @classmethod
     def _all_rows(cls, sheet: Worksheet):
@@ -307,7 +308,7 @@ class XlsxManager(TableSetManager):
         return [sheet.cell(row=row, column=col).value
                 for col in self._all_cols(sheet)]
 
-    def _create_sheet_processor_state(self, tabname: str) -> Headers:
+    def _create_tab_processor_state(self, tabname: str) -> Headers:
         sheet = self.reader_agent[tabname]
         headers: List[str] = [str(sheet.cell(row=1, column=col).value)
                               for col in self._all_cols(sheet)]
@@ -321,6 +322,10 @@ class XlsxManager(TableSetManager):
 
 
 class ItemManagerMixin(BasicTableSetManager):
+    """
+    This can add functionality to a reader such as an XlsxManager or a CsvManager in order to make its rows
+    get handled like Items instead of just flat table rows.
+    """
 
     def __init__(self, filename: str, **kwargs):
         super().__init__(filename=filename, **kwargs)
@@ -333,8 +338,10 @@ class ItemManagerMixin(BasicTableSetManager):
     def sheet_parsed_headers(self, tabname: str) -> List[List[Union[int, str]]]:
         return self.parsed_headers_by_tabname[tabname]
 
-    def _create_sheet_processor_state(self, tabname: str) -> ParsedHeaders:
-        super()._create_sheet_processor_state(tabname)
+    def _create_tab_processor_state(self, tabname: str) -> ParsedHeaders:
+        super()._create_tab_processor_state(tabname)
+        # This will create state that allows us to efficiently assign values in the right place on each row
+        # by setting up a prototype we can copy and then drop values into.
         self._compile_sheet_headers(tabname)
         return self.sheet_parsed_headers(tabname)
 
@@ -358,16 +365,23 @@ class ItemManagerMixin(BasicTableSetManager):
 
 
 class ItemXlsxManager(ItemManagerMixin, XlsxManager):
+    """
+    This layers item-style row processing functionality on an XLSX file.
+    """
     pass
 
 
 class CsvManager(TableSetManager):
+    """
+    This implements the mechanism to get a series of rows out of the sheet in a csv file,
+    returning a result that still looks like there could have been multiple tabs.
+    """
 
     DEFAULT_TAB_NAME = 'Sheet1'
 
-    def __init__(self, filename: str, sheet_name: str = None, **kwargs):
-        super().__init__(filename=filename, **kwargs)
-        self.tab_name = sheet_name or self.DEFAULT_TAB_NAME
+    def __init__(self, filename: str, tab_name=None):
+        super().__init__(filename=filename)
+        self.tab_name = tab_name or self.DEFAULT_TAB_NAME
 
     @property
     def tabnames(self) -> List[str]:
@@ -383,7 +397,7 @@ class CsvManager(TableSetManager):
     def _raw_row_generator_for_tabname(self, tabname: str) -> Iterable[SheetRow]:
         return self.reader_agent
 
-    def _create_sheet_processor_state(self, tabname: str) -> Headers:
+    def _create_tab_processor_state(self, tabname: str) -> Headers:
         headers: Headers = self.headers_by_tabname.get(tabname)
         if headers is None:
             self.headers_by_tabname[tabname] = headers = self.reader_agent.__next__()
@@ -396,22 +410,31 @@ class CsvManager(TableSetManager):
 
 
 class ItemCsvManager(ItemManagerMixin, CsvManager):
+    """
+    This layers item-style row processing functionality on a CSV file.
+    """
     pass
 
 
 class ItemManager(AbstractTableSetManager):
+    """
+    This class will open a .xlsx or .csv file and load its content in our standard format.
+    (See more detailed description in AbstractTableManager.)
+    """
 
     @classmethod
-    def create_implementation_manager(cls, filename: str, **kwargs) -> BasicTableSetManager:
+    def create_implementation_manager(cls, filename: str, tab_name=None) -> BasicTableSetManager:
         if filename.endswith(".xlsx"):
-            reader_agent = ItemXlsxManager(filename, **kwargs)
+            if tab_name is not None:
+                raise ValueError(f".xlsx files don't need tab_name={tab_name!r}")
+            reader_agent = ItemXlsxManager(filename)
         elif filename.endswith(".csv"):
-            reader_agent = ItemCsvManager(filename, **kwargs)
+            reader_agent = ItemCsvManager(filename, tab_name=tab_name)
         else:
             raise ValueError(f"Unknown file type: {filename}")
         return reader_agent
 
     @classmethod
-    def load_table_set(cls, filename: str) -> AnyJsonData:
-        manager = cls.create_implementation_manager(filename)
+    def load(cls, filename: str, tab_name=None) -> AnyJsonData:
+        manager = cls.create_implementation_manager(filename, tab_name=tab_name)
         return manager.load_content()

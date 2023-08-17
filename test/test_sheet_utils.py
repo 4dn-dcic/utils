@@ -171,13 +171,13 @@ def test_xlsx_manager_load_content():
 
 def test_xlsx_manager_load_workbook():
 
-    assert XlsxManager.load_table_set(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_RAW_CONTENT
+    assert XlsxManager.load(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_RAW_CONTENT
 
 
 def test_xlsx_manager_load_csv():
 
     with pytest.raises(Exception):
-        XlsxManager.load_table_set(SAMPLE_CSV_FILE)
+        XlsxManager.load(SAMPLE_CSV_FILE)
 
 
 def test_item_xlsx_manager_load_content():
@@ -188,13 +188,13 @@ def test_item_xlsx_manager_load_content():
 
 def test_item_xlsx_manager_load_workbook():
 
-    assert ItemXlsxManager.load_table_set(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_ITEM_CONTENT
+    assert ItemXlsxManager.load(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_ITEM_CONTENT
 
 
 def test_item_xlsx_manager_load_csv():
 
     with pytest.raises(Exception):
-        ItemXlsxManager.load_table_set(SAMPLE_CSV_FILE)
+        ItemXlsxManager.load(SAMPLE_CSV_FILE)
 
 
 def test_csv_manager_load_content():
@@ -205,13 +205,13 @@ def test_csv_manager_load_content():
 
 def test_csv_manager_load_workbook():
 
-    assert CsvManager.load_table_set(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_RAW_CONTENT
+    assert CsvManager.load(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_RAW_CONTENT
 
 
 def test_csv_manager_load_csv():
 
     with pytest.raises(Exception):
-        CsvManager.load_table_set(SAMPLE_XLSX_FILE)
+        CsvManager.load(SAMPLE_XLSX_FILE)
 
 
 def test_item_csv_manager_load_content():
@@ -222,20 +222,20 @@ def test_item_csv_manager_load_content():
 
 def test_item_csv_manager_load_workbook():
 
-    assert ItemCsvManager.load_table_set(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_ITEM_CONTENT
+    assert ItemCsvManager.load(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_ITEM_CONTENT
 
 
 def test_item_csv_manager_load_csv():
 
     with pytest.raises(Exception):
-        ItemCsvManager.load_table_set(SAMPLE_XLSX_FILE)
+        ItemCsvManager.load(SAMPLE_XLSX_FILE)
 
 
 def test_item_manager_load_workbook():
 
-    assert ItemManager.load_table_set(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_ITEM_CONTENT
+    assert ItemManager.load(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_ITEM_CONTENT
 
-    assert ItemManager.load_table_set(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_ITEM_CONTENT
+    assert ItemManager.load(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_ITEM_CONTENT
 
     with pytest.raises(ValueError):
-        ItemManager.load_table_set("something.else")
+        ItemManager.load("something.else")
