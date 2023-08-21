@@ -3478,9 +3478,9 @@ def input_series(*items):
 def is_subdict(json1, json2, desc1="json1", desc2="json2", verbose=True):
     """
     Does asymmetric testing of dictionary equivalence, assuring json2 has all the content of json1,
-    even if not vice versa. In other words, the dictionary structure is equivalent to the extent
-    that (recursively) all dictionary keys on the left occur in the right hand side even if not
-    necessarily all dictionary keys on the right occur in the left.
+    even if not vice versa. In other words, the dictionary structure is equivalent, to the extent
+    that (recursively) all dictionary keys on the left hand side also occur on the right hand side
+    even if not necessarily all dictionary keys on the right occur in the left.
 
     For example,
        x = {"foo": 3}

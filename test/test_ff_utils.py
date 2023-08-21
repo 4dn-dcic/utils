@@ -5,13 +5,13 @@ import json
 import os
 import pytest
 import requests
-import shutil
+import tempfile
 import time
 
 from botocore.exceptions import ClientError
 from dcicutils import es_utils, ff_utils, s3_utils
 from dcicutils.ff_mocks import mocked_s3utils_with_sse, TestScenarios, RequestsTestRecorder
-from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true
+from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true, ignorable, file_contents
 from dcicutils.qa_utils import (
     check_duplicated_items_by_key, ignored, raises_regexp, MockResponse, MockBoto3, MockBotoSQSClient, is_subdict,
 )
@@ -469,6 +469,11 @@ def test_stuff_in_queues_unit():
     with mock.patch.object(ff_utils, "boto3", MockBoto3(sqs=MockBotoSQSClientErring)):
         assert ff_utils.stuff_in_queues('fourfront-foo')
         assert ff_utils.stuff_in_queues('fourfront-foo', check_secondary=True)
+
+
+def test_internal_compute_stuff_in_queues_requires_env():
+    with pytest.raises(ValueError):
+        ff_utils.internal_compute_stuff_in_queues(None, True)
 
 
 @pytest.mark.integratedx
@@ -1856,29 +1861,22 @@ def test_delete_field(integrated_ff):
     assert "Bad status code" in str(exec_info.value)
 
 
-@pytest.mark.direct_es_query
-@pytest.mark.integrated
 @pytest.mark.file_operation
-@pytest.mark.flaky
-def test_dump_results_to_json(integrated_ff):
-
-    def clear_folder(folder):
-        ignored(folder)
-        try:
-            shutil.rmtree(test_folder)
-        except FileNotFoundError:
-            pass
-
-    test_folder = 'test/test_data'
-    clear_folder(test_folder)
-    test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
-    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
-    store, uuids = ff_utils.expand_es_metadata(test_list, store_frame='object', key=key, ff_env=ff_env)
-    len_store = len(store)
-    ff_utils.dump_results_to_json(store, test_folder)
-    all_files = os.listdir(test_folder)
-    assert len(all_files) == len_store
-    clear_folder(test_folder)
+@pytest.mark.unit
+def test_dump_results_to_json():
+    print()
+    with tempfile.TemporaryDirectory() as test_folder:
+        store = {  # mocked first return value from expanded_es_metadata
+            'experiment_hi_c': [{'uuid': '1234', '@id': '/a/b/', "other": "stuff"}],
+            'experiment_set': [{'uuid': '12345', '@id': '/c/d/', "other": "stuff"}],
+        }
+        ff_utils.dump_results_to_json(store, test_folder)
+        all_files = os.listdir(test_folder)
+        assert len(all_files) == len(store)
+        for file in all_files:
+            print(f"file={file}")
+            base, ext = os.path.splitext(os.path.basename(file))
+            assert store[base] == json.loads(file_contents(os.path.join(test_folder, file)))
 
 
 @pytest.mark.direct_es_query
@@ -1934,8 +1932,37 @@ def test_convert_param():
     expected2 = [{'workflow_argument_name': 'param1', 'value': '5'}]
     converted_params1 = ff_utils.convert_param(params)
     converted_params2 = ff_utils.convert_param(params, vals_as_string=True)
-    assert expected1 == converted_params1
-    assert expected2 == converted_params2
+    assert converted_params1 == expected1
+    assert converted_params2 == expected2
+
+    params = {'param1': 5, 'param2': 6}
+    expected1 = [{'workflow_argument_name': 'param1', 'value': 5},
+                 {'workflow_argument_name': 'param2', 'value': 6}]
+    expected2 = [{'workflow_argument_name': 'param1', 'value': '5'},
+                 {'workflow_argument_name': 'param2', 'value': '6'}]
+    converted_params1 = ff_utils.convert_param(params)
+    converted_params2 = ff_utils.convert_param(params, vals_as_string=True)
+    assert converted_params1 == expected1
+    assert converted_params2 == expected2
+
+    params = {'param1': 'a'}
+    expected1 = [{'workflow_argument_name': 'param1', 'value': 'a'}]
+    expected2 = [{'workflow_argument_name': 'param1', 'value': 'a'}]
+    converted_params1 = ff_utils.convert_param(params)
+    converted_params2 = ff_utils.convert_param(params, vals_as_string=True)
+    assert converted_params1 == expected1
+    assert converted_params2 == expected2
+
+    # See my notes in convert_param about the error-handling it does. Not sure this is what's intended.
+    params = {'param1': ['a']}
+    expected1 = [{'workflow_argument_name': 'param1', 'value': "['a']"}]
+    expected2 = [{'workflow_argument_name': 'param1', 'value': "['a']"}]
+    with pytest.raises(Exception):
+        converted_params1 = ff_utils.convert_param(params)
+    converted_params2 = ff_utils.convert_param(params, vals_as_string=True)
+    ignorable(converted_params1, expected1)  # wouldn't be ignored if commented-out line below got uncommented
+    # assert converted_params1 == expected1
+    assert converted_params2 == expected2
 
 
 @pytest.mark.integrated

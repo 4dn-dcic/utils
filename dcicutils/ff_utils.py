@@ -1,4 +1,5 @@
 import boto3
+import io
 import json
 import os
 import random
@@ -1482,6 +1483,14 @@ def convert_param(parameter_dict, vals_as_string=False):
                 if v % 1 == 0:
                     v = int(v)
             except ValueError:
+                # TODO: Maybe just catch Exception, not ValueError?
+                # This is why I hate advice to people that they try to second-guess error types for which they
+                # don't have express guarantees about the kinds of errors that can happen.
+                # Does the code author really want to have other errors go unhandled, or did they just think this
+                # was the only possible error. If it's the only possible error, Exception is a find way to catch it.
+                # In fact, float('a') will raise ValueError, but float(['a']) will raise TypeError.
+                # I think this should probably treat both of those the same, but I'm not going to make that change
+                # for now.. -kmp 21-Aug-2023
                 v = str(v)
         else:
             v = str(v)
@@ -1512,8 +1521,8 @@ def dump_results_to_json(store, folder):
     if not os.path.exists(folder):
         os.makedirs(folder)
     for a_type in store:
-        filename = folder + '/' + a_type + '.json'
-        with open(filename, 'w') as outfile:
+        filename = os.path.join(folder, a_type + '.json')
+        with io.open(filename, 'w') as outfile:
             json.dump(store[a_type], outfile, indent=4)
 
 

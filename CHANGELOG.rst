@@ -22,6 +22,8 @@ Change Log
 
   * New function ``get_schema`` that will pull down an individual schema definition.
   * New function ``get_schemas`` that will pull down all schema definitions.
+  * Minor tweaks to ``dump_results_to_json`` for style reasons,
+    and repairs to its overly complex and error-prone unit test.
 
 
 7.8.0
