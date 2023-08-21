@@ -3499,7 +3499,6 @@ def is_subdict(json1, json2, desc1="json1", desc2="json2", verbose=True):
         output explaining failures or near-failures when True, and otherwise, if False, not showing such output.
     """
 
-
     def out(x):
         if verbose:
             PRINT(x)
