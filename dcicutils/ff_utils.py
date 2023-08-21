@@ -1511,13 +1511,17 @@ def generate_rand_accession(project_prefix='4DN', item_prefix='FI'):
 
 
 def dump_results_to_json(store, folder):
-    """Takes resuls from expand_es_metadata, and dumps them into the given folder in json format.
+    """
+    Takes resuls from expand_es_metadata, and dumps them into the given folder in json format.
+
+    e.g., given a dictionary {'a': a_dict, 'b': b_dict, 'c': c_dict}
+    it will write files 'a', 'b', and 'c' to the given folder (creating it if need be),
+    containing a_dict, b_dict, and c_dict, respectively.
+
     Args:
         store (dict): results from expand_es_metadata
         folder:       folder for storing output
     """
-    if folder[-1] == '/':
-        folder = folder[:-1]
     if not os.path.exists(folder):
         os.makedirs(folder)
     for a_type in store:

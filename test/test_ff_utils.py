@@ -1865,18 +1865,24 @@ def test_delete_field(integrated_ff):
 @pytest.mark.unit
 def test_dump_results_to_json():
     print()
-    with tempfile.TemporaryDirectory() as test_folder:
-        store = {  # mocked first return value from expanded_es_metadata
-            'experiment_hi_c': [{'uuid': '1234', '@id': '/a/b/', "other": "stuff"}],
-            'experiment_set': [{'uuid': '12345', '@id': '/c/d/', "other": "stuff"}],
-        }
-        ff_utils.dump_results_to_json(store, test_folder)
-        all_files = os.listdir(test_folder)
-        assert len(all_files) == len(store)
-        for file in all_files:
-            print(f"file={file}")
-            base, ext = os.path.splitext(os.path.basename(file))
-            assert store[base] == json.loads(file_contents(os.path.join(test_folder, file)))
+    for subdir in [None, 'missing/dir']:
+        for slashed in [False, True]:
+            with tempfile.TemporaryDirectory() as test_folder:
+                if subdir:
+                    test_folder = os.path.join(test_folder, subdir)
+                if slashed:
+                    test_folder = test_folder.rstrip('/') + '/'
+                store = {  # mocked first return value from expanded_es_metadata
+                    'experiment_hi_c': [{'uuid': '1234', '@id': '/a/b/', "other": "stuff"}],
+                    'experiment_set': [{'uuid': '12345', '@id': '/c/d/', "other": "stuff"}],
+                }
+                ff_utils.dump_results_to_json(store, test_folder)
+                all_files = os.listdir(test_folder)
+                assert len(all_files) == len(store)
+                for file in all_files:
+                    print(f"test_folder={test_folder} file={file}")
+                    base, ext = os.path.splitext(os.path.basename(file))
+                    assert store[base] == json.loads(file_contents(os.path.join(test_folder, file)))
 
 
 @pytest.mark.direct_es_query
@@ -1991,6 +1997,12 @@ def test_are_counts_even_integrated(integrated_ff):
 
 # These are stripped-down versions of actual results that illustrate the kinds of output we might expect.
 
+SAMPLE_COUNTS_PAGE_FAILURE = {
+    'error':
+        ("DEV_ENV_DOMAIN_SUFFIX is not defined."
+         " It is needed for get_env_real_url('fourfront-wolf')"
+         " because env fourfront-wolf has no entry in public_url_table.")}
+
 SAMPLE_COUNTS_MISMATCH = {
     'title': 'Item Counts',
     'db_es_total': 'DB: 54  ES: 57   < ES has 3 more items >',
@@ -2018,7 +2030,10 @@ SAMPLE_COUNTS_MATCH = {
 }
 
 
-@pytest.mark.parametrize('expect_match, sample_counts', [(True, SAMPLE_COUNTS_MATCH), (False, SAMPLE_COUNTS_MISMATCH)])
+@pytest.mark.parametrize('expect_match, sample_counts',
+                         [(True, SAMPLE_COUNTS_MATCH),
+                          (False, SAMPLE_COUNTS_MISMATCH),
+                          (False, SAMPLE_COUNTS_PAGE_FAILURE)])
 def test_are_counts_even_unit(expect_match, sample_counts):
 
     unsupplied = object()
@@ -2046,8 +2061,13 @@ def test_are_counts_even_unit(expect_match, sample_counts):
                     assert counts_are_even
                     assert 'more items' not in ' '.join(totals)
                 else:
-                    assert not counts_are_even
-                    assert 'more items' in ' '.join(totals)
+                    if isinstance(totals, list):  # in the normal case, totals is a list
+                        assert not counts_are_even
+                        assert 'more items' in ' '.join(totals)
+                    else:  # when failing to get the page, it's a dictionary
+                        assert not counts_are_even
+                        assert isinstance(totals, dict)
+                        assert 'error' in totals
 
 
 @pytest.mark.parametrize('url, expected_bucket, expected_key', [
