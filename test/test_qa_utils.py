@@ -20,7 +20,7 @@ from dcicutils.ff_mocks import mocked_s3utils
 from dcicutils.lang_utils import there_are
 from dcicutils.misc_utils import Retry, PRINT, file_contents, REF_TZ, local_attrs, ignored
 from dcicutils.qa_utils import (
-    mock_not_called, override_environ, override_dict, show_elapsed_time, timed,
+    mock_not_called, override_environ, override_dict, show_elapsed_time, timed, is_subdict,
     ControlledTime, Occasionally, RetryManager, MockFileSystem, NotReallyRandom, MockUUIDModule, MockedCommandArgs,
     MockResponse, printed_output, MockBotoS3Client, MockKeysNotImplemented, MockBoto3, known_bug_expected,
     raises_regexp, VersionChecker, check_duplicated_items_by_key, guess_local_timezone_for_testing,
@@ -2256,3 +2256,66 @@ def test_mock_boto3_iam_role_collection():
     collection = MockBoto3IamRoleCollection()
     assert collection["Roles"] == []
     assert collection["Foo"] is None
+
+
+def test_is_subdict():
+
+    print()  # start on fresh line
+
+    for same in [{}, {"foo": 3}, {"foo": [1, "x", {"bar": 17}]}]:
+        with printed_output() as printed:
+            assert is_subdict(same, same)
+            assert printed.lines == []
+
+    for verbose in [False, True]:
+        with printed_output() as printed:
+            assert is_subdict({"foo": 3}, {"foo": 3, "bar": 4}, verbose=verbose)
+            if verbose:
+                assert printed.lines == [
+                    "Non-fatal keyword mismatch at '':",
+                    " json1 keys: {'foo'}",
+                    " json2 keys: {'bar', 'foo'}",
+                ]
+            else:
+                assert printed.lines == []
+
+    for verbose in [True, False]:
+        with printed_output() as printed:
+            assert not is_subdict({"foo": 3, "bar": {"x": 3, "y": 4}},
+                                  {"foo": 3, "bar": {"x": 3, "y": 5, "baz": 0}}, verbose=verbose)
+            if verbose:
+                assert printed.lines == [
+                    "Non-fatal keyword mismatch at '.bar':",
+                    " json1 keys: {'x', 'y'}",
+                    " json2 keys: {'baz', 'x', 'y'}",
+                    "Failed at '.bar.y' due to value mismatch: 4 != 5",
+                    # "Recursive failure at '.bar' in object comparison",
+                    # "Recursive failure at '' in object comparison",
+                ]
+            else:
+                assert printed.lines == []
+
+    for verbose in [True, False]:
+        with printed_output() as printed:
+            assert not is_subdict({"foo": 3, "bar": [1, 2, 3]},
+                                  {"foo": 3, "bar": [1, 2, 3, 4]}, verbose=verbose)
+            if verbose:
+                assert printed.lines == [
+                    "Failed at '.bar' in list comparison due to length mismatch: 3 vs 4",
+                    # "Recursive failure at '' in object comparison"
+                ]
+            else:
+                assert printed.lines == []
+
+    for verbose in [True, False]:
+        with printed_output() as printed:
+            assert not is_subdict({"foo": 3, "baz": [1, 2, 3]},
+                                  {"foo": 3, "bar": [1, 2, 3, 4]}, verbose=verbose)
+            if verbose:
+                assert printed.lines == [
+                    "Failed at '' in object comparison due to key set mismatch:",
+                    " json1 keys: {'baz', 'foo'}",
+                    " json2 keys: {'bar', 'foo'}",
+                ]
+            else:
+                assert printed.lines == []

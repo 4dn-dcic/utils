@@ -7,6 +7,23 @@ Change Log
 ----------
 
 
+7.9.0
+=====
+
+* In ``misc_utils``:
+
+  * New function ``to_camelcase`` that can take either snake_case or CamelCase input.
+
+* In ``qa_utils``:
+
+  * New function ``is_subdict`` for asymmetric testing of dictionary equivalence.
+
+* In ``ff_utils``:
+
+  * New function ``get_schema`` that will pull down an individual schema definition.
+  * New function ``get_schemas`` that will pull down all schema definitions.
+
+
 7.8.0
 =====
 

@@ -6,7 +6,6 @@ import requests
 import time
 
 from collections import namedtuple
-from dcicutils.lang_utils import disjoined_list
 from elasticsearch.exceptions import AuthorizationException
 from typing import Optional, Dict, List
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
@@ -16,7 +15,8 @@ from .common import (
     AnyAuthDict, AuthDict, SimpleAuthPair, AuthData, AnyAuthData, PortalEnvName,
     # S3BucketName, S3KeyName,
 )
-from .misc_utils import PRINT
+from .lang_utils import disjoined_list
+from .misc_utils import PRINT, to_camel_case
 
 
 # TODO (C4-92, C4-102): Probably to centralize this information in env_utils. Also figure out relation to CGAP.
@@ -281,7 +281,7 @@ def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
     Function to get metadata for a given obj_id (uuid or @id, most likely).
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
-    Also a boolean 'check_queue', which if True
+    Also, a boolean 'check_queue', which, if True,
     will use information from the queues and/or datastore=database to
     ensure that the metadata is accurate.
     Takes an optional string add_on that should contain things like
@@ -421,7 +421,7 @@ def search_result_generator(page_generator):
     now return A,C,D but we already had the first page, so we request data starting at position 3
     for the second page and get E,G,I.  That means our sequence of return values would be A,C,E,E,G,I,K,M,
     or, in other words, showing a duplication. To avoid this, we keep track of the IDs we've seen
-    and show only the first case of each element, so A,C,E,G,I,K,M. (We won't see the D but we weren't
+    and show only the first case of each element, so A,C,E,G,I,K,M. (We won't see the D, but we weren't
     going to see it anyway, and it wasn't available the time we started, so the timing was already close.)
 
     Unfortunately, we aren't so lucky for deletion, though that happens more rarely. That will cause
@@ -687,7 +687,7 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
 
     resp = get_metadata(uuid, key=key, ff_env=ff_env)
 
-    # Checks wheter the input is a experiment or experimentset otherwise throws an error
+    # Checks whether the input is an Experiment or ExperimentSet, and otherwise throws an error.
     if 'ExperimentSet' not in resp['@type']:
         raise TypeError('Expected ExperimentSet')
 
@@ -862,7 +862,7 @@ def get_es_metadata(uuids, es_client=None, filters=None, sources=None, chunk_siz
                 sources = ['embedded.files.uuid']
             i.e. getting all fields for lab in embedded frame
                 sources = ['embedded.lab.*']
-            i.e. for getting a only object frame
+            i.e. for getting only an object frame
                 sources = ['object.*']
         chunk_size:
             Integer chunk_size may be used to control the number of uuids that are
@@ -870,7 +870,7 @@ def get_es_metadata(uuids, es_client=None, filters=None, sources=None, chunk_siz
             ES reads to timeout.
         is_generator:
             Boolean is_generator will return a generator for individual results if True;
-            if False (default), returns a list of results.
+            if False, (default), returns a list of results.
         key: authentication key for ff_env (see get_authentication_with_server)
         ff_env: authentication by env (needs system variables)
     """
@@ -939,6 +939,40 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth):
                                                page_size=chunk_size):
             for hit in es_page:
                 yield hit['_source']  # yield individual items from ES
+
+
+def get_schemas(key=None, ff_env=None) -> Dict[str, Dict]:
+    """
+    Gets a dictionary of all schema definitions
+
+    Args:
+        key (dict):   standard ff_utils authentication key
+        ff_env (str): standard ff environment string
+
+    Returns:
+        dict: a mapping from keys that are schema names to schema definitions
+    """
+    auth = get_authentication_with_server(key, ff_env)
+    schemas = get_metadata('profiles/', key=auth, add_on='frame=raw')
+    return schemas
+
+
+def get_schema(name, key=None, ff_env=None) -> Dict:
+    """
+    Gets the schema definition with the given name.
+
+    Args:
+        name (str):   a schema name (CamelCase or snake_case), or None
+        key (dict):   standard ff_utils authentication key
+        ff_env (str): standard ff environment string
+
+    Returns:
+        dict: contains key schema names and value item class names
+    """
+    auth = get_authentication_with_server(key, ff_env)
+    url = f"profiles/{to_camel_case(name)}.json"
+    schema = get_metadata(url, key=auth, add_on='frame=raw')
+    return schema
 
 
 def get_schema_names(key=None, ff_env=None):
@@ -1034,7 +1068,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
     chunk = 100  # chunk the requests - don't want to hurt es performance
 
     while uuid_list:
-        uuids_to_check = []  # uuids to add to uuid_list if not if not in item_uuids
+        uuids_to_check = []  # uuids to add to uuid_list if not in item_uuids
 
         # get the next page of data, recreating the es_client if need be
         try:
@@ -1121,7 +1155,7 @@ def _get_page(*, page, key=None, ff_env=None):
 
 def get_health_page(key=None, ff_env=None):
     """
-    Simple function to return the json for a FF health page
+    Simple function to return the json for an environment's health page
     """
     return _get_page(page='/health', key=key, ff_env=ff_env)
 
@@ -1143,7 +1177,7 @@ CountSummary = namedtuple('CountSummary', ['are_even', 'summary_total'])
 def get_counts_summary(env):
     """ Returns a named tuple given an FF name to check representing the counts state.
             CountSummary
-                are_even: boolean on whether or not counts are even
+                are_even: boolean that is True if counts are even and False otherwise
                 summary_total: raw value of counts
     """
     totals = get_counts_page(ff_env=env)
@@ -1182,7 +1216,7 @@ class SearchESMetadataHandler(object):
 
         :arg index: index to search under
         :arg query: query to run
-        :arg is_generator: boolean on whether or not to use a generator
+        :arg is_generator: boolean that is True if a generator is requested and otherwise False
         :arg page_size: if using a generator, how many results to give per request
 
         :returns: list of results of query or None
@@ -1194,7 +1228,7 @@ class SearchESMetadataHandler(object):
 
 def search_es_metadata(index, query, key=None, ff_env=None, is_generator=False):
     """
-        Executes a lucene search query on on the ES Instance for this
+        Executes a lucene search query on the ES Instance for this
         environment.
 
         NOTE: It is okay to use this function directly but for repeat usage please use
@@ -1204,7 +1238,7 @@ def search_es_metadata(index, query, key=None, ff_env=None, is_generator=False):
         :arg query: dictionary of query
         :arg key: optional, 2-tuple authentication key (access_key_id, secret)
         :arg ff_env: ff_env to use
-        :arg is_generator: boolean on whether or not to use a generator
+        :arg is_generator: boolean that is True if a generator is requested and otherwise False
 
         :returns: list of results of query or None
     """
@@ -1484,7 +1518,7 @@ def dump_results_to_json(store, folder):
 
 
 def parse_s3_bucket_and_key_url(url: str) -> (str, str):
-    """ Parses the given s3 URL into its pair of bucket, key
+    """ Parses the given s3 URL into its pair of (bucket, key).
         Note that this function works the way it does because of how these
         urls end up in our database. Eventually we should clean this up.
         Format:
