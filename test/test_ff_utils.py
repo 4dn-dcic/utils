@@ -1,17 +1,19 @@
+import base64
 import copy
+import hashlib
 import json
 import os
 import pytest
 import requests
-import shutil
+import tempfile
 import time
 
 from botocore.exceptions import ClientError
 from dcicutils import es_utils, ff_utils, s3_utils
 from dcicutils.ff_mocks import mocked_s3utils_with_sse, TestScenarios, RequestsTestRecorder
-from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true
+from dcicutils.misc_utils import make_counter, remove_prefix, remove_suffix, check_true, ignorable, file_contents
 from dcicutils.qa_utils import (
-    check_duplicated_items_by_key, ignored, raises_regexp, MockResponse, MockBoto3, MockBotoSQSClient,
+    check_duplicated_items_by_key, ignored, raises_regexp, MockResponse, MockBoto3, MockBotoSQSClient, is_subdict,
 )
 from types import GeneratorType
 from unittest import mock
@@ -177,7 +179,7 @@ def test_url_params_functions():
 
 def test_unified_authentication_decoding(integrated_ff):
     """
-    Test that we decode the various formats and locations of keys and secrets in an uniform way.
+    Test that we decode the various formats and locations of keys and secrets in a uniform way.
     """
 
     any_id, any_secret, any_env = 'any-id', 'any-secret', 'any-env'
@@ -369,7 +371,7 @@ def test_unified_authentication_integrated(integrated_ff):
 @using_fresh_ff_deployed_state_for_testing()
 def test_unified_authentication_prod_envs_integrated_only():
     # This is ONLY an integration test. There is no unit test functionality tested here.
-    # All of the functionality used here is already tested elsewhere.
+    # All functionality used here is already tested elsewhere.
 
     # Fourfront prod
     ff_prod_auth = ff_utils.unified_authentication(ff_env="data")
@@ -469,11 +471,16 @@ def test_stuff_in_queues_unit():
         assert ff_utils.stuff_in_queues('fourfront-foo', check_secondary=True)
 
 
+def test_internal_compute_stuff_in_queues_requires_env():
+    with pytest.raises(ValueError):
+        ff_utils.internal_compute_stuff_in_queues(None, True)
+
+
 @pytest.mark.integratedx
 @pytest.mark.flaky
 def test_stuff_in_queues_integrated(integrated_ff):
     """
-    Gotta index a bunch of stuff to make this work
+    We need to index a bunch of stuff to make this work
     """
     search_res = ff_utils.search_metadata('search/?limit=all&type=File', key=integrated_ff['ff_key'])
     # just take the first handful
@@ -552,7 +559,7 @@ def test_get_metadata_unit():
 
     ts = TestScenarios
 
-    # The first part of this function sets up some common tools and then we test various scenarios
+    # The first part of this function sets up some common tools, and then we test various scenarios.
 
     counter = make_counter()  # used to generate some sample data in mock calls
     unsupplied = object()     # used in defaulting to prove an argument wasn't called
@@ -579,7 +586,7 @@ def test_get_metadata_unit():
         (a) that the mock uses a URL on the 'bar' scenario environment ('http://fourfront-bar.example/')
             so that we know some other authorized request wasn't also attempted that wasn't expecting this mock.
         (b) that the retry_fxn was not passed, since this mock doesn't know what to do with that
-        (c) that it's a GET operation, since we're not prepared to store anything and we're testing a getter function
+        (c) that it's a GET operation, since we're not prepared to store anything, and we're testing a getter function
         (d) that proper authorization for the 'bar' scenario was given
         It returns mock data that identifies itself as what was asked for.
         """
@@ -621,7 +628,7 @@ def test_get_metadata_unit():
             res_w_key = ff_utils.get_metadata(test_item, key=ts.bar_env_auth_dict, check_queue=check_queue, **kwargs)
             # Check that the data flow back from our mock authorized_request call did what we expect
             assert res_w_key == {'@id': test_item_id, 'mock_data': n}
-            # Check that the call out to the mock authorized_request is the thing we think.
+            # Check that the call-out to the mock authorized_request is the thing we think.
             # In particular, we expect that
             # (a) this is a GET
             # (b) it has appropriate auth
@@ -1005,8 +1012,8 @@ def check_search_metadata(integrated_ff, url, expect_shortfall=False):
     if url != '':  # replace stub with actual url from integrated_ff
         url = integrated_ff['ff_key']['server'] + '/'
 
-    # Note that we do some some .reset() calls on a mock that are not needed when servicing the integration test,
-    # but they are harmless and it seemed pointless to make it conditional. -kmp 15-Jan-2021
+    # Note that we do some .reset() calls on a mock that are not needed when servicing the integration test,
+    # but they are harmless, and it seemed pointless to make it conditional. -kmp 15-Jan-2021
     InsertingMockedSearchItems.reset()
     search_res = ff_utils.search_metadata(url + 'search/?limit=all&type=File', key=integrated_ff['ff_key'])
     assert isinstance(search_res, list)
@@ -1288,6 +1295,224 @@ def test_get_health_page(integrated_ff):
     # make sure it's error tolerant
     bad_health_res = ff_utils.get_health_page(ff_env='not_an_env')
     assert bad_health_res and 'error' in bad_health_res
+
+
+@pytest.mark.xfail(reason=("Probably long-standing problem, recently discovered."
+                           " System functions OK in spite of it. Tracked as C4-1087."))
+@pytest.mark.integrated
+def test_get_schema_consistent(integrated_ff):
+
+    def get_it():
+        return ff_utils.get_schema('User',
+                                   key=integrated_ff['ff_key'],
+                                   ff_env=integrated_ff['ff_env'])
+
+    first_try = get_it()
+
+    for i in range(5):
+        print(f"Try {i}...")
+        nth_try = get_it()
+        assert first_try == nth_try
+        time.sleep(2)
+
+
+def test_get_schemas_options():
+
+    mocked_schemas = {
+        'foo': {
+            "a": "schema",
+            "$id": "something/Foo.json",
+        },
+        'abstract_foo': {
+            "some": "schema data",
+            "$id": "something/AbstractFoo.json",
+            'isAbstract': True,
+        },
+        'bar': {
+            "another": "schema",
+            "$id": "something/Bar.json",
+        },
+        'bartemp': {
+            "some": "hack schema",
+        },
+        'baz': {
+            "yet_another": "schema",
+            "$id": "something/Baz.json",
+        },
+    }
+
+    def mocked_schemas_subset(keys):
+        return {key: value for key, value in mocked_schemas.items() if key in keys}
+
+    with mock.patch.object(ff_utils, "get_authentication_with_server") as mock_get_authentication_with_server:
+
+        mock_get_authentication_with_server.return_value = 'some-auth'
+
+        with mock.patch.object(ff_utils, "get_metadata") as mock_get_metadata:
+
+            def mocked_get_metadata(url, key, add_on):
+                assert url == "profiles/"  # this is the web API to ask for all profiles
+                assert key == 'some-auth'  # we assume auth is tested elsewhere
+                assert add_on == "frame=raw"  # we presently always send this
+                return mocked_schemas
+
+            mock_get_metadata.side_effect = mocked_get_metadata
+
+            expected = mocked_schemas
+            actual = ff_utils.get_schemas()
+            assert actual == mocked_schemas
+
+            expected = mocked_schemas
+            actual = ff_utils.get_schemas(allow_abstract=True, require_id=False)
+            assert actual == expected
+            # There should be just one abstract in our sample data
+            assert any(not schema.get('isAbstract') for schema in actual.values())
+            assert not all(not schema.get('isAbstract') for schema in actual.values())
+            # There should be just one that has no id in our sample data
+            assert any(schema.get('$id') for schema in actual.values())
+            assert not all(schema.get('$id') for schema in actual.values())
+
+            expected = mocked_schemas_subset({'abstract_foo', 'foo', 'bar', 'baz'})
+            actual = ff_utils.get_schemas(allow_abstract=True, require_id=True)
+            assert actual == expected
+            # There should be just one abstract in our sample data
+            assert any(not schema.get('isAbstract') for schema in actual.values())
+            assert not all(not schema.get('isAbstract') for schema in actual.values())
+            # We have asked that they all have an id
+            assert all(schema.get('$id') for schema in actual.values())
+
+            expected = mocked_schemas_subset({'foo', 'bar', 'bartemp', 'baz'})
+            actual = ff_utils.get_schemas(allow_abstract=False, require_id=False)
+            assert actual == expected
+            # We have asked that none are abstract
+            assert all(not schema.get('isAbstract') for schema in actual.values())
+            # There should be just one that has no id in our sample data
+            assert any(schema.get('$id') for schema in actual.values())
+            assert not all(schema.get('$id') for schema in actual.values())
+
+            expected = mocked_schemas_subset({'foo', 'bar', 'baz'})
+            actual = ff_utils.get_schemas(allow_abstract=False, require_id=True)
+            assert actual == expected
+            # We have asked that none are abstract
+            assert all(not schema.get('isAbstract') for schema in actual.values())
+            # We have asked that they all have an id
+            assert all(schema.get('$id') for schema in actual.values())
+
+
+@pytest.mark.integrated
+@pytest.mark.flaky
+def test_get_schema_and_get_schemas(integrated_ff):
+
+    def tidy(x: dict) -> dict:
+        assert isinstance(x, dict)
+        # We have observed some variability in the facets and return values of get_metadata,
+        # so this is intended to paper over that since it seems irrelevant to what we're
+        # wanting to find out here. We'll track that other bug (C4-1087) elsewhere.
+        tidied = x.copy()
+        tidied.pop('facets', None)
+        tidied.pop('columns', None)
+        return tidied
+
+    user_schema = ff_utils.get_schema('User',
+                                      key=integrated_ff['ff_key'],
+                                      ff_env=integrated_ff['ff_env'])
+    user_schema = tidy(user_schema)
+
+    assert user_schema.get('title') == 'User'
+    assert user_schema.get('type') == 'object'
+    assert isinstance(user_schema.get('properties'), dict)
+
+    experiment_set_schema_snake = ff_utils.get_schema('experiment_set',
+                                                      key=integrated_ff['ff_key'],
+                                                      ff_env=integrated_ff['ff_env'])
+    experiment_set_schema_snake = tidy(experiment_set_schema_snake)
+    assert experiment_set_schema_snake.get('title') == 'Experiment Set'
+
+    experiment_set_schema_camel = ff_utils.get_schema('ExperimentSet',
+                                                      key=integrated_ff['ff_key'],
+                                                      ff_env=integrated_ff['ff_env'])
+    experiment_set_schema_camel = tidy(experiment_set_schema_camel)
+    assert experiment_set_schema_camel.get('title') == 'Experiment Set'
+
+    all_schemas = ff_utils.get_schemas(key=integrated_ff['ff_key'],
+                                       ff_env=integrated_ff['ff_env'])
+    # We have these already loaded, so check them in full...
+    user_schema_from_all_schemas = all_schemas.get('User')
+    user_schema_from_all_schemas = tidy(user_schema_from_all_schemas)
+
+    experiment_set_schema_from_all_schemas = all_schemas.get('ExperimentSet')
+    experiment_set_schema_from_all_schemas = tidy(experiment_set_schema_from_all_schemas)
+
+    assert is_subdict(desc1="    profiles/User.keys()",
+                      desc2="profiles/['User'].keys()",
+                      json1=user_schema,
+                      json2=user_schema_from_all_schemas)
+
+    assert is_subdict(desc1="    profiles/ExperimentSet.keys()",
+                      desc2="profiles/['ExperimentSet'].keys()",
+                      json1=experiment_set_schema_camel,
+                      json2=experiment_set_schema_from_all_schemas)
+
+    assert is_subdict(desc1="   profiles/experiment_set.keys()",
+                      desc2="profiles/['ExperimentSet'].keys()",
+                      json1=experiment_set_schema_snake,
+                      json2=experiment_set_schema_from_all_schemas)
+
+    # Do some random spot-checking...
+    assert 'Lab' in all_schemas
+    assert 'ExperimentType' in all_schemas
+
+
+@pytest.mark.xfail(reason=("Probably long-standing problem, recently discovered."
+                           " System functions OK in spite of it. Tracked as C4-1087."))
+@pytest.mark.integrated
+def test_get_metadata_consistent(integrated_ff):
+
+    def get_it():
+        return ff_utils.get_metadata('profiles/User.json',
+                                     key=integrated_ff['ff_key'],
+                                     ff_env=integrated_ff['ff_env'])
+
+    first_try = get_it()
+
+    for i in range(5):
+        print(f"Try {i}...")
+        nth_try = get_it()
+        try:
+            assert first_try == nth_try
+        except AssertionError:
+            is_subdict(first_try, nth_try, verbose=True)  # This is called for output side-effect
+            raise  # Go ahead and continue raising. We just wanted more debugging info.
+        time.sleep(2)
+
+
+@pytest.mark.xfail(reason=("Probably long-standing problem, recently discovered."
+                           " System functions OK in spite of it. Tracked as C4-1087."))
+@pytest.mark.integrated
+def test_get_metadata_consistent_noting_pattern(integrated_ff):
+
+    print()
+
+    def hash(json):
+        return base64.b64encode(hashlib.md5(str(json).encode('utf-8')).digest())
+
+    def get_it():
+        return ff_utils.get_metadata('profiles/User.json',
+                                     key=integrated_ff['ff_key'],
+                                     ff_env=integrated_ff['ff_env'])
+
+    first_try = get_it()
+    print(f"first_try={hash(first_try)}")
+
+    failed = False
+
+    for i in range(2, 10):
+        nth_try = get_it()
+        print(f"Try {i}: {hash(nth_try)}")
+        failed = failed or not is_subdict(nth_try, first_try)
+        time.sleep(2)
+
+    assert not failed
 
 
 @pytest.mark.integrated
@@ -1599,7 +1824,7 @@ def get_mocked_result(*, kind, dirname, uuid, ignored_kwargs=None):
 @pytest.mark.unit
 def test_get_qc_metrics_logic_unit():
     """
-    End to end test on 'get_associated_qc_metrics' to check the logic of the fuction to make sure
+    End-to-end test on 'get_associated_qc_metrics' to check the logic of the fuction to make sure
     it is getting the qc metrics.
     """
     with mock.patch("dcicutils.ff_utils.get_metadata") as mock_get_metadata:
@@ -1719,29 +1944,28 @@ def test_delete_field(integrated_ff):
     assert "Bad status code" in str(exec_info.value)
 
 
-@pytest.mark.direct_es_query
-@pytest.mark.integrated
 @pytest.mark.file_operation
-@pytest.mark.flaky
-def test_dump_results_to_json(integrated_ff):
-
-    def clear_folder(folder):
-        ignored(folder)
-        try:
-            shutil.rmtree(test_folder)
-        except FileNotFoundError:
-            pass
-
-    test_folder = 'test/test_data'
-    clear_folder(test_folder)
-    test_list = ['7f9eb396-5c1a-4c5e-aebf-28ea39d6a50f']
-    key, ff_env = integrated_ff['ff_key'], integrated_ff['ff_env']
-    store, uuids = ff_utils.expand_es_metadata(test_list, store_frame='object', key=key, ff_env=ff_env)
-    len_store = len(store)
-    ff_utils.dump_results_to_json(store, test_folder)
-    all_files = os.listdir(test_folder)
-    assert len(all_files) == len_store
-    clear_folder(test_folder)
+@pytest.mark.unit
+def test_dump_results_to_json():
+    print()
+    for subdir in [None, 'missing/dir']:
+        for slashed in [False, True]:
+            with tempfile.TemporaryDirectory() as test_folder:
+                if subdir:
+                    test_folder = os.path.join(test_folder, subdir)
+                if slashed:
+                    test_folder = test_folder.rstrip('/') + '/'
+                store = {  # mocked first return value from expanded_es_metadata
+                    'experiment_hi_c': [{'uuid': '1234', '@id': '/a/b/', "other": "stuff"}],
+                    'experiment_set': [{'uuid': '12345', '@id': '/c/d/', "other": "stuff"}],
+                }
+                ff_utils.dump_results_to_json(store, test_folder)
+                all_files = os.listdir(test_folder)
+                assert len(all_files) == len(store)
+                for file in all_files:
+                    print(f"test_folder={test_folder} file={file}")
+                    base, ext = os.path.splitext(os.path.basename(file))
+                    assert store[base] == json.loads(file_contents(os.path.join(test_folder, file)))
 
 
 @pytest.mark.direct_es_query
@@ -1797,8 +2021,37 @@ def test_convert_param():
     expected2 = [{'workflow_argument_name': 'param1', 'value': '5'}]
     converted_params1 = ff_utils.convert_param(params)
     converted_params2 = ff_utils.convert_param(params, vals_as_string=True)
-    assert expected1 == converted_params1
-    assert expected2 == converted_params2
+    assert converted_params1 == expected1
+    assert converted_params2 == expected2
+
+    params = {'param1': 5, 'param2': 6}
+    expected1 = [{'workflow_argument_name': 'param1', 'value': 5},
+                 {'workflow_argument_name': 'param2', 'value': 6}]
+    expected2 = [{'workflow_argument_name': 'param1', 'value': '5'},
+                 {'workflow_argument_name': 'param2', 'value': '6'}]
+    converted_params1 = ff_utils.convert_param(params)
+    converted_params2 = ff_utils.convert_param(params, vals_as_string=True)
+    assert converted_params1 == expected1
+    assert converted_params2 == expected2
+
+    params = {'param1': 'a'}
+    expected1 = [{'workflow_argument_name': 'param1', 'value': 'a'}]
+    expected2 = [{'workflow_argument_name': 'param1', 'value': 'a'}]
+    converted_params1 = ff_utils.convert_param(params)
+    converted_params2 = ff_utils.convert_param(params, vals_as_string=True)
+    assert converted_params1 == expected1
+    assert converted_params2 == expected2
+
+    # See my notes in convert_param about the error-handling it does. Not sure this is what's intended.
+    params = {'param1': ['a']}
+    expected1 = [{'workflow_argument_name': 'param1', 'value': "['a']"}]
+    expected2 = [{'workflow_argument_name': 'param1', 'value': "['a']"}]
+    with pytest.raises(Exception):
+        converted_params1 = ff_utils.convert_param(params)
+    converted_params2 = ff_utils.convert_param(params, vals_as_string=True)
+    ignorable(converted_params1, expected1)  # wouldn't be ignored if commented-out line below got uncommented
+    # assert converted_params1 == expected1
+    assert converted_params2 == expected2
 
 
 @pytest.mark.integrated
@@ -1827,6 +2080,12 @@ def test_are_counts_even_integrated(integrated_ff):
 
 # These are stripped-down versions of actual results that illustrate the kinds of output we might expect.
 
+SAMPLE_COUNTS_PAGE_FAILURE = {
+    'error':
+        ("DEV_ENV_DOMAIN_SUFFIX is not defined."
+         " It is needed for get_env_real_url('fourfront-wolf')"
+         " because env fourfront-wolf has no entry in public_url_table.")}
+
 SAMPLE_COUNTS_MISMATCH = {
     'title': 'Item Counts',
     'db_es_total': 'DB: 54  ES: 57   < ES has 3 more items >',
@@ -1854,7 +2113,10 @@ SAMPLE_COUNTS_MATCH = {
 }
 
 
-@pytest.mark.parametrize('expect_match, sample_counts', [(True, SAMPLE_COUNTS_MATCH), (False, SAMPLE_COUNTS_MISMATCH)])
+@pytest.mark.parametrize('expect_match, sample_counts',
+                         [(True, SAMPLE_COUNTS_MATCH),
+                          (False, SAMPLE_COUNTS_MISMATCH),
+                          (False, SAMPLE_COUNTS_PAGE_FAILURE)])
 def test_are_counts_even_unit(expect_match, sample_counts):
 
     unsupplied = object()
@@ -1882,8 +2144,13 @@ def test_are_counts_even_unit(expect_match, sample_counts):
                     assert counts_are_even
                     assert 'more items' not in ' '.join(totals)
                 else:
-                    assert not counts_are_even
-                    assert 'more items' in ' '.join(totals)
+                    if isinstance(totals, list):  # in the normal case, totals is a list
+                        assert not counts_are_even
+                        assert 'more items' in ' '.join(totals)
+                    else:  # when failing to get the page, it's a dictionary
+                        assert not counts_are_even
+                        assert isinstance(totals, dict)
+                        assert 'error' in totals
 
 
 @pytest.mark.parametrize('url, expected_bucket, expected_key', [

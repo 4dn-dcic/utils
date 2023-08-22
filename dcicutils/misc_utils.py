@@ -1331,6 +1331,16 @@ def snake_case_to_camel_case(s, separator='_'):
     return s.title().replace(separator, '')
 
 
+def to_camel_case(s):
+    """
+    Converts a string that might be in snake_case or CamelCase into CamelCase.
+    """
+    if s[:1].isupper() and '_' not in s:
+        return s
+    else:
+        return snake_case_to_camel_case(s)
+
+
 def capitalize1(s):
     """
     Capitalizes the first letter of a string and leaves the others alone.
