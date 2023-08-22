@@ -8,7 +8,7 @@ Change Log
 
 7.8.1
 =====
-* Changed PyYAML version to ^6.0.1 as 5.4.1 (but not 5.3.1) is problematic (with Python 3.9) for Mac M1.
+* Changed ``PyYAML`` version to ^6.0.1; the Mac M1 has issues building 5.4.1 (though 5.3.1 works)
 
 
 7.8.0
