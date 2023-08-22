@@ -3543,7 +3543,7 @@ def is_subdict(json1, json2, desc1="json1", desc2="json2", verbose=True):
         else:
             result = False
             if not result:
-                out(f"Mismatch at {path}.")
+                out(f"Type mismatch ({json1.__class__.__name__} vs {json2.__class__.__name__}) at {path!r}:")
                 out(f" {desc1}: {json1}")
                 out(f" {desc2}: {json2}")
         return result

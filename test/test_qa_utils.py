@@ -2319,3 +2319,16 @@ def test_is_subdict():
                 ]
             else:
                 assert printed.lines == []
+
+    for verbose in [True, False]:
+        with printed_output() as printed:
+            assert not is_subdict({"foo": [1, 2, 3]},
+                                  {"foo": 3}, verbose=verbose)
+            if verbose:
+                assert printed.lines == [
+                    "Type mismatch (list vs int) at '.foo':",
+                    " json1: [1, 2, 3]",
+                    " json2: 3",
+                ]
+            else:
+                assert printed.lines == []

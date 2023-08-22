@@ -969,7 +969,7 @@ def get_schemas(key=None, ff_env=None, *, allow_abstract=True, require_id=False)
         key (dict):               standard ff_utils authentication key
         ff_env (str):             standard ff environment string
         allow_abstract (boolean): controls whether abstract schemas can be returned (default True, return them)
-        require_id (boolean):     controls whether a $id field is required for schema to be included
+        require_id (boolean):     controls whether a '$id' field is required for schema to be included
                                   (default False, include even if no $id)
 
     Returns:
