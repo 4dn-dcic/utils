@@ -7,6 +7,12 @@ Change Log
 ----------
 
 
+7.9.0
+=====
+
+* Changed ``PyYAML`` version to ^6.0.1; the Mac M1 has issues building 5.4.1 (though 5.3.1 works).
+
+
 7.8.0
 =====
 
