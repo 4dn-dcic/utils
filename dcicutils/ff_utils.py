@@ -961,7 +961,7 @@ def get_schema_names(key=None, ff_env=None):
         if value.get('isAbstract') is True:
             continue
         # some test schemas in local don't have the id field
-        schema_filename = value.get('id')
+        schema_filename = value.get('$id')
         if schema_filename:
             schema_name[key] = schema_filename.split('/')[-1][:-5]
     return schema_name

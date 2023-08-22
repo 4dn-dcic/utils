@@ -6,7 +6,7 @@ dcicutils
 Change Log
 ----------
 
-7.7.3
+7.8.1
 =====
 
 * Added ``boto_monkey_patching`` module to use monkey patching to override the endpoint URLs for
@@ -15,6 +15,12 @@ Change Log
   instance of S3 or SQS via localstack (https://localstack.cloud).
 * Comment and typo cleanup in ``publish_to_pypi.py``.
 * Updates PyYAML to ^6.0.1 because Mac M1 (with Python 3.9) only likes 5.3.1 (not 5.4.1) or 6+.
+
+
+7.8.0
+=====
+
+* Add ``variant_utils`` with tools to filter through CGAP data.
 
 
 7.7.2
