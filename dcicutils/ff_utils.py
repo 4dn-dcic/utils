@@ -17,7 +17,7 @@ from .common import (
     # S3BucketName, S3KeyName,
 )
 from .lang_utils import disjoined_list
-from .misc_utils import PRINT, to_camel_case
+from .misc_utils import PRINT, to_camel_case, remove_suffix
 
 
 # TODO (C4-92, C4-102): Probably to centralize this information in env_utils. Also figure out relation to CGAP.
@@ -942,22 +942,6 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth):
                 yield hit['_source']  # yield individual items from ES
 
 
-def get_schemas(key=None, ff_env=None) -> Dict[str, Dict]:
-    """
-    Gets a dictionary of all schema definitions
-
-    Args:
-        key (dict):   standard ff_utils authentication key
-        ff_env (str): standard ff environment string
-
-    Returns:
-        dict: a mapping from keys that are schema names to schema definitions
-    """
-    auth = get_authentication_with_server(key, ff_env)
-    schemas = get_metadata('profiles/', key=auth, add_on='frame=raw')
-    return schemas
-
-
 def get_schema(name, key=None, ff_env=None) -> Dict:
     """
     Gets the schema definition with the given name.
@@ -976,30 +960,57 @@ def get_schema(name, key=None, ff_env=None) -> Dict:
     return schema
 
 
-def get_schema_names(key=None, ff_env=None):
+def get_schemas(key=None, ff_env=None, *, allow_abstract=True, require_id=False) -> Dict[str, Dict]:
+    """
+    Gets a dictionary of all schema definitions.
+    By default, this returns all schemas, but the allow_abstract= and require_id= keywords allow limited filtering.
+
+    Args:
+        key (dict):               standard ff_utils authentication key
+        ff_env (str):             standard ff environment string
+        allow_abstract (boolean): controls whether abstract schemas can be returned (default True, return them)
+        require_id (boolean):     controls whether a $id field is required for schema to be included
+                                  (default False, include even if no $id)
+
+    Returns:
+        dict: a mapping from keys that are schema names to schema definitions
+    """
+    auth = get_authentication_with_server(key, ff_env)
+    schemas: Dict[str, Dict] = get_metadata('profiles/', key=auth, add_on='frame=raw')
+    filtered_schemas = {}
+    for schema_name, schema in schemas.items():
+        if allow_abstract or not schema.get('isAbstract'):
+            id_field = schema.get('$id')  # some test schemas in local may not have the $id field
+            if id_field or not require_id:
+                filtered_schemas[schema_name] = schema
+    return filtered_schemas
+
+
+def get_schema_names(key=None, ff_env=None, allow_abstract=False) -> Dict[str, str]:
     """
     Create a dictionary of all schema names to item class names
+
+    By default, names of abstract schemas are not included. The allow_abstract= keyword argument controls this.
+
+    Names that have no $id cannot be included because they lack the relevant information to
+    construct our return value. However, these presumably mostly come up for local debugging and shouldn't matter.
+    (See ff_utils.get_schemas if you want more refined control.)
+
     i.e. FileFastq: file_fastq
 
     Args:
-        key (dict):                      standard ff_utils authentication key
-        ff_env (str):                    standard ff environment string
+        key (dict):               standard ff_utils authentication key
+        ff_env (str):             standard ff environment string
+        allow_abstract (boolean): controls whether names of abstract schemas can be returned (default False, omit)
 
     Returns:
         dict: contains key schema names and value item class names
     """
-    auth = get_authentication_with_server(key, ff_env)
-    schema_name = {}
-    profiles = get_metadata('profiles/', key=auth, add_on='frame=raw')
-    for key, value in profiles.items():
-        # skip abstract types
-        if value.get('isAbstract') is True:
-            continue
-        # some test schemas in local don't have the id field
-        schema_filename = value.get('$id')
-        if schema_filename:
-            schema_name[key] = schema_filename.split('/')[-1][:-5]
-    return schema_name
+    schemas = get_schemas(key=key, ff_env=ff_env, allow_abstract=allow_abstract, require_id=True)
+    return {
+        schema_name: remove_suffix(".json", schema.get('$id').split('/')[-1])
+        for schema_name, schema in schemas.items()
+    }
 
 
 def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_pc_wfr=False, ignore_field=None,

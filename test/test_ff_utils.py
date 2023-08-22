@@ -1316,6 +1316,89 @@ def test_get_schema_consistent(integrated_ff):
         time.sleep(2)
 
 
+def test_get_schemas_options():
+
+    mocked_schemas = {
+        'foo': {
+            "a": "schema",
+            "$id": "something/Foo.json",
+        },
+        'abstract_foo': {
+            "some": "schema data",
+            "$id": "something/AbstractFoo.json",
+            'isAbstract': True,
+        },
+        'bar': {
+            "another": "schema",
+            "$id": "something/Bar.json",
+        },
+        'bartemp': {
+            "some": "hack schema",
+        },
+        'baz': {
+            "yet_another": "schema",
+            "$id": "something/Baz.json",
+        },
+    }
+
+    def mocked_schemas_subset(keys):
+        return {key: value for key, value in mocked_schemas.items() if key in keys}
+
+    with mock.patch.object(ff_utils, "get_authentication_with_server") as mock_get_authentication_with_server:
+
+        mock_get_authentication_with_server.return_value = 'some-auth'
+
+        with mock.patch.object(ff_utils, "get_metadata") as mock_get_metadata:
+
+            def mocked_get_metadata(url, key, add_on):
+                assert url == "profiles/"  # this is the web API to ask for all profiles
+                assert key == 'some-auth'  # we assume auth is tested elsewhere
+                assert add_on == "frame=raw"  # we presently always send this
+                return mocked_schemas
+
+            mock_get_metadata.side_effect = mocked_get_metadata
+
+            expected = mocked_schemas
+            actual = ff_utils.get_schemas()
+            assert actual == mocked_schemas
+
+            expected = mocked_schemas
+            actual = ff_utils.get_schemas(allow_abstract=True, require_id=False)
+            assert actual == expected
+            # There should be just one abstract in our sample data
+            assert any(not schema.get('isAbstract') for schema in actual.values())
+            assert not all(not schema.get('isAbstract') for schema in actual.values())
+            # There should be just one that has no id in our sample data
+            assert any(schema.get('$id') for schema in actual.values())
+            assert not all(schema.get('$id') for schema in actual.values())
+
+            expected = mocked_schemas_subset({'abstract_foo', 'foo', 'bar', 'baz'})
+            actual = ff_utils.get_schemas(allow_abstract=True, require_id=True)
+            assert actual == expected
+            # There should be just one abstract in our sample data
+            assert any(not schema.get('isAbstract') for schema in actual.values())
+            assert not all(not schema.get('isAbstract') for schema in actual.values())
+            # We have asked that they all have an id
+            assert all(schema.get('$id') for schema in actual.values())
+
+            expected = mocked_schemas_subset({'foo', 'bar', 'bartemp', 'baz'})
+            actual = ff_utils.get_schemas(allow_abstract=False, require_id=False)
+            assert actual == expected
+            # We have asked that none are abstract
+            assert all(not schema.get('isAbstract') for schema in actual.values())
+            # There should be just one that has no id in our sample data
+            assert any(schema.get('$id') for schema in actual.values())
+            assert not all(schema.get('$id') for schema in actual.values())
+
+            expected = mocked_schemas_subset({'foo', 'bar', 'baz'})
+            actual = ff_utils.get_schemas(allow_abstract=False, require_id=True)
+            assert actual == expected
+            # We have asked that none are abstract
+            assert all(not schema.get('isAbstract') for schema in actual.values())
+            # We have asked that they all have an id
+            assert all(schema.get('$id') for schema in actual.values())
+
+
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_get_schema_and_get_schemas(integrated_ff):
