@@ -1339,6 +1339,15 @@ def capitalize1(s):
     return s[:1].upper() + s[1:]
 
 
+uuid_re = re.compile(r'(?i)[{]?(?:[0-9a-f]{4}-?){8}[}]?')
+
+
+def is_uuid(instance):
+    # Python's UUID ignores all dashes, whereas Postgres is more strict
+    # http://www.postgresql.org/docs/9.2/static/datatype-uuid.html
+    return bool(uuid_re.match(instance))
+
+
 def string_list(s):
     """
     Turns a comma-separated list into an actual list, trimming whitespace and ignoring nulls.

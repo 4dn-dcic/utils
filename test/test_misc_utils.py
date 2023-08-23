@@ -17,7 +17,7 @@ from dcicutils import misc_utils as misc_utils_module
 from dcicutils.misc_utils import (
     PRINT, ignored, ignorable, filtered_warnings, get_setting_from_context, TestApp, VirtualApp, VirtualAppError,
     _VirtualAppHelper,  # noqa - yes, this is a protected member, but we still want to test it
-    Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool, str_to_bool,
+    Retry, apply_dict_overrides, utc_today_str, RateManager, environ_bool, str_to_bool, is_uuid,
     LockoutManager, check_true, remove_prefix, remove_suffix, full_class_name, full_object_name, constantly,
     keyword_as_title, file_contents, CachedField, camel_case_to_snake_case, snake_case_to_camel_case, make_counter,
     CustomizableProperty, UncustomizedInstance, getattr_customized, copy_json, url_path_join,
@@ -1988,6 +1988,33 @@ def test_snake_case_to_camel_case_hyphenated(token, expected):
 ])
 def test_capitalize1(token, expected):
     assert capitalize1(token) == expected
+
+
+def test_is_uuid():
+
+    good_uuid = str(uuid.uuid4())
+    bad_uuid = '123-456-789'
+
+    assert not is_uuid("12345678abcd678123456781234")  # wrong length. expecting 32 digits
+    assert not is_uuid("12-3456781234abcd1234567812345678")  # hyphens only allowed at multiple of four boundaries
+    assert not is_uuid("12-3456781234abcd1234567-812345678")  # ditto
+
+    assert is_uuid("123456781234abcd1234567812345678")
+    assert is_uuid("12345678abcd56781234ABCD12345678")
+    assert is_uuid("1234-5678abcd56781234ABCD12345678")
+    assert is_uuid("12345678abcd-56781234ABCD1234-5678")
+    assert is_uuid("1234-5678-abcd56781234ABCD-12345678")
+    assert is_uuid("1234-5678-abcd-56781234ABCD12345678")
+    assert is_uuid("1234-5678-abcd-5678-1234-ABCD-1234-5678")
+    assert is_uuid("1234-5678-abcd-5678-1234-ABCD-1234-5678-")  # we don't really want this, but we tolerate it
+
+    assert is_uuid("{12345678abcd56781234ABCD12345678}")  # braces are optionally allowed
+    assert is_uuid("{1234-5678-abcd5678-1234-ABCD-1234-5678}")  # ditto
+    assert is_uuid("1234-5678-abcd5678-1234-ABCD-1234-5678}")  # ditto
+    assert is_uuid("{1234-5678-abcd5678-1234-ABCD-1234-5678-}")  # balanced braces trailing hyphen tolerated
+
+    assert is_uuid(good_uuid) is True
+    assert is_uuid(bad_uuid) is False
 
 
 def test_string_list():

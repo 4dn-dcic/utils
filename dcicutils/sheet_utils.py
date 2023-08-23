@@ -3,13 +3,15 @@ import copy
 import csv
 import io
 import openpyxl
+import uuid
 
 from dcicutils.common import AnyJsonData
+from dcicutils.lang_utils import conjoined_list, maybe_pluralize
 from dcicutils.misc_utils import ignored
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.workbook.workbook import Workbook
 from tempfile import TemporaryFile
-from typing import Any, Dict, Iterable, List, Union
+from typing import Any, Dict, Iterable, List, Optional, Union
 
 
 Header = str
@@ -19,6 +21,17 @@ ParsedHeaders = List[ParsedHeader]
 SheetCellValue = Union[int, float, str]
 SheetRow = List[SheetCellValue]
 CsvReader = type(csv.reader(TemporaryFile()))
+
+
+def unwanted_kwargs(*, context, kwargs, context_plural=False, detailed=False):
+    if kwargs:
+        unwanted = [f"{argname}={value!r}" if detailed else argname
+                    for argname, value in kwargs.items()
+                    if value is not None]
+        if unwanted:
+            does_not = "don't" if context_plural else "doesn't"
+            raise ValueError(f"{context} {does_not} use"
+                             f" {maybe_pluralize(unwanted, 'keyword argument')} {conjoined_list(unwanted)}.")
 
 
 def prefer_number(value: SheetCellValue):
@@ -51,6 +64,57 @@ def open_text_input_file_respecting_byte_order_mark(filename):
         detected_encoding = bom_info and bom_info.get('encoding')  # tread lightly
 
     return io.open(filename, 'r', encoding=detected_encoding)
+
+
+class TypeHint:
+    def apply_hint(self, value):
+        return value
+
+    def __str__(self):
+        return f"<{self.__class__.__name__}>"
+
+    def __repr__(self):
+        return self.__str__()
+
+
+class BoolHint(TypeHint):
+
+    def apply_hint(self, value):
+        if isinstance(value, str) and value:
+            if 'true'.startswith(value.lower()):
+                return True
+            elif 'false'.startswith(value.lower()):
+                return False
+        return super().apply_hint(value)
+
+
+class EnumHint(TypeHint):
+
+    def __str__(self):
+        return f"<EnumHint {','.join(f'{key}={val}' for key, val in self.value_map.items())}>"
+
+    def __init__(self, value_map):
+        self.value_map = value_map
+
+    def apply_hint(self, value):
+        if isinstance(value, str):
+            if value in self.value_map:
+                result = self.value_map[value]
+                return result
+            else:
+                lvalue = value.lower()
+                found = []
+                for lkey, key in self.value_map.items():
+                    if lkey.startswith(lvalue):
+                        found.append(lkey)
+                if len(found) == 1:
+                    [only_found] = found
+                    result = self.value_map[only_found]
+                    return result
+        return super().apply_hint(value)
+
+
+OptionalTypeHints = List[Optional[TypeHint]]
 
 
 class ItemTools:
@@ -128,8 +192,10 @@ class ItemTools:
             cls.assure_patch_prototype_shape(parent=parent[key0], keys=more_keys)
         return parent
 
+    INSTAGUIDS_ENABLED = False  # Experimental feature not enabled by default
+
     @classmethod
-    def parse_item_value(cls, value: SheetCellValue) -> AnyJsonData:
+    def parse_item_value(cls, value: SheetCellValue, context=None) -> AnyJsonData:
         if isinstance(value, str):
             lvalue = value.lower()
             # TODO: We could consult a schema to make this less heuristic, but this may do for now
@@ -140,11 +206,29 @@ class ItemTools:
             elif lvalue == 'null' or lvalue == '':
                 return None
             elif '|' in value:
-                return [cls.parse_item_value(subvalue) for subvalue in value.split('|')]
+                if value == '|':  # Use '|' for []
+                    return []
+                else:
+                    if value.endswith("|"):  # Use 'foo|' for ['foo']
+                        value = value[:-1]
+                    return [cls.parse_item_value(subvalue, context=context) for subvalue in value.split('|')]
+            elif cls.INSTAGUIDS_ENABLED and context is not None and value.startswith('#'):
+                # Note that this clause MUST follow '|' clause above so '#foo|#bar' isn't seen as instaguid
+                return cls.get_instaguid(value, context=context)
             else:
                 return prefer_number(value)
         else:  # presumably a number (int or float)
             return value
+
+    @classmethod
+    def get_instaguid(cls, guid_placeholder: str, *, context: Optional[Dict] = None):
+        if context is None:
+            return guid_placeholder
+        else:
+            referent = context.get(guid_placeholder)
+            if not referent:
+                context[guid_placeholder] = referent = str(uuid.uuid4())
+            return referent
 
     @classmethod
     def set_path_value(cls, datum: Union[List, Dict], path: ParsedHeader, value: Any, force: bool = False):
@@ -155,6 +239,36 @@ class ItemTools:
             datum[key] = value
         else:
             cls.set_path_value(datum[key], more_path, value)
+
+    @classmethod
+    def find_type_hint(cls, parsed_header: ParsedHeader, schema: Any):
+
+        def finder(subheader, subschema):
+            if not parsed_header:
+                return None
+            else:
+                [key1, *other_headers] = subheader
+                if isinstance(key1, str) and isinstance(subschema, dict):
+                    if subschema.get('type') == 'object':
+                        def1 = subschema.get('properties', {}).get(key1)
+                        if not other_headers:
+                            if def1 is not None:
+                                t = def1.get('type')
+                                if t == 'string':
+                                    enum = def1.get('enum')
+                                    if enum:
+                                        mapping = {e.lower(): e for e in enum}
+                                        return EnumHint(mapping)
+                                elif t == 'boolean':
+                                    return BoolHint()
+                                else:
+                                    pass  # fall through to asking super()
+                            else:
+                                pass  # fall through to asking super()
+                        else:
+                            return finder(subheader=other_headers, subschema=def1)
+
+        return finder(subheader=parsed_header, subschema=schema)
 
 
 # TODO: Consider whether this might want to be an abstract base class. Some change might be needed.
@@ -188,8 +302,7 @@ class AbstractTableSetManager:
     """
 
     def __init__(self, **kwargs):
-        if kwargs:
-            raise ValueError(f"Got unexpected keywords: {kwargs}")
+        unwanted_kwargs(context=self.__class__.__name__, kwargs=kwargs)
 
     # TODO: Consider whether this should be an abstractmethod (but first see detailed design note at top of class.)
     @classmethod
@@ -247,8 +360,8 @@ class TableSetManager(BasicTableSetManager):
         table_set_manager: TableSetManager = cls(filename)
         return table_set_manager.load_content()
 
-    def __init__(self, filename: str):
-        super().__init__(filename=filename)
+    def __init__(self, filename: str, **kwargs):
+        super().__init__(filename=filename, **kwargs)
 
     @property
     def tabnames(self) -> List[str]:
@@ -335,23 +448,36 @@ class ItemManagerMixin(BasicTableSetManager):
     get handled like Items instead of just flat table rows.
     """
 
-    def __init__(self, filename: str, **kwargs):
+    def __init__(self, filename: str, schemas=None, **kwargs):
         super().__init__(filename=filename, **kwargs)
         self.patch_prototypes_by_tabname: Dict[str, Dict] = {}
-        self.parsed_headers_by_tabname: Dict[str, List[List[Union[int, str]]]] = {}
+        self.parsed_headers_by_tabname: Dict[str, ParsedHeaders] = {}
+        self.type_hints_by_tabname: Dict[str, OptionalTypeHints] = {}
+        self.schemas = schemas or {}
+        self._instaguid_context_table: Dict[str, str] = {}
 
     def sheet_patch_prototype(self, tabname: str) -> Dict:
-        return self.patch_prototypes_by_tabname[tabname]
+        result = self.patch_prototypes_by_tabname[tabname]
+        return result
 
-    def sheet_parsed_headers(self, tabname: str) -> List[List[Union[int, str]]]:
+    def sheet_parsed_headers(self, tabname: str) -> ParsedHeaders:
         return self.parsed_headers_by_tabname[tabname]
 
-    def _create_tab_processor_state(self, tabname: str) -> ParsedHeaders:
-        super()._create_tab_processor_state(tabname)
-        # This will create state that allows us to efficiently assign values in the right place on each row
-        # by setting up a prototype we can copy and then drop values into.
-        self._compile_sheet_headers(tabname)
-        return self.sheet_parsed_headers(tabname)
+    def sheet_type_hints(self, tabname: str) -> OptionalTypeHints:
+        return self.type_hints_by_tabname[tabname]
+
+    class SheetState:
+
+        def __init__(self, parsed_headers: ParsedHeaders, type_hints: OptionalTypeHints):
+            self.parsed_headers = parsed_headers
+            self.type_hints = type_hints
+
+    def _compile_type_hints(self, tabname: str):
+        parsed_headers = self.sheet_parsed_headers(tabname)
+        schema = self.schemas.get(tabname)
+        type_hints = [ItemTools.find_type_hint(parsed_header, schema) if schema else None
+                      for parsed_header in parsed_headers]
+        self.type_hints_by_tabname[tabname] = type_hints
 
     def _compile_sheet_headers(self, tabname: str):
         headers = self.headers_by_tabname[tabname]
@@ -360,16 +486,29 @@ class ItemManagerMixin(BasicTableSetManager):
         prototype = ItemTools.compute_patch_prototype(parsed_headers)
         self.patch_prototypes_by_tabname[tabname] = prototype
 
-    def _process_row(self, tabname: str, parsed_headers: ParsedHeaders, row_data: SheetRow) -> AnyJsonData:
+    def _create_tab_processor_state(self, tabname: str) -> SheetState:
+        super()._create_tab_processor_state(tabname)
+        # This will create state that allows us to efficiently assign values in the right place on each row
+        # by setting up a prototype we can copy and then drop values into.
+        self._compile_sheet_headers(tabname)
+        self._compile_type_hints(tabname)
+        return self.SheetState(parsed_headers=self.sheet_parsed_headers(tabname),
+                               type_hints=self.sheet_type_hints(tabname))
+
+    def _process_row(self, tabname: str, state: SheetState, row_data: SheetRow) -> AnyJsonData:
+        parsed_headers = state.parsed_headers
+        type_hints = state.type_hints
         patch_item = copy.deepcopy(self.sheet_patch_prototype(tabname))
         for i, value in enumerate(row_data):
             parsed_value = self.parse_cell_value(value)
+            type_hint = type_hints[i]
+            if type_hint:
+                parsed_value = type_hint.apply_hint(parsed_value)
             ItemTools.set_path_value(patch_item, parsed_headers[i], parsed_value)
         return patch_item
 
-    @classmethod
-    def parse_cell_value(cls, value: SheetCellValue) -> AnyJsonData:
-        return ItemTools.parse_item_value(value)
+    def parse_cell_value(self, value: SheetCellValue) -> AnyJsonData:
+        return ItemTools.parse_item_value(value, context=self._instaguid_context_table)
 
 
 class ItemXlsxManager(ItemManagerMixin, XlsxManager):
@@ -387,9 +526,10 @@ class CsvManager(TableSetManager):
 
     DEFAULT_TAB_NAME = 'Sheet1'
 
-    def __init__(self, filename: str, tab_name=None):
-        super().__init__(filename=filename)
+    def __init__(self, filename: str, tab_name: Optional[str] = None, escaping: bool = False, **kwargs):
+        super().__init__(filename=filename, **kwargs)
         self.tab_name = tab_name or self.DEFAULT_TAB_NAME
+        self.escaping = escaping
 
     @property
     def tabnames(self) -> List[str]:
@@ -409,7 +549,6 @@ class CsvManager(TableSetManager):
         headers: Headers = self.headers_by_tabname.get(tabname)
         if headers is None:
             self.headers_by_tabname[tabname] = headers = self.reader_agent.__next__()
-            print(f"Headers={headers}")
         return headers
 
     def _process_row(self, tabname: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
@@ -449,22 +588,26 @@ class ItemManager(AbstractTableSetManager):
     """
 
     @classmethod
-    def create_implementation_manager(cls, filename: str, tab_name=None) -> BasicTableSetManager:
+    def create_implementation_manager(cls, filename: str, escaping=None, **kwargs) -> BasicTableSetManager:
         if filename.endswith(".xlsx"):
-            if tab_name is not None:
-                raise ValueError(f".xlsx files don't need tab_name={tab_name!r}")
-            reader_agent = ItemXlsxManager(filename)
+            # unwanted_kwargs(context="ItemManager for .xlsx files", kwargs=kwargs)
+            reader_agent = ItemXlsxManager(filename, escaping=escaping, **kwargs)
         elif filename.endswith(".csv"):
-            reader_agent = ItemCsvManager(filename, tab_name=tab_name)
+            tab_name = kwargs.pop('tab_name', None)
+            # unwanted_kwargs(context="ItemManager for .csv files", kwargs=kwargs)
+            reader_agent = ItemCsvManager(filename, escaping=escaping, tab_name=tab_name, **kwargs)
         elif filename.endswith(".tsv"):
-            reader_agent = ItemTsvManager(filename, tab_name=tab_name)
+            tab_name = kwargs.pop('tab_name', None)
+            # unwanted_kwargs(context="ItemManager for .tsv files", kwargs=kwargs)
+            reader_agent = ItemTsvManager(filename, escaping=escaping, tab_name=tab_name, **kwargs)
         else:
             raise ValueError(f"Unknown file type: {filename}")
         return reader_agent
 
     @classmethod
-    def load(cls, filename: str, tab_name=None) -> AnyJsonData:
-        manager = cls.create_implementation_manager(filename, tab_name=tab_name)
+    def load(cls, filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
+             schemas: Optional[Dict] = None) -> AnyJsonData:
+        manager = cls.create_implementation_manager(filename, tab_name=tab_name, escaping=escaping, schemas=schemas)
         return manager.load_content()
 
 
