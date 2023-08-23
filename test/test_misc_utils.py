@@ -30,7 +30,7 @@ from dcicutils.misc_utils import (
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
-    MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked,
+    MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -1976,6 +1976,23 @@ def test_snake_case_to_camel_case(token, expected):
 ])
 def test_snake_case_to_camel_case_hyphenated(token, expected):
     assert snake_case_to_camel_case(token, separator='-') == expected
+
+
+@pytest.mark.parametrize('token, expected', [
+    ('variant_sample', 'VariantSample'),
+    ('variant', 'Variant'),
+    ('_variant_', 'Variant'),
+    ('__variant', 'Variant'),
+    ('higlass_view_config', 'HiglassViewConfig'),
+    ('a_b_c_d', 'ABCD'),
+    ('', ''),
+    ('oneverylongthing1234567895_d', 'Oneverylongthing1234567895D'),
+    ('x_m_l_container', 'XMLContainer'),
+    ('X_M_L_Container', 'XMLContainer'),
+])
+def test_to_camel_case_hyphenated(token, expected):
+    assert to_camel_case(token) == expected
+    assert to_camel_case(expected) == expected  # make sure it's stable
 
 
 @pytest.mark.parametrize('token, expected', [
