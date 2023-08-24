@@ -9,15 +9,46 @@ from dcicutils.sheet_utils import (
     # High-level interfaces
     ItemManager, load_items,
     # Low-level implementation
-    ItemTools, XlsxManager, ItemXlsxManager,
-    CsvManager, ItemCsvManager, TsvManager, ItemTsvManager,
+    BasicTableSetManager,
+    ItemTools, XlsxManager, XlsxItemManager,
+    CsvManager, CsvItemManager, TsvManager, TsvItemManager,
     # TypeHint, EnumHint,
     BoolHint,
+    # Error handling
+    LoadFailure, LoadArgumentsError, LoadTableError,
     # Utilities
     prefer_number, unwanted_kwargs,
 )
 from typing import Dict
 from .conftest_settings import TEST_DIR
+
+
+def test_load_failure():
+
+    sample_message = "This is a test."
+
+    load_failure_object = LoadFailure(sample_message)
+    assert isinstance(load_failure_object, LoadFailure)
+    assert str(load_failure_object) == sample_message
+
+
+def test_load_argument_error():
+
+    sample_message = "This is a test."
+
+    load_failure_object = LoadArgumentsError(sample_message)
+    assert isinstance(load_failure_object, LoadArgumentsError)
+    assert str(load_failure_object) == sample_message
+
+
+def test_load_table_error():
+
+    sample_message = "This is a test."
+
+    load_failure_object = LoadTableError(sample_message)
+    assert isinstance(load_failure_object, LoadTableError)
+    assert str(load_failure_object) == sample_message
+
 
 
 def test_prefer_number():
@@ -61,9 +92,14 @@ TstArgs = namedtuple("TstArgs1", tst_args, defaults=(None,) * len(tst_args.split
 ])
 def test_unwanted_kwargs_with_error(context, context_plural, detailed, kwargs, message):
 
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(LoadArgumentsError) as exc:
         unwanted_kwargs(context=context, kwargs=kwargs, context_plural=context_plural, detailed=detailed)
     assert str(exc.value) == message
+
+
+def test_back_table_set_create_state():
+
+    assert BasicTableSetManager._create_tab_processor_state('some-tab') is None
 
 
 def test_item_tools_parse_sheet_header():
@@ -108,7 +144,7 @@ def test_item_tools_compute_patch_prototype(parsed_headers, expected_prototype):
 def test_item_tools_compute_patch_prototype_errors(headers):
 
     parsed_headers = ItemTools.parse_sheet_headers(headers)
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(LoadTableError) as exc:
         ItemTools.compute_patch_prototype(parsed_headers)
     assert str(exc.value) == "A header cannot begin with a numeric ref: 0"
 
@@ -204,6 +240,8 @@ def test_item_tools_set_path_value():
 
 
 def test_item_tools_find_type_hint():
+
+    assert ItemTools.find_type_hint(None, 'anything') is None
 
     assert ItemTools.find_type_hint(['foo', 'bar'], None) is None
     assert ItemTools.find_type_hint(['foo', 'bar'], "something") is None
@@ -304,13 +342,13 @@ SAMPLE_CSV_FILE = os.path.join(TEST_DIR, 'data_files/sample_items_sheet2.csv')
 
 SAMPLE_CSV_FILE_RAW_CONTENT = {CsvManager.DEFAULT_TAB_NAME: SAMPLE_XLSX_FILE_RAW_CONTENT['Sheet2']}
 
-SAMPLE_CSV_FILE_ITEM_CONTENT = {ItemCsvManager.DEFAULT_TAB_NAME: SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']}
+SAMPLE_CSV_FILE_ITEM_CONTENT = {CsvItemManager.DEFAULT_TAB_NAME: SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']}
 
 SAMPLE_TSV_FILE = os.path.join(TEST_DIR, 'data_files/sample_items_sheet2.tsv')
 
 SAMPLE_TSV_FILE_RAW_CONTENT = {TsvManager.DEFAULT_TAB_NAME: SAMPLE_XLSX_FILE_RAW_CONTENT['Sheet2']}
 
-SAMPLE_TSV_FILE_ITEM_CONTENT = {ItemTsvManager.DEFAULT_TAB_NAME: SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']}
+SAMPLE_TSV_FILE_ITEM_CONTENT = {TsvItemManager.DEFAULT_TAB_NAME: SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']}
 
 
 def test_xlsx_manager_load_content():
@@ -326,26 +364,29 @@ def test_xlsx_manager_load():
 
 def test_xlsx_manager_load_csv():
 
-    with pytest.raises(Exception):
+    with pytest.raises(LoadArgumentsError) as exc:
         XlsxManager.load(SAMPLE_CSV_FILE)
+    assert str(exc.value).startswith('The TableSetManager subclass XlsxManager'
+                                     ' expects only .xlsx filenames:')
 
 
-def test_item_xlsx_manager_load_content():
+def test_xlsx_item_manager_load_content():
 
-    it = ItemXlsxManager(SAMPLE_XLSX_FILE)
+    it = XlsxItemManager(SAMPLE_XLSX_FILE)
     assert it.load_content() == SAMPLE_XLSX_FILE_ITEM_CONTENT
 
 
-def test_item_xlsx_manager_load():
+def test_xlsx_item_manager_load():
 
-    assert ItemXlsxManager.load(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_ITEM_CONTENT
+    assert XlsxItemManager.load(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_ITEM_CONTENT
 
 
-def test_item_xlsx_manager_load_csv():
+def test_xlsx_item_manager_load_csv():
 
-    with pytest.raises(Exception):
-        ItemXlsxManager.load(SAMPLE_CSV_FILE)
-
+    with pytest.raises(LoadArgumentsError) as exc:
+        XlsxItemManager.load(SAMPLE_CSV_FILE)
+    assert str(exc.value).startswith('The TableSetManager subclass XlsxItemManager'
+                                     ' expects only .xlsx filenames:')
 
 def test_csv_manager_load_content():
 
@@ -360,26 +401,29 @@ def test_csv_manager_load():
 
 def test_csv_manager_load_csv():
 
-    with pytest.raises(Exception):
+    with pytest.raises(LoadArgumentsError) as exc:
         CsvManager.load(SAMPLE_XLSX_FILE)
+    assert str(exc.value).startswith('The TableSetManager subclass CsvManager'
+                                     ' expects only .csv filenames:')
 
 
-def test_item_csv_manager_load_content():
+def test_csv_item_manager_load_content():
 
-    it = ItemCsvManager(SAMPLE_CSV_FILE)
+    it = CsvItemManager(SAMPLE_CSV_FILE)
     assert it.load_content() == SAMPLE_CSV_FILE_ITEM_CONTENT
 
 
-def test_item_csv_manager_load():
+def test_csv_item_manager_load():
 
-    assert ItemCsvManager.load(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_ITEM_CONTENT
+    assert CsvItemManager.load(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_ITEM_CONTENT
 
 
-def test_item_csv_manager_load_csv():
+def test_csv_item_manager_load_csv():
 
-    with pytest.raises(Exception):
-        ItemCsvManager.load(SAMPLE_XLSX_FILE)
-
+    with pytest.raises(LoadArgumentsError) as exc:
+        CsvItemManager.load(SAMPLE_XLSX_FILE)
+    assert str(exc.value).startswith('The TableSetManager subclass CsvItemManager'
+                                     ' expects only .csv filenames:')
 
 def test_tsv_manager_load_content():
 
@@ -394,25 +438,29 @@ def test_tsv_manager_load():
 
 def test_tsv_manager_load_csv():
 
-    with pytest.raises(Exception):
+    with pytest.raises(LoadArgumentsError) as exc:
         TsvManager.load(SAMPLE_XLSX_FILE)
+    assert str(exc.value).startswith('The TableSetManager subclass TsvManager'
+                                     ' expects only .tsv or .tsv.txt filenames:')
 
 
-def test_item_tsv_manager_load_content():
+def test_tsv_item_manager_load_content():
 
-    it = ItemTsvManager(SAMPLE_TSV_FILE)
+    it = TsvItemManager(SAMPLE_TSV_FILE)
     assert it.load_content() == SAMPLE_TSV_FILE_ITEM_CONTENT
 
 
-def test_item_tsv_manager_load():
+def test_tsv_item_manager_load():
 
-    assert ItemTsvManager.load(SAMPLE_TSV_FILE) == SAMPLE_TSV_FILE_ITEM_CONTENT
+    assert TsvItemManager.load(SAMPLE_TSV_FILE) == SAMPLE_TSV_FILE_ITEM_CONTENT
 
 
-def test_item_tsv_manager_load_csv():
+def test_tsv_item_manager_load_csv():
 
-    with pytest.raises(Exception):
-        ItemTsvManager.load(SAMPLE_XLSX_FILE)
+    with pytest.raises(LoadArgumentsError) as exc:
+        TsvItemManager.load(SAMPLE_XLSX_FILE)
+    assert str(exc.value).startswith('The TableSetManager subclass TsvItemManager'
+                                     ' expects only .tsv or .tsv.txt filenames:')
 
 
 def test_item_manager_load():
@@ -421,8 +469,11 @@ def test_item_manager_load():
 
     assert ItemManager.load(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_ITEM_CONTENT
 
-    with pytest.raises(ValueError):
+    assert ItemManager.load(SAMPLE_TSV_FILE) == SAMPLE_TSV_FILE_ITEM_CONTENT
+
+    with pytest.raises(LoadArgumentsError) as exc:
         ItemManager.load("something.else")
+    assert str(exc.value) == "Unknown file type: something.else"
 
 
 def test_load_items():
@@ -431,8 +482,9 @@ def test_load_items():
 
     assert load_items(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_ITEM_CONTENT
 
-    with pytest.raises(ValueError):
+    with pytest.raises(LoadArgumentsError) as exc:
         load_items("something.else")
+    assert str(exc.value) == "Unknown file type: something.else"
 
 
 SAMPLE_CSV_FILE2_SCHEMAS = {
@@ -456,7 +508,7 @@ SAMPLE_CSV_FILE2_CONTENT = {
 }
 
 SAMPLE_CSV_FILE2_ITEM_CONTENT = {
-    ItemCsvManager.DEFAULT_TAB_NAME: [
+    CsvItemManager.DEFAULT_TAB_NAME: [
         {"name": "john", "sex": "M", "member": False},
         {"name": "juan", "sex": "male", "member": True},
         {"name": "igor", "sex": "unknown", "member": None},

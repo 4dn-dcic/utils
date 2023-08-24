@@ -6,7 +6,7 @@ import openpyxl
 import uuid
 
 from dcicutils.common import AnyJsonData
-from dcicutils.lang_utils import conjoined_list, maybe_pluralize
+from dcicutils.lang_utils import conjoined_list, disjoined_list, maybe_pluralize
 from dcicutils.misc_utils import ignored
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.workbook.workbook import Workbook
@@ -23,6 +23,30 @@ SheetRow = List[SheetCellValue]
 CsvReader = type(csv.reader(TemporaryFile()))
 
 
+class LoadFailure(Exception):
+    """
+    In general, we'd prefer to load up the spreadsheet with clumsy data that can then be validated in detail,
+    but some errors are so confusing or so problematic that we need to just fail the load right away.
+    """
+    pass
+
+
+class LoadArgumentsError(LoadFailure):
+    """
+    Errors of this class represent situations where we can't get started because
+    there's a problem with the given arguments.
+    """
+    pass
+
+
+class LoadTableError(LoadFailure):
+    """
+    Errors of this class represent situations where we can't get started because
+    there's a problem with some table's syntax, for example headers that don't make sense.
+    """
+    pass
+
+
 def unwanted_kwargs(*, context, kwargs, context_plural=False, detailed=False):
     if kwargs:
         unwanted = [f"{argname}={value!r}" if detailed else argname
@@ -30,8 +54,8 @@ def unwanted_kwargs(*, context, kwargs, context_plural=False, detailed=False):
                     if value is not None]
         if unwanted:
             does_not = "don't" if context_plural else "doesn't"
-            raise ValueError(f"{context} {does_not} use"
-                             f" {maybe_pluralize(unwanted, 'keyword argument')} {conjoined_list(unwanted)}.")
+            raise LoadArgumentsError(f"{context} {does_not} use"
+                                     f" {maybe_pluralize(unwanted, 'keyword argument')} {conjoined_list(unwanted)}.")
 
 
 def prefer_number(value: SheetCellValue):
@@ -165,7 +189,7 @@ class ItemTools:
         for parsed_header in parsed_headers:
             parsed_header0 = parsed_header[0]
             if isinstance(parsed_header0, int):
-                raise ValueError(f"A header cannot begin with a numeric ref: {parsed_header0}")
+                raise LoadTableError(f"A header cannot begin with a numeric ref: {parsed_header0}")
             cls.assure_patch_prototype_shape(parent=prototype, keys=parsed_header)
         return prototype
 
@@ -184,7 +208,7 @@ class ItemTools:
             if key0 == n:
                 parent.append(placeholder)
             elif key0 > n:
-                raise Exception("Numeric items must occur sequentially.")
+                raise LoadTableError("Numeric items must occur sequentially.")
         elif isinstance(key0, str):
             if key0 not in parent:
                 parent[key0] = placeholder
@@ -311,7 +335,7 @@ class AbstractTableSetManager:
         Reads a filename and returns a dictionary that maps sheet names to rows of dictionary data.
         For more information, see documentation of AbstractTableSetManager.
         """
-        raise NotImplementedError(f".load(...) is not implemented for {cls.__name__}.")
+        raise NotImplementedError(f".load(...) is not implemented for {cls.__name__}.")  # noQA
 
 
 class BasicTableSetManager(AbstractTableSetManager):
@@ -335,7 +359,8 @@ class BasicTableSetManager(AbstractTableSetManager):
     def tab_content(self, tabname: str) -> List[AnyJsonData]:
         return self.content_by_tabname[tabname]
 
-    def _create_tab_processor_state(self, tabname: str) -> Any:
+    @classmethod
+    def _create_tab_processor_state(cls, tabname: str) -> Any:
         """
         This method provides for the possibility that some parsers will want auxiliary state,
         (such as parsed headers or a line count or a table of temporary names for objects to cross-link
@@ -347,16 +372,23 @@ class BasicTableSetManager(AbstractTableSetManager):
 
     def _get_reader_agent(self) -> Any:
         """This function is responsible for opening the workbook and returning a workbook object."""
-        raise NotImplementedError(f"._get_reader_agent() is not implemented for {self.__class__.__name__}.")
+        raise NotImplementedError(f"._get_reader_agent() is not implemented for {self.__class__.__name__}.")  # noQA
 
     def load_content(self) -> Any:
-        raise NotImplementedError(f".load_content() is not implemented for {self.__class__.__name__}.")
+        raise NotImplementedError(f".load_content() is not implemented for {self.__class__.__name__}.")  # noQA
 
 
 class TableSetManager(BasicTableSetManager):
 
+    ALLOWED_FILE_EXTENSIONS = None
+
     @classmethod
     def load(cls, filename: str) -> AnyJsonData:
+        if cls.ALLOWED_FILE_EXTENSIONS:
+            if not any(filename.lower().endswith(suffix) for suffix in cls.ALLOWED_FILE_EXTENSIONS):
+                raise LoadArgumentsError(f"The TableSetManager subclass {cls.__name__} expects only"
+                                         f" {disjoined_list(cls.ALLOWED_FILE_EXTENSIONS)} filenames: {filename}")
+
         table_set_manager: TableSetManager = cls(filename)
         return table_set_manager.load_content()
 
@@ -365,13 +397,13 @@ class TableSetManager(BasicTableSetManager):
 
     @property
     def tabnames(self) -> List[str]:
-        raise NotImplementedError(f".tabnames is not implemented for {self.__class__.__name__}..")
+        raise NotImplementedError(f".tabnames is not implemented for {self.__class__.__name__}..")  # noQA
 
     def _raw_row_generator_for_tabname(self, tabname: str) -> Iterable[SheetRow]:
         """
         Given a tabname and a state (returned by _sheet_loader_state), return a generator for a set of row values.
         """
-        raise NotImplementedError(f"._rows_for_tabname(...) is not implemented for {self.__class__.__name__}.")
+        raise NotImplementedError(f"._rows_for_tabname(...) is not implemented for {self.__class__.__name__}.")  # noQA
 
     def _process_row(self, tabname: str, state: Any, row: List[SheetCellValue]) -> AnyJsonData:
         """
@@ -379,7 +411,7 @@ class TableSetManager(BasicTableSetManager):
         must return a list of objects representing column values.
         What constitutes a processed up to the class, but other than that the result must be a JSON dictionary.
         """
-        raise NotImplementedError(f"._process_row(...) is not implemented for {self.__class__.__name__}.")
+        raise NotImplementedError(f"._process_row(...) is not implemented for {self.__class__.__name__}.")  # noQA
 
     def load_content(self) -> AnyJsonData:
         for tabname in self.tabnames:
@@ -400,6 +432,8 @@ class XlsxManager(TableSetManager):
     """
     This implements the mechanism to get a series of rows out of the sheets in an XLSX file.
     """
+
+    ALLOWED_FILE_EXTENSIONS = ['.xlsx']
 
     @classmethod
     def _all_rows(cls, sheet: Worksheet):
@@ -510,7 +544,7 @@ class ItemManagerMixin(BasicTableSetManager):
         return ItemTools.parse_item_value(value, context=self._instaguid_context_table)
 
 
-class ItemXlsxManager(ItemManagerMixin, XlsxManager):
+class XlsxItemManager(ItemManagerMixin, XlsxManager):
     """
     This layers item-style row processing functionality on an XLSX file.
     """
@@ -522,6 +556,8 @@ class CsvManager(TableSetManager):
     This implements the mechanism to get a series of rows out of the sheet in a csv file,
     returning a result that still looks like there could have been multiple tabs.
     """
+
+    ALLOWED_FILE_EXTENSIONS = ['.csv']
 
     DEFAULT_TAB_NAME = 'Sheet1'
 
@@ -564,7 +600,7 @@ class CsvManager(TableSetManager):
                 for i, row_datum in enumerate(row_data)}
 
 
-class ItemCsvManager(ItemManagerMixin, CsvManager):
+class CsvItemManager(ItemManagerMixin, CsvManager):
     """
     This layers item-style row processing functionality on a CSV file.
     """
@@ -576,12 +612,14 @@ class TsvManager(CsvManager):
     TSV files are just CSV files with tabs instead of commas as separators.
     (We do not presently handle any escaping of strange characters. May need to add handling for backslash escaping.)
     """
+    ALLOWED_FILE_EXTENSIONS = ['.tsv', '.tsv.txt']
+
     @classmethod
     def _get_csv_reader(cls, filename) -> CsvReader:
         return csv.reader(open_text_input_file_respecting_byte_order_mark(filename), delimiter='\t')
 
 
-class ItemTsvManager(ItemManagerMixin, TsvManager):
+class TsvItemManager(ItemManagerMixin, TsvManager):
     """
     This layers item-style row processing functionality on a TSV file.
     """
@@ -598,17 +636,17 @@ class ItemManager(AbstractTableSetManager):
     def create_implementation_manager(cls, filename: str, escaping=None, **kwargs) -> BasicTableSetManager:
         if filename.endswith(".xlsx"):
             # unwanted_kwargs(context="ItemManager for .xlsx files", kwargs=kwargs)
-            reader_agent = ItemXlsxManager(filename, escaping=escaping, **kwargs)
+            reader_agent = XlsxItemManager(filename, escaping=escaping, **kwargs)
         elif filename.endswith(".csv"):
             tab_name = kwargs.pop('tab_name', None)
             # unwanted_kwargs(context="ItemManager for .csv files", kwargs=kwargs)
-            reader_agent = ItemCsvManager(filename, escaping=escaping, tab_name=tab_name, **kwargs)
+            reader_agent = CsvItemManager(filename, escaping=escaping, tab_name=tab_name, **kwargs)
         elif filename.endswith(".tsv"):
             tab_name = kwargs.pop('tab_name', None)
             # unwanted_kwargs(context="ItemManager for .tsv files", kwargs=kwargs)
-            reader_agent = ItemTsvManager(filename, escaping=escaping, tab_name=tab_name, **kwargs)
+            reader_agent = TsvItemManager(filename, escaping=escaping, tab_name=tab_name, **kwargs)
         else:
-            raise ValueError(f"Unknown file type: {filename}")
+            raise LoadArgumentsError(f"Unknown file type: {filename}")
         return reader_agent
 
     @classmethod
