@@ -265,7 +265,7 @@ class ItemTools:
             cls.set_path_value(datum[key], more_path, value)
 
     @classmethod
-    def find_type_hint(cls, parsed_header: ParsedHeader, schema: Any):
+    def find_type_hint(cls, parsed_header: Optional[ParsedHeader], schema: Any):
 
         def finder(subheader, subschema):
             if not parsed_header:

@@ -50,7 +50,6 @@ def test_load_table_error():
     assert str(load_failure_object) == sample_message
 
 
-
 def test_prefer_number():
 
     assert prefer_number('') is None
@@ -388,6 +387,7 @@ def test_xlsx_item_manager_load_csv():
     assert str(exc.value).startswith('The TableSetManager subclass XlsxItemManager'
                                      ' expects only .xlsx filenames:')
 
+
 def test_csv_manager_load_content():
 
     wt = CsvManager(SAMPLE_CSV_FILE)
@@ -424,6 +424,7 @@ def test_csv_item_manager_load_csv():
         CsvItemManager.load(SAMPLE_XLSX_FILE)
     assert str(exc.value).startswith('The TableSetManager subclass CsvItemManager'
                                      ' expects only .csv filenames:')
+
 
 def test_tsv_manager_load_content():
 
