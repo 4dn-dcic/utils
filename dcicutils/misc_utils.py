@@ -1349,12 +1349,21 @@ def capitalize1(s):
     return s[:1].upper() + s[1:]
 
 
+"""
+Python's UUID ignores all dashes, whereas Postgres is more strict
+http://www.postgresql.org/docs/9.2/static/datatype-uuid.html
+See also http://www.postgresql.org/docs/9.2/static/datatype-uuid.html
+And, anyway, this pattern is what our portals have been doing
+for quite a while, so it's the most stable choice for us now.
+"""
+
 uuid_re = re.compile(r'(?i)[{]?(?:[0-9a-f]{4}-?){8}[}]?')
 
-
 def is_uuid(instance):
-    # Python's UUID ignores all dashes, whereas Postgres is more strict
-    # http://www.postgresql.org/docs/9.2/static/datatype-uuid.html
+    """
+    Predicate returns true for any group of 32 hex characters with optional hyphens every four characters.
+    We insist on lowercase to make matching faster. See other notes on this design choice above.
+    """
     return bool(uuid_re.match(instance))
 
 
