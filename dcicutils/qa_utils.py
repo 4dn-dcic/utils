@@ -10,6 +10,7 @@ import dateutil.tz as dateutil_tz
 import functools
 import hashlib
 import io
+import json
 import logging
 import os
 import pytest
@@ -720,7 +721,7 @@ class _PrintCapturer:
         texts = remove_suffix('\n', text).split('\n')
         last_text = texts[-1]
         result = wrapped_action(text, **kwargs)  # noQA - This call to print is low-level implementation
-        # This only captures non-file output output.
+        # This only captures non-file output.
         file = kwargs.get('file')
         if file is None:
             file = sys.stdout
@@ -853,7 +854,7 @@ class MockBoto3Session:
         self._aws_secret_access_key = kwargs.get("aws_secret_access_key")
         self._aws_region = region_name
 
-        # These is specific for testing.
+        # This is specific for testing.
         self._aws_credentials_dir = None
 
     # FYI: Some things to note about how boto3 (and probably any AWS client) reads AWS credentials/region.
@@ -915,7 +916,7 @@ class MockBoto3Session:
         self._aws_secret_access_key = aws_secret_access_key
         self._aws_region = region_name
 
-        # These is specific for testing.
+        # This is specific for testing.
         self._aws_credentials_dir = aws_credentials_dir
 
     @staticmethod
@@ -2270,8 +2271,7 @@ class MockBotoS3Client(MockBoto3Client):
     def upload_fileobj(self, Fileobj, Bucket, Key, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
         self.check_for_kwargs_required_by_mock("upload_fileobj", Bucket=Bucket, Key=Key, **kwargs)
         data = Fileobj.read()
-        PRINT("Uploading %s (%s bytes) to bucket %s key %s"
-              % (Fileobj, len(data), Bucket, Key))
+        PRINT(f"Uploading {Fileobj} ({len(data)} bytes) to bucket {Bucket} key {Key}")
         with self.s3_files.open(os.path.join(Bucket, Key), 'wb') as fp:
             fp.write(data)
 
@@ -2284,8 +2284,7 @@ class MockBotoS3Client(MockBoto3Client):
         self.check_for_kwargs_required_by_mock("download_fileobj", Bucket=Bucket, Key=Key, **kwargs)
         with self.s3_files.open(os.path.join(Bucket, Key), 'rb') as fp:
             data = fp.read()
-        PRINT("Downloading bucket %s key %s (%s bytes) to %s"
-              % (Bucket, Key, len(data), Fileobj))
+        PRINT(f"Downloading bucket {Bucket} key {Key} ({len(data)} bytes) to {Fileobj}")
         Fileobj.write(data)
 
     def download_file(self, Bucket, Key, Filename, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
@@ -2382,7 +2381,7 @@ class MockBotoS3Client(MockBoto3Client):
         raise ClientError(operation_name='HeadBucket',
                           error_response={  # noQA - PyCharm wrongly complains about this dictionary
                               "Error": {"Code": "404", "Message": "Not Found"},
-                              "ResponseMetadata": {"HTTPStatusCode": 404},
+                              "ResponseMetadata": self.compute_mock_response_metadata(http_status_code=404),
                           })
 
     def get_object_tagging(self, Bucket, Key):
@@ -2645,7 +2644,7 @@ class MockBotoS3Client(MockBoto3Client):
         }
 
     def list_objects_v2(self, Bucket):  # noQA - AWS argument naming style
-        # This is different but similar to list_objects. However we don't really care about that.
+        # This is different but similar to list_objects. However, we don't really care about that.
         return self.list_objects(Bucket=Bucket)
 
     def copy_object(self, CopySource, Bucket, Key, CopySourceVersionId=None,
@@ -2698,7 +2697,7 @@ class MockBotoS3Client(MockBoto3Client):
         new_storage_class = target_storage_class
         if (copy_in_place
                 and GlacierUtils.transition_involves_glacier_restoration(source_storage_class, target_storage_class)):
-            new_storage_class = None  # For a restoration, the don't update the glacier data. It's restored elsewhere.
+            new_storage_class = None  # For a restoration, don't update the glacier data. It's restored elsewhere.
             target_attribute_block.restore_temporarily(delay_seconds=self.RESTORATION_DELAY_SECONDS,
                                                        duration_days=1, storage_class=target_storage_class)
             PRINT(f"Set up restoration {target_attribute_block.restoration}")
@@ -2806,6 +2805,7 @@ class MockBotoS3Client(MockBoto3Client):
 
     def restore_object(self, Bucket, Key, RestoreRequest, VersionId: Optional[str] = None,
                        StorageClass: Optional[S3StorageClass] = None):
+        # TODO: VersionId is unused in the arglist. Is that OK? -kmp 19-Aug-2023
         duration_days: int = RestoreRequest.get('Days')
         storage_class: S3StorageClass = StorageClass or self.storage_class
         s3_filename = f"{Bucket}/{Key}"
@@ -3047,8 +3047,8 @@ def known_bug_expected(jira_ticket=None, fixed=False, error_class=None):
         with known_bug_expected(jira_ticket="TST-00001", error_class=RuntimeError, fixed=True):
             ... stuff that fails ...
 
-    If the previously-expected error (now thought to be fixed) happens, an error will result so it's easy to tell
-    if there's been a regression.
+    If the previously-expected error (now thought to be fixed) happens, an error will result
+    so that it's easy to tell if there's been a regression.
 
     Parameters:
 
@@ -3088,7 +3088,7 @@ def client_failer(operation_name, code=400):
     def fail(message, code=code):
         raise ClientError(
             {  # noQA - PyCharm wrongly complains about this dictionary
-                "Error": {"Message": message, "Code": code}
+                "Error": {"Message": message, "Code": code}  # noQA - Boto3 declares a string here but allows int code
             },
             operation_name=operation_name)
     return fail
@@ -3473,3 +3473,78 @@ def input_series(*items):
             inputs.append(item)
         yield
         assert not inputs, "Did not use all inputs."
+
+
+def is_subdict(json1, json2, desc1="json1", desc2="json2", verbose=True):
+    """
+    Does asymmetric testing of dictionary equivalence, assuring json2 has all the content of json1,
+    even if not vice versa. In other words, the dictionary structure is equivalent, to the extent
+    that (recursively) all dictionary keys on the left hand side also occur on the right hand side
+    even if not necessarily all dictionary keys on the right occur in the left.
+
+    For example,
+       x = {"foo": 3}
+       y = {"foo": 3, "bar": 4}
+       is_subdict(x, y) is True
+       is_subdict(y, x) is False
+
+    The desc1 and desc2 can be provided to help with verbose mode, identifying what is on the left
+    and what is on the right.
+
+    :param json1: a JSON structure, the outer part of which is a dictionary
+    :param json2: a JSON structure, the outer part of which is a dictionary
+    :param desc1: a name or brief description for the json1 (default "json1")
+    :param desc2: a name or brief description for the json2 (default "json2")
+    :param verbose: a boolean (default True) that controls whether the comparison is verbose, showing
+        output explaining failures or near-failures when True, and otherwise, if False, not showing such output.
+    """
+
+    def out(x):
+        if verbose:
+            PRINT(x)
+
+    def sorted_set_repr(x):
+        return f"{{{repr(sorted(x))[1:-1]}}}"
+
+    def recurse(json1, json2, path=""):
+        if isinstance(json1, dict) and isinstance(json2, dict):
+            k1 = set(json1.keys())
+            k2 = set(json2.keys())
+            result = k1 <= k2
+            if result:
+                if k1 != k2:
+                    out(f"Non-fatal keyword mismatch at {path!r}:")
+                    out(f" {desc1} keys: {sorted_set_repr(k1)}")
+                    out(f" {desc2} keys: {sorted_set_repr(k2)}")
+                result = all(recurse(value, json2[key], path=f"{path}.{key}")
+                             for key, value in json1.items())
+                if not result:
+                    # out(f"Recursive failure at {path!r} in object comparison")
+                    pass
+            else:
+                out(f"Failed at {path!r} in object comparison due to key set mismatch:")
+                out(f" {desc1} keys: {sorted_set_repr(k1)}")
+                out(f" {desc2} keys: {sorted_set_repr(k2)}")
+        elif isinstance(json1, list) and isinstance(json2, list):
+            len1 = len(json1)
+            len2 = len(json2)
+            result = len1 == len2
+            if not result:
+                out(f"Failed at {path!r} in list comparison due to length mismatch: {len1} vs {len2}")
+            else:
+                result = all(recurse(json1[i], json2[i], path=f"{path}[{i}]") for i in range(len1))
+                if not result:
+                    # out(f"Recursive failure at {path!r} in list comparison")
+                    pass
+        elif type(json1) == type(json2):
+            result = json1 == json2
+            if not result:
+                out(f"Failed at {path!r} due to value mismatch: {json.dumps(json1)} != {json.dumps(json2)}")
+        else:
+            result = False
+            if not result:
+                out(f"Type mismatch ({json1.__class__.__name__} vs {json2.__class__.__name__}) at {path!r}:")
+                out(f" {desc1}: {json1}")
+                out(f" {desc2}: {json2}")
+        return result
+    return recurse(json1, json2)
