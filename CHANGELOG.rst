@@ -24,7 +24,7 @@ Change Log
     * Classes ``XlsxManager``, ``CsvManager`` and ``TsvManager`` for loading raw data
       from ``.xlsx``, ``.csv``, and ``.tsv`` files, respectively.
 
-    * Classes ``ItemXlsxManager``, ``ItemCsvManager``, and ``ItemTsvManager`` for loading Item-style data
+    * Classes ``XlsxItemManager``, ``CsvItemManager``, and ``TsvItemManager`` for loading Item-style data
       from ``.xlsx``, ``.csv``, and ``.tsv`` files, respectively.
 
 * Contains a fix for a bug in ``ff_utils.get_schema_names`` (`C4-1086 <https://hms-dbmi.atlassian.net/browse/C4-1086>`_).
