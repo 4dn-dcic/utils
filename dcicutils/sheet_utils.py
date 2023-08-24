@@ -457,8 +457,7 @@ class ItemManagerMixin(BasicTableSetManager):
         self._instaguid_context_table: Dict[str, str] = {}
 
     def sheet_patch_prototype(self, tabname: str) -> Dict:
-        result = self.patch_prototypes_by_tabname[tabname]
-        return result
+        return self.patch_prototypes_by_tabname[tabname]
 
     def sheet_parsed_headers(self, tabname: str) -> ParsedHeaders:
         return self.parsed_headers_by_tabname[tabname]
