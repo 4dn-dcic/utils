@@ -561,10 +561,9 @@ class CsvManager(TableSetManager):
 
     DEFAULT_TAB_NAME = 'Sheet1'
 
-    def __init__(self, filename: str, tab_name: Optional[str] = None, escaping: bool = False, **kwargs):
+    def __init__(self, filename: str, tab_name: Optional[str] = None, **kwargs):
         super().__init__(filename=filename, **kwargs)
         self.tab_name = tab_name or self.DEFAULT_TAB_NAME
-        self.escaping = escaping
 
     @property
     def tabnames(self) -> List[str]:
@@ -614,9 +613,42 @@ class TsvManager(CsvManager):
     """
     ALLOWED_FILE_EXTENSIONS = ['.tsv', '.tsv.txt']
 
+    def __init__(self, filename: str, escaping: Optional[bool] = None, **kwargs):
+        super().__init__(filename=filename, **kwargs)
+        self.escaping: bool = escaping or False
+
     @classmethod
     def _get_csv_reader(cls, filename) -> CsvReader:
         return csv.reader(open_text_input_file_respecting_byte_order_mark(filename), delimiter='\t')
+
+    def parse_cell_value(self, value: SheetCellValue) -> AnyJsonData:
+        if self.escaping and isinstance(value, str) and '\\' in value:
+            value = self.expand_escape_sequences(value)
+        return super().parse_cell_value(value)
+
+    @classmethod
+    def expand_escape_sequences(cls, text: str) -> str:
+        s = io.StringIO()
+        escaping = False
+        for ch in text:
+            if escaping:
+                if ch == 'r':
+                    s.write('\r')
+                elif ch == 't':
+                    s.write('\t')
+                elif ch == 'n':
+                    s.write('\n')
+                elif ch == '\\':
+                    s.write('\\')
+                else:
+                    # Rather than err, just leave other sequences as-is.
+                    s.write(f"\\{ch}")
+                escaping = False
+            elif ch == '\\':
+                escaping = True
+            else:
+                s.write(ch)
+        return s.getvalue()
 
 
 class TsvItemManager(ItemManagerMixin, TsvManager):
@@ -633,17 +665,15 @@ class ItemManager(AbstractTableSetManager):
     """
 
     @classmethod
-    def create_implementation_manager(cls, filename: str, escaping=None, **kwargs) -> BasicTableSetManager:
+    def create_implementation_manager(cls, filename: str, **kwargs) -> BasicTableSetManager:
         if filename.endswith(".xlsx"):
-            # unwanted_kwargs(context="ItemManager for .xlsx files", kwargs=kwargs)
-            reader_agent = XlsxItemManager(filename, escaping=escaping, **kwargs)
+            reader_agent = XlsxItemManager(filename, **kwargs)
         elif filename.endswith(".csv"):
             tab_name = kwargs.pop('tab_name', None)
-            # unwanted_kwargs(context="ItemManager for .csv files", kwargs=kwargs)
-            reader_agent = CsvItemManager(filename, escaping=escaping, tab_name=tab_name, **kwargs)
+            reader_agent = CsvItemManager(filename, tab_name=tab_name, **kwargs)
         elif filename.endswith(".tsv"):
+            escaping = kwargs.pop('escaping', None)
             tab_name = kwargs.pop('tab_name', None)
-            # unwanted_kwargs(context="ItemManager for .tsv files", kwargs=kwargs)
             reader_agent = TsvItemManager(filename, escaping=escaping, tab_name=tab_name, **kwargs)
         else:
             raise LoadArgumentsError(f"Unknown file type: {filename}")

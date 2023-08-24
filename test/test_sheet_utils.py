@@ -432,6 +432,14 @@ def test_tsv_manager_load_content():
     assert wt.load_content() == SAMPLE_TSV_FILE_RAW_CONTENT
 
 
+def test_tsv_manager_expand_escape_sequences():
+
+    assert TsvManager.expand_escape_sequences("foo") == "foo"
+    assert TsvManager.expand_escape_sequences("foo\\tbar") == "foo\tbar"
+    assert TsvManager.expand_escape_sequences("\\r\\t\\n\\\\") == "\r\t\n\\"
+    assert TsvManager.expand_escape_sequences("foo\\fbar") == "foo\\fbar"
+
+
 def test_tsv_manager_load():
 
     assert TsvManager.load(SAMPLE_TSV_FILE) == SAMPLE_TSV_FILE_RAW_CONTENT
