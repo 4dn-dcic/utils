@@ -6,19 +6,46 @@ dcicutils
 Change Log
 ----------
 
-7.8.1
-=====
+7.11.0
+======
 * Changed ``PyYAML`` version to ^6.0.1; the Mac M1 has issues building 5.4.1 (though 5.3.1 works)
 
 
-7.8.0
-=====
+7.10.0
+======
 
 * New module ``sheet_utils`` for loading workbooks.
 
   * class ``WorkbookManager`` for loading raw data
 
   * class ``ItemManager`` for loading item data
+
+
+7.9.0
+=====
+
+* In ``misc_utils``:
+
+  * New function ``to_camelcase`` that can take either snake_case or CamelCase input.
+
+* In ``qa_utils``:
+
+  * New function ``is_subdict`` for asymmetric testing of dictionary equivalence.
+
+* In ``ff_utils``:
+
+  * New function ``get_schema`` that will pull down an individual schema definition.
+  * New function ``get_schemas`` that will pull down all schema definitions.
+  * New argument ``allow_abstract`` to ``get_schema_names``
+    for conceptual compatibility with ``get_schemas``.
+  * Minor tweaks to ``dump_results_to_json`` for style reasons,
+    and repairs to its overly complex and error-prone unit test.
+
+
+7.8.0
+=====
+
+* Add ``variant_utils`` with tools to filter through CGAP data.
 
 
 7.7.2

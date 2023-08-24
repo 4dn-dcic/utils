@@ -1,4 +1,5 @@
 import boto3
+import io
 import json
 import os
 import random
@@ -6,7 +7,6 @@ import requests
 import time
 
 from collections import namedtuple
-from dcicutils.lang_utils import disjoined_list
 from elasticsearch.exceptions import AuthorizationException
 from typing import Optional, Dict, List
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
@@ -16,7 +16,8 @@ from .common import (
     AnyAuthDict, AuthDict, SimpleAuthPair, AuthData, AnyAuthData, PortalEnvName,
     # S3BucketName, S3KeyName,
 )
-from .misc_utils import PRINT
+from .lang_utils import disjoined_list
+from .misc_utils import PRINT, to_camel_case, remove_suffix
 
 
 # TODO (C4-92, C4-102): Probably to centralize this information in env_utils. Also figure out relation to CGAP.
@@ -281,7 +282,7 @@ def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
     Function to get metadata for a given obj_id (uuid or @id, most likely).
     Either takes a dictionary form authentication (MUST include 'server')
     or a string fourfront-environment.
-    Also a boolean 'check_queue', which if True
+    Also, a boolean 'check_queue', which, if True,
     will use information from the queues and/or datastore=database to
     ensure that the metadata is accurate.
     Takes an optional string add_on that should contain things like
@@ -421,7 +422,7 @@ def search_result_generator(page_generator):
     now return A,C,D but we already had the first page, so we request data starting at position 3
     for the second page and get E,G,I.  That means our sequence of return values would be A,C,E,E,G,I,K,M,
     or, in other words, showing a duplication. To avoid this, we keep track of the IDs we've seen
-    and show only the first case of each element, so A,C,E,G,I,K,M. (We won't see the D but we weren't
+    and show only the first case of each element, so A,C,E,G,I,K,M. (We won't see the D, but we weren't
     going to see it anyway, and it wasn't available the time we started, so the timing was already close.)
 
     Unfortunately, we aren't so lucky for deletion, though that happens more rarely. That will cause
@@ -687,7 +688,7 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
 
     resp = get_metadata(uuid, key=key, ff_env=ff_env)
 
-    # Checks wheter the input is a experiment or experimentset otherwise throws an error
+    # Checks whether the input is an Experiment or ExperimentSet, and otherwise throws an error.
     if 'ExperimentSet' not in resp['@type']:
         raise TypeError('Expected ExperimentSet')
 
@@ -862,7 +863,7 @@ def get_es_metadata(uuids, es_client=None, filters=None, sources=None, chunk_siz
                 sources = ['embedded.files.uuid']
             i.e. getting all fields for lab in embedded frame
                 sources = ['embedded.lab.*']
-            i.e. for getting a only object frame
+            i.e. for getting only an object frame
                 sources = ['object.*']
         chunk_size:
             Integer chunk_size may be used to control the number of uuids that are
@@ -870,7 +871,7 @@ def get_es_metadata(uuids, es_client=None, filters=None, sources=None, chunk_siz
             ES reads to timeout.
         is_generator:
             Boolean is_generator will return a generator for individual results if True;
-            if False (default), returns a list of results.
+            if False, (default), returns a list of results.
         key: authentication key for ff_env (see get_authentication_with_server)
         ff_env: authentication by env (needs system variables)
     """
@@ -941,30 +942,75 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth):
                 yield hit['_source']  # yield individual items from ES
 
 
-def get_schema_names(key=None, ff_env=None):
+def get_schema(name, key=None, ff_env=None) -> Dict:
     """
-    Create a dictionary of all schema names to item class names
-    i.e. FileFastq: file_fastq
+    Gets the schema definition with the given name.
 
     Args:
-        key (dict):                      standard ff_utils authentication key
-        ff_env (str):                    standard ff environment string
+        name (str):   a schema name (CamelCase or snake_case), or None
+        key (dict):   standard ff_utils authentication key
+        ff_env (str): standard ff environment string
 
     Returns:
         dict: contains key schema names and value item class names
     """
     auth = get_authentication_with_server(key, ff_env)
-    schema_name = {}
-    profiles = get_metadata('profiles/', key=auth, add_on='frame=raw')
-    for key, value in profiles.items():
-        # skip abstract types
-        if value.get('isAbstract') is True:
-            continue
-        # some test schemas in local don't have the id field
-        schema_filename = value.get('id')
-        if schema_filename:
-            schema_name[key] = schema_filename.split('/')[-1][:-5]
-    return schema_name
+    url = f"profiles/{to_camel_case(name)}.json"
+    schema = get_metadata(url, key=auth, add_on='frame=raw')
+    return schema
+
+
+def get_schemas(key=None, ff_env=None, *, allow_abstract=True, require_id=False) -> Dict[str, Dict]:
+    """
+    Gets a dictionary of all schema definitions.
+    By default, this returns all schemas, but the allow_abstract= and require_id= keywords allow limited filtering.
+
+    Args:
+        key (dict):               standard ff_utils authentication key
+        ff_env (str):             standard ff environment string
+        allow_abstract (boolean): controls whether abstract schemas can be returned (default True, return them)
+        require_id (boolean):     controls whether a '$id' field is required for schema to be included
+                                  (default False, include even if no $id)
+
+    Returns:
+        dict: a mapping from keys that are schema names to schema definitions
+    """
+    auth = get_authentication_with_server(key, ff_env)
+    schemas: Dict[str, Dict] = get_metadata('profiles/', key=auth, add_on='frame=raw')
+    filtered_schemas = {}
+    for schema_name, schema in schemas.items():
+        if allow_abstract or not schema.get('isAbstract'):
+            id_field = schema.get('$id')  # some test schemas in local may not have the $id field
+            if id_field or not require_id:
+                filtered_schemas[schema_name] = schema
+    return filtered_schemas
+
+
+def get_schema_names(key=None, ff_env=None, allow_abstract=False) -> Dict[str, str]:
+    """
+    Create a dictionary of all schema names to item class names
+
+    By default, names of abstract schemas are not included. The allow_abstract= keyword argument controls this.
+
+    Names that have no $id cannot be included because they lack the relevant information to
+    construct our return value. However, these presumably mostly come up for local debugging and shouldn't matter.
+    (See ff_utils.get_schemas if you want more refined control.)
+
+    i.e. FileFastq: file_fastq
+
+    Args:
+        key (dict):               standard ff_utils authentication key
+        ff_env (str):             standard ff environment string
+        allow_abstract (boolean): controls whether names of abstract schemas can be returned (default False, omit)
+
+    Returns:
+        dict: contains key schema names and value item class names
+    """
+    schemas = get_schemas(key=key, ff_env=ff_env, allow_abstract=allow_abstract, require_id=True)
+    return {
+        schema_name: remove_suffix(".json", schema.get('$id').split('/')[-1])
+        for schema_name, schema in schemas.items()
+    }
 
 
 def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_pc_wfr=False, ignore_field=None,
@@ -1034,7 +1080,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
     chunk = 100  # chunk the requests - don't want to hurt es performance
 
     while uuid_list:
-        uuids_to_check = []  # uuids to add to uuid_list if not if not in item_uuids
+        uuids_to_check = []  # uuids to add to uuid_list if not in item_uuids
 
         # get the next page of data, recreating the es_client if need be
         try:
@@ -1121,7 +1167,7 @@ def _get_page(*, page, key=None, ff_env=None):
 
 def get_health_page(key=None, ff_env=None):
     """
-    Simple function to return the json for a FF health page
+    Simple function to return the json for an environment's health page
     """
     return _get_page(page='/health', key=key, ff_env=ff_env)
 
@@ -1143,7 +1189,7 @@ CountSummary = namedtuple('CountSummary', ['are_even', 'summary_total'])
 def get_counts_summary(env):
     """ Returns a named tuple given an FF name to check representing the counts state.
             CountSummary
-                are_even: boolean on whether or not counts are even
+                are_even: boolean that is True if counts are even and False otherwise
                 summary_total: raw value of counts
     """
     totals = get_counts_page(ff_env=env)
@@ -1182,7 +1228,7 @@ class SearchESMetadataHandler(object):
 
         :arg index: index to search under
         :arg query: query to run
-        :arg is_generator: boolean on whether or not to use a generator
+        :arg is_generator: boolean that is True if a generator is requested and otherwise False
         :arg page_size: if using a generator, how many results to give per request
 
         :returns: list of results of query or None
@@ -1194,7 +1240,7 @@ class SearchESMetadataHandler(object):
 
 def search_es_metadata(index, query, key=None, ff_env=None, is_generator=False):
     """
-        Executes a lucene search query on on the ES Instance for this
+        Executes a lucene search query on the ES Instance for this
         environment.
 
         NOTE: It is okay to use this function directly but for repeat usage please use
@@ -1204,7 +1250,7 @@ def search_es_metadata(index, query, key=None, ff_env=None, is_generator=False):
         :arg query: dictionary of query
         :arg key: optional, 2-tuple authentication key (access_key_id, secret)
         :arg ff_env: ff_env to use
-        :arg is_generator: boolean on whether or not to use a generator
+        :arg is_generator: boolean that is True if a generator is requested and otherwise False
 
         :returns: list of results of query or None
     """
@@ -1448,6 +1494,14 @@ def convert_param(parameter_dict, vals_as_string=False):
                 if v % 1 == 0:
                     v = int(v)
             except ValueError:
+                # TODO: Maybe just catch Exception, not ValueError?
+                # This is why I hate advice to people that they try to second-guess error types for which they
+                # don't have express guarantees about the kinds of errors that can happen.
+                # Does the code author really want to have other errors go unhandled, or did they just think this
+                # was the only possible error. If it's the only possible error, Exception is a find way to catch it.
+                # In fact, float('a') will raise ValueError, but float(['a']) will raise TypeError.
+                # I think this should probably treat both of those the same, but I'm not going to make that change
+                # for now.. -kmp 21-Aug-2023
                 v = str(v)
         else:
             v = str(v)
@@ -1468,23 +1522,27 @@ def generate_rand_accession(project_prefix='4DN', item_prefix='FI'):
 
 
 def dump_results_to_json(store, folder):
-    """Takes resuls from expand_es_metadata, and dumps them into the given folder in json format.
+    """
+    Takes resuls from expand_es_metadata, and dumps them into the given folder in json format.
+
+    e.g., given a dictionary {'a': a_dict, 'b': b_dict, 'c': c_dict}
+    it will write files 'a', 'b', and 'c' to the given folder (creating it if need be),
+    containing a_dict, b_dict, and c_dict, respectively.
+
     Args:
         store (dict): results from expand_es_metadata
         folder:       folder for storing output
     """
-    if folder[-1] == '/':
-        folder = folder[:-1]
     if not os.path.exists(folder):
         os.makedirs(folder)
     for a_type in store:
-        filename = folder + '/' + a_type + '.json'
-        with open(filename, 'w') as outfile:
+        filename = os.path.join(folder, a_type + '.json')
+        with io.open(filename, 'w') as outfile:
             json.dump(store[a_type], outfile, indent=4)
 
 
 def parse_s3_bucket_and_key_url(url: str) -> (str, str):
-    """ Parses the given s3 URL into its pair of bucket, key
+    """ Parses the given s3 URL into its pair of (bucket, key).
         Note that this function works the way it does because of how these
         urls end up in our database. Eventually we should clean this up.
         Format:
