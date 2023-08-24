@@ -325,11 +325,11 @@ class BasicTableSetManager(AbstractTableSetManager):
     def __init__(self, filename: str, **kwargs):
         super().__init__(**kwargs)
         self.filename: str = filename
-        self.headers_by_tabname: Dict[str, List[str]] = {}
+        self.headers_by_tabname: Dict[str, Headers] = {}
         self.content_by_tabname: Dict[str, List[AnyJsonData]] = {}
         self.reader_agent: Any = self._get_reader_agent()
 
-    def tab_headers(self, tabname: str) -> List[str]:
+    def tab_headers(self, tabname: str) -> Headers:
         return self.headers_by_tabname[tabname]
 
     def tab_content(self, tabname: str) -> List[AnyJsonData]:
@@ -431,8 +431,8 @@ class XlsxManager(TableSetManager):
 
     def _create_tab_processor_state(self, tabname: str) -> Headers:
         sheet = self.reader_agent[tabname]
-        headers: List[str] = [str(sheet.cell(row=1, column=col).value)
-                              for col in self._all_cols(sheet)]
+        headers: Headers = [str(sheet.cell(row=1, column=col).value)
+                            for col in self._all_cols(sheet)]
         self.headers_by_tabname[sheet.title] = headers
         return headers
 
@@ -541,11 +541,19 @@ class CsvManager(TableSetManager):
     def _get_csv_reader(cls, filename) -> CsvReader:
         return csv.reader(open_text_input_file_respecting_byte_order_mark(filename))
 
+    PAD_TRAILING_TABS = True
+
     def _raw_row_generator_for_tabname(self, tabname: str) -> Iterable[SheetRow]:
-        return self.reader_agent
+        headers = self.tab_headers(tabname)
+        n_headers = len(headers)
+        for row_data in self.reader_agent:
+            n_cols = len(row_data)
+            if self.PAD_TRAILING_TABS and n_cols < n_headers:
+                row_data = row_data + [''] * (n_headers - n_cols)
+            yield row_data
 
     def _create_tab_processor_state(self, tabname: str) -> Headers:
-        headers: Headers = self.headers_by_tabname.get(tabname)
+        headers: Optional[Headers] = self.headers_by_tabname.get(tabname)
         if headers is None:
             self.headers_by_tabname[tabname] = headers = self.reader_agent.__next__()
         return headers

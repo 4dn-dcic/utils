@@ -157,7 +157,7 @@ def test_item_tools_parse_item_value_guids(instaguids_enabled):
 
     with local_attrs(ItemTools, INSTAGUIDS_ENABLED=instaguids_enabled):
 
-        sample_simple_field_input= "#foo"
+        sample_simple_field_input = "#foo"
 
         parsed = ItemTools.parse_item_value(sample_simple_field_input)
         assert parsed == sample_simple_field_input
@@ -491,10 +491,42 @@ SAMPLE_CSV_FILE3_SCHEMAS = {
 
 SAMPLE_CSV_FILE3_PERSON_CONTENT_HINTED = {
     "Person": [
-        {"name": "John", "uuid": "#john", "sex": "Male", "father": "#igor", "mother": "#mary", "parents": None, "children": None},
-        {"name": "Juan", "uuid": "#juan", "sex": "Male", "father": None, "mother": None, "parents": ["#igor", "#mary"], "children": None},
-        {"name": "Igor", "uuid": "#igor", "sex": "Male", "father": None, "mother": None, "parents": None, "children": ["#john"]},
-        {"name": "Mary", "uuid": "#mary", "sex": "Female", "father": None, "mother": None, "parents": None, "children": ["#john"]}
+        {
+            "name": "John",
+            "uuid": "#john",
+            "sex": "Male",
+            "father": "#igor",
+            "mother": "#mary",
+            "parents": None,
+            "children": None,
+        },
+        {
+            "name": "Juan",
+            "uuid": "#juan",
+            "sex": "Male",
+            "father": None,
+            "mother": None,
+            "parents": ["#igor", "#mary"],
+            "children": None,
+        },
+        {
+            "name": "Igor",
+            "uuid": "#igor",
+            "sex": "Male",
+            "father": None,
+            "mother": None,
+            "parents": None,
+            "children": ["#john"],
+        },
+        {
+            "name": "Mary",
+            "uuid": "#mary",
+            "sex": "Female",
+            "father": None,
+            "mother": None,
+            "parents": None,
+            "children": ["#john"],
+        },
     ]
 }
 
