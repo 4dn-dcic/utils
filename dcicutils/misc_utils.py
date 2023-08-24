@@ -1359,6 +1359,7 @@ for quite a while, so it's the most stable choice for us now.
 
 uuid_re = re.compile(r'(?i)[{]?(?:[0-9a-f]{4}-?){8}[}]?')
 
+
 def is_uuid(instance):
     """
     Predicate returns true for any group of 32 hex characters with optional hyphens every four characters.
