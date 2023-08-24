@@ -5,6 +5,7 @@ import io
 import openpyxl
 
 from dcicutils.common import AnyJsonData
+from dcicutils.lang_utils import conjoined_list, maybe_pluralize
 from dcicutils.misc_utils import ignored
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.workbook.workbook import Workbook
@@ -19,6 +20,17 @@ ParsedHeaders = List[ParsedHeader]
 SheetCellValue = Union[int, float, str]
 SheetRow = List[SheetCellValue]
 CsvReader = type(csv.reader(TemporaryFile()))
+
+
+def unwanted_kwargs(*, context, kwargs, context_plural=False, detailed=False):
+    if kwargs:
+        unwanted = [f"{argname}={value!r}" if detailed else argname
+                    for argname, value in kwargs.items()
+                    if value is not None]
+        if unwanted:
+            does_not = "don't" if context_plural else "doesn't"
+            raise ValueError(f"{context} {does_not} use"
+                             f" {maybe_pluralize(unwanted, 'keyword argument')} {conjoined_list(unwanted)}.")
 
 
 def prefer_number(value: SheetCellValue):
@@ -140,7 +152,12 @@ class ItemTools:
             elif lvalue == 'null' or lvalue == '':
                 return None
             elif '|' in value:
-                return [cls.parse_item_value(subvalue) for subvalue in value.split('|')]
+                if value == '|':  # Use '|' for []
+                    return []
+                else:
+                    if value.endswith("|"):  # Use 'foo|' for ['foo']
+                        value = value[:-1]
+                    return [cls.parse_item_value(subvalue) for subvalue in value.split('|')]
             else:
                 return prefer_number(value)
         else:  # presumably a number (int or float)
@@ -188,8 +205,7 @@ class AbstractTableSetManager:
     """
 
     def __init__(self, **kwargs):
-        if kwargs:
-            raise ValueError(f"Got unexpected keywords: {kwargs}")
+        unwanted_kwargs(context=self.__class__.__name__, kwargs=kwargs)
 
     # TODO: Consider whether this should be an abstractmethod (but first see detailed design note at top of class.)
     @classmethod
@@ -247,8 +263,8 @@ class TableSetManager(BasicTableSetManager):
         table_set_manager: TableSetManager = cls(filename)
         return table_set_manager.load_content()
 
-    def __init__(self, filename: str):
-        super().__init__(filename=filename)
+    def __init__(self, filename: str, **kwargs):
+        super().__init__(filename=filename, **kwargs)
 
     @property
     def tabnames(self) -> List[str]:
@@ -338,12 +354,12 @@ class ItemManagerMixin(BasicTableSetManager):
     def __init__(self, filename: str, **kwargs):
         super().__init__(filename=filename, **kwargs)
         self.patch_prototypes_by_tabname: Dict[str, Dict] = {}
-        self.parsed_headers_by_tabname: Dict[str, List[List[Union[int, str]]]] = {}
+        self.parsed_headers_by_tabname: Dict[str, ParsedHeaders] = {}
 
     def sheet_patch_prototype(self, tabname: str) -> Dict:
         return self.patch_prototypes_by_tabname[tabname]
 
-    def sheet_parsed_headers(self, tabname: str) -> List[List[Union[int, str]]]:
+    def sheet_parsed_headers(self, tabname: str) -> ParsedHeaders:
         return self.parsed_headers_by_tabname[tabname]
 
     def _create_tab_processor_state(self, tabname: str) -> ParsedHeaders:
@@ -387,8 +403,8 @@ class CsvManager(TableSetManager):
 
     DEFAULT_TAB_NAME = 'Sheet1'
 
-    def __init__(self, filename: str, tab_name=None):
-        super().__init__(filename=filename)
+    def __init__(self, filename: str, tab_name=None, **kwargs):
+        super().__init__(filename=filename, **kwargs)
         self.tab_name = tab_name or self.DEFAULT_TAB_NAME
 
     @property
@@ -409,7 +425,6 @@ class CsvManager(TableSetManager):
         headers: Headers = self.headers_by_tabname.get(tabname)
         if headers is None:
             self.headers_by_tabname[tabname] = headers = self.reader_agent.__next__()
-            print(f"Headers={headers}")
         return headers
 
     def _process_row(self, tabname: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
@@ -449,15 +464,18 @@ class ItemManager(AbstractTableSetManager):
     """
 
     @classmethod
-    def create_implementation_manager(cls, filename: str, tab_name=None) -> BasicTableSetManager:
+    def create_implementation_manager(cls, filename: str, **kwargs) -> BasicTableSetManager:
         if filename.endswith(".xlsx"):
-            if tab_name is not None:
-                raise ValueError(f".xlsx files don't need tab_name={tab_name!r}")
-            reader_agent = ItemXlsxManager(filename)
+            # unwanted_kwargs(context="ItemManager for .xlsx files", kwargs=kwargs)
+            reader_agent = ItemXlsxManager(filename, **kwargs)
         elif filename.endswith(".csv"):
-            reader_agent = ItemCsvManager(filename, tab_name=tab_name)
+            tab_name = kwargs.pop('tab_name', None)
+            # unwanted_kwargs(context="ItemManager for .csv files", kwargs=kwargs)
+            reader_agent = ItemCsvManager(filename, tab_name=tab_name, **kwargs)
         elif filename.endswith(".tsv"):
-            reader_agent = ItemTsvManager(filename, tab_name=tab_name)
+            tab_name = kwargs.pop('tab_name', None)
+            # unwanted_kwargs(context="ItemManager for .tsv files", kwargs=kwargs)
+            reader_agent = ItemTsvManager(filename, tab_name=tab_name, **kwargs)
         else:
             raise ValueError(f"Unknown file type: {filename}")
         return reader_agent
