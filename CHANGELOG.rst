@@ -12,9 +12,22 @@ Change Log
 
 * New module ``sheet_utils`` for loading workbooks.
 
-  * class ``WorkbookManager`` for loading raw data
+  * Important things of interest:
 
-  * class ``ItemManager`` for loading item data
+    * Class ``ItemManager`` for loading Item-style data
+      from any ``.xlsx``, ``.csv`` or ``.tsv`` files.
+
+    * Function ``load_items`` that does the same as ``ItemManager.load``.
+
+  * Various low-level implementation classes such as:
+
+    * Classes ``XlsxManager``, ``CsvManager`` and ``TsvManager`` for loading raw data
+      from ``.xlsx``, ``.csv``, and ``.tsv`` files, respectively.
+
+    * Classes ``ItemXlsxManager``, ``ItemCsvManager``, and ``ItemTsvManager`` for loading Item-style data
+      from ``.xlsx``, ``.csv``, and ``.tsv`` files, respectively.
+
+* Contains a fix for a bug in ``ff_utils.get_schema_names`` (`C4-1086 <https://hms-dbmi.atlassian.net/browse/C4-1086>`_).
 
 
 7.9.0
