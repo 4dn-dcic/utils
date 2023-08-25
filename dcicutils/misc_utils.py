@@ -2358,7 +2358,7 @@ class JsonLinesReader:
                     self.headers = line
                     n_headers = len(line)
                     continue
-            # If length of line is mroe than we expect, ignore it. Let user put comments beyond our table
+            # If length of line is more than we expect, ignore it. Let user put comments beyond our table
             # But if length of line is less than we expect, extend the line with None
             if self.headers:
                 if not isinstance(line, list):
