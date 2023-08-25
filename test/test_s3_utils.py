@@ -409,7 +409,7 @@ def test_s3utils_get_google_key():
     keys = s3u.get_google_key()
     assert isinstance(keys, dict)
     assert keys['type'] == 'service_account'
-    assert keys["project_id"] == "fourfront-396315" # yes, this is a magic constant
+    assert keys["project_id"] == "fourfront-396315"  # yes, this is a magic constant
     for dict_key in ['private_key_id', 'private_key', 'client_email', 'client_id', 'auth_uri', 'client_x509_cert_url']:
         assert keys[dict_key]
 
