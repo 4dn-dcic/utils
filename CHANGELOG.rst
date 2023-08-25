@@ -19,7 +19,7 @@ Change Log
 
     * Function ``load_items`` that does the same as ``ItemManager.load``.
 
-  * Various low-level implementation classes such as:
+  * Various lower-level implementation classes such as:
 
     * Classes ``XlsxManager``, ``CsvManager`` and ``TsvManager`` for loading raw data
       from ``.xlsx``, ``.csv``, and ``.tsv`` files, respectively.
@@ -27,7 +27,11 @@ Change Log
     * Classes ``XlsxItemManager``, ``CsvItemManager``, and ``TsvItemManager`` for loading Item-style data
       from ``.xlsx``, ``.csv``, and ``.tsv`` files, respectively.
 
-* Contains a fix for a bug in ``ff_utils.get_schema_names`` (`C4-1086 <https://hms-dbmi.atlassian.net/browse/C4-1086>`_).
+* New functionality in ``misc_utils``:
+
+  * New function ``is_uuid`` (migrated from Fourfront)
+  * New function ``pad_to``
+  * New class ``JsonLinesReader``
 
 
 7.9.0

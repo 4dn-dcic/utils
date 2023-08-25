@@ -3,18 +3,19 @@ import copy
 import csv
 import io
 import openpyxl
+import os
 import uuid
 
 from dcicutils.common import AnyJsonData
 from dcicutils.env_utils import public_env_name, EnvUtils
 from dcicutils.ff_utils import get_schema
 from dcicutils.lang_utils import conjoined_list, disjoined_list, maybe_pluralize
-from dcicutils.misc_utils import ignored, PRINT
+from dcicutils.misc_utils import ignored, PRINT, pad_to
 from dcicutils.task_utils import pmap
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.workbook.workbook import Workbook
 from tempfile import TemporaryFile
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Type, Union
 
 
 Header = str
@@ -334,7 +335,7 @@ class AbstractTableSetManager:
 
     # TODO: Consider whether this should be an abstractmethod (but first see detailed design note at top of class.)
     @classmethod
-    def load(cls, filename: str) -> Dict[str, List[AnyJsonData]]:
+    def load(cls, filename: str, **kwargs) -> Dict[str, List[AnyJsonData]]:
         """
         Reads a filename and returns a dictionary that maps sheet names to rows of dictionary data.
         For more information, see documentation of AbstractTableSetManager.
@@ -353,6 +354,8 @@ class BasicTableSetManager(AbstractTableSetManager):
     of each sheet. Even a csv file, which doesn't have multiple tabs can be seen as the degenerate case
     of this where there's only one set of headers and only one block of content.
     """
+
+    ALLOWED_FILE_EXTENSIONS: List[str] = []
 
     def __init__(self, filename: str, **kwargs):
         super().__init__(**kwargs)
@@ -387,17 +390,26 @@ class BasicTableSetManager(AbstractTableSetManager):
 
 
 class TableSetManager(BasicTableSetManager):
-
-    ALLOWED_FILE_EXTENSIONS = None
+    """
+    This is the base class for all things that read tablesets. Those may be:
+    * Excel workbook readers (.xlsx)
+    * Comma-separated file readers (.csv)
+    * Tab-separarated file readers (.tsv in most of the world, but Microsoft stupidly calls this .txt, outright
+      refusing to write a .tsv file, so many people seem to compromise and call this .tsv.txt)
+    Unimplemented formats that could easily be made to do the same thing:
+    * JSON files
+    * JSON lines files
+    * YAML files
+    """
 
     @classmethod
-    def load(cls, filename: str) -> AnyJsonData:
+    def load(cls, filename: str, **kwargs) -> AnyJsonData:
         if cls.ALLOWED_FILE_EXTENSIONS:
             if not any(filename.lower().endswith(suffix) for suffix in cls.ALLOWED_FILE_EXTENSIONS):
                 raise LoadArgumentsError(f"The TableSetManager subclass {cls.__name__} expects only"
                                          f" {disjoined_list(cls.ALLOWED_FILE_EXTENSIONS)} filenames: {filename}")
 
-        table_set_manager: TableSetManager = cls(filename)
+        table_set_manager: TableSetManager = cls(filename, **kwargs)
         return table_set_manager.load_content()
 
     def __init__(self, filename: str, **kwargs):
@@ -430,6 +442,33 @@ class TableSetManager(BasicTableSetManager):
     @classmethod
     def parse_cell_value(cls, value: SheetCellValue) -> AnyJsonData:
         return prefer_number(value)
+
+
+class TableSetManagerRegistry:
+
+    ALL_TABLE_SET_MANAGERS: Dict[str, Type[TableSetManager]] = {}
+
+    @classmethod
+    def register(cls, class_to_register: Type[TableSetManager]):
+        for ext in class_to_register.ALLOWED_FILE_EXTENSIONS:
+            existing = cls.ALL_TABLE_SET_MANAGERS.get(ext)
+            if existing:
+                raise Exception(f"Tried to define {class_to_register} to extension {ext},"
+                                f" but {existing} already claimed that.")
+            cls.ALL_TABLE_SET_MANAGERS[ext] = class_to_register
+        return class_to_register
+
+    @classmethod
+    def manager_for_filename(cls, filename: str) -> Type[TableSetManager]:
+        base = os.path.basename(filename)
+        dotparts = base.split('.')
+        while dotparts:
+            suffix = f".{'.'.join(dotparts)}"
+            found = cls.ALL_TABLE_SET_MANAGERS.get(suffix)
+            if found:
+                return found
+            dotparts = dotparts[1:]
+        raise LoadArgumentsError(f"Unknown file type: {filename}")
 
 
 class XlsxManager(TableSetManager):
@@ -484,7 +523,7 @@ class SchemaAutoloadMixin(AbstractTableSetManager):
 
     SCHEMA_CACHE = {}  # Shared cache. Do not override. Use .clear_schema_cache() to clear it.
     CACHE_SCHEMAS = True  # Controls whether we're doing caching at all
-    AUTOLOAD_SCHEMAS_DEFAULT = False
+    AUTOLOAD_SCHEMAS_DEFAULT = True
 
     def __init__(self, autoload_schemas: Optional[bool] = None, portal_env: Optional[str] = None, **kwargs):
         if portal_env is None:
@@ -592,6 +631,7 @@ class ItemManagerMixin(SchemaAutoloadMixin, BasicTableSetManager):
         return ItemTools.parse_item_value(value, context=self._instaguid_context_table)
 
 
+@TableSetManagerRegistry.register
 class XlsxItemManager(ItemManagerMixin, XlsxManager):
     """
     This layers item-style row processing functionality on an XLSX file.
@@ -599,7 +639,20 @@ class XlsxItemManager(ItemManagerMixin, XlsxManager):
     pass
 
 
-class CsvManager(TableSetManager):
+class SingleTableMixin(AbstractTableSetManager):
+
+    DEFAULT_TAB_NAME = 'Sheet1'
+
+    def __init__(self, tab_name: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.tab_name = tab_name or self.DEFAULT_TAB_NAME
+
+    @property
+    def tabnames(self) -> List[str]:
+        return [self.tab_name]
+
+
+class CsvManager(SingleTableMixin, TableSetManager):
     """
     This implements the mechanism to get a series of rows out of the sheet in a csv file,
     returning a result that still looks like there could have been multiple tabs.
@@ -607,21 +660,14 @@ class CsvManager(TableSetManager):
 
     ALLOWED_FILE_EXTENSIONS = ['.csv']
 
-    DEFAULT_TAB_NAME = 'Sheet1'
-
-    def __init__(self, filename: str, tab_name: Optional[str] = None, **kwargs):
+    def __init__(self, filename: str, **kwargs):
         super().__init__(filename=filename, **kwargs)
-        self.tab_name = tab_name or self.DEFAULT_TAB_NAME
-
-    @property
-    def tabnames(self) -> List[str]:
-        return [self.tab_name]
 
     def _get_reader_agent(self) -> CsvReader:
-        return self._get_csv_reader(self.filename)
+        return self._get_reader_agent_for_filename(self.filename)
 
     @classmethod
-    def _get_csv_reader(cls, filename) -> CsvReader:
+    def _get_reader_agent_for_filename(cls, filename) -> CsvReader:
         return csv.reader(open_text_input_file_respecting_byte_order_mark(filename))
 
     PAD_TRAILING_TABS = True
@@ -630,9 +676,8 @@ class CsvManager(TableSetManager):
         headers = self.tab_headers(tabname)
         n_headers = len(headers)
         for row_data in self.reader_agent:
-            n_cols = len(row_data)
-            if self.PAD_TRAILING_TABS and n_cols < n_headers:
-                row_data = row_data + [''] * (n_headers - n_cols)
+            if self.PAD_TRAILING_TABS:
+                row_data = pad_to(n_headers, row_data, padding='')
             yield row_data
 
     def _create_tab_processor_state(self, tabname: str) -> Headers:
@@ -647,6 +692,7 @@ class CsvManager(TableSetManager):
                 for i, row_datum in enumerate(row_data)}
 
 
+@TableSetManagerRegistry.register
 class CsvItemManager(ItemManagerMixin, CsvManager):
     """
     This layers item-style row processing functionality on a CSV file.
@@ -666,7 +712,7 @@ class TsvManager(CsvManager):
         self.escaping: bool = escaping or False
 
     @classmethod
-    def _get_csv_reader(cls, filename) -> CsvReader:
+    def _get_reader_agent_for_filename(cls, filename) -> CsvReader:
         return csv.reader(open_text_input_file_respecting_byte_order_mark(filename), delimiter='\t')
 
     def parse_cell_value(self, value: SheetCellValue) -> AnyJsonData:
@@ -699,6 +745,7 @@ class TsvManager(CsvManager):
         return s.getvalue()
 
 
+@TableSetManagerRegistry.register
 class TsvItemManager(ItemManagerMixin, TsvManager):
     """
     This layers item-style row processing functionality on a TSV file.
@@ -714,24 +761,22 @@ class ItemManager(AbstractTableSetManager):
 
     @classmethod
     def create_implementation_manager(cls, filename: str, **kwargs) -> BasicTableSetManager:
-        if filename.endswith(".xlsx"):
-            reader_agent = XlsxItemManager(filename, **kwargs)
-        elif filename.endswith(".csv"):
-            tab_name = kwargs.pop('tab_name', None)
-            reader_agent = CsvItemManager(filename, tab_name=tab_name, **kwargs)
-        elif filename.endswith(".tsv"):
-            escaping = kwargs.pop('escaping', None)
-            tab_name = kwargs.pop('tab_name', None)
-            reader_agent = TsvItemManager(filename, escaping=escaping, tab_name=tab_name, **kwargs)
-        else:
-            raise LoadArgumentsError(f"Unknown file type: {filename}")
+        reader_agent_class = TableSetManagerRegistry.manager_for_filename(filename)
+        reader_agent = reader_agent_class(filename, **kwargs)
         return reader_agent
 
     @classmethod
-    def load(cls, filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
-             schemas: Optional[Dict] = None, autoload_schemas: Optional[bool] = None) -> AnyJsonData:
+    def load(cls, filename: str,
+             tab_name: Optional[str] = None,
+             escaping: Optional[bool] = None,
+             schemas: Optional[Dict] = None,
+             autoload_schemas: Optional[bool] = None,
+             **kwargs) -> Dict[str, List[AnyJsonData]]:
+        """
+        Given a filename and various options
+        """
         manager = cls.create_implementation_manager(filename, tab_name=tab_name, escaping=escaping, schemas=schemas,
-                                                    autoload_schemas=autoload_schemas)
+                                                    autoload_schemas=autoload_schemas, **kwargs)
         return manager.load_content()
 
 

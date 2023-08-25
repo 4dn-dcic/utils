@@ -30,12 +30,13 @@ from dcicutils.misc_utils import (
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
-    MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case,
+    MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case, pad_to, JsonLinesReader,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
     raises_regexp, MockId, MockLog, input_series,
 )
+from typing import Any, Dict, List
 from unittest import mock
 
 
@@ -1094,7 +1095,7 @@ def test_lockout_manager():
 
     protected_action = "simulated action"
 
-    # The function now() will get us the time. This assure us that binding datetime.datetime
+    # The function now() will get us the time. This assures us that binding datetime.datetime
     # will not be affecting us.
     now = datetime_module.datetime.now
 
@@ -1197,7 +1198,7 @@ def test_rate_manager():
     # PyCharm thinks this is not used. -kmp 26-Jul-2020
     # r = RateManager(interval_seconds=60, safety_seconds=1, allowed_attempts=4)
 
-    # The function now() will get us the time. This assure us that binding datetime.datetime
+    # The function now() will get us the time. This assures us that binding datetime.datetime
     # will not be affecting us.
     now = datetime_module.datetime.now
 
@@ -1885,7 +1886,7 @@ class TestCachedField:
             assert field.get() == val5
             assert field.get() == val5
 
-            dt.sleep(self.DEFAULT_TIMEOUT)  # Fast forward to where we're going to refill again
+            dt.sleep(self.DEFAULT_TIMEOUT)  # Fast-forward to where we're going to refill again
             val6 = field.get()
             assert val6 != val5
 
@@ -2077,7 +2078,7 @@ def test_copy_json(obj):
 
 
 def test_copy_json_side_effects():
-    obj = {'foo': [1, 2, 3], 'bar': [{'x': 4, 'y': 5}, {'x': 2, 'y': 7}]}
+    obj: Dict[str, Any] = {'foo': [1, 2, 3], 'bar': [{'x': 4, 'y': 5}, {'x': 2, 'y': 7}]}
     obj_copy = copy_json(obj)
     obj['foo'][1] = 20
     obj['bar'][0]['y'] = 500  # NoQA - PyCharm wrongly fears there are type errors in this line, that it will fail.
@@ -2931,7 +2932,7 @@ def test_classproperty_cached():
     assert str(exc.value) == ("The subclasses= argument to classproperty_cached.reset must not be False"
                               " because classproperty_cached does not use per-subclass caches.")
 
-    # This will clear SubClock cache, bu that's shared with the Clock cache, so both will clear.
+    # This will clear SubClock cache, but that's shared with the Clock cache, so both will clear.
     assert classproperty_cached.reset(instance_class=SubClock, attribute_name='sample') is True
 
     c_t5 = Clock.sample     # This should recompute Clock.sample cache, which is shared by SubCLock
@@ -3285,7 +3286,7 @@ def test_deduplicate_list():
     xlen = len(x)
 
     assert sorted(deduplicate_list(x)) == ['a', 'b', 'c']
-    assert len(x) == xlen  # make sure there was no side-effect to the original list
+    assert len(x) == xlen  # make sure there was no side effect to the original list
 
     y = ['a']
     y0 = deduplicate_list(y)
@@ -3495,3 +3496,85 @@ def test_map_chunked():
 
     res = map_chunked(lambda x: ''.join(x), "abcdefghij", chunk_size=4, reduce=lambda x: '.'.join(x))
     assert res == 'abcd.efgh.ij'
+
+
+def test_pad_to():
+
+    assert pad_to(5, []) == [None, None, None, None, None]
+    assert pad_to(5, [], padding='foo') == ['foo', 'foo', 'foo', 'foo', 'foo']
+
+    assert pad_to(5, ['x']) == ['x', None, None, None, None]
+    assert pad_to(5, ['x'], padding='foo') == ['x', 'foo', 'foo', 'foo', 'foo']
+
+    six_elements = ['a', 'b', 'c', 'd', 'e', 'f']
+
+    assert pad_to(5, six_elements) == six_elements
+    assert pad_to(5, six_elements, padding='foo')
+
+
+def test_json_lines_reader_dicts():
+
+    print()  # start on a fresh line
+
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove():
+
+        item1 = {"foo": 1, "bar": 2}
+        item2 = {"foo": 3, "bar": 4}
+
+        item1_str = json.dumps(item1)
+        item2_str = json.dumps(item2)
+
+        sample_lines = [item1_str, item2_str]
+
+        sample_filename = "somefile.jsonl"
+
+        with io.open(sample_filename, 'w') as fp:
+            for line in sample_lines:
+                print(line, file=fp)
+
+        for file, content in mfs.files.items():
+            print("=" * 20, file, "=" * 20)
+            print(content.decode('utf-8'))
+            print("=" * 80)
+
+        with io.open(sample_filename) as fp:
+            assert [line for line in JsonLinesReader(fp)] == [item1, item2]
+
+
+def test_json_lines_reader_lists():
+
+    print()  # start on a fresh line
+
+    mfs = MockFileSystem()
+
+    with mfs.mock_exists_open_remove():
+
+        item1 = {"foo": 1, "bar": 2}
+        item2 = {"foo": 3, "bar": 4}
+
+        headers: List[str] = list(item1.keys())
+
+        item1_str = json.dumps([item1[header] for header in headers])
+        item2_str = json.dumps([item2[header] for header in headers])
+
+        sample_lines = [item1_str, item2_str]
+
+        sample_filename = "somefile.jsonl"
+
+        with io.open(sample_filename, 'w') as fp:
+
+            print(json.dumps(headers), file=fp)
+            for line in sample_lines:
+                print(line, file=fp)
+
+        for file, content in mfs.files.items():
+            print("=" * 20, file, "=" * 20)
+            print(content.decode('utf-8'))
+            print("=" * 80)
+
+        with io.open(sample_filename) as fp:
+            parsed = [line for line in JsonLinesReader(fp)]
+            expected = [item1, item2]
+            assert parsed == expected

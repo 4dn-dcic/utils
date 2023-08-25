@@ -9,6 +9,7 @@ import hashlib
 import inspect
 import math
 import io
+import json
 import os
 import logging
 import pytz
@@ -2329,3 +2330,43 @@ def parse_in_radix(text: str, *, radix: int):
     except Exception:
         pass
     raise ValueError(f"Unable to parse: {text!r}")
+
+
+def pad_to(target_size: int, data: list, *, padding=None):
+    actual_size = len(data)
+    if actual_size < target_size:
+        data = data + [padding] * (target_size - actual_size)
+    return data
+
+
+class JsonLinesReader:
+
+    def __init__(self, fp, padded=False, padding=None):
+        self.fp = fp
+        self.padded: bool = padded
+        self.padding = padding
+        self.headers = None  # Might change after we see first line
+
+    def __iter__(self):
+        first_line = True
+        n_headers = 0
+        for raw_line in self.fp:
+            line = json.loads(raw_line)
+            if first_line:
+                first_line = False
+                if isinstance(line, list):
+                    self.headers = line
+                    n_headers = len(line)
+                    continue
+            # If length of line is mroe than we expect, ignore it. Let user put comments beyond our table
+            # But if length of line is less than we expect, extend the line with None
+            if self.headers:
+                if not isinstance(line, list):
+                    raise Exception("If the first line is a list, all lines must be.")
+                if self.padded and len(line) < n_headers:
+                    line = pad_to(n_headers, line, padding=self.padding)
+                yield dict(zip(self.headers, line))
+            elif isinstance(line, dict):
+                yield line
+            else:
+                raise Exception(f"If the first line is not a list, all lines must be dictionaries: {line!r}")
