@@ -36,6 +36,7 @@ Change Log
     for conceptual compatibility with ``get_schemas``.
   * Minor tweaks to ``dump_results_to_json`` for style reasons,
     and repairs to its overly complex and error-prone unit test.
+  * Fix to license_utils.py for localstack-ext.
 
 
 7.8.0
