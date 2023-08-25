@@ -6,8 +6,11 @@ import openpyxl
 import uuid
 
 from dcicutils.common import AnyJsonData
+from dcicutils.env_utils import public_env_name, EnvUtils
+from dcicutils.ff_utils import get_schema
 from dcicutils.lang_utils import conjoined_list, disjoined_list, maybe_pluralize
-from dcicutils.misc_utils import ignored
+from dcicutils.misc_utils import ignored, PRINT
+from dcicutils.task_utils import pmap
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.workbook.workbook import Workbook
 from tempfile import TemporaryFile
@@ -315,6 +318,7 @@ class AbstractTableSetManager:
             "Sheet2": [...],
             ...,
         }
+    It also needs some implementation of the .tabnames property.
     Note that at this level of abstraction, we take no position on what form of representation is used
     for the rows, as long as it is JSON data of some kind. It might be
          {"col1": "val1", "col2": "val2", ...}
@@ -336,6 +340,10 @@ class AbstractTableSetManager:
         For more information, see documentation of AbstractTableSetManager.
         """
         raise NotImplementedError(f".load(...) is not implemented for {cls.__name__}.")  # noQA
+
+    @property
+    def tabnames(self) -> List[str]:
+        raise NotImplementedError(f".tabnames is not implemented for {self.__class__.__name__}..")  # noQA
 
 
 class BasicTableSetManager(AbstractTableSetManager):
@@ -394,10 +402,6 @@ class TableSetManager(BasicTableSetManager):
 
     def __init__(self, filename: str, **kwargs):
         super().__init__(filename=filename, **kwargs)
-
-    @property
-    def tabnames(self) -> List[str]:
-        raise NotImplementedError(f".tabnames is not implemented for {self.__class__.__name__}..")  # noQA
 
     def _raw_row_generator_for_tabname(self, tabname: str) -> Iterable[SheetRow]:
         """
@@ -476,18 +480,62 @@ class XlsxManager(TableSetManager):
                 for i, row_datum in enumerate(row_data)}
 
 
-class ItemManagerMixin(BasicTableSetManager):
+class SchemaAutoloadMixin(AbstractTableSetManager):
+
+    SCHEMA_CACHE = {}  # Shared cache. Do not override. Use .clear_schema_cache() to clear it.
+    CACHE_SCHEMAS = True  # Controls whether we're doing caching at all
+    AUTOLOAD_SCHEMAS_DEFAULT = False
+
+    def __init__(self, autoload_schemas: Optional[bool] = None, portal_env: Optional[str] = None, **kwargs):
+        if portal_env is None:
+            portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
+            PRINT(f"The portal_env was not explicitly supplied. Schemas will come from portal_env={portal_env!r}.")
+        super().__init__(**kwargs)
+        self.autoload_schemas: bool = self.AUTOLOAD_SCHEMAS_DEFAULT if autoload_schemas is None else autoload_schemas
+        self.portal_env: Optional[str] = portal_env
+
+    def fetch_relevant_schemas(self, schema_names: List[str]):
+        # The schema_names argument is not normally given, but it is there for easier testing
+        def fetch_schema(schema_name):
+            schema = self.fetch_schema(schema_name, portal_env=self.portal_env)
+            return schema_name, schema
+        if self.autoload_schemas and self.portal_env:
+            autoloaded = {tabname: schema
+                          for tabname, schema in pmap(fetch_schema, schema_names)}
+            return autoloaded
+        else:
+            return {}
+
+    @classmethod
+    def fetch_schema(cls, schema_name: str, *, portal_env: str):
+        def just_fetch_it():
+            return get_schema(schema_name, ff_env=portal_env)
+        if cls.CACHE_SCHEMAS:
+            schema: Optional[AnyJsonData] = cls.SCHEMA_CACHE.get(schema_name)
+            if schema is None:
+                cls.SCHEMA_CACHE[schema_name] = schema = just_fetch_it()
+            return schema
+        else:
+            return just_fetch_it()
+
+    @classmethod
+    def clear_schema_cache(cls):
+        for key in list(cls.SCHEMA_CACHE.keys()):  # important to get the list of keys as a separate object first
+            cls.SCHEMA_CACHE.pop(key, None)
+
+
+class ItemManagerMixin(SchemaAutoloadMixin, BasicTableSetManager):
     """
     This can add functionality to a reader such as an XlsxManager or a CsvManager in order to make its rows
     get handled like Items instead of just flat table rows.
     """
 
-    def __init__(self, filename: str, schemas=None, **kwargs):
+    def __init__(self, filename: str, schemas: Optional[Dict[str, AnyJsonData]] = None, **kwargs):
         super().__init__(filename=filename, **kwargs)
         self.patch_prototypes_by_tabname: Dict[str, Dict] = {}
         self.parsed_headers_by_tabname: Dict[str, ParsedHeaders] = {}
         self.type_hints_by_tabname: Dict[str, OptionalTypeHints] = {}
-        self.schemas = schemas or {}
+        self.schemas = schemas or self.fetch_relevant_schemas(self.tabnames)
         self._instaguid_context_table: Dict[str, str] = {}
 
     def sheet_patch_prototype(self, tabname: str) -> Dict:
@@ -681,8 +729,9 @@ class ItemManager(AbstractTableSetManager):
 
     @classmethod
     def load(cls, filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
-             schemas: Optional[Dict] = None) -> AnyJsonData:
-        manager = cls.create_implementation_manager(filename, tab_name=tab_name, escaping=escaping, schemas=schemas)
+             schemas: Optional[Dict] = None, autoload_schemas: Optional[bool] = None) -> AnyJsonData:
+        manager = cls.create_implementation_manager(filename, tab_name=tab_name, escaping=escaping, schemas=schemas,
+                                                    autoload_schemas=autoload_schemas)
         return manager.load_content()
 
 

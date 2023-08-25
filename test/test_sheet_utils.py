@@ -1,15 +1,18 @@
+import contextlib
 import json
 import os
 import pytest
 
 from collections import namedtuple
+from dcicutils import sheet_utils as sheet_utils_module
 from dcicutils.common import AnyJsonData
 from dcicutils.misc_utils import is_uuid, local_attrs
+from dcicutils.qa_utils import printed_output
 from dcicutils.sheet_utils import (
     # High-level interfaces
     ItemManager, load_items,
     # Low-level implementation
-    BasicTableSetManager,
+    BasicTableSetManager, SchemaAutoloadMixin,
     ItemTools, XlsxManager, XlsxItemManager,
     CsvManager, CsvItemManager, TsvManager, TsvItemManager,
     # TypeHint, EnumHint,
@@ -19,8 +22,10 @@ from dcicutils.sheet_utils import (
     # Utilities
     prefer_number, unwanted_kwargs,
 )
-from typing import Dict
+from typing import Dict, Optional
+from unittest import mock
 from .conftest_settings import TEST_DIR
+from .helpers import using_fresh_ff_state_for_testing
 
 
 def test_load_failure():
@@ -660,3 +665,134 @@ def test_load_items_with_schema_and_instaguids(instaguids_enabled):
             assert matches_template(actual, expected)
         else:
             assert actual == expected  # no substitution performed
+
+
+class SchemaAutoloaderForTesting(SchemaAutoloadMixin):
+    pass
+
+
+@contextlib.contextmanager
+def schema_autoloader_for_testing(**kwargs) -> SchemaAutoloadMixin:
+    autoloader: Optional[SchemaAutoloadMixin] = None
+    success = False
+    try:
+        autoloader: SchemaAutoloadMixin = SchemaAutoloaderForTesting(**kwargs)
+        assert autoloader.SCHEMA_CACHE == {}, "The schema cache is not clean."
+        yield autoloader
+        success = True
+    finally:
+        if autoloader is not None:
+            autoloader.clear_schema_cache()
+            assert autoloader.SCHEMA_CACHE == SchemaAutoloadMixin.SCHEMA_CACHE == {}
+        if not success:
+            raise
+
+
+@using_fresh_ff_state_for_testing()
+@pytest.mark.integrated
+@pytest.mark.parametrize('portal_env', [None, 'data'])
+def test_schema_autoload_mixin_caching(portal_env):
+
+    with schema_autoloader_for_testing(portal_env=portal_env) as autoloader:
+
+        assert autoloader.portal_env == 'data'  # it should have defaulted even if we didn't supply it
+
+        assert autoloader.SCHEMA_CACHE == SchemaAutoloadMixin.SCHEMA_CACHE == {}
+
+        sample_schema_name = 'foo'
+        sample_schema = {'mock_schema_for': 'foo'}
+
+        with mock.patch.object(sheet_utils_module, "get_schema") as mock_get_schema:
+            mock_get_schema.return_value = sample_schema
+            assert autoloader.fetch_schema(sample_schema_name, portal_env=autoloader.portal_env) == sample_schema
+
+        schema_cache_with_sample_schema = {sample_schema_name: sample_schema}
+        assert SchemaAutoloadMixin.SCHEMA_CACHE == schema_cache_with_sample_schema
+        assert autoloader.SCHEMA_CACHE == schema_cache_with_sample_schema
+
+
+@using_fresh_ff_state_for_testing()
+@pytest.mark.integrated
+@pytest.mark.parametrize('portal_env', [None, 'data'])
+def test_schema_autoload_mixin_fetch_schema(portal_env):
+
+    with schema_autoloader_for_testing(portal_env=portal_env) as autoloader:
+
+        assert autoloader.portal_env == 'data'
+
+        user_schema = autoloader.fetch_schema('user', portal_env=autoloader.portal_env)
+
+        assert user_schema['$id'] == '/profiles/user.json'
+        assert user_schema['title'] == 'User'
+        assert 'properties' in user_schema
+
+
+@using_fresh_ff_state_for_testing()
+@pytest.mark.integrated
+@pytest.mark.parametrize('autoload_schemas', [True, False])
+@pytest.mark.parametrize('cache_schemas', [True, False])
+@pytest.mark.parametrize('portal_env', [None, 'data'])
+def test_schema_autoload_mixin_fetch_relevant_schemas(autoload_schemas, cache_schemas, portal_env):
+
+    with printed_output() as printed:
+        with local_attrs(SchemaAutoloadMixin, CACHE_SCHEMAS=cache_schemas):
+            with schema_autoloader_for_testing(portal_env=portal_env, autoload_schemas=autoload_schemas) as autoloader:
+
+                assert autoloader.portal_env == 'data'
+
+                if autoload_schemas:
+
+                    schemas = autoloader.fetch_relevant_schemas(['User', 'Lab'])
+                    assert isinstance(schemas, dict)
+                    assert len(schemas) == 2
+                    assert set(schemas.keys()) == {'User', 'Lab'}
+
+                else:
+
+                    assert autoloader.fetch_relevant_schemas(['User', 'Lab']) == {}
+
+                if portal_env == 'data':
+                    assert printed.lines == []
+                else:
+                    assert printed.lines == [
+                        "The portal_env was not explicitly supplied. Schemas will come from portal_env='data'."
+                    ]
+
+
+SAMPLE_ITEMS_FOR_REAL_SCHEMAS_FILE = os.path.join(TEST_DIR, 'data_files/sample_items_for_real_schemas.csv')
+
+
+@using_fresh_ff_state_for_testing()
+@pytest.mark.integrated
+def test_workbook_with_schemas():
+
+    actual_data = CsvManager(filename=SAMPLE_ITEMS_FOR_REAL_SCHEMAS_FILE, tab_name='ExperimentSeq').load_content()
+    expected_data = {
+        "ExperimentSeq": [
+            {
+                "accession": "foo",
+                "fragment_size_selection_method": "spri"
+            },
+            {
+                "accession": "bar",
+                "fragment_size_selection_method": "blue"
+            }
+        ]
+    }
+    assert actual_data == expected_data
+
+    actual_items = load_items(SAMPLE_ITEMS_FOR_REAL_SCHEMAS_FILE,
+                              tab_name='ExperimentSeq', autoload_schemas=True)
+    expected_items = {
+        "ExperimentSeq": [
+            {
+                "accession": "foo",
+                "fragment_size_selection_method": "SPRI beads"
+            },
+            {
+                "accession": "bar",
+                "fragment_size_selection_method": "BluePippin"
+            }
+        ]
+    }
+    assert actual_items == expected_items
