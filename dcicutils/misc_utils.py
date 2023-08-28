@@ -2333,6 +2333,10 @@ def parse_in_radix(text: str, *, radix: int):
 
 
 def pad_to(target_size: int, data: list, *, padding=None):
+    """
+    This will pad to a given target size, a list of a potentially different actual size, using given padding.
+    e.g., pad_to(3, [1, 2]) will return [1, 2, None]
+    """
     actual_size = len(data)
     if actual_size < target_size:
         data = data + [padding] * (target_size - actual_size)
@@ -2342,6 +2346,32 @@ def pad_to(target_size: int, data: list, *, padding=None):
 class JsonLinesReader:
 
     def __init__(self, fp, padded=False, padding=None):
+        """
+        Given an fp (the conventional name for a "file pointer", the thing a call to io.open returns,
+        this creates an object that can be used to iterate across the lines in the JSON lines file
+        that the fp is reading from.
+
+        There are two possible formats that this will return.
+
+        For files that contain a series of dictionaries, such as:
+            {"something": 1, "else": "a"}
+            {"something": 2, "else": "b"}
+            ...etc
+        this will just return thos those dictionaries one-by-one when iterated over.
+
+        The same set of dictionaries will also be yielded by a file containing:
+            ["something", "else"]
+            [1, "a"]
+            [2, "b"]
+            ...etc
+        this will just return thos those dictionaries one-by-one when iterated over.
+
+        NOTES:
+
+        * In the second case, shorter lists on subsequent lines return only partial dictionaries.
+        * In the second case, longer lists on subsequent lines will quietly drop any extra elements.
+        """
+
         self.fp = fp
         self.padded: bool = padded
         self.padding = padding

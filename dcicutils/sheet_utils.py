@@ -224,6 +224,9 @@ class ItemTools:
 
     @classmethod
     def parse_item_value(cls, value: SheetCellValue, context=None) -> AnyJsonData:
+        # TODO: Remodularize this for easier testing and more Schema-driven effect
+        # Doug asks that this be broken up into different mechanisms, more modular and separately testable.
+        # I pretty much agree with that. I'm just waiting for suggestions on what kinds of features are desired.
         if isinstance(value, str):
             lvalue = value.lower()
             # TODO: We could consult a schema to make this less heuristic, but this may do for now
@@ -244,6 +247,8 @@ class ItemTools:
                 # Note that this clause MUST follow '|' clause above so '#foo|#bar' isn't seen as instaguid
                 return cls.get_instaguid(value, context=context)
             else:
+                # Doug points out that the schema might not agree, might want a string representation of a number.
+                # At this semantic layer, this might be a bad choice.
                 return prefer_number(value)
         else:  # presumably a number (int or float)
             return value
