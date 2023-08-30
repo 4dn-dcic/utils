@@ -324,7 +324,7 @@ class AbstractTableSetManager:
             "Sheet2": [...],
             ...,
         }
-    It also needs some implementation of the .tabnames property.
+    It also needs some implementation of the .tab_names property.
     Note that at this level of abstraction, we take no position on what form of representation is used
     for the rows, as long as it is JSON data of some kind. It might be
          {"col1": "val1", "col2": "val2", ...}
@@ -348,8 +348,8 @@ class AbstractTableSetManager:
         raise NotImplementedError(f".load(...) is not implemented for {cls.__name__}.")  # noQA
 
     @property
-    def tabnames(self) -> List[str]:
-        raise NotImplementedError(f".tabnames is not implemented for {self.__class__.__name__}..")  # noQA
+    def tab_names(self) -> List[str]:
+        raise NotImplementedError(f".tab_names is not implemented for {self.__class__.__name__}..")  # noQA
 
 
 class BasicTableSetManager(AbstractTableSetManager):
@@ -365,25 +365,25 @@ class BasicTableSetManager(AbstractTableSetManager):
     def __init__(self, filename: str, **kwargs):
         super().__init__(**kwargs)
         self.filename: str = filename
-        self.headers_by_tabname: Dict[str, Headers] = {}
-        self.content_by_tabname: Dict[str, List[AnyJsonData]] = {}
+        self.headers_by_tab_name: Dict[str, Headers] = {}
+        self.content_by_tab_name: Dict[str, List[AnyJsonData]] = {}
         self.reader_agent: Any = self._get_reader_agent()
 
-    def tab_headers(self, tabname: str) -> Headers:
-        return self.headers_by_tabname[tabname]
+    def tab_headers(self, tab_name: str) -> Headers:
+        return self.headers_by_tab_name[tab_name]
 
-    def tab_content(self, tabname: str) -> List[AnyJsonData]:
-        return self.content_by_tabname[tabname]
+    def tab_content(self, tab_name: str) -> List[AnyJsonData]:
+        return self.content_by_tab_name[tab_name]
 
     @classmethod
-    def _create_tab_processor_state(cls, tabname: str) -> Any:
+    def _create_tab_processor_state(cls, tab_name: str) -> Any:
         """
         This method provides for the possibility that some parsers will want auxiliary state,
         (such as parsed headers or a line count or a table of temporary names for objects to cross-link
         or some other such feature) that it carries with it as it moves from line to line parsing things.
         Subclasses might therefore want to make this do something more interesting.
         """
-        ignored(tabname)  # subclasses might need this, but we don't
+        ignored(tab_name)  # subclasses might need this, but we don't
         return None
 
     def _get_reader_agent(self) -> Any:
@@ -420,13 +420,13 @@ class TableSetManager(BasicTableSetManager):
     def __init__(self, filename: str, **kwargs):
         super().__init__(filename=filename, **kwargs)
 
-    def _raw_row_generator_for_tabname(self, tabname: str) -> Iterable[SheetRow]:
+    def _raw_row_generator_for_tab_name(self, tab_name: str) -> Iterable[SheetRow]:
         """
-        Given a tabname and a state (returned by _sheet_loader_state), return a generator for a set of row values.
+        Given a tab_name and a state (returned by _sheet_loader_state), return a generator for a set of row values.
         """
-        raise NotImplementedError(f"._rows_for_tabname(...) is not implemented for {self.__class__.__name__}.")  # noQA
+        raise NotImplementedError(f"._rows_for_tab_name(...) is not implemented for {self.__class__.__name__}.")  # noQA
 
-    def _process_row(self, tabname: str, state: Any, row: List[SheetCellValue]) -> AnyJsonData:
+    def _process_row(self, tab_name: str, state: Any, row: List[SheetCellValue]) -> AnyJsonData:
         """
         This needs to take a state and whatever represents a row and
         must return a list of objects representing column values.
@@ -435,14 +435,14 @@ class TableSetManager(BasicTableSetManager):
         raise NotImplementedError(f"._process_row(...) is not implemented for {self.__class__.__name__}.")  # noQA
 
     def load_content(self) -> AnyJsonData:
-        for tabname in self.tabnames:
+        for tab_name in self.tab_names:
             sheet_content = []
-            state = self._create_tab_processor_state(tabname)
-            for row_data in self._raw_row_generator_for_tabname(tabname):
-                processed_row_data: AnyJsonData = self._process_row(tabname, state, row_data)
+            state = self._create_tab_processor_state(tab_name)
+            for row_data in self._raw_row_generator_for_tab_name(tab_name):
+                processed_row_data: AnyJsonData = self._process_row(tab_name, state, row_data)
                 sheet_content.append(processed_row_data)
-            self.content_by_tabname[tabname] = sheet_content
-        return self.content_by_tabname
+            self.content_by_tab_name[tab_name] = sheet_content
+        return self.content_by_tab_name
 
     @classmethod
     def parse_cell_value(cls, value: SheetCellValue) -> AnyJsonData:
@@ -496,14 +496,14 @@ class XlsxManager(TableSetManager):
             yield col
 
     @property
-    def tabnames(self) -> List[str]:
+    def tab_names(self) -> List[str]:
         return self.reader_agent.sheetnames
 
     def _get_reader_agent(self) -> Workbook:
         return openpyxl.load_workbook(self.filename)
 
-    def _raw_row_generator_for_tabname(self, tabname: str) -> Iterable[SheetRow]:
-        sheet = self.reader_agent[tabname]
+    def _raw_row_generator_for_tab_name(self, tab_name: str) -> Iterable[SheetRow]:
+        sheet = self.reader_agent[tab_name]
         return (self._get_raw_row_content_tuple(sheet, row)
                 for row in self._all_rows(sheet))
 
@@ -511,15 +511,15 @@ class XlsxManager(TableSetManager):
         return [sheet.cell(row=row, column=col).value
                 for col in self._all_cols(sheet)]
 
-    def _create_tab_processor_state(self, tabname: str) -> Headers:
-        sheet = self.reader_agent[tabname]
+    def _create_tab_processor_state(self, tab_name: str) -> Headers:
+        sheet = self.reader_agent[tab_name]
         headers: Headers = [str(sheet.cell(row=1, column=col).value)
                             for col in self._all_cols(sheet)]
-        self.headers_by_tabname[sheet.title] = headers
+        self.headers_by_tab_name[sheet.title] = headers
         return headers
 
-    def _process_row(self, tabname: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
-        ignored(tabname)
+    def _process_row(self, tab_name: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
+        ignored(tab_name)
         return {headers[i]: self.parse_cell_value(row_datum)
                 for i, row_datum in enumerate(row_data)}
 
@@ -544,8 +544,8 @@ class SchemaAutoloadMixin(AbstractTableSetManager):
             schema = self.fetch_schema(schema_name, portal_env=self.portal_env)
             return schema_name, schema
         if self.autoload_schemas and self.portal_env:
-            autoloaded = {tabname: schema
-                          for tabname, schema in pmap(fetch_schema, schema_names)}
+            autoloaded = {tab_name: schema
+                          for tab_name, schema in pmap(fetch_schema, schema_names)}
             return autoloaded
         else:
             return {}
@@ -576,20 +576,20 @@ class ItemManagerMixin(SchemaAutoloadMixin, BasicTableSetManager):
 
     def __init__(self, filename: str, schemas: Optional[Dict[str, AnyJsonData]] = None, **kwargs):
         super().__init__(filename=filename, **kwargs)
-        self.patch_prototypes_by_tabname: Dict[str, Dict] = {}
-        self.parsed_headers_by_tabname: Dict[str, ParsedHeaders] = {}
-        self.type_hints_by_tabname: Dict[str, OptionalTypeHints] = {}
-        self.schemas = schemas or self.fetch_relevant_schemas(self.tabnames)
+        self.patch_prototypes_by_tab_name: Dict[str, Dict] = {}
+        self.parsed_headers_by_tab_name: Dict[str, ParsedHeaders] = {}
+        self.type_hints_by_tab_name: Dict[str, OptionalTypeHints] = {}
+        self.schemas = schemas or self.fetch_relevant_schemas(self.tab_names)
         self._instaguid_context_table: Dict[str, str] = {}
 
-    def sheet_patch_prototype(self, tabname: str) -> Dict:
-        return self.patch_prototypes_by_tabname[tabname]
+    def sheet_patch_prototype(self, tab_name: str) -> Dict:
+        return self.patch_prototypes_by_tab_name[tab_name]
 
-    def sheet_parsed_headers(self, tabname: str) -> ParsedHeaders:
-        return self.parsed_headers_by_tabname[tabname]
+    def sheet_parsed_headers(self, tab_name: str) -> ParsedHeaders:
+        return self.parsed_headers_by_tab_name[tab_name]
 
-    def sheet_type_hints(self, tabname: str) -> OptionalTypeHints:
-        return self.type_hints_by_tabname[tabname]
+    def sheet_type_hints(self, tab_name: str) -> OptionalTypeHints:
+        return self.type_hints_by_tab_name[tab_name]
 
     class SheetState:
 
@@ -597,33 +597,33 @@ class ItemManagerMixin(SchemaAutoloadMixin, BasicTableSetManager):
             self.parsed_headers = parsed_headers
             self.type_hints = type_hints
 
-    def _compile_type_hints(self, tabname: str):
-        parsed_headers = self.sheet_parsed_headers(tabname)
-        schema = self.schemas.get(tabname)
+    def _compile_type_hints(self, tab_name: str):
+        parsed_headers = self.sheet_parsed_headers(tab_name)
+        schema = self.schemas.get(tab_name)
         type_hints = [ItemTools.find_type_hint(parsed_header, schema) if schema else None
                       for parsed_header in parsed_headers]
-        self.type_hints_by_tabname[tabname] = type_hints
+        self.type_hints_by_tab_name[tab_name] = type_hints
 
-    def _compile_sheet_headers(self, tabname: str):
-        headers = self.headers_by_tabname[tabname]
+    def _compile_sheet_headers(self, tab_name: str):
+        headers = self.headers_by_tab_name[tab_name]
         parsed_headers = ItemTools.parse_sheet_headers(headers)
-        self.parsed_headers_by_tabname[tabname] = parsed_headers
+        self.parsed_headers_by_tab_name[tab_name] = parsed_headers
         prototype = ItemTools.compute_patch_prototype(parsed_headers)
-        self.patch_prototypes_by_tabname[tabname] = prototype
+        self.patch_prototypes_by_tab_name[tab_name] = prototype
 
-    def _create_tab_processor_state(self, tabname: str) -> SheetState:
-        super()._create_tab_processor_state(tabname)
+    def _create_tab_processor_state(self, tab_name: str) -> SheetState:
+        super()._create_tab_processor_state(tab_name)
         # This will create state that allows us to efficiently assign values in the right place on each row
         # by setting up a prototype we can copy and then drop values into.
-        self._compile_sheet_headers(tabname)
-        self._compile_type_hints(tabname)
-        return self.SheetState(parsed_headers=self.sheet_parsed_headers(tabname),
-                               type_hints=self.sheet_type_hints(tabname))
+        self._compile_sheet_headers(tab_name)
+        self._compile_type_hints(tab_name)
+        return self.SheetState(parsed_headers=self.sheet_parsed_headers(tab_name),
+                               type_hints=self.sheet_type_hints(tab_name))
 
-    def _process_row(self, tabname: str, state: SheetState, row_data: SheetRow) -> AnyJsonData:
+    def _process_row(self, tab_name: str, state: SheetState, row_data: SheetRow) -> AnyJsonData:
         parsed_headers = state.parsed_headers
         type_hints = state.type_hints
-        patch_item = copy.deepcopy(self.sheet_patch_prototype(tabname))
+        patch_item = copy.deepcopy(self.sheet_patch_prototype(tab_name))
         for i, value in enumerate(row_data):
             parsed_value = self.parse_cell_value(value)
             type_hint = type_hints[i]
@@ -653,7 +653,7 @@ class SingleTableMixin(AbstractTableSetManager):
         self.tab_name = tab_name or self.DEFAULT_TAB_NAME
 
     @property
-    def tabnames(self) -> List[str]:
+    def tab_names(self) -> List[str]:
         return [self.tab_name]
 
 
@@ -677,22 +677,22 @@ class CsvManager(SingleTableMixin, TableSetManager):
 
     PAD_TRAILING_TABS = True
 
-    def _raw_row_generator_for_tabname(self, tabname: str) -> Iterable[SheetRow]:
-        headers = self.tab_headers(tabname)
+    def _raw_row_generator_for_tab_name(self, tab_name: str) -> Iterable[SheetRow]:
+        headers = self.tab_headers(tab_name)
         n_headers = len(headers)
         for row_data in self.reader_agent:
             if self.PAD_TRAILING_TABS:
                 row_data = pad_to(n_headers, row_data, padding='')
             yield row_data
 
-    def _create_tab_processor_state(self, tabname: str) -> Headers:
-        headers: Optional[Headers] = self.headers_by_tabname.get(tabname)
+    def _create_tab_processor_state(self, tab_name: str) -> Headers:
+        headers: Optional[Headers] = self.headers_by_tab_name.get(tab_name)
         if headers is None:
-            self.headers_by_tabname[tabname] = headers = self.reader_agent.__next__()
+            self.headers_by_tab_name[tab_name] = headers = self.reader_agent.__next__()
         return headers
 
-    def _process_row(self, tabname: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
-        ignored(tabname)
+    def _process_row(self, tab_name: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
+        ignored(tab_name)
         return {headers[i]: self.parse_cell_value(row_datum)
                 for i, row_datum in enumerate(row_data)}
 
