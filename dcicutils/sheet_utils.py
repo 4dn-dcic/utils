@@ -8,6 +8,7 @@ import openpyxl
 import os
 import re
 import uuid
+import yaml
 
 from dcicutils.common import AnyJsonData
 from dcicutils.env_utils import public_env_name, EnvUtils
@@ -687,6 +688,9 @@ class _JsonInsertsDataItemManager(ItemManagerMixin, BasicTableSetManager):
 
     ALLOWED_FILE_EXTENSIONS = []
 
+    def _parser(self, filename):
+        return json.load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
+
     def _load_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
         raise NotImplementedError(f"._load_json_data() is not implemented for {cls.__name__}.")  # noQA
 
@@ -714,7 +718,7 @@ class TabbedJsonInsertsItemManager(_JsonInsertsDataItemManager):
     ALLOWED_FILE_EXTENSIONS = [".tabs.json"]  # If you want them all in one family, use this extension
 
     def _load_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
-        data = json.load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
+        data = self._parser(filename)
         if (not isinstance(data, dict)
                 or not all(isinstance(tab_name, str) for tab_name in data.keys())
                 or not all(isinstance(content, list) and all(isinstance(item, dict) for item in content)
@@ -724,12 +728,21 @@ class TabbedJsonInsertsItemManager(_JsonInsertsDataItemManager):
 
 
 @TableSetManagerRegistry.register()
+class TabbedYamlInsertsItemManager(TabbedJsonInsertsItemManager):
+
+    ALLOWED_FILE_EXTENSIONS = [".tabs.yaml"]
+
+    def _parser(self, filename):
+        return yaml.safe_load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
+
+
+@TableSetManagerRegistry.register()
 class SimpleJsonInsertsItemManager(SingleTableMixin, _JsonInsertsDataItemManager):
 
-    ALLOWED_FILE_EXTENSIONS = [".json"]  # If you want them all in one family, use this extension
+    ALLOWED_FILE_EXTENSIONS = [".json"]
 
     def _load_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
-        data = {self._tab_name: json.load(open_unicode_text_input_file_respecting_byte_order_mark(filename))}
+        data = {self._tab_name: self._parser(filename)}
         if not all(isinstance(content, list) and all(isinstance(item, dict) for item in content)
                    for content in data.values()):
             raise ValueError(f"Data in {filename} is not of type List[dict].")
@@ -737,9 +750,18 @@ class SimpleJsonInsertsItemManager(SingleTableMixin, _JsonInsertsDataItemManager
 
 
 @TableSetManagerRegistry.register()
+class SimpleYamlInsertsItemManager(SimpleJsonInsertsItemManager):
+
+    ALLOWED_FILE_EXTENSIONS = [".yaml"]
+
+    def _parser(self, filename):
+        return yaml.safe_load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
+
+
+@TableSetManagerRegistry.register()
 class SimpleJsonLinesInsertsItemManager(SingleTableMixin, _JsonInsertsDataItemManager):
 
-    ALLOWED_FILE_EXTENSIONS = [".jsonl"]  # If you want them all in one family, use this extension
+    ALLOWED_FILE_EXTENSIONS = [".jsonl"]
 
     def _load_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
         content = [line for line in JsonLinesReader(open_unicode_text_input_file_respecting_byte_order_mark(filename))]

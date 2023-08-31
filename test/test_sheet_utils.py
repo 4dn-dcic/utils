@@ -377,9 +377,13 @@ SAMPLE_TSV_FILE_RAW_CONTENT = {SAMPLE_TSV_FILE_SHEET_NAME: SAMPLE_XLSX_FILE_RAW_
 
 SAMPLE_TSV_FILE_ITEM_CONTENT = {SAMPLE_TSV_FILE_SHEET_NAME: SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']}
 
-SAMPLE_JSON_FILE = os.path.join(TEST_DIR, 'data_files/sample_items.tabs.json')
+SAMPLE_JSON_TABS_FILE = os.path.join(TEST_DIR, 'data_files/sample_items.tabs.json')
 
-SAMPLE_JSON_FILE_ITEM_CONTENT = SAMPLE_XLSX_FILE_ITEM_CONTENT
+SAMPLE_JSON_TABS_FILE_ITEM_CONTENT = SAMPLE_XLSX_FILE_ITEM_CONTENT
+
+SAMPLE_YAML_TABS_FILE = os.path.join(TEST_DIR, 'data_files/sample_items.tabs.yaml')
+
+SAMPLE_YAML_TABS_FILE_ITEM_CONTENT = SAMPLE_XLSX_FILE_ITEM_CONTENT
 
 
 def test_xlsx_manager_load_content():
@@ -512,9 +516,9 @@ def test_item_manager_load():
 
     assert ItemManager.load(SAMPLE_TSV_FILE, autoload_schemas=False) == SAMPLE_TSV_FILE_ITEM_CONTENT
 
-    loaded = ItemManager.load(SAMPLE_JSON_FILE, autoload_schemas=False)
+    loaded = ItemManager.load(SAMPLE_JSON_TABS_FILE, autoload_schemas=False)
     print("loaded=", json.dumps(loaded, indent=2))
-    expected = SAMPLE_JSON_FILE_ITEM_CONTENT
+    expected = SAMPLE_JSON_TABS_FILE_ITEM_CONTENT
     print("expected=", json.dumps(expected, indent=2))
     assert loaded == expected
 
@@ -700,6 +704,13 @@ def test_sample_items_csv_vs_json():
     json_content = load_items(SAMPLE_JSON_FILE2, tab_name="Person")
 
     assert csv_content == json_content
+
+
+def test_sample_items_json_vs_yaml():
+
+    tabs_data_from_json = load_items(SAMPLE_JSON_TABS_FILE)
+    tabs_data_from_yaml = load_items(SAMPLE_YAML_TABS_FILE)
+    assert tabs_data_from_json == tabs_data_from_yaml
 
 
 @pytest.mark.parametrize('instaguids_enabled', [True, False])
