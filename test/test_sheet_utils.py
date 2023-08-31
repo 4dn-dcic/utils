@@ -10,7 +10,7 @@ from dcicutils.misc_utils import is_uuid, local_attrs
 from dcicutils.qa_utils import printed_output
 from dcicutils.sheet_utils import (
     # High-level interfaces
-    ItemManager, load_items,
+    ItemManager, load_items, TableSetManagerRegistry,
     # Low-level implementation
     BasicTableSetManager, SchemaAutoloadMixin,
     ItemTools, XlsxManager, XlsxItemManager,
@@ -26,6 +26,9 @@ from typing import Dict, Optional
 from unittest import mock
 from .conftest_settings import TEST_DIR
 from .helpers import using_fresh_ff_state_for_testing
+
+
+TEST_SHEET_1 = 'Sheet1'
 
 
 def test_load_failure():
@@ -125,6 +128,13 @@ def test_item_tools_parse_sheet_headers():
     input = ['a.b', 'a.c', 'a.d#1', 'a.d#2']
     expected = [['a', 'b'], ['a', 'c'], ['a', 'd', 1], ['a', 'd', 2]]
     assert ItemTools.parse_sheet_headers(input) == expected
+
+
+def test_item_tools_infer_tab_name():
+
+    assert ItemTools.infer_tab_name('some/dir/some') == 'some'
+    assert ItemTools.infer_tab_name('some/dir/some.file') == 'some'
+    assert ItemTools.infer_tab_name('some/dir/some.file.name') == 'some'
 
 
 @pytest.mark.parametrize('parsed_headers,expected_prototype', [
@@ -288,6 +298,15 @@ def test_item_tools_find_type_hint():
     assert actual is None
 
 
+def test_table_set_manager_registry_manager_for_filename():
+
+    assert TableSetManagerRegistry.manager_for_filename("xyz/foo.csv") == CsvItemManager
+
+    with pytest.raises(Exception) as exc:
+        TableSetManagerRegistry.manager_for_filename("xyz/foo.something.missing")
+    assert str(exc.value) == "Unknown file type: xyz/foo.something.missing"
+
+
 SAMPLE_XLSX_FILE = os.path.join(TEST_DIR, 'data_files/sample_items.xlsx')
 
 SAMPLE_XLSX_FILE_RAW_CONTENT = {
@@ -344,15 +363,23 @@ SAMPLE_XLSX_FILE_ITEM_CONTENT = {
 
 SAMPLE_CSV_FILE = os.path.join(TEST_DIR, 'data_files/sample_items_sheet2.csv')
 
-SAMPLE_CSV_FILE_RAW_CONTENT = {CsvManager.DEFAULT_TAB_NAME: SAMPLE_XLSX_FILE_RAW_CONTENT['Sheet2']}
+SAMPLE_CSV_FILE_SHEET_NAME = ItemTools.infer_tab_name(SAMPLE_CSV_FILE)
 
-SAMPLE_CSV_FILE_ITEM_CONTENT = {CsvItemManager.DEFAULT_TAB_NAME: SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']}
+SAMPLE_CSV_FILE_RAW_CONTENT = {SAMPLE_CSV_FILE_SHEET_NAME: SAMPLE_XLSX_FILE_RAW_CONTENT['Sheet2']}
+
+SAMPLE_CSV_FILE_ITEM_CONTENT = {SAMPLE_CSV_FILE_SHEET_NAME: SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']}
 
 SAMPLE_TSV_FILE = os.path.join(TEST_DIR, 'data_files/sample_items_sheet2.tsv')
 
-SAMPLE_TSV_FILE_RAW_CONTENT = {TsvManager.DEFAULT_TAB_NAME: SAMPLE_XLSX_FILE_RAW_CONTENT['Sheet2']}
+SAMPLE_TSV_FILE_SHEET_NAME = ItemTools.infer_tab_name(SAMPLE_TSV_FILE)
 
-SAMPLE_TSV_FILE_ITEM_CONTENT = {TsvItemManager.DEFAULT_TAB_NAME: SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']}
+SAMPLE_TSV_FILE_RAW_CONTENT = {SAMPLE_TSV_FILE_SHEET_NAME: SAMPLE_XLSX_FILE_RAW_CONTENT['Sheet2']}
+
+SAMPLE_TSV_FILE_ITEM_CONTENT = {SAMPLE_TSV_FILE_SHEET_NAME: SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']}
+
+SAMPLE_JSON_FILE = os.path.join(TEST_DIR, 'data_files/sample_items.tabs.json')
+
+SAMPLE_JSON_FILE_ITEM_CONTENT = SAMPLE_XLSX_FILE_ITEM_CONTENT
 
 
 def test_xlsx_manager_load_content():
@@ -485,6 +512,12 @@ def test_item_manager_load():
 
     assert ItemManager.load(SAMPLE_TSV_FILE, autoload_schemas=False) == SAMPLE_TSV_FILE_ITEM_CONTENT
 
+    loaded = ItemManager.load(SAMPLE_JSON_FILE, autoload_schemas=False)
+    print("loaded=", json.dumps(loaded, indent=2))
+    expected = SAMPLE_JSON_FILE_ITEM_CONTENT
+    print("expected=", json.dumps(expected, indent=2))
+    assert loaded == expected
+
     with pytest.raises(LoadArgumentsError) as exc:
         ItemManager.load("something.else")
     assert str(exc.value) == "Unknown file type: something.else"
@@ -501,6 +534,10 @@ def test_load_items():
     assert str(exc.value) == "Unknown file type: something.else"
 
 
+SAMPLE_CSV_FILE2 = os.path.join(TEST_DIR, 'data_files/sample_items2.csv')
+
+SAMPLE_CSV_FILE2_SHEET_NAME = ItemTools.infer_tab_name(SAMPLE_CSV_FILE2)
+
 SAMPLE_CSV_FILE2_SCHEMAS = {
     "Person": {
         "type": "object",
@@ -513,7 +550,7 @@ SAMPLE_CSV_FILE2_SCHEMAS = {
 }
 
 SAMPLE_CSV_FILE2_CONTENT = {
-    CsvManager.DEFAULT_TAB_NAME: [
+    SAMPLE_CSV_FILE2_SHEET_NAME: [
         {"name": "john", "sex": "M", "member": "false"},
         {"name": "juan", "sex": "male", "member": "true"},
         {"name": "igor", "sex": "unknown", "member": None},
@@ -522,7 +559,7 @@ SAMPLE_CSV_FILE2_CONTENT = {
 }
 
 SAMPLE_CSV_FILE2_ITEM_CONTENT = {
-    CsvItemManager.DEFAULT_TAB_NAME: [
+    SAMPLE_CSV_FILE2_SHEET_NAME: [
         {"name": "john", "sex": "M", "member": False},
         {"name": "juan", "sex": "male", "member": True},
         {"name": "igor", "sex": "unknown", "member": None},
@@ -539,7 +576,11 @@ SAMPLE_CSV_FILE2_PERSON_CONTENT_HINTED = {
     ]
 }
 
-SAMPLE_CSV_FILE2 = os.path.join(TEST_DIR, 'data_files/sample_items2.csv')
+
+SAMPLE_JSON_FILE2 = os.path.join(TEST_DIR, 'data_files/sample_items2.json')
+
+SAMPLE_JSON_FILE2_SHEET_NAME = ItemTools.infer_tab_name(SAMPLE_JSON_FILE2)
+
 
 SAMPLE_CSV_FILE3_SCHEMAS = {
     "Person": {
@@ -652,6 +693,15 @@ def test_load_items_with_schema():
     assert actual == expected
 
 
+def test_sample_items_csv_vs_json():
+
+    csv_content = load_items(SAMPLE_CSV_FILE2, schemas=SAMPLE_CSV_FILE2_SCHEMAS, tab_name='Person')
+
+    json_content = load_items(SAMPLE_JSON_FILE2, tab_name="Person")
+
+    assert csv_content == json_content
+
+
 @pytest.mark.parametrize('instaguids_enabled', [True, False])
 def test_load_items_with_schema_and_instaguids(instaguids_enabled):
 
@@ -738,7 +788,7 @@ def test_schema_autoload_mixin_fetch_relevant_schemas(autoload_schemas, cache_sc
         with local_attrs(SchemaAutoloadMixin, CACHE_SCHEMAS=cache_schemas):
             with schema_autoloader_for_testing(portal_env=portal_env, autoload_schemas=autoload_schemas) as autoloader:
 
-                assert autoloader.portal_env == 'data'
+                assert autoloader.portal_env == ('data' if autoload_schemas or portal_env else None)
 
                 if autoload_schemas:
 
@@ -751,7 +801,7 @@ def test_schema_autoload_mixin_fetch_relevant_schemas(autoload_schemas, cache_sc
 
                     assert autoloader.fetch_relevant_schemas(['User', 'Lab']) == {}
 
-                if portal_env == 'data':
+                if portal_env == 'data' or not autoload_schemas:
                     assert printed.lines == []
                 else:
                     assert printed.lines == [

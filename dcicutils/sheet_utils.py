@@ -1,16 +1,19 @@
 import chardet
 import copy
 import csv
+import glob
 import io
+import json
 import openpyxl
 import os
+import re
 import uuid
 
 from dcicutils.common import AnyJsonData
 from dcicutils.env_utils import public_env_name, EnvUtils
 from dcicutils.ff_utils import get_schema
 from dcicutils.lang_utils import conjoined_list, disjoined_list, maybe_pluralize
-from dcicutils.misc_utils import ignored, PRINT, pad_to
+from dcicutils.misc_utils import ignored, PRINT, pad_to, JsonLinesReader
 from dcicutils.task_utils import pmap
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.workbook.workbook import Workbook
@@ -82,16 +85,16 @@ def prefer_number(value: SheetCellValue):
     return value
 
 
-def open_text_input_file_respecting_byte_order_mark(filename):
+def open_unicode_text_input_file_respecting_byte_order_mark(filename):
     """
     Opens a file for text input, respecting a byte-order mark (BOM).
     """
     with io.open(filename, 'rb') as fp:
         leading_bytes = fp.read(4 * 8)  # 4 bytes is all we need
-        bom_info = chardet.detect(leading_bytes)
+        bom_info = chardet.detect(leading_bytes, should_rename_legacy=True)
         detected_encoding = bom_info and bom_info.get('encoding')  # tread lightly
-
-    return io.open(filename, 'r', encoding=detected_encoding)
+    use_encoding = 'utf-8' if detected_encoding == 'ascii' else detected_encoding
+    return io.open(filename, 'r', encoding=use_encoding)
 
 
 class TypeHint:
@@ -303,6 +306,10 @@ class ItemTools:
 
         return finder(subheader=parsed_header, subschema=schema)
 
+    @classmethod
+    def infer_tab_name(cls, filename):
+        return os.path.basename(filename).split('.')[0]
+
 
 # TODO: Consider whether this might want to be an abstract base class. Some change might be needed.
 #
@@ -414,7 +421,7 @@ class TableSetManager(BasicTableSetManager):
                 raise LoadArgumentsError(f"The TableSetManager subclass {cls.__name__} expects only"
                                          f" {disjoined_list(cls.ALLOWED_FILE_EXTENSIONS)} filenames: {filename}")
 
-        table_set_manager: TableSetManager = cls(filename, **kwargs)
+        table_set_manager: TableSetManager = cls(filename=filename, **kwargs)
         return table_set_manager.load_content()
 
     def __init__(self, filename: str, **kwargs):
@@ -451,29 +458,45 @@ class TableSetManager(BasicTableSetManager):
 
 class TableSetManagerRegistry:
 
-    ALL_TABLE_SET_MANAGERS: Dict[str, Type[TableSetManager]] = {}
+    ALL_TABLE_SET_MANAGERS: Dict[str, Type['ItemManagerMixin']] = {}
+    ALL_TABLE_SET_REGEXP_MAPPINGS = []
 
     @classmethod
-    def register(cls, class_to_register: Type[TableSetManager]):
-        for ext in class_to_register.ALLOWED_FILE_EXTENSIONS:
-            existing = cls.ALL_TABLE_SET_MANAGERS.get(ext)
-            if existing:
-                raise Exception(f"Tried to define {class_to_register} to extension {ext},"
-                                f" but {existing} already claimed that.")
-            cls.ALL_TABLE_SET_MANAGERS[ext] = class_to_register
-        return class_to_register
+    def register(cls, regexp=None):
+        def _wrapped_register(class_to_register: Type['ItemManagerMixin']):
+            if regexp:
+                cls.ALL_TABLE_SET_REGEXP_MAPPINGS.append((re.compile(regexp), class_to_register))
+            for ext in class_to_register.ALLOWED_FILE_EXTENSIONS:
+                existing = cls.ALL_TABLE_SET_MANAGERS.get(ext)
+                if existing:
+                    raise Exception(f"Tried to define {class_to_register} to extension {ext},"
+                                    f" but {existing} already claimed that.")
+                cls.ALL_TABLE_SET_MANAGERS[ext] = class_to_register
+            return class_to_register
+        return _wrapped_register
 
     @classmethod
-    def manager_for_filename(cls, filename: str) -> Type[TableSetManager]:
-        base = os.path.basename(filename)
-        dotparts = base.split('.')
-        while dotparts:
-            suffix = f".{'.'.join(dotparts)}"
-            found = cls.ALL_TABLE_SET_MANAGERS.get(suffix)
-            if found:
-                return found
-            dotparts = dotparts[1:]
+    def manager_for_filename(cls, filename: str) -> Type['ItemManagerMixin']:
+        base: str = os.path.basename(filename)
+        suffix_parts = base.split('.')[1:]
+        if suffix_parts:
+            for i in range(0, len(suffix_parts)):
+                suffix = f".{'.'.join(suffix_parts[i:])}"
+                found = cls.ALL_TABLE_SET_MANAGERS.get(suffix)
+                if found:
+                    return found
+        else:
+            special_case: Optional[Type[ItemManagerMixin]] = cls.manager_for_special_filename(filename)
+            if special_case:
+                return special_case
         raise LoadArgumentsError(f"Unknown file type: {filename}")
+
+    @classmethod
+    def manager_for_special_filename(cls, filename: str) -> Optional[Type['ItemManagerMixin']]:
+        for pattern, manager_class in cls.ALL_TABLE_SET_REGEXP_MAPPINGS:
+            if pattern.match(filename):
+                return manager_class
+        return None
 
 
 class XlsxManager(TableSetManager):
@@ -530,13 +553,16 @@ class SchemaAutoloadMixin(AbstractTableSetManager):
     CACHE_SCHEMAS = True  # Controls whether we're doing caching at all
     AUTOLOAD_SCHEMAS_DEFAULT = True
 
-    def __init__(self, autoload_schemas: Optional[bool] = None, portal_env: Optional[str] = None, **kwargs):
-        if portal_env is None:
-            portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
-            PRINT(f"The portal_env was not explicitly supplied. Schemas will come from portal_env={portal_env!r}.")
-        super().__init__(**kwargs)
+    def __init__(self, autoload_schemas: Optional[bool] = None, portal_env: Optional[str] = None,
+                 **kwargs):
+        # This setup must be in place before the class initialization is done (via the super call).
         self.autoload_schemas: bool = self.AUTOLOAD_SCHEMAS_DEFAULT if autoload_schemas is None else autoload_schemas
+        if self.autoload_schemas:
+            if portal_env is None:
+                portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
+                PRINT(f"The portal_env was not explicitly supplied. Schemas will come from portal_env={portal_env!r}.")
         self.portal_env: Optional[str] = portal_env
+        super().__init__(**kwargs)
 
     def fetch_relevant_schemas(self, schema_names: List[str]):
         # The schema_names argument is not normally given, but it is there for easier testing
@@ -636,7 +662,7 @@ class ItemManagerMixin(SchemaAutoloadMixin, BasicTableSetManager):
         return ItemTools.parse_item_value(value, context=self._instaguid_context_table)
 
 
-@TableSetManagerRegistry.register
+@TableSetManagerRegistry.register()
 class XlsxItemManager(ItemManagerMixin, XlsxManager):
     """
     This layers item-style row processing functionality on an XLSX file.
@@ -646,15 +672,103 @@ class XlsxItemManager(ItemManagerMixin, XlsxManager):
 
 class SingleTableMixin(AbstractTableSetManager):
 
-    DEFAULT_TAB_NAME = 'Sheet1'
-
-    def __init__(self, tab_name: Optional[str] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.tab_name = tab_name or self.DEFAULT_TAB_NAME
+    def __init__(self, filename: str, tab_name: Optional[str] = None, **kwargs):
+        self._tab_name = tab_name or ItemTools.infer_tab_name(filename)
+        super().__init__(filename=filename, **kwargs)
 
     @property
     def tab_names(self) -> List[str]:
-        return [self.tab_name]
+        return [self._tab_name]
+
+
+class _JsonInsertsDataItemManager(ItemManagerMixin, BasicTableSetManager):
+
+    AUTOLOAD_SCHEMAS_DEFAULT = False
+
+    ALLOWED_FILE_EXTENSIONS = []
+
+    def _load_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
+        raise NotImplementedError(f"._load_json_data() is not implemented for {cls.__name__}.")  # noQA
+
+    @property
+    def tab_names(self) -> List[str]:
+        return list(self.content_by_tab_name.keys())
+
+    def _get_reader_agent(self) -> Any:
+        return self
+
+    def load_content(self) -> Dict[str, AnyJsonData]:
+        data = self._load_json_data(self.filename)
+        for tab_name, tab_content in data.items():
+            self.content_by_tab_name[tab_name] = tab_content
+            if not tab_content:
+                self.headers_by_tab_name[tab_name] = []
+            else:
+                self.headers_by_tab_name[tab_name] = list(tab_content[0].keys())
+        return self.content_by_tab_name
+
+
+@TableSetManagerRegistry.register()
+class TabbedJsonInsertsItemManager(_JsonInsertsDataItemManager):
+
+    ALLOWED_FILE_EXTENSIONS = [".tabs.json"]  # If you want them all in one family, use this extension
+
+    def _load_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
+        data = json.load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
+        if (not isinstance(data, dict)
+                or not all(isinstance(tab_name, str) for tab_name in data.keys())
+                or not all(isinstance(content, list) and all(isinstance(item, dict) for item in content)
+                           for content in data.values())):
+            raise ValueError(f"Data in {filename} is not of type Dict[str, List[dict]].")
+        return data
+
+
+@TableSetManagerRegistry.register()
+class SimpleJsonInsertsItemManager(SingleTableMixin, _JsonInsertsDataItemManager):
+
+    ALLOWED_FILE_EXTENSIONS = [".json"]  # If you want them all in one family, use this extension
+
+    def _load_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
+        data = {self._tab_name: json.load(open_unicode_text_input_file_respecting_byte_order_mark(filename))}
+        if not all(isinstance(content, list) and all(isinstance(item, dict) for item in content)
+                   for content in data.values()):
+            raise ValueError(f"Data in {filename} is not of type List[dict].")
+        return data
+
+
+@TableSetManagerRegistry.register()
+class SimpleJsonLinesInsertsItemManager(SingleTableMixin, _JsonInsertsDataItemManager):
+
+    ALLOWED_FILE_EXTENSIONS = [".jsonl"]  # If you want them all in one family, use this extension
+
+    def _load_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
+        content = [line for line in JsonLinesReader(open_unicode_text_input_file_respecting_byte_order_mark(filename))]
+        data = {self._tab_name: content}
+        if not all(isinstance(content, list) and all(isinstance(item, dict) for item in content)
+                   for content in data.values()):
+            raise ValueError(f"Data in {filename} is not of type List[dict].")
+        return data
+
+
+@TableSetManagerRegistry.register(regexp="^(.*/)?(|[^/]*[-_])inserts/?$")
+class InsertsItemManager(_JsonInsertsDataItemManager):
+
+    ALLOWED_FILE_EXTENSIONS = []
+
+    def _load_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
+        if not os.path.isdir(filename):
+            raise LoadArgumentsError(f"{filename} is not the name of an inserts directory.")
+        tab_files = glob.glob(os.path.join(filename, "*.json"))
+        data = {}
+        for tab_file in tab_files:
+            tab_content = json.load(open_unicode_text_input_file_respecting_byte_order_mark(tab_file))
+            # Here we don't use os.path.splitext because we want to split on the first dot.
+            # e.g., for foo.bar.baz, return just foo
+            #       this allows names like ExperimentSet.tab.json that might need to use multi-dot suffixes
+            #       for things unrelated to the tab name.
+            tab_name = os.path.basename(tab_file).split('.')[0]
+            data[tab_name] = tab_content
+        return data
 
 
 class CsvManager(SingleTableMixin, TableSetManager):
@@ -665,15 +779,12 @@ class CsvManager(SingleTableMixin, TableSetManager):
 
     ALLOWED_FILE_EXTENSIONS = ['.csv']
 
-    def __init__(self, filename: str, **kwargs):
-        super().__init__(filename=filename, **kwargs)
-
     def _get_reader_agent(self) -> CsvReader:
         return self._get_reader_agent_for_filename(self.filename)
 
     @classmethod
     def _get_reader_agent_for_filename(cls, filename) -> CsvReader:
-        return csv.reader(open_text_input_file_respecting_byte_order_mark(filename))
+        return csv.reader(open_unicode_text_input_file_respecting_byte_order_mark(filename))
 
     PAD_TRAILING_TABS = True
 
@@ -697,7 +808,7 @@ class CsvManager(SingleTableMixin, TableSetManager):
                 for i, row_datum in enumerate(row_data)}
 
 
-@TableSetManagerRegistry.register
+@TableSetManagerRegistry.register()
 class CsvItemManager(ItemManagerMixin, CsvManager):
     """
     This layers item-style row processing functionality on a CSV file.
@@ -718,7 +829,7 @@ class TsvManager(CsvManager):
 
     @classmethod
     def _get_reader_agent_for_filename(cls, filename) -> CsvReader:
-        return csv.reader(open_text_input_file_respecting_byte_order_mark(filename), delimiter='\t')
+        return csv.reader(open_unicode_text_input_file_respecting_byte_order_mark(filename), delimiter='\t')
 
     def parse_cell_value(self, value: SheetCellValue) -> AnyJsonData:
         if self.escaping and isinstance(value, str) and '\\' in value:
@@ -750,7 +861,7 @@ class TsvManager(CsvManager):
         return s.getvalue()
 
 
-@TableSetManagerRegistry.register
+@TableSetManagerRegistry.register()
 class TsvItemManager(ItemManagerMixin, TsvManager):
     """
     This layers item-style row processing functionality on a TSV file.
@@ -767,7 +878,7 @@ class ItemManager(AbstractTableSetManager):
     @classmethod
     def create_implementation_manager(cls, filename: str, **kwargs) -> BasicTableSetManager:
         reader_agent_class = TableSetManagerRegistry.manager_for_filename(filename)
-        reader_agent = reader_agent_class(filename, **kwargs)
+        reader_agent = reader_agent_class(filename=filename, **kwargs)
         return reader_agent
 
     @classmethod
@@ -780,8 +891,8 @@ class ItemManager(AbstractTableSetManager):
         """
         Given a filename and various options
         """
-        manager = cls.create_implementation_manager(filename, tab_name=tab_name, escaping=escaping, schemas=schemas,
-                                                    autoload_schemas=autoload_schemas, **kwargs)
+        manager = cls.create_implementation_manager(filename=filename, tab_name=tab_name, escaping=escaping,
+                                                    schemas=schemas, autoload_schemas=autoload_schemas, **kwargs)
         return manager.load_content()
 
 

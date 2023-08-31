@@ -1,0 +1,2 @@
+{"name": "bill", "age": 23, "mother.name": "mary",     "mother.age": 58, "father.name": "fred",    "father.age": 63, "friends#0.name": "sam",    "friends#0.age": 22, "friends#1.name": "arthur", "friends#1.age": 19}
+{"name": "joe",  "age": 9,  "mother.name": "estrella", "mother.age": 35, "father.name": "anthony", "father.age": 34, "friends#0.name": "anders", "friends#0.age": 9}

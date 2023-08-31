@@ -1,4 +1,0 @@
-Note that one of the lines in file sample_items_sheet_2.tsv has two blank fields at end of line.
-PyCharm and perhaps other editors "helpfully" removes trailing whitespace from lines,
-so the number of columns varies line-to-line. Instead of insisting on explicit tabs at end of line,
-we pad such short lines with nulls when reading from the file.
