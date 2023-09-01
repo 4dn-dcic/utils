@@ -724,12 +724,15 @@ class TabbedJsonInsertsItemManager(InsertsItemManager):
 
     def _load_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
         data = self._parser(filename)
+        self._check_json_data(filename, data)
+        return data
+
+    def _check_json_data(self, filename: str, data):
         if (not isinstance(data, dict)
                 or not all(isinstance(tab_name, str) for tab_name in data.keys())
                 or not all(isinstance(content, list) and all(isinstance(item, dict) for item in content)
                            for content in data.values())):
             raise ValueError(f"Data in {filename} is not of type Dict[str, List[dict]].")
-        return data
 
 
 @TableSetManagerRegistry.register()
@@ -748,10 +751,13 @@ class SimpleJsonInsertsItemManager(SingleTableMixin, InsertsItemManager):
 
     def _load_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
         data = {self._tab_name: self._parser(filename)}
+        self._check_json_data(filename, data)
+        return data
+
+    def _check_json_data(self, filename: str, data):
         if not all(isinstance(content, list) and all(isinstance(item, dict) for item in content)
                    for content in data.values()):
             raise ValueError(f"Data in {filename} is not of type List[dict].")
-        return data
 
 
 @TableSetManagerRegistry.register()
@@ -759,7 +765,7 @@ class SimpleYamlInsertsItemManager(SimpleJsonInsertsItemManager):
 
     ALLOWED_FILE_EXTENSIONS = [".yaml"]
 
-    def _parser(self, filename):
+    def _parse_json_data(self, filename):
         return yaml.safe_load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
 
 
@@ -768,13 +774,20 @@ class SimpleJsonLinesInsertsItemManager(SingleTableMixin, InsertsItemManager):
 
     ALLOWED_FILE_EXTENSIONS = [".jsonl"]
 
-    def _load_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
+    def _parse_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
         content = [line for line in JsonLinesReader(open_unicode_text_input_file_respecting_byte_order_mark(filename))]
         data = {self._tab_name: content}
+        return data
+
+    def _load_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
+        data = self._parse_json_data(filename)
+        self._check_json_data(filename, data)
+        return data
+
+    def _check_json_data(self, filename: str, data):
         if not all(isinstance(content, list) and all(isinstance(item, dict) for item in content)
                    for content in data.values()):
             raise ValueError(f"Data in {filename} is not of type List[dict].")
-        return data
 
 
 @TableSetManagerRegistry.register(regexp="^(.*/)?(|[^/]*[-_])inserts/?$")
@@ -782,7 +795,7 @@ class InsertsDirectoryItemManager(InsertsItemManager):
 
     ALLOWED_FILE_EXTENSIONS = []
 
-    def _load_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
+    def _parse_json_data(self, filename: str) -> Dict[str, AnyJsonData]:
         if not os.path.isdir(filename):
             raise LoadArgumentsError(f"{filename} is not the name of an inserts directory.")
         tab_files = glob.glob(os.path.join(filename, "*.json"))
