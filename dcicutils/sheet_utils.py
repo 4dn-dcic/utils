@@ -687,9 +687,7 @@ class SingleTableMixin(AbstractTableSetManager):
         return [self._tab_name]
 
 
-class InsertsItemManager(ItemManagerMixin, BasicTableSetManager):
-
-    AUTOLOAD_SCHEMAS_DEFAULT = False
+class InsertsManager(BasicTableSetManager):  # ItemManagerMixin isn't really appropriate here
 
     ALLOWED_FILE_EXTENSIONS = []
 
@@ -701,7 +699,7 @@ class InsertsItemManager(ItemManagerMixin, BasicTableSetManager):
         self._check_inserts_data(filename, data)
         return data
 
-    def _check_inserts_data(self, filename, data):  # by default, we do no specific error checking
+    def _check_inserts_data(self, filename: str, data):  # by default, we do no specific error checking
         pass
 
     @property
@@ -722,11 +720,27 @@ class InsertsItemManager(ItemManagerMixin, BasicTableSetManager):
         return self.content_by_tab_name
 
 
-@TableSetManagerRegistry.register()
-class TabbedJsonInsertsItemManager(InsertsItemManager):
+class InsertsItemManager(AbstractItemManager, InsertsManager):  # ItemManagerMixin isn't really appropriate here
+
+    AUTOLOAD_SCHEMAS_DEFAULT = False  # Has no effect, but someone might inspect the value.
+
+    def __init__(self, filename: str, *, autoload_schemas: Optional[bool] = None, portal_env: Optional[str] = None,
+                 schemas: Optional[Dict[str, AnyJsonData]] = None, **kwargs):
+        ignored(portal_env)  # Would only be used if autoload_schemas was requested, and we don't allow that.
+        if schemas not in [None, {}]:
+            raise ValueError(f"{self.__class__.__name__} does not allow schemas={schemas!r}.")
+        if autoload_schemas not in [None, False]:
+            raise ValueError(f"{self.__class__.__name__} does not allow autoload_schemas={autoload_schemas!r}.")
+        super().__init__(filename, **kwargs)
+
+
+class TabbedJsonInsertsManager(InsertsItemManager):
 
     ALLOWED_FILE_EXTENSIONS = [".tabs.json"]  # If you want them all in one family, use this extension
 
+
+@TableSetManagerRegistry.register()
+class TabbedJsonInsertsItemManager(TabbedJsonInsertsManager):
     def _check_inserts_data(self, filename: str, data):
         if (not isinstance(data, dict)
                 or not all(isinstance(tab_name, str) for tab_name in data.keys())
@@ -745,7 +759,7 @@ class TabbedYamlInsertsItemManager(TabbedJsonInsertsItemManager):
 
 
 @TableSetManagerRegistry.register()
-class SimpleJsonInsertsItemManager(SingleTableMixin, InsertsItemManager):
+class SimpleJsonInsertsItemManager(SingleTableMixin, InsertsManager):
 
     ALLOWED_FILE_EXTENSIONS = [".json"]
 
@@ -770,7 +784,7 @@ class SimpleYamlInsertsItemManager(SimpleJsonInsertsItemManager):
 
 
 @TableSetManagerRegistry.register()
-class SimpleJsonLinesInsertsItemManager(SingleTableMixin, InsertsItemManager):
+class SimpleJsonLinesInsertsItemManager(SingleTableMixin, InsertsManager):
 
     ALLOWED_FILE_EXTENSIONS = [".jsonl"]
 
@@ -791,7 +805,7 @@ class SimpleJsonLinesInsertsItemManager(SingleTableMixin, InsertsItemManager):
 
 
 @TableSetManagerRegistry.register(regexp="^(.*/)?(|[^/]*[-_])inserts/?$")
-class InsertsDirectoryItemManager(InsertsItemManager):
+class InsertsDirectoryItemManager(InsertsManager):
 
     ALLOWED_FILE_EXTENSIONS = []
 
@@ -916,7 +930,7 @@ class ItemManager(AbstractTableSetManager):
     """
 
     @classmethod
-    def create_implementation_manager(cls, filename: str, **kwargs) -> BasicTableSetManager:
+    def create_implementation_manager(cls, filename: str, **kwargs) -> AbstractItemManager:
         reader_agent_class = TableSetManagerRegistry.manager_for_filename(filename)
         reader_agent = reader_agent_class(filename=filename, **kwargs)
         return reader_agent
