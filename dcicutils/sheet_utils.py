@@ -343,6 +343,8 @@ class AbstractTableSetManager:
     happen is not constrained by this class.
     """
 
+    ALLOWED_FILE_EXTENSIONS: List[str] = []
+
     def __init__(self, **kwargs):
         unwanted_kwargs(context=self.__class__.__name__, kwargs=kwargs)
 
@@ -367,8 +369,6 @@ class BasicTableSetManager(AbstractTableSetManager):
     of each sheet. Even a csv file, which doesn't have multiple tabs can be seen as the degenerate case
     of this where there's only one set of headers and only one block of content.
     """
-
-    ALLOWED_FILE_EXTENSIONS: List[str] = []
 
     def __init__(self, filename: str, **kwargs):
         super().__init__(**kwargs)
@@ -457,14 +457,19 @@ class TableSetManager(BasicTableSetManager):
         return prefer_number(value)
 
 
+class AbstractItemManager(AbstractTableSetManager):
+
+    pass
+
+
 class TableSetManagerRegistry:
 
-    ALL_TABLE_SET_MANAGERS: Dict[str, Type['ItemManagerMixin']] = {}
+    ALL_TABLE_SET_MANAGERS: Dict[str, Type[AbstractItemManager]] = {}
     ALL_TABLE_SET_REGEXP_MAPPINGS = []
 
     @classmethod
     def register(cls, regexp=None):
-        def _wrapped_register(class_to_register: Type['ItemManagerMixin']):
+        def _wrapped_register(class_to_register: Type[AbstractItemManager]):
             if regexp:
                 cls.ALL_TABLE_SET_REGEXP_MAPPINGS.append((re.compile(regexp), class_to_register))
             for ext in class_to_register.ALLOWED_FILE_EXTENSIONS:
@@ -477,7 +482,7 @@ class TableSetManagerRegistry:
         return _wrapped_register
 
     @classmethod
-    def manager_for_filename(cls, filename: str) -> Type['ItemManagerMixin']:
+    def manager_for_filename(cls, filename: str) -> Type[AbstractItemManager]:
         base: str = os.path.basename(filename)
         suffix_parts = base.split('.')[1:]
         if suffix_parts:
@@ -487,13 +492,13 @@ class TableSetManagerRegistry:
                 if found:
                     return found
         else:
-            special_case: Optional[Type[ItemManagerMixin]] = cls.manager_for_special_filename(filename)
+            special_case: Optional[Type[AbstractItemManager]] = cls.manager_for_special_filename(filename)
             if special_case:
                 return special_case
         raise LoadArgumentsError(f"Unknown file type: {filename}")
 
     @classmethod
-    def manager_for_special_filename(cls, filename: str) -> Optional[Type['ItemManagerMixin']]:
+    def manager_for_special_filename(cls, filename: str) -> Optional[Type[AbstractItemManager]]:
         for pattern, manager_class in cls.ALL_TABLE_SET_REGEXP_MAPPINGS:
             if pattern.match(filename):
                 return manager_class
@@ -595,7 +600,7 @@ class SchemaAutoloadMixin(AbstractTableSetManager):
             cls.SCHEMA_CACHE.pop(key, None)
 
 
-class ItemManagerMixin(SchemaAutoloadMixin, BasicTableSetManager):
+class ItemManagerMixin(SchemaAutoloadMixin, AbstractItemManager, BasicTableSetManager):
     """
     This can add functionality to a reader such as an XlsxManager or a CsvManager in order to make its rows
     get handled like Items instead of just flat table rows.
@@ -682,7 +687,7 @@ class SingleTableMixin(AbstractTableSetManager):
         return [self._tab_name]
 
 
-class _JsonInsertsDataItemManager(ItemManagerMixin, BasicTableSetManager):
+class InsertsItemManager(ItemManagerMixin, BasicTableSetManager):
 
     AUTOLOAD_SCHEMAS_DEFAULT = False
 
@@ -713,7 +718,7 @@ class _JsonInsertsDataItemManager(ItemManagerMixin, BasicTableSetManager):
 
 
 @TableSetManagerRegistry.register()
-class TabbedJsonInsertsItemManager(_JsonInsertsDataItemManager):
+class TabbedJsonInsertsItemManager(InsertsItemManager):
 
     ALLOWED_FILE_EXTENSIONS = [".tabs.json"]  # If you want them all in one family, use this extension
 
@@ -737,7 +742,7 @@ class TabbedYamlInsertsItemManager(TabbedJsonInsertsItemManager):
 
 
 @TableSetManagerRegistry.register()
-class SimpleJsonInsertsItemManager(SingleTableMixin, _JsonInsertsDataItemManager):
+class SimpleJsonInsertsItemManager(SingleTableMixin, InsertsItemManager):
 
     ALLOWED_FILE_EXTENSIONS = [".json"]
 
@@ -759,7 +764,7 @@ class SimpleYamlInsertsItemManager(SimpleJsonInsertsItemManager):
 
 
 @TableSetManagerRegistry.register()
-class SimpleJsonLinesInsertsItemManager(SingleTableMixin, _JsonInsertsDataItemManager):
+class SimpleJsonLinesInsertsItemManager(SingleTableMixin, InsertsItemManager):
 
     ALLOWED_FILE_EXTENSIONS = [".jsonl"]
 
@@ -773,7 +778,7 @@ class SimpleJsonLinesInsertsItemManager(SingleTableMixin, _JsonInsertsDataItemMa
 
 
 @TableSetManagerRegistry.register(regexp="^(.*/)?(|[^/]*[-_])inserts/?$")
-class InsertsItemManager(_JsonInsertsDataItemManager):
+class InsertsDirectoryItemManager(InsertsItemManager):
 
     ALLOWED_FILE_EXTENSIONS = []
 
