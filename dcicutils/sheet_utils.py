@@ -29,6 +29,8 @@ ParsedHeaders = List[ParsedHeader]
 SheetCellValue = Union[int, float, str]
 SheetRow = List[SheetCellValue]
 CsvReader = type(csv.reader(TemporaryFile()))
+SheetData = List[dict]
+TabbedSheetData = Dict[str, SheetData]
 
 
 class LoadFailure(Exception):
@@ -84,6 +86,30 @@ def prefer_number(value: SheetCellValue):
         # If we couldn't parse it as an int or float, fall through to returning the original value
         pass
     return value
+
+
+def expand_string_escape_sequences(text: str) -> str:
+    s = io.StringIO()
+    escaping = False
+    for ch in text:
+        if escaping:
+            if ch == 'r':
+                s.write('\r')
+            elif ch == 't':
+                s.write('\t')
+            elif ch == 'n':
+                s.write('\n')
+            elif ch == '\\':
+                s.write('\\')
+            else:
+                # Rather than err, just leave other sequences as-is.
+                s.write(f"\\{ch}")
+            escaping = False
+        elif ch == '\\':
+            escaping = True
+        else:
+            s.write(ch)
+    return s.getvalue()
 
 
 def open_unicode_text_input_file_respecting_byte_order_mark(filename):
@@ -345,12 +371,13 @@ class AbstractTableSetManager:
 
     ALLOWED_FILE_EXTENSIONS: List[str] = []
 
-    def __init__(self, **kwargs):
+    def __init__(self, filename: str, **kwargs):
+        self.filename: str = filename
         unwanted_kwargs(context=self.__class__.__name__, kwargs=kwargs)
 
     # TODO: Consider whether this should be an abstractmethod (but first see detailed design note at top of class.)
     @classmethod
-    def load(cls, filename: str, **kwargs) -> Dict[str, List[AnyJsonData]]:
+    def load(cls, filename: str, **kwargs) -> TabbedSheetData:
         """
         Reads a filename and returns a dictionary that maps sheet names to rows of dictionary data.
         For more information, see documentation of AbstractTableSetManager.
@@ -360,6 +387,9 @@ class AbstractTableSetManager:
     @property
     def tab_names(self) -> List[str]:
         raise NotImplementedError(f".tab_names is not implemented for {self.__class__.__name__}..")  # noQA
+
+    def load_content(self) -> Any:
+        raise NotImplementedError(f".load_content() is not implemented for {self.__class__.__name__}.")  # noQA
 
 
 class BasicTableSetManager(AbstractTableSetManager):
@@ -371,10 +401,9 @@ class BasicTableSetManager(AbstractTableSetManager):
     """
 
     def __init__(self, filename: str, **kwargs):
-        super().__init__(**kwargs)
-        self.filename: str = filename
+        super().__init__(filename=filename, **kwargs)
         self.headers_by_tab_name: Dict[str, Headers] = {}
-        self.content_by_tab_name: Dict[str, List[AnyJsonData]] = {}
+        self.content_by_tab_name: Dict[str, SheetData] = {}
         self.reader_agent: Any = self._get_reader_agent()
 
     def tab_headers(self, tab_name: str) -> Headers:
@@ -398,21 +427,21 @@ class BasicTableSetManager(AbstractTableSetManager):
         """This function is responsible for opening the workbook and returning a workbook object."""
         raise NotImplementedError(f"._get_reader_agent() is not implemented for {self.__class__.__name__}.")  # noQA
 
-    def load_content(self) -> Any:
-        raise NotImplementedError(f".load_content() is not implemented for {self.__class__.__name__}.")  # noQA
 
-
-class TableSetManager(BasicTableSetManager):
+class SemanticTableSetManager(BasicTableSetManager):
     """
-    This is the base class for all things that read tablesets. Those may be:
+    This is the base class for all workbook-like things, which read tablesets with possible semantic processing.
+    Those may be:
     * Excel workbook readers (.xlsx)
     * Comma-separated file readers (.csv)
     * Tab-separarated file readers (.tsv in most of the world, but Microsoft stupidly calls this .txt, outright
       refusing to write a .tsv file, so many people seem to compromise and call this .tsv.txt)
-    Unimplemented formats that could easily be made to do the same thing:
-    * JSON files
-    * JSON lines files
-    * YAML files
+    This is NOT a parent class of these kinds of files, which we always take literally as if semantic processing
+    were already done (in part so they can be used to test the results of other formats):
+    * Json files
+    * Yaml files
+    * Inserts directories
+    * JsonLines files
     """
 
     @classmethod
@@ -422,7 +451,7 @@ class TableSetManager(BasicTableSetManager):
                 raise LoadArgumentsError(f"The TableSetManager subclass {cls.__name__} expects only"
                                          f" {disjoined_list(cls.ALLOWED_FILE_EXTENSIONS)} filenames: {filename}")
 
-        table_set_manager: TableSetManager = cls(filename=filename, **kwargs)
+        table_set_manager: SemanticTableSetManager = cls(filename=filename, **kwargs)
         return table_set_manager.load_content()
 
     def __init__(self, filename: str, **kwargs):
@@ -464,22 +493,55 @@ class AbstractItemManager(AbstractTableSetManager):
 
 class TableSetManagerRegistry:
 
-    ALL_TABLE_SET_MANAGERS: Dict[str, Type[AbstractItemManager]] = {}
+    ALL_TABLE_SET_MANAGERS: Dict[str, Type[AbstractTableSetManager]] = {}
+    ALL_TABLE_SET_ITEM_MANAGERS: Dict[str, Type[AbstractItemManager]] = {}
     ALL_TABLE_SET_REGEXP_MAPPINGS = []
+    ALL_TABLE_SET_REGEXP_ITEM_MAPPINGS = []
+
+    @classmethod
+    def describe_for_debugging(cls):
+        me = cls.__name__
+        for attr in ["ALL_TABLE_SET_MANAGERS", "ALL_TABLE_SET_ITEM_MANAGERS"]:
+            print(f"{me}.{attr}:")
+            for suffix, manager_class in getattr(cls, attr).items() or [(None, None)]:
+                suffix: str
+                print(f" {('---' if suffix is None else suffix).rjust(50)}"
+                      f" :: {manager_class.__name__ if manager_class else '---'}")
+        for attr in ["ALL_TABLE_SET_REGEXP_MAPPINGS", "ALL_TABLE_SET_REGEXP_ITEM_MAPPINGS"]:
+            print(f"{me}.{attr}:")
+            for regexp, manager_class in getattr(cls, attr) or [(None, None)]:
+                regexp: str
+                print(f" {('---' if regexp is None else str(regexp)).rjust(50)}"
+                      f" :: {manager_class.__name__ if regexp else '---'}")
 
     @classmethod
     def register(cls, regexp=None):
-        def _wrapped_register(class_to_register: Type[AbstractItemManager]):
+        def _wrapped_register(class_to_register: Type[AbstractTableSetManager]):
+            is_item_class = issubclass(class_to_register, AbstractItemManager)
+            print(f"The class {class_to_register.__name__} {'IS' if is_item_class else 'is NOT'} an item class.")
+            manager_table: Dict[str, Type[AbstractTableSetManager]] = (
+                cls.ALL_TABLE_SET_ITEM_MANAGERS
+                if is_item_class
+                else cls.ALL_TABLE_SET_MANAGERS
+            )
+            regexp_mapping = (
+                cls.ALL_TABLE_SET_REGEXP_ITEM_MAPPINGS
+                if is_item_class
+                else cls.ALL_TABLE_SET_REGEXP_MAPPINGS
+            )
+
             if regexp:
-                cls.ALL_TABLE_SET_REGEXP_MAPPINGS.append((re.compile(regexp), class_to_register))
+                regexp_mapping.append((re.compile(regexp), class_to_register))
             for ext in class_to_register.ALLOWED_FILE_EXTENSIONS:
-                existing = cls.ALL_TABLE_SET_MANAGERS.get(ext)
+                existing = manager_table.get(ext)
                 if existing:
                     raise Exception(f"Tried to define {class_to_register} to extension {ext},"
                                     f" but {existing} already claimed that.")
-                cls.ALL_TABLE_SET_MANAGERS[ext] = class_to_register
+                manager_table[ext] = class_to_register
             return class_to_register
         return _wrapped_register
+
+    register1 = register
 
     @classmethod
     def manager_for_filename(cls, filename: str) -> Type[AbstractItemManager]:
@@ -488,7 +550,7 @@ class TableSetManagerRegistry:
         if suffix_parts:
             for i in range(0, len(suffix_parts)):
                 suffix = f".{'.'.join(suffix_parts[i:])}"
-                found = cls.ALL_TABLE_SET_MANAGERS.get(suffix)
+                found = cls.ALL_TABLE_SET_ITEM_MANAGERS.get(suffix)
                 if found:
                     return found
         else:
@@ -499,13 +561,14 @@ class TableSetManagerRegistry:
 
     @classmethod
     def manager_for_special_filename(cls, filename: str) -> Optional[Type[AbstractItemManager]]:
-        for pattern, manager_class in cls.ALL_TABLE_SET_REGEXP_MAPPINGS:
+        for pattern, manager_class in cls.ALL_TABLE_SET_REGEXP_ITEM_MAPPINGS:
             if pattern.match(filename):
                 return manager_class
         return None
 
 
-class XlsxManager(TableSetManager):
+@TableSetManagerRegistry.register1()
+class XlsxManager(SemanticTableSetManager):
     """
     This implements the mechanism to get a series of rows out of the sheets in an XLSX file.
     """
@@ -559,7 +622,7 @@ class SchemaAutoloadMixin(AbstractTableSetManager):
     CACHE_SCHEMAS = True  # Controls whether we're doing caching at all
     AUTOLOAD_SCHEMAS_DEFAULT = True
 
-    def __init__(self, autoload_schemas: Optional[bool] = None, portal_env: Optional[str] = None,
+    def __init__(self, filename: str, autoload_schemas: Optional[bool] = None, portal_env: Optional[str] = None,
                  **kwargs):
         # This setup must be in place before the class initialization is done (via the super call).
         self.autoload_schemas: bool = self.AUTOLOAD_SCHEMAS_DEFAULT if autoload_schemas is None else autoload_schemas
@@ -568,7 +631,7 @@ class SchemaAutoloadMixin(AbstractTableSetManager):
                 portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
                 PRINT(f"The portal_env was not explicitly supplied. Schemas will come from portal_env={portal_env!r}.")
         self.portal_env: Optional[str] = portal_env
-        super().__init__(**kwargs)
+        super().__init__(filename=filename, **kwargs)
 
     def fetch_relevant_schemas(self, schema_names: List[str]):
         # The schema_names argument is not normally given, but it is there for easier testing
@@ -691,16 +754,22 @@ class InsertsManager(BasicTableSetManager):  # ItemManagerMixin isn't really app
 
     ALLOWED_FILE_EXTENSIONS = []
 
-    def _parse_inserts_data(self, filename):  # by default, we assume inserts files are JSON data
-        return json.load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
+    def _parse_inserts_data(self, filename: str) -> AnyJsonData:
+        raise NotImplementedError(f"._parse_inserts_dataa(...) is not implemented for {self.__class__.__name__}.")  # noQA
 
-    def _load_inserts_data(self, filename: str) -> Dict[str, AnyJsonData]:
-        data = self._parse_inserts_data(filename)
-        self._check_inserts_data(filename, data)
+    def _load_inserts_data(self, filename: str) -> TabbedSheetData:
+        data: AnyJsonData = self._parse_inserts_data(filename)
+        tabbed_inserts: AnyJsonData = self._wrap_inserts_data(filename, data)
+        if (not isinstance(tabbed_inserts, dict)
+                or not all(isinstance(tab_name, str) for tab_name in tabbed_inserts.keys())
+                or not all(isinstance(content, list) and all(isinstance(item, dict) for item in content)
+                           for content in tabbed_inserts.values())):
+            raise ValueError(f"Data in {filename} is not of type TabbedSheetData (Dict[str, List[dict]]).")
+        tabbed_inserts: TabbedSheetData  # we've just checked that
+        return tabbed_inserts
+
+    def _wrap_inserts_data(self, filename: str, data: AnyJsonData) -> AnyJsonData:
         return data
-
-    def _check_inserts_data(self, filename: str, data):  # by default, we do no specific error checking
-        pass
 
     @property
     def tab_names(self) -> List[str]:
@@ -720,7 +789,55 @@ class InsertsManager(BasicTableSetManager):  # ItemManagerMixin isn't really app
         return self.content_by_tab_name
 
 
-class InsertsItemManager(AbstractItemManager, InsertsManager):  # ItemManagerMixin isn't really appropriate here
+class SimpleInsertsMixin(SingleTableMixin):
+
+    def _wrap_inserts_data(self, filename: str, data: AnyJsonData) -> TabbedSheetData:
+        if (not isinstance(data, list)
+                or not all(isinstance(item, dict) for item in data)):
+            raise ValueError(f"Data in {filename} is not of type SheetData (List[dict]).")
+        return {self._tab_name: data}
+
+
+class JsonInsertsMixin:
+
+    def _parse_inserts_data(self, filename: str) -> AnyJsonData:
+        return json.load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
+
+
+@TableSetManagerRegistry.register1()
+class TabbedJsonInsertsManager(JsonInsertsMixin, InsertsManager):
+
+    ALLOWED_FILE_EXTENSIONS = [".tabs.json"]  # If you want them all in one family, use this extension
+
+
+@TableSetManagerRegistry.register1()
+class SimpleJsonInsertsManager(SimpleInsertsMixin, JsonInsertsMixin, InsertsManager):
+
+    ALLOWED_FILE_EXTENSIONS = [".json"]
+
+
+class YamlInsertsMixin:
+
+    def _parse_inserts_data(self, filename) -> AnyJsonData:
+        return yaml.safe_load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
+
+
+@TableSetManagerRegistry.register1()
+class TabbedYamlInsertsManager(YamlInsertsMixin, InsertsManager):
+
+    ALLOWED_FILE_EXTENSIONS = [".tabs.yaml"]
+
+    def _parse_inserts_data(self, filename) -> AnyJsonData:
+        return yaml.safe_load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
+
+
+@TableSetManagerRegistry.register1()
+class SimpleYamlInsertsManager(SimpleInsertsMixin, YamlInsertsMixin, InsertsManager):
+
+    ALLOWED_FILE_EXTENSIONS = [".yaml"]
+
+
+class InsertsItemMixin(AbstractItemManager):  # ItemManagerMixin isn't really appropriate here
 
     AUTOLOAD_SCHEMAS_DEFAULT = False  # Has no effect, but someone might inspect the value.
 
@@ -731,85 +848,49 @@ class InsertsItemManager(AbstractItemManager, InsertsManager):  # ItemManagerMix
             raise ValueError(f"{self.__class__.__name__} does not allow schemas={schemas!r}.")
         if autoload_schemas not in [None, False]:
             raise ValueError(f"{self.__class__.__name__} does not allow autoload_schemas={autoload_schemas!r}.")
-        super().__init__(filename, **kwargs)
-
-
-class TabbedJsonInsertsManager(InsertsItemManager):
-
-    ALLOWED_FILE_EXTENSIONS = [".tabs.json"]  # If you want them all in one family, use this extension
+        super().__init__(filename=filename, **kwargs)
 
 
 @TableSetManagerRegistry.register()
-class TabbedJsonInsertsItemManager(TabbedJsonInsertsManager):
-    def _check_inserts_data(self, filename: str, data):
-        if (not isinstance(data, dict)
-                or not all(isinstance(tab_name, str) for tab_name in data.keys())
-                or not all(isinstance(content, list) and all(isinstance(item, dict) for item in content)
-                           for content in data.values())):
-            raise ValueError(f"Data in {filename} is not of type Dict[str, List[dict]].")
+class TabbedJsonInsertsItemManager(InsertsItemMixin, TabbedJsonInsertsManager):
+    pass
 
 
 @TableSetManagerRegistry.register()
-class TabbedYamlInsertsItemManager(TabbedJsonInsertsItemManager):
-
-    ALLOWED_FILE_EXTENSIONS = [".tabs.yaml"]
-
-    def _parse_inserts_data(self, filename):
-        return yaml.safe_load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
+class SimpleJsonInsertsItemManager(InsertsItemMixin, SimpleJsonInsertsManager):
+    pass
 
 
 @TableSetManagerRegistry.register()
-class SimpleJsonInsertsItemManager(SingleTableMixin, InsertsManager):
-
-    ALLOWED_FILE_EXTENSIONS = [".json"]
-
-    def _load_inserts_data(self, filename: str) -> Dict[str, AnyJsonData]:
-        data = {self._tab_name: self._parse_inserts_data(filename)}
-        self._check_inserts_data(filename, data)
-        return data
-
-    def _check_inserts_data(self, filename: str, data):
-        if not all(isinstance(content, list) and all(isinstance(item, dict) for item in content)
-                   for content in data.values()):
-            raise ValueError(f"Data in {filename} is not of type List[dict].")
+class TabbedYamlInsertsItemManager(InsertsItemMixin, TabbedYamlInsertsManager):
+    pass
 
 
 @TableSetManagerRegistry.register()
-class SimpleYamlInsertsItemManager(SimpleJsonInsertsItemManager):
-
-    ALLOWED_FILE_EXTENSIONS = [".yaml"]
-
-    def _parse_inserts_data(self, filename):
-        return yaml.safe_load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
+class SimpleYamlInsertsItemManager(InsertsItemMixin, SimpleYamlInsertsManager):
+    pass
 
 
-@TableSetManagerRegistry.register()
-class SimpleJsonLinesInsertsItemManager(SingleTableMixin, InsertsManager):
+@TableSetManagerRegistry.register1()
+class SimpleJsonLinesInsertsManager(SimpleInsertsMixin, InsertsManager):
 
     ALLOWED_FILE_EXTENSIONS = [".jsonl"]
 
-    def _parse_inserts_data(self, filename: str) -> Dict[str, AnyJsonData]:
-        content = [line for line in JsonLinesReader(open_unicode_text_input_file_respecting_byte_order_mark(filename))]
-        data = {self._tab_name: content}
-        return data
-
-    def _load_inserts_data(self, filename: str) -> Dict[str, AnyJsonData]:
-        data = self._parse_inserts_data(filename)
-        self._check_inserts_data(filename, data)
-        return data
-
-    def _check_inserts_data(self, filename: str, data):
-        if not all(isinstance(content, list) and all(isinstance(item, dict) for item in content)
-                   for content in data.values()):
-            raise ValueError(f"Data in {filename} is not of type List[dict].")
+    def _parse_inserts_data(self, filename: str) -> AnyJsonData:
+        return [line for line in JsonLinesReader(open_unicode_text_input_file_respecting_byte_order_mark(filename))]
 
 
-@TableSetManagerRegistry.register(regexp="^(.*/)?(|[^/]*[-_])inserts/?$")
-class InsertsDirectoryItemManager(InsertsManager):
+@TableSetManagerRegistry.register()
+class SimpleJsonLinesInsertsItemManager(InsertsItemMixin, SimpleJsonLinesInsertsManager):
+    pass
+
+
+@TableSetManagerRegistry.register1()
+class InsertsDirectoryManager(InsertsManager):
 
     ALLOWED_FILE_EXTENSIONS = []
 
-    def _parse_inserts_data(self, filename: str) -> Dict[str, AnyJsonData]:
+    def _parse_inserts_data(self, filename: str) -> AnyJsonData:
         if not os.path.isdir(filename):
             raise LoadArgumentsError(f"{filename} is not the name of an inserts directory.")
         tab_files = glob.glob(os.path.join(filename, "*.json"))
@@ -825,7 +906,13 @@ class InsertsDirectoryItemManager(InsertsManager):
         return data
 
 
-class CsvManager(SingleTableMixin, TableSetManager):
+@TableSetManagerRegistry.register(regexp="^(.*/)?(|[^/]*[-_])inserts/?$")
+class InsertsDirectoryItemManager(InsertsItemMixin, InsertsDirectoryManager):
+    pass
+
+
+@TableSetManagerRegistry.register1()
+class CsvManager(SingleTableMixin, SemanticTableSetManager):
     """
     This implements the mechanism to get a series of rows out of the sheet in a csv file,
     returning a result that still looks like there could have been multiple tabs.
@@ -870,6 +957,7 @@ class CsvItemManager(ItemManagerMixin, CsvManager):
     pass
 
 
+@TableSetManagerRegistry.register1()
 class TsvManager(CsvManager):
     """
     TSV files are just CSV files with tabs instead of commas as separators.
@@ -887,32 +975,8 @@ class TsvManager(CsvManager):
 
     def parse_cell_value(self, value: SheetCellValue) -> AnyJsonData:
         if self.escaping and isinstance(value, str) and '\\' in value:
-            value = self.expand_escape_sequences(value)
-        return super().parse_cell_value(value)
-
-    @classmethod
-    def expand_escape_sequences(cls, text: str) -> str:
-        s = io.StringIO()
-        escaping = False
-        for ch in text:
-            if escaping:
-                if ch == 'r':
-                    s.write('\r')
-                elif ch == 't':
-                    s.write('\t')
-                elif ch == 'n':
-                    s.write('\n')
-                elif ch == '\\':
-                    s.write('\\')
-                else:
-                    # Rather than err, just leave other sequences as-is.
-                    s.write(f"\\{ch}")
-                escaping = False
-            elif ch == '\\':
-                escaping = True
-            else:
-                s.write(ch)
-        return s.getvalue()
+            value = expand_string_escape_sequences(value)
+        return super().parse_cell_value(value)  # noQA - PyCharm wrongly thinks this method call is improper
 
 
 @TableSetManagerRegistry.register()
@@ -941,7 +1005,7 @@ class ItemManager(AbstractTableSetManager):
              escaping: Optional[bool] = None,
              schemas: Optional[Dict] = None,
              autoload_schemas: Optional[bool] = None,
-             **kwargs) -> Dict[str, List[AnyJsonData]]:
+             **kwargs) -> TabbedSheetData:
         """
         Given a filename and various options
         """
@@ -951,3 +1015,7 @@ class ItemManager(AbstractTableSetManager):
 
 
 load_items = ItemManager.load
+
+
+# Uncommenting this will cause this library, upon loading, to print out debugging data about what got defined.
+TableSetManagerRegistry.describe_for_debugging()

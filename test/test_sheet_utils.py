@@ -20,7 +20,7 @@ from dcicutils.sheet_utils import (
     # Error handling
     LoadFailure, LoadArgumentsError, LoadTableError,
     # Utilities
-    prefer_number, unwanted_kwargs,
+    prefer_number, unwanted_kwargs, expand_string_escape_sequences,
 )
 from typing import Dict, Optional
 from unittest import mock
@@ -70,6 +70,14 @@ def test_prefer_number():
     assert prefer_number('123e1') == 1230.0
     assert prefer_number('123e+1') == 1230.0
     assert prefer_number('123e-1') == 12.3
+
+
+def test_expand_string_escape_sequences():
+
+    assert expand_string_escape_sequences("foo") == "foo"
+    assert expand_string_escape_sequences("foo\\tbar") == "foo\tbar"
+    assert expand_string_escape_sequences("\\r\\t\\n\\\\") == "\r\t\n\\"
+    assert expand_string_escape_sequences("foo\\fbar") == "foo\\fbar"
 
 
 def test_unwanted_kwargs_without_error():
@@ -468,14 +476,6 @@ def test_tsv_manager_load_content():
     assert wt.load_content() == SAMPLE_TSV_FILE_RAW_CONTENT
 
 
-def test_tsv_manager_expand_escape_sequences():
-
-    assert TsvManager.expand_escape_sequences("foo") == "foo"
-    assert TsvManager.expand_escape_sequences("foo\\tbar") == "foo\tbar"
-    assert TsvManager.expand_escape_sequences("\\r\\t\\n\\\\") == "\r\t\n\\"
-    assert TsvManager.expand_escape_sequences("foo\\fbar") == "foo\\fbar"
-
-
 def test_tsv_manager_load():
 
     assert TsvManager.load(SAMPLE_TSV_FILE) == SAMPLE_TSV_FILE_RAW_CONTENT
@@ -729,7 +729,9 @@ def test_load_items_with_schema_and_instaguids(instaguids_enabled):
 
 
 class SchemaAutoloaderForTesting(SchemaAutoloadMixin):
-    pass
+
+    def __init__(self, **kwargs):
+        super().__init__(filename='ignored.file.name', **kwargs)
 
 
 @contextlib.contextmanager
