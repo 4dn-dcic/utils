@@ -1,4 +1,5 @@
 import chardet
+import contextlib
 import copy
 import csv
 import glob
@@ -13,7 +14,7 @@ import yaml
 from dcicutils.common import AnyJsonData
 from dcicutils.env_utils import public_env_name, EnvUtils
 from dcicutils.ff_utils import get_schema
-from dcicutils.lang_utils import conjoined_list, disjoined_list, maybe_pluralize
+from dcicutils.lang_utils import conjoined_list, disjoined_list, maybe_pluralize, there_are
 from dcicutils.misc_utils import ignored, PRINT, pad_to, JsonLinesReader
 from dcicutils.task_utils import pmap
 from openpyxl.worksheet.worksheet import Worksheet
@@ -55,6 +56,21 @@ class LoadTableError(LoadFailure):
     there's a problem with some table's syntax, for example headers that don't make sense.
     """
     pass
+
+
+@contextlib.contextmanager
+def deferred_problems():
+    problems = []
+
+    def note_problems(problem):
+        problems.append(problem)
+
+    yield note_problems
+
+    if problems:
+        for problem in problems:
+            PRINT(f"Problem: {problem}")
+        raise Exception(there_are(problems, kind='problem while compiling hints', tense='past', show=False))
 
 
 def unwanted_kwargs(*, context, kwargs, context_plural=False, detailed=False):
@@ -440,7 +456,7 @@ class SemanticTableSetManager(BasicTableSetManager):
     and a class that is semantically interpreted as an "item".
 
     This is NOT a parent class of these kinds of files, which we always take literally as if semantic processing
-    were already done (in part so they can be used to test the results of other formats):
+    were already done (in part so that they can be used to test the results of other formats):
     * Json files
     * Yaml files
     * Inserts directories
@@ -669,9 +685,18 @@ class ItemManagerMixin(SchemaAutoloadMixin, AbstractItemManager, BasicTableSetMa
     def _compile_type_hints(self, tab_name: str):
         parsed_headers = self.sheet_parsed_headers(tab_name)
         schema = self.schemas.get(tab_name)
+        with deferred_problems() as note_problem:
+            for required_header in self._schema_required_headers(schema):
+                if required_header not in parsed_headers:
+                    note_problem("Missing required header")
         type_hints = [ItemTools.find_type_hint(parsed_header, schema) if schema else None
                       for parsed_header in parsed_headers]
         self.type_hints_by_tab_name[tab_name] = type_hints
+
+    @classmethod
+    def _schema_required_headers(cls, schema):
+        ignored(schema)
+        return []  # TODO: Make this compute a list of required headers (in parsed header form)
 
     def _compile_sheet_headers(self, tab_name: str):
         headers = self.headers_by_tab_name[tab_name]
@@ -742,7 +767,9 @@ class InsertsManager(BasicTableSetManager):  # ItemManagerMixin isn't really app
         tabbed_inserts: TabbedSheetData  # we've just checked that
         return tabbed_inserts
 
-    def _wrap_inserts_data(self, filename: str, data: AnyJsonData) -> AnyJsonData:
+    @classmethod
+    def _wrap_inserts_data(cls, filename: str, data: AnyJsonData) -> AnyJsonData:
+        ignored(filename)
         return data
 
     @property
@@ -774,7 +801,8 @@ class SimpleInsertsMixin(SingleTableMixin):
 
 class JsonInsertsMixin:
 
-    def _parse_inserts_data(self, filename: str) -> AnyJsonData:
+    @classmethod
+    def _parse_inserts_data(cls, filename: str) -> AnyJsonData:
         return json.load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
 
 
@@ -921,7 +949,8 @@ class CsvManager(SingleTableMixin, SemanticTableSetManager):
             self.headers_by_tab_name[tab_name] = headers = self.reader_agent.__next__()
         return headers
 
-    def _escape_cell_text(self, cell_text):
+    @classmethod
+    def _escape_cell_text(cls, cell_text):
         if '\\' in cell_text:
             return expand_string_escape_sequences(cell_text)
         else:
