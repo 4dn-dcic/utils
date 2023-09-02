@@ -10,7 +10,7 @@ from dcicutils.misc_utils import is_uuid, local_attrs
 from dcicutils.qa_utils import printed_output
 from dcicutils.sheet_utils import (
     # High-level interfaces
-    ItemManager, load_items, TableSetManagerRegistry,
+    ItemManager, load_items, TABLE_SET_MANAGER_REGISTRY, ITEM_MANAGER_REGISTRY,
     # Low-level implementation
     BasicTableSetManager, SchemaAutoloadMixin,
     ItemTools, XlsxManager, XlsxItemManager,
@@ -308,10 +308,16 @@ def test_item_tools_find_type_hint():
 
 def test_table_set_manager_registry_manager_for_filename():
 
-    assert TableSetManagerRegistry.manager_for_filename("xyz/foo.csv") == CsvItemManager
+    assert TABLE_SET_MANAGER_REGISTRY.manager_for_filename("xyz/foo.csv") == CsvManager
 
     with pytest.raises(Exception) as exc:
-        TableSetManagerRegistry.manager_for_filename("xyz/foo.something.missing")
+        TABLE_SET_MANAGER_REGISTRY.manager_for_filename("xyz/foo.something.missing")
+    assert str(exc.value) == "Unknown file type: xyz/foo.something.missing"
+
+    assert ITEM_MANAGER_REGISTRY.manager_for_filename("xyz/foo.csv") == CsvItemManager
+
+    with pytest.raises(Exception) as exc:
+        ITEM_MANAGER_REGISTRY.manager_for_filename("xyz/foo.something.missing")
     assert str(exc.value) == "Unknown file type: xyz/foo.something.missing"
 
 

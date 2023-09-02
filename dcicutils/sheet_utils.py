@@ -19,7 +19,7 @@ from dcicutils.task_utils import pmap
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.workbook.workbook import Workbook
 from tempfile import TemporaryFile
-from typing import Any, Dict, Iterable, List, Optional, Type, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
 
 
 Header = str
@@ -31,7 +31,7 @@ SheetRow = List[SheetCellValue]
 CsvReader = type(csv.reader(TemporaryFile()))
 SheetData = List[dict]
 TabbedSheetData = Dict[str, SheetData]
-
+Regexp = type(re.compile("sample"))
 
 class LoadFailure(Exception):
     """
@@ -496,81 +496,52 @@ class AbstractItemManager(AbstractTableSetManager):
 
 class TableSetManagerRegistry:
 
-    ALL_TABLE_SET_MANAGERS: Dict[str, Type[AbstractTableSetManager]] = {}
-    ALL_TABLE_SET_ITEM_MANAGERS: Dict[str, Type[AbstractItemManager]] = {}
-    ALL_TABLE_SET_REGEXP_MAPPINGS = []
-    ALL_TABLE_SET_REGEXP_ITEM_MAPPINGS = []
+    def __init__(self):
+        self.manager_table: Dict[str, Type[AbstractTableSetManager]] = {}
+        self.regexp_mappings: List[Tuple[Regexp, Type[AbstractTableSetManager]]] = []
 
-    @classmethod
-    def describe_for_debugging(cls):
-        me = cls.__name__
-        for attr in ["ALL_TABLE_SET_MANAGERS", "ALL_TABLE_SET_ITEM_MANAGERS"]:
-            print(f"{me}.{attr}:")
-            for suffix, manager_class in getattr(cls, attr).items() or [(None, None)]:
-                suffix: str
-                print(f" {('---' if suffix is None else suffix).rjust(50)}"
-                      f" :: {manager_class.__name__ if manager_class else '---'}")
-        for attr in ["ALL_TABLE_SET_REGEXP_MAPPINGS", "ALL_TABLE_SET_REGEXP_ITEM_MAPPINGS"]:
-            print(f"{me}.{attr}:")
-            for regexp, manager_class in getattr(cls, attr) or [(None, None)]:
-                regexp: str
-                print(f" {('---' if regexp is None else str(regexp)).rjust(50)}"
-                      f" :: {manager_class.__name__ if regexp else '---'}")
-
-    @classmethod
-    def register(cls, regexp=None):
+    def register(self, regexp: Optional[str] = None):
         def _wrapped_register(class_to_register: Type[AbstractTableSetManager]):
-            is_item_class = issubclass(class_to_register, AbstractItemManager)
-            print(f"The class {class_to_register.__name__} {'IS' if is_item_class else 'is NOT'} an item class.")
-            manager_table: Dict[str, Type[AbstractTableSetManager]] = (
-                cls.ALL_TABLE_SET_ITEM_MANAGERS
-                if is_item_class
-                else cls.ALL_TABLE_SET_MANAGERS
-            )
-            regexp_mapping = (
-                cls.ALL_TABLE_SET_REGEXP_ITEM_MAPPINGS
-                if is_item_class
-                else cls.ALL_TABLE_SET_REGEXP_MAPPINGS
-            )
-
             if regexp:
-                regexp_mapping.append((re.compile(regexp), class_to_register))
+                self.regexp_mappings.append((re.compile(regexp), class_to_register))
             for ext in class_to_register.ALLOWED_FILE_EXTENSIONS:
-                existing = manager_table.get(ext)
+                existing = self.manager_table.get(ext)
                 if existing:
                     raise Exception(f"Tried to define {class_to_register} to extension {ext},"
                                     f" but {existing} already claimed that.")
-                manager_table[ext] = class_to_register
+                self.manager_table[ext] = class_to_register
             return class_to_register
         return _wrapped_register
 
     register1 = register
 
-    @classmethod
-    def manager_for_filename(cls, filename: str) -> Type[AbstractItemManager]:
+    def manager_for_filename(self, filename: str) -> Type[AbstractTableSetManager]:
         base: str = os.path.basename(filename)
         suffix_parts = base.split('.')[1:]
         if suffix_parts:
             for i in range(0, len(suffix_parts)):
                 suffix = f".{'.'.join(suffix_parts[i:])}"
-                found = cls.ALL_TABLE_SET_ITEM_MANAGERS.get(suffix)
+                found: Optional[Type[AbstractTableSetManager]] = self.manager_table.get(suffix)
                 if found:
                     return found
         else:
-            special_case: Optional[Type[AbstractItemManager]] = cls.manager_for_special_filename(filename)
+            special_case: Optional[Type[AbstractItemManager]] = self.manager_for_special_filename(filename)
             if special_case:
                 return special_case
         raise LoadArgumentsError(f"Unknown file type: {filename}")
 
-    @classmethod
-    def manager_for_special_filename(cls, filename: str) -> Optional[Type[AbstractItemManager]]:
-        for pattern, manager_class in cls.ALL_TABLE_SET_REGEXP_ITEM_MAPPINGS:
+    def manager_for_special_filename(self, filename: str) -> Optional[Type[AbstractTableSetManager]]:
+        for pattern, manager_class in self.regexp_mappings:
             if pattern.match(filename):
                 return manager_class
         return None
 
 
-@TableSetManagerRegistry.register1()
+TABLE_SET_MANAGER_REGISTRY = TableSetManagerRegistry()
+ITEM_MANAGER_REGISTRY = TableSetManagerRegistry()
+
+
+@TABLE_SET_MANAGER_REGISTRY.register()
 class XlsxManager(SemanticTableSetManager):
     """
     This implements the mechanism to get a series of rows out of the sheets in an XLSX file.
@@ -734,7 +705,7 @@ class ItemManagerMixin(SchemaAutoloadMixin, AbstractItemManager, BasicTableSetMa
         return ItemTools.parse_item_value(value, context=self._instaguid_context_table)
 
 
-@TableSetManagerRegistry.register()
+@ITEM_MANAGER_REGISTRY.register()
 class XlsxItemManager(ItemManagerMixin, XlsxManager):
     """
     This layers item-style row processing functionality on an XLSX file.
@@ -807,13 +778,13 @@ class JsonInsertsMixin:
         return json.load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
 
 
-@TableSetManagerRegistry.register1()
+@TABLE_SET_MANAGER_REGISTRY.register()
 class TabbedJsonInsertsManager(JsonInsertsMixin, InsertsManager):
 
     ALLOWED_FILE_EXTENSIONS = [".tabs.json"]  # If you want them all in one family, use this extension
 
 
-@TableSetManagerRegistry.register1()
+@TABLE_SET_MANAGER_REGISTRY.register()
 class SimpleJsonInsertsManager(SimpleInsertsMixin, JsonInsertsMixin, InsertsManager):
 
     ALLOWED_FILE_EXTENSIONS = [".json"]
@@ -825,7 +796,7 @@ class YamlInsertsMixin:
         return yaml.safe_load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
 
 
-@TableSetManagerRegistry.register1()
+@TABLE_SET_MANAGER_REGISTRY.register()
 class TabbedYamlInsertsManager(YamlInsertsMixin, InsertsManager):
 
     ALLOWED_FILE_EXTENSIONS = [".tabs.yaml"]
@@ -834,7 +805,7 @@ class TabbedYamlInsertsManager(YamlInsertsMixin, InsertsManager):
         return yaml.safe_load(open_unicode_text_input_file_respecting_byte_order_mark(filename))
 
 
-@TableSetManagerRegistry.register1()
+@TABLE_SET_MANAGER_REGISTRY.register()
 class SimpleYamlInsertsManager(SimpleInsertsMixin, YamlInsertsMixin, InsertsManager):
 
     ALLOWED_FILE_EXTENSIONS = [".yaml"]
@@ -854,27 +825,27 @@ class InsertsItemMixin(AbstractItemManager):  # ItemManagerMixin isn't really ap
         super().__init__(filename=filename, **kwargs)
 
 
-@TableSetManagerRegistry.register()
+@ITEM_MANAGER_REGISTRY.register()
 class TabbedJsonInsertsItemManager(InsertsItemMixin, TabbedJsonInsertsManager):
     pass
 
 
-@TableSetManagerRegistry.register()
+@ITEM_MANAGER_REGISTRY.register()
 class SimpleJsonInsertsItemManager(InsertsItemMixin, SimpleJsonInsertsManager):
     pass
 
 
-@TableSetManagerRegistry.register()
+@ITEM_MANAGER_REGISTRY.register()
 class TabbedYamlInsertsItemManager(InsertsItemMixin, TabbedYamlInsertsManager):
     pass
 
 
-@TableSetManagerRegistry.register()
+@ITEM_MANAGER_REGISTRY.register()
 class SimpleYamlInsertsItemManager(InsertsItemMixin, SimpleYamlInsertsManager):
     pass
 
 
-@TableSetManagerRegistry.register1()
+@TABLE_SET_MANAGER_REGISTRY.register()
 class SimpleJsonLinesInsertsManager(SimpleInsertsMixin, InsertsManager):
 
     ALLOWED_FILE_EXTENSIONS = [".jsonl"]
@@ -883,12 +854,12 @@ class SimpleJsonLinesInsertsManager(SimpleInsertsMixin, InsertsManager):
         return [line for line in JsonLinesReader(open_unicode_text_input_file_respecting_byte_order_mark(filename))]
 
 
-@TableSetManagerRegistry.register()
+@ITEM_MANAGER_REGISTRY.register()
 class SimpleJsonLinesInsertsItemManager(InsertsItemMixin, SimpleJsonLinesInsertsManager):
     pass
 
 
-@TableSetManagerRegistry.register1()
+@TABLE_SET_MANAGER_REGISTRY.register(regexp="^(.*/)?(|[^/]*[-_])inserts/?$")
 class InsertsDirectoryManager(InsertsManager):
 
     ALLOWED_FILE_EXTENSIONS = []
@@ -909,12 +880,12 @@ class InsertsDirectoryManager(InsertsManager):
         return data
 
 
-@TableSetManagerRegistry.register(regexp="^(.*/)?(|[^/]*[-_])inserts/?$")
+@ITEM_MANAGER_REGISTRY.register(regexp="^(.*/)?(|[^/]*[-_])inserts/?$")
 class InsertsDirectoryItemManager(InsertsItemMixin, InsertsDirectoryManager):
     pass
 
 
-@TableSetManagerRegistry.register1()
+@TABLE_SET_MANAGER_REGISTRY.register()
 class CsvManager(SingleTableMixin, SemanticTableSetManager):
     """
     This implements the mechanism to get a series of rows out of the sheet in a csv file,
@@ -966,7 +937,7 @@ class CsvManager(SingleTableMixin, SemanticTableSetManager):
                     for i, cell_text in enumerate(row_data)}
 
 
-@TableSetManagerRegistry.register()
+@ITEM_MANAGER_REGISTRY.register()
 class CsvItemManager(ItemManagerMixin, CsvManager):
     """
     This layers item-style row processing functionality on a CSV file.
@@ -974,7 +945,7 @@ class CsvItemManager(ItemManagerMixin, CsvManager):
     pass
 
 
-@TableSetManagerRegistry.register1()
+@TABLE_SET_MANAGER_REGISTRY.register()
 class TsvManager(CsvManager):
     """
     TSV files are just CSV files with tabs instead of commas as separators.
@@ -987,12 +958,36 @@ class TsvManager(CsvManager):
         return csv.reader(open_unicode_text_input_file_respecting_byte_order_mark(filename), delimiter='\t')
 
 
-@TableSetManagerRegistry.register()
+@ITEM_MANAGER_REGISTRY.register()
 class TsvItemManager(ItemManagerMixin, TsvManager):
     """
     This layers item-style row processing functionality on a TSV file.
     """
     pass
+
+
+class TableSetManager(AbstractTableSetManager):
+    """
+    This class will open a .xlsx or .csv file and load its content in our standard format.
+    (See more detailed description in AbstractTableManager.)
+    """
+
+    @classmethod
+    def create_implementation_manager(cls, filename: str, **kwargs) -> AbstractTableSetManager:
+        reader_agent_class = TABLE_SET_MANAGER_REGISTRY.manager_for_filename(filename)
+        if issubclass(reader_agent_class, AbstractItemManager):
+            raise ValueError(f"TableSetManager unexpectedly found reader agent class {reader_agent_class}.")
+        reader_agent = reader_agent_class(filename=filename, **kwargs)
+        return reader_agent
+
+    @classmethod
+    def load(cls, filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
+             **kwargs) -> TabbedSheetData:
+        """
+        Given a filename and various options
+        """
+        manager = cls.create_implementation_manager(filename=filename, tab_name=tab_name, escaping=escaping, **kwargs)
+        return manager.load_content()
 
 
 class ItemManager(AbstractTableSetManager):
@@ -1003,16 +998,16 @@ class ItemManager(AbstractTableSetManager):
 
     @classmethod
     def create_implementation_manager(cls, filename: str, **kwargs) -> AbstractItemManager:
-        reader_agent_class = TableSetManagerRegistry.manager_for_filename(filename)
+        reader_agent_class: Type[AbstractTableSetManager] = ITEM_MANAGER_REGISTRY.manager_for_filename(filename)
+        if not issubclass(reader_agent_class, AbstractItemManager):
+            raise ValueError(f"ItemManager unexpectedly found reader agent class {reader_agent_class}.")
+        reader_agent_class: Type[AbstractItemManager]
         reader_agent = reader_agent_class(filename=filename, **kwargs)
         return reader_agent
 
     @classmethod
-    def load(cls, filename: str,
-             tab_name: Optional[str] = None,
-             escaping: Optional[bool] = None,
-             schemas: Optional[Dict] = None,
-             autoload_schemas: Optional[bool] = None,
+    def load(cls, filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
+             schemas: Optional[Dict] = None, autoload_schemas: Optional[bool] = None,
              **kwargs) -> TabbedSheetData:
         """
         Given a filename and various options
@@ -1022,8 +1017,5 @@ class ItemManager(AbstractTableSetManager):
         return manager.load_content()
 
 
+load_table_set = TableSetManager.load
 load_items = ItemManager.load
-
-
-# Uncommenting this will cause this library, upon loading, to print out debugging data about what got defined.
-TableSetManagerRegistry.describe_for_debugging()
