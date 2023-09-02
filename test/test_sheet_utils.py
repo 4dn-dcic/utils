@@ -470,6 +470,17 @@ def test_csv_item_manager_load_csv():
                                      ' expects only .csv filenames:')
 
 
+def test_csv_escaping():
+
+    actual = CsvManager.load("test/data_files/escaping.csv", escaping=False)
+    expected = json.load(open("test/data_files/escaping-false.json"))
+    assert actual == expected
+
+    actual = CsvManager.load("test/data_files/escaping.csv", escaping=True)
+    expected = json.load(open("test/data_files/escaping-true.json"))
+    assert actual == expected
+
+
 def test_tsv_manager_load_content():
 
     wt = TsvManager(SAMPLE_TSV_FILE)

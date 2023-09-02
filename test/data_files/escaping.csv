@@ -1,0 +1,11 @@
+name,unquoted,doublequoted,singlequoted,overflow
+backslash,\\,"\\",'\\'
+formfeed,\f,"\f",'\f'
+newline,\n,"\n",'\n'
+return,\r,"\r",'\r'
+tab,\t,"\t",'\t'
+misc,\m,"\m",'\m'
+quote1,N/A,"x,,z",N/A
+quotelong,N/A,"x,,z,N/A
+quotlongcontinued,",N/A
+comma,N/A,",",','

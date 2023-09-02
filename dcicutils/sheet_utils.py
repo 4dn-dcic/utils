@@ -430,12 +430,15 @@ class BasicTableSetManager(AbstractTableSetManager):
 
 class SemanticTableSetManager(BasicTableSetManager):
     """
-    This is the base class for all workbook-like things, which read tablesets with possible semantic processing.
+    This is the base class for all workbook-like data sources, i.e., that may need to apply semantic processing.
     Those may be:
     * Excel workbook readers (.xlsx)
     * Comma-separated file readers (.csv)
     * Tab-separarated file readers (.tsv in most of the world, but Microsoft stupidly calls this .txt, outright
       refusing to write a .tsv file, so many people seem to compromise and call this .tsv.txt)
+    There are two levels to each of these: a class that is not semantically interpreted,
+    and a class that is semantically interpreted as an "item".
+
     This is NOT a parent class of these kinds of files, which we always take literally as if semantic processing
     were already done (in part so they can be used to test the results of other formats):
     * Json files
@@ -920,6 +923,10 @@ class CsvManager(SingleTableMixin, SemanticTableSetManager):
 
     ALLOWED_FILE_EXTENSIONS = ['.csv']
 
+    def __init__(self, filename: str, escaping: Optional[bool] = None, **kwargs):
+        super().__init__(filename=filename, **kwargs)
+        self.escaping: bool = escaping or False
+
     def _get_reader_agent(self) -> CsvReader:
         return self._get_reader_agent_for_filename(self.filename)
 
@@ -943,10 +950,20 @@ class CsvManager(SingleTableMixin, SemanticTableSetManager):
             self.headers_by_tab_name[tab_name] = headers = self.reader_agent.__next__()
         return headers
 
+    def _escape_cell_text(self, cell_text):
+        if '\\' in cell_text:
+            return expand_string_escape_sequences(cell_text)
+        else:
+            return cell_text
+
     def _process_row(self, tab_name: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
         ignored(tab_name)
-        return {headers[i]: self.parse_cell_value(row_datum)
-                for i, row_datum in enumerate(row_data)}
+        if self.escaping:
+            return {headers[i]: self.parse_cell_value(self._escape_cell_text(cell_text))
+                    for i, cell_text in enumerate(row_data)}
+        else:
+            return {headers[i]: self.parse_cell_value(cell_text)
+                    for i, cell_text in enumerate(row_data)}
 
 
 @TableSetManagerRegistry.register()
@@ -965,18 +982,9 @@ class TsvManager(CsvManager):
     """
     ALLOWED_FILE_EXTENSIONS = ['.tsv', '.tsv.txt']
 
-    def __init__(self, filename: str, escaping: Optional[bool] = None, **kwargs):
-        super().__init__(filename=filename, **kwargs)
-        self.escaping: bool = escaping or False
-
     @classmethod
     def _get_reader_agent_for_filename(cls, filename) -> CsvReader:
         return csv.reader(open_unicode_text_input_file_respecting_byte_order_mark(filename), delimiter='\t')
-
-    def parse_cell_value(self, value: SheetCellValue) -> AnyJsonData:
-        if self.escaping and isinstance(value, str) and '\\' in value:
-            value = expand_string_escape_sequences(value)
-        return super().parse_cell_value(value)  # noQA - PyCharm wrongly thinks this method call is improper
 
 
 @TableSetManagerRegistry.register()
