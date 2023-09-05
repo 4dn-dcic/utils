@@ -23,6 +23,13 @@ beanstalk_utils
    :members:
 
 
+boto_monkey_patching
+^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.boto_monkey_patching
+   :members:
+
+
 codebuild_utils
 ^^^^^^^^^^^^^^^
 

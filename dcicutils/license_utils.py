@@ -874,13 +874,18 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
 
         ],
 
+        'Other/Proprietary License': [
+            # This is known to be offered under Apache-2.0 license.
+            # Ref: https://github.com/localstack/localstack/blob/master/LICENSE.txt
+            'localstack-ext'
+        ],
+
         'UNLICENSED': [
             # The udn-browser library is our own and has been observed to sometimes show up in some contexts
             # as UNLICENSED, when really it's MIT.
             # Ref: https://github.com/dbmi-bgm/udn-browser/blob/main/LICENSE
             'udn-browser',
         ],
-
     }
 
 

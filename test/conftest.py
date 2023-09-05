@@ -1,4 +1,11 @@
 import os
+
+# Disable any AWS endpoint-url (ala boto_monkey_patching/localstack) environment variables overrides for testing.
+if "LOCALSTACK_S3_URL" in os.environ:
+    os.environ.pop("LOCALSTACK_S3_URL")
+if "LOCALSTACK_SQS_URL" in os.environ:
+    os.environ.pop("LOCALSTACK_SQS_URL")
+
 import pytest
 import requests
 

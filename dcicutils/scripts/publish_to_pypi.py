@@ -5,12 +5,13 @@
 # 1. The git repo MUST NOT contain unstaged changes.
 # 2. The git repo MUST NOT contain staged but uncommitted changes.
 # 3. The git repo MUST NOT contain committed but unpushed changes.
-# 4. The git repo package directories MUST NOT contain untracked files,
+# 4. The git repo MUST be tagged (its most recent commit must be for a tag).
+# 5. The git repo package directories MUST NOT contain untracked files,
 #    OR if they do contain untracked files then you must confirm this is OK.
-# 5. The version being published must NOT have already been published.
+# 6. The version being published must NOT have already been published.
 #
 # ASSUMES you have these credentials environment variables correctly set for PyPi publishing;
-# although a --username and --password are also supported to set these via command-line.
+# although a --username and --password are alternatively supported to set these via command-line.
 #
 # - PYPI_USER
 # - PYPI_PASSWORD
@@ -22,19 +23,15 @@
 # option to skip this confimation, however it is only allowed when running in the
 # context of GitHub actions - it checks for the GITHUB_ACTIONS environment variable.
 #
-# Prints warning if PY
-#
-# FYI: This was created late April 2023 after a junk file containing development
-# logging output containing passwords was accidentally published to PyPi;
-# item #4 above specifically addresses/prevents this. Perhaps better
-# would be if publishing only happened via GitHub actions.
+# FYI: This was created late April 2023 after a junk file containing development logging
+# output containing passwords was accidentally published to PyPi; item #5 above specifically
+# addresses/prevents this. Perhaps better would be if publishing only happened via GitHub actions.
 
 import argparse
 import os
 import requests
 import subprocess
 import toml
-
 from typing import Tuple, Union
 
 
@@ -111,9 +108,9 @@ def publish_package(pypi_username: str = None, pypi_password: str = None, force_
     if pypi_username != PYPI_API_TOKEN_USERNAME:
         if not force_allow_username:
             # Just in case someone really really needs this we will allow for now: --force-allow-username
-            ERROR_PRINT(f"Publishing with username/pasword is no longer allowed; must use API token instead.")
+            ERROR_PRINT(f"Publishing with username/password is no longer allowed; must use API token instead.")
             return False
-        WARNING_PRINT(f"Publishing with username/pasword is NOT recommmended; use API token instead;"
+        WARNING_PRINT(f"Publishing with username/password is NOT recommmended; use API token instead;"
                       f"only allowing because you said: --force-allow-username")
     poetry_publish_command = [
         "poetry", "publish",

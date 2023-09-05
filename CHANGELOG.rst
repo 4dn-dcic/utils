@@ -6,6 +6,16 @@ dcicutils
 Change Log
 ----------
 
+7.10.0
+======
+
+* Added ``boto_monkey_patching`` module to use monkey patching to override the endpoint URLs for
+  S3 or SQS boto3 client/resource creation using the ``LOCALSTACK_S3_URL`` or ``LOCALSTACK_SQS_URL``
+  environment variables to specify that these services should use a locally running ersatz
+  instance of S3 or SQS via localstack (https://localstack.cloud).
+* Comment and typo cleanup in ``publish_to_pypi.py``.
+* Updates PyYAML to ^6.0.1 because Mac M1 (with Python 3.9) only likes 5.3.1 (not 5.4.1) or 6+.
+
 
 7.9.0
 =====
@@ -26,6 +36,7 @@ Change Log
     for conceptual compatibility with ``get_schemas``.
   * Minor tweaks to ``dump_results_to_json`` for style reasons,
     and repairs to its overly complex and error-prone unit test.
+  * Fix to license_utils.py for localstack-ext.
 
 
 7.8.0
@@ -70,7 +81,6 @@ Change Log
 
 7.6.0
 =====
-
 * In ``creds_utils``:
 
   * Support for ``SMaHTKeyManager``

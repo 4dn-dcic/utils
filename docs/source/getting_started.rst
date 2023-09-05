@@ -30,3 +30,7 @@ Central metadata functions
 The most useful utilities functions for most users are the metadata functions, which generally are used to access, create, or edit object metadata on the Fourfront portal. Since this utilities module is a pip-installable Python package, they can be leveraged as an API to the portal in your scripts. All of these functions are contained within  ``dcicutils.ff_utils.py``.
 
 See example usage of these functions `here <./examples.html#metadata>`_
+
+Local development notes
+^^^^^^^^^^^^^^^^^^^^^^^
+For local debugging and development, there is some support for the ``localstack`` package (https://localstack.cloud/), or something like it, to use a local ersatz version of certain AWS services, namely, currently, for S3 and SQS, whereby any boto3 based calls which use these services will optionally use the local ersatz version. To take advantage of this simply set the environment variables ``LOCALSTACK_S3_URL`` and/or ``LOCALSTACK_SQS_URL`` environment variables when running your process, whatever that may be, e.g. ``export LOCALSTACK_S3_URL=http://localhost:4566``. To install ``localstack`` use ``pip install localstack``, and to start it use ``localstack``. FYI this support is implemented via "monkey patching" hooked on these environment variables (see the ``boto_monkey_patching.py`` module for details).
