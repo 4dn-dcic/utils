@@ -34,6 +34,7 @@ SheetData = List[dict]
 TabbedSheetData = Dict[str, SheetData]
 Regexp = type(re.compile("sample"))
 
+
 class LoadFailure(Exception):
     """
     In general, we'd prefer to load up the spreadsheet with clumsy data that can then be validated in detail,
