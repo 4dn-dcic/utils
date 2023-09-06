@@ -7,6 +7,15 @@ Change Log
 ----------
 
 
+7.10.0
+======
+
+* In ``ff_utils``:
+
+  * New arguments ``portal_env=`` and ``portal_vapp`` to ``get_schema``
+    for function ``get_schema`` and ``get_schemas``.
+
+
 7.9.0
 =====
 
