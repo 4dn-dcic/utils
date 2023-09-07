@@ -1316,112 +1316,6 @@ def test_get_schema_consistent(integrated_ff):
         time.sleep(2)
 
 
-@pytest.mark.unit
-def test_get_schema_with_vapp():
-
-    sample_vapp = mock.MagicMock()
-    sample_schema_metadata = {"foo": "foo-schema", "bar": "bar-schema"}
-    sample_auth = mock.MagicMock()
-
-    with pytest.raises(ValueError) as exc:
-        ff_utils.get_schema('User', ff_env='foo', portal_env='bar')
-    assert str(exc.value) == 'You may not supply both portal_env= and ff_env= together.'
-
-    with pytest.raises(ValueError) as exc:
-        ff_utils.get_schema('User', ff_env='foo', portal_vapp=sample_vapp)
-    assert str(exc.value) == 'You may not supply both portal_vapp= and ff_env= together.'
-
-    with pytest.raises(ValueError) as exc:
-        ff_utils.get_schema('User', portal_env='foo', portal_vapp=sample_vapp)
-    assert str(exc.value) == 'You may not supply both portal_vapp= and portal_env= together.'
-
-    for env_args in [{}, {'portal_env': 'foo'}, {'ff_env': 'foo'}]:
-
-        with mock.patch.object(ff_utils, "get_metadata") as mock_get_metadata:
-            with mock.patch.object(ff_utils, "get_authentication_with_server") as mock_get_authentication_with_server:
-
-                expected_env = list(env_args.items())[0][1] if env_args else None
-
-                mock_get_metadata.return_value = sample_schema_metadata
-                mock_get_authentication_with_server.return_value = sample_auth
-
-                # When called with no vapp, get_metadata is consulted (after getting auth info)
-                assert ff_utils.get_schema('User', **env_args) == sample_schema_metadata
-
-                mock_get_authentication_with_server.assert_called_once_with(auth=None, ff_env=expected_env)
-                mock_get_metadata.assert_called_once_with(obj_id='profiles/User.json', key=sample_auth,
-                                                          add_on='frame=raw')
-
-                sample_vapp.get.assert_not_called()
-
-    sample_vapp.get.assert_not_called()
-
-    with mock.patch.object(ff_utils, "get_metadata") as mock_get_metadata:
-        with mock.patch.object(ff_utils, "get_authentication_with_server") as mock_get_authentication_with_server:
-
-            sample_vapp.get.return_value = MockResponse(200, json=sample_schema_metadata)
-
-            assert ff_utils.get_schema('User', portal_vapp=sample_vapp) == sample_schema_metadata
-
-            mock_get_authentication_with_server.assert_not_called()
-            mock_get_metadata.assert_not_called()
-
-            sample_vapp.get.assert_called_once_with('profiles/User.json?frame=raw')
-
-
-@pytest.mark.unit
-def test_get_schemas_with_vapp():
-
-    sample_vapp = mock.MagicMock()
-    sample_schema_metadata = {"foo": {"$id": "Foo.json"}, "bar": {"$id": "Bar.json"}}
-    sample_auth = mock.MagicMock()
-
-    with pytest.raises(ValueError) as exc:
-        ff_utils.get_schemas(ff_env='foo', portal_env='bar')
-    assert str(exc.value) == 'You may not supply both portal_env= and ff_env= together.'
-
-    with pytest.raises(ValueError) as exc:
-        ff_utils.get_schemas(ff_env='foo', portal_vapp=sample_vapp)
-    assert str(exc.value) == 'You may not supply both portal_vapp= and ff_env= together.'
-
-    with pytest.raises(ValueError) as exc:
-        ff_utils.get_schemas(portal_env='foo', portal_vapp=sample_vapp)
-    assert str(exc.value) == 'You may not supply both portal_vapp= and portal_env= together.'
-
-    for env_args in [{}, {'portal_env': 'foo'}, {'ff_env': 'foo'}]:
-
-        with mock.patch.object(ff_utils, "get_metadata") as mock_get_metadata:
-            with mock.patch.object(ff_utils, "get_authentication_with_server") as mock_get_authentication_with_server:
-
-                expected_env = list(env_args.items())[0][1] if env_args else None
-
-                mock_get_metadata.return_value = sample_schema_metadata
-                mock_get_authentication_with_server.return_value = sample_auth
-
-                # When called with no vapp, get_metadata is consulted (after getting auth info)
-                assert ff_utils.get_schemas(**env_args) == sample_schema_metadata
-
-                mock_get_authentication_with_server.assert_called_once_with(auth=None, ff_env=expected_env)
-                mock_get_metadata.assert_called_once_with(obj_id='profiles/', key=sample_auth,
-                                                          add_on='frame=raw')
-
-                sample_vapp.get.assert_not_called()
-
-    sample_vapp.get.assert_not_called()
-
-    with mock.patch.object(ff_utils, "get_metadata") as mock_get_metadata:
-        with mock.patch.object(ff_utils, "get_authentication_with_server") as mock_get_authentication_with_server:
-
-            sample_vapp.get.return_value = sample_schema_metadata
-
-            assert ff_utils.get_schemas(portal_vapp=sample_vapp) == sample_schema_metadata
-
-            mock_get_authentication_with_server.assert_not_called()
-            mock_get_metadata.assert_not_called()
-
-            sample_vapp.get.assert_called_once_with('profiles/?frame=raw')
-
-
 def test_get_schemas_options():
 
     mocked_schemas = {
@@ -1456,8 +1350,8 @@ def test_get_schemas_options():
 
         with mock.patch.object(ff_utils, "get_metadata") as mock_get_metadata:
 
-            def mocked_get_metadata(obj_id, key, add_on):
-                assert obj_id == "profiles/"  # this is the web API to ask for all profiles
+            def mocked_get_metadata(url, key, add_on):
+                assert url == "profiles/"  # this is the web API to ask for all profiles
                 assert key == 'some-auth'  # we assume auth is tested elsewhere
                 assert add_on == "frame=raw"  # we presently always send this
                 return mocked_schemas
