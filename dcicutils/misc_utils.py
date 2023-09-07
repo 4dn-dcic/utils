@@ -192,7 +192,11 @@ class _VirtualAppHelper(webtest.TestApp):
     pass
 
 
-class VirtualApp:
+class AbstractVirtualApp:
+    pass
+
+
+class VirtualApp(AbstractVirtualApp):
     """
     Wrapper class for TestApp, to allow custom control over submitting Encoded requests,
     simulating a number of conditions, including permissions.
