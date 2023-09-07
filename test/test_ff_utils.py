@@ -1359,7 +1359,7 @@ def test_get_schema_with_vapp():
     with mock.patch.object(ff_utils, "get_metadata") as mock_get_metadata:
         with mock.patch.object(ff_utils, "get_authentication_with_server") as mock_get_authentication_with_server:
 
-            sample_vapp.get.return_value = sample_schema_metadata
+            sample_vapp.get.return_value = MockResponse(200, json=sample_schema_metadata)
 
             assert ff_utils.get_schema('User', portal_vapp=sample_vapp) == sample_schema_metadata
 
