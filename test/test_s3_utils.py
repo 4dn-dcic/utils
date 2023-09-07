@@ -404,6 +404,7 @@ def test_s3utils_get_higlass_key(portal_env):
 
 _GOOGLE_FOURFRONT_PROJECT_ID = "fourfront-396315"
 
+
 @pytest.mark.integrated
 @using_fresh_ff_state_for_testing()
 def test_s3utils_get_google_key():
