@@ -994,8 +994,7 @@ def get_schema(name, key=None, ff_env: Optional[str] = None, portal_env: Optiona
         res = portal_vapp.get(full_url)
         return get_response_json(res)
     else:
-        auth = get_authentication_with_server(auth=key, ff_env=portal_env)
-        schema = get_metadata(obj_id=base_url, key=auth, add_on=add_on)
+        schema = get_metadata(obj_id=base_url, key=key, ff_env=portal_env, add_on=add_on)
         return schema
 
 
@@ -1026,8 +1025,7 @@ def get_schemas(key=None, ff_env: Optional[str] = None, *, allow_abstract: bool 
         full_url = f"{base_url}?{add_on}"
         schemas: Dict[str, Dict] = portal_vapp.get(full_url)
     else:
-        auth = get_authentication_with_server(auth=key, ff_env=portal_env)
-        schemas: Dict[str, Dict] = get_metadata(obj_id=base_url, key=auth, add_on=add_on)
+        schemas: Dict[str, Dict] = get_metadata(obj_id=base_url, key=key, ff_env=portal_env, add_on=add_on)
     filtered_schemas = {}
     for schema_name, schema in schemas.items():
         if allow_abstract or not schema.get('isAbstract'):

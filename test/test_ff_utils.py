@@ -1348,8 +1348,8 @@ def test_get_schema_with_vapp():
                 # When called with no vapp, get_metadata is consulted (after getting auth info)
                 assert ff_utils.get_schema('User', **env_args) == sample_schema_metadata
 
-                mock_get_authentication_with_server.assert_called_once_with(auth=None, ff_env=expected_env)
-                mock_get_metadata.assert_called_once_with(obj_id='profiles/User.json', key=sample_auth,
+                mock_get_authentication_with_server.assert_not_called()
+                mock_get_metadata.assert_called_once_with(obj_id='profiles/User.json', key=None, ff_env=expected_env,
                                                           add_on='frame=raw')
 
                 sample_vapp.get.assert_not_called()
@@ -1398,11 +1398,10 @@ def test_get_schemas_with_vapp():
                 mock_get_metadata.return_value = sample_schema_metadata
                 mock_get_authentication_with_server.return_value = sample_auth
 
-                # When called with no vapp, get_metadata is consulted (after getting auth info)
                 assert ff_utils.get_schemas(**env_args) == sample_schema_metadata
 
-                mock_get_authentication_with_server.assert_called_once_with(auth=None, ff_env=expected_env)
-                mock_get_metadata.assert_called_once_with(obj_id='profiles/', key=sample_auth,
+                mock_get_authentication_with_server.assert_not_called()
+                mock_get_metadata.assert_called_once_with(obj_id='profiles/', key=None, ff_env=expected_env,
                                                           add_on='frame=raw')
 
                 sample_vapp.get.assert_not_called()
@@ -1456,9 +1455,10 @@ def test_get_schemas_options():
 
         with mock.patch.object(ff_utils, "get_metadata") as mock_get_metadata:
 
-            def mocked_get_metadata(obj_id, key, add_on):
+            def mocked_get_metadata(obj_id, key, ff_env, add_on):
                 assert obj_id == "profiles/"  # this is the web API to ask for all profiles
-                assert key == 'some-auth'  # we assume auth is tested elsewhere
+                assert key is None  # it would get looked up
+                assert ff_env is None  # it would get looked up, too
                 assert add_on == "frame=raw"  # we presently always send this
                 return mocked_schemas
 
