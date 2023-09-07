@@ -4,10 +4,11 @@ import os
 import pytest
 
 from collections import namedtuple
-from dcicutils import sheet_utils as sheet_utils_module
+from dcicutils import sheet_utils as sheet_utils_module, ff_utils as ff_utils_module
 from dcicutils.common import AnyJsonData
-from dcicutils.misc_utils import is_uuid, local_attrs
-from dcicutils.qa_utils import printed_output
+from dcicutils.env_utils import EnvUtils, public_env_name
+from dcicutils.misc_utils import is_uuid, local_attrs, NamedObject, AbstractVirtualApp
+from dcicutils.qa_utils import printed_output, mock_not_called, MockResponse
 from dcicutils.sheet_utils import (
     # High-level interfaces
     ItemManager, load_items, TABLE_SET_MANAGER_REGISTRY, ITEM_MANAGER_REGISTRY,
@@ -846,6 +847,10 @@ SAMPLE_ITEMS_FOR_REAL_SCHEMAS_FILE = os.path.join(TEST_DIR, 'data_files/sample_i
 @pytest.mark.integrated
 def test_workbook_with_schemas():
 
+    print()  # start o a fresh line
+
+    SchemaAutoloadMixin.clear_schema_cache()
+
     actual_data = CsvManager(filename=SAMPLE_ITEMS_FOR_REAL_SCHEMAS_FILE, tab_name='ExperimentSeq').load_content()
     expected_data = {
         "ExperimentSeq": [
@@ -875,4 +880,56 @@ def test_workbook_with_schemas():
             }
         ]
     }
+    assert actual_items == expected_items
+
+
+@using_fresh_ff_state_for_testing()
+@pytest.mark.integrated
+def test_workbook_with_schemas_and_portal_vapp():
+
+    print()  # start on a fresh line
+
+    SchemaAutoloadMixin.clear_schema_cache()
+
+    portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
+
+    experiment_seq_schema = ff_utils_module.get_schema('ExperimentSeq', portal_env=portal_env)
+
+    expected_items = {
+        "ExperimentSeq": [
+            {
+                "accession": "foo",
+                "fragment_size_selection_method": "SPRI beads"
+            },
+            {
+                "accession": "bar",
+                "fragment_size_selection_method": "BluePippin"
+            }
+        ]
+    }
+
+    class MockVapp(NamedObject, AbstractVirtualApp):
+
+        def __init__(self, name):
+            super().__init__(name=name)
+            self.call_count = 0
+
+        def get(self, path_url):
+            assert path_url.startswith('profiles/ExperimentSeq.json?')
+            self.call_count += 1
+            response = MockResponse(200, json=experiment_seq_schema)
+            return response
+
+    portal_vapp = MockVapp(name=f'MockVapp[{portal_env}]')
+
+    old_count = portal_vapp.call_count
+
+    with mock.patch.object(ff_utils_module, "get_authentication_with_server",
+                           mock_not_called("get_authentication_with_server")):
+        with mock.patch.object(ff_utils_module, "get_metadata",
+                               mock_not_called("get_metadata")):
+            actual_items = load_items(SAMPLE_ITEMS_FOR_REAL_SCHEMAS_FILE,
+                                      tab_name='ExperimentSeq', autoload_schemas=True, portal_vapp=portal_vapp)
+
+    assert portal_vapp.call_count == old_count + 1
     assert actual_items == expected_items

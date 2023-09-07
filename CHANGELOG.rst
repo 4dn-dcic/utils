@@ -7,7 +7,7 @@ Change Log
 ----------
 
 
-7.10.0
+7.11.0
 ======
 
 * New module ``sheet_utils`` for loading workbooks.
@@ -32,6 +32,23 @@ Change Log
   * New function ``is_uuid`` (migrated from Fourfront)
   * New function ``pad_to``
   * New class ``JsonLinesReader``
+
+
+7.10.0
+======
+
+* In ``ff_utils``:
+
+  * New arguments ``portal_env=`` and ``portal_vapp`` to ``get_schema``
+    for function ``get_schema`` and ``get_schemas``.
+
+* In ``s3_utils``:
+
+  * Fix a failing test (caused by an environmental change, no functional change).
+
+* In ``license_utils``:
+
+  * Allow C4 infrastructure to use the ``chardet`` library.
 
 
 7.9.0

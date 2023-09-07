@@ -11,16 +11,16 @@ import re
 import uuid
 import yaml
 
-from dcicutils.common import AnyJsonData
-from dcicutils.env_utils import public_env_name, EnvUtils
-from dcicutils.ff_utils import get_schema
-from dcicutils.lang_utils import conjoined_list, disjoined_list, maybe_pluralize, there_are
-from dcicutils.misc_utils import ignored, PRINT, pad_to, JsonLinesReader
-from dcicutils.task_utils import pmap
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.workbook.workbook import Workbook
 from tempfile import TemporaryFile
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
+from .common import AnyJsonData
+from .env_utils import public_env_name, EnvUtils
+from .ff_utils import get_schema
+from .lang_utils import conjoined_list, disjoined_list, maybe_pluralize, there_are
+from .misc_utils import ignored, PRINT, pad_to, JsonLinesReader, AbstractVirtualApp
+from .task_utils import pmap
 
 
 Header = str
@@ -614,22 +614,23 @@ class SchemaAutoloadMixin(AbstractTableSetManager):
     AUTOLOAD_SCHEMAS_DEFAULT = True
 
     def __init__(self, filename: str, autoload_schemas: Optional[bool] = None, portal_env: Optional[str] = None,
-                 **kwargs):
+                 portal_vapp: Optional[AbstractVirtualApp] = None, **kwargs):
         # This setup must be in place before the class initialization is done (via the super call).
         self.autoload_schemas: bool = self.AUTOLOAD_SCHEMAS_DEFAULT if autoload_schemas is None else autoload_schemas
-        if self.autoload_schemas:
-            if portal_env is None:
+        if self.autoload_schemas:  # If autoload_schemas is False, we don't care about doing this defaulting.
+            if portal_env is None and portal_vapp is None:
                 portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
                 PRINT(f"The portal_env was not explicitly supplied. Schemas will come from portal_env={portal_env!r}.")
         self.portal_env: Optional[str] = portal_env
+        self.portal_vapp: Optional[AbstractVirtualApp] = portal_vapp
         super().__init__(filename=filename, **kwargs)
 
     def fetch_relevant_schemas(self, schema_names: List[str]):
         # The schema_names argument is not normally given, but it is there for easier testing
         def fetch_schema(schema_name):
-            schema = self.fetch_schema(schema_name, portal_env=self.portal_env)
+            schema = self.fetch_schema(schema_name, portal_env=self.portal_env, portal_vapp=self.portal_vapp)
             return schema_name, schema
-        if self.autoload_schemas and self.portal_env:
+        if self.autoload_schemas and (self.portal_env or self.portal_vapp):
             autoloaded = {tab_name: schema
                           for tab_name, schema in pmap(fetch_schema, schema_names)}
             return autoloaded
@@ -637,9 +638,10 @@ class SchemaAutoloadMixin(AbstractTableSetManager):
             return {}
 
     @classmethod
-    def fetch_schema(cls, schema_name: str, *, portal_env: str):
+    def fetch_schema(cls, schema_name: str, *, portal_env: Optional[str] = None,
+                     portal_vapp: Optional[AbstractVirtualApp] = None):
         def just_fetch_it():
-            return get_schema(schema_name, ff_env=portal_env)
+            return get_schema(schema_name, portal_env=portal_env, portal_vapp=portal_vapp)
         if cls.CACHE_SCHEMAS:
             schema: Optional[AnyJsonData] = cls.SCHEMA_CACHE.get(schema_name)
             if schema is None:
@@ -665,8 +667,15 @@ class ItemManagerMixin(SchemaAutoloadMixin, AbstractItemManager, BasicTableSetMa
         self.patch_prototypes_by_tab_name: Dict[str, Dict] = {}
         self.parsed_headers_by_tab_name: Dict[str, ParsedHeaders] = {}
         self.type_hints_by_tab_name: Dict[str, OptionalTypeHints] = {}
-        self.schemas = schemas or self.fetch_relevant_schemas(self.tab_names)
+        self._schemas = schemas
         self._instaguid_context_table: Dict[str, str] = {}
+
+    @property
+    def schemas(self):
+        schemas = self._schemas
+        if schemas is None:
+            self._schemas = schemas = self.fetch_relevant_schemas(self.tab_names)
+        return schemas
 
     def sheet_patch_prototype(self, tab_name: str) -> Dict:
         return self.patch_prototypes_by_tab_name[tab_name]
@@ -841,12 +850,18 @@ class SimpleYamlInsertsManager(SimpleInsertsMixin, YamlInsertsMixin, InsertsMana
 
 
 class InsertsItemMixin(AbstractItemManager):  # ItemManagerMixin isn't really appropriate here
+    """
+    This class is used for inserts directories and other JSON-like data that will be literally used as an Item
+    without semantic pre-processing. In other words, these classes will not be pre-checked for semantic correctness
+    but instead assumed to have been checked by other means.
+    """
 
     AUTOLOAD_SCHEMAS_DEFAULT = False  # Has no effect, but someone might inspect the value.
 
     def __init__(self, filename: str, *, autoload_schemas: Optional[bool] = None, portal_env: Optional[str] = None,
-                 schemas: Optional[Dict[str, AnyJsonData]] = None, **kwargs):
-        ignored(portal_env)  # Would only be used if autoload_schemas was requested, and we don't allow that.
+                 portal_vapp: Optional[AbstractVirtualApp] = None, schemas: Optional[Dict[str, AnyJsonData]] = None,
+                 **kwargs):
+        ignored(portal_env, portal_vapp)  # Would only be used if autoload_schemas was true, and we don't allow that.
         if schemas not in [None, {}]:
             raise ValueError(f"{self.__class__.__name__} does not allow schemas={schemas!r}.")
         if autoload_schemas not in [None, False]:
@@ -1038,12 +1053,24 @@ class ItemManager(AbstractTableSetManager):
     @classmethod
     def load(cls, filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
              schemas: Optional[Dict] = None, autoload_schemas: Optional[bool] = None,
+             portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None,
              **kwargs) -> TabbedSheetData:
         """
-        Given a filename and various options
+        Given a filename and various options, loads the items associated with that filename.
+
+        :param filename: The name of the file to load.
+        :param tab_name: For files that lack multiple tabs (such as .csv or .tsv),
+            the tab name to associate with the data.
+        :param escaping: Whether to perform escape processing on backslashes.
+        :param schemas: A set of schemas to use instead of trying to load them.
+        :param autoload_schemas: Whether to try autoloading schemas.
+        :param portal_env: A portal to consult to find schemas (usually if calling from the outside of a portal).
+        :param portal_vapp: A vapp to use (usually if calling from within a portal).
         """
         manager = cls.create_implementation_manager(filename=filename, tab_name=tab_name, escaping=escaping,
-                                                    schemas=schemas, autoload_schemas=autoload_schemas, **kwargs)
+                                                    schemas=schemas, autoload_schemas=autoload_schemas,
+                                                    portal_env=portal_env, portal_vapp=portal_vapp,
+                                                    **kwargs)
         return manager.load_content()
 
 
