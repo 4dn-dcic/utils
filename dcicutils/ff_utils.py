@@ -991,8 +991,8 @@ def get_schema(name, key=None, ff_env: Optional[str] = None, portal_env: Optiona
     add_on = 'frame=raw'
     if portal_vapp:
         full_url = f"{base_url}?{add_on}"
-        schema = portal_vapp.get(full_url)
-        return schema
+        res = portal_vapp.get(full_url)
+        return get_response_json(res)
     else:
         auth = get_authentication_with_server(auth=key, ff_env=portal_env)
         schema = get_metadata(obj_id=base_url, key=auth, add_on=add_on)
