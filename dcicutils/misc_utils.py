@@ -295,7 +295,9 @@ class VirtualApp:
         """
         return self.wrapped_app.app
 
+
 VirtualAppResponse = webtest.response.TestResponse
+
 
 def exported(*variables):
     """
