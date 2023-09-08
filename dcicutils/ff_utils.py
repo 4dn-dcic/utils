@@ -1488,7 +1488,7 @@ def get_response_json(res):
     it is not present. Used with the metadata functions.
     """
     try:
-        # TODO: Fix for res being from vapp (webtest.response.TestRespons) call, using MockResponse ...
+        # TODO: Fix for res being from vapp (webtest.response.TestResponse) call, using MockResponse ...
         res_json = res.json()
     except Exception:
         raise Exception('Cannot get json for request to %s. Status'
