@@ -17,7 +17,7 @@ from .common import (
     # S3BucketName, S3KeyName,
 )
 from .lang_utils import disjoined_list
-from .misc_utils import PRINT, to_camel_case, remove_suffix, VirtualApp
+from .misc_utils import PRINT, to_camel_case, remove_suffix, VirtualApp, VirtualAppResponse
 
 
 # TODO (C4-92, C4-102): Probably to centralize this information in env_utils. Also figure out relation to CGAP.
@@ -990,7 +990,7 @@ def get_schema(name, key=None, ff_env: Optional[str] = None, portal_env: Optiona
     base_url = f"profiles/{to_camel_case(name)}.json"
     add_on = 'frame=raw'
     if portal_vapp:
-        full_url = f"{base_url}?{add_on}"
+        full_url = f"/{base_url}?{add_on}"
         res = portal_vapp.get(full_url)
         return get_response_json(res)
     else:
@@ -1022,7 +1022,7 @@ def get_schemas(key=None, ff_env: Optional[str] = None, *, allow_abstract: bool 
     base_url = 'profiles/'
     add_on = 'frame=raw'
     if portal_vapp:
-        full_url = f"{base_url}?{add_on}"
+        full_url = f"/{base_url}?{add_on}"
         schemas: Dict[str, Dict] = portal_vapp.get(full_url)
     else:
         schemas: Dict[str, Dict] = get_metadata(obj_id=base_url, key=key, ff_env=portal_env, add_on=add_on)
@@ -1488,7 +1488,10 @@ def get_response_json(res):
     it is not present. Used with the metadata functions.
     """
     try:
-        res_json = res.json()
+        if isinstance(res, VirtualAppResponse):
+            res_json = res.json
+        else:
+            res_json = res.json()
     except Exception:
         raise Exception('Cannot get json for request to %s. Status'
                         ' code: %s. Response text: %s' %
