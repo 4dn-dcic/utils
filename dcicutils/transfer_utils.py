@@ -47,30 +47,39 @@ class TransferUtils:
             mapping[filename] = download_url
         return mapping
 
+    def patch_location_to_portal(self, atid, file_path):
+        """ Patches a special field to atid indicating it is redundantly stored at file_path """
+        pass  # implement me after data model is in
+
     @staticmethod
-    def download_curl(url: str, filename: str) -> None:
+    def download_curl(url: str, filename: str) -> str:
         """ Downloads from url under filename at the download path using curl """
         subprocess.run(['curl', '-L', url, '-o', filename], check=True)
+        return filename
 
     @staticmethod
-    def download_wget(url: str, filename):
+    def download_wget(url: str, filename: str) -> str:
         """ Downloads from url under filename at the download path using wget """
         subprocess.run(['wget', '-q', url, '-O', filename], check=True)
+        return filename
 
     @staticmethod
-    def download_rclone(url, filename):
+    def download_rclone(url: str, filename: str) -> str:
         """ Downloads from url under filename at the download path using rclone """
         subprocess.run(['rclone', 'copy', url, filename], check=True)
+        return filename
 
     @staticmethod
-    def download_globus(url, filename):
+    def download_globus(url: str, filename: str) -> str:
         """ Downloads from url under filename at the download path using curl """
         subprocess.run(['globus', 'transfer', 'download', url, filename], check=True)
+        return filename
 
-    def download_file(self, url, filename):
+    def download_file(self, url: str, filename: str) -> str:
         """ Entrypoint for general download, will select appropriate downloader depending on what was
             passed to init
         """
+        filename = os.path.join(self.download_path, filename)
         if self.downloader == Downloader.CURL:
             return self.download_curl(url, filename)
         elif self.downloader == Downloader.WGET:
@@ -80,7 +89,7 @@ class TransferUtils:
         else:  # rclone
             return self.download_rclone(url, filename)
 
-    def parallel_download(self, filename_to_url_mapping):
+    def parallel_download(self, filename_to_url_mapping: dict) -> list:
         """ Executes a parallel download given the result of extract_file_download_urls_from_search """
         download_files = []
         with concurrent.futures.ProcessPoolExecutor(max_workers=self.num_processes) as executor:
