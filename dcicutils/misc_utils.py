@@ -301,6 +301,9 @@ class VirtualApp(AbstractVirtualApp):
         return self.wrapped_app.app
 
 
+VirtualAppResponse = webtest.response.TestResponse
+
+
 def exported(*variables):
     """
     This function does nothing but is used for declaration purposes.
