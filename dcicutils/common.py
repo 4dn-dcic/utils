@@ -1,5 +1,8 @@
+import csv
 import os
+import re
 
+from tempfile import TemporaryFile
 from typing import Dict, Union, Tuple, List, Any
 from typing_extensions import Literal
 
@@ -69,6 +72,9 @@ UrlString = str
 
 PortalEnvName = str
 
+Regexp = type(re.compile("sample"))
+
+CsvReader = type(csv.reader(TemporaryFile()))
 
 # ===== AWS Data =====
 
