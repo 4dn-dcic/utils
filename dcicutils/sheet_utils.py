@@ -575,18 +575,16 @@ class TsvManager(CsvManager):
         return csv.reader(open_unicode_text_input_file_respecting_byte_order_mark(filename), delimiter='\t')
 
 
-def do_shell_command(command, cwd=None):
+def _do_shell_command(command, cwd=None):
     # This might need to be more elaborate, but hopefully it will do for now. -kmp 11-Sep-2023
     subprocess.check_output(command, cwd=cwd)
 
 
 @contextlib.contextmanager
-def maybe_unpack(filename):
+def maybe_unpack(filename):  # Maybe move to another module
     """
     If necessary, unpack a file that is zipped and/or tarred, yielding the name of the file (unpacked or not).
     """
-    if not os.path.exists(filename):
-        raise ValueError(f"The file {filename!r} does not exist.")
     unpackables = ['.tar.gz', '.tar', '.tgz', '.gz', '.zip']
     ext = None
     for unpackable in unpackables:
@@ -596,20 +594,26 @@ def maybe_unpack(filename):
     if not ext:
         yield filename
         return
+    if not os.path.exists(filename):
+        # We don't bother to raise this error if we're not planning to do any unpacking.
+        # The caller can decide if/when such errors are needed in that case.
+        # But if we are going to have to move bits around, they'll need to actually be there.
+        # -kmp 12-Sep-2023
+        raise ValueError(f"The file {filename!r} does not exist.")
     target_base_part = remove_suffix(ext, os.path.basename(filename), required=True)
     target_ext = '.tar.gz' if ext == '.tgz' else ext
     with TemporaryDirectory() as temp_dir:
         temp_base = os.path.join(temp_dir, target_base_part)
         temp_filename = temp_base + target_ext
-        do_shell_command(['cp', filename, temp_filename])
+        _do_shell_command(['cp', filename, temp_filename])
         if temp_filename.endswith('.gz'):
-            do_shell_command(['gunzip', temp_filename], cwd=temp_dir)
+            _do_shell_command(['gunzip', temp_filename], cwd=temp_dir)
             temp_filename = remove_suffix('.gz', temp_filename)
         elif temp_filename.endswith(".zip"):
-            do_shell_command(['unzip', temp_filename], cwd=temp_dir)
+            _do_shell_command(['unzip', temp_filename], cwd=temp_dir)
             temp_filename = remove_suffix('.zip', temp_filename)
         if temp_filename.endswith(".tar"):
-            do_shell_command(['tar', '-xf', temp_filename], cwd=temp_dir)
+            _do_shell_command(['tar', '-xf', temp_filename], cwd=temp_dir)
             tar_file = temp_filename
             temp_filename = remove_suffix(".tar", temp_filename, required=True)
             if not os.path.isdir(temp_filename):
@@ -644,9 +648,7 @@ class TableSetManager(AbstractTableSetManager):
         """
         Given a filename and various options
         """
-
         with maybe_unpack(filename) as filename:
-
             manager = cls.create_implementation_manager(filename=filename, tab_name=tab_name, escaping=escaping,
                                                         **kwargs)
             return manager.load_content()
