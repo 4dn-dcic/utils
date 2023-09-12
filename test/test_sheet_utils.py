@@ -42,7 +42,6 @@ TEST_SHEET_1 = 'Sheet1'
 
 
 def test_load_failure():
-
     sample_message = "This is a test."
 
     load_failure_object = LoadFailure(sample_message)
@@ -51,7 +50,6 @@ def test_load_failure():
 
 
 def test_load_argument_error():
-
     sample_message = "This is a test."
 
     load_failure_object = LoadArgumentsError(sample_message)
@@ -60,7 +58,6 @@ def test_load_argument_error():
 
 
 def test_load_table_error():
-
     sample_message = "This is a test."
 
     load_failure_object = LoadTableError(sample_message)
@@ -69,7 +66,6 @@ def test_load_table_error():
 
 
 def test_prefer_number():
-
     assert prefer_number('') is None
     assert prefer_number('123') == 123
     assert prefer_number('3.14') == 3.14
@@ -83,7 +79,6 @@ def test_prefer_number():
 
 
 def test_expand_string_escape_sequences():
-
     assert expand_string_escape_sequences("foo") == "foo"
     assert expand_string_escape_sequences("foo\\tbar") == "foo\tbar"
     assert expand_string_escape_sequences("\\r\\t\\n\\\\") == "\r\t\n\\"
@@ -116,26 +111,22 @@ TstArgs = namedtuple("TstArgs1", tst_args, defaults=(None,) * len(tst_args.split
             message="Function foo doesn't use keyword arguments a=1 and b=2."),  # noQA PyCharm can't see defaults
 ])
 def test_unwanted_kwargs_with_error(context, context_plural, detailed, kwargs, message):
-
     with pytest.raises(LoadArgumentsError) as exc:
         unwanted_kwargs(context=context, kwargs=kwargs, context_plural=context_plural, detailed=detailed)
     assert str(exc.value) == message
 
 
 def test_back_table_set_create_state():
-
     assert BasicTableSetManager._create_tab_processor_state('some-tab') is None
 
 
 def test_infer_tab_name_from_filename():
-
     assert infer_tab_name_from_filename('some/dir/some') == 'some'
     assert infer_tab_name_from_filename('some/dir/some.file') == 'some'
     assert infer_tab_name_from_filename('some/dir/some.file.name') == 'some'
 
 
 def test_table_set_manager_registry_manager_for_filename():
-
     assert TABLE_SET_MANAGER_REGISTRY.manager_for_filename("xyz/foo.csv") == CsvManager
 
     with pytest.raises(Exception) as exc:
@@ -223,18 +214,15 @@ SAMPLE_YAML_TABS_FILE_ITEM_CONTENT = SAMPLE_XLSX_FILE_ITEM_CONTENT
 
 
 def test_xlsx_manager_load_content():
-
     wt = XlsxManager(SAMPLE_XLSX_FILE)
     assert wt.load_content() == SAMPLE_XLSX_FILE_RAW_CONTENT
 
 
 def test_xlsx_manager_load():
-
     assert XlsxManager.load(SAMPLE_XLSX_FILE) == SAMPLE_XLSX_FILE_RAW_CONTENT
 
 
 def test_xlsx_manager_load_csv():
-
     with pytest.raises(LoadArgumentsError) as exc:
         XlsxManager.load(SAMPLE_CSV_FILE)
     assert str(exc.value).startswith('The TableSetManager subclass XlsxManager'
@@ -242,27 +230,22 @@ def test_xlsx_manager_load_csv():
 
 
 def test_csv_manager_load_content():
-
     wt = CsvManager(SAMPLE_CSV_FILE)
     assert wt.load_content() == SAMPLE_CSV_FILE_RAW_CONTENT
 
 
 def test_csv_manager_load():
-
     assert CsvManager.load(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_RAW_CONTENT
 
 
 def test_csv_manager_load_csv():
-
     with pytest.raises(LoadArgumentsError) as exc:
         CsvManager.load(SAMPLE_XLSX_FILE)
     assert str(exc.value).startswith('The TableSetManager subclass CsvManager'
                                      ' expects only .csv filenames:')
 
 
-
 def test_csv_escaping():
-
     actual = CsvManager.load("test/data_files/escaping.csv", escaping=False)
     expected = json.load(open("test/data_files/escaping-false.json"))
     assert actual == expected
@@ -273,21 +256,16 @@ def test_csv_escaping():
 
 
 def test_tsv_manager_load_content():
-
     wt = TsvManager(SAMPLE_TSV_FILE)
     assert wt.load_content() == SAMPLE_TSV_FILE_RAW_CONTENT
 
 
 def test_tsv_manager_load():
-
     assert TsvManager.load(SAMPLE_TSV_FILE) == SAMPLE_TSV_FILE_RAW_CONTENT
 
 
 def test_tsv_manager_load_csv():
-
     with pytest.raises(LoadArgumentsError) as exc:
         TsvManager.load(SAMPLE_XLSX_FILE)
     assert str(exc.value).startswith('The TableSetManager subclass TsvManager'
                                      ' expects only .tsv or .tsv.txt filenames:')
-
-

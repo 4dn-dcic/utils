@@ -10,7 +10,7 @@ from .ff_utils import get_schema
 from .lang_utils import there_are
 from .misc_utils import AbstractVirtualApp, ignored, PRINT
 from .sheet_utils import (
-    Header, Headers, ParsedHeader, ParsedHeaders, SheetCellValue, SheetRow,  TabbedSheetData,  # SheetData,
+    Header, Headers, ParsedHeader, ParsedHeaders, SheetCellValue, SheetRow, TabbedSheetData,  # SheetData,
     prefer_number,
     LoadTableError,
     TableSetManagerRegistry, AbstractTableSetManager, BasicTableSetManager,
@@ -499,5 +499,6 @@ class ItemManager(AbstractTableSetManager):
                                                     portal_env=portal_env, portal_vapp=portal_vapp,
                                                     **kwargs)
         return manager.load_content()
+
 
 load_items = ItemManager.load

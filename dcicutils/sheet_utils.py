@@ -1,3 +1,5 @@
+import contextlib
+
 import chardet
 # import contextlib
 # import copy
@@ -8,18 +10,19 @@ import json
 import openpyxl
 import os
 import re
+import subprocess
 # import uuid
 import yaml
 
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.workbook.workbook import Workbook
-from tempfile import TemporaryFile
+from tempfile import TemporaryFile, TemporaryDirectory
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
 from .common import AnyJsonData, Regexp
 # from .env_utils import public_env_name, EnvUtils
 # from .ff_utils import get_schema
 from .lang_utils import conjoined_list, disjoined_list, maybe_pluralize  # , there_are
-from .misc_utils import ignored, pad_to, JsonLinesReader  # , PRINT, AbstractVirtualApp
+from .misc_utils import ignored, pad_to, JsonLinesReader, remove_suffix  # , PRINT, AbstractVirtualApp
 # from .task_utils import pmap
 
 
@@ -123,9 +126,6 @@ def open_unicode_text_input_file_respecting_byte_order_mark(filename):
         detected_encoding = bom_info and bom_info.get('encoding')  # tread lightly
     use_encoding = 'utf-8' if detected_encoding == 'ascii' else detected_encoding
     return io.open(filename, 'r', encoding=use_encoding)
-
-
-
 
 
 # TODO: Consider whether this might want to be an abstract base class. Some change might be needed.
@@ -325,7 +325,6 @@ class TableSetManagerRegistry:
 TABLE_SET_MANAGER_REGISTRY = TableSetManagerRegistry()
 
 
-
 @TABLE_SET_MANAGER_REGISTRY.register()
 class XlsxManager(SemanticTableSetManager):
     """
@@ -480,9 +479,6 @@ class SimpleYamlInsertsManager(SimpleInsertsMixin, YamlInsertsMixin, InsertsMana
     ALLOWED_FILE_EXTENSIONS = [".yaml"]
 
 
-
-
-
 @TABLE_SET_MANAGER_REGISTRY.register()
 class SimpleJsonLinesInsertsManager(SimpleInsertsMixin, InsertsManager):
 
@@ -490,8 +486,6 @@ class SimpleJsonLinesInsertsManager(SimpleInsertsMixin, InsertsManager):
 
     def _parse_inserts_data(self, filename: str) -> AnyJsonData:
         return [line for line in JsonLinesReader(open_unicode_text_input_file_respecting_byte_order_mark(filename))]
-
-
 
 
 @TABLE_SET_MANAGER_REGISTRY.register(regexp="^(.*/)?(|[^/]*[-_])inserts/?$")
@@ -513,8 +507,6 @@ class InsertsDirectoryManager(InsertsManager):
             tab_name = os.path.basename(tab_file).split('.')[0]
             data[tab_name] = tab_content
         return data
-
-
 
 
 @TABLE_SET_MANAGER_REGISTRY.register()
@@ -570,8 +562,6 @@ class CsvManager(SingleTableMixin, SemanticTableSetManager):
                     for i, cell_text in enumerate(row_data)}
 
 
-
-
 @TABLE_SET_MANAGER_REGISTRY.register()
 class TsvManager(CsvManager):
     """
@@ -585,6 +575,47 @@ class TsvManager(CsvManager):
         return csv.reader(open_unicode_text_input_file_respecting_byte_order_mark(filename), delimiter='\t')
 
 
+def do_shell_command(command, cwd=None):
+    # This might need to be more elaborate, but hopefully it will do for now. -kmp 11-Sep-2023
+    subprocess.check_output(command, cwd=cwd)
+
+
+@contextlib.contextmanager
+def maybe_unpack(filename):
+    """
+    If necessary, unpack a file that is zipped and/or tarred, yielding the name of the file (unpacked or not).
+    """
+    if not os.path.exists(filename):
+        raise ValueError(f"The file {filename!r} does not exist.")
+    unpackables = ['.tar.gz', '.tar', '.tgz', '.gz', '.zip']
+    ext = None
+    for unpackable in unpackables:
+        if filename.endswith(unpackable):
+            ext = unpackable
+            break
+    if not ext:
+        yield filename
+        return
+    target_base_part = remove_suffix(ext, os.path.basename(filename), required=True)
+    target_ext = '.tar.gz' if ext == '.tgz' else ext
+    with TemporaryDirectory() as temp_dir:
+        temp_base = os.path.join(temp_dir, target_base_part)
+        temp_filename = temp_base + target_ext
+        do_shell_command(['cp', filename, temp_filename])
+        if temp_filename.endswith('.gz'):
+            do_shell_command(['gunzip', temp_filename], cwd=temp_dir)
+            temp_filename = remove_suffix('.gz', temp_filename)
+        elif temp_filename.endswith(".zip"):
+            do_shell_command(['unzip', temp_filename], cwd=temp_dir)
+            temp_filename = remove_suffix('.zip', temp_filename)
+        if temp_filename.endswith(".tar"):
+            do_shell_command(['tar', '-xf', temp_filename], cwd=temp_dir)
+            tar_file = temp_filename
+            temp_filename = remove_suffix(".tar", temp_filename, required=True)
+            if not os.path.isdir(temp_filename):
+                raise Exception(f"{tar_file} didn't unpack to a dir: {temp_filename}")
+        # print(f"Unpacked {filename} to {temp_filename}")
+        yield temp_filename
 
 
 class TableSetManager(AbstractTableSetManager):
@@ -593,8 +624,11 @@ class TableSetManager(AbstractTableSetManager):
     (See more detailed description in AbstractTableManager.)
     """
 
+    COMPRESSION_EXTENSIONS = ['.gz', '.tgz', '.tar.gz']
+
     @classmethod
     def create_implementation_manager(cls, filename: str, **kwargs) -> AbstractTableSetManager:
+
         reader_agent_class = TABLE_SET_MANAGER_REGISTRY.manager_for_filename(filename)
         # This is a bad forward reference in current refactor, but also may be testing for something we don't need
         # to worry about anymore. -kmp 11-Sep-2023
@@ -610,12 +644,12 @@ class TableSetManager(AbstractTableSetManager):
         """
         Given a filename and various options
         """
-        manager = cls.create_implementation_manager(filename=filename, tab_name=tab_name, escaping=escaping, **kwargs)
-        return manager.load_content()
 
+        with maybe_unpack(filename) as filename:
 
-
+            manager = cls.create_implementation_manager(filename=filename, tab_name=tab_name, escaping=escaping,
+                                                        **kwargs)
+            return manager.load_content()
 
 
 load_table_set = TableSetManager.load
-

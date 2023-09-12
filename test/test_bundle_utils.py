@@ -167,7 +167,6 @@ def test_item_tools_parse_item_value_guids(instaguids_enabled):
 
 
 def test_item_tools_set_path_value():
-
     x = {'foo': 1, 'bar': 2}
     ItemTools.set_path_value(x, ['foo'], 3)
     assert x == {'foo': 3, 'bar': 2}
@@ -182,7 +181,6 @@ def test_item_tools_set_path_value():
 
 
 def test_item_tools_find_type_hint():
-
     assert ItemTools.find_type_hint(None, 'anything') is None
 
     assert ItemTools.find_type_hint(['foo', 'bar'], None) is None
@@ -227,7 +225,6 @@ def test_item_tools_find_type_hint():
 
 
 def test_item_manager_registry_manager_for_filename():
-
     assert ITEM_MANAGER_REGISTRY.manager_for_filename("xyz/foo.csv") == CsvItemManager
 
     with pytest.raises(Exception) as exc:
@@ -236,57 +233,47 @@ def test_item_manager_registry_manager_for_filename():
 
 
 def test_xlsx_item_manager_load_content():
-
     it = XlsxItemManager(SAMPLE_XLSX_FILE, autoload_schemas=False)
     assert it.load_content() == SAMPLE_XLSX_FILE_ITEM_CONTENT
 
 
 def test_xlsx_item_manager_load():
-
     assert XlsxItemManager.load(SAMPLE_XLSX_FILE, autoload_schemas=False) == SAMPLE_XLSX_FILE_ITEM_CONTENT
 
 
 def test_xlsx_item_manager_load_csv():
-
     with pytest.raises(LoadArgumentsError) as exc:
         XlsxItemManager.load(SAMPLE_CSV_FILE)
     assert str(exc.value).startswith('The TableSetManager subclass XlsxItemManager'
                                      ' expects only .xlsx filenames:')
 
 
-
-
 def test_csv_item_manager_load_content():
-
     it = CsvItemManager(SAMPLE_CSV_FILE, autoload_schemas=False)
     assert it.load_content() == SAMPLE_CSV_FILE_ITEM_CONTENT
 
 
 def test_csv_item_manager_load():
-
     assert CsvItemManager.load(SAMPLE_CSV_FILE, autoload_schemas=False) == SAMPLE_CSV_FILE_ITEM_CONTENT
 
 
 def test_csv_item_manager_load_csv():
-
     with pytest.raises(LoadArgumentsError) as exc:
         CsvItemManager.load(SAMPLE_XLSX_FILE, autoload_schemas=False)
     assert str(exc.value).startswith('The TableSetManager subclass CsvItemManager'
                                      ' expects only .csv filenames:')
 
-def test_tsv_item_manager_load_content():
 
+def test_tsv_item_manager_load_content():
     it = TsvItemManager(SAMPLE_TSV_FILE, autoload_schemas=False)
     assert it.load_content() == SAMPLE_TSV_FILE_ITEM_CONTENT
 
 
 def test_tsv_item_manager_load():
-
     assert TsvItemManager.load(SAMPLE_TSV_FILE, autoload_schemas=False) == SAMPLE_TSV_FILE_ITEM_CONTENT
 
 
 def test_tsv_item_manager_load_csv():
-
     with pytest.raises(LoadArgumentsError) as exc:
         TsvItemManager.load(SAMPLE_XLSX_FILE, autoload_schemas=False)
     assert str(exc.value).startswith('The TableSetManager subclass TsvItemManager'
@@ -294,11 +281,8 @@ def test_tsv_item_manager_load_csv():
 
 
 def test_item_manager_load():
-
     assert ItemManager.load(SAMPLE_XLSX_FILE, autoload_schemas=False) == SAMPLE_XLSX_FILE_ITEM_CONTENT
-
     assert ItemManager.load(SAMPLE_CSV_FILE, autoload_schemas=False) == SAMPLE_CSV_FILE_ITEM_CONTENT
-
     assert ItemManager.load(SAMPLE_TSV_FILE, autoload_schemas=False) == SAMPLE_TSV_FILE_ITEM_CONTENT
 
     loaded = ItemManager.load(SAMPLE_JSON_TABS_FILE, autoload_schemas=False)
@@ -313,9 +297,7 @@ def test_item_manager_load():
 
 
 def test_load_items():
-
     assert load_items(SAMPLE_XLSX_FILE, autoload_schemas=False) == SAMPLE_XLSX_FILE_ITEM_CONTENT
-
     assert load_items(SAMPLE_CSV_FILE, autoload_schemas=False) == SAMPLE_CSV_FILE_ITEM_CONTENT
 
     with pytest.raises(LoadArgumentsError) as exc:
