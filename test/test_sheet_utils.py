@@ -915,7 +915,7 @@ def test_workbook_with_schemas_and_portal_vapp():
             self.call_count = 0
 
         def get(self, path_url):
-            assert path_url.startswith('profiles/ExperimentSeq.json?')
+            assert path_url.startswith('/profiles/ExperimentSeq.json?')
             self.call_count += 1
             response = MockResponse(200, json=experiment_seq_schema)
             return response

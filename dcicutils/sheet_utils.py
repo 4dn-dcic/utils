@@ -8,18 +8,19 @@ import json
 import openpyxl
 import os
 import re
+import subprocess
 import uuid
 import yaml
 
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.workbook.workbook import Workbook
-from tempfile import TemporaryFile
+from tempfile import TemporaryFile, TemporaryDirectory
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
 from .common import AnyJsonData
 from .env_utils import public_env_name, EnvUtils
 from .ff_utils import get_schema
 from .lang_utils import conjoined_list, disjoined_list, maybe_pluralize, there_are
-from .misc_utils import ignored, PRINT, pad_to, JsonLinesReader, AbstractVirtualApp
+from .misc_utils import ignored, PRINT, pad_to, JsonLinesReader, AbstractVirtualApp, remove_suffix
 from .task_utils import pmap
 
 
@@ -1011,6 +1012,53 @@ class TsvItemManager(ItemManagerMixin, TsvManager):
     pass
 
 
+def _do_shell_command(command, cwd=None):
+    # This might need to be more elaborate, but hopefully it will do for now. -kmp 11-Sep-2023
+    subprocess.check_output(command, cwd=cwd)
+
+
+@contextlib.contextmanager
+def maybe_unpack(filename):  # Maybe move to another module
+    """
+    If necessary, unpack a file that is zipped and/or tarred, yielding the name of the file (unpacked or not).
+    """
+    unpackables = ['.tar.gz', '.tar', '.tgz', '.gz', '.zip']
+    ext = None
+    for unpackable in unpackables:
+        if filename.endswith(unpackable):
+            ext = unpackable
+            break
+    if not ext:
+        yield filename
+        return
+    if not os.path.exists(filename):
+        # We don't bother to raise this error if we're not planning to do any unpacking.
+        # The caller can decide if/when such errors are needed in that case.
+        # But if we are going to have to move bits around, they'll need to actually be there.
+        # -kmp 12-Sep-2023
+        raise ValueError(f"The file {filename!r} does not exist.")
+    target_base_part = remove_suffix(ext, os.path.basename(filename), required=True)
+    target_ext = '.tar.gz' if ext == '.tgz' else ext
+    with TemporaryDirectory() as temp_dir:
+        temp_base = os.path.join(temp_dir, target_base_part)
+        temp_filename = temp_base + target_ext
+        _do_shell_command(['cp', filename, temp_filename])
+        if temp_filename.endswith('.gz'):
+            _do_shell_command(['gunzip', temp_filename], cwd=temp_dir)
+            temp_filename = remove_suffix('.gz', temp_filename)
+        elif temp_filename.endswith(".zip"):
+            _do_shell_command(['unzip', temp_filename], cwd=temp_dir)
+            temp_filename = remove_suffix('.zip', temp_filename)
+        if temp_filename.endswith(".tar"):
+            _do_shell_command(['tar', '-xf', temp_filename], cwd=temp_dir)
+            tar_file = temp_filename
+            temp_filename = remove_suffix(".tar", temp_filename, required=True)
+            if not os.path.isdir(temp_filename):
+                raise Exception(f"{tar_file} didn't unpack to a dir: {temp_filename}")
+        # print(f"Unpacked {filename} to {temp_filename}")
+        yield temp_filename
+
+
 class TableSetManager(AbstractTableSetManager):
     """
     This class will open a .xlsx or .csv file and load its content in our standard format.
@@ -1031,8 +1079,10 @@ class TableSetManager(AbstractTableSetManager):
         """
         Given a filename and various options
         """
-        manager = cls.create_implementation_manager(filename=filename, tab_name=tab_name, escaping=escaping, **kwargs)
-        return manager.load_content()
+        with maybe_unpack(filename) as filename:
+            manager = cls.create_implementation_manager(filename=filename, tab_name=tab_name, escaping=escaping,
+                                                        **kwargs)
+            return manager.load_content()
 
 
 class ItemManager(AbstractTableSetManager):
@@ -1067,11 +1117,14 @@ class ItemManager(AbstractTableSetManager):
         :param portal_env: A portal to consult to find schemas (usually if calling from the outside of a portal).
         :param portal_vapp: A vapp to use (usually if calling from within a portal).
         """
-        manager = cls.create_implementation_manager(filename=filename, tab_name=tab_name, escaping=escaping,
-                                                    schemas=schemas, autoload_schemas=autoload_schemas,
-                                                    portal_env=portal_env, portal_vapp=portal_vapp,
-                                                    **kwargs)
-        return manager.load_content()
+
+        with maybe_unpack(filename) as filename:
+
+            manager = cls.create_implementation_manager(filename=filename, tab_name=tab_name, escaping=escaping,
+                                                        schemas=schemas, autoload_schemas=autoload_schemas,
+                                                        portal_env=portal_env, portal_vapp=portal_vapp,
+                                                        **kwargs)
+            return manager.load_content()
 
 
 load_table_set = TableSetManager.load
