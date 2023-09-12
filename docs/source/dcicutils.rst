@@ -23,6 +23,13 @@ beanstalk_utils
    :members:
 
 
+bundle_utils
+^^^^^^^^^^^^
+
+.. automodule:: dcicutils.bundle_utils
+   :members:
+
+
 codebuild_utils
 ^^^^^^^^^^^^^^^
 
