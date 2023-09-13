@@ -8,7 +8,8 @@ import subprocess as subprocess_module
 
 from collections import defaultdict
 from dcicutils.license_utils import (
-    LicenseFrameworkRegistry, LicenseFramework, PythonLicenseFramework, JavascriptLicenseFramework,
+    LicenseFrameworkRegistry, LicenseFramework,
+    PythonLicenseFramework, JavascriptLicenseFramework, RLicenseFramework,
     LicenseAnalysis, LicenseChecker, LicenseStatus, LicenseFileParser,
     LicenseCheckFailure, LicenseOwnershipCheckFailure, LicenseAcceptabilityCheckFailure,
     warnings as license_utils_warnings_module,
@@ -134,12 +135,12 @@ def test_license_framework_registry_register():  # decorator
     with LicenseFrameworkRegistry.temporary_registration_for_testing():
 
         with pytest.raises(ValueError):
-            @LicenseFrameworkRegistry.register(name='bogus_dummy')
+            @LicenseFrameworkRegistry.register_framework(name='bogus_dummy')
             class BogusDummyLicenseFramework:
                 pass
             ignored(BogusDummyLicenseFramework)
 
-        @LicenseFrameworkRegistry.register(name='dummy')
+        @LicenseFrameworkRegistry.register_framework(name='dummy')
         class DummyLicenseFramework(LicenseFramework):
             pass
 
@@ -159,6 +160,7 @@ def test_license_framework_registry_all_frameworks():
     assert sorted(frameworks, key=lambda x: x.NAME) == [
         JavascriptLicenseFramework,
         PythonLicenseFramework,
+        RLicenseFramework
     ]
 
 
@@ -166,7 +168,7 @@ def test_license_framework_registry_find_framework():
 
     with LicenseFrameworkRegistry.temporary_registration_for_testing():
 
-        @LicenseFrameworkRegistry.register(name='dummy1')
+        @LicenseFrameworkRegistry.register_framework(name='dummy1')
         class DummyLicenseFramework1(LicenseFramework):
             pass
 
@@ -187,7 +189,8 @@ def test_license_framework_registry_find_framework():
 def test_javascript_license_framework_implicated_licenses():
 
     def check_implications(spec, implications):
-        assert JavascriptLicenseFramework.implicated_licenses(licenses_spec=spec) == implications
+        assert JavascriptLicenseFramework.implicated_licenses(package_name='ignored',
+                                                              licenses_spec=spec) == implications
 
     check_implications(spec='(MIT AND BSD-3-Clause)', implications=['BSD-3-Clause', 'MIT'])
     check_implications(spec='(CC-BY-4.0 AND OFL-1.1 AND MIT)', implications=['CC-BY-4.0', 'MIT', 'OFL-1.1'])
@@ -216,10 +219,10 @@ def test_javascript_license_framework_get_licenses():
         mock_check_output.return_value = subprocess_output
         with printed_output() as printed:
             assert JavascriptLicenseFramework.get_dependencies() == [
-                {'licenses': ['Apache-2.0'], 'name': 'package1'},
-                {'licenses': ['MIT'], 'name': 'package2'},
-                {'licenses': ['Apache-2.0', 'MIT'], 'name': 'package3'},
-                {'licenses': [], 'name': 'package4'},
+                {'framework': 'javascript', 'licenses': ['Apache-2.0'], 'name': 'package1'},
+                {'framework': 'javascript', 'licenses': ['MIT'], 'name': 'package2'},
+                {'framework': 'javascript', 'licenses': ['Apache-2.0', 'MIT'], 'name': 'package3'},
+                {'framework': 'javascript', 'licenses': [], 'name': 'package4'},
             ]
             assert printed.lines == [
                 "Rewriting '(MIT OR Apache-2.0)' as ['Apache-2.0', 'MIT']"
@@ -625,6 +628,7 @@ def test_license_checker_analyze_license_dependencies_by_framework():
         assert mock_analyze.mock_calls == [
             mock.call(analysis=analysis, acceptable=None, exceptions=None, framework=JavascriptLicenseFramework),
             mock.call(analysis=analysis, acceptable=None, exceptions=None, framework=PythonLicenseFramework),
+            mock.call(analysis=analysis, acceptable=None, exceptions=None, framework=RLicenseFramework),
         ]
 
 

@@ -1,4 +1,5 @@
 import contextlib
+import csv
 import datetime
 import io
 import json
@@ -23,13 +24,15 @@ except ImportError:  # pragma: no cover - not worth unit testing this case
 #    import piplicenses
 
 from collections import defaultdict
-from typing import Any, Dict, DefaultDict, List, Optional, Type, Union
+from typing import Any, Dict, DefaultDict, List, Optional, Type, TypeVar, Union
 
 # For obscure reasons related to how this file is used for early prototyping, these must use absolute references
 # to modules, not relative references. Later when things are better installed, we can make refs relative again.
+from dcicutils.exceptions import InvalidParameterError
 from dcicutils.lang_utils import there_are
-from dcicutils.misc_utils import PRINT, get_error_message, local_attrs
+from dcicutils.misc_utils import PRINT, get_error_message, local_attrs, ignored
 
+T = TypeVar("T")
 
 # logging.basicConfig()
 # logger = logging.getLogger(__name__)
@@ -41,6 +44,10 @@ _LICENSE_CLASSIFIER = 'license_classifier'
 _LICENSES = 'licenses'
 _NAME = 'name'
 _STATUS = 'status'
+
+
+def augment(d: dict, by: dict):
+    return dict(d, **by)
 
 
 class LicenseStatus:
@@ -87,13 +94,13 @@ class LicenseFrameworkRegistry:
             yield
 
     @classmethod
-    def register(cls, *, name):
+    def register_framework(cls, *, name):
         """
         Declares a python license framework classs.
         Mostly these names will be language names like 'python' or 'javascript',
         but they might be names of other, non-linguistic frameworks (like 'cgap-pipeline', for example).
         """
-        def _decorator(framework_class):
+        def _decorator(framework_class: T) -> T:
             if not issubclass(framework_class, LicenseFramework):
                 raise ValueError(f"The class {framework_class.__name__} does not inherit from LicenseFramework.")
             framework_class.NAME = name
@@ -117,11 +124,12 @@ class LicenseFrameworkRegistry:
         return sorted(cls.LICENSE_FRAMEWORKS.values(), key=lambda x: x.NAME)
 
 
-@LicenseFrameworkRegistry.register(name='javascript')
+@LicenseFrameworkRegistry.register_framework(name='javascript')
 class JavascriptLicenseFramework(LicenseFramework):
 
     @classmethod
-    def implicated_licenses(cls, *, licenses_spec: str):
+    def implicated_licenses(cls, *, package_name, licenses_spec: str) -> List[str]:
+        ignored(package_name)
         # We only care which licenses were mentioned, not what algebra is used on them.
         # (Thankfully there are no NOTs, and that's probably not by accident, since that would be too big a set.)
         # So for us, either (FOO AND BAR) or (FOO OR BAR) is the same because we want to treat it as "FOO,BAR".
@@ -150,7 +158,7 @@ class JavascriptLicenseFramework(LicenseFramework):
         for name, record in records.items():
             licenses_spec = record.get(_LICENSES)
             if '(' in licenses_spec:
-                licenses = cls.implicated_licenses(licenses_spec=licenses_spec)
+                licenses = cls.implicated_licenses(package_name=name, licenses_spec=licenses_spec)
                 PRINT(f"Rewriting {licenses_spec!r} as {licenses!r}")
             elif licenses_spec:
                 licenses = [licenses_spec]
@@ -158,13 +166,14 @@ class JavascriptLicenseFramework(LicenseFramework):
                 licenses = []
             entry = {
                 _NAME: name.lstrip('@').split('@')[0],  # e.g., @foo/bar@3.7
-                _LICENSES: licenses  # TODO: could parse this better.
+                _LICENSES: licenses,  # TODO: could parse this better.
+                _FRAMEWORK: 'javascript'
             }
             result.append(entry)
         return result
 
 
-@LicenseFrameworkRegistry.register(name='python')
+@LicenseFrameworkRegistry.register_framework(name='python')
 class PythonLicenseFramework(LicenseFramework):
 
     @classmethod
@@ -184,9 +193,97 @@ class PythonLicenseFramework(LicenseFramework):
             entry = {
                 _NAME: license_name,
                 _LICENSES: licenses,
-                _LANGUAGE: 'python',
+                _FRAMEWORK: 'python',
             }
             result.append(entry)
+        return sorted(result, key=lambda x: x.get(_NAME).lower())
+
+
+@LicenseFrameworkRegistry.register_framework(name='r')
+class RLicenseFramework(LicenseFramework):
+
+    VERBOSE = False
+
+    R_PART_SPEC = re.compile("^Part of R [0-9.]+$")
+    # This is intended to match ' (= 3)', ' (>= 3)', ' (version 3)', ' (version 3 or greater)'
+    # It will incidentally and harmlessly also take ' (>version 3)' or '(>= 3 or greater)'.
+    # It will also correctly handle the unlikely case of ' (= 3 or greater)'
+    # or will
+    VERSION_SPEC = re.compile('( [(]([>]?)(?:[=]|version) ([0-9.]+)((?: or (?:greater|later))?)[)])')
+    GPL_VERSION_CHOICE = re.compile('^GPL-v?([0-9.+]) (?:OR|[|]) GPL-v?([0-9.+])$')
+    R_LANGUAGE_LICENSE_NAME = 'R-language-license'
+
+    @classmethod
+    def implicated_licenses(cls, *, package_name, licenses_spec: str) -> List[str]:
+        if cls.R_PART_SPEC.match(licenses_spec):
+            return [cls.R_LANGUAGE_LICENSE_NAME]
+        m = cls.GPL_VERSION_CHOICE.match(licenses_spec)
+        if m:
+            version_a, version_b = m.groups()
+            return [f"GPL-{version_a}-or-{version_b}"]
+        # We only care which licenses were mentioned, not what algebra is used on them.
+        # (Thankfully there are no NOTs, and that's probably not by accident, since that would be too big a set.)
+        # So for us, either (FOO AND BAR) or (FOO OR BAR) is the same because we want to treat it as "FOO,BAR".
+        # If all of those licenses match, all is good. That _does_ mean some things like (MIT OR GPL-3.0) will
+        # have trouble passing unless both MIT and GPL-3.0 are allowed.
+        n = 0
+        original_licenses_spec = licenses_spec
+        while n < 1000:  # just in case of an infinite loop
+            n += 1
+            m = cls.VERSION_SPEC.search(licenses_spec)
+            if not m:
+                break
+            matched, greater, version_spec, greater2 = m.groups()
+            greater = greater or greater2
+            licenses_spec = licenses_spec.replace(matched,
+                                                  f"-{version_spec}"
+                                                  f"{'+' if greater else ''}")
+        if licenses_spec != original_licenses_spec:
+            PRINT(f"Rewriting {original_licenses_spec!r} as {licenses_spec!r}.")
+        licenses = sorted(map(lambda x: x.strip(),
+                              (licenses_spec
+                               .replace('|', ',')
+                               .replace('file ', f'Custom: {package_name} file ')
+                               ).split(',')))
+        return licenses
+
+    @classmethod
+    def get_dependencies(cls):
+
+        _PACKAGE = "Package"
+        _LICENSE = "License"
+
+        found_problems = 0
+
+        output_bytes = subprocess.check_output(['r', '--no-echo', '-q', '-e',
+                                                f'write.csv(installed.packages()[,c("Package", "License")])'],
+                                               # This will output to stderr if there's an error,
+                                               # but it will still put {} on stdout, which is good enough for us.
+                                               stderr=subprocess.DEVNULL)
+        output = output_bytes.decode('utf-8')
+        result = []
+        first_line = True
+        for entry in csv.reader(io.StringIO(output)):  # [ignore, package, license]
+            if first_line:
+                first_line = False
+                if entry == ["", _PACKAGE, _LICENSE]:  # we expect headers
+                    continue
+            try:
+                package_name = entry[1]
+                licenses_spec = entry[2]
+                licenses = cls.implicated_licenses(package_name=package_name, licenses_spec=licenses_spec)
+                entry = {
+                    _NAME: package_name,
+                    _LICENSES: licenses,
+                    _FRAMEWORK: 'r',
+                }
+                result.append(entry)
+            except Exception as e:
+                found_problems += 1
+                if cls.VERBOSE:
+                    PRINT(get_error_message(e))
+        if found_problems > 0:
+            warnings.warn(there_are(found_problems, kind="problem", show=False, punctuate=True, tense='past'))
         return sorted(result, key=lambda x: x.get(_NAME).lower())
 
 
@@ -316,7 +413,7 @@ class LicenseChecker:
     Note that if you don't like these license names, which are admittedly non-standard and do nt seem to use
     SPDX naming conventions, you can customize the get_dependencies method to return a different
     list, one of the form
-    [{"name": "libname", "license_classifier": ["license1", "license2", ...], "language": "python"}]
+    [{"name": "libname", "license_classifier": ["license1", "license2", ...], "framework": "python"}]
     by whatever means you like and using whatever names you like.
     """
 
@@ -499,6 +596,30 @@ class LicenseChecker:
             raise LicenseAcceptabilityCheckFailure(unacceptable_licenses=analysis.unacceptable)
 
 
+class LicenseCheckerRegistry:
+
+    REGISTRY: Dict[str, Type[LicenseChecker]] = {}
+
+    @classmethod
+    def register_checker(cls, name: str):
+        def _register(license_checker_class: Type[LicenseChecker]):
+            cls.REGISTRY[name] = license_checker_class
+            return license_checker_class
+        return _register
+
+    @classmethod
+    def lookup_checker(cls, name: str) -> Type[LicenseChecker]:
+        result: Optional[Type[LicenseChecker]] = cls.REGISTRY.get(name)
+        if result is None:
+            raise InvalidParameterError(parameter='checker_name', value=name,
+                                        options=cls.all_checker_names())
+        return result
+
+    @classmethod
+    def all_checker_names(cls):
+        return list(cls.REGISTRY.keys())
+
+
 class LicenseCheckFailure(Exception):
 
     DEFAULT_MESSAGE = "License check failure."
@@ -523,16 +644,13 @@ class LicenseAcceptabilityCheckFailure(LicenseCheckFailure):
         super().__init__(message=message)
 
 
-class C4InfrastructureLicenseChecker(LicenseChecker):
+@LicenseCheckerRegistry.register_checker('park-lab-common')
+class ParkLabCommonLicenseChecker(LicenseChecker):
     """
-    This set of values is useful to us in Park Lab where these tools were developed.
-    If you're at some other organization, we recommend you make a class that has values
-    suitable to your own organizational needs.
+    Minimal checker common to all tech from Park Lab.
     """
 
     COPYRIGHT_OWNER = "President and Fellows of Harvard College"
-    LICENSE_TITLE = "(The )?MIT License"
-    LICENSE_FRAMEWORKS = ['python', 'javascript']
 
     ALLOWED = [
 
@@ -583,6 +701,13 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         'Eclipse Public License',
         'EPL-2.0',
 
+        # The FSF Unlimited License (FSFUL) seems to be a completely permissive license.
+        # Refs:
+        #  * https://spdx.org/licenses/FSFUL.html
+        #  * https://fedoraproject.org/wiki/Licensing/FSF_Unlimited_License
+        'FSF Unlimited License',
+        'FSFUL',
+
         # Linking = Yes, Cat = Permissive Software Licenses
         # Ref: https://en.wikipedia.org/wiki/Historical_Permission_Notice_and_Disclaimer
         'Historical Permission Notice and Disclaimer (HPND)',
@@ -626,6 +751,16 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         'The Unlicense (Unlicense)',
         'Unlicense',
 
+        # Various licenses seem to call themselves or be summed up as unlimited.
+        # So far we know of none that are not highly permissive.
+        #   * boot and KernSmooth are reported by R as being 'Unlimited'
+        #     Refs:
+        #       * https://cran.r-project.org/web/packages/KernSmooth/index.html
+        #         (https://github.com/cran/KernSmooth/blob/master/LICENCE.note)
+        #       * https://cran.r-project.org/package=boot
+        #         (https://github.com/cran/boot/blob/master/DESCRIPTION)
+        'Unlimited',
+
         # Linking = Permissive, Private Use = ?
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
         'W3C License',
@@ -645,6 +780,29 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         # Ref: https://en.wikipedia.org/wiki/Zope_Public_License
         'Zope Public License',
     ]
+
+    EXCEPTIONS = {
+
+        # DFSG = Debian Free Software Guidelines
+        # Ref: https://en.wikipedia.org/wiki/Debian_Free_Software_Guidelines
+        # Used as an apparent modifier to other licenses, to say they are approved per Debian.
+        # For example in this case, pytest-timeout has license: DFSG approved, MIT License,
+        # but is really just an MIT License that someone has checked is DFSG approved.
+        'DFSG approved': [
+            'pytest-timeout',  # MIT Licensed
+        ],
+
+        # Linking = With Restrictions, Private Use = Yes
+        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        'GNU Lesser General Public License v2 or later (LGPLv2+)': [
+            'chardet'  # used at runtime during server operation (ingestion), but not modified or distributed
+        ],
+
+        'GNU General Public License (GPL)': [
+            'docutils',  # Used only privately as a separate documentation-generation task for ReadTheDocs
+        ],
+
+    }
 
     EXPECTED_MISSING_LICENSES = [
 
@@ -726,7 +884,7 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
         'responses',
 
         # This seems to get flagged sometimes, but is not the pypi snovault library, it's what our dcicsnovault
-        # calls itself internally.. In any case, it's under MIT license and OK.
+        # calls itself internally. In any case, it's under MIT license and OK.
         # Ref: https://github.com/4dn-dcic/snovault/blob/master/LICENSE.txt
         'snovault',
 
@@ -757,141 +915,215 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
 
     ]
 
-    EXCEPTIONS = {
 
-        'BSD*': [
-            # Although modified to insert the author name into the license text itself,
-            # the license for these libraries are essentially BSD-3-Clause.
-            'formatio',
-            'samsam',
+@LicenseCheckerRegistry.register_checker('park-lab-gpl-pipeline')
+class ParkLabGplPipelineLicenseChecker(ParkLabCommonLicenseChecker):
+    """
+    Minimal checker common to GPL pipelines from Park Lab.
+    """
 
-            # There are some slightly different versions of what appear to be BSD licenses here,
-            # but clearly the license is permissive.
-            # Ref: https://www.npmjs.com/package/mutation-observer?activeTab=readme
-            'mutation-observer',
-        ],
+    LICENSE_FRAMEWORKS = ['python', 'r']  # TODO: Implement 'conda' and add it here.
 
-        'Custom: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global': [
-            # The use of this URL appears to be a syntax error in the definition of entries-ponyfill
-            # In fact this seems to be covered by a CC0-1.0 license.
-            # Ref: https://unpkg.com/browse/object.entries-ponyfill@1.0.1/LICENSE
-            'object.entries-ponyfill',
-        ],
-
-        'Custom: https://github.com/saikocat/colorbrewer.': [
-            # The use of this URL appears to be a syntax error in the definition of cartocolor
-            # In fact, this seems to be covered by a CC-BY-3.0 license.
-            # Ref: https://www.npmjs.com/package/cartocolor?activeTab=readme
-            'cartocolor',
-        ],
-
-        'Custom: https://travis-ci.org/component/emitter.png': [
-            # The use of this png appears to be a syntax error in the definition of emitter-component.
-            # In fact, emitter-component uses an MIT License
-            # Ref: https://www.npmjs.com/package/emitter-component
-            # Ref: https://github.com/component/emitter/blob/master/LICENSE
-            'emitter-component',
-        ],
-
-        # The 'turfs-jsts' repository (https://github.com/DenisCarriere/turf-jsts/blob/master/README.md)
-        # seems to lack a license, but appears to be forked from the jsts library that uses
-        # the Eclipse Public License 1.0 and Eclipse Distribution License 1.0, so probably a permissive
-        # license is intended.
-        'Custom: https://travis-ci.org/DenisCarriere/turf-jsts.svg': [
-            'turf-jsts'
-        ],
-
-        # DFSG = Debian Free Software Guidelines
-        # Ref: https://en.wikipedia.org/wiki/Debian_Free_Software_Guidelines
-        # Used as an apparent modifier to other licenses, to say they are approved per Debian.
-        # For example in this case, pytest-timeout has license: DFSG approved, MIT License,
-        # but is really just an MIT License that someone has checked is DFSG approved.
-        'DFSG approved': [
-            'pytest-timeout',  # MIT Licensed
-        ],
+    ALLOWED = ParkLabCommonLicenseChecker.ALLOWED + [
 
         # Linking = With Restrictions, Private Use = Yes
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'GNU Lesser General Public License v2 or later (LGPLv2+)': [
-            'chardet'  # used at runtime during server operation (ingestion), but not modified or distributed
-        ],
+        'GNU Lesser General Public License v2 or later (LGPLv2+)',
+        'LGPL-v2', 'LGPL-v2.0', 'LGPL-2', 'LGPL-2.0',
+        'LGPL-v2+', 'LGPL-v2.0+', 'LGPL-2+', 'LGPL-2.0+',
 
         # Linking = With Restrictions, Private Use = Yes
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'GNU Lesser General Public License v3 or later (LGPLv3+)': [
-            'pytest-redis',  # used only privately in testing, not used in server code, not modified, not distributed
-            'mirakuru',      # required by pytest-redis (used only where it's used)
-        ],
+        'GNU Lesser General Public License v3 or later (LGPLv3+)',
+        'LGPL-v3', 'LGPL-v3.0', 'LGPL-3', 'LGPL-3.0',
+        'LGPL-v3+', 'LGPL-v3.0+', 'LGPL-3+', 'LGPL-3.0+',
 
-        'GNU General Public License (GPL)': [
-            'docutils',  # Used only privately as a separate documentation-generation task for ReadTheDocs
-        ],
+        # Uncertain whether this is LGPL 2 or 3, but in any case we think weak copyleft should be OK
+        # for pipeline or server use as long as we're not distributing sources.
+        'LGPL',
+        'GNU Library or Lesser General Public License (LGPL)',
 
-        # Linking = With Restrictions, Private Use = Yes
+        # Linking = "GPLv3 compatible only", Private Use = Yes
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        # 'GNU Lesser General Public License v3 or later (LGPLv3+)',
+        'GPL-2-or-3',
+        'GPL-v2+', 'GPL-v2.0+', 'GPL-2+', 'GPL-2.0+',
+        'GPL-v3', 'GPL-v3.0', 'GPL-3', 'GPL-3.0',
+        'GPL-v3+', 'GPL-v3.0+', 'GPL-3+', 'GPL-3.0+',
 
-        # Linking = With Restrictions, Private Use = Yes
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'GNU Library or Lesser General Public License (LGPL)': [
-            'psycopg2',  # Used at runtime during server operation, but not modified or distributed
-            'psycopg2-binary',  # Used at runtime during server operation, but not modified or distributed
-            'chardet',  # Potentially used downstream in loadxl to detect charset for text files
-            'pyzmq',  # Used in post-deploy-perf-tests, not distributed, and not modified or distributed
-        ],
+        # Uncertain whether this is GPL 2 or 3, but we'll assume that means we can use either.
+        # And version 3 is our preferred interpretation.
+        'GNU General Public License',
+        'GPL',
 
-        'GPL-2.0': [
-            # The license file for the node-forge javascript library says:
-            #
-            #   "You may use the Forge project under the terms of either the BSD License or the
-            #   GNU General Public License (GPL) Version 2."
-            #
-            # (We choose to use it under the BSD license.)
-            # Ref: https://www.npmjs.com/package/node-forge?activeTab=code
-            'node-forge',
-        ],
+        RLicenseFramework.R_LANGUAGE_LICENSE_NAME
 
-        'MIT*': [
+    ]
 
-            # This library uses a mix of licenses, but they (MIT, CC0) generally seem permissive.
-            # (It also mentions that some tools for building/testing use other libraries.)
-            # Ref: https://github.com/requirejs/domReady/blob/master/LICENSE
-            'domready',
 
-            # This library is under 'COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.1'
-            # Ref: https://github.com/javaee/jsonp/blob/master/LICENSE.txt
-            # About CDDL ...
-            # Linking = Permissive, Private Use = ?
+@LicenseCheckerRegistry.register_checker('park-lab-common-server')
+class ParkLabCommonServerLicenseChecker(ParkLabCommonLicenseChecker):
+    """
+    Checker for servers from Park Lab.
+
+    If you're at some other organization, we recommend you make a class that has values
+    suitable to your own organizational needs.
+    """
+
+    LICENSE_FRAMEWORKS = ['python', 'javascript']
+
+    EXCEPTIONS = augment(
+        ParkLabCommonLicenseChecker.EXCEPTIONS,
+        by={
+            'BSD*': [
+                # Although modified to insert the author name into the license text itself,
+                # the license for these libraries are essentially BSD-3-Clause.
+                'formatio',
+                'samsam',
+
+                # There are some slightly different versions of what appear to be BSD licenses here,
+                # but clearly the license is permissive.
+                # Ref: https://www.npmjs.com/package/mutation-observer?activeTab=readme
+                'mutation-observer',
+            ],
+
+            'Custom: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global': [
+                # The use of this URL appears to be a syntax error in the definition of entries-ponyfill
+                # In fact this seems to be covered by a CC0-1.0 license.
+                # Ref: https://unpkg.com/browse/object.entries-ponyfill@1.0.1/LICENSE
+                'object.entries-ponyfill',
+            ],
+
+            'Custom: https://github.com/saikocat/colorbrewer.': [
+                # The use of this URL appears to be a syntax error in the definition of cartocolor
+                # In fact, this seems to be covered by a CC-BY-3.0 license.
+                # Ref: https://www.npmjs.com/package/cartocolor?activeTab=readme
+                'cartocolor',
+            ],
+
+            'Custom: https://travis-ci.org/component/emitter.png': [
+                # The use of this png appears to be a syntax error in the definition of emitter-component.
+                # In fact, emitter-component uses an MIT License
+                # Ref: https://www.npmjs.com/package/emitter-component
+                # Ref: https://github.com/component/emitter/blob/master/LICENSE
+                'emitter-component',
+            ],
+
+            # The 'turfs-jsts' repository (https://github.com/DenisCarriere/turf-jsts/blob/master/README.md)
+            # seems to lack a license, but appears to be forked from the jsts library that uses
+            # the Eclipse Public License 1.0 and Eclipse Distribution License 1.0, so probably a permissive
+            # license is intended.
+            'Custom: https://travis-ci.org/DenisCarriere/turf-jsts.svg': [
+                'turf-jsts'
+            ],
+
+            # Linking = With Restrictions, Private Use = Yes
             # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-            'jsonp',
+            'GNU Lesser General Public License v3 or later (LGPLv3+)': [
+                # used only privately in testing, not used in server code, not modified, not distributed
+                'pytest-redis',
+                # required by pytest-redis (used only where it's used)
+                'mirakuru',
+            ],
 
-            # This library says pretty clearly it intends MIT license.
-            # Ref: https://www.npmjs.com/package/component-indexof
-            # Linking = Permissive, Private Use = Yes
+            'GNU General Public License (GPL)': [
+                'docutils',  # Used only privately as a separate documentation-generation task for ReadTheDocs
+            ],
+
+            # Linking = With Restrictions, Private Use = Yes
             # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-            'component-indexof',
+            # 'GNU Lesser General Public License v3 or later (LGPLv3+)',
 
-            # These look like a pretty straight MIT license.
-            # Linking = Permissive, Private Use = Yes
+            # Linking = With Restrictions, Private Use = Yes
             # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-            'mixin',        # LICENSE file at https://www.npmjs.com/package/mixin?activeTab=code
-            'stack-trace',  # https://github.com/stacktracejs/stacktrace.js/blob/master/LICENSE
-            'typed-function',  # LICENSE at https://www.npmjs.com/package/typed-function?activeTab=code
+            'GNU Library or Lesser General Public License (LGPL)': [
+                'psycopg2',  # Used at runtime during server operation, but not modified or distributed
+                'psycopg2-binary',  # Used at runtime during server operation, but not modified or distributed
+                'chardet',  # Potentially used downstream in loadxl to detect charset for text files
+                'pyzmq',  # Used in post-deploy-perf-tests, not distributed, and not modified or distributed
+            ],
 
-        ],
+            'GPL-2.0': [
+                # The license file for the node-forge javascript library says:
+                #
+                #   "You may use the Forge project under the terms of either the BSD License or the
+                #   GNU General Public License (GPL) Version 2."
+                #
+                # (We choose to use it under the BSD license.)
+                # Ref: https://www.npmjs.com/package/node-forge?activeTab=code
+                'node-forge',
+            ],
 
-        'UNLICENSED': [
-            # The udn-browser library is our own and has been observed to sometimes show up in some contexts
-            # as UNLICENSED, when really it's MIT.
-            # Ref: https://github.com/dbmi-bgm/udn-browser/blob/main/LICENSE
-            'udn-browser',
-        ],
+            'MIT*': [
 
-    }
+                # This library uses a mix of licenses, but they (MIT, CC0) generally seem permissive.
+                # (It also mentions that some tools for building/testing use other libraries.)
+                # Ref: https://github.com/requirejs/domReady/blob/master/LICENSE
+                'domready',
+
+                # This library is under 'COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.1'
+                # Ref: https://github.com/javaee/jsonp/blob/master/LICENSE.txt
+                # About CDDL ...
+                # Linking = Permissive, Private Use = ?
+                # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+                'jsonp',
+
+                # This library says pretty clearly it intends MIT license.
+                # Ref: https://www.npmjs.com/package/component-indexof
+                # Linking = Permissive, Private Use = Yes
+                # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+                'component-indexof',
+
+                # These look like a pretty straight MIT license.
+                # Linking = Permissive, Private Use = Yes
+                # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+                'mixin',        # LICENSE file at https://www.npmjs.com/package/mixin?activeTab=code
+                'stack-trace',  # https://github.com/stacktracejs/stacktrace.js/blob/master/LICENSE
+                'typed-function',  # LICENSE at https://www.npmjs.com/package/typed-function?activeTab=code
+
+            ],
+
+            'UNLICENSED': [
+                # The udn-browser library is our own and has been observed to sometimes show up in some contexts
+                # as UNLICENSED, when really it's MIT.
+                # Ref: https://github.com/dbmi-bgm/udn-browser/blob/main/LICENSE
+                'udn-browser',
+            ],
+        })
 
 
+@LicenseCheckerRegistry.register_checker('c4-infrastructure')
+class C4InfrastructureLicenseChecker(ParkLabCommonServerLicenseChecker):
+    """
+    Checker for C4 infrastructure (Fourfront, CGAP, SMaHT) from Park Lab.
+    """
+
+    LICENSE_TITLE = "(The )?MIT License"
+
+
+@LicenseCheckerRegistry.register_checker('c4-python-infrastructure')
 class C4PythonInfrastructureLicenseChecker(C4InfrastructureLicenseChecker):
     """
-    For situations like dcicutils and dcicsnovault where there's no Javascript, this will test just Python.
+    Checker for C4 python library infrastructure (Fourfront, CGAP, SMaHT) from Park Lab.
     """
     LICENSE_FRAMEWORKS = ['python']
+
+
+@LicenseCheckerRegistry.register_checker('scan2-pipeline')
+class Scan2PipelineLicenseChecker(ParkLabGplPipelineLicenseChecker):
+    """
+    Checker for SCAN2 library from Park Lab.
+    """
+
+    EXCEPTIONS = augment(
+        ParkLabGplPipelineLicenseChecker.EXCEPTIONS,
+        by={
+            'Custom: Matrix file LICENCE': [
+                # The custom information in https://cran.r-project.org/web/packages/Matrix/LICENCE
+                # says there are potential extra restrictions beyond a simple GPL license
+                # if SparseSuite is used, but it is not requested explicitly by Scan2, and we're
+                # trusting that any other libraries used by Scan2 would have investigated this.
+                # So, effectively, we think the Matrix library for this situation operates the
+                # same as if it were just GPL-3 licensed, and we are fine with that.
+                'Matrix'
+            ]
+        })
