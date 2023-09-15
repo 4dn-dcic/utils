@@ -31,7 +31,7 @@ from typing import Any, Dict, DefaultDict, List, Optional, Type, TypeVar, Union
 # to modules, not relative references. Later when things are better installed, we can make refs relative again.
 from dcicutils.exceptions import InvalidParameterError
 from dcicutils.lang_utils import there_are
-from dcicutils.misc_utils import PRINT, get_error_message, local_attrs, ignored, json_file_contents
+from dcicutils.misc_utils import PRINT, get_error_message, ignorable, ignored, json_file_contents, local_attrs
 
 T = TypeVar("T")
 
@@ -173,6 +173,7 @@ def simplify_license_versions(licenses_spec: str, *, for_package_name) -> str:
     # have trouble passing unless both MIT and GPL-3.0 are allowed.
     transform_count = 0
     original_licenses_spec = licenses_spec
+    ignorable(original_licenses_spec)  # sometimes useful for debugging
     while True:
         if transform_count > 100:  # It'd be surprising if there were even ten of these to convert.
             warnings.warn(f"Transforming {for_package_name} {licenses_spec!r} seemed to be looping."
