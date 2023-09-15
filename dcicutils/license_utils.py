@@ -187,7 +187,7 @@ def simplify_license_versions(licenses_spec: str, *, for_package_name) -> str:
         licenses_spec = licenses_spec.replace(matched,
                                               f"-{version_spec}"
                                               f"{'+' if is_greater else ''}")
-        print(f"REWRITING1: {licenses_spec}")
+        # print(f"REWRITING1: {licenses_spec}")
     transform_count = 0
     while True:
         if transform_count > 100:  # It'd be surprising if there were even ten of these to convert.
@@ -200,9 +200,9 @@ def simplify_license_versions(licenses_spec: str, *, for_package_name) -> str:
             break
         matched = m.group(1)
         licenses_spec = licenses_spec.replace(matched, '+')
-        print(f"REWRITING2: {licenses_spec}")
-    if licenses_spec != original_licenses_spec:
-        PRINT(f"Rewriting {original_licenses_spec!r} as {licenses_spec!r}.")
+        # print(f"REWRITING2: {licenses_spec}")
+    # if licenses_spec != original_licenses_spec:
+    #     print(f"Rewriting {original_licenses_spec!r} as {licenses_spec!r}.")
     return licenses_spec
 
 
@@ -229,7 +229,7 @@ class JavascriptLicenseFramework(LicenseFramework):
             licenses_spec = record.get(_LICENSES)
             if '(' in licenses_spec:
                 licenses = cls.implicated_licenses(package_name=name, licenses_spec=licenses_spec)
-                PRINT(f"Rewriting {licenses_spec!r} as {licenses!r}")
+                # print(f"Rewriting {licenses_spec!r} as {licenses!r}")
             elif licenses_spec:
                 licenses = [licenses_spec]
             else:
