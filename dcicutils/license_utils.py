@@ -1118,15 +1118,22 @@ class ParkLabCommonLicenseChecker(LicenseChecker):
     ]
 
 
+@LicenseCheckerRegistry.register_checker('park-lab-pipeline')
+class ParkLabPipelineLicenseChecker(ParkLabCommonLicenseChecker):
+    """
+    Minimal checker common to pipelines from Park Lab.
+    """
+
+    LICENSE_FRAMEWORKS = ['python', 'conda', 'r']
+
+
 @LicenseCheckerRegistry.register_checker('park-lab-gpl-pipeline')
 class ParkLabGplPipelineLicenseChecker(ParkLabCommonLicenseChecker):
     """
     Minimal checker common to GPL pipelines from Park Lab.
     """
 
-    LICENSE_FRAMEWORKS = ['python', 'conda', 'r']
-
-    ALLOWED = ParkLabCommonLicenseChecker.ALLOWED + [
+    ALLOWED = ParkLabPipelineLicenseChecker.ALLOWED + [
 
         # Linking = With Restrictions, Private Use = Yes
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
@@ -1314,22 +1321,24 @@ class C4PythonInfrastructureLicenseChecker(C4InfrastructureLicenseChecker):
     LICENSE_FRAMEWORKS = ['python']
 
 
-@LicenseCheckerRegistry.register_checker('scan2-pipeline')
-class Scan2PipelineLicenseChecker(ParkLabGplPipelineLicenseChecker):
-    """
-    Checker for SCAN2 library from Park Lab.
-    """
-
-    EXCEPTIONS = augment(
-        ParkLabGplPipelineLicenseChecker.EXCEPTIONS,
-        by={
-            'Custom: Matrix file LICENCE': [
-                # The custom information in https://cran.r-project.org/web/packages/Matrix/LICENCE
-                # says there are potential extra restrictions beyond a simple GPL license
-                # if SparseSuite is used, but it is not requested explicitly by Scan2, and we're
-                # trusting that any other libraries used by Scan2 would have investigated this.
-                # So, effectively, we think the Matrix library for this situation operates the
-                # same as if it were just GPL-3 licensed, and we are fine with that.
-                'Matrix'
-            ]
-        })
+# Need to figure out if this shoul duse the regular pipeline checker of the GPL checker as the parent here.
+#
+# @LicenseCheckerRegistry.register_checker('scan2-pipeline')
+# class Scan2PipelineLicenseChecker(ParkLabGplPipelineLicenseChecker):
+#     """
+#     Checker for SCAN2 library from Park Lab.
+#     """
+#
+#     EXCEPTIONS = augment(
+#         ParkLabGplPipelineLicenseChecker.EXCEPTIONS,
+#         by={
+#             'Custom: Matrix file LICENCE': [
+#                 # The custom information in https://cran.r-project.org/web/packages/Matrix/LICENCE
+#                 # says there are potential extra restrictions beyond a simple GPL license
+#                 # if SparseSuite is used, but it is not requested explicitly by Scan2, and we're
+#                 # trusting that any other libraries used by Scan2 would have investigated this.
+#                 # So, effectively, we think the Matrix library for this situation operates the
+#                 # same as if it were just GPL-3 licensed, and we are fine with that.
+#                 'Matrix'
+#             ]
+#         })
