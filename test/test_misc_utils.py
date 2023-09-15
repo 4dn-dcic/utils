@@ -30,7 +30,7 @@ from dcicutils.misc_utils import (
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
-    MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case,
+    MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case, json_file_contents,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -1786,6 +1786,16 @@ def test_file_contents():
         assert file_contents("foo.bin", binary=True) == b'\x48\x65\x6c\x6c\x6f\x21\x0a'
         assert file_contents("foo.bin", binary=False) == b'\x48\x65\x6c\x6c\x6f\x21\x0a'.decode('utf-8')
         assert file_contents("foo.bin", binary=False) == 'Hello!\n'
+
+
+def test_json_file_contents():
+
+    mfs = MockFileSystem()
+    sample_data = {"foo": 1, "bar": [2, True]}
+    with mock.patch("io.open", mfs.open):
+        with io.open("foo.txt", 'w') as fp:
+            json.dump(sample_data, fp)
+        assert json_file_contents("foo.txt") == sample_data
 
 
 def test_make_counter():

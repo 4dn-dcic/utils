@@ -33,6 +33,10 @@ Change Log
     | ``Scan2PipelineLicenseChecker``          | ``scan2-pipeline``             | New            |
     +------------------------------------------+--------------------------------+----------------+
 
+* In ``misc_utils``:
+
+  * New function ``json_file_contents``
+
 * In ``scripts``:
 
   * Add a ``run-license-checker`` script, implemented by ``run_license_checker.py``,

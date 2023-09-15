@@ -9,7 +9,7 @@ import subprocess as subprocess_module
 from collections import defaultdict
 from dcicutils.license_utils import (
     LicenseFrameworkRegistry, LicenseFramework,
-    PythonLicenseFramework, JavascriptLicenseFramework, RLicenseFramework,
+    PythonLicenseFramework, JavascriptLicenseFramework, CondaLicenseFramework, RLicenseFramework,
     LicenseAnalysis, LicenseChecker, LicenseStatus, LicenseFileParser,
     LicenseCheckFailure, LicenseOwnershipCheckFailure, LicenseAcceptabilityCheckFailure,
     warnings as license_utils_warnings_module,
@@ -158,6 +158,7 @@ def test_license_framework_registry_all_frameworks():
     assert all(isinstance(framework, type) and issubclass(framework, LicenseFramework) for framework in frameworks)
 
     assert sorted(frameworks, key=lambda x: x.NAME) == [
+        CondaLicenseFramework,
         JavascriptLicenseFramework,
         PythonLicenseFramework,
         RLicenseFramework
@@ -626,6 +627,7 @@ def test_license_checker_analyze_license_dependencies_by_framework():
         analysis = LicenseAnalysis()
         LicenseChecker.analyze_license_dependencies_by_framework(analysis=analysis, frameworks=None)
         assert mock_analyze.mock_calls == [
+            mock.call(analysis=analysis, acceptable=None, exceptions=None, framework=CondaLicenseFramework),
             mock.call(analysis=analysis, acceptable=None, exceptions=None, framework=JavascriptLicenseFramework),
             mock.call(analysis=analysis, acceptable=None, exceptions=None, framework=PythonLicenseFramework),
             mock.call(analysis=analysis, acceptable=None, exceptions=None, framework=RLicenseFramework),

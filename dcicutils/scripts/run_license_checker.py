@@ -2,8 +2,8 @@ import argparse
 
 from dcicutils.command_utils import script_catch_errors, ScriptFailure
 from dcicutils.lang_utils import there_are, conjoined_list
-from dcicutils.license_utils import LicenseCheckerRegistry, LicenseChecker
-from dcicutils.misc_utils import PRINT
+from dcicutils.license_utils import LicenseCheckerRegistry, LicenseChecker, LicenseCheckFailure
+from dcicutils.misc_utils import PRINT, get_error_message
 from typing import Optional, Type
 
 
@@ -60,4 +60,7 @@ def run_license_checker(name: Optional[str]):
             checker_class: Type[LicenseChecker] = LicenseCheckerRegistry.lookup_checker(name)
         except Exception as e:
             raise ScriptFailure(str(e))
-        checker_class.validate()
+        try:
+            checker_class.validate()
+        except LicenseCheckFailure as e:
+            raise ScriptFailure(get_error_message(e))

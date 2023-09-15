@@ -1,6 +1,7 @@
 import contextlib
 import csv
 import datetime
+import glob
 import io
 import json
 # import logging
@@ -30,7 +31,7 @@ from typing import Any, Dict, DefaultDict, List, Optional, Type, TypeVar, Union
 # to modules, not relative references. Later when things are better installed, we can make refs relative again.
 from dcicutils.exceptions import InvalidParameterError
 from dcicutils.lang_utils import there_are
-from dcicutils.misc_utils import PRINT, get_error_message, local_attrs, ignored
+from dcicutils.misc_utils import PRINT, get_error_message, local_attrs, ignored, json_file_contents
 
 T = TypeVar("T")
 
@@ -44,6 +45,10 @@ _LICENSE_CLASSIFIER = 'license_classifier'
 _LICENSES = 'licenses'
 _NAME = 'name'
 _STATUS = 'status'
+
+
+def pattern(x):
+    return re.compile(x, re.IGNORECASE)
 
 
 def augment(d: dict, by: dict):
@@ -124,25 +129,90 @@ class LicenseFrameworkRegistry:
         return sorted(cls.LICENSE_FRAMEWORKS.values(), key=lambda x: x.NAME)
 
 
+def extract_boolean_terms(boolean_expression: str) -> List[str]:
+    # We only care which licenses were mentioned, not what algebra is used on them.
+    # (Thankfully there are no NOTs, and that's probably not by accident, since that would be too big a set.)
+    # So for us, either (FOO AND BAR) or (FOO OR BAR) is the same because we want to treat it as "FOO,BAR".
+    # If all of those licenses match, all is good. That _does_ mean some things like (MIT OR GPL-3.0) will
+    # have trouble passing unless both MIT and GPL-3.0 are allowed.
+    terms = sorted(map(lambda x: x.strip(),
+                       (boolean_expression
+                        .replace('(', '')
+                        .replace(')', '')
+                        .replace(' AND ', ',')
+                        .replace(' and ', ',')
+                        .replace(' & ', ',')
+                        .replace(' OR ', ',')
+                        .replace(' or ', ',')
+                        .replace('|', ',')
+                        .replace(';', ',')
+                        .replace(' + ', ',')
+                        ).split(',')))
+    return terms
+
+
+# This is intended to match ' (= 3)', ' (>= 3)', ' (version 3)', ' (version 3 or greater)'
+# It will incidentally and harmlessly also take ' (>version 3)' or '(>= 3 or greater)'.
+# It will also correctly handle the unlikely case of ' (= 3 or greater)'
+
+_OR_LATER_PATTERN = '(?:[- ]or[ -](?:greater|later))'
+_PARENTHETICAL_VERSION_CONSTRAINT = re.compile(f'( [(]([>]?)(?:[=]|version) ([0-9.]+)({_OR_LATER_PATTERN}?)[)])')
+_POSTFIX_OR_LATER_PATTERN = re.compile(f"({_OR_LATER_PATTERN})")
+_GPL_VERSION_CHOICE = re.compile('^GPL-v?([0-9.+]) (?:OR|[|]) GPL-v?([0-9.+])$')
+
+
+def simplify_license_versions(licenses_spec: str, *, for_package_name) -> str:
+    m = _GPL_VERSION_CHOICE.match(licenses_spec)
+    if m:
+        version_a, version_b = m.groups()
+        return f"GPL-{version_a}-or-{version_b}"
+    # We only care which licenses were mentioned, not what algebra is used on them.
+    # (Thankfully there are no NOTs, and that's probably not by accident, since that would be too big a set.)
+    # So for us, either (FOO AND BAR) or (FOO OR BAR) is the same because we want to treat it as "FOO,BAR".
+    # If all of those licenses match, all is good. That _does_ mean some things like (MIT OR GPL-3.0) will
+    # have trouble passing unless both MIT and GPL-3.0 are allowed.
+    transform_count = 0
+    original_licenses_spec = licenses_spec
+    while True:
+        if transform_count > 100:  # It'd be surprising if there were even ten of these to convert.
+            warnings.warn(f"Transforming {for_package_name} {licenses_spec!r} seemed to be looping."
+                          f" Please report this as a bug.")
+            return licenses_spec  # return the unmodified
+        transform_count += 1
+        m = _PARENTHETICAL_VERSION_CONSTRAINT.search(licenses_spec)
+        if not m:
+            break
+        matched, greater, version_spec, greater2 = m.groups()
+        is_greater = bool(greater or greater2)
+        licenses_spec = licenses_spec.replace(matched,
+                                              f"-{version_spec}"
+                                              f"{'+' if is_greater else ''}")
+        print(f"REWRITING1: {licenses_spec}")
+    transform_count = 0
+    while True:
+        if transform_count > 100:  # It'd be surprising if there were even ten of these to convert.
+            warnings.warn(f"Transforming {for_package_name} {licenses_spec!r} seemed to be looping."
+                          f" Please report this as a bug.")
+            return licenses_spec  # return the unmodified
+        transform_count += 1
+        m = _POSTFIX_OR_LATER_PATTERN.search(licenses_spec)
+        if not m:
+            break
+        matched = m.group(1)
+        licenses_spec = licenses_spec.replace(matched, '+')
+        print(f"REWRITING2: {licenses_spec}")
+    if licenses_spec != original_licenses_spec:
+        PRINT(f"Rewriting {original_licenses_spec!r} as {licenses_spec!r}.")
+    return licenses_spec
+
+
 @LicenseFrameworkRegistry.register_framework(name='javascript')
 class JavascriptLicenseFramework(LicenseFramework):
 
     @classmethod
     def implicated_licenses(cls, *, package_name, licenses_spec: str) -> List[str]:
         ignored(package_name)
-        # We only care which licenses were mentioned, not what algebra is used on them.
-        # (Thankfully there are no NOTs, and that's probably not by accident, since that would be too big a set.)
-        # So for us, either (FOO AND BAR) or (FOO OR BAR) is the same because we want to treat it as "FOO,BAR".
-        # If all of those licenses match, all is good. That _does_ mean some things like (MIT OR GPL-3.0) will
-        # have trouble passing unless both MIT and GPL-3.0 are allowed.
-        licenses = sorted(map(lambda x: x.strip(),
-                              (licenses_spec
-                               .replace('(', '')
-                               .replace(')', '')
-                               .replace(' AND ', ',')
-                               .replace(' OR ', ',')
-                               ).split(',')))
-        return licenses
+        return extract_boolean_terms(licenses_spec)
 
     @classmethod
     def get_dependencies(cls):
@@ -199,47 +269,52 @@ class PythonLicenseFramework(LicenseFramework):
         return sorted(result, key=lambda x: x.get(_NAME).lower())
 
 
+@LicenseFrameworkRegistry.register_framework(name='conda')
+class CondaLicenseFramework(LicenseFramework):
+
+    @classmethod
+    def get_dependencies(cls):
+        prefix = os.environ.get("CONDA_LICENSE_CHECKER_PREFIX", os.environ.get("CONDA_PREFIX", ""))
+        result = []
+        filespec = os.path.join(prefix, "conda-meta/*.json")
+        files = glob.glob(filespec)
+        for file in files:
+            data = json_file_contents(file)
+            package_name = data['name']
+            package_license = data.get('license') or "MISSING"
+            if package_license:
+                # print(f"package_license={package_license}")
+                simplified_package_license_spec = simplify_license_versions(package_license,
+                                                                            for_package_name=package_name)
+                # print(f" =simplified_package_license_spec => {simplified_package_license_spec}")
+                package_licenses = extract_boolean_terms(simplified_package_license_spec)
+                # print(f"=> {package_licenses}")
+            else:
+                package_licenses = []
+            entry = {
+                _NAME: package_name,
+                _LICENSES: package_licenses,
+                _FRAMEWORK: 'conda',
+            }
+            result.append(entry)
+        # print(f"conda get_dependencies result={json.dumps(result, indent=2)}")
+        # print("conda deps = ", json.dumps(result, indent=2))
+        return result
+
+
 @LicenseFrameworkRegistry.register_framework(name='r')
 class RLicenseFramework(LicenseFramework):
 
     VERBOSE = False
 
     R_PART_SPEC = re.compile("^Part of R [0-9.]+$")
-    # This is intended to match ' (= 3)', ' (>= 3)', ' (version 3)', ' (version 3 or greater)'
-    # It will incidentally and harmlessly also take ' (>version 3)' or '(>= 3 or greater)'.
-    # It will also correctly handle the unlikely case of ' (= 3 or greater)'
-    # or will
-    VERSION_SPEC = re.compile('( [(]([>]?)(?:[=]|version) ([0-9.]+)((?: or (?:greater|later))?)[)])')
-    GPL_VERSION_CHOICE = re.compile('^GPL-v?([0-9.+]) (?:OR|[|]) GPL-v?([0-9.+])$')
     R_LANGUAGE_LICENSE_NAME = 'R-language-license'
 
     @classmethod
     def implicated_licenses(cls, *, package_name, licenses_spec: str) -> List[str]:
         if cls.R_PART_SPEC.match(licenses_spec):
             return [cls.R_LANGUAGE_LICENSE_NAME]
-        m = cls.GPL_VERSION_CHOICE.match(licenses_spec)
-        if m:
-            version_a, version_b = m.groups()
-            return [f"GPL-{version_a}-or-{version_b}"]
-        # We only care which licenses were mentioned, not what algebra is used on them.
-        # (Thankfully there are no NOTs, and that's probably not by accident, since that would be too big a set.)
-        # So for us, either (FOO AND BAR) or (FOO OR BAR) is the same because we want to treat it as "FOO,BAR".
-        # If all of those licenses match, all is good. That _does_ mean some things like (MIT OR GPL-3.0) will
-        # have trouble passing unless both MIT and GPL-3.0 are allowed.
-        n = 0
-        original_licenses_spec = licenses_spec
-        while n < 1000:  # just in case of an infinite loop
-            n += 1
-            m = cls.VERSION_SPEC.search(licenses_spec)
-            if not m:
-                break
-            matched, greater, version_spec, greater2 = m.groups()
-            greater = greater or greater2
-            licenses_spec = licenses_spec.replace(matched,
-                                                  f"-{version_spec}"
-                                                  f"{'+' if greater else ''}")
-        if licenses_spec != original_licenses_spec:
-            PRINT(f"Rewriting {original_licenses_spec!r} as {licenses_spec!r}.")
+        licenses_spec = simplify_license_versions(licenses_spec, for_package_name=package_name)
         licenses = sorted(map(lambda x: x.strip(),
                               (licenses_spec
                                .replace('|', ',')
@@ -475,6 +550,22 @@ class LicenseChecker:
                                                            check_license_title=license_title or cls.LICENSE_TITLE,
                                                            analysis=analysis)
 
+    CHOICE_REGEXPS = {}
+
+    @classmethod
+    def _make_regexp_for_choices(cls, choices):
+        inner_pattern = '|'.join('^' + (re.escape(choice) if isinstance(choice, str) else choice.pattern) + '$'
+                                 for choice in choices) or "^$"
+        return re.compile(f"({inner_pattern})", re.IGNORECASE)
+
+    @classmethod
+    def _find_regexp_for_choices(cls, choices):
+        key = str(choices)
+        regexp = cls.CHOICE_REGEXPS.get(key)
+        if not regexp:
+            cls.CHOICE_REGEXPS[key] = regexp = cls._make_regexp_for_choices(choices)
+        return regexp
+
     @classmethod
     def analyze_license_dependencies_for_framework(cls, *,
                                                    analysis: LicenseAnalysis,
@@ -482,7 +573,7 @@ class LicenseChecker:
                                                    acceptable: Optional[List[str]] = None,
                                                    exceptions: Optional[Dict[str, str]] = None,
                                                    ) -> None:
-        acceptable = (acceptable or []) + (cls.ALLOWED or [])
+        acceptability_regexp = cls._find_regexp_for_choices((acceptable or []) + (cls.ALLOWED or []))
         exceptions = dict(cls.EXCEPTIONS or {}, **(exceptions or {}))
 
         try:
@@ -512,7 +603,7 @@ class LicenseChecker:
                 by_special_exception = False
                 for license_name in license_names:
                     special_exceptions = exceptions.get(license_name, [])
-                    if license_name in acceptable:
+                    if acceptability_regexp.match(license_name):  # license_name in acceptable:
                         pass
                     elif name in special_exceptions:
                         by_special_exception = True
@@ -556,7 +647,7 @@ class LicenseChecker:
     def show_unacceptable_licenses(cls, *, analysis: LicenseAnalysis) -> LicenseAnalysis:
         if analysis.unacceptable:
             PRINT(there_are(analysis.unacceptable, kind="unacceptable license", show=False, punctuation_mark=':'))
-            for license, names in analysis.unacceptable.items():
+            for license, names in sorted(analysis.unacceptable.items()):
                 PRINT(f" {license}: {', '.join(names)}")
         return analysis
 
@@ -666,16 +757,39 @@ class ParkLabCommonLicenseChecker(LicenseChecker):
         'AFL-2.1',
 
         # Linking = Permissive, Private Use = Yes
+        # Apache licenses before version 2.0 are controversial, but we here construe an unmarked naming to imply
+        # any version, and hence v2.
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
         'Apache Software License',
         'Apache-Style',
-        'Apache-2.0',
+        pattern("Apache([- ]2([.]0)?)?([- ]Licen[cs]e)?([- ]with[- ]LLVM[- ]exception)?"),
+        # 'Apache-2.0',
+
+        # Artistic License 1.0 was confusing to people, so its status as permissive is in general uncertain,
+        # however the issue seems to revolve around point 8 (relating to whether or not perl is deliberately
+        # exposed). That isn't in play for our uses, so we don't flag it here.
+        # Artistic license 2.0 is a permissive license.
+        # Ref: https://en.wikipedia.org/wiki/Artistic_License
+        'Artistic-1.0-Perl',
+        pattern('Artistic[- ]2([.]0)?'),
+
+        # According to Wikipedia, the Boost is considered permissive and BSD-like.
+        # Refs:
+        #  *
+        #  * https://en.wikipedia.org/wiki/Boost_(C%2B%2B_libraries)#License
+        pattern('(BSL|Boost(([- ]Software)?[- ]License)?)([- ]1([.]0)?)?'),
 
         # Linking = Permissive, Private Use = Yes
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'BSD License',
-        'BSD-2-Clause',
-        'BSD-3-Clause',
+        pattern('((modified[- ])?[234][- ]Clause[- ])?BSD([- ][234][- ]Clause)?( Licen[cs]e)?'),
+        # 'BSD License',
+        # 'BSD-2-Clause',
+        # 'BSD-3-Clause',
+        # 'BSD 3-Clause',
+
+        # BZIP2 is a permissive license
+        # Ref: https://github.com/asimonov-im/bzip2/blob/master/LICENSE
+        pattern('bzip2(-1[.0-9]*)'),
 
         # Linking = Public Domain, Private Use = Public Domain
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
@@ -687,6 +801,10 @@ class ParkLabCommonLicenseChecker(LicenseChecker):
         'CC-BY',
         'CC-BY-3.0',
         'CC-BY-4.0',
+
+        # The curl license is a permissive license.
+        # Ref: https://curl.se/docs/copyright.html
+        'curl',
 
         # Linking = Permissive, Private Use = ?
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
@@ -708,9 +826,25 @@ class ParkLabCommonLicenseChecker(LicenseChecker):
         'FSF Unlimited License',
         'FSFUL',
 
+        # The FreeType license is a permissive license.
+        # Ref: LicenseRef-FreeType
+        pattern('(Licen[cs]eRef-)?(FTL|FreeType( Licen[cs]e)?)'),
+
         # Linking = Yes, Cat = Permissive Software Licenses
         # Ref: https://en.wikipedia.org/wiki/Historical_Permission_Notice_and_Disclaimer
         'Historical Permission Notice and Disclaimer (HPND)',
+        'HPND',
+        pattern('(Licen[cs]eRef-)?PIL'),
+        # The Pillow or Python Image Library is an HPND license, which is a simple permissive license:
+        # Refs:
+        #   * https://github.com/python-pillow/Pillow/blob/main/LICENSE
+        #   * https://www.fsf.org/blogs/licensing/historical-permission-notice-and-disclaimer-added-to-license-list
+
+        # The IJG license, used by Independent JPEG Group (IJG) is a custom permissive license.
+        # Refs:
+        #   * https://en.wikipedia.org/wiki/Libjpeg
+        #   * https://github.com/libjpeg-turbo/libjpeg-turbo/blob/main/LICENSE.md
+        'IJG',
 
         # Linking = Permissive, Private Use = Permissive
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
@@ -735,16 +869,28 @@ class ParkLabCommonLicenseChecker(LicenseChecker):
         'OFL-1.1',
 
         # Ref: https://en.wikipedia.org/wiki/Public_domain
-        'Public Domain',
+        pattern('(Licen[cs]eRef-)?Public[- ]Domain([- ]dedic[t]?ation)?'),  # "dedictation" is a typo in docutils
 
         # Linking = Permissive, Private Use = Permissive
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        pattern('(Licen[cs]eRef-)?PSF-2([.][.0-9]*)'),
         'Python Software Foundation License',
         'Python-2.0',
 
         # License = BSD-like
         # Ref: https://en.wikipedia.org/wiki/Pylons_project
         'Repoze Public License',
+
+        # The TCL or Tcl/Tk licenses are permissive licenses.
+        # Ref: https://www.tcl.tk/software/tcltk/license.html
+        # The one used by the tktable library has a 'bourbon' clause that doesn't add compliance requirements
+        # Ref: https://github.com/wjoye/tktable/blob/master/license.txt
+        pattern('Tcl([/]tk)?'),
+
+        # The Ubuntu Font Licence is mostly permissive. It contains some restrictions if you are going to modify the
+        # fonts that require you to change the name to avoid confusion. But for our purposes, we're assuming that's
+        # not done, and so we're not flagging it.
+        pattern('Ubuntu Font Licen[cs]e Version( 1([.]0)?)?'),
 
         # Linking = Permissive/Public domain, Private Use = Permissive/Public domain
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
@@ -798,8 +944,63 @@ class ParkLabCommonLicenseChecker(LicenseChecker):
             'chardet'  # used at runtime during server operation (ingestion), but not modified or distributed
         ],
 
+        # Linking = With Restrictions, Private Use = Yes
+        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        'GNU Lesser General Public License v3 or later (LGPLv3+)': [
+            # used only privately in testing, not used in server code, not modified, not distributed
+            'pytest-redis',
+            # required by pytest-redis (used only where it's used)
+            'mirakuru',
+        ],
+
         'GNU General Public License (GPL)': [
             'docutils',  # Used only privately as a separate documentation-generation task for ReadTheDocs
+        ],
+
+        'MIT/X11 Derivative': [
+            # The license used by libxkbcommon is complicated and involves numerous included licenses,
+            # but all are permissive.
+            # Ref: https://github.com/xkbcommon/libxkbcommon/blob/master/LICENSE
+            'libxkbcommon',
+        ],
+
+        'None': [
+            # It's not obvious why Conda shows this license as 'None'.
+            # In fact, though, BSD 3-Clause "New" or "Revised" License
+            # Ref: https://github.com/AnacondaRecipes/_libgcc_mutex-feedstock/blob/master/LICENSE.txt
+            '_libgcc_mutex',
+        ],
+
+        'PostgreSQL': [
+            # The libpq library is actually licensed with a permissive BSD 3-Clause "New" or "Revised" License
+            # Ref: https://github.com/lpsmith/postgresql-libpq/blob/master/LICENSE
+            'libpq',
+        ],
+
+        'UCSD': [
+            # It isn't obvious why these show up with a UCSD license in Conda.
+            # The actual sources say it should be a 2-clause BSD license:
+            # Refs:
+            #   * https://github.com/AlexandrovLab/SigProfilerMatrixGenerator/blob/master/LICENSE
+            #   * https://github.com/AlexandrovLab/SigProfilerPlotting/blob/master/LICENSE
+            'sigprofilermatrixgenerator',
+            'sigprofilerplotting',
+        ],
+
+        'X11': [
+            # The ncurses library has a VERY complicated history, BUT seems consistently permissive
+            # and the most recent version seems to be essentially the MIT license.
+            # Refs:
+            #   * https://en.wikipedia.org/wiki/Ncurses#License
+            #   * https://invisible-island.net/ncurses/ncurses-license.html
+            'ncurses'
+        ],
+
+        'zlib-acknowledgement': [
+            # It isn't clear whey libpng shows up with this license name, but the license for libpng
+            # is a permissive license.
+            # Ref: https://github.com/glennrp/libpng/blob/libpng16/LICENSE
+            'libpng',
         ],
 
     }
@@ -922,33 +1123,46 @@ class ParkLabGplPipelineLicenseChecker(ParkLabCommonLicenseChecker):
     Minimal checker common to GPL pipelines from Park Lab.
     """
 
-    LICENSE_FRAMEWORKS = ['python', 'r']  # TODO: Implement 'conda' and add it here.
+    LICENSE_FRAMEWORKS = ['python', 'conda', 'r']
 
     ALLOWED = ParkLabCommonLicenseChecker.ALLOWED + [
 
         # Linking = With Restrictions, Private Use = Yes
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'GNU Lesser General Public License v2 or later (LGPLv2+)',
-        'LGPL-v2', 'LGPL-v2.0', 'LGPL-2', 'LGPL-2.0',
-        'LGPL-v2+', 'LGPL-v2.0+', 'LGPL-2+', 'LGPL-2.0+',
-
-        # Linking = With Restrictions, Private Use = Yes
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'GNU Lesser General Public License v3 or later (LGPLv3+)',
-        'LGPL-v3', 'LGPL-v3.0', 'LGPL-3', 'LGPL-3.0',
-        'LGPL-v3+', 'LGPL-v3.0+', 'LGPL-3+', 'LGPL-3.0+',
+        # The "exceptions", if present, indicate waivers to source delivery requirements.
+        # Ref: https://spdx.org/licenses/LGPL-3.0-linking-exception.html
+        pattern('GNU Lesser General Public License v2( or later)?( [(]LGPL[v]?[23][+]?[)])?'),
+        # 'GNU Lesser General Public License v2 or later (LGPLv2+)',
+        # 'GNU Lesser General Public License v3 or later (LGPLv3+)',
+        # 'LGPLv2', 'LGPL-v2', 'LGPL-v2.0', 'LGPL-2', 'LGPL-2.0',
+        # 'LGPLv2+', 'LGPL-v2+', 'LGPL-v2.0+', 'LGPL-2+', 'LGPL-2.0+',
+        # 'LGPLv3', 'LGPL-v3', 'LGPL-v3.0', 'LGPL-3', 'LGPL-3.0',
+        # 'LGPLv3+', 'LGPL-v3+', 'LGPL-v3.0+', 'LGPL-3+', 'LGPL-3.0+',
+        pattern('LGPL[v-]?[.0-9]*([+]|-only)?([- ]with[- ]exceptions)?'),
 
         # Uncertain whether this is LGPL 2 or 3, but in any case we think weak copyleft should be OK
         # for pipeline or server use as long as we're not distributing sources.
         'LGPL',
         'GNU Library or Lesser General Public License (LGPL)',
 
+        # GPL
+        #  * library exception operates like LGPL
+        #  * classpath exception is a linking exception related to Oracle
+        # Refs:
+        #   * https://www.gnu.org/licenses/old-licenses/gpl-1.0.en.html
+        #   * https://spdx.org/licenses/GPL-2.0-with-GCC-exception.html
+        #   * https://spdx.org/licenses/GPL-3.0-with-GCC-exception.html
+        pattern('(GNU General Public License|GPL)[ ]?[v-]?[123]([.]0)?([+]|[- ]only)?'
+                '([- ]with[- ]GCC(([- ]runtime)?[- ]library)?[- ]exception([- ][.0-9]*)?)?'
+                '([- ]with[- ]Classpath[- ]exception([- ][.0-9]+)?)?'),
+
         # Linking = "GPLv3 compatible only", Private Use = Yes
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'GPL-2-or-3',
-        'GPL-v2+', 'GPL-v2.0+', 'GPL-2+', 'GPL-2.0+',
-        'GPL-v3', 'GPL-v3.0', 'GPL-3', 'GPL-3.0',
-        'GPL-v3+', 'GPL-v3.0+', 'GPL-3+', 'GPL-3.0+',
+        'GPL-2-or-3',  # we sometimes generate this token
+        # 'GPLv2+', 'GPL-v2+', 'GPL-v2.0+', 'GPL-2+', 'GPL-2.0+',
+        # 'GPLv3', 'GPL-v3', 'GPL-v3.0', 'GPL-3', 'GPL-3.0',
+        # 'GPLv3+', 'GPL-v3+', 'GPL-v3.0+', 'GPL-3+', 'GPL-3.0+',
+        # 'GPLv3-only', 'GPL-3-only', 'GPL-v3-only', 'GPL-3.0-only', 'GPL-v3.0-only',
 
         # Uncertain whether this is GPL 2 or 3, but we'll assume that means we can use either.
         # And version 3 is our preferred interpretation.
@@ -1014,15 +1228,6 @@ class ParkLabCommonServerLicenseChecker(ParkLabCommonLicenseChecker):
             # license is intended.
             'Custom: https://travis-ci.org/DenisCarriere/turf-jsts.svg': [
                 'turf-jsts'
-            ],
-
-            # Linking = With Restrictions, Private Use = Yes
-            # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-            'GNU Lesser General Public License v3 or later (LGPLv3+)': [
-                # used only privately in testing, not used in server code, not modified, not distributed
-                'pytest-redis',
-                # required by pytest-redis (used only where it's used)
-                'mirakuru',
             ],
 
             'GNU General Public License (GPL)': [

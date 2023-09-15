@@ -7,10 +7,11 @@ import datetime
 import functools
 import hashlib
 import inspect
-import math
 import io
-import os
+import json
 import logging
+import math
+import os
 import pytz
 import re
 import rfc3986.validators
@@ -20,8 +21,8 @@ import warnings
 import webtest  # importing the library makes it easier to mock testing
 
 from collections import defaultdict
-from dateutil.parser import parse as dateutil_parse
 from datetime import datetime as datetime_type
+from dateutil.parser import parse as dateutil_parse
 from typing import Optional
 
 
@@ -1308,6 +1309,11 @@ def keyword_as_title(keyword):
 def file_contents(filename, binary=False):
     with io.open(filename, 'rb' if binary else 'r') as fp:
         return fp.read()
+
+
+def json_file_contents(filename):
+    with io.open(filename, 'r') as fp:
+        return json.load(fp)
 
 
 def camel_case_to_snake_case(s, separator='_'):
