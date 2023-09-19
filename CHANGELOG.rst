@@ -7,6 +7,14 @@ Change Log
 ----------
 
 
+7.12.0
+======
+
+* In ``glacier_utils``:
+
+  * Add functionality for KMS key encrypted accounts
+
+
 7.11.0
 ======
 
@@ -15,6 +23,7 @@ Change Log
   * Fix in ``get_schema`` and ``get_schemas`` for the ``portal_vapp`` case needing a leading slash on the URL.
   * Fix in ``get_schema`` and ``get_schemas`` for the ``portal_vapp`` returning webtest.response.TestResponse
     which has a ``json`` object property rather than a function.
+
 
 7.10.0
 ======
