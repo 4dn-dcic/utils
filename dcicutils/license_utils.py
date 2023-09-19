@@ -31,7 +31,9 @@ from typing import Any, Dict, DefaultDict, List, Optional, Type, TypeVar, Union
 # to modules, not relative references. Later when things are better installed, we can make refs relative again.
 from dcicutils.exceptions import InvalidParameterError
 from dcicutils.lang_utils import there_are
-from dcicutils.misc_utils import PRINT, get_error_message, ignorable, ignored, json_file_contents, local_attrs
+from dcicutils.misc_utils import (
+    PRINT, get_error_message, ignorable, ignored, json_file_contents, local_attrs, environ_bool,
+)
 
 T = TypeVar("T")
 
@@ -63,9 +65,13 @@ class LicenseStatus:
     UNEXPECTED_MISSING = "UNEXPECTED_MISSING"
 
 
+LICENSE_UTILS_VERBOSE = environ_bool("LICENSE_UTILS_VERBOSE", default=False)
+
+
 class LicenseFramework:
 
     NAME = None
+    VERBOSE = LICENSE_UTILS_VERBOSE
 
     @classmethod
     def get_dependencies(cls):
@@ -129,7 +135,7 @@ class LicenseFrameworkRegistry:
         return sorted(cls.LICENSE_FRAMEWORKS.values(), key=lambda x: x.NAME)
 
 
-def extract_boolean_terms(boolean_expression: str) -> List[str]:
+def extract_boolean_terms(boolean_expression: str, for_package_name: str) -> List[str]:
     # We only care which licenses were mentioned, not what algebra is used on them.
     # (Thankfully there are no NOTs, and that's probably not by accident, since that would be too big a set.)
     # So for us, either (FOO AND BAR) or (FOO OR BAR) is the same because we want to treat it as "FOO,BAR".
@@ -147,6 +153,7 @@ def extract_boolean_terms(boolean_expression: str) -> List[str]:
                         .replace('|', ',')
                         .replace(';', ',')
                         .replace(' + ', ',')
+                        .replace('file ', f'Custom: {for_package_name} file ')
                         ).split(',')))
     return terms
 
@@ -161,7 +168,7 @@ _POSTFIX_OR_LATER_PATTERN = re.compile(f"({_OR_LATER_PATTERN})")
 _GPL_VERSION_CHOICE = re.compile('^GPL-v?([0-9.+]) (?:OR|[|]) GPL-v?([0-9.+])$')
 
 
-def simplify_license_versions(licenses_spec: str, *, for_package_name) -> str:
+def simplify_license_versions(licenses_spec: str, *, for_package_name, verbose: bool = False) -> str:
     m = _GPL_VERSION_CHOICE.match(licenses_spec)
     if m:
         version_a, version_b = m.groups()
@@ -188,7 +195,6 @@ def simplify_license_versions(licenses_spec: str, *, for_package_name) -> str:
         licenses_spec = licenses_spec.replace(matched,
                                               f"-{version_spec}"
                                               f"{'+' if is_greater else ''}")
-        # print(f"REWRITING1: {licenses_spec}")
     transform_count = 0
     while True:
         if transform_count > 100:  # It'd be surprising if there were even ten of these to convert.
@@ -201,9 +207,8 @@ def simplify_license_versions(licenses_spec: str, *, for_package_name) -> str:
             break
         matched = m.group(1)
         licenses_spec = licenses_spec.replace(matched, '+')
-        # print(f"REWRITING2: {licenses_spec}")
-    # if licenses_spec != original_licenses_spec:
-    #     print(f"Rewriting {original_licenses_spec!r} as {licenses_spec!r}.")
+    if verbose and licenses_spec != original_licenses_spec:
+        print(f"Rewriting {original_licenses_spec!r} as {licenses_spec!r}.")
     return licenses_spec
 
 
@@ -213,7 +218,7 @@ class JavascriptLicenseFramework(LicenseFramework):
     @classmethod
     def implicated_licenses(cls, *, package_name, licenses_spec: str) -> List[str]:
         ignored(package_name)
-        return extract_boolean_terms(licenses_spec)
+        return extract_boolean_terms(licenses_spec, for_package_name=package_name)
 
     @classmethod
     def get_dependencies(cls):
@@ -288,7 +293,8 @@ class CondaLicenseFramework(LicenseFramework):
                 simplified_package_license_spec = simplify_license_versions(package_license,
                                                                             for_package_name=package_name)
                 # print(f" =simplified_package_license_spec => {simplified_package_license_spec}")
-                package_licenses = extract_boolean_terms(simplified_package_license_spec)
+                package_licenses = extract_boolean_terms(simplified_package_license_spec,
+                                                         for_package_name=package_name)
                 # print(f"=> {package_licenses}")
             else:
                 package_licenses = []
@@ -298,6 +304,7 @@ class CondaLicenseFramework(LicenseFramework):
                 _FRAMEWORK: 'conda',
             }
             result.append(entry)
+        result.sort(key=lambda x: x['name'])
         # print(f"conda get_dependencies result={json.dumps(result, indent=2)}")
         # print("conda deps = ", json.dumps(result, indent=2))
         return result
@@ -305,8 +312,6 @@ class CondaLicenseFramework(LicenseFramework):
 
 @LicenseFrameworkRegistry.register_framework(name='r')
 class RLicenseFramework(LicenseFramework):
-
-    VERBOSE = False
 
     R_PART_SPEC = re.compile("^Part of R [0-9.]+$")
     R_LANGUAGE_LICENSE_NAME = 'R-language-license'
@@ -316,15 +321,21 @@ class RLicenseFramework(LicenseFramework):
         if cls.R_PART_SPEC.match(licenses_spec):
             return [cls.R_LANGUAGE_LICENSE_NAME]
         licenses_spec = simplify_license_versions(licenses_spec, for_package_name=package_name)
-        licenses = sorted(map(lambda x: x.strip(),
-                              (licenses_spec
-                               .replace('|', ',')
-                               .replace('file ', f'Custom: {package_name} file ')
-                               ).split(',')))
+        licenses = extract_boolean_terms(licenses_spec, for_package_name=package_name)
+        # licenses = sorted(map(lambda x: x.strip(),
+        #                       (licenses_spec
+        #                        .replace('|', ',')
+        #                        .replace('file ', f'Custom: {package_name} file ')
+        #                        ).split(',')))
         return licenses
 
     @classmethod
     def get_dependencies(cls):
+        # NOTE: Although the R Language itself is released under the GPL, our belief is that it is
+        # still possible to write programs in R that are not GPL, even programs that use commercial licenses.
+        # So we do ordinary license checking here, same as in other frameworks.
+        # For notes on this, see the R FAQ.
+        # Ref: https://cran.r-project.org/doc/FAQ/R-FAQ.html#Can-I-use-R-for-commercial-purposes_003f
 
         _PACKAGE = "Package"
         _LICENSE = "License"
@@ -365,7 +376,7 @@ class RLicenseFramework(LicenseFramework):
 
 class LicenseFileParser:
 
-    VERBOSE = False
+    VERBOSE = LICENSE_UTILS_VERBOSE
 
     SEPARATORS = '-.,'
     SEPARATORS_AND_WHITESPACE = SEPARATORS + ' \t'
@@ -930,6 +941,18 @@ class ParkLabCommonLicenseChecker(LicenseChecker):
 
     EXCEPTIONS = {
 
+        # The Bioconductor zlibbioc license is a permissive license.
+        # Ref: https://github.com/Bioconductor/zlibbioc/blob/devel/LICENSE
+        'Custom: bioconductor-zlibbioc file LICENSE': [
+            'bioconductor-zlibbioc'
+        ],
+
+        # The Bioconductor rsamtools license is an MIT license
+        # Ref: https://bioconductor.org/packages/release/bioc/licenses/Rsamtools/LICENSE
+        'Custom: bioconductor-rsamtools file LICENSE': [
+            'bioconductor-rsamtools'
+        ],
+
         # DFSG = Debian Free Software Guidelines
         # Ref: https://en.wikipedia.org/wiki/Debian_Free_Software_Guidelines
         # Used as an apparent modifier to other licenses, to say they are approved per Debian.
@@ -937,6 +960,19 @@ class ParkLabCommonLicenseChecker(LicenseChecker):
         # but is really just an MIT License that someone has checked is DFSG approved.
         'DFSG approved': [
             'pytest-timeout',  # MIT Licensed
+        ],
+
+        'FOSS': [
+            # The r-stringi library is a conda library that implements a stringi (pronounced "stringy") library for R.
+            # The COnda source feed is: https://github.com/conda-forge/r-stringi-feedstock
+            # This page explains that the home source is https://stringi.gagolewski.com/ but that's a doc page.
+            # The doc page says:
+            # > stringi’s source code is hosted on GitHub.
+            # > It is distributed under the open source BSD-3-clause license.
+            # The source code has a license that begins with a BSD-3-clause license and includes numerous others,
+            # but they all appear to be permissive.
+            #   Ref: https://github.com/gagolews/stringi/blob/master/LICENSE
+            'stringi', 'r-stringi',
         ],
 
         # Linking = With Restrictions, Private Use = Yes
@@ -1321,24 +1357,38 @@ class C4PythonInfrastructureLicenseChecker(C4InfrastructureLicenseChecker):
     LICENSE_FRAMEWORKS = ['python']
 
 
-# Need to figure out if this shoul duse the regular pipeline checker of the GPL checker as the parent here.
-#
-# @LicenseCheckerRegistry.register_checker('scan2-pipeline')
-# class Scan2PipelineLicenseChecker(ParkLabGplPipelineLicenseChecker):
-#     """
-#     Checker for SCAN2 library from Park Lab.
-#     """
-#
-#     EXCEPTIONS = augment(
-#         ParkLabGplPipelineLicenseChecker.EXCEPTIONS,
-#         by={
-#             'Custom: Matrix file LICENCE': [
-#                 # The custom information in https://cran.r-project.org/web/packages/Matrix/LICENCE
-#                 # says there are potential extra restrictions beyond a simple GPL license
-#                 # if SparseSuite is used, but it is not requested explicitly by Scan2, and we're
-#                 # trusting that any other libraries used by Scan2 would have investigated this.
-#                 # So, effectively, we think the Matrix library for this situation operates the
-#                 # same as if it were just GPL-3 licensed, and we are fine with that.
-#                 'Matrix'
-#             ]
-#         })
+@LicenseCheckerRegistry.register_checker('scan2-pipeline')
+class Scan2PipelineLicenseChecker(ParkLabGplPipelineLicenseChecker):
+    """
+    Checker for SCAN2 library from Park Lab.
+    """
+
+    EXCEPTIONS = augment(
+        ParkLabGplPipelineLicenseChecker.EXCEPTIONS,
+        by={
+            'Custom: Matrix file LICENCE': [
+                # The custom information in https://cran.r-project.org/web/packages/Matrix/LICENCE
+                # says there are potential extra restrictions beyond a simple GPL license
+                # if SparseSuite is used, but it is not requested explicitly by Scan2, and we're
+                # trusting that any other libraries used by Scan2 would have investigated this.
+                # So, effectively, we think the Matrix library for this situation operates the
+                # same as if it were just GPL-3 licensed, and we are fine with that.
+                'Matrix'
+            ],
+
+            "MISSING": [
+                # mysql-common and mysql-libs are GPL, but since they are delivered by conda
+                # and not distributed as part of the Scan2 distribution, they should be OK.
+                # Ref: https://redresscompliance.com/mysql-license-a-complete-guide-to-licensing/#:~:text=commercial%20use  # noQA
+                'mysql-common',
+                'mysql-libs',
+
+                # This is our own library
+                'r-scan2', 'scan2',
+            ]
+        }
+    )
+
+    EXPECTED_MISSING_LICENSES = ParkLabGplPipelineLicenseChecker.EXPECTED_MISSING_LICENSES + [
+
+    ]

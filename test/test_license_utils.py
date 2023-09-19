@@ -14,7 +14,7 @@ from dcicutils.license_utils import (
     LicenseCheckFailure, LicenseOwnershipCheckFailure, LicenseAcceptabilityCheckFailure,
     warnings as license_utils_warnings_module,
 )
-from dcicutils.misc_utils import ignored, file_contents
+from dcicutils.misc_utils import ignored, file_contents, local_attrs
 from dcicutils.qa_utils import printed_output, MockFileSystem
 from unittest import mock
 
@@ -201,40 +201,41 @@ def test_javascript_license_framework_implicated_licenses():
     check_implications(spec='(FOO OR (BAR AND BAZ))', implications=['BAR', 'BAZ', 'FOO'])
 
 
-def test_javascript_license_framework_get_licenses():
+@pytest.mark.parametrize('verbose', [False, True])
+def test_javascript_license_framework_get_licenses(verbose):
 
-    print()  # start on a fresh line
-    packages = {}
-    for i, license in enumerate(['Apache-2.0', 'MIT', '(MIT OR Apache-2.0)', ''], start=1):
-        package = f'package{i}'
-        packages[f"package{i}"] = {
-            "licenses": license,
-            "repository": f"https://github.com/dummy/{package}",
-            "publisher": f"J Dummy{i}",
-            "email": f"jdummy{i}@dummyhost.example.com",
-            "path": f"/some/path/to/package{i}",
-            "licenseFile": f"/some/path/to/package{i}/license"
-        }
-    subprocess_output = json.dumps(packages)
-    with mock.patch.object(subprocess_module, "check_output") as mock_check_output:
-        mock_check_output.return_value = subprocess_output
-        with printed_output() as printed:
-            assert JavascriptLicenseFramework.get_dependencies() == [
-                {'framework': 'javascript', 'licenses': ['Apache-2.0'], 'name': 'package1'},
-                {'framework': 'javascript', 'licenses': ['MIT'], 'name': 'package2'},
-                {'framework': 'javascript', 'licenses': ['Apache-2.0', 'MIT'], 'name': 'package3'},
-                {'framework': 'javascript', 'licenses': [], 'name': 'package4'},
-            ]
-            assert printed.lines == [
-                "Rewriting '(MIT OR Apache-2.0)' as ['Apache-2.0', 'MIT']"
-            ]
+    with local_attrs(LicenseFramework, REWRITE_VERBOSE=verbose):
+        print()  # start on a fresh line
+        packages = {}
+        for i, license in enumerate(['Apache-2.0', 'MIT', '(MIT OR Apache-2.0)', ''], start=1):
+            package = f'package{i}'
+            packages[f"package{i}"] = {
+                "licenses": license,
+                "repository": f"https://github.com/dummy/{package}",
+                "publisher": f"J Dummy{i}",
+                "email": f"jdummy{i}@dummyhost.example.com",
+                "path": f"/some/path/to/package{i}",
+                "licenseFile": f"/some/path/to/package{i}/license"
+            }
+        subprocess_output = json.dumps(packages)
+        with mock.patch.object(subprocess_module, "check_output") as mock_check_output:
+            mock_check_output.return_value = subprocess_output
+            with printed_output() as printed:
+                assert JavascriptLicenseFramework.get_dependencies() == [
+                    {'framework': 'javascript', 'licenses': ['Apache-2.0'], 'name': 'package1'},
+                    {'framework': 'javascript', 'licenses': ['MIT'], 'name': 'package2'},
+                    {'framework': 'javascript', 'licenses': ['Apache-2.0', 'MIT'], 'name': 'package3'},
+                    {'framework': 'javascript', 'licenses': [], 'name': 'package4'},
+                ]
+                expected_rewrite_description = "Rewriting '(MIT OR Apache-2.0)' as ['Apache-2.0', 'MIT']"
+                assert printed.lines == ([expected_rewrite_description] if verbose else [])
 
-        # A special case for missing data...
-        mock_check_output.return_value = "{}\n\n"
-        with pytest.raises(Exception) as esc:
-            # When no package data is available, {} gets returned, and we need to complain this is odd.
-            JavascriptLicenseFramework.get_dependencies()
-        assert str(esc.value) == "No javascript license data was found."
+            # A special case for missing data...
+            mock_check_output.return_value = "{}\n\n"
+            with pytest.raises(Exception) as esc:
+                # When no package data is available, {} gets returned, and we need to complain this is odd.
+                JavascriptLicenseFramework.get_dependencies()
+            assert str(esc.value) == "No javascript license data was found."
 
 
 def test_python_license_framework_piplicenses_args():
