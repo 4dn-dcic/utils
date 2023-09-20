@@ -37,8 +37,8 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = ">=3.7,<3.12"
-boto3 = "^1.17.39"
-botocore = "^1.20.39"
+boto3 = "^1.28.51"
+botocore = "^1.31.51"
 # The DCIC portals (cgap-portal and fourfront) are very particular about which ElasticSearch version.
 # This value is intentionally pinned and must not be changed casually.
 elasticsearch = "7.13.4"
@@ -62,8 +62,8 @@ tqdm = "^4.65.0"
 
 
 [tool.poetry.dev-dependencies]
-botocore-stubs = "1.21.22"
-boto3-stubs = "1.18.23"
+botocore-stubs = "^1.31.51"
+boto3-stubs = "^1.28.51"
 coverage = ">=7.2.3"
 # Loaded manually in GA workflow for coverage because a dependency on 2to3
 # in its docopts dependency makes a problem for laoding it here in poetry. -kmp 7-Apr-2023
