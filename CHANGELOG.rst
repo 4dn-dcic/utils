@@ -9,7 +9,7 @@ Change Log
 8.0.0
 =====
 
-* Update Python to 3.11.
+* Update Python to 3.11; and nixed Python 3.7.
 * Updated boto3/botocore versions.
 * Updatad pyyaml version to ^6.0.1; Mac M1 has issues building 5.4.1 (though 5.3.1 works).
   See PyYAML 6.0 change log here: https://github.com/yaml/pyyaml/blob/master/CHANGES
