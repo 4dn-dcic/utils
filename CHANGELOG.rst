@@ -6,7 +6,7 @@ dcicutils
 Change Log
 ----------
 
-7.10.0
+7.13.0
 ======
 
 * Changed PyYAML version to ^6.0.1; Mac M1 has issues building 5.4.1 (though 5.3.1 works).
@@ -14,6 +14,41 @@ Change Log
   The only incompatible change seems to be that yaml.load now requires a Loader argument;
   and searching our repos (4dn-dcic, dbmi-bgm, smaht-dac) the only ones which might be affected
   are cwltools and parliament2, neither of which are dependent on dcicutils in any way.
+
+7.12.0
+======
+
+* In ``glacier_utils``:
+
+  * Add functionality for KMS key encrypted accounts
+
+
+7.11.0
+======
+
+* In ``ff_utils``:
+
+  * Fix in ``get_schema`` and ``get_schemas`` for the ``portal_vapp`` case needing a leading slash on the URL.
+  * Fix in ``get_schema`` and ``get_schemas`` for the ``portal_vapp`` returning webtest.response.TestResponse
+    which has a ``json`` object property rather than a function.
+
+
+7.10.0
+======
+
+* In ``ff_utils``:
+
+  * New arguments ``portal_env=`` and ``portal_vapp`` to ``get_schema``
+    for function ``get_schema`` and ``get_schemas``.
+
+* In ``s3_utils``:
+
+  * Fix a failing test (caused by an environmental change, no functional change).
+
+* In ``license_utils``:
+
+  * Allow C4 infrastructure to use the ``chardet`` library.
+
 
 7.9.0
 =====

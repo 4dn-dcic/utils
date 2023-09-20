@@ -8,7 +8,7 @@ import time
 
 from collections import namedtuple
 from elasticsearch.exceptions import AuthorizationException
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from . import s3_utils, es_utils
 from .common import (
@@ -17,7 +17,7 @@ from .common import (
     # S3BucketName, S3KeyName,
 )
 from .lang_utils import disjoined_list
-from .misc_utils import PRINT, to_camel_case, remove_suffix
+from .misc_utils import PRINT, to_camel_case, remove_suffix, VirtualApp, VirtualAppResponse
 
 
 # TODO (C4-92, C4-102): Probably to centralize this information in env_utils. Also figure out relation to CGAP.
@@ -419,7 +419,7 @@ def search_result_generator(page_generator):
     but where a page size of 3 is used with start position 0. That call will return A,C,E. The
     user may expect G,I on the second page, but before it can be done, suppose an element D is
     indexed and that the stored data is A,C,D,E,G,I,K,M. Requesting data from start position 0 would
-    now return A,C,D but we already had the first page, so we request data starting at position 3
+    now return A,C,D, but we already had the first page, so we request data starting at position 3
     for the second page and get E,G,I.  That means our sequence of return values would be A,C,E,E,G,I,K,M,
     or, in other words, showing a duplication. To avoid this, we keep track of the IDs we've seen
     and show only the first case of each element, so A,C,E,G,I,K,M. (We won't see the D, but we weren't
@@ -647,7 +647,7 @@ def get_associated_qc_metrics(uuid, key=None, ff_env=None, include_processed_fil
                               include_raw_files=False,
                               include_supplementary_files=False):
     """
-    Given a uuid of an experimentSet return a dictionary of dictionaries with each dictionary
+    Given a UUID of an experimentSet return a dictionary of dictionaries with each dictionary
     representing a quality metric.
 
     Args:
@@ -942,32 +942,75 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth):
                 yield hit['_source']  # yield individual items from ES
 
 
-def get_schema(name, key=None, ff_env=None) -> Dict:
+def resolve_portal_env(ff_env: Optional[str], portal_env: Optional[str],
+                       portal_vapp: Optional[VirtualApp]) -> Optional[str]:
+    """
+    Resolves which of ff_env and portal_env to use (after doing consistency checking).
+    There are two consistency checks performed, for which an error is raised on failure:
+        1. If neither ff_env= and portal_env= is None, the values must be compatible.
+        2. If either ff_env= or portal_env= is not None, portal_vapp= must be None.
+
+    The intent is that callers will do:
+        portal_env = resolve_portal_env(ff_env=ff_env, portal_env=portal_env, portal_vapp=portal_vapp)
+    and then afterward not have to worry that arguments are inconsistent.
+
+    Args:
+        ff_env:      an environment name or None
+        portal_env:  an environment name or None
+        portal_vapp: a VirtualApp or None
+    """
+    if ff_env:
+        if portal_env and portal_env != ff_env:
+            raise ValueError("You may not supply both portal_env= and ff_env= together.")
+        portal_env = ff_env
+    if portal_env and portal_vapp:
+        env_arg_name = 'ff_env=' if ff_env else 'portal_env='
+        raise ValueError(f"You may not supply both portal_vapp= and {env_arg_name} together.")
+    return portal_env
+
+
+def get_schema(name, key=None, ff_env: Optional[str] = None, portal_env: Optional[str] = None,
+               portal_vapp: Optional[VirtualApp] = None) -> Dict:
     """
     Gets the schema definition with the given name.
+
+    Only one of portal_env= (or ff_env=) or portal_vapp= can be provided. This determines how the schemas are obtained.
 
     Args:
         name (str):   a schema name (CamelCase or snake_case), or None
         key (dict):   standard ff_utils authentication key
-        ff_env (str): standard ff environment string
+        ff_env (str): standard environment string (deprecated, please prefer portal_env=)
+        portal_env:   standard environment string (compatible replacement for ff_env=)
+        portal_vapp:  a VirtualApp or None
 
     Returns:
         dict: contains key schema names and value item class names
     """
-    auth = get_authentication_with_server(key, ff_env)
-    url = f"profiles/{to_camel_case(name)}.json"
-    schema = get_metadata(url, key=auth, add_on='frame=raw')
-    return schema
+    portal_env = resolve_portal_env(ff_env=ff_env, portal_env=portal_env, portal_vapp=portal_vapp)
+    base_url = f"profiles/{to_camel_case(name)}.json"
+    add_on = 'frame=raw'
+    if portal_vapp:
+        full_url = f"/{base_url}?{add_on}"
+        res = portal_vapp.get(full_url)
+        return get_response_json(res)
+    else:
+        schema = get_metadata(obj_id=base_url, key=key, ff_env=portal_env, add_on=add_on)
+        return schema
 
 
-def get_schemas(key=None, ff_env=None, *, allow_abstract=True, require_id=False) -> Dict[str, Dict]:
+def get_schemas(key=None, ff_env: Optional[str] = None, *, allow_abstract: bool = True, require_id: bool = False,
+                portal_env: Optional[str] = None, portal_vapp: Optional[VirtualApp] = None) -> Dict[str, Dict]:
     """
     Gets a dictionary of all schema definitions.
     By default, this returns all schemas, but the allow_abstract= and require_id= keywords allow limited filtering.
 
+    Only one of portal_env= (or ff_env=) or portal_vapp= can be provided. This determines how the schemas are obtained.
+
     Args:
         key (dict):               standard ff_utils authentication key
-        ff_env (str):             standard ff environment string
+        ff_env (str):             standard environment string (deprecated, please prefer portal_env=)
+        portal_env:               standard environment string (compatible replacement for ff_env=)
+        portal_vapp:              a VirtualApp or None
         allow_abstract (boolean): controls whether abstract schemas can be returned (default True, return them)
         require_id (boolean):     controls whether a '$id' field is required for schema to be included
                                   (default False, include even if no $id)
@@ -975,8 +1018,14 @@ def get_schemas(key=None, ff_env=None, *, allow_abstract=True, require_id=False)
     Returns:
         dict: a mapping from keys that are schema names to schema definitions
     """
-    auth = get_authentication_with_server(key, ff_env)
-    schemas: Dict[str, Dict] = get_metadata('profiles/', key=auth, add_on='frame=raw')
+    portal_env = resolve_portal_env(ff_env=ff_env, portal_env=portal_env, portal_vapp=portal_vapp)
+    base_url = 'profiles/'
+    add_on = 'frame=raw'
+    if portal_vapp:
+        full_url = f"/{base_url}?{add_on}"
+        schemas: Dict[str, Dict] = portal_vapp.get(full_url)
+    else:
+        schemas: Dict[str, Dict] = get_metadata(obj_id=base_url, key=key, ff_env=portal_env, add_on=add_on)
     filtered_schemas = {}
     for schema_name, schema in schemas.items():
         if allow_abstract or not schema.get('isAbstract'):
@@ -1439,7 +1488,10 @@ def get_response_json(res):
     it is not present. Used with the metadata functions.
     """
     try:
-        res_json = res.json()
+        if isinstance(res, VirtualAppResponse):
+            res_json = res.json
+        else:
+            res_json = res.json()
     except Exception:
         raise Exception('Cannot get json for request to %s. Status'
                         ' code: %s. Response text: %s' %

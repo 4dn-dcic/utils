@@ -812,6 +812,12 @@ class C4InfrastructureLicenseChecker(LicenseChecker):
 
         # Linking = With Restrictions, Private Use = Yes
         # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        'GNU Lesser General Public License v2 or later (LGPLv2+)': [
+            'chardet'  # used at runtime during server operation (ingestion), but not modified or distributed
+        ],
+
+        # Linking = With Restrictions, Private Use = Yes
+        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
         'GNU Lesser General Public License v3 or later (LGPLv3+)': [
             'pytest-redis',  # used only privately in testing, not used in server code, not modified, not distributed
             'mirakuru',      # required by pytest-redis (used only where it's used)
