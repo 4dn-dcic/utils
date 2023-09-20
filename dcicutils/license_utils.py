@@ -33,6 +33,7 @@ from dcicutils.exceptions import InvalidParameterError
 from dcicutils.lang_utils import there_are
 from dcicutils.misc_utils import (
     PRINT, get_error_message, ignorable, ignored, json_file_contents, local_attrs, environ_bool,
+    remove_suffix,
 )
 
 T = TypeVar("T")
@@ -65,13 +66,16 @@ class LicenseStatus:
     UNEXPECTED_MISSING = "UNEXPECTED_MISSING"
 
 
-LICENSE_UTILS_VERBOSE = environ_bool("LICENSE_UTILS_VERBOSE", default=False)
+class LicenseOptions:
+    # General verbosity, such as progress information
+    VERBOSE = environ_bool("LICENSE_UTILS_VERBOSE", default=True)
+    # Specific additional debugging output
+    DEBUG = environ_bool("LICENSE_UTILS_DEBUG", default=False)
 
 
 class LicenseFramework:
 
     NAME = None
-    VERBOSE = LICENSE_UTILS_VERBOSE
 
     @classmethod
     def get_dependencies(cls):
@@ -135,29 +139,6 @@ class LicenseFrameworkRegistry:
         return sorted(cls.LICENSE_FRAMEWORKS.values(), key=lambda x: x.NAME)
 
 
-def extract_boolean_terms(boolean_expression: str, for_package_name: str) -> List[str]:
-    # We only care which licenses were mentioned, not what algebra is used on them.
-    # (Thankfully there are no NOTs, and that's probably not by accident, since that would be too big a set.)
-    # So for us, either (FOO AND BAR) or (FOO OR BAR) is the same because we want to treat it as "FOO,BAR".
-    # If all of those licenses match, all is good. That _does_ mean some things like (MIT OR GPL-3.0) will
-    # have trouble passing unless both MIT and GPL-3.0 are allowed.
-    terms = sorted(map(lambda x: x.strip(),
-                       (boolean_expression
-                        .replace('(', '')
-                        .replace(')', '')
-                        .replace(' AND ', ',')
-                        .replace(' and ', ',')
-                        .replace(' & ', ',')
-                        .replace(' OR ', ',')
-                        .replace(' or ', ',')
-                        .replace('|', ',')
-                        .replace(';', ',')
-                        .replace(' + ', ',')
-                        .replace('file ', f'Custom: {for_package_name} file ')
-                        ).split(',')))
-    return terms
-
-
 # This is intended to match ' (= 3)', ' (>= 3)', ' (version 3)', ' (version 3 or greater)'
 # It will incidentally and harmlessly also take ' (>version 3)' or '(>= 3 or greater)'.
 # It will also correctly handle the unlikely case of ' (= 3 or greater)'
@@ -168,7 +149,7 @@ _POSTFIX_OR_LATER_PATTERN = re.compile(f"({_OR_LATER_PATTERN})")
 _GPL_VERSION_CHOICE = re.compile('^GPL-v?([0-9.+]) (?:OR|[|]) GPL-v?([0-9.+])$')
 
 
-def simplify_license_versions(licenses_spec: str, *, for_package_name, verbose: bool = False) -> str:
+def simplify_license_versions(licenses_spec: str, *, for_package_name) -> str:
     m = _GPL_VERSION_CHOICE.match(licenses_spec)
     if m:
         version_a, version_b = m.groups()
@@ -207,9 +188,35 @@ def simplify_license_versions(licenses_spec: str, *, for_package_name, verbose: 
             break
         matched = m.group(1)
         licenses_spec = licenses_spec.replace(matched, '+')
-    if verbose and licenses_spec != original_licenses_spec:
-        print(f"Rewriting {original_licenses_spec!r} as {licenses_spec!r}.")
+    if LicenseOptions.DEBUG and licenses_spec != original_licenses_spec:
+        PRINT(f"Rewriting {original_licenses_spec!r} as {licenses_spec!r}.")
     return licenses_spec
+
+
+def extract_boolean_terms(boolean_expression: str, for_package_name: str) -> List[str]:
+    # We only care which licenses were mentioned, not what algebra is used on them.
+    # (Thankfully there are no NOTs, and that's probably not by accident, since that would be too big a set.)
+    # So for us, either (FOO AND BAR) or (FOO OR BAR) is the same because we want to treat it as "FOO,BAR".
+    # If all of those licenses match, all is good. That _does_ mean some things like (MIT OR GPL-3.0) will
+    # have trouble passing unless both MIT and GPL-3.0 are allowed.
+    revised_boolean_expression = (
+        boolean_expression
+        .replace('(', '')
+        .replace(')', '')
+        .replace(' AND ', ',')
+        .replace(' and ', ',')
+        .replace(' & ', ',')
+        .replace(' OR ', ',')
+        .replace(' or ', ',')
+        .replace('|', ',')
+        .replace(';', ',')
+        .replace(' + ', ',')
+        .replace('file ', f'Custom: {for_package_name} file ')
+    )
+    terms = [x for x in sorted(map(lambda x: x.strip(), revised_boolean_expression.split(','))) if x]
+    if LicenseOptions.DEBUG and revised_boolean_expression != boolean_expression:
+        PRINT(f"Rewriting {boolean_expression!r} as {terms!r}.")
+    return terms
 
 
 @LicenseFrameworkRegistry.register_framework(name='javascript')
@@ -218,7 +225,21 @@ class JavascriptLicenseFramework(LicenseFramework):
     @classmethod
     def implicated_licenses(cls, *, package_name, licenses_spec: str) -> List[str]:
         ignored(package_name)
-        return extract_boolean_terms(licenses_spec, for_package_name=package_name)
+        licenses_spec = simplify_license_versions(licenses_spec, for_package_name=package_name)
+        licenses = extract_boolean_terms(licenses_spec, for_package_name=package_name)
+        return licenses
+
+    VERSION_PATTERN = re.compile('^.+?([@][0-9.][^@]*|)$')
+
+    @classmethod
+    def strip_version(cls, raw_name):
+        name = raw_name
+        m = cls.VERSION_PATTERN.match(raw_name)  # e.g., @foo/bar@3.7
+        if m:
+            suffix = m.group(1)
+            if suffix:
+                name = remove_suffix(m.group(1), name)
+        return name
 
     @classmethod
     def get_dependencies(cls):
@@ -231,18 +252,13 @@ class JavascriptLicenseFramework(LicenseFramework):
             # e.g., this happens if there's no javascript in the repo
             raise Exception("No javascript license data was found.")
         result = []
-        for name, record in records.items():
-            licenses_spec = record.get(_LICENSES)
-            if '(' in licenses_spec:
-                licenses = cls.implicated_licenses(package_name=name, licenses_spec=licenses_spec)
-                # print(f"Rewriting {licenses_spec!r} as {licenses!r}")
-            elif licenses_spec:
-                licenses = [licenses_spec]
-            else:
-                licenses = []
+        for raw_name, record in records.items():
+            name = cls.strip_version(raw_name)
+            raw_licenses_spec = record.get(_LICENSES)
+            licenses = cls.implicated_licenses(licenses_spec=raw_licenses_spec, package_name=name)
             entry = {
-                _NAME: name.lstrip('@').split('@')[0],  # e.g., @foo/bar@3.7
-                _LICENSES: licenses,  # TODO: could parse this better.
+                _NAME: name,
+                _LICENSES: licenses,
                 _FRAMEWORK: 'javascript'
             }
             result.append(entry)
@@ -322,11 +338,6 @@ class RLicenseFramework(LicenseFramework):
             return [cls.R_LANGUAGE_LICENSE_NAME]
         licenses_spec = simplify_license_versions(licenses_spec, for_package_name=package_name)
         licenses = extract_boolean_terms(licenses_spec, for_package_name=package_name)
-        # licenses = sorted(map(lambda x: x.strip(),
-        #                       (licenses_spec
-        #                        .replace('|', ',')
-        #                        .replace('file ', f'Custom: {package_name} file ')
-        #                        ).split(',')))
         return licenses
 
     @classmethod
@@ -367,7 +378,7 @@ class RLicenseFramework(LicenseFramework):
                 result.append(entry)
             except Exception as e:
                 found_problems += 1
-                if cls.VERBOSE:
+                if LicenseOptions.VERBOSE:
                     PRINT(get_error_message(e))
         if found_problems > 0:
             warnings.warn(there_are(found_problems, kind="problem", show=False, punctuate=True, tense='past'))
@@ -375,8 +386,6 @@ class RLicenseFramework(LicenseFramework):
 
 
 class LicenseFileParser:
-
-    VERBOSE = LICENSE_UTILS_VERBOSE
 
     SEPARATORS = '-.,'
     SEPARATORS_AND_WHITESPACE = SEPARATORS + ' \t'
@@ -414,7 +423,7 @@ class LicenseFileParser:
             lines = []
             for i, line in enumerate(fp):
                 line = line.strip(' \t\n\r')
-                if cls.VERBOSE:  # pragma: no cover - this is just for debugging
+                if LicenseOptions.DEBUG:  # pragma: no cover - this is just for debugging
                     PRINT(str(i).rjust(3), line)
                 m = cls.COPYRIGHT_LINE.match(line) if line[:1].isupper() else None
                 if not m:
@@ -506,8 +515,6 @@ class LicenseChecker:
 
     # Set this to True in subclasses if you want your organization's policy to be that you see
     # some visible proof of which licenses were checked.
-    VERBOSE = True
-
     LICENSE_TITLE = None
     COPYRIGHT_OWNER = None
     LICENSE_FRAMEWORKS = None
@@ -630,7 +637,7 @@ class LicenseChecker:
                 _LICENSES: license_names,
                 _STATUS: status
             })
-            if cls.VERBOSE:  # pragma: no cover - this is just for debugging
+            if LicenseOptions.VERBOSE:  # pragma: no cover - this is just for debugging
                 PRINT(f"Checked {framework.NAME} {name}:"
                       f" {'; '.join(license_names) if license_names else '---'} ({status})")
 

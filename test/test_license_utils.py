@@ -8,11 +8,12 @@ import subprocess as subprocess_module
 
 from collections import defaultdict
 from dcicutils.license_utils import (
-    LicenseFrameworkRegistry, LicenseFramework,
+    LicenseOptions, LicenseFrameworkRegistry, LicenseFramework,
     PythonLicenseFramework, JavascriptLicenseFramework, CondaLicenseFramework, RLicenseFramework,
     LicenseAnalysis, LicenseChecker, LicenseStatus, LicenseFileParser,
     LicenseCheckFailure, LicenseOwnershipCheckFailure, LicenseAcceptabilityCheckFailure,
     warnings as license_utils_warnings_module,
+    extract_boolean_terms, simplify_license_versions,
 )
 from dcicutils.misc_utils import ignored, file_contents, local_attrs
 from dcicutils.qa_utils import printed_output, MockFileSystem
@@ -187,11 +188,82 @@ def test_license_framework_registry_find_framework():
             LicenseFrameworkRegistry.find_framework(1)  # noQA - arg is intentionally of wrong type for testing
 
 
-def test_javascript_license_framework_implicated_licenses():
+def test_javascript_license_framework_strip_version():
+
+    print()  # start on fresh line
+
+    strip_version = JavascriptLicenseFramework.strip_version
+
+    assert strip_version('') == ''
+
+    assert strip_version('foo') == 'foo'
+    assert strip_version('foo@bar') == 'foo@bar'
+
+    assert strip_version('foo@3') == 'foo'
+    assert strip_version('foo@3.1') == 'foo'
+    assert strip_version('foo@3.1.0') == 'foo'
+    assert strip_version('foo@3.1.0b3') == 'foo'
+    assert strip_version('foo@3.1-beta') == 'foo'
+
+    assert strip_version("@foo-3.1-beta") == '@foo-3.1-beta'  # we don't treat leading '@' as a version marker
+    assert strip_version('foo@.9') == 'foo'  # we tolerate a leading dot even though it's probably bad form
+    assert strip_version('foo@beta-3.9') == 'foo@beta-3.9'  # treating suffix as version here is farther than we'll go
+
+
+@pytest.mark.parametrize('debug', [False, True])
+def test_simplify_license_versions(debug):
+
+    def test_it(spec, expected):
+        with local_attrs(LicenseOptions, DEBUG=True):
+            with printed_output() as printed:
+                assert simplify_license_versions(spec, for_package_name='ignored') == expected
+                assert printed.last == f"Rewriting {spec!r} as {expected!r}."
+
+    test_it('GPL (version 2)', 'GPL-2')
+    test_it('GPL (version 2.0)', 'GPL-2.0')
+    test_it('GPL (= 2.0)', 'GPL-2.0')
+    test_it('GPL (= 2.1)', 'GPL-2.1')
+
+    test_it('GPL (>= 2)', 'GPL-2+')
+    test_it('GPL (>= 2.0)', 'GPL-2.0+')
+    test_it('GPL (version 2 or greater)', 'GPL-2+')
+    test_it('GPL (version 2 or later)', 'GPL-2+')
+
+
+@pytest.mark.parametrize('debug', [False, True])
+def test_extract_boolean_terms(debug):
+
+    print()  # start on a blank line
 
     def check_implications(spec, implications):
-        assert JavascriptLicenseFramework.implicated_licenses(package_name='ignored',
-                                                              licenses_spec=spec) == implications
+        with local_attrs(LicenseOptions, DEBUG=debug):
+            with printed_output() as printed:
+                assert extract_boolean_terms(spec, for_package_name='ignored') == implications
+                assert printed.lines == ([f"Rewriting {spec!r} as {implications!r}."] if debug else [])
+
+    check_implications(spec='(MIT AND BSD-3-Clause)', implications=['BSD-3-Clause', 'MIT'])
+    check_implications(spec='(CC-BY-4.0 AND OFL-1.1 AND MIT)', implications=['CC-BY-4.0', 'MIT', 'OFL-1.1'])
+
+    check_implications(spec='(MIT OR Apache-2.0)', implications=['Apache-2.0', 'MIT'])
+
+    check_implications(spec='(FOO OR (BAR AND BAZ))', implications=['BAR', 'BAZ', 'FOO'])
+
+    sample_package = 'some-package'
+    assert extract_boolean_terms('MIT or file FOO', for_package_name=sample_package) == [
+        f'Custom: {sample_package} file FOO',
+        'MIT',
+    ]
+
+
+@pytest.mark.parametrize('debug', [False, True])
+def test_javascript_license_framework_implicated_licenses(debug):
+
+    def check_implications(spec, implications):
+        with local_attrs(LicenseOptions, DEBUG=debug):
+            with printed_output() as printed:
+                assert JavascriptLicenseFramework.implicated_licenses(package_name='ignored',
+                                                                      licenses_spec=spec) == implications
+                assert printed.lines == ([f"Rewriting {spec!r} as {implications!r}."] if debug else [])
 
     check_implications(spec='(MIT AND BSD-3-Clause)', implications=['BSD-3-Clause', 'MIT'])
     check_implications(spec='(CC-BY-4.0 AND OFL-1.1 AND MIT)', implications=['CC-BY-4.0', 'MIT', 'OFL-1.1'])
@@ -201,10 +273,10 @@ def test_javascript_license_framework_implicated_licenses():
     check_implications(spec='(FOO OR (BAR AND BAZ))', implications=['BAR', 'BAZ', 'FOO'])
 
 
-@pytest.mark.parametrize('verbose', [False, True])
-def test_javascript_license_framework_get_licenses(verbose):
+@pytest.mark.parametrize('debug', [False, True])
+def test_javascript_license_framework_get_licenses(debug):
 
-    with local_attrs(LicenseFramework, REWRITE_VERBOSE=verbose):
+    with local_attrs(LicenseOptions, DEBUG=debug):
         print()  # start on a fresh line
         packages = {}
         for i, license in enumerate(['Apache-2.0', 'MIT', '(MIT OR Apache-2.0)', ''], start=1):
@@ -227,8 +299,8 @@ def test_javascript_license_framework_get_licenses(verbose):
                     {'framework': 'javascript', 'licenses': ['Apache-2.0', 'MIT'], 'name': 'package3'},
                     {'framework': 'javascript', 'licenses': [], 'name': 'package4'},
                 ]
-                expected_rewrite_description = "Rewriting '(MIT OR Apache-2.0)' as ['Apache-2.0', 'MIT']"
-                assert printed.lines == ([expected_rewrite_description] if verbose else [])
+                expected_rewrite_description = "Rewriting '(MIT OR Apache-2.0)' as ['Apache-2.0', 'MIT']."
+                assert printed.lines == ([expected_rewrite_description] if debug else [])
 
             # A special case for missing data...
             mock_check_output.return_value = "{}\n\n"
