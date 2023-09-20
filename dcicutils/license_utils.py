@@ -433,8 +433,6 @@ class LicenseFileParser:
             lines = []
             for i, line in enumerate(fp):
                 line = line.strip(' \t\n\r')
-                # if LicenseOptions.DEBUG:  # pragma: no cover - this is just for debugging
-                #    PRINT(str(i).rjust(3), line)
                 m = cls.COPYRIGHT_LINE.match(line) if line[:1].isupper() else None
                 if not m:
                     lines.append(line)
