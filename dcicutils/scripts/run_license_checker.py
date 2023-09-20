@@ -2,7 +2,7 @@ import argparse
 
 from dcicutils.command_utils import script_catch_errors, ScriptFailure
 from dcicutils.lang_utils import there_are, conjoined_list
-from dcicutils.license_utils import LicenseCheckerRegistry, LicenseChecker, LicenseCheckFailure
+from dcicutils.license_utils import LicenseOptions, LicenseCheckerRegistry, LicenseChecker, LicenseCheckFailure
 from dcicutils.misc_utils import PRINT, get_error_message
 from typing import Optional, Type
 
@@ -25,10 +25,17 @@ def main():
                         help=f"The name of a checker to run. "
                         + there_are(ALL_CHECKER_NAMES, kind='available checker',
                                     show=True, joiner=conjoined_list, punctuate=True))
+    parser.add_argument("--brief", '-b', default=False, action="store_true",
+                        help="Requests brief output.")
+    parser.add_argument("--debug", '-q', default=False, action="store_true",
+                        help="Requests additional debugging output.")
+    parser.add_argument("--conda-prefix", "--conda_prefix", "--cp", default=LicenseOptions.CONDA_PREFIX,
+                        help=(f"Overrides the CONDA_PREFIX (default {LicenseOptions.CONDA_PREFIX!r})."))
+
     args = parser.parse_args()
 
     with script_catch_errors():
-        run_license_checker(name=args.name)
+        run_license_checker(name=args.name, verbose=not args.brief, debug=args.debug, conda_prefix=args.conda_prefix)
 
 
 def show_help_for_choosing_license_checker():
@@ -52,7 +59,10 @@ def show_help_for_choosing_license_checker():
     PRINT("")
 
 
-def run_license_checker(name: Optional[str]):
+def run_license_checker(name: Optional[str],
+                        verbose=LicenseOptions.VERBOSE,
+                        debug=LicenseOptions.DEBUG,
+                        conda_prefix=LicenseOptions.CONDA_PREFIX):
     if name is None:
         show_help_for_choosing_license_checker()
     else:
@@ -61,6 +71,7 @@ def run_license_checker(name: Optional[str]):
         except Exception as e:
             raise ScriptFailure(str(e))
         try:
-            checker_class.validate()
+            with LicenseOptions.selected_options(verbose=verbose, debug=debug, conda_prefix=conda_prefix):
+                checker_class.validate()
         except LicenseCheckFailure as e:
             raise ScriptFailure(get_error_message(e))

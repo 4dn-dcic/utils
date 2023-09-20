@@ -71,6 +71,16 @@ class LicenseOptions:
     VERBOSE = environ_bool("LICENSE_UTILS_VERBOSE", default=True)
     # Specific additional debugging output
     DEBUG = environ_bool("LICENSE_UTILS_DEBUG", default=False)
+    CONDA_PREFIX = os.environ.get("CONDA_LICENSE_CHECKER_PREFIX", os.environ.get("CONDA_PREFIX", ""))
+
+    @classmethod
+    @contextlib.contextmanager
+    def selected_options(cls, verbose=VERBOSE, debug=DEBUG, conda_prefix=CONDA_PREFIX):
+        """
+        Allows a script, for example, to specify overrides for these options dynamically.
+        """
+        with local_attrs(cls, VERBOSE=verbose, DEBUG=debug, CONDA_PREFIX=conda_prefix):
+            yield
 
 
 class LicenseFramework:
@@ -296,7 +306,7 @@ class CondaLicenseFramework(LicenseFramework):
 
     @classmethod
     def get_dependencies(cls):
-        prefix = os.environ.get("CONDA_LICENSE_CHECKER_PREFIX", os.environ.get("CONDA_PREFIX", ""))
+        prefix = LicenseOptions.CONDA_PREFIX
         result = []
         filespec = os.path.join(prefix, "conda-meta/*.json")
         files = glob.glob(filespec)
@@ -423,8 +433,8 @@ class LicenseFileParser:
             lines = []
             for i, line in enumerate(fp):
                 line = line.strip(' \t\n\r')
-                if LicenseOptions.DEBUG:  # pragma: no cover - this is just for debugging
-                    PRINT(str(i).rjust(3), line)
+                # if LicenseOptions.DEBUG:  # pragma: no cover - this is just for debugging
+                #    PRINT(str(i).rjust(3), line)
                 m = cls.COPYRIGHT_LINE.match(line) if line[:1].isupper() else None
                 if not m:
                     lines.append(line)
