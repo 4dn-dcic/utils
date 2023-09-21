@@ -1186,23 +1186,20 @@ dev = ["pre-commit", "pytest-asyncio", "tox"]
 
 [[package]]
 name = "pytest-redis"
-version = "2.4.0"
+version = "3.0.2"
 description = "Redis fixtures and fixture factories for Pytest."
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "pytest-redis-2.4.0.tar.gz", hash = "sha256:8a07520abed3cd341e8da1793059aa5717b02e56c43e7c76435db682cede10aa"},
-    {file = "pytest_redis-2.4.0-py3-none-any.whl", hash = "sha256:3cf00ad3f7241e38ce6f1bcb66af11b91956a889f1e216cfc026e81aa638a4e7"},
+    {file = "pytest-redis-3.0.2.tar.gz", hash = "sha256:e54660e95fb1ec0feb7426523e37710ac7850380c60f9ee693c4045a6fc28ac5"},
+    {file = "pytest_redis-3.0.2-py3-none-any.whl", hash = "sha256:e2fd39658f396b6ae22976b80f94c61ebda5bc2bb8fe7eabcc7a7f994f7659f8"},
 ]
 
 [package.dependencies]
 mirakuru = "*"
 port-for = ">=0.6.0"
-pytest = ">=6.2.0"
-redis = "*"
-
-[package.extras]
-tests = ["mock", "pytest-cov", "pytest-xdist"]
+pytest = ">=6.2"
+redis = ">=3"
 
 [[package]]
 name = "pytest-runner"
@@ -1609,4 +1606,4 @@ tests = ["PasteDeploy", "WSGIProxy2", "coverage", "mock", "nose (<1.3.0)", "pyqu
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<3.12"
-content-hash = "0aff1a06a42172e53af4af12de567f74bf87dec1cdd16b62b99271bbed5ac8a6"
+content-hash = "fb29c53ae0f29eab1185dee384d1cd3b7dd039ca2cef7a5a38915de0e939a6a1"

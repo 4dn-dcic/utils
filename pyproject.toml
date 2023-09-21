@@ -70,10 +70,10 @@ coverage = ">=7.2.3"
 flake8 = ">=3.9.2"
 flaky = ">=3.7.0"
 pip-licenses = "^4.3.3"
-pytest = ">=4.5.0"
+pytest = "^7.4.2"
 pytest-cov = ">=2.7.1"
 pytest-mock = ">=1.11.0"
-pytest-redis = "^2.0.0"
+pytest-redis = "^3.0.2"
 pytest-runner = ">=5.1"
 
 
