@@ -58,10 +58,6 @@ class GlacierUtils:
         self.env_key = self.key_manager.get_keydict_for_env(env_name)
         self.health_page = get_health_page(key=self.env_key, ff_env=env_name)
 
-    @property
-    def kms_key_id(self) -> str:
-        return self.health_page.get("s3_encrypt_key_id", "")
-
     @classmethod
     def is_glacier_storage_class(cls, storage_class: S3StorageClass):
         return storage_class in S3_GLACIER_CLASSES
@@ -299,9 +295,6 @@ class GlacierUtils:
             }
             if tags:
                 cmu['Tagging'] = tags
-            if self.kms_key_id:
-                cmu['ServerSideEncryption'] = 'aws:kms'
-                cmu['SSEKMSKeyId'] = self.kms_key_id
             mpu = self.s3.create_multipart_upload(**cmu)
             mpu_upload_id = mpu['UploadId']
         except Exception as e:
@@ -388,21 +381,16 @@ class GlacierUtils:
             else:
                 # Force copy the object into standard in a single operation
                 copy_source = {'Bucket': bucket, 'Key': key}
-                copy_args = {
+                copy_target = {
                     'Bucket': bucket, 'Key': key,
                     'StorageClass': storage_class,
                 }
                 if version_id:
                     copy_source['VersionId'] = version_id
-                    copy_args['CopySourceVersionId'] = version_id
+                    copy_target['CopySourceVersionId'] = version_id
                 if tags:
-                    copy_args['Tagging'] = tags
-                if self.kms_key_id:
-                    copy_args['ServerSideEncryption'] = 'aws:kms'
-                    copy_args['SSEKMSKeyId'] = self.kms_key_id
-                response = self.s3.copy_object(
-                    **copy_args, CopySource=copy_source
-                )
+                    copy_target['Tagging'] = tags
+                response = self.s3.copy_object(CopySource=copy_source, **copy_target)
                 PRINT(f'Response from boto3 copy:\n{response}')
                 PRINT(f'Object {bucket}/{key} copied back to its original location in S3')
                 return response
