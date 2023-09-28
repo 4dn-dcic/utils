@@ -2308,7 +2308,9 @@ class MockBotoS3Client(MockBoto3Client):
         "application/json": [".json"],
         "text/plain": [".txt", ".text"],
         "binary/octet-stream": [".fo"],
-        # xyzzy: temporary hack to see if fixes with ubuntu 22.04 2023-09-28 ...
+        # The below is because on Ubuntu 22.04 (docker), as opposed to 20.04, the mimetypes.guess_type
+        # function returns this strange value for an argument ending in ".fo"; this manifested as a test
+        # failure (put_object assert below) in test_s3_utils.test_unzip_s3_to_s3_unit. dmichaels/2023-09-28.
         "application/vnd.software602.filler.form+xml": [".fo"],
     }
 
