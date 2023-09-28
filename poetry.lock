@@ -45,32 +45,32 @@ lxml = ["lxml"]
 
 [[package]]
 name = "boto3"
-version = "1.28.54"
+version = "1.28.56"
 description = "The AWS SDK for Python"
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "boto3-1.28.54-py3-none-any.whl", hash = "sha256:3cb2aee317a1b8686e3b23674e4099b8ff7451bd8acc61b9719acff86fa024d1"},
-    {file = "boto3-1.28.54.tar.gz", hash = "sha256:22e37d8c4f2d97b5e5c6ccc1d9edc7760717990b0ba8b8ea17a58cc87e57c5c9"},
+    {file = "boto3-1.28.56-py3-none-any.whl", hash = "sha256:f5fcb27cdbd08ca38d699f2d2e32d96d1d9fab3368c15c6bc326256612d2cfd7"},
+    {file = "boto3-1.28.56.tar.gz", hash = "sha256:b927a7ed335d543c33c15fa63f1076f3fa8422959771c2187da74bc4395ab6e3"},
 ]
 
 [package.dependencies]
-botocore = ">=1.31.54,<1.32.0"
+botocore = ">=1.31.56,<1.32.0"
 jmespath = ">=0.7.1,<2.0.0"
-s3transfer = ">=0.6.0,<0.7.0"
+s3transfer = ">=0.7.0,<0.8.0"
 
 [package.extras]
 crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "boto3-stubs"
-version = "1.28.54"
-description = "Type annotations for boto3 1.28.54 generated with mypy-boto3-builder 7.19.0"
+version = "1.28.56"
+description = "Type annotations for boto3 1.28.56 generated with mypy-boto3-builder 7.19.0"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "boto3-stubs-1.28.54.tar.gz", hash = "sha256:cb6f6a6cca4826c2b5d61b0a3fcf9cb84d7924c120b7e1c670f08e21cc010425"},
-    {file = "boto3_stubs-1.28.54-py3-none-any.whl", hash = "sha256:a58a6ebd0767d7aa1f4ab6f3eec93388b20afff5c5b25c8fe8f866d85eda6f67"},
+    {file = "boto3-stubs-1.28.56.tar.gz", hash = "sha256:2b77d4b9e944ffa4308822dc0327269f47cc4527a97903a3c5d14b9abed4eaad"},
+    {file = "boto3_stubs-1.28.56-py3-none-any.whl", hash = "sha256:e9c1f32463cf8e6ba56588f7c0f5cae52190b87eb19744ad1067a717be1c80b3"},
 ]
 
 [package.dependencies]
@@ -114,7 +114,7 @@ backup-gateway = ["mypy-boto3-backup-gateway (>=1.28.0,<1.29.0)"]
 backupstorage = ["mypy-boto3-backupstorage (>=1.28.0,<1.29.0)"]
 batch = ["mypy-boto3-batch (>=1.28.0,<1.29.0)"]
 billingconductor = ["mypy-boto3-billingconductor (>=1.28.0,<1.29.0)"]
-boto3 = ["boto3 (==1.28.54)", "botocore (==1.31.54)"]
+boto3 = ["boto3 (==1.28.56)", "botocore (==1.31.56)"]
 braket = ["mypy-boto3-braket (>=1.28.0,<1.29.0)"]
 budgets = ["mypy-boto3-budgets (>=1.28.0,<1.29.0)"]
 ce = ["mypy-boto3-ce (>=1.28.0,<1.29.0)"]
@@ -440,13 +440,13 @@ xray = ["mypy-boto3-xray (>=1.28.0,<1.29.0)"]
 
 [[package]]
 name = "botocore"
-version = "1.31.54"
+version = "1.31.56"
 description = "Low-level, data-driven core of boto 3."
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "botocore-1.31.54-py3-none-any.whl", hash = "sha256:71fdb337ddcdb6bf378e1211cba9ce754c35f12b1524c7d0c0c147b2310356c7"},
-    {file = "botocore-1.31.54.tar.gz", hash = "sha256:c98e78a9490c4166b205f87912b46770e156bfe7d53bae54ccbd49c68a336ec6"},
+    {file = "botocore-1.31.56-py3-none-any.whl", hash = "sha256:66c686e4eda7051ffcc9357d9075390c8ab2f95a2977669039618ee186fb533b"},
+    {file = "botocore-1.31.56.tar.gz", hash = "sha256:70252cd8abc2fe9b791328e187620f5a3911545e2520486b01ecfad31f41b9cb"},
 ]
 
 [package.dependencies]
@@ -459,13 +459,13 @@ crt = ["awscrt (==0.16.26)"]
 
 [[package]]
 name = "botocore-stubs"
-version = "1.31.54"
+version = "1.31.56"
 description = "Type annotations and code completion for botocore"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "botocore_stubs-1.31.54-py3-none-any.whl", hash = "sha256:6e3e015ba4d2172c6a9bd5ff5131c39c995991559a567dce6c8534884f83ded1"},
-    {file = "botocore_stubs-1.31.54.tar.gz", hash = "sha256:96223fdf87a68037dd1ed366ffe28b5b744aca495a365f4535e2179c9a88455c"},
+    {file = "botocore_stubs-1.31.56-py3-none-any.whl", hash = "sha256:e8f7273f57c09ef47f8bdc89765b151f43a46b3c29c52fb58e9982115ed14d84"},
+    {file = "botocore_stubs-1.31.56.tar.gz", hash = "sha256:e1510bd361acf755ecace42ee984281adfea6f96695ed22a08a4ceeabfe66f5f"},
 ]
 
 [package.dependencies]
@@ -1366,13 +1366,13 @@ idna2008 = ["idna"]
 
 [[package]]
 name = "s3transfer"
-version = "0.6.2"
+version = "0.7.0"
 description = "An Amazon S3 Transfer Manager"
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "s3transfer-0.6.2-py3-none-any.whl", hash = "sha256:b014be3a8a2aab98cfe1abc7229cc5a9a0cf05eb9c1f2b86b230fd8df3f78084"},
-    {file = "s3transfer-0.6.2.tar.gz", hash = "sha256:cab66d3380cca3e70939ef2255d01cd8aece6a4907a9528740f668c4b0611861"},
+    {file = "s3transfer-0.7.0-py3-none-any.whl", hash = "sha256:10d6923c6359175f264811ef4bf6161a3156ce8e350e705396a7557d6293c33a"},
+    {file = "s3transfer-0.7.0.tar.gz", hash = "sha256:fd3889a66f5fe17299fe75b82eae6cf722554edca744ca5d5fe308b104883d2e"},
 ]
 
 [package.dependencies]
@@ -1489,13 +1489,13 @@ files = [
 
 [[package]]
 name = "types-s3transfer"
-version = "0.6.2"
+version = "0.7.0"
 description = "Type annotations and code completion for s3transfer"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "types_s3transfer-0.6.2-py3-none-any.whl", hash = "sha256:1068877b6e59be5226fa3006ae64371ac9d5bc590dfdbd9c66fd0a075d3254ac"},
-    {file = "types_s3transfer-0.6.2.tar.gz", hash = "sha256:4ba9b483796fdcd026aa162ee03bdcedd2bf7d08e9387c820dcdd158b0102057"},
+    {file = "types_s3transfer-0.7.0-py3-none-any.whl", hash = "sha256:ae9ed9273465d9f43da8b96307383da410c6b59c3b2464c88d20b578768e97c6"},
+    {file = "types_s3transfer-0.7.0.tar.gz", hash = "sha256:aca0f2486d0a3a5037cd5b8f3e20a4522a29579a8dd183281ff0aa1c4e2c8aa7"},
 ]
 
 [[package]]
