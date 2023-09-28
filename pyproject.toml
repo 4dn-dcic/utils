@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "7.12.0.1b7"  # TODO: To become 8.0.0
+version = "7.12.0.1b8"  # TODO: To become 8.0.0
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -38,8 +38,8 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.12"
-boto3 = "^1.28.54"
-botocore = "^1.31.54"
+boto3 = "^1.28.56"
+botocore = "^1.31.56"
 # The DCIC portals (cgap-portal and fourfront) are very particular about which ElasticSearch version.
 # This value is intentionally pinned and must not be changed casually.
 elasticsearch = "7.13.4"
@@ -63,8 +63,8 @@ tqdm = "^4.65.0"
 
 
 [tool.poetry.dev-dependencies]
-boto3-stubs = "^1.28.54"
-botocore-stubs = "^1.31.54"
+boto3-stubs = "^1.28.56"
+botocore-stubs = "^1.31.56"
 coverage = ">=7.2.3"
 # Loaded manually in GA workflow for coverage because a dependency on 2to3
 # in its docopts dependency makes a problem for laoding it here in poetry. -kmp 7-Apr-2023
