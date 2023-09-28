@@ -2308,7 +2308,8 @@ class MockBotoS3Client(MockBoto3Client):
         "application/json": [".json"],
         "text/plain": [".txt", ".text"],
         "binary/octet-stream": [".fo"],
-        "application/vnd.software602.filler.form+xml": [".json"], # xyzzy: temporary hack to see if fixes with ubuntu 22.04 2023-09-28
+        # xyzzy: temporary hack to see if fixes with ubuntu 22.04 2023-09-28 ...
+        "application/vnd.software602.filler.form+xml": [".json"],
     }
 
     def put_object(self, *, Bucket, Key, Body, ContentType=None, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
