@@ -1,9 +1,10 @@
 import os
-from ff_utils import search_metadata
 import subprocess
 import concurrent.futures
 from env_utils import is_cgap_env
 from creds_utils import CGAPKeyManager, SMaHTKeyManager
+from ff_utils import search_metadata, get_download_url
+from misc_utils import PRINT
 
 
 class TransferUtilsError(Exception):
@@ -43,7 +44,14 @@ class TransferUtils:
         mapping = {}
         for file_item in search_metadata(search, key=self.key):
             filename = file_item['accession']
-            download_url = f'{self.key.get("server", "invalid-keyfile")}/{file_item["@id"]}/@@download'
+            try:
+                download_url = get_download_url(file_item['@id'])
+            except Exception as e:
+                PRINT(f'Could not retrieve download link for {filename} - is it a file type?')
+                mapping[filename] = e
+                continue
+            if '.s3.amazonaws.com' not in download_url:
+                PRINT(f'Potentially bad URL retrieved back from application: {download_url} - continuing')
             mapping[filename] = download_url
         return mapping
 
