@@ -745,11 +745,12 @@ class LicenseCheckerRegistry:
         return cls.REGISTRY.get(checker_name, None)
 
     @classmethod
-    def lookup_checker(cls, checker_name: str, autoload: bool = False) -> Type[LicenseChecker]:
+    def lookup_checker(cls, checker_name: str, autoload: bool = False,
+                       policy_dir: Optional[str] = None) -> Type[LicenseChecker]:
         result: Optional[Type[LicenseChecker]] = cls.find_checker(checker_name)
         if result is None:
-            if autoload:
-                policy_dir = LicenseOptions.POLICY_DIR or POLICY_DIR
+            if autoload or policy_dir:
+                policy_dir = policy_dir or LicenseOptions.POLICY_DIR or POLICY_DIR
                 PRINT(f"Looking for custom policy {checker_name} in {policy_dir} ...")
                 result = find_or_create_license_class(policy_name=checker_name,
                                                       policy_dir=policy_dir)

@@ -31,9 +31,9 @@ def main():
     parser.add_argument("--debug", '-q', default=False, action="store_true",
                         help="Requests additional debugging output.")
     parser.add_argument("--conda-prefix", "--conda_prefix", "--cp", default=LicenseOptions.CONDA_PREFIX,
-                        help=(f"Overrides the CONDA_PREFIX (default {LicenseOptions.CONDA_PREFIX!r})."))
+                        help=f"Overrides the CONDA_PREFIX (default {LicenseOptions.CONDA_PREFIX!r}).")
     parser.add_argument("--policy-dir", "--policy_dir", "--pd", default=LicenseOptions.POLICY_DIR,
-                        help=(f"Specifies a custom policy directory (default {LicenseOptions.POLICY_DIR!r})."))
+                        help=f"Specifies a custom policy directory (default {LicenseOptions.POLICY_DIR!r}).")
 
     args = parser.parse_args()
 
