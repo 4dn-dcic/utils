@@ -726,6 +726,37 @@ def test_get_metadata_integrated(integrated_ff):
     assert isinstance(res_obj['individual'], str)
 
 
+@pytest.mark.integratedx
+def test_get_download_url_integrated(integrated_ff):
+    """ Tests in an integrated fashion the download URL API ie: it should not follow redirects and tolerate
+        various different item type formats
+    """
+    valid_formats = [
+        '4DNFIH6Z2ZD5',  # accession
+        'files-processed/4DNFIH6Z2ZD5/',  # variations on actual resource path
+        '/files-processed/4DNFIH6Z2ZD5/',
+        '//files-processed/4DNFIH6Z2ZD5/',
+        'files-processed/4DNFIH6Z2ZD5//',
+        '//files-processed/4DNFIH6Z2ZD5//',
+        'b9930e7a-49e5-4c33-afab-9ec90d65faf3',  # variations on uuid
+        '/b9930e7a-49e5-4c33-afab-9ec90d65faf3',
+        '/b9930e7a-49e5-4c33-afab-9ec90d65faf3/',
+        '//b9930e7a-49e5-4c33-afab-9ec90d65faf3',
+        'b9930e7a-49e5-4c33-afab-9ec90d65faf3//'
+    ]
+    for format in valid_formats:
+        assert 's3.amazonaws.com' in ff_utils.get_download_url(format, key=integrated_ff['ff_key'])
+
+    invalid_formats = [
+        'not-a-uuid',
+        'b9930e7a-49e5-4c33-afab-9ec90d65faf4',  # non-existent uuid
+        '986b362f-4eb6-4a9c-8173-3ab267307e3a'  # uuid of a user (no download)
+    ]
+    for format in invalid_formats:
+        with pytest.raises(Exception):
+            ff_utils.get_download_url(format, key=integrated_ff['ff_key'])
+
+
 @pytest.mark.integrated
 @pytest.mark.flaky
 def test_patch_metadata_integrated(integrated_ff):

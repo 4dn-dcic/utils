@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+7.14.0
+======
+
+* New module ``transfer_utils``:
+
+  * Creates new utilities for downloading files and patching a location back to the portal
+
 
 7.13.0
 ======

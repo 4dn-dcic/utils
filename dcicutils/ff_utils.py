@@ -299,6 +299,22 @@ def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
     return get_response_json(response)
 
 
+def get_download_url(obj_id: str, key: Optional[dict] = None, ff_env: str = None) -> str:
+    """
+    Function to get a download URL for a file without following the redirect so that such results can
+    be accumulated for retrieval later. Note that by default download URLs expire after 24 hours
+
+    :param obj_id: resource path to object we would like to download
+    :param key: relevant auth
+    :param ff_env: if using admin keys, name of env to resolve
+    :return: url to s3 for download
+    """
+    auth = get_authentication_with_server(key, ff_env)
+    get_url = '/'.join([auth['server'], _sls(obj_id)]).rstrip('/') + '/@@download'
+    response = authorized_request(get_url, auth=auth, verb='GET', allow_redirects=False)
+    return response.headers['Location']
+
+
 def patch_metadata(patch_item, obj_id='', key=None, ff_env=None, add_on=''):
     """
     Patch metadata given the patch body and an optional obj_id (if not provided,
