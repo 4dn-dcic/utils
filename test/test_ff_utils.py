@@ -1397,7 +1397,7 @@ def test_get_schema_with_vapp():
             mock_get_authentication_with_server.assert_not_called()
             mock_get_metadata.assert_not_called()
 
-            sample_vapp.get.assert_called_once_with('profiles/User.json?frame=raw')
+            sample_vapp.get.assert_called_once_with('/profiles/User.json?frame=raw')
 
 
 @pytest.mark.unit
@@ -1449,7 +1449,7 @@ def test_get_schemas_with_vapp():
             mock_get_authentication_with_server.assert_not_called()
             mock_get_metadata.assert_not_called()
 
-            sample_vapp.get.assert_called_once_with('profiles/?frame=raw')
+            sample_vapp.get.assert_called_once_with('/profiles/?frame=raw')
 
 
 def test_get_schemas_options():
