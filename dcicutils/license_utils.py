@@ -497,17 +497,26 @@ class LicenseFileParser:
 
 class LicenseChecker:
     """
-    There are three important class variables to specify:
+    License checkers are defined as .jsonc. The JSONC file format is JSON with Comments.
+    (The comments are Javascript syntax, either '//' or '/* ... */'.)
+
+    There are these important class variables to specify:
 
     LICENSE_TITLE is a string naming the license to be expected in LICENSE.txt
 
     COPYRIGHT_OWNER is the name of the copyright owner.
 
-    LICENSE_FRAMEWORKS will default to all defined frameworks (presently ['python', 'javascript'], but can be limited to
-     just ['python'] for example.  It doesn't make a lot of sense to limit it to ['javascript'], though you could,
-     since you are using a Python library to do this, and it probably needs to have its dependencies checked.
+    LICENSE_FRAMEWORKS will default to all defined frameworks (presently ['python', 'javascript'],
+      but can be limited to just ['python'] for example.  It doesn't make a lot of sense to limit it to
+      ['javascript'], though you could, since you are using a Python library to do this, and it probably
+      needs to have its dependencies checked.
 
-    ALLOWED is a list of license names as returned by the pip-licenses library.
+    ALLOWED is a list of license names as returned by the various license frameworks. Because they rely on different
+      underlying tools the exact format of the names that result might vary. (For this reason, there is a regular
+      expression capability for this particular attribute, so in addition to just a string, you can also use
+      {"pattern": "<regexp>"} For very long regular expressions, {"pattern": ["<regexp-part-1>", ...]} will
+      concatenate all the parts into a single regexp so they can be gracefully broken over lines in the .jsonc
+      source file.  If regexp flags are requierd, use {"pattern" "<regexp>", "flags": ["flag1", ...]}.
 
     EXPECTED_MISSING_LICENSES is a list of libraries that are expected to have no license information.
       This is so you don't have to get warning fatigue by seeing a warning over and over for things you know about.
@@ -896,7 +905,11 @@ def find_or_create_license_class(*, policy_name: str, policy_dir: str, for_env,
                      (*parent_classes, LicenseChecker),
                      {'_policy_data': policy_data, **defaulted_policy_data})
     new_class.__doc__ = policy_data.get("description") or f'License policy {policy_name} needs a "description".'
-    assert isinstance(new_class, type) and issubclass(new_class, LicenseChecker)  # Sigh. PyCharm can't figure this out
+    # Sigh. PyCharm can't figure this out type fact out, even with a type hint on the above assignment to new_class,
+    # such as 'new_class: Type[LicenseChecker] = ...'. That should have worked. Putting in an assert was the only way
+    # I could find to convince PyCharm of the truth. I don't expect this assertion to ever fail. It's just an artifact
+    # to prevent ugly browser highlighting. I'll try to arrange a bug report for them. -kmp 29-Sep-2023
+    assert isinstance(new_class, type) and issubclass(new_class, LicenseChecker)
     license_policy_class: Type[LicenseChecker] = new_class
     decorator = LicenseCheckerRegistry.register_checker(name=policy_name)
     registered_class = decorator(license_policy_class)
@@ -1006,4 +1019,9 @@ def load_license_policies(for_env, policy_dir=None):
         find_or_create_license_class(policy_name=policy_name, policy_dir=policy_dir, for_env=for_env)
 
 
+# This will cause the definitions of classes to in the predefined set to be exported by this library
+# in case they need to be imported elsewhere, for example to use in unit-testing. Those are things like
+#  * ParkLabCommonLicenseChecker, etc.
+#  * C4InfrastructureLicenseChecker, etc.
+# See license_policies/*.jsonc for a full list.
 load_license_policies(for_env=globals())
