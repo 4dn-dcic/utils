@@ -1,0 +1,104 @@
+{
+    "class_key": "park-lab-common-server",
+    "inherits_from": ["park-lab-common"],
+    "description": "Minimal/generic checker for servers from Park Lab.",
+
+    "LICENSE_FRAMEWORKS": ["python", "javascript"],
+
+    "EXCEPTIONS": {
+        "BSD*": [
+            // Although modified to insert the author name into the license text itself,
+            // the license for these libraries are essentially BSD-3-Clause.
+            "formatio",
+            "samsam",
+
+            // There are some slightly different versions of what appear to be BSD licenses here,
+            // but clearly the license is permissive.
+            // Ref: https://www.npmjs.com/package/mutation-observer?activeTab=readme
+            "mutation-observer"
+        ],
+        "Custom: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global": [
+            // The use of this URL appears to be a syntax error in the definition of entries-ponyfill
+            // In fact this seems to be covered by a CC0-1.0 license.
+            // Ref: https://unpkg.com/browse/object.entries-ponyfill@1.0.1/LICENSE
+            "object.entries-ponyfill"
+        ],
+        "Custom: https://github.com/saikocat/colorbrewer.": [
+            // The use of this URL appears to be a syntax error in the definition of cartocolor
+            // In fact, this seems to be covered by a CC-BY-3.0 license.
+            // Ref: https://www.npmjs.com/package/cartocolor?activeTab=readme
+            "cartocolor"
+        ],
+        "Custom: https://travis-ci.org/component/emitter.png": [
+            // The use of this png appears to be a syntax error in the definition of emitter-component.
+            // In fact, emitter-component uses an MIT License
+            // Ref: https://www.npmjs.com/package/emitter-component
+            // Ref: https://github.com/component/emitter/blob/master/LICENSE
+            "emitter-component"
+        ],
+        "Custom: https://travis-ci.org/DenisCarriere/turf-jsts.svg": [        
+            // The 'turfs-jsts' repository (https://github.com/DenisCarriere/turf-jsts/blob/master/README.md)
+            // seems to lack a license, but appears to be forked from the jsts library that uses
+            // the Eclipse Public License 1.0 and Eclipse Distribution License 1.0, so probably a permissive
+            // license is intended.
+            "turf-jsts"
+        ],
+        "GNU General Public License (GPL)": [
+            "docutils"  // Used only privately as a separate documentation-generation task for ReadTheDocs
+        ],
+        "GNU Library or Lesser General Public License (LGPL)": [
+
+            // Linking = With Restrictions, Private Use = Yes
+            // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+            // "GNU Lesser General Public License v3 or later (LGPLv3+)",
+            // Linking = With Restrictions, Private Use = Yes
+            // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+            "psycopg2",         // Used at runtime during server operation, but not modified or distributed
+            "psycopg2-binary",  // Used at runtime during server operation, but not modified or distributed
+            "chardet",          // Potentially used downstream in loadxl to detect charset for text files
+            "pyzmq"             // Used in post-deploy-perf-tests, not distributed, and not modified or distributed
+        ],
+        "GPL-2.0": [
+            // The license file for the node-forge javascript library says:
+            //
+            //   "You may use the Forge project under the terms of either the BSD License or the
+            //   GNU General Public License (GPL) Version 2."
+            //
+            // (We choose to use it under the BSD license.)
+            // Ref: https://www.npmjs.com/package/node-forge?activeTab=code
+            "node-forge"
+        ],
+        "MIT*": [
+            // This library uses a mix of licenses, but they (MIT, CC0) generally seem permissive.
+            // (It also mentions that some tools for building/testing use other libraries.)
+            // Ref: https://github.com/requirejs/domReady/blob/master/LICENSE
+            "domready",
+
+            // This library is under "COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.1"
+            // Ref: https://github.com/javaee/jsonp/blob/master/LICENSE.txt
+            // About CDDL ...
+            // Linking = Permissive, Private Use = ?
+            // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+            "jsonp",
+
+            // This library says pretty clearly it intends MIT license.
+            // Ref: https://www.npmjs.com/package/component-indexof
+            // Linking = Permissive, Private Use = Yes
+            // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+            "component-indexof",
+
+            // These look like a pretty straight MIT license.
+            // Linking = Permissive, Private Use = Yes
+            // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+            "mixin",           // LICENSE file at https://www.npmjs.com/package/mixin?activeTab=code
+            "stack-trace",     // https://github.com/stacktracejs/stacktrace.js/blob/master/LICENSE
+            "typed-function"   // LICENSE at https://www.npmjs.com/package/typed-function?activeTab=code
+        ],
+        "UNLICENSED": [
+            // The udn-browser library is our own and has been observed to sometimes show up in some contexts
+            // as UNLICENSED, when really it is MIT.
+            // Ref: https://github.com/dbmi-bgm/udn-browser/blob/main/LICENSE
+            "udn-browser"
+        ]
+    }
+}

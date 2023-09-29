@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "7.12.0.2b9"  # TODO: To become 8.0.0
+version = "7.12.0.2b10"  # TODO: To become 8.0.0
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -46,6 +46,7 @@ elasticsearch = "7.13.4"
 aws-requests-auth = ">=0.4.2,<1"
 docker = "^4.4.4"
 gitpython = "^3.1.2"
+jsonc-parser = "^1.1.5"
 pytz = ">=2020.4"
 PyYAML = "^6.0.1"
 requests = "^2.21.0"
@@ -82,6 +83,8 @@ pytest-runner = ">=5.1"
 [tool.poetry.scripts]
 publish-to-pypi = "dcicutils.scripts.publish_to_pypi:main"
 show-contributors = "dcicutils.contribution_scripts:show_contributors_main"
+run-license-checker = "dcicutils.scripts.run_license_checker:main"
+
 
 [tool.pytest.ini_options]
 addopts = "--basetemp=/tmp/pytest"

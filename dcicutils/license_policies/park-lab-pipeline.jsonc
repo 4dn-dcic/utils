@@ -1,0 +1,12 @@
+{
+    "class_key": "park-lab-pipeline",
+    "class_name": "ParkLabPipelineLicenseChecker",
+    "inherits_from": ["park-lab-common"],
+    "description": "Minimal/generic checker for non-GPL-approved pipelines from Park Lab.",
+
+    "LICENSE_FRAMEWORKS": ["python", "conda", "r"]
+}
+
+
+
+
