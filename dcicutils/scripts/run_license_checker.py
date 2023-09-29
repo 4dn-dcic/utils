@@ -10,7 +10,8 @@ from typing import Optional, Type
 EPILOG = __doc__
 
 
-ALL_CHECKER_NAMES = LicenseCheckerRegistry.all_checker_names()
+ALL_CHECKER_NAMES = sorted(LicenseCheckerRegistry.all_checker_names(),
+                           key=lambda x: 'aaaaa-' + x if x.startswith('park-lab-') else x)
 NEWLINE = '\n'
 
 

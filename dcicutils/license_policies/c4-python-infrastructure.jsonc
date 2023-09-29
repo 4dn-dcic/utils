@@ -1,0 +1,8 @@
+{
+    "class_key": "c4-python-infrastructure",
+    "class_name": "C4PythonInfrastructureLicenseChecker",
+    "inherits_from": ["c4-infrastructure"],
+    "description": "Checker for C4 python library infrastructure (Fourfront, CGAP, SMaHT) from Park Lab.",
+
+    "LICENSE_FRAMEWORKS": ["python"]
+}

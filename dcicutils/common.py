@@ -1,4 +1,5 @@
 import os
+import re
 
 from typing import Dict, Union, Tuple, List, Any
 from typing_extensions import Literal
@@ -35,6 +36,8 @@ ChaliceStage = Literal['dev', 'prod']
 OrchestratedApp = Literal['cgap', 'fourfront', 'smaht']
 
 LIBRARY_DIR = os.path.dirname(__file__)
+
+Regexp = type(re.compile("sample"))
 
 # ===== Auth Data =====
 

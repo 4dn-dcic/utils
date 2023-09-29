@@ -2000,8 +2000,9 @@ def test_snake_case_to_camel_case_hyphenated(token, expected):
     ('x_m_l_container', 'XMLContainer'),
     ('X_M_L_Container', 'XMLContainer'),
 ])
-def test_to_camel_case_hyphenated(token, expected):
+def test_to_camel_case(token, expected):
     assert to_camel_case(token) == expected
+    assert to_camel_case(token.replace('_', '-')) == expected
     assert to_camel_case(expected) == expected  # make sure it's stable
 
 

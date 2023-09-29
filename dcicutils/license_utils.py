@@ -4,7 +4,6 @@ import datetime
 import glob
 import io
 import json
-# import logging
 import os
 import re
 import subprocess
@@ -25,15 +24,17 @@ except ImportError:  # pragma: no cover - not worth unit testing this case
 #    import piplicenses
 
 from collections import defaultdict
+from jsonc_parser.parser import JsoncParser
 from typing import Any, Dict, DefaultDict, List, Optional, Type, TypeVar, Union
 
 # For obscure reasons related to how this file is used for early prototyping, these must use absolute references
 # to modules, not relative references. Later when things are better installed, we can make refs relative again.
+from dcicutils.common import Regexp, AnyJsonData
 from dcicutils.exceptions import InvalidParameterError
-from dcicutils.lang_utils import there_are
+from dcicutils.lang_utils import there_are, conjoined_list
 from dcicutils.misc_utils import (
     PRINT, get_error_message, ignorable, ignored, json_file_contents, local_attrs, environ_bool,
-    remove_suffix,
+    remove_suffix, to_camel_case
 )
 
 T = TypeVar("T")
@@ -48,6 +49,10 @@ _LICENSE_CLASSIFIER = 'license_classifier'
 _LICENSES = 'licenses'
 _NAME = 'name'
 _STATUS = 'status'
+
+_INHERITS_FROM = 'inherits_from'
+_ALLOWED = 'allowed'
+_EXCEPT = 'except'
 
 
 def pattern(x):
@@ -147,6 +152,10 @@ class LicenseFrameworkRegistry:
     @classmethod
     def all_frameworks(cls):
         return sorted(cls.LICENSE_FRAMEWORKS.values(), key=lambda x: x.NAME)
+
+    @classmethod
+    def all_framework_names(cls):
+        return sorted(cls.LICENSE_FRAMEWORKS.keys())
 
 
 # This is intended to match ' (= 3)', ' (>= 3)', ' (version 3)', ' (version 3 or greater)'
@@ -315,13 +324,10 @@ class CondaLicenseFramework(LicenseFramework):
             package_name = data['name']
             package_license = data.get('license') or "MISSING"
             if package_license:
-                # print(f"package_license={package_license}")
                 simplified_package_license_spec = simplify_license_versions(package_license,
                                                                             for_package_name=package_name)
-                # print(f" =simplified_package_license_spec => {simplified_package_license_spec}")
                 package_licenses = extract_boolean_terms(simplified_package_license_spec,
                                                          for_package_name=package_name)
-                # print(f"=> {package_licenses}")
             else:
                 package_licenses = []
             entry = {
@@ -331,8 +337,6 @@ class CondaLicenseFramework(LicenseFramework):
             }
             result.append(entry)
         result.sort(key=lambda x: x['name'])
-        # print(f"conda get_dependencies result={json.dumps(result, indent=2)}")
-        # print("conda deps = ", json.dumps(result, indent=2))
         return result
 
 
@@ -498,16 +502,16 @@ class LicenseChecker:
 
     COPYRIGHT_OWNER is the name of the copyright owner.
 
-    FRAMEWORKS will default to all defined frameworks (presently ['python', 'javascript'], but can be limited to
+    LICENSE_FRAMEWORKS will default to all defined frameworks (presently ['python', 'javascript'], but can be limited to
      just ['python'] for example.  It doesn't make a lot of sense to limit it to ['javascript'], though you could,
      since you are using a Python library to do this, and it probably needs to have its dependencies checked.
 
     ALLOWED is a list of license names as returned by the pip-licenses library.
 
-    EXPECTED_MISSING is a list of libraries that are expected to have no license information. This is so you don't
-      have to get warning fatigue by seeing a warning over and over for things you know about. If a new library
-      with no license info shows up that you don't expect, you should investigate it, make sure it's OK,
-      and then add it to this list.
+    EXPECTED_MISSING_LICENSES is a list of libraries that are expected to have no license information.
+      This is so you don't have to get warning fatigue by seeing a warning over and over for things you know about.
+      If a new library with no license info shows up that you don't expect, you should investigate it,
+      make sure it's OK, and then add it to this list.
 
     EXCEPTIONS is a table (a dict) keyed on license names with entries that are lists of library names that are
       allowed to use the indicated license even though the license might not be generally allowed. This should be
@@ -673,6 +677,7 @@ class LicenseChecker:
     @classmethod
     def show_unacceptable_licenses(cls, *, analysis: LicenseAnalysis) -> LicenseAnalysis:
         if analysis.unacceptable:
+            # This is part of the essential output, so is not conditional on switches.
             PRINT(there_are(analysis.unacceptable, kind="unacceptable license", show=False, punctuation_mark=':'))
             for license, names in sorted(analysis.unacceptable.items()):
                 PRINT(f" {license}: {', '.join(names)}")
@@ -726,10 +731,14 @@ class LicenseCheckerRegistry:
         return _register
 
     @classmethod
-    def lookup_checker(cls, name: str) -> Type[LicenseChecker]:
-        result: Optional[Type[LicenseChecker]] = cls.REGISTRY.get(name)
+    def find_checker(cls, checker_name: str) -> Optional[Type[LicenseChecker]]:
+        return cls.REGISTRY.get(checker_name, None)
+
+    @classmethod
+    def lookup_checker(cls, checker_name: str) -> Type[LicenseChecker]:
+        result: Optional[Type[LicenseChecker]] = cls.find_checker(checker_name)
         if result is None:
-            raise InvalidParameterError(parameter='checker_name', value=name,
+            raise InvalidParameterError(parameter='checker_name', value=checker_name,
                                         options=cls.all_checker_names())
         return result
 
@@ -762,648 +771,230 @@ class LicenseAcceptabilityCheckFailure(LicenseCheckFailure):
         super().__init__(message=message)
 
 
-@LicenseCheckerRegistry.register_checker('park-lab-common')
-class ParkLabCommonLicenseChecker(LicenseChecker):
+def literal_string_or_regexp_from_dict(item):
     """
-    Minimal checker common to all tech from Park Lab.
+    Expects either a string (which will be matched using ordinary equality) ore a regular expression,
+    expressed as a dictionary of the form {"pattern": <regexp>, "flags": [<flag>, ...]}
+    The pattern is required. The flags may be omitted if null.
+    A pattern is either a string or a list of strings. If it is a list of strings, it will be concatenated
+    into a single string, which can be useful for breaking long strings over lines.
+    Flags are string names of re.WHATEVER flags that would be given to Python's re.compile.
+    UNICODE and IGNORECASE are on by default.
     """
-
-    COPYRIGHT_OWNER = "President and Fellows of Harvard College"
-
-    ALLOWED = [
-
-        # <<Despite its name, Zero-Clause BSD is an alteration of the ISC license,
-        #   and is not textually derived from licenses in the BSD family.
-        #   Zero-Clause BSD was originally approved under the name “Free Public License 1.0.0”>>
-        # Ref: https://opensource.org/license/0bsd/
-        '0BSD',
-
-        # Linking = Permissive, Private Use = Yes
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'Academic Free License (AFL)',
-        'AFL-2.1',
-
-        # Linking = Permissive, Private Use = Yes
-        # Apache licenses before version 2.0 are controversial, but we here construe an unmarked naming to imply
-        # any version, and hence v2.
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'Apache Software License',
-        'Apache-Style',
-        pattern("Apache([- ]2([.]0)?)?([- ]Licen[cs]e)?([- ]with[- ]LLVM[- ]exception)?"),
-        # 'Apache-2.0',
-
-        # Artistic License 1.0 was confusing to people, so its status as permissive is in general uncertain,
-        # however the issue seems to revolve around point 8 (relating to whether or not perl is deliberately
-        # exposed). That isn't in play for our uses, so we don't flag it here.
-        # Artistic license 2.0 is a permissive license.
-        # Ref: https://en.wikipedia.org/wiki/Artistic_License
-        'Artistic-1.0-Perl',
-        pattern('Artistic[- ]2([.]0)?'),
-
-        # According to Wikipedia, the Boost is considered permissive and BSD-like.
-        # Refs:
-        #  *
-        #  * https://en.wikipedia.org/wiki/Boost_(C%2B%2B_libraries)#License
-        pattern('(BSL|Boost(([- ]Software)?[- ]License)?)([- ]1([.]0)?)?'),
-
-        # Linking = Permissive, Private Use = Yes
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        pattern('((modified[- ])?[234][- ]Clause[- ])?BSD([- ][234][- ]Clause)?( Licen[cs]e)?'),
-        # 'BSD License',
-        # 'BSD-2-Clause',
-        # 'BSD-3-Clause',
-        # 'BSD 3-Clause',
-
-        # BZIP2 is a permissive license
-        # Ref: https://github.com/asimonov-im/bzip2/blob/master/LICENSE
-        pattern('bzip2(-1[.0-9]*)'),
-
-        # Linking = Public Domain, Private Use = Public Domain
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'CC0',
-        'CC0-1.0',
-
-        # Linking = Permissive, Private Use = Permissive
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'CC-BY',
-        'CC-BY-3.0',
-        'CC-BY-4.0',
-
-        # The curl license is a permissive license.
-        # Ref: https://curl.se/docs/copyright.html
-        'curl',
-
-        # Linking = Permissive, Private Use = ?
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'CDDL',
-
-        # The original Eclipse Distribution License 1.0 is essentially a BSD-3-Clause license.
-        # Ref: https://www.eclipse.org/org/documents/edl-v10.php
-        'Eclipse Distribution License',
-
-        # Linking = Permissive, Private Use = Yes
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'Eclipse Public License',
-        'EPL-2.0',
-
-        # The FSF Unlimited License (FSFUL) seems to be a completely permissive license.
-        # Refs:
-        #  * https://spdx.org/licenses/FSFUL.html
-        #  * https://fedoraproject.org/wiki/Licensing/FSF_Unlimited_License
-        'FSF Unlimited License',
-        'FSFUL',
-
-        # The FreeType license is a permissive license.
-        # Ref: LicenseRef-FreeType
-        pattern('(Licen[cs]eRef-)?(FTL|FreeType( Licen[cs]e)?)'),
-
-        # Linking = Yes, Cat = Permissive Software Licenses
-        # Ref: https://en.wikipedia.org/wiki/Historical_Permission_Notice_and_Disclaimer
-        'Historical Permission Notice and Disclaimer (HPND)',
-        'HPND',
-        pattern('(Licen[cs]eRef-)?PIL'),
-        # The Pillow or Python Image Library is an HPND license, which is a simple permissive license:
-        # Refs:
-        #   * https://github.com/python-pillow/Pillow/blob/main/LICENSE
-        #   * https://www.fsf.org/blogs/licensing/historical-permission-notice-and-disclaimer-added-to-license-list
-
-        # The IJG license, used by Independent JPEG Group (IJG) is a custom permissive license.
-        # Refs:
-        #   * https://en.wikipedia.org/wiki/Libjpeg
-        #   * https://github.com/libjpeg-turbo/libjpeg-turbo/blob/main/LICENSE.md
-        'IJG',
-
-        # Linking = Permissive, Private Use = Permissive
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'ISC License (ISCL)',
-        'ISC',
-
-        # Linking = Permissive, Private Use = Yes
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'MIT License',
-        'MIT',
-
-        # Linking = Permissive, Private Use = Yes
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'Mozilla Public License 2.0 (MPL 2.0)',
-        'MPL-1.1',
-        'MPL-2.0',
-
-        # The SIL Open Font License appears to be a copyleft-style license that applies narrowly
-        # to icons and not to the entire codebase. It is advertised as OK for use even in commercial
-        # applications.
-        # Ref: https://fontawesome.com/license/free
-        'OFL-1.1',
-
-        # Ref: https://en.wikipedia.org/wiki/Public_domain
-        pattern('(Licen[cs]eRef-)?Public[- ]Domain([- ]dedic[t]?ation)?'),  # "dedictation" is a typo in docutils
-
-        # Linking = Permissive, Private Use = Permissive
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        pattern('(Licen[cs]eRef-)?PSF-2([.][.0-9]*)'),
-        'Python Software Foundation License',
-        'Python-2.0',
-
-        # License = BSD-like
-        # Ref: https://en.wikipedia.org/wiki/Pylons_project
-        'Repoze Public License',
-
-        # The TCL or Tcl/Tk licenses are permissive licenses.
-        # Ref: https://www.tcl.tk/software/tcltk/license.html
-        # The one used by the tktable library has a 'bourbon' clause that doesn't add compliance requirements
-        # Ref: https://github.com/wjoye/tktable/blob/master/license.txt
-        pattern('Tcl([/]tk)?'),
-
-        # The Ubuntu Font Licence is mostly permissive. It contains some restrictions if you are going to modify the
-        # fonts that require you to change the name to avoid confusion. But for our purposes, we're assuming that's
-        # not done, and so we're not flagging it.
-        pattern('Ubuntu Font Licen[cs]e Version( 1([.]0)?)?'),
-
-        # Linking = Permissive/Public domain, Private Use = Permissive/Public domain
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'The Unlicense (Unlicense)',
-        'Unlicense',
-
-        # Various licenses seem to call themselves or be summed up as unlimited.
-        # So far we know of none that are not highly permissive.
-        #   * boot and KernSmooth are reported by R as being 'Unlimited'
-        #     Refs:
-        #       * https://cran.r-project.org/web/packages/KernSmooth/index.html
-        #         (https://github.com/cran/KernSmooth/blob/master/LICENCE.note)
-        #       * https://cran.r-project.org/package=boot
-        #         (https://github.com/cran/boot/blob/master/DESCRIPTION)
-        'Unlimited',
-
-        # Linking = Permissive, Private Use = ?
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'W3C License',
-        'W3C-20150513',
-
-        # Linking = Permissive/Public Domain, Private Use = Yes
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'WTFPL',
-
-        # Copyleft = No
-        # Ref: https://en.wikipedia.org/wiki/Zlib_License
-        # Linking = Permissive, Private Use = ? (for zlib/libpng license)
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'Zlib',
-
-        # Copyleft = No, FSF/OSI-approved: Yes
-        # Ref: https://en.wikipedia.org/wiki/Zope_Public_License
-        'Zope Public License',
-    ]
-
-    EXCEPTIONS = {
-
-        # The Bioconductor zlibbioc license is a permissive license.
-        # Ref: https://github.com/Bioconductor/zlibbioc/blob/devel/LICENSE
-        'Custom: bioconductor-zlibbioc file LICENSE': [
-            'bioconductor-zlibbioc'
-        ],
-
-        # The Bioconductor rsamtools license is an MIT license
-        # Ref: https://bioconductor.org/packages/release/bioc/licenses/Rsamtools/LICENSE
-        'Custom: bioconductor-rsamtools file LICENSE': [
-            'bioconductor-rsamtools'
-        ],
-
-        # DFSG = Debian Free Software Guidelines
-        # Ref: https://en.wikipedia.org/wiki/Debian_Free_Software_Guidelines
-        # Used as an apparent modifier to other licenses, to say they are approved per Debian.
-        # For example in this case, pytest-timeout has license: DFSG approved, MIT License,
-        # but is really just an MIT License that someone has checked is DFSG approved.
-        'DFSG approved': [
-            'pytest-timeout',  # MIT Licensed
-        ],
-
-        'FOSS': [
-            # The r-stringi library is a conda library that implements a stringi (pronounced "stringy") library for R.
-            # The COnda source feed is: https://github.com/conda-forge/r-stringi-feedstock
-            # This page explains that the home source is https://stringi.gagolewski.com/ but that's a doc page.
-            # The doc page says:
-            # > stringi’s source code is hosted on GitHub.
-            # > It is distributed under the open source BSD-3-clause license.
-            # The source code has a license that begins with a BSD-3-clause license and includes numerous others,
-            # but they all appear to be permissive.
-            #   Ref: https://github.com/gagolews/stringi/blob/master/LICENSE
-            'stringi', 'r-stringi',
-        ],
-
-        # Linking = With Restrictions, Private Use = Yes
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'GNU Lesser General Public License v2 or later (LGPLv2+)': [
-            'chardet'  # used at runtime during server operation (ingestion), but not modified or distributed
-        ],
-
-        # Linking = With Restrictions, Private Use = Yes
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'GNU Lesser General Public License v3 or later (LGPLv3+)': [
-            # used only privately in testing, not used in server code, not modified, not distributed
-            'pytest-redis',
-            # required by pytest-redis (used only where it's used)
-            'mirakuru',
-        ],
-
-        'GNU General Public License (GPL)': [
-            'docutils',  # Used only privately as a separate documentation-generation task for ReadTheDocs
-        ],
-
-        'MIT/X11 Derivative': [
-            # The license used by libxkbcommon is complicated and involves numerous included licenses,
-            # but all are permissive.
-            # Ref: https://github.com/xkbcommon/libxkbcommon/blob/master/LICENSE
-            'libxkbcommon',
-        ],
-
-        'None': [
-            # It's not obvious why Conda shows this license as 'None'.
-            # In fact, though, BSD 3-Clause "New" or "Revised" License
-            # Ref: https://github.com/AnacondaRecipes/_libgcc_mutex-feedstock/blob/master/LICENSE.txt
-            '_libgcc_mutex',
-        ],
-
-        'PostgreSQL': [
-            # The libpq library is actually licensed with a permissive BSD 3-Clause "New" or "Revised" License
-            # Ref: https://github.com/lpsmith/postgresql-libpq/blob/master/LICENSE
-            'libpq',
-        ],
-
-        'UCSD': [
-            # It isn't obvious why these show up with a UCSD license in Conda.
-            # The actual sources say it should be a 2-clause BSD license:
-            # Refs:
-            #   * https://github.com/AlexandrovLab/SigProfilerMatrixGenerator/blob/master/LICENSE
-            #   * https://github.com/AlexandrovLab/SigProfilerPlotting/blob/master/LICENSE
-            'sigprofilermatrixgenerator',
-            'sigprofilerplotting',
-        ],
-
-        'X11': [
-            # The ncurses library has a VERY complicated history, BUT seems consistently permissive
-            # and the most recent version seems to be essentially the MIT license.
-            # Refs:
-            #   * https://en.wikipedia.org/wiki/Ncurses#License
-            #   * https://invisible-island.net/ncurses/ncurses-license.html
-            'ncurses'
-        ],
-
-        'zlib-acknowledgement': [
-            # It isn't clear whey libpng shows up with this license name, but the license for libpng
-            # is a permissive license.
-            # Ref: https://github.com/glennrp/libpng/blob/libpng16/LICENSE
-            'libpng',
-        ],
-
-    }
-
-    EXPECTED_MISSING_LICENSES = [
-
-        # This is a name we use for our C4 portals. And it isn't published.
-        # We inherited the name from the Stanford ENCODE group, which had an MIT-licensed repo we forked
-        'encoded',  # cgap-portal, fourfront, and smaht-portal all call themselves this
-
-        # We believe that since these next here are part of the Pylons project, they're covered under
-        # the same license as the other Pylons projects. We're seeking clarification.
-        'pyramid-translogger',
-        'subprocess-middleware',
-
-        # This appears to be a BSD 2-Clause "Simplified" License, according to GitHub.
-        # PyPi also says it's a BSD license.
-        # Ref: https://github.com/paulc/dnslib/blob/master/LICENSE
-        'dnslib',
-
-        # This says it wants an ISC License, which we already have approval for but just isn't showing up.
-        # Ref: https://github.com/rthalley/dnspython/blob/master/LICENSE
-        'dnspython',
-
-        # This appears to be a mostly-MIT-style license.
-        # There are references to parts being in the public domain, though it's not obvious if that's meaningful.
-        # It's probably sufficient for our purposes to treat this as a permissive license.
-        # Ref: https://github.com/tlsfuzzer/python-ecdsa/blob/master/LICENSE
-        'ecdsa',
-
-        # This has an MIT license in its source repository
-        # Ref: https://github.com/xlwings/jsondiff/blob/master/LICENSE
-        'jsondiff',
-
-        # This has an MIT license in its source repository
-        # Ref: https://github.com/pkerpedjiev/negspy/blob/master/LICENSE
-        'negspy',
-
-        # This license statement is complicated, but seems adequately permissive.
-        # Ref: https://foss.heptapod.net/python-libs/passlib/-/blob/branch/stable/LICENSE
-        'passlib',
-
-        # This seems to be a BSD-3-Clause license.
-        # Ref: https://github.com/protocolbuffers/protobuf/blob/main/LICENSE
-        # pypi agrees in the Meta section of protobuf's page, where it says "3-Clause BSD License"
-        # Ref: https://pypi.org/project/protobuf/
-        'protobuf',
-
-        # The WTFPL license is permissive.
-        # Ref: https://github.com/mk-fg/pretty-yaml/blob/master/COPYING
-        'pyaml',
-
-        # This uses a BSD license
-        # Ref: https://github.com/eliben/pycparser/blob/master/LICENSE
-        'pycparser',
-
-        # The source repo for pyDes says this is under an MIT license
-        # Ref: https://github.com/twhiteman/pyDes/blob/master/LICENSE.txt
-        # pypi, probably wrongly, thinks this is in the public domain (as of 2023-07-21)
-        # Ref: https://pypi.org/project/pyDes/
-        'pyDes',
-
-        # This uses an MIT license
-        # Ref: https://github.com/pysam-developers/pysam/blob/master/COPYING
-        'pysam',
-
-        # The version of python-lambda that we forked calls itself this (and publishes at pypi under this name)
-        "python-lambda-4dn",
-
-        # This is MIT-licensed:
-        # Ref: https://github.com/themiurgo/ratelim/blob/master/LICENSE
-        # pypi agrees
-        # Ref: https://pypi.org/project/ratelim/
-        'ratelim',
-
-        # This is a BSD-3-Clause-Modification license
-        # Ref: https://github.com/repoze/repoze.debug/blob/master/LICENSE.txt
-        'repoze.debug',
-
-        # This is an Apache-2.0 license
-        # Ref: https://github.com/getsentry/responses/blob/master/LICENSE
-        'responses',
-
-        # This seems to get flagged sometimes, but is not the pypi snovault library, it's what our dcicsnovault
-        # calls itself internally. In any case, it's under MIT license and OK.
-        # Ref: https://github.com/4dn-dcic/snovault/blob/master/LICENSE.txt
-        'snovault',
-
-        # PyPi identifies the supervisor library license as "BSD-derived (http://www.repoze.org/LICENSE.txt)"
-        # Ref: https://pypi.org/project/supervisor/
-        # In fact, though, the license is a bit more complicated, though apparently still permissive.
-        # Ref: https://github.com/Supervisor/supervisor/blob/main/LICENSES.txt
-        'supervisor',
-
-        # This seems to be a BSD-3-Clause-Modification license.
-        # Ref: https://github.com/Pylons/translationstring/blob/master/LICENSE.txt
-        'translationstring',
-
-        # This seems to be a BSD-3-Clause-Modification license.
-        # Ref: https://github.com/Pylons/venusian/blob/master/LICENSE.txt
-        'venusian',
-
-        # PyPi identifies zope.deprecation as using the "Zope Public License (ZPL 2.1)" license.
-        # Ref: https://github.com/zopefoundation/Zope/blob/master/LICENSE.txt
-        'zope.deprecation',
-
-        # Below are licenses last known to have licenses missing in pip-licenses and need to be investigated further.
-        # Note well that just because pip-licenses doesn't know the license doesn't mean the software has
-        # no license. It may just mean the library is poorly registered in pypi. Some licenses have to be
-        # found by looking at the library's documentation or source files.
-
-        # (all of these have been classified at this point)
-
-    ]
-
-
-@LicenseCheckerRegistry.register_checker('park-lab-pipeline')
-class ParkLabPipelineLicenseChecker(ParkLabCommonLicenseChecker):
+    if isinstance(item, str):
+        return item
+    elif not isinstance(item, dict):
+        raise ValueError(f'Expected a string or a dictionary describing a regular expression.')
+    pattern = item.get('pattern')
+    # The pattern is permitted to be a string or list of strings, since in a JSON-style file we can't
+    # do the thing we do in python where we just juxtapose several strings, separated by whitespace
+    # and/or newlines, in order to have them taken as a single literal string. -kmp 29-Sep-2023
+    if isinstance(pattern, str):
+        pass
+    elif isinstance(pattern, list):
+        pattern = ''.join(pattern)
+    else:
+        raise ValueError(f"Invalid pattern expression: {item!r}")
+    flags = item.get('flags') or []
+    compilation_flags = re.IGNORECASE  # UNICODE will default, but IGNORECASE we have to set up manually
+    for flag in flags:
+        if isinstance(flag, str) and flag.isupper():
+            if hasattr(re, flag):
+                compilation_flags |= getattr(re, flag)
+            else:
+                raise ValueError(f"No such flag re.{flag}")
+        else:
+            raise ValueError(f"Flags must be strigs: {flag!r}")
+    regexp = re.compile(pattern, compilation_flags)
+    return regexp
+
+
+def read_license_policy_file(file):
     """
-    Minimal checker common to pipelines from Park Lab.
+    Reads a license policy file, which is a JSONC file (can contain JSON with Javascript-style comments)
+    The policy is a dictionary, but the ALLOWED option is a list that can contain special syntax allowing
+    a regular expression to be inferred. See documentation of `string_or_regexp_dict` for details.
     """
+    data = JsoncParser.parse_file(file)
+    allowed = data.get('ALLOWED')
+    if isinstance(allowed, list):
+        # The "ALLOWED" option is specially permitted to contain regular expressions.
+        data['ALLOWED'] = [literal_string_or_regexp_from_dict(allowance) for allowance in allowed]
+    return data
 
-    LICENSE_FRAMEWORKS = ['python', 'conda', 'r']
+
+_MY_DIR = os.path.dirname(__file__)
+
+POLICY_DIR = os.path.join(_MY_DIR, "license_policies")
+
+POLICY_DATA_CACHE = {}
 
 
-@LicenseCheckerRegistry.register_checker('park-lab-gpl-pipeline')
-class ParkLabGplPipelineLicenseChecker(ParkLabCommonLicenseChecker):
+def built_in_policy_names():
+    return [
+        os.path.splitext(os.path.basename(license_policy_path))[0]
+        for license_policy_path in glob.glob(os.path.join(POLICY_DIR, "*.jsonc"))]
+
+
+def find_policy_data(policy_name: str, policy_dir: Optional[str] = None,
+                     use_cache: bool = True, error_if_missing: bool = True):
+    policy_dir = POLICY_DIR if policy_dir is None else policy_dir
+    existing_data = POLICY_DATA_CACHE.get(policy_name) if use_cache else None
+    if existing_data:
+        return existing_data
+    else:
+        filename = os.path.join(policy_dir, policy_name + ".jsonc")
+        if not os.path.exists(filename):
+            if error_if_missing:
+                raise ValueError(f"No such policy: {policy_name!r}")
+            else:
+                return None
+        data = read_license_policy_file(filename)
+        POLICY_DATA_CACHE[policy_name] = data
+        return data
+
+
+def find_or_create_license_class(*, policy_name: str, policy_dir: str, for_env,
+                                 # This next argument should never be passed explicitly by callers other than
+                                 # recursive calls to this function. -kmp 28-Sep-2023
+                                 _creation_attmpts_in_progress=None):
     """
-    Minimal checker common to GPL pipelines from Park Lab.
+    Define a policy class given a policy name (like 'c4-infrastructure').
     """
-
-    ALLOWED = ParkLabPipelineLicenseChecker.ALLOWED + [
-
-        # Linking = With Restrictions, Private Use = Yes
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        # The "exceptions", if present, indicate waivers to source delivery requirements.
-        # Ref: https://spdx.org/licenses/LGPL-3.0-linking-exception.html
-        pattern('GNU Lesser General Public License v2( or later)?( [(]LGPL[v]?[23][+]?[)])?'),
-        # 'GNU Lesser General Public License v2 or later (LGPLv2+)',
-        # 'GNU Lesser General Public License v3 or later (LGPLv3+)',
-        # 'LGPLv2', 'LGPL-v2', 'LGPL-v2.0', 'LGPL-2', 'LGPL-2.0',
-        # 'LGPLv2+', 'LGPL-v2+', 'LGPL-v2.0+', 'LGPL-2+', 'LGPL-2.0+',
-        # 'LGPLv3', 'LGPL-v3', 'LGPL-v3.0', 'LGPL-3', 'LGPL-3.0',
-        # 'LGPLv3+', 'LGPL-v3+', 'LGPL-v3.0+', 'LGPL-3+', 'LGPL-3.0+',
-        pattern('LGPL[v-]?[.0-9]*([+]|-only)?([- ]with[- ]exceptions)?'),
-
-        # Uncertain whether this is LGPL 2 or 3, but in any case we think weak copyleft should be OK
-        # for pipeline or server use as long as we're not distributing sources.
-        'LGPL',
-        'GNU Library or Lesser General Public License (LGPL)',
-
-        # GPL
-        #  * library exception operates like LGPL
-        #  * classpath exception is a linking exception related to Oracle
-        # Refs:
-        #   * https://www.gnu.org/licenses/old-licenses/gpl-1.0.en.html
-        #   * https://spdx.org/licenses/GPL-2.0-with-GCC-exception.html
-        #   * https://spdx.org/licenses/GPL-3.0-with-GCC-exception.html
-        pattern('(GNU General Public License|GPL)[ ]?[v-]?[123]([.]0)?([+]|[- ]only)?'
-                '([- ]with[- ]GCC(([- ]runtime)?[- ]library)?[- ]exception([- ][.0-9]*)?)?'
-                '([- ]with[- ]Classpath[- ]exception([- ][.0-9]+)?)?'),
-
-        # Linking = "GPLv3 compatible only", Private Use = Yes
-        # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-        'GPL-2-or-3',  # we sometimes generate this token
-        # 'GPLv2+', 'GPL-v2+', 'GPL-v2.0+', 'GPL-2+', 'GPL-2.0+',
-        # 'GPLv3', 'GPL-v3', 'GPL-v3.0', 'GPL-3', 'GPL-3.0',
-        # 'GPLv3+', 'GPL-v3+', 'GPL-v3.0+', 'GPL-3+', 'GPL-3.0+',
-        # 'GPLv3-only', 'GPL-3-only', 'GPL-v3-only', 'GPL-3.0-only', 'GPL-v3.0-only',
-
-        # Uncertain whether this is GPL 2 or 3, but we'll assume that means we can use either.
-        # And version 3 is our preferred interpretation.
-        'GNU General Public License',
-        'GPL',
-
-        RLicenseFramework.R_LANGUAGE_LICENSE_NAME
-
-    ]
+    _creation_attmpts_in_progress = _creation_attmpts_in_progress or []
+    existing_checker = LicenseCheckerRegistry.find_checker(checker_name=policy_name)
+    if existing_checker:
+        return existing_checker
+    elif policy_name in _creation_attmpts_in_progress:
+        raise ValueError(f"Circular reference to {policy_name} detected"
+                         f" while creating {conjoined_list(_creation_attmpts_in_progress)}.")
+    _creation_attmpts_in_progress.append(policy_name)
+    license_checker_class_name = to_camel_case(policy_name) + "LicenseChecker"
+    policy_data = find_policy_data(policy_name, policy_dir=policy_dir)
+    inherits_from = policy_data.get('inherits_from')
+    if not isinstance(inherits_from, list):
+        raise ValueError(f'Policy {policy_name!r} needs "inherits_from": [...parent names...],'
+                         f' which may be empty but must be specified.')
+    license_frameworks = policy_data.get('LICENSE_FRAMEWORKS')
+    if license_frameworks == "ALL":
+        policy_data['LICENSE_FRAMEWORKS'] = LicenseFrameworkRegistry.all_framework_names()
+    parent_classes = [find_or_create_license_class(policy_name=parent_name, policy_dir=policy_dir, for_env=for_env,
+                                                   _creation_attmpts_in_progress=_creation_attmpts_in_progress)
+                      for parent_name in inherits_from]
+    defaulted_policy_data = default_policy_data(policy_name=policy_name, policy_data=policy_data,
+                                                parent_classes=parent_classes)
+    new_class = type(license_checker_class_name,
+                     (*parent_classes, LicenseChecker),
+                     {'_policy_data': policy_data, **defaulted_policy_data})
+    new_class.__doc__ = policy_data.get("description") or f'License policy {policy_name} needs a "description".'
+    assert isinstance(new_class, type) and issubclass(new_class, LicenseChecker)  # Sigh. PyCharm can't figure this out
+    license_policy_class: Type[LicenseChecker] = new_class
+    decorator = LicenseCheckerRegistry.register_checker(name=policy_name)
+    registered_class = decorator(license_policy_class)
+    command = f"{license_checker_class_name} = LicenseCheckerRegistry.lookup_checker({repr(policy_name)})"
+    if LicenseOptions.DEBUG:  # pragma: no cover - this doesn't have to work for production
+        PRINT(f"Executing: {command}")
+    exec(command, for_env)
+    if LicenseOptions.DEBUG:  # pragma: no cover - this doesn't have to work for production
+        PRINT(f" {license_checker_class_name}.LICENSE_FRAMEWORKS"
+              f" = {eval(license_checker_class_name, for_env).LICENSE_FRAMEWORKS!r}")
+    _creation_attmpts_in_progress.remove(policy_name)
+    return registered_class
 
 
-@LicenseCheckerRegistry.register_checker('park-lab-common-server')
-class ParkLabCommonServerLicenseChecker(ParkLabCommonLicenseChecker):
+def use_policy_literal(*, policy_name, policy_datum, other_policy_data):
+    """This is used for datum that requires no merging. The policy_datum is returned. Other arguments are ignored."""
+    ignored(policy_name, other_policy_data)
+    return policy_datum
+
+
+def str_or_regexp_sort_key(datum: Union[str, Regexp]):
     """
-    Checker for servers from Park Lab.
-
-    If you're at some other organization, we recommend you make a class that has values
-    suitable to your own organizational needs.
+    Returns a key for a datum that is an element of a list of elements that are strings or compiled regular expressions.
+    Regular expressions will sort where their parttern would be in the series of strings.
     """
-
-    LICENSE_FRAMEWORKS = ['python', 'javascript']
-
-    EXCEPTIONS = augment(
-        ParkLabCommonLicenseChecker.EXCEPTIONS,
-        by={
-            'BSD*': [
-                # Although modified to insert the author name into the license text itself,
-                # the license for these libraries are essentially BSD-3-Clause.
-                'formatio',
-                'samsam',
-
-                # There are some slightly different versions of what appear to be BSD licenses here,
-                # but clearly the license is permissive.
-                # Ref: https://www.npmjs.com/package/mutation-observer?activeTab=readme
-                'mutation-observer',
-            ],
-
-            'Custom: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global': [
-                # The use of this URL appears to be a syntax error in the definition of entries-ponyfill
-                # In fact this seems to be covered by a CC0-1.0 license.
-                # Ref: https://unpkg.com/browse/object.entries-ponyfill@1.0.1/LICENSE
-                'object.entries-ponyfill',
-            ],
-
-            'Custom: https://github.com/saikocat/colorbrewer.': [
-                # The use of this URL appears to be a syntax error in the definition of cartocolor
-                # In fact, this seems to be covered by a CC-BY-3.0 license.
-                # Ref: https://www.npmjs.com/package/cartocolor?activeTab=readme
-                'cartocolor',
-            ],
-
-            'Custom: https://travis-ci.org/component/emitter.png': [
-                # The use of this png appears to be a syntax error in the definition of emitter-component.
-                # In fact, emitter-component uses an MIT License
-                # Ref: https://www.npmjs.com/package/emitter-component
-                # Ref: https://github.com/component/emitter/blob/master/LICENSE
-                'emitter-component',
-            ],
-
-            # The 'turfs-jsts' repository (https://github.com/DenisCarriere/turf-jsts/blob/master/README.md)
-            # seems to lack a license, but appears to be forked from the jsts library that uses
-            # the Eclipse Public License 1.0 and Eclipse Distribution License 1.0, so probably a permissive
-            # license is intended.
-            'Custom: https://travis-ci.org/DenisCarriere/turf-jsts.svg': [
-                'turf-jsts'
-            ],
-
-            'GNU General Public License (GPL)': [
-                'docutils',  # Used only privately as a separate documentation-generation task for ReadTheDocs
-            ],
-
-            # Linking = With Restrictions, Private Use = Yes
-            # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-            # 'GNU Lesser General Public License v3 or later (LGPLv3+)',
-
-            # Linking = With Restrictions, Private Use = Yes
-            # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-            'GNU Library or Lesser General Public License (LGPL)': [
-                'psycopg2',  # Used at runtime during server operation, but not modified or distributed
-                'psycopg2-binary',  # Used at runtime during server operation, but not modified or distributed
-                'chardet',  # Potentially used downstream in loadxl to detect charset for text files
-                'pyzmq',  # Used in post-deploy-perf-tests, not distributed, and not modified or distributed
-            ],
-
-            'GPL-2.0': [
-                # The license file for the node-forge javascript library says:
-                #
-                #   "You may use the Forge project under the terms of either the BSD License or the
-                #   GNU General Public License (GPL) Version 2."
-                #
-                # (We choose to use it under the BSD license.)
-                # Ref: https://www.npmjs.com/package/node-forge?activeTab=code
-                'node-forge',
-            ],
-
-            'MIT*': [
-
-                # This library uses a mix of licenses, but they (MIT, CC0) generally seem permissive.
-                # (It also mentions that some tools for building/testing use other libraries.)
-                # Ref: https://github.com/requirejs/domReady/blob/master/LICENSE
-                'domready',
-
-                # This library is under 'COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.1'
-                # Ref: https://github.com/javaee/jsonp/blob/master/LICENSE.txt
-                # About CDDL ...
-                # Linking = Permissive, Private Use = ?
-                # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-                'jsonp',
-
-                # This library says pretty clearly it intends MIT license.
-                # Ref: https://www.npmjs.com/package/component-indexof
-                # Linking = Permissive, Private Use = Yes
-                # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-                'component-indexof',
-
-                # These look like a pretty straight MIT license.
-                # Linking = Permissive, Private Use = Yes
-                # Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
-                'mixin',        # LICENSE file at https://www.npmjs.com/package/mixin?activeTab=code
-                'stack-trace',  # https://github.com/stacktracejs/stacktrace.js/blob/master/LICENSE
-                'typed-function',  # LICENSE at https://www.npmjs.com/package/typed-function?activeTab=code
-
-            ],
-
-            'UNLICENSED': [
-                # The udn-browser library is our own and has been observed to sometimes show up in some contexts
-                # as UNLICENSED, when really it's MIT.
-                # Ref: https://github.com/dbmi-bgm/udn-browser/blob/main/LICENSE
-                'udn-browser',
-            ],
-        })
+    # Rationale: We want something like this just to make testing predictable.
+    if isinstance(datum, str):
+        return datum
+    else:
+        return datum.pattern
 
 
-@LicenseCheckerRegistry.register_checker('c4-infrastructure')
-class C4InfrastructureLicenseChecker(ParkLabCommonServerLicenseChecker):
+def merge_policy_lists(*, policy_name, policy_datum, other_policy_data, sort_key=None):
     """
-    Checker for C4 infrastructure (Fourfront, CGAP, SMaHT) from Park Lab.
+    Merges a set of policy lists by appending them and de-duplicating.
+    By default, the result list is assumed to be homogenous in type and suitable for sorting.
+    If the list is of heterogeneous type, a sort_key is must be supplied to allow a total ordering.
     """
-
-    LICENSE_TITLE = "(The )?MIT License"
-
-
-@LicenseCheckerRegistry.register_checker('c4-python-infrastructure')
-class C4PythonInfrastructureLicenseChecker(C4InfrastructureLicenseChecker):
-    """
-    Checker for C4 python library infrastructure (Fourfront, CGAP, SMaHT) from Park Lab.
-    """
-    LICENSE_FRAMEWORKS = ['python']
+    ignored(policy_name)
+    result = policy_datum
+    for other_datum in other_policy_data:
+        result += other_datum
+    # de-duplicate and apply a deterministic ordering to make testing easier.
+    return sorted(set(result), key=sort_key)
 
 
-@LicenseCheckerRegistry.register_checker('scan2-pipeline')
-class Scan2PipelineLicenseChecker(ParkLabGplPipelineLicenseChecker):
-    """
-    Checker for SCAN2 library from Park Lab.
-    """
+def merge_policy_strings_or_regexps(*, policy_name, policy_datum, other_policy_data):
+    return merge_policy_lists(policy_name=policy_name, policy_datum=policy_datum, other_policy_data=other_policy_data,
+                              sort_key=str_or_regexp_sort_key)
 
-    EXCEPTIONS = augment(
-        ParkLabGplPipelineLicenseChecker.EXCEPTIONS,
-        by={
-            'Custom: Matrix file LICENCE': [
-                # The custom information in https://cran.r-project.org/web/packages/Matrix/LICENCE
-                # says there are potential extra restrictions beyond a simple GPL license
-                # if SparseSuite is used, but it is not requested explicitly by Scan2, and we're
-                # trusting that any other libraries used by Scan2 would have investigated this.
-                # So, effectively, we think the Matrix library for this situation operates the
-                # same as if it were just GPL-3 licensed, and we are fine with that.
-                'Matrix'
-            ],
 
-            "MISSING": [
-                # mysql-common and mysql-libs are GPL, but since they are delivered by conda
-                # and not distributed as part of the Scan2 distribution, they should be OK.
-                # Ref: https://redresscompliance.com/mysql-license-a-complete-guide-to-licensing/#:~:text=commercial%20use  # noQA
-                'mysql-common',
-                'mysql-libs',
+def merge_policy_dicts(*, policy_name, policy_datum, other_policy_data):
+    ignored(policy_name)
+    merged = defaultdict(lambda: [])
 
-                # This is our own library
-                'r-scan2', 'scan2',
-            ]
-        }
-    )
+    def add_to_merged(d):
+        for k, values in d.items():
+            for value in values:
+                merged[k].append(value)
 
-    EXPECTED_MISSING_LICENSES = ParkLabGplPipelineLicenseChecker.EXPECTED_MISSING_LICENSES + [
+    add_to_merged(policy_datum)
+    for other_datum in other_policy_data:
+        add_to_merged(other_datum)
 
-    ]
+    return {k: sorted(set(v)) for k, v in sorted(merged.items())}
+
+
+POLICY_ATTRS: callable = {
+    'class_key': use_policy_literal,
+    'class_name': use_policy_literal,
+    'inherits_from': use_policy_literal,
+    'description': use_policy_literal,
+    'LICENSE_TITLE': use_policy_literal,
+    'COPYRIGHT_OWNER': use_policy_literal,
+    'LICENSE_FRAMEWORKS': use_policy_literal,
+    'ALLOWED': merge_policy_strings_or_regexps,
+    'EXPECTED_MISSING_LICENSES': merge_policy_lists,
+    'EXCEPTIONS': merge_policy_dicts,
+}
+
+POLICY_MERGE_LISTS = {'ALLOWED', 'EXPECTED_MISSING_LICENSES'}
+POLICY_MERGE_DICTS = {'EXCEPTIONS'}
+
+
+def get_attrs_for_classes(attr: str, class_data: List[Type]):
+    result = []
+    for class_datum in class_data:
+        attr_val = getattr(class_datum, attr, None)  # Intentionally treats explicit None the same as missing
+        if attr_val is not None:
+            result.append(attr_val)
+    return result
+
+
+def default_policy_data(*, policy_name: str, policy_data: AnyJsonData, parent_classes: List[Type]):
+    result = {}
+    for key_to_default, val_to_be_defaulted in policy_data.items():
+        attr_handler: Optional[callable] = POLICY_ATTRS.get(key_to_default)
+        if attr_handler is None:
+            raise ValueError(f"Bad policy attribute: {key_to_default}")
+        result[key_to_default] = attr_handler(policy_name=policy_name, policy_datum=val_to_be_defaulted,
+                                              other_policy_data=get_attrs_for_classes(key_to_default, parent_classes))
+    return result
+
+
+def load_license_policies(for_env, policy_dir=None):
+    for policy_name in built_in_policy_names():
+        find_or_create_license_class(policy_name=policy_name, policy_dir=policy_dir, for_env=for_env)
+
+
+load_license_policies(for_env=globals())
