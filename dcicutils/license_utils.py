@@ -77,14 +77,15 @@ class LicenseOptions:
     # Specific additional debugging output
     DEBUG = environ_bool("LICENSE_UTILS_DEBUG", default=False)
     CONDA_PREFIX = os.environ.get("CONDA_LICENSE_CHECKER_PREFIX", os.environ.get("CONDA_PREFIX", ""))
+    POLICY_DIR = os.environ.get("LICENSE_UTILS_POLICY_DIR")
 
     @classmethod
     @contextlib.contextmanager
-    def selected_options(cls, verbose=VERBOSE, debug=DEBUG, conda_prefix=CONDA_PREFIX):
+    def selected_options(cls, verbose=VERBOSE, debug=DEBUG, conda_prefix=CONDA_PREFIX, policy_dir=POLICY_DIR):
         """
         Allows a script, for example, to specify overrides for these options dynamically.
         """
-        with local_attrs(cls, VERBOSE=verbose, DEBUG=debug, CONDA_PREFIX=conda_prefix):
+        with local_attrs(cls, VERBOSE=verbose, DEBUG=debug, CONDA_PREFIX=conda_prefix, POLICY_DIR=policy_dir):
             yield
 
 
@@ -735,9 +736,17 @@ class LicenseCheckerRegistry:
         return cls.REGISTRY.get(checker_name, None)
 
     @classmethod
-    def lookup_checker(cls, checker_name: str) -> Type[LicenseChecker]:
+    def lookup_checker(cls, checker_name: str, autoload: bool = False) -> Type[LicenseChecker]:
         result: Optional[Type[LicenseChecker]] = cls.find_checker(checker_name)
         if result is None:
+            if autoload:
+                policy_dir = LicenseOptions.POLICY_DIR or POLICY_DIR
+                PRINT(f"Looking for custom policy {checker_name} in {policy_dir} ...")
+                result = find_or_create_license_class(policy_name=checker_name,
+                                                      policy_dir=policy_dir,
+                                                      for_env=globals())
+                if result:
+                    return result
             raise InvalidParameterError(parameter='checker_name', value=checker_name,
                                         options=cls.all_checker_names())
         return result
