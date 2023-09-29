@@ -10,7 +10,8 @@ from typing import Optional, Type
 EPILOG = __doc__
 
 
-ALL_CHECKER_NAMES = LicenseCheckerRegistry.all_checker_names()
+ALL_CHECKER_NAMES = sorted(LicenseCheckerRegistry.all_checker_names(),
+                           key=lambda x: 'aaaaa-' + x if x.startswith('park-lab-') else x)
 NEWLINE = '\n'
 
 
@@ -31,11 +32,14 @@ def main():
                         help="Requests additional debugging output.")
     parser.add_argument("--conda-prefix", "--conda_prefix", "--cp", default=LicenseOptions.CONDA_PREFIX,
                         help=(f"Overrides the CONDA_PREFIX (default {LicenseOptions.CONDA_PREFIX!r})."))
+    parser.add_argument("--policy-dir", "--policy_dir", "--pd", default=LicenseOptions.POLICY_DIR,
+                        help=(f"Specifies a custom policy directory (default {LicenseOptions.POLICY_DIR!r})."))
 
     args = parser.parse_args()
 
     with script_catch_errors():
-        run_license_checker(name=args.name, verbose=not args.brief, debug=args.debug, conda_prefix=args.conda_prefix)
+        run_license_checker(name=args.name, verbose=not args.brief, debug=args.debug, conda_prefix=args.conda_prefix,
+                            policy_dir=args.policy_dir)
 
 
 def show_help_for_choosing_license_checker():
@@ -62,16 +66,18 @@ def show_help_for_choosing_license_checker():
 def run_license_checker(name: Optional[str],
                         verbose=LicenseOptions.VERBOSE,
                         debug=LicenseOptions.DEBUG,
-                        conda_prefix=LicenseOptions.CONDA_PREFIX):
+                        conda_prefix=LicenseOptions.CONDA_PREFIX,
+                        policy_dir=LicenseOptions.POLICY_DIR):
     if name is None:
         show_help_for_choosing_license_checker()
     else:
-        try:
-            checker_class: Type[LicenseChecker] = LicenseCheckerRegistry.lookup_checker(name)
-        except Exception as e:
-            raise ScriptFailure(str(e))
-        try:
-            with LicenseOptions.selected_options(verbose=verbose, debug=debug, conda_prefix=conda_prefix):
+        with LicenseOptions.selected_options(verbose=verbose, debug=debug, conda_prefix=conda_prefix,
+                                             policy_dir=policy_dir):
+            try:
+                checker_class: Type[LicenseChecker] = LicenseCheckerRegistry.lookup_checker(name, autoload=True)
+            except Exception as e:
+                raise ScriptFailure(str(e))
+            try:
                 checker_class.validate()
-        except LicenseCheckFailure as e:
-            raise ScriptFailure(get_error_message(e))
+            except LicenseCheckFailure as e:
+                raise ScriptFailure(get_error_message(e))

@@ -1,0 +1,8 @@
+{
+    "class_key": "c4-infrastructure",
+    "class_name": "C4InfrastructureLicenseChecker",
+    "inherits_from": ["park-lab-common-server"],
+    "description": "Checker for C4 infrastructure (Fourfront, CGAP, SMaHT) from Park Lab.",
+
+    "LICENSE_TITLE": "(The )?MIT License"
+}

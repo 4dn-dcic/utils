@@ -1344,7 +1344,11 @@ def to_camel_case(s):
     """
     Converts a string that might be in snake_case or CamelCase into CamelCase.
     """
-    if s[:1].isupper() and '_' not in s:
+    hyphen_found = False
+    if '-' in s:
+        hyphen_found = True
+        s = s.replace('-', '_')
+    if not hyphen_found and s[:1].isupper() and '_' not in s:
         return s
     else:
         return snake_case_to_camel_case(s)
