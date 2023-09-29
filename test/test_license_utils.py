@@ -959,31 +959,23 @@ def test_find_or_create_license_class():
 
                 # This tests the find part
                 test_registry['test'] = TestChecker
-                assert find_or_create_license_class(policy_name='test', policy_dir='ignored',
-                                                    for_env='ignored') == TestChecker
+                assert find_or_create_license_class(policy_name='test', policy_dir='ignored') == TestChecker
                 mock_find_policy_data.assert_not_called()
 
             mock_find_policy_data.return_value = {"inherits_from": []}
-            local_env = locals()
-            # The command that gets executed will expect to use LicenseCheckerRegistry, which would be in globals()
-            # but is not in locals(), so we have to add it. -kmp 29-Sep-2023
-            local_env["LicenseCheckerRegistry"] = license_utils_module.LicenseCheckerRegistry
-            policy_class = find_or_create_license_class(policy_name='something', policy_dir='/my/policy/dir',
-                                                        for_env=local_env)
-            assert local_env["SomethingLicenseChecker"] == policy_class  # check that it got installed in environment
+            policy_class = find_or_create_license_class(policy_name='something', policy_dir='/my/policy/dir')
             assert issubclass(policy_class, LicenseChecker)
 
 
 def test_load_license_policies():
     test_policy_names = ['my_project', 'your_project']
     policy_dir_for_testing = 'some/dir/'
-    some_env = 'some-env'
     with mock.patch.object(license_utils_module, "find_or_create_license_class") as mock_find_or_create_license_class:
         with mock.patch.object(license_utils_module, "built_in_policy_names") as mock_built_in_policy_names:
             mock_built_in_policy_names.return_value = test_policy_names
-            load_license_policies(policy_dir=policy_dir_for_testing, for_env=some_env)
+            load_license_policies(policy_dir=policy_dir_for_testing)
             mock_find_or_create_license_class.assert_has_calls([
-                mock.call(policy_name=policy_name, policy_dir=policy_dir_for_testing, for_env=some_env)
+                mock.call(policy_name=policy_name, policy_dir=policy_dir_for_testing)
                 for policy_name in test_policy_names
             ])
 

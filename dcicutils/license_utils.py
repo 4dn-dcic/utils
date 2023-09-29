@@ -512,10 +512,10 @@ class LicenseChecker:
       needs to have its dependencies checked.
 
     ALLOWED is a list of license names as returned by the various license frameworks. Because they rely on different
-      underlying tools the exact format of the names that result might vary. (For this reason, there is a regular
-      expression capability for this particular attribute, so in addition to just a string, you can also use
+      underlying tools the exact format of the names that result might vary. For this reason, there is a regular
+      expression capability for this particular attribute. In addition to just a string, you can also use
       {"pattern": "<regexp>"} For very long regular expressions, {"pattern": ["<regexp-part-1>", ...]} will
-      concatenate all the parts into a single regexp so they can be gracefully broken over lines in the .jsonc
+      concatenate all the parts into a single regexp, so they can be gracefully broken over lines in the .jsonc
       source file.  If regexp flags are requierd, use {"pattern" "<regexp>", "flags": ["flag1", ...]}.
 
     EXPECTED_MISSING_LICENSES is a list of libraries that are expected to have no license information.
@@ -752,8 +752,7 @@ class LicenseCheckerRegistry:
                 policy_dir = LicenseOptions.POLICY_DIR or POLICY_DIR
                 PRINT(f"Looking for custom policy {checker_name} in {policy_dir} ...")
                 result = find_or_create_license_class(policy_name=checker_name,
-                                                      policy_dir=policy_dir,
-                                                      for_env=globals())
+                                                      policy_dir=policy_dir)
                 if result:
                     return result
             raise InvalidParameterError(parameter='checker_name', value=checker_name,
@@ -872,7 +871,7 @@ def find_policy_data(policy_name: str, policy_dir: Optional[str] = None,
         return data
 
 
-def find_or_create_license_class(*, policy_name: str, policy_dir: str, for_env,
+def find_or_create_license_class(*, policy_name: str, policy_dir: str,
                                  # This next argument should never be passed explicitly by callers other than
                                  # recursive calls to this function. -kmp 28-Sep-2023
                                  _creation_attmpts_in_progress=None):
@@ -896,7 +895,7 @@ def find_or_create_license_class(*, policy_name: str, policy_dir: str, for_env,
     license_frameworks = policy_data.get('LICENSE_FRAMEWORKS')
     if license_frameworks == "ALL":
         policy_data['LICENSE_FRAMEWORKS'] = LicenseFrameworkRegistry.all_framework_names()
-    parent_classes = [find_or_create_license_class(policy_name=parent_name, policy_dir=policy_dir, for_env=for_env,
+    parent_classes = [find_or_create_license_class(policy_name=parent_name, policy_dir=policy_dir,
                                                    _creation_attmpts_in_progress=_creation_attmpts_in_progress)
                       for parent_name in inherits_from]
     defaulted_policy_data = default_policy_data(policy_name=policy_name, policy_data=policy_data,
@@ -913,13 +912,10 @@ def find_or_create_license_class(*, policy_name: str, policy_dir: str, for_env,
     license_policy_class: Type[LicenseChecker] = new_class
     decorator = LicenseCheckerRegistry.register_checker(name=policy_name)
     registered_class = decorator(license_policy_class)
-    command = f"{license_checker_class_name} = LicenseCheckerRegistry.lookup_checker({repr(policy_name)})"
     if LicenseOptions.DEBUG:  # pragma: no cover - this doesn't have to work for production
-        PRINT(f"Executing: {command}")
-    exec(command, for_env)
-    if LicenseOptions.DEBUG:  # pragma: no cover - this doesn't have to work for production
-        PRINT(f" {license_checker_class_name}.LICENSE_FRAMEWORKS"
-              f" = {eval(license_checker_class_name, for_env).LICENSE_FRAMEWORKS!r}")
+        found_class = LicenseCheckerRegistry.lookup_checker(policy_name)
+        PRINT(f"Registered checker class {policy_name!r}"
+              f" with license_frameworks {conjoined_list(found_class.LICENSE_FRAMEWORKS)}.")
     _creation_attmpts_in_progress.remove(policy_name)
     return registered_class
 
@@ -1014,9 +1010,9 @@ def default_policy_data(*, policy_name: str, policy_data: AnyJsonData, parent_cl
     return result
 
 
-def load_license_policies(for_env, policy_dir=None):
+def load_license_policies(policy_dir=None):
     for policy_name in built_in_policy_names():
-        find_or_create_license_class(policy_name=policy_name, policy_dir=policy_dir, for_env=for_env)
+        find_or_create_license_class(policy_name=policy_name, policy_dir=policy_dir)
 
 
 # This will cause the definitions of classes to in the predefined set to be exported by this library
@@ -1024,4 +1020,11 @@ def load_license_policies(for_env, policy_dir=None):
 #  * ParkLabCommonLicenseChecker, etc.
 #  * C4InfrastructureLicenseChecker, etc.
 # See license_policies/*.jsonc for a full list.
-load_license_policies(for_env=globals())
+load_license_policies()
+
+ParkLabCommonLicenseChecker = LicenseCheckerRegistry.lookup_checker('park-lab-common')
+ParkLabCommonServerLicenseChecker = LicenseCheckerRegistry.lookup_checker('park-lab-common-server')
+ParkLabPipelineLicenseChecker = LicenseCheckerRegistry.lookup_checker('park-lab-pipeline')
+ParkLabGplPipelineLicenseChecker = LicenseCheckerRegistry.lookup_checker('park-lab-gpl-pipeline')
+C4InfrastructureLicenseChecker = LicenseCheckerRegistry.lookup_checker('c4-infrastructure')
+C4PythonInfrastructureLicenseChecker = LicenseCheckerRegistry.lookup_checker('c4-python-infrastructure')
