@@ -914,6 +914,18 @@ files = [
 ]
 
 [[package]]
+name = "jsonc-parser"
+version = "1.1.5"
+description = "A lightweight, native tool for parsing .jsonc files"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+files = [
+    {file = "jsonc-parser-1.1.5.tar.gz", hash = "sha256:7126d17725b0413cd40af4297d9f6412c4181a62135e4c41cdf8f6a82c5936e6"},
+    {file = "jsonc_parser-1.1.5-py3-none-any.whl", hash = "sha256:abd1db76a4c6d1733ec7bb5340a89c49cbc878a181a1e7947ee6719eedf2c6cc"},
+]
+
+[[package]]
 name = "mccabe"
 version = "0.7.0"
 description = "McCabe checker, plugin for flake8"

@@ -17,6 +17,42 @@ Change Log
   and searching our GitHub organizations (4dn-dcic, dbmi-bgm, smaht-dac) the only ones which might
   be affected are cwltools and parliament2, neither of which are dependent on dcicutils in any way.
 
+7.13.0
+======
+
+* In ``license_utils``:
+
+  * Add an ``RLanguageFramework``.
+
+  * Add various additional checker classes, and a registry to catalog them. Refactor so that pre-existing
+    classes better share information in an inherited way.
+
+    +------------------------------------------+--------------------------------+----------------+
+    |                 Class                    |          Checker Name          |    Status      |
+    +==========================================+================================+================+
+    | ``ParkLabCommonLicenseChecker``          | ``park-lab-common``            | New            |
+    +------------------------------------------+--------------------------------+----------------+
+    | ``ParkLabGplPipelineLicenseChecker``     | ``park-lab-gpl-pipeline``      | New            |
+    +------------------------------------------+--------------------------------+----------------+
+    | ``ParkLabCommonServerLicenseChecker``    | ``park-lab-common-server``     | New            |
+    +------------------------------------------+--------------------------------+----------------+
+    | ``C4InfrastructureLicenseChecker``       | ``c4-infastructure``           | Refactored     |
+    +------------------------------------------+--------------------------------+----------------+
+    | ``C4PythonInfrastructureLicenseChecker`` | ``c4-python-infrastructure``   | Refactored     |
+    +------------------------------------------+--------------------------------+----------------+
+    | ``Scan2PipelineLicenseChecker``          | ``scan2-pipeline``             | New            |
+    +------------------------------------------+--------------------------------+----------------+
+
+* In ``misc_utils``:
+
+  * New function ``json_file_contents``
+
+* In ``scripts``:
+
+  * Add a ``run-license-checker`` script, implemented by ``run_license_checker.py``,
+    that runs the license checker whose "checker name" is given as an argument.
+
+
 7.12.0
 ======
 

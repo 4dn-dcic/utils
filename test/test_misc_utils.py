@@ -30,7 +30,7 @@ from dcicutils.misc_utils import (
     classproperty, classproperty_cached, classproperty_cached_each_subclass, Singleton, NamedObject, obsolete,
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
-    MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case,
+    MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case, json_file_contents,
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -1788,6 +1788,16 @@ def test_file_contents():
         assert file_contents("foo.bin", binary=False) == 'Hello!\n'
 
 
+def test_json_file_contents():
+
+    mfs = MockFileSystem()
+    sample_data = {"foo": 1, "bar": [2, True]}
+    with mock.patch("io.open", mfs.open):
+        with io.open("foo.txt", 'w') as fp:
+            json.dump(sample_data, fp)
+        assert json_file_contents("foo.txt") == sample_data
+
+
 def test_make_counter():
 
     counter = make_counter()
@@ -1990,8 +2000,9 @@ def test_snake_case_to_camel_case_hyphenated(token, expected):
     ('x_m_l_container', 'XMLContainer'),
     ('X_M_L_Container', 'XMLContainer'),
 ])
-def test_to_camel_case_hyphenated(token, expected):
+def test_to_camel_case(token, expected):
     assert to_camel_case(token) == expected
+    assert to_camel_case(token.replace('_', '-')) == expected
     assert to_camel_case(expected) == expected  # make sure it's stable
 
 

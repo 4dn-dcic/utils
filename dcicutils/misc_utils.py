@@ -7,10 +7,11 @@ import datetime
 import functools
 import hashlib
 import inspect
-import math
 import io
-import os
+import json
 import logging
+import math
+import os
 import pytz
 import re
 import rfc3986.validators
@@ -20,8 +21,8 @@ import warnings
 import webtest  # importing the library makes it easier to mock testing
 
 from collections import defaultdict
-from dateutil.parser import parse as dateutil_parse
 from datetime import datetime as datetime_type
+from dateutil.parser import parse as dateutil_parse
 from typing import Optional
 
 
@@ -1310,6 +1311,11 @@ def file_contents(filename, binary=False):
         return fp.read()
 
 
+def json_file_contents(filename):
+    with io.open(filename, 'r') as fp:
+        return json.load(fp)
+
+
 def camel_case_to_snake_case(s, separator='_'):
     """
     Converts CamelCase to snake_case.
@@ -1338,7 +1344,11 @@ def to_camel_case(s):
     """
     Converts a string that might be in snake_case or CamelCase into CamelCase.
     """
-    if s[:1].isupper() and '_' not in s:
+    hyphen_found = False
+    if '-' in s:
+        hyphen_found = True
+        s = s.replace('-', '_')
+    if not hyphen_found and s[:1].isupper() and '_' not in s:
         return s
     else:
         return snake_case_to_camel_case(s)

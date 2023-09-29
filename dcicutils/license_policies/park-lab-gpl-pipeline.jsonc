@@ -1,0 +1,62 @@
+{
+    "class_key": "park-lab-gpl-pipeline",
+    "class_name": "ParkLabGplPipelineLicenseChecker",
+    "inherits_from": ["park-lab-pipeline"],
+    "description": "Minimal/generic checker for GPL-approved pipelines from Park Lab.",
+
+    "ALLOWED": [
+
+        // Linking = With Restrictions, Private Use = Yes
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        // The "exceptions", if present, indicate waivers to source delivery requirements.
+        // Ref: https://spdx.org/licenses/LGPL-3.0-linking-exception.html
+        {"pattern": "GNU Lesser General Public License v2( or later)?( [(]LGPL[v]?[23][+]?[)])?"},
+        // "GNU Lesser General Public License v2 or later (LGPLv2+)",
+        // "GNU Lesser General Public License v3 or later (LGPLv3+)",
+        // "LGPLv2", "LGPL-v2", "LGPL-v2.0", "LGPL-2", "LGPL-2.0",
+        // "LGPLv2+", "LGPL-v2+", "LGPL-v2.0+", "LGPL-2+", "LGPL-2.0+",
+        // "LGPLv3", "LGPL-v3", "LGPL-v3.0", "LGPL-3", "LGPL-3.0",
+        // "LGPLv3+", "LGPL-v3+", "LGPL-v3.0+", "LGPL-3+", "LGPL-3.0+",
+        {"pattern": "LGPL[v-]?[.0-9]*([+]|-only)?([- ]with[- ]exceptions)?"},
+
+        // Uncertain whether this is LGPL 2 or 3, but in any case we think weak copyleft should be OK
+        // for pipeline or server use as long as we"re not distributing sources.
+        "LGPL",
+        "GNU Library or Lesser General Public License (LGPL)",
+
+        // GPL
+        //  * library exception operates like LGPL
+        //  * classpath exception is a linking exception related to Oracle
+        // Refs:
+        //   * https://www.gnu.org/licenses/old-licenses/gpl-1.0.en.html
+        //   * https://spdx.org/licenses/GPL-2.0-with-GCC-exception.html
+        //   * https://spdx.org/licenses/GPL-3.0-with-GCC-exception.html
+        {
+            "pattern": [
+                "(GNU General Public License|GPL)[ ]?[v-]?[123]([.]0)?([+]|[- ]only)?",
+                "([- ]with[- ]GCC(([- ]runtime)?[- ]library)?[- ]exception([- ][.0-9]*)?)?",
+                "([- ]with[- ]Classpath[- ]exception([- ][.0-9]+)?)?"
+            ]
+        },
+
+        // Linking = "GPLv3 compatible only", Private Use = Yes
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "GPL-2-or-3",  // we sometimes generate this token
+        // "GPLv2+", "GPL-v2+", "GPL-v2.0+", "GPL-2+", "GPL-2.0+",
+        // "GPLv3", "GPL-v3", "GPL-v3.0", "GPL-3", "GPL-3.0",
+        // "GPLv3+", "GPL-v3+", "GPL-v3.0+", "GPL-3+", "GPL-3.0+",
+        // "GPLv3-only", "GPL-3-only", "GPL-v3-only", "GPL-3.0-only", "GPL-v3.0-only",
+
+        // Uncertain whether this is GPL 2 or 3, but we'll assume that means we can use either.
+        // And version 3 is our preferred interpretation.
+        "GNU General Public License",
+        "GPL",
+
+        // This is an arbitrary catch-all name we made up because the R language some things identify themselves
+        // as a specific part of the R language
+        // Ref: https://cran.r-project.org/doc/FAQ/R-FAQ.html#Legalese
+        // An important clarification to this is here:
+        // Ref: https://cran.r-project.org/doc/FAQ/R-FAQ.html#Can-I-use-R-for-commercial-purposes_003f
+        "R-language-license"
+    ]
+}
