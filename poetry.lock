@@ -909,6 +909,18 @@ files = [
 ]
 
 [[package]]
+name = "jsonc-parser"
+version = "1.1.5"
+description = "A lightweight, native tool for parsing .jsonc files"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+files = [
+    {file = "jsonc-parser-1.1.5.tar.gz", hash = "sha256:7126d17725b0413cd40af4297d9f6412c4181a62135e4c41cdf8f6a82c5936e6"},
+    {file = "jsonc_parser-1.1.5-py3-none-any.whl", hash = "sha256:abd1db76a4c6d1733ec7bb5340a89c49cbc878a181a1e7947ee6719eedf2c6cc"},
+]
+
+[[package]]
 name = "mccabe"
 version = "0.7.0"
 description = "McCabe checker, plugin for flake8"
@@ -1633,4 +1645,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.7,<3.10"
-content-hash = "eb629a04469e24b917d9525dd06dac72f2014cc9ede879946909929f5c09b9fd"
+content-hash = "5c8040da1a4f9bfafc292d7bd6c8353e29731a1d08f83a51a0a958943cfeed9c"

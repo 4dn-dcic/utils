@@ -27,6 +27,7 @@ def mock_health_page() -> dict:
         'file_upload_bucket': 'cgap-dummy-main-application-cgap-dummy-files',
         'namespace': 'cgap-dummy',
         'processed_file_bucket': 'cgap-dummy-main-application-cgap-dummy-wfoutput',
+        's3_encrypt_key_id': 'dummy_kms_key',
     }
 
 

@@ -7,7 +7,7 @@ Change Log
 ----------
 
 
-7.12.0
+7.14.0
 ======
 
 * New module ``sheet_utils`` for loading workbooks.
@@ -32,6 +32,50 @@ Change Log
   * New function ``is_uuid`` (migrated from Fourfront)
   * New function ``pad_to``
   * New class ``JsonLinesReader``
+
+
+7.13.0
+======
+
+* In ``license_utils``:
+
+  * Add an ``RLanguageFramework``.
+
+  * Add various additional checker classes, and a registry to catalog them. Refactor so that pre-existing
+    classes better share information in an inherited way.
+
+    +------------------------------------------+--------------------------------+----------------+
+    |                 Class                    |          Checker Name          |    Status      |
+    +==========================================+================================+================+
+    | ``ParkLabCommonLicenseChecker``          | ``park-lab-common``            | New            |
+    +------------------------------------------+--------------------------------+----------------+
+    | ``ParkLabGplPipelineLicenseChecker``     | ``park-lab-gpl-pipeline``      | New            |
+    +------------------------------------------+--------------------------------+----------------+
+    | ``ParkLabCommonServerLicenseChecker``    | ``park-lab-common-server``     | New            |
+    +------------------------------------------+--------------------------------+----------------+
+    | ``C4InfrastructureLicenseChecker``       | ``c4-infastructure``           | Refactored     |
+    +------------------------------------------+--------------------------------+----------------+
+    | ``C4PythonInfrastructureLicenseChecker`` | ``c4-python-infrastructure``   | Refactored     |
+    +------------------------------------------+--------------------------------+----------------+
+    | ``Scan2PipelineLicenseChecker``          | ``scan2-pipeline``             | New            |
+    +------------------------------------------+--------------------------------+----------------+
+
+* In ``misc_utils``:
+
+  * New function ``json_file_contents``
+
+* In ``scripts``:
+
+  * Add a ``run-license-checker`` script, implemented by ``run_license_checker.py``,
+    that runs the license checker whose "checker name" is given as an argument.
+
+
+7.12.0
+======
+
+* In ``glacier_utils``:
+
+  * Add functionality for KMS key encrypted accounts
 
 
 7.11.0

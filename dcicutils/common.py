@@ -39,6 +39,8 @@ OrchestratedApp = Literal['cgap', 'fourfront', 'smaht']
 
 LIBRARY_DIR = os.path.dirname(__file__)
 
+Regexp = type(re.compile("sample"))
+
 # ===== Auth Data =====
 
 AuthStr = str

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "7.11.0.1b9"  # to become "7.12.0"
+version = "7.13.0.1b10"  # to become "7.14.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -47,6 +47,7 @@ aws-requests-auth = ">=0.4.2,<1"
 chardet = "^5.2.0"
 docker = "^4.4.4"
 gitpython = "^3.1.2"
+jsonc-parser = "^1.1.5"
 openpyxl = "^3.1.2"
 opensearch-py = "^2.0.1"
 pyOpenSSL = "^23.1.1"
@@ -84,6 +85,8 @@ pytest-runner = ">=5.1"
 [tool.poetry.scripts]
 publish-to-pypi = "dcicutils.scripts.publish_to_pypi:main"
 show-contributors = "dcicutils.contribution_scripts:show_contributors_main"
+run-license-checker = "dcicutils.scripts.run_license_checker:main"
+
 
 [tool.pytest.ini_options]
 addopts = "--basetemp=/tmp/pytest"
