@@ -1,0 +1,407 @@
+{
+    "class_key": "park-lab-common",
+    "class_name": "ParkLabCommonLicenseChecker",
+    "inherits_from": [],
+    "description": "Minimal/generic checker common to all tech from Park Lab.",
+
+    "COPYRIGHT_OWNER": "President and Fellows of Harvard College",
+
+    "LICENSE_FRAMEWORKS": "ALL",
+
+    "ALLOWED": [
+
+        // <<Despite its name, Zero-Clause BSD is an alteration of the ISC license,
+        //   and is not textually derived from licenses in the BSD family.
+        //   Zero-Clause BSD was originally approved under the name “Free Public License 1.0.0”>>
+        // Ref: https://opensource.org/license/0bsd/
+        "0BSD",
+
+        // Linking = Permissive, Private Use = Yes
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "Academic Free License (AFL)",
+        "AFL-2.1",
+
+        // Linking = Permissive, Private Use = Yes
+        // Apache licenses before version 2.0 are controversial, but we here construe an unmarked naming to imply
+        // any version, and hence v2.
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "Apache Software License",
+        "Apache-Style",
+        {"pattern": "Apache([- ]2([.]0)?)?([- ]Licen[cs]e)?([- ]with[- ]LLVM[- ]exception)?"},
+        // "Apache-2.0",
+
+        // Artistic License 1.0 was confusing to people, so its status as permissive is in general uncertain,
+        // however the issue seems to revolve around point 8 (relating to whether or not perl is deliberately
+        // exposed). That isn't in play for our uses, so we don't flag it here.
+        // Artistic license 2.0 is a permissive license.
+        // Ref: https://en.wikipedia.org/wiki/Artistic_License
+        "Artistic-1.0-Perl",
+        {"pattern": "Artistic[- ]2([.]0)?"},
+
+        // According to Wikipedia, the Boost is considered permissive and BSD-like.
+        // Refs:
+        //  *
+        //  * https://en.wikipedia.org/wiki/Boost_(C%2B%2B_libraries)#License
+        {"pattern": "(BSL|Boost(([- ]Software)?[- ]License)?)([- ]1([.]0)?)?"},
+
+        // Linking = Permissive, Private Use = Yes
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        {"pattern": "((modified[- ])?[234][- ]Clause[- ])?BSD([- ][234][- ]Clause)?( Licen[cs]e)?"},
+        // "BSD License",
+        // "BSD-2-Clause",
+        // "BSD-3-Clause",
+        // "BSD 3-Clause",
+
+        // BZIP2 is a permissive license
+        // Ref: https://github.com/asimonov-im/bzip2/blob/master/LICENSE
+        {"pattern": "bzip2(-1[.0-9]*)"},
+
+        // Linking = Public Domain, Private Use = Public Domain
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "CC0",
+        "CC0-1.0",
+
+        // Linking = Permissive, Private Use = Permissive
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "CC-BY",
+        "CC-BY-3.0",
+        "CC-BY-4.0",
+
+        // The curl license is a permissive license.
+        // Ref: https://curl.se/docs/copyright.html
+        "curl",
+
+        // Linking = Permissive, Private Use = ?
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "CDDL",
+
+        // The original Eclipse Distribution License 1.0 is essentially a BSD-3-Clause license.
+        // Ref: https://www.eclipse.org/org/documents/edl-v10.php
+        "Eclipse Distribution License",
+
+        // Linking = Permissive, Private Use = Yes
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "Eclipse Public License",
+        "EPL-2.0",
+
+        // The FSF Unlimited License (FSFUL) seems to be a completely permissive license.
+        // Refs:
+        //  * https://spdx.org/licenses/FSFUL.html
+        //  * https://fedoraproject.org/wiki/Licensing/FSF_Unlimited_License
+        "FSF Unlimited License",
+        "FSFUL",
+
+        // The FreeType license is a permissive license.
+        // Ref: LicenseRef-FreeType
+        {"pattern": "(Licen[cs]eRef-)?(FTL|FreeType( Licen[cs]e)?)"},
+
+        // Linking = Yes, Cat = Permissive Software Licenses
+        // Ref: https://en.wikipedia.org/wiki/Historical_Permission_Notice_and_Disclaimer
+        "Historical Permission Notice and Disclaimer (HPND)",
+        "HPND",
+        {"pattern": "(Licen[cs]eRef-)?PIL"},
+        // The Pillow or Python Image Library is an HPND license, which is a simple permissive license:
+        // Refs:
+        //   * https://github.com/python-pillow/Pillow/blob/main/LICENSE
+        //   * https://www.fsf.org/blogs/licensing/historical-permission-notice-and-disclaimer-added-to-license-list
+
+        // The IJG license, used by Independent JPEG Group (IJG) is a custom permissive license.
+        // Refs:
+        //   * https://en.wikipedia.org/wiki/Libjpeg
+        //   * https://github.com/libjpeg-turbo/libjpeg-turbo/blob/main/LICENSE.md
+        "IJG",
+
+        // Linking = Permissive, Private Use = Permissive
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "ISC License (ISCL)",
+        "ISC",
+
+        // Linking = Permissive, Private Use = Yes
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "MIT License",
+        "MIT",
+
+        // Linking = Permissive, Private Use = Yes
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "Mozilla Public License 2.0 (MPL 2.0)",
+        "MPL-1.1",
+        "MPL-2.0",
+
+        // The SIL Open Font License appears to be a copyleft-style license that applies narrowly
+        // to icons and not to the entire codebase. It is advertised as OK for use even in commercial
+        // applications.
+        // Ref: https://fontawesome.com/license/free
+        "OFL-1.1",
+
+        // Ref: https://en.wikipedia.org/wiki/Public_domain
+        {"pattern": "(Licen[cs]eRef-)?Public[- ]Domain([- ]dedic[t]?ation)?"},  // "dedictation" is a typo in docutils
+
+        // Linking = Permissive, Private Use = Permissive
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        {"pattern": "(Licen[cs]eRef-)?PSF-2([.][.0-9]*)"},
+        "Python Software Foundation License",
+        "Python-2.0",
+
+        // License = BSD-like
+        // Ref: https://en.wikipedia.org/wiki/Pylons_project
+        "Repoze Public License",
+
+        // The TCL or Tcl/Tk licenses are permissive licenses.
+        // Ref: https://www.tcl.tk/software/tcltk/license.html
+        // The one used by the tktable library has a "bourbon" clause that doesn't add compliance requirements
+        // Ref: https://github.com/wjoye/tktable/blob/master/license.txt
+        {"pattern": "Tcl([/]tk)?"},
+
+        // The Ubuntu Font Licence is mostly permissive. It contains some restrictions if you are going to modify the
+        // fonts that require you to change the name to avoid confusion. But for our purposes, we're assuming that's
+        // not done, and so we're not flagging it.
+        {"pattern": "Ubuntu Font Licen[cs]e Version( 1([.]0)?)?"},
+
+        // Linking = Permissive/Public domain, Private Use = Permissive/Public domain
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "The Unlicense (Unlicense)",
+        "Unlicense",
+
+        // Various licenses seem to call themselves or be summed up as unlimited.
+        // So far we know of none that are not highly permissive.
+        //   * boot and KernSmooth are reported by R as being "Unlimited"
+        //     Refs:
+        //       * https://cran.r-project.org/web/packages/KernSmooth/index.html
+        //         (https://github.com/cran/KernSmooth/blob/master/LICENCE.note)
+        //       * https://cran.r-project.org/package=boot
+        //         (https://github.com/cran/boot/blob/master/DESCRIPTION)
+        "Unlimited",
+
+        // Linking = Permissive, Private Use = ?
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "W3C License",
+        "W3C-20150513",
+
+        // Linking = Permissive/Public Domain, Private Use = Yes
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "WTFPL",
+
+        // Copyleft = No
+        // Ref: https://en.wikipedia.org/wiki/Zlib_License
+        // Linking = Permissive, Private Use = ? (for zlib/libpng license)
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "Zlib",
+
+        // Copyleft = No, FSF/OSI-approved: Yes
+        // Ref: https://en.wikipedia.org/wiki/Zope_Public_License
+        "Zope Public License"
+    ],
+
+    "EXCEPTIONS": {
+
+        // The Bioconductor zlibbioc license is a permissive license.
+        // Ref: https://github.com/Bioconductor/zlibbioc/blob/devel/LICENSE
+        "Custom: bioconductor-zlibbioc file LICENSE": [
+            "bioconductor-zlibbioc"
+        ],
+
+        // The Bioconductor rsamtools license is an MIT license
+        // Ref: https://bioconductor.org/packages/release/bioc/licenses/Rsamtools/LICENSE
+        "Custom: bioconductor-rsamtools file LICENSE": [
+            "bioconductor-rsamtools"
+        ],
+
+        // DFSG = Debian Free Software Guidelines
+        // Ref: https://en.wikipedia.org/wiki/Debian_Free_Software_Guidelines
+        // Used as an apparent modifier to other licenses, to say they are approved per Debian.
+        // For example in this case, pytest-timeout has license: DFSG approved, MIT License,
+        // but is really just an MIT License that someone has checked is DFSG approved.
+        "DFSG approved": [
+            "pytest-timeout"  // MIT Licensed
+        ],
+
+        "FOSS": [
+            // The r-stringi library is a conda library that implements a stringi (pronounced "stringy") library for R.
+            // The COnda source feed is: https://github.com/conda-forge/r-stringi-feedstock
+            // This page explains that the home source is https://stringi.gagolewski.com/ but that's a doc page.
+            // The doc page says:
+            // > stringi’s source code is hosted on GitHub.
+            // > It is distributed under the open source BSD-3-clause license.
+            // The source code has a license that begins with a BSD-3-clause license and includes numerous others,
+            // but they all appear to be permissive.
+            //   Ref: https://github.com/gagolews/stringi/blob/master/LICENSE
+            "stringi",
+            "r-stringi"
+        ],
+
+        // Linking = With Restrictions, Private Use = Yes
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "GNU Lesser General Public License v2 or later (LGPLv2+)": [
+            "chardet"  // used at runtime during server operation (ingestion), but not modified or distributed
+        ],
+
+        // Linking = With Restrictions, Private Use = Yes
+        // Ref: https://en.wikipedia.org/wiki/Comparison_of_free_and_open-source_software_licenses
+        "GNU Lesser General Public License v3 or later (LGPLv3+)": [
+            // used only privately in testing, not used in server code, not modified, not distributed
+            "pytest-redis",
+            // required by pytest-redis (used only where it's used)
+            "mirakuru"
+        ],
+
+        "GNU General Public License (GPL)": [
+            "docutils"  // Used only privately as a separate documentation-generation task for ReadTheDocs
+        ],
+
+        "MIT/X11 Derivative": [
+            // The license used by libxkbcommon is complicated and involves numerous included licenses,
+            // but all are permissive.
+            // Ref: https://github.com/xkbcommon/libxkbcommon/blob/master/LICENSE
+            "libxkbcommon"
+        ],
+
+        "None": [
+            // It's not obvious why Conda shows this license as "None".
+            // In fact, though, BSD 3-Clause "New" or "Revised" License
+            // Ref: https://github.com/AnacondaRecipes/_libgcc_mutex-feedstock/blob/master/LICENSE.txt
+            "_libgcc_mutex"
+        ],
+
+        "PostgreSQL": [
+            // The libpq library is actually licensed with a permissive BSD 3-Clause "New" or "Revised" License
+            // Ref: https://github.com/lpsmith/postgresql-libpq/blob/master/LICENSE
+            "libpq"
+        ],
+
+        "UCSD": [
+            // It isn't obvious why these show up with a UCSD license in Conda.
+            // The actual sources say it should be a 2-clause BSD license:
+            // Refs:
+            //   * https://github.com/AlexandrovLab/SigProfilerMatrixGenerator/blob/master/LICENSE
+            //   * https://github.com/AlexandrovLab/SigProfilerPlotting/blob/master/LICENSE
+            "sigprofilermatrixgenerator",
+            "sigprofilerplotting"
+        ],
+
+        "X11": [
+            // The ncurses library has a VERY complicated history, BUT seems consistently permissive
+            // and the most recent version seems to be essentially the MIT license.
+            // Refs:
+            //   * https://en.wikipedia.org/wiki/Ncurses#License
+            //   * https://invisible-island.net/ncurses/ncurses-license.html
+            "ncurses"
+        ],
+
+        "zlib-acknowledgement": [
+            // It isn't clear whey libpng shows up with this license name, but the license for libpng
+            // is a permissive license.
+            // Ref: https://github.com/glennrp/libpng/blob/libpng16/LICENSE
+            "libpng"
+        ]
+    },
+
+    "EXPECTED_MISSING_LICENSES": [
+
+        // This is a name we use for our C4 portals. And it isn't published.
+        // We inherited the name from the Stanford ENCODE group, which had an MIT-licensed repo we forked
+        "encoded",  // cgap-portal, fourfront, and smaht-portal all call themselves this
+
+        // We believe that since these next here are part of the Pylons project, they're covered under
+        // the same license as the other Pylons projects. We're seeking clarification.
+        "pyramid-translogger",
+        "subprocess-middleware",
+
+        // This appears to be a BSD 2-Clause "Simplified" License, according to GitHub.
+        // PyPi also says it's a BSD license.
+        // Ref: https://github.com/paulc/dnslib/blob/master/LICENSE
+        "dnslib",
+
+        // This says it wants an ISC License, which we already have approval for but just isn't showing up.
+        // Ref: https://github.com/rthalley/dnspython/blob/master/LICENSE
+        "dnspython",
+
+        // This appears to be a mostly-MIT-style license.
+        // There are references to parts being in the public domain, though it's not obvious if that's meaningful.
+        // It's probably sufficient for our purposes to treat this as a permissive license.
+        // Ref: https://github.com/tlsfuzzer/python-ecdsa/blob/master/LICENSE
+        "ecdsa",
+
+        // This has an MIT license in its source repository
+        // Ref: https://github.com/xlwings/jsondiff/blob/master/LICENSE
+        "jsondiff",
+
+        // This has an MIT license in its source repository
+        // Ref: https://github.com/pkerpedjiev/negspy/blob/master/LICENSE
+        "negspy",
+
+        // This license statement is complicated, but seems adequately permissive.
+        // Ref: https://foss.heptapod.net/python-libs/passlib/-/blob/branch/stable/LICENSE
+        "passlib",
+
+        // This seems to be a BSD-3-Clause license.
+        // Ref: https://github.com/protocolbuffers/protobuf/blob/main/LICENSE
+        // pypi agrees in the Meta section of protobuf's page, where it says "3-Clause BSD License"
+        // Ref: https://pypi.org/project/protobuf/
+        "protobuf",
+
+        // The WTFPL license is permissive.
+        // Ref: https://github.com/mk-fg/pretty-yaml/blob/master/COPYING
+        "pyaml",
+
+        // This uses a BSD license
+        // Ref: https://github.com/eliben/pycparser/blob/master/LICENSE
+        "pycparser",
+
+        // The source repo for pyDes says this is under an MIT license
+        // Ref: https://github.com/twhiteman/pyDes/blob/master/LICENSE.txt
+        // pypi, probably wrongly, thinks this is in the public domain (as of 2023-07-21)
+        // Ref: https://pypi.org/project/pyDes/
+        "pyDes",
+
+        // This uses an MIT license
+        // Ref: https://github.com/pysam-developers/pysam/blob/master/COPYING
+        "pysam",
+
+        // The version of python-lambda that we forked calls itself this (and publishes at pypi under this name)
+        "python-lambda-4dn",
+
+        // This is MIT-licensed:
+        // Ref: https://github.com/themiurgo/ratelim/blob/master/LICENSE
+        // pypi agrees
+        // Ref: https://pypi.org/project/ratelim/
+        "ratelim",
+
+        // This is a BSD-3-Clause-Modification license
+        // Ref: https://github.com/repoze/repoze.debug/blob/master/LICENSE.txt
+        "repoze.debug",
+
+        // This is an Apache-2.0 license
+        // Ref: https://github.com/getsentry/responses/blob/master/LICENSE
+        "responses",
+
+        // This seems to get flagged sometimes, but is not the pypi snovault library, it's what our dcicsnovault
+        // calls itself internally. In any case, it's under MIT license and OK.
+        // Ref: https://github.com/4dn-dcic/snovault/blob/master/LICENSE.txt
+        "snovault",
+
+        // PyPi identifies the supervisor library license as "BSD-derived (http://www.repoze.org/LICENSE.txt)"
+        // Ref: https://pypi.org/project/supervisor/
+        // In fact, though, the license is a bit more complicated, though apparently still permissive.
+        // Ref: https://github.com/Supervisor/supervisor/blob/main/LICENSES.txt
+        "supervisor",
+
+        // This seems to be a BSD-3-Clause-Modification license.
+        // Ref: https://github.com/Pylons/translationstring/blob/master/LICENSE.txt
+        "translationstring",
+
+        // This seems to be a BSD-3-Clause-Modification license.
+        // Ref: https://github.com/Pylons/venusian/blob/master/LICENSE.txt
+        "venusian",
+
+        // PyPi identifies zope.deprecation as using the "Zope Public License (ZPL 2.1)" license.
+        // Ref: https://github.com/zopefoundation/Zope/blob/master/LICENSE.txt
+        "zope.deprecation"
+
+        // Below are licenses last known to have licenses missing in pip-licenses and need to be investigated further.
+        // Note well that just because pip-licenses doesn't know the license doesn't mean the software has
+        // no license. It may just mean the library is poorly registered in pypi. Some licenses have to be
+        // found by looking at the library's documentation or source files.
+
+        // (all of these have been classified at this point)
+    ]
+}
