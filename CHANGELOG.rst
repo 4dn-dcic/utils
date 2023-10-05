@@ -6,6 +6,16 @@ dcicutils
 Change Log
 ----------
 
+8.0.0
+=====
+
+* Update Python to 3.11; and nixed Python 3.7.
+* Updated boto3/botocore versions.
+* Updatad pyyaml version to ^6.0.1; Mac M1 has issues building 5.4.1 (though 5.3.1 works).
+  See PyYAML 6.0 change log here: https://github.com/yaml/pyyaml/blob/master/CHANGES
+  The only incompatible change seems to be that yaml.load now requires a Loader argument;
+  and searching our GitHub organizations (4dn-dcic, dbmi-bgm, smaht-dac) the only ones which might
+  be affected are cwltools and parliament2, neither of which are dependent on dcicutils in any way.
 
 7.13.0
 ======
