@@ -107,7 +107,7 @@ class EnglishUtils:
         f"^an?[ -]+([^ -].*)$",
         re.IGNORECASE)
 
-    _NOUN_WITH_THAT_OR_WHICH_QUALIFIER = re.compile("^(.*[^,])(,|)[ ]+(that|which)[ ]+(.*)$", re.IGNORECASE)
+    _NOUN_WITH_CLAUSE_QUALIFIER = re.compile("^(.*[^,])(,|)[ ]+(that|which|while)[ ]+(.*)$", re.IGNORECASE)
     _IS_QUALIFIER = re.compile("^(is|was|has)[ ]+(.*)$", re.IGNORECASE)
 
     @classmethod
@@ -125,7 +125,7 @@ class EnglishUtils:
         capitalize = word[0].isupper()
         upcase = word.isupper()  # capitalize and not any(ch.islower() for ch in word)
 
-        qual_matched = cls._NOUN_WITH_THAT_OR_WHICH_QUALIFIER.match(word)
+        qual_matched = cls._NOUN_WITH_CLAUSE_QUALIFIER.match(word)
         if qual_matched:
             qualified, comma, connective, qualifier = qual_matched.groups()
             word = qualified

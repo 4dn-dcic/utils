@@ -1358,6 +1358,13 @@ def to_camel_case(s):
         return snake_case_to_camel_case(s)
 
 
+def to_snake_case(s):
+    """
+    Converts a string that might be in snake_case or CamelCase into CamelCase.
+    """
+    return camel_case_to_snake_case(to_camel_case(s))
+
+
 def capitalize1(s):
     """
     Capitalizes the first letter of a string and leaves the others alone.

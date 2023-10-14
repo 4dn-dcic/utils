@@ -28,13 +28,16 @@ from .misc_utils import ignored, pad_to, JsonLinesReader, remove_suffix  # , PRI
 
 Header = str
 Headers = List[str]
+TabbedHeaders = Dict[str, Headers]
 ParsedHeader = List[Union[str, int]]
 ParsedHeaders = List[ParsedHeader]
+TabbedParsedHeaders = Dict[str, ParsedHeaders]
 SheetCellValue = Union[int, float, str]
 SheetRow = List[SheetCellValue]
 CsvReader = type(csv.reader(TemporaryFile()))
 SheetData = List[dict]
 TabbedSheetData = Dict[str, SheetData]
+TabbedSchemas = Dict[str, Dict]
 
 
 class LoadFailure(Exception):
@@ -72,21 +75,23 @@ def unwanted_kwargs(*, context, kwargs, context_plural=False, detailed=False):
                                      f" {maybe_pluralize(unwanted, 'keyword argument')} {conjoined_list(unwanted)}.")
 
 
-def prefer_number(value: SheetCellValue):
+def prefer_number(value: SheetCellValue, kind='num'):
     if isinstance(value, str):  # the given value might be an int or float, in which case just fall through
         if not value:
             return None
         value = value
         ch0 = value[0]
         if ch0 == '+' or ch0 == '-' or ch0.isdigit():
-            try:
-                return int(value)
-            except Exception:
-                pass
-            try:
-                return float(value)
-            except Exception:
-                pass
+            if kind == 'num' or kind == 'int':
+                try:
+                    return int(value)
+                except Exception:
+                    pass
+            if kind == 'num' or kind == 'float':
+                try:
+                    return float(value)
+                except Exception:
+                    pass
         # If we couldn't parse it as an int or float, fall through to returning the original value
         pass
     return value
@@ -247,7 +252,8 @@ class SemanticTableSetManager(BasicTableSetManager):
         table_set_manager: SemanticTableSetManager = cls(filename=filename, **kwargs)
         return table_set_manager.load_content()
 
-    def __init__(self, filename: str, **kwargs):
+    def __init__(self, filename: str, prefer_number: bool = True, **kwargs):
+        self.prefer_number: bool = prefer_number
         super().__init__(filename=filename, **kwargs)
 
     def _raw_row_generator_for_tab_name(self, tab_name: str) -> Iterable[SheetRow]:
@@ -274,9 +280,8 @@ class SemanticTableSetManager(BasicTableSetManager):
             self.content_by_tab_name[tab_name] = sheet_content
         return self.content_by_tab_name
 
-    @classmethod
-    def parse_cell_value(cls, value: SheetCellValue) -> AnyJsonData:
-        return prefer_number(value)
+    def parse_cell_value(self, value: SheetCellValue) -> AnyJsonData:
+        return prefer_number(value) if self.prefer_number else value
 
 
 class TableSetManagerRegistry:
