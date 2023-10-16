@@ -1,0 +1,5 @@
+name,sex,uuid,father,mother,parents,children
+John,Male,#john,#igor,#mary,,
+Juan,Male,#juan,,,#igor|#mary,
+Igor,Male,#igor,,,,#john|
+Mary,Female,#mary,,,,#john|

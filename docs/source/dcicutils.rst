@@ -281,6 +281,13 @@ secrets_utils
   :members:
 
 
+sheet_utils
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.sheet_utils
+  :members:
+
+
 snapshot_utils
 ^^^^^^^^^^^^^^
 

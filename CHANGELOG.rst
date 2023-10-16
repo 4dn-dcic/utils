@@ -61,6 +61,33 @@ Change Log
   * Add functionality for KMS key encrypted accounts
 
 
+7.12.0
+======
+
+* New module ``sheet_utils`` for loading workbooks.
+
+  * Important things of interest:
+
+    * Class ``ItemManager`` for loading Item-style data
+      from any ``.xlsx``, ``.csv`` or ``.tsv`` files.
+
+    * Function ``load_items`` that does the same as ``ItemManager.load``.
+
+  * Various lower-level implementation classes such as:
+
+    * Classes ``XlsxManager``, ``CsvManager`` and ``TsvManager`` for loading raw data
+      from ``.xlsx``, ``.csv``, and ``.tsv`` files, respectively.
+
+    * Classes ``XlsxItemManager``, ``CsvItemManager``, and ``TsvItemManager`` for loading Item-style data
+      from ``.xlsx``, ``.csv``, and ``.tsv`` files, respectively.
+
+* New functionality in ``misc_utils``:
+
+  * New function ``is_uuid`` (migrated from Fourfront)
+  * New function ``pad_to``
+  * New class ``JsonLinesReader``
+
+
 7.11.0
 ======
 

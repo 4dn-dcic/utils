@@ -1,0 +1,3 @@
+["name", "age", "mother", "father", "friends"]
+["bill", 23, {"name": "mary",     "age": 58}, {"name": "fred",    "age": 63}, [{"name": "sam",    "age":  22}, {"name":  "arthur", "age": 19}]]
+["joe", 9,   {"name": "estrella", "age": 35}, {"name": "anthony", "age": 34}, [{"name": "anders", "age":  9}]]
