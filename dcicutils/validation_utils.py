@@ -40,17 +40,20 @@ class SchemaManager:
         # if schemas is None:
         #     schemas = self.schemas
         # The schema_names argument is not normally given, but it is there for easier testing
-        def fetch_schema(schema_name):
-            cached_schema = self.schemas.get(schema_name)  # schemas.get(schema_name)
-            schema = self.fetch_schema(schema_name) if cached_schema is None else cached_schema
-            return schema_name, schema
+        def name_and_schema(schema_name):
+            # cached_schema = self.schemas.get(schema_name)  # schemas.get(schema_name)
+            # schema = self.fetch_schema(schema_name) if cached_schema is None else cached_schema
+            return schema_name, self.fetch_schema(schema_name)
         return {schema_name: schema
-                for schema_name, schema in pmap(fetch_schema, schema_names)}
+                for schema_name, schema in pmap(name_and_schema, schema_names)}
 
     def schema_exists(self, schema_name: str):
         return bool(self.fetch_schema(schema_name=schema_name))
 
     def fetch_schema(self, schema_name: str):
+        override_schema = self.schemas.get(schema_name)
+        if override_schema is not None:
+            return override_schema
         schema: Optional[AnyJsonData] = self.SCHEMA_CACHE.get(schema_name)
         if schema is None and schema_name not in self.SCHEMA_CACHE:  # If None is already stored, don't look it up again
             schema = get_schema(schema_name, portal_env=self.portal_env, portal_vapp=self.portal_vapp)
