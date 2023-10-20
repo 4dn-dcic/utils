@@ -352,7 +352,7 @@ class EnglishUtils:
     def there_are(cls, items, *, kind: str = "thing", count: Optional[int] = None, there: str = "there",
                   capitalize=True, joiner=None, zero: object = "no", punctuate=None, punctuate_none=None,
                   use_article=False, show=True, context=None, tense='present', punctuation_mark: str = ".",
-                  **joiner_options) -> str:
+                  just_are=False, **joiner_options) -> str:
         """
         Constructs a sentence that enumerates a set of things.
 
@@ -372,6 +372,7 @@ class EnglishUtils:
         :param show: whether to show the items if there are any (default True)
         :param context: an optional prepositional phrase indicating the context of the item(s) (default None)
         :param tense: one of 'past', 'present', 'future', 'conditional', or 'hypothetical' for the verbs used
+        :param just_are: whether to stop at "There is" or "There are" without anything else.
 
         By far the most common uses are likely to be:
 
@@ -403,7 +404,10 @@ class EnglishUtils:
         n = len(items) if count is None else count
         # If the items is not in the tenses table, it's assumed to be a modal like 'might', 'may', 'must', 'can' etc.
         is_or_are = cls._conjugate_be(count=n, tense=tense)
-        part1 = f"{there} {is_or_are} {n_of(n, kind, num_format=lambda n, thing: zero if n == 0 else None)}"
+        part0 = f"{there} {is_or_are}"
+        if just_are:
+            return part0
+        part1 = f"{part0} {n_of(n, kind, num_format=lambda n, thing: zero if n == 0 else None)}"
         if context:
             part1 += f" {context}"
         if n == 0 or not show:

@@ -1,25 +1,8 @@
-# import contextlib
 import json
 import os
 import pytest
 
 from collections import namedtuple
-# from dcicutils import bundle_utils as bundle_utils_module, ff_utils as ff_utils_module
-# from dcicutils.common import AnyJsonData
-# from dcicutils.env_utils import EnvUtils, public_env_name
-# from dcicutils.misc_utils import is_uuid, local_attrs, NamedObject, AbstractVirtualApp
-# from dcicutils.qa_utils import printed_output, mock_not_called, MockResponse
-# from dcicutils.bundle_utils import (
-#     # High-level interfaces
-#     ItemManager, load_items, ITEM_MANAGER_REGISTRY,
-#     # Low-level implementation
-#     SchemaAutoloadMixin,
-#     ItemTools,
-#     XlsxItemManager,
-#     CsvItemManager, TsvItemManager,
-#     # TypeHint, EnumHint,
-#     BoolHint,
-# )
 from dcicutils.sheet_utils import (
     # High-level interfaces
     TABLE_SET_MANAGER_REGISTRY,
@@ -32,10 +15,7 @@ from dcicutils.sheet_utils import (
     # Utilities
     prefer_number, unwanted_kwargs, expand_string_escape_sequences, infer_tab_name_from_filename,
 )
-# from typing import Dict, Optional
-# from unittest import mock
 from .conftest_settings import TEST_DIR
-# from .helpers import using_fresh_ff_state_for_testing
 
 
 TEST_SHEET_1 = 'Sheet1'
@@ -160,11 +140,39 @@ SAMPLE_XLSX_FILE_RAW_CONTENT = {
     ]
 }
 
+SAMPLE_XLSX_FILE_INFLATED_CONTENT = {
+    "Sheet1": [
+        {"x": 1, "y": {"a": 1, "z": 1}},
+        {"x": 1, "y": {"a": 2, "z": 3}},
+        {"x": "alpha", "y": {"a": "beta", "z": "gamma|delta"}},  # ["gamma", "delta"]
+    ],
+    "Sheet2": [
+        {
+            "name": "bill", "age": 23,
+            "mother": {"name": "mary", "age": 58},
+            "father": {"name": "fred", "age": 63},
+            "friends": [
+                {"name": "sam", "age": 22},
+                {"name": "arthur", "age": 19},
+            ]
+        },
+        {
+            "name": "joe", "age": 9,
+            "mother": {"name": "estrella", "age": 35},
+            "father": {"name": "anthony", "age": 34},
+            "friends": [
+                {"name": "anders", "age": 9},
+                {"name": None, "age": None}
+            ]
+        },
+    ],
+}
+
 SAMPLE_XLSX_FILE_ITEM_CONTENT = {
     "Sheet1": [
         {"x": 1, "y": {"a": 1, "z": 1}},
         {"x": 1, "y": {"a": 2, "z": 3}},
-        {"x": "alpha", "y": {"a": "beta", "z": ["gamma", "delta"]}},
+        {"x": "alpha", "y": {"a": "beta", "z": "gamma|delta"}},  # not ["gamma", "delta"], unless schema says so
     ],
     "Sheet2": [
         {
@@ -194,6 +202,8 @@ SAMPLE_CSV_FILE_SHEET_NAME = infer_tab_name_from_filename(SAMPLE_CSV_FILE)
 
 SAMPLE_CSV_FILE_RAW_CONTENT = {SAMPLE_CSV_FILE_SHEET_NAME: SAMPLE_XLSX_FILE_RAW_CONTENT['Sheet2']}
 
+SAMPLE_CSV_FILE_INFLATED_CONTENT = {SAMPLE_CSV_FILE_SHEET_NAME: SAMPLE_XLSX_FILE_INFLATED_CONTENT['Sheet2']}
+
 SAMPLE_CSV_FILE_ITEM_CONTENT = {SAMPLE_CSV_FILE_SHEET_NAME: SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']}
 
 SAMPLE_TSV_FILE = os.path.join(TEST_DIR, 'data_files/sample_items_sheet2.tsv')
@@ -201,6 +211,8 @@ SAMPLE_TSV_FILE = os.path.join(TEST_DIR, 'data_files/sample_items_sheet2.tsv')
 SAMPLE_TSV_FILE_SHEET_NAME = infer_tab_name_from_filename(SAMPLE_TSV_FILE)
 
 SAMPLE_TSV_FILE_RAW_CONTENT = {SAMPLE_TSV_FILE_SHEET_NAME: SAMPLE_XLSX_FILE_RAW_CONTENT['Sheet2']}
+
+SAMPLE_TSV_FILE_INFLATED_CONTENT = {SAMPLE_TSV_FILE_SHEET_NAME: SAMPLE_XLSX_FILE_INFLATED_CONTENT['Sheet2']}
 
 SAMPLE_TSV_FILE_ITEM_CONTENT = {SAMPLE_TSV_FILE_SHEET_NAME: SAMPLE_XLSX_FILE_ITEM_CONTENT['Sheet2']}
 

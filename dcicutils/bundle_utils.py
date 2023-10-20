@@ -1,17 +1,15 @@
-import contextlib
+# import contextlib
 import copy
-# import os
-# import uuid
-# import warnings
+import jsonschema
 
 from typing import Any, Dict, List, Optional, Union  # , Type
 from .common import AnyJsonData  # , Regexp, CsvReader
 from .env_utils import EnvUtils, public_env_name
-from .ff_utils import get_schema, get_metadata
+from .ff_utils import get_metadata  # , get_schema
 from .lang_utils import there_are
 from .misc_utils import AbstractVirtualApp, ignored, PRINT, to_camel_case
 from .sheet_utils import (
-    TabbedSchemas, LoadTableError, prefer_number,
+    TabbedJsonSchemas, LoadTableError, prefer_number,
     Header, Headers, TabbedHeaders,
     ParsedHeader, ParsedHeaders, TabbedParsedHeaders,
     SheetCellValue, TabbedSheetData,  # SheetRow, SheetData,
@@ -20,9 +18,15 @@ from .sheet_utils import (
     # SimpleJsonInsertsManager, SimpleYamlInsertsManager, SimpleJsonLinesInsertsManager,
     # TabbedJsonInsertsManager, TabbedYamlInsertsManager,
     # InsertsDirectoryManager,
+    InsertsManager,
     load_table_set
 )
-from .task_utils import pmap
+# from .task_utils import pmap
+from .validation_utils import SchemaManager
+
+
+PatchPrototype = Dict
+TabbedPatchPrototypes = Dict[str, PatchPrototype]
 
 
 # @contextlib.contextmanager
@@ -236,7 +240,10 @@ class ItemTools:
     INSTAGUIDS_ENABLED = False  # Experimental feature not enabled by default
 
     @classmethod
-    def parse_item_value(cls, value: SheetCellValue) -> AnyJsonData:
+    def parse_item_value(cls, value: SheetCellValue,
+                         apply_heuristics: bool = False, split_pipe: bool = False) -> AnyJsonData:
+        if not apply_heuristics:
+            return value
         # TODO: Remodularize this for easier testing and more Schema-driven effect
         # Doug asks that this be broken up into different mechanisms, more modular and separately testable.
         # I pretty much agree with that. I'm just waiting for suggestions on what kinds of features are desired.
@@ -249,18 +256,18 @@ class ItemTools:
                 return False
             elif lvalue == 'null' or lvalue == '':
                 return None
-            elif '|' in value:
+            elif split_pipe and '|' in value:
                 if value == '|':  # Use '|' for []
                     return []
                 else:
                     if value.endswith("|"):  # Use 'foo|' for ['foo']
                         value = value[:-1]
-                    return [cls.parse_item_value(subvalue) for subvalue in value.split('|')]
+                    return [cls.parse_item_value(subvalue, apply_heuristics=apply_heuristics, split_pipe=split_pipe)
+                            for subvalue in value.split('|')]
             else:
                 # Doug points out that the schema might not agree, might want a string representation of a number.
                 # At this semantic layer, this might be a bad choice.
-                # return prefer_number(value)
-                return value
+                return prefer_number(value)
         else:  # presumably a number (int or float)
             return value
 
@@ -310,80 +317,71 @@ class ItemTools:
         return finder(subheader=parsed_header, subschema=schema)
 
 
-class SchemaManager:
-
-    SCHEMA_CACHE = {}  # Shared cache. Do not override. Use .clear_schema_cache() to clear it.
-
-    @classmethod
-    @contextlib.contextmanager
-    def fresh_schema_manager_context_for_testing(cls):
-        old_schema_cache = cls.SCHEMA_CACHE
-        try:
-            cls.SCHEMA_CACHE = {}
-            yield
-        finally:
-            cls.SCHEMA_CACHE = old_schema_cache
-
-    def __init__(self, portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
-        if portal_env is None and portal_vapp is None:
-            portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
-            PRINT(f"The portal_env was not explicitly supplied. Schemas will come from portal_env={portal_env!r}.")
-        self.portal_env = portal_env
-        self.portal_vapp = portal_vapp
-
-    def fetch_relevant_schemas(self, schema_names: List[str], schemas: Optional[TabbedSchemas] = None):
-        if schemas is None:
-            schemas = {}
-        # The schema_names argument is not normally given, but it is there for easier testing
-        def fetch_schema(schema_name):
-            schema = schemas.get(schema_name)
-            schema = (self.fetch_schema(schema_name, portal_env=self.portal_env, portal_vapp=self.portal_vapp)
-                      if schema is None
-                      else schema)
-            return schema_name, schema
-        return {schema_name: schema
-                for schema_name, schema in pmap(fetch_schema, schema_names)}
-
-    @classmethod
-    def schema_exists(cls, schema_name: str, *, portal_env: Optional[str] = None,
-                     portal_vapp: Optional[AbstractVirtualApp] = None):
-        return bool(cls.fetch_schema(schema_name=schema_name, portal_env=portal_env, portal_vapp=portal_vapp))
-
-    @classmethod
-    def fetch_schema(cls, schema_name: str, *, portal_env: Optional[str] = None,
-                     portal_vapp: Optional[AbstractVirtualApp] = None):
-        schema: Optional[AnyJsonData] = cls.SCHEMA_CACHE.get(schema_name)
-        if schema is None and schema_name not in cls.SCHEMA_CACHE:  # If None is already stored, don't look it up again
-            schema = get_schema(schema_name, portal_env=portal_env, portal_vapp=portal_vapp)
-            cls.SCHEMA_CACHE[schema_name] = schema
-        return schema
-
-    @classmethod
-    def clear_schema_cache(cls):
-        for key in list(cls.SCHEMA_CACHE.keys()):  # important to get the list of keys as a separate object first
-            cls.SCHEMA_CACHE.pop(key, None)
+# class SchemaManager:
+#
+#     SCHEMA_CACHE = {}  # Shared cache. Do not override. Use .clear_schema_cache() to clear it.
+#
+#     @classmethod
+#     @contextlib.contextmanager
+#     def fresh_schema_manager_context_for_testing(cls):
+#         old_schema_cache = cls.SCHEMA_CACHE
+#         try:
+#             cls.SCHEMA_CACHE = {}
+#             yield
+#         finally:
+#             cls.SCHEMA_CACHE = old_schema_cache
+#
+#     def __init__(self, schemas: Optional[TabbedSchemas] = None,
+#                  portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
+#         if portal_env is None and portal_vapp is None:
+#             portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
+#             PRINT(f"The portal_env was not explicitly supplied. Schemas will come from portal_env={portal_env!r}.")
+#         self.portal_env = portal_env
+#         self.portal_vapp = portal_vapp
+#         self.schemas = {} if schemas is None else schemas.copy()
+#
+#     def fetch_relevant_schemas(self, schema_names: List[str]):  # , schemas: Optional[TabbedSchemas] = None):
+#         # if schemas is None:
+#         #     schemas = self.schemas
+#         # The schema_names argument is not normally given, but it is there for easier testing
+#         def fetch_schema(schema_name):
+#             cached_schema = self.schemas.get(schema_name)  # schemas.get(schema_name)
+#             schema = self.fetch_schema(schema_name) if cached_schema is None else cached_schema
+#             return schema_name, schema
+#         return {schema_name: schema
+#                 for schema_name, schema in pmap(fetch_schema, schema_names)}
+#
+#     def schema_exists(self, schema_name: str):
+#         return bool(self.fetch_schema(schema_name=schema_name))
+#
+#     def fetch_schema(self, schema_name: str):
+#         schema: Optional[AnyJsonData] = self.SCHEMA_CACHE.get(schema_name)
+#         if schema is None and schema_name not in self.SCHEMA_CACHE:  # If None is already stored, don't look it up again
+#             schema = get_schema(schema_name, portal_env=self.portal_env, portal_vapp=self.portal_vapp)
+#             self.SCHEMA_CACHE[schema_name] = schema
+#         return schema
+#
+#     @classmethod
+#     def clear_schema_cache(cls):
+#         for key in list(cls.SCHEMA_CACHE.keys()):  # important to get the list of keys as a separate object first
+#             cls.SCHEMA_CACHE.pop(key, None)
+#
+#     def identifying_properties(self, schema=None, schema_name=None, among: Optional[List[str]] = None):
+#         schema = schema if schema is not None else self.fetch_schema(schema_name)
+#         possible_identifying_properties = set(schema.get("identifyingProperties") or []) | {'uuid'}
+#         identifying_properties = sorted(possible_identifying_properties
+#                                         if among is None
+#                                         else (prop
+#                                               for prop in among
+#                                               if prop in possible_identifying_properties))
+#         return identifying_properties
 
 
 ITEM_MANAGER_REGISTRY = TableSetManagerRegistry()
 
-PatchPrototype = Dict
-TabbedPatchPrototypes = Dict[str, PatchPrototype]
 
 
-def extract_tabbed_headers(data: TabbedSheetData) -> TabbedHeaders:
-    result: TabbedHeaders = {}
-    for tab, rows in data.items():
-        if rows:
-            # Data is homogeneous, so whatever the headers for the first row should be the same for all
-            headers: List[str] = list(rows[0].keys())
-        else:
-            # If there's no data in the tab, there are also no headers
-            headers: List[str] = []
-        result[tab] = headers
-    return result
-
-
-class TableInflater:
+class InflatableTabbedDataManager:
     """
     This tool can be used independently of the item tools. It doesn't involve schemas, but it does allow the
     inflation of a table with dotted names to structures. e.g., a table with headers mother.name, mother.age,
@@ -397,9 +395,10 @@ class TableInflater:
     Note, too, that although data != inflate(data), once inflated, inflate(inflate(data)) == inflate(data).
     """
 
-    def __init__(self, tabbed_sheet_data: TabbedSheetData):
+    def __init__(self, tabbed_sheet_data: TabbedSheetData, apply_heuristics: bool = False):
         self.tabbed_sheet_data: TabbedSheetData = tabbed_sheet_data
-        self.headers_by_tab_name: TabbedHeaders = extract_tabbed_headers(tabbed_sheet_data)
+        self.apply_heuristics = apply_heuristics
+        self.headers_by_tab_name: TabbedHeaders = InsertsManager.extract_tabbed_headers(tabbed_sheet_data)
         self.parsed_headers_by_tab_name: TabbedParsedHeaders = {
             tab_name: ItemTools.parse_sheet_headers(headers)
             for tab_name, headers in self.headers_by_tab_name.items()
@@ -424,55 +423,77 @@ class TableInflater:
                   for row in self.tabbed_sheet_data[tab_name]]
         return result
 
-    @classmethod
-    def inflate_row(cls, row: Dict, *, prototype: Dict, parsed_headers: ParsedHeaders):
+    def inflate_row(self, row: Dict, *, prototype: Dict, parsed_headers: ParsedHeaders):
         patch_item = copy.deepcopy(prototype)
         for column_number, column_value in enumerate(row.values()):
-            parsed_value = ItemTools.parse_item_value(column_value)
+            parsed_value = ItemTools.parse_item_value(column_value, apply_heuristics=self.apply_heuristics)
             ItemTools.set_path_value(patch_item, parsed_headers[column_number], parsed_value)
         return patch_item
 
     @classmethod
-    def inflate(cls, tabbed_sheet_data: TabbedSheetData):
-        inflater = cls(tabbed_sheet_data)
+    def inflate(cls, tabbed_sheet_data: TabbedSheetData, apply_heuristics: bool = False):
+        inflater = cls(tabbed_sheet_data, apply_heuristics=apply_heuristics)
         inflated = inflater.inflate_tabs()
         return inflated
 
 
-inflate = TableInflater.inflate
+inflate = InflatableTabbedDataManager.inflate
 
 
-def load_table_structures(filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
-                          prefer_number: bool = True, **kwargs):
+def load_table_structures(filename: str, *, apply_heuristics: bool = True,
+                          tab_name: Optional[str] = None, escaping: Optional[bool] = None, **kwargs):
     """This differs from load_table_set only in that it inflates the content. It does not apply schemas."""
-    tabbed_rows = load_table_set(filename=filename, tab_name=tab_name, escaping=escaping, prefer_number=prefer_number,
-                                 **kwargs)
-    tabbed_structures = inflate(tabbed_rows)
+    tabbed_rows = load_table_set(filename=filename, tab_name=tab_name, escaping=escaping, **kwargs)
+    tabbed_structures = inflate(tabbed_rows, apply_heuristics=apply_heuristics)
     return tabbed_structures
 
 
-class TabbedItemTable:
+class TableChecker(InflatableTabbedDataManager, TypeHintContext):
 
-    def __init__(self, tabbed_sheet_data: TabbedSheetData,
-                 portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
+    def __init__(self, tabbed_sheet_data: TabbedSheetData, schemas: Optional[TabbedJsonSchemas] = None,
+                 portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None,
+                 apply_heuristics: bool = False):
+
+        if portal_env is None and portal_vapp is None:
+            portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
+        # InflatableTabbedDataManager supplies:
+        #   self.tabbed_sheet_data: TabbedSheetData =
+        #   self.headers_by_tab_name: TabbedHeaders =
+        #   self.parsed_headers_by_tab_name: TabbedParsedHeaders =
+        #   self.patch_prototypes_by_tab_name: TabbedPatchPrototypes =
+        self._problems: List[str] = []
+        super().__init__(tabbed_sheet_data=tabbed_sheet_data, apply_heuristics=apply_heuristics)
         self.portal_env = portal_env
         self.portal_vapp = portal_vapp
-        self.headers_by_tab_name: Dict[str, str] = {
-            tab_name: list(rows[0].keys()) if rows else []
-            for tab_name, rows in tabbed_sheet_data.items()
-        }
+        self.schema_manager: SchemaManager = SchemaManager(portal_env=portal_env, portal_vapp=portal_vapp,
+                                                           schemas=schemas)
+        self.schemas = self.schema_manager.fetch_relevant_schemas(self.tab_names)  # , schemas=schemas)
         self.lookup_tables_by_tab_name: Dict[str, Dict[str, Dict]] = {
             tab_name: self.build_lookup_table_for_tab(tab_name, rows=rows)
             for tab_name, rows in tabbed_sheet_data.items()
         }
+        self.type_hints_by_tab_name: Dict[str, OptionalTypeHints] = {
+            tab_name: self.compile_type_hints(tab_name)
+            for tab_name in self.tab_names
+        }
+
+    def schema_for_tab(self, tab_name: str) -> dict:
+        # Once our class is initialized, every tab should have a schema, even if just {}
+        schema = self.schemas.get(tab_name)
+        if schema is None:
+            raise ValueError(f"No schema was given or fetched for tab {tab_name!r}.")
+        return schema
+
+    def note_problem(self, problem: str):
+        self._problems.append(problem)
 
     def build_lookup_table_for_tab(self, tab_name: str, *, rows: List[Dict]) -> Dict[str, Dict]:
-        # TODO: It might be enough to just return the keys as a set, not a full dict
-        schema = get_schema(tab_name, portal_env=self.portal_env, portal_vapp=self.portal_vapp)
-        possible_identifying_properties = set(schema.get("identifyingProperties") or []) | {'uuid'}
-        identifying_properties = [prop
-                                  for prop in self.headers_by_tab_name[tab_name]
-                                  if prop in possible_identifying_properties]
+        # schema = self.schema_for_tab(tab_name)
+        # possible_identifying_properties = set(schema.get("identifyingProperties") or []) | {'uuid'}
+        # identifying_properties = [prop
+        #                           for prop in self.headers_by_tab_name[tab_name]
+        #                           if prop in possible_identifying_properties]
+        identifying_properties = self.schema_manager.identifying_properties(schema_name=tab_name)
         if not identifying_properties:
             # Maybe issue a warning here that we're going to lose
             empty_lookup_table: Dict[str, Dict] = {}
@@ -499,30 +520,6 @@ class TabbedItemTable:
         else:  # Apparently some stray type not in our tables
             return None
 
-
-class TableChecker(TableInflater, TypeHintContext):
-
-    def __init__(self, tabbed_sheet_data: TabbedSheetData, schemas: Optional[TabbedSchemas] = None,
-                 portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
-        self.portal_env = portal_env
-        self.portal_vapp = portal_vapp
-        self._problems: List[str] = []
-        super().__init__(tabbed_sheet_data=tabbed_sheet_data)
-        self.schema_manager = SchemaManager(portal_env=portal_env, portal_vapp=portal_vapp)
-        self.schemas = self.schema_manager.fetch_relevant_schemas(self.tab_names, schemas=schemas)
-        self.type_hints_by_tab_name: Dict[str, OptionalTypeHints] = {
-            tab_name: self.compile_type_hints(tab_name)
-            for tab_name in self.tab_names
-        }
-        self.tabbed_item_table = TabbedItemTable(tabbed_sheet_data, portal_env=portal_env, portal_vapp=portal_vapp)
-        # self.lookup_tables_by_tab_name: Dict[str, Dict[str, Dict]] = {
-        #     tab_name: self.build_lookup_table_for_tab(tab_name, rows=rows)
-        #     for tab_name, rows in tabbed_sheet_data.items()
-        # }
-
-    def note_problem(self, problem: str):
-        self._problems.append(problem)
-
     def raise_any_pending_problems(self):
         problems = self._problems
         if problems:
@@ -540,12 +537,8 @@ class TableChecker(TableInflater, TypeHintContext):
         return result
 
     def validate_ref(self, item_type, item_ref):
-        if self.tabbed_item_table.contains_ref(item_type=item_type, item_ref=item_ref):
+        if self.contains_ref(item_type=item_type, item_ref=item_ref):
             return True
-        # lookup_table = self.lookup_tables_by_tab_name.get(item_type)
-        # if lookup_table:
-        #     if item_ref in lookup_table:
-        #         return True
         try:
             info = get_metadata(f"/{to_camel_case(item_type)}/{item_ref}")
             # Basically return True if there's a value at all,
@@ -556,25 +549,6 @@ class TableChecker(TableInflater, TypeHintContext):
 
     def schema_exists(self, schema_name: str) -> bool:
         return self.schema_manager.schema_exists(schema_name)
-
-    # def build_lookup_table_for_tab(self, tab_name: str, *, rows: List[Dict]) -> Dict[str, Dict]:
-    #     # TODO: It might be enough to just return the keys as a set, not a full dict
-    #     schema = get_schema(tab_name, portal_env=self.portal_env, portal_vapp=self.portal_vapp)
-    #     possible_identifying_properties = set(schema.get("identifyingProperties") or []) | {'uuid'}
-    #     identifying_properties = [prop
-    #                               for prop in self.headers_by_tab_name[tab_name]
-    #                               if prop in possible_identifying_properties]
-    #     if not identifying_properties:
-    #         # Maybe issue a warning here that we're going to lose
-    #         empty_lookup_table: Dict[str, Dict] = {}
-    #         return empty_lookup_table
-    #     lookup_table: Dict[str, Dict] = {}
-    #     for row in rows:
-    #         for identifying_property in identifying_properties:
-    #             value = row.get(identifying_property)
-    #             if value is not '' and value is not None:
-    #                 lookup_table[str(value)] = row
-    #     return lookup_table
 
     def check_tab(self, tab_name: str):
         prototype = self.patch_prototypes_by_tab_name[tab_name]
@@ -589,7 +563,7 @@ class TableChecker(TableInflater, TypeHintContext):
                   parsed_headers: ParsedHeaders, type_hints: OptionalTypeHints):
         patch_item = copy.deepcopy(prototype)
         for column_number, column_value in enumerate(row.values()):
-            parsed_value = ItemTools.parse_item_value(column_value)
+            parsed_value = ItemTools.parse_item_value(column_value, apply_heuristics=self.apply_heuristics)
             type_hint = type_hints[column_number]
             if type_hint:
                 try:
@@ -602,8 +576,11 @@ class TableChecker(TableInflater, TypeHintContext):
         return patch_item
 
     @classmethod
-    def check(cls, tabbed_sheet_data: TabbedSheetData, schemas: Optional[TabbedSchemas] = None, **kwargs):
-        checker = cls(tabbed_sheet_data, schemas=schemas, **kwargs)
+    def check(cls, tabbed_sheet_data: TabbedSheetData, schemas: Optional[TabbedJsonSchemas] = None,
+              apply_heuristics: bool = False,
+              portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
+        checker = cls(tabbed_sheet_data, schemas=schemas, apply_heuristics=apply_heuristics,
+                      portal_env=portal_env, portal_vapp=portal_vapp)
         checked = checker.check_tabs()
         return checked
 
@@ -638,8 +615,15 @@ check = TableChecker.check
 
 
 def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
-               schemas: Optional[TabbedSchemas] = None, **kwargs):
+               schemas: Optional[TabbedJsonSchemas] = None, apply_heuristics: bool = False,
+               portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None,
+               validate: bool = False, **kwargs):
     tabbed_rows = load_table_set(filename=filename, tab_name=tab_name, escaping=escaping, prefer_number=False,
                                  **kwargs)
-    checked_items = check(tabbed_rows, schemas=schemas)
+    checked_items = check(tabbed_rows, schemas=schemas, portal_env=portal_env, portal_vapp=portal_vapp,
+                          apply_heuristics=apply_heuristics)
+    if validate:
+        raise NotImplementedError("Need to implement validation.")  # TODO: Implement validation
     return checked_items
+
+

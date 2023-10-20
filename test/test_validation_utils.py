@@ -1,0 +1,107 @@
+import copy
+import os
+import pytest
+import re
+
+from dcicutils.bundle_utils import inflate
+from dcicutils.misc_utils import AbstractVirtualApp, NamedObject, json_file_contents, to_snake_case
+from dcicutils.qa_utils import MockResponse
+from dcicutils.validation_utils import SchemaManager, validate_data_against_schemas, summary_of_data_validation_errors
+from .conftest_settings import TEST_DIR
+from .helpers_for_bundles import SAMPLE_WORKBOOK_WITH_NAME_REFS
+
+
+def test_schema_manager_identifying_value():
+
+    with pytest.raises(ValueError) as exc:
+        assert SchemaManager.identifying_value({'any': 'thing'}, [])
+    assert str(exc.value) == "No identifying properties were specified."
+
+    person_named_fred = {'age': 33, 'name': 'Fred', 'favorite-color': 'yellow'}
+    assert SchemaManager.identifying_value(person_named_fred, ['uuid', 'name']) == 'Fred'
+
+    person_nicknamed_fred = {'age': 33, 'nickname': 'Fred', 'favorite-color': 'yellow'}
+    with pytest.raises(ValueError) as exc:
+        SchemaManager.identifying_value(person_nicknamed_fred, ['uuid', 'name'])
+    assert str(exc.value) == ("""There are no identifying properties 'uuid' or 'name'"""
+                              """ in {"age": 33, "nickname": "Fred", "favorite-color": "yellow"}.""")
+
+    with pytest.raises(ValueError) as exc:
+        SchemaManager.identifying_value(person_nicknamed_fred, ['name'])
+    assert str(exc.value) == ("""There is no identifying property 'name'"""
+                              """ in {"age": 33, "nickname": "Fred", "favorite-color": "yellow"}.""")
+
+
+def test_validate_data_against_schemas():
+
+    with SchemaManager.fresh_schema_manager_context_for_testing():
+
+        class MockVapp(NamedObject, AbstractVirtualApp):
+
+            @classmethod
+            def get(cls, path_url):
+
+                m = re.match('/profiles/(.*)[.]json?', path_url)
+                if m:
+                    base = to_snake_case(m.group(1))
+                    file = os.path.join(TEST_DIR, 'data_files', 'sample_schemas', f'{base}.json')
+                    response_data = json_file_contents(file)
+                    response = MockResponse(200, json=response_data, url=path_url)
+                    return response
+                raise Exception(f"MockVapp can't handle this case: {path_url}")
+
+        portal_vapp = MockVapp(name=f'MockVapp["data_files/sample_schemas"]')
+
+        good_workbook = inflate(SAMPLE_WORKBOOK_WITH_NAME_REFS)
+
+        assert validate_data_against_schemas(good_workbook, portal_vapp) is None
+
+        bogus_workbook = copy.deepcopy(good_workbook)  # modified immediately below
+        user_items = bogus_workbook['User']
+        user_item0 = user_items[0]
+        user_item0['bogus'] = 'item'
+
+        assert validate_data_against_schemas(bogus_workbook, portal_vapp) == {
+            'errors': [
+                {
+                    'extraneous_properties': ['bogus'],
+                    'index': 0,
+                    'item': 'e0dec518-cb0c-45f3-8c97-21b2659ec129',
+                    'type': 'User'
+                }
+            ]
+        }
+
+
+def test_summary_of_data_validation_errors():
+
+    error_report_1 = {
+        'errors': [
+            {
+                'extraneous_properties': ['bogus'],
+                'index': 0,
+                'item': 'e0dec518-cb0c-45f3-8c97-21b2659ec129',
+                'type': 'User'
+            }
+        ]
+    }
+
+    sample_data_file_name = 'my-data-file'
+    sample_s3_data_file_location = 'my-s3-data-file-location'
+    sample_s3_details_location = 'my-s3-details-location'
+
+    assert summary_of_data_validation_errors(error_report_1,
+                                             data_file_name=sample_data_file_name,
+                                             s3_data_file_location=sample_s3_data_file_location,
+                                             s3_details_location=sample_s3_details_location
+                                             ) == [
+        'Ingestion data validation error summary:',
+        'Data file: my-data-file',
+        'Data file in S3: my-s3-data-file-location',
+        'Items unidentified: 0',
+        'Items missing properties: 0',
+        'Items with extraneous properties: 1',
+        'Other errors: 0',
+        'Exceptions: 0',
+        'Details: my-s3-details-location'
+    ]

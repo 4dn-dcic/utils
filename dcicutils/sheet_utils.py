@@ -37,7 +37,8 @@ SheetRow = List[SheetCellValue]
 CsvReader = type(csv.reader(TemporaryFile()))
 SheetData = List[dict]
 TabbedSheetData = Dict[str, SheetData]
-TabbedSchemas = Dict[str, Dict]
+JsonSchema = Dict
+TabbedJsonSchemas = Dict[str, JsonSchema]
 
 
 class LoadFailure(Exception):
@@ -166,7 +167,12 @@ class AbstractTableSetManager:
 
     ALLOWED_FILE_EXTENSIONS: List[str] = []
 
-    def __init__(self, filename: str, **kwargs):
+    def __init__(self, filename: str, prefer_number: Optional[bool] = None, **kwargs):
+        if prefer_number:
+            # It's OK to pass prefer_number=None (meaning take the default) and prefer_number=False,
+            # since that requires no action, but if a class wants to manage such preferences,
+            # as happens in FlattenedTableSetManager, it will have to do it itself.
+            raise ValueError(f"This class {self.__class__.__name__} does not implement prefer_number={prefer_number!r}")
         self.filename: str = filename
         unwanted_kwargs(context=self.__class__.__name__, kwargs=kwargs)
 
@@ -223,7 +229,7 @@ class BasicTableSetManager(AbstractTableSetManager):
         raise NotImplementedError(f"._get_reader_agent() is not implemented for {self.__class__.__name__}.")  # noQA
 
 
-class SemanticTableSetManager(BasicTableSetManager):
+class FlattenedTableSetManager(BasicTableSetManager):
     """
     This is the base class for all workbook-like data sources, i.e., that may need to apply semantic processing.
     Those may be:
@@ -249,10 +255,12 @@ class SemanticTableSetManager(BasicTableSetManager):
                 raise LoadArgumentsError(f"The TableSetManager subclass {cls.__name__} expects only"
                                          f" {disjoined_list(cls.ALLOWED_FILE_EXTENSIONS)} filenames: {filename}")
 
-        table_set_manager: SemanticTableSetManager = cls(filename=filename, **kwargs)
+        table_set_manager: FlattenedTableSetManager = cls(filename=filename, **kwargs)
         return table_set_manager.load_content()
 
-    def __init__(self, filename: str, prefer_number: bool = True, **kwargs):
+    def __init__(self, filename: str, prefer_number: Optional[bool] = None, **kwargs):
+        if prefer_number is None:  # i.e., no initial value specified
+            prefer_number = True
         self.prefer_number: bool = prefer_number
         super().__init__(filename=filename, **kwargs)
 
@@ -331,7 +339,7 @@ TABLE_SET_MANAGER_REGISTRY = TableSetManagerRegistry()
 
 
 @TABLE_SET_MANAGER_REGISTRY.register()
-class XlsxManager(SemanticTableSetManager):
+class XlsxManager(FlattenedTableSetManager):
     """
     This implements the mechanism to get a series of rows out of the sheets in an XLSX file.
     """
@@ -424,14 +432,23 @@ class InsertsManager(BasicTableSetManager):
     def _get_reader_agent(self) -> Any:
         return self
 
+    @classmethod
+    def extract_tabbed_headers(cls, data: TabbedSheetData) -> TabbedHeaders:
+        result: TabbedHeaders = {}
+        for tab, rows in data.items():
+            if rows:
+                # Data is homogeneous, so whatever the headers for the first row should be the same for all
+                headers: List[str] = list(rows[0].keys())
+            else:
+                # If there's no data in the tab, there are also no headers
+                headers: List[str] = []
+            result[tab] = headers
+        return result
+
     def load_content(self) -> Dict[str, AnyJsonData]:
         data = self._load_inserts_data(self.filename)
-        for tab_name, tab_content in data.items():
-            self.content_by_tab_name[tab_name] = tab_content
-            if not tab_content:
-                self.headers_by_tab_name[tab_name] = []
-            else:
-                self.headers_by_tab_name[tab_name] = list(tab_content[0].keys())
+        self.content_by_tab_name = data
+        self.headers_by_tab_name = self.extract_tabbed_headers(data)
         return self.content_by_tab_name
 
 
@@ -515,7 +532,7 @@ class InsertsDirectoryManager(InsertsManager):
 
 
 @TABLE_SET_MANAGER_REGISTRY.register()
-class CsvManager(SingleTableMixin, SemanticTableSetManager):
+class CsvManager(SingleTableMixin, FlattenedTableSetManager):
     """
     This implements the mechanism to get a series of rows out of the sheet in a csv file,
     returning a result that still looks like there could have been multiple tabs.

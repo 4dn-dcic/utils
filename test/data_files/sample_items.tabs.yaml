@@ -10,9 +10,7 @@ Sheet1:
 - x: alpha
   y:
     a: beta
-    z:
-    - gamma
-    - delta
+    z: gamma|delta
 Sheet2:
 - age: 23
   father:

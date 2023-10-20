@@ -18,10 +18,7 @@
             "x": "alpha",
             "y": {
                 "a": "beta",
-                "z": [
-                    "gamma",
-                    "delta"
-                ]
+                "z": "gamma|delta"
             }
         }
     ],
