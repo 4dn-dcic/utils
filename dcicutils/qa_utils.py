@@ -2308,6 +2308,10 @@ class MockBotoS3Client(MockBoto3Client):
         "application/json": [".json"],
         "text/plain": [".txt", ".text"],
         "binary/octet-stream": [".fo"],
+        # The below is because on Ubuntu 22.04 (docker), as opposed to 20.04, the mimetypes.guess_type
+        # function returns this strange value for an argument ending in ".fo"; this manifested as a test
+        # failure (put_object assert below) in test_s3_utils.test_unzip_s3_to_s3_unit. dmichaels/2023-09-28.
+        "application/vnd.software602.filler.form+xml": [".fo"],
     }
 
     def put_object(self, *, Bucket, Key, Body, ContentType=None, **kwargs):  # noqa - Uppercase argument names are chosen by AWS
