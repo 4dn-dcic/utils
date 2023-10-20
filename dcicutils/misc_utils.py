@@ -9,10 +9,6 @@ import hashlib
 import inspect
 import io
 import json
-<<<<<<< HEAD
-import os
-=======
->>>>>>> master
 import logging
 import math
 import os
@@ -305,7 +301,7 @@ class VirtualApp(AbstractVirtualApp):
         return self.wrapped_app.app
 
 
-VirtualAppResponse = webtest.response.TestResponse
+VirtualAppResponse = webtest.response.TestResponse  # NoQA - PyCharm sees a problem, but none occurs in practice
 
 
 def exported(*variables):

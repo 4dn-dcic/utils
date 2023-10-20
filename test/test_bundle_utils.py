@@ -397,7 +397,7 @@ def test_load_items_with_schema():
     print("Case 2")
     file_base_name = os.path.splitext(os.path.basename(SAMPLE_CSV_FILE2))[0]
     expected = SAMPLE_CSV_FILE2_ITEM_CONTENT
-    actual = load_items(SAMPLE_CSV_FILE2, schemas={file_base_name: {}}, apply_heuristics=True)  #  schemas=SAMPLE_CSV_FILE2_SCHEMAS)
+    actual = load_items(SAMPLE_CSV_FILE2, schemas={file_base_name: {}}, apply_heuristics=True)
     assert actual == expected
 
     print("Case 3")
@@ -623,7 +623,7 @@ def mocked_schemas(mock_remotes: bool = True, expected_portal_env=None, expected
         if not data:
             return None
         for prop in possible_identifying_properties:
-            if not prop in data[0]:
+            if prop not in data[0]:
                 continue
             found = find_association(data, **{prop: item_ref})
             if found:
@@ -656,9 +656,6 @@ def mocked_schemas(mock_remotes: bool = True, expected_portal_env=None, expected
             yield
 
 
-
-
-
 def test_table_checker():
 
     print()  # start on a fresh line
@@ -683,5 +680,3 @@ def test_table_checker():
 
         checker = TableChecker(SAMPLE_WORKBOOK_WITH_NAME_REFS, portal_env=mock_ff_env)
         checker.check_tabs()
-
-

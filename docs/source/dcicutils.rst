@@ -323,6 +323,13 @@ trace_utils
   :members:
 
 
+validation_utils
+^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.validation_utils
+  :members:
+
+
 variant_utils
 ^^^^^^^^^^^
 

@@ -1,6 +1,4 @@
-# import contextlib
 import copy
-import jsonschema
 
 from typing import Any, Dict, List, Optional, Union  # , Type
 from .common import AnyJsonData  # , Regexp, CsvReader
@@ -282,7 +280,8 @@ class ItemTools:
             cls.set_path_value(datum[key], more_path, value)
 
     @classmethod
-    def find_type_hint(cls, parsed_header: Optional[ParsedHeader], schema: Any, context: Optional[TypeHintContext] = None):
+    def find_type_hint(cls, parsed_header: Optional[ParsedHeader], schema: Any,
+                       context: Optional[TypeHintContext] = None):
 
         def finder(subheader, subschema):
             if not parsed_header:
@@ -356,7 +355,7 @@ class ItemTools:
 #
 #     def fetch_schema(self, schema_name: str):
 #         schema: Optional[AnyJsonData] = self.SCHEMA_CACHE.get(schema_name)
-#         if schema is None and schema_name not in self.SCHEMA_CACHE:  # If None is already stored, don't look it up again
+#         if schema is None and schema_name not in self.SCHEMA_CACHE:  # If None is already stored, don't look up again
 #             schema = get_schema(schema_name, portal_env=self.portal_env, portal_vapp=self.portal_vapp)
 #             self.SCHEMA_CACHE[schema_name] = schema
 #         return schema
@@ -378,7 +377,6 @@ class ItemTools:
 
 
 ITEM_MANAGER_REGISTRY = TableSetManagerRegistry()
-
 
 
 class InflatableTabbedDataManager:
@@ -502,7 +500,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         for row in rows:
             for identifying_property in identifying_properties:
                 value = row.get(identifying_property)
-                if value is not '' and value is not None:
+                if value != '' and value is not None:
                     lookup_table[str(value)] = row
         return lookup_table
 
@@ -606,7 +604,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         return []  # TODO: Make this compute a list of required headers (in parsed header form)
 
     def create_tab_processor_state(self, tab_name: str) -> SheetState:
-                                          # This will create state that allows us to efficiently assign values in the right place on each row
+        # This will create state that allows us to efficiently assign values in the right place on each row
         return self.SheetState(parsed_headers=self.parsed_headers_by_tab_name[tab_name],
                                type_hints=self.type_hints_by_tab_name[tab_name])
 
@@ -625,5 +623,3 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
     if validate:
         raise NotImplementedError("Need to implement validation.")  # TODO: Implement validation
     return checked_items
-
-

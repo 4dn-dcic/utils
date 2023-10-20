@@ -101,7 +101,7 @@ def validate_data_against_schemas(data: TabbedSheetData,
     where each top-level dictionary property is the name of the data type for the contained schema.
     These data types are (strings) assumed to be in snake-case form, e.g. "file_submitted".
 
-    If there are any missing required properties, any extraneous properties, or any undentified
+    If there are any absent required properties, any extraneous properties, or any undentified
     items in the data, then returns a dictionary with an itemized description of each of these errors,
     otherwise returns None if there are no problems. Note that an unidentified item is one which has
     no value for uuid nor any of the other identifying property values as defined by the schema.
@@ -242,7 +242,7 @@ def validate_data_item_against_schemas(data_item: AnyJsonData, data_type: str,
     return errors
 
 
-def summary_of_data_validation_errors(data_validation_errors: Dict, # submission: SmahtSubmissionFolio,
+def summary_of_data_validation_errors(data_validation_errors: Dict,  # submission: SmahtSubmissionFolio,
                                       data_file_name: str,
                                       s3_data_file_location: str,
                                       s3_details_location: str) -> List[str]:
