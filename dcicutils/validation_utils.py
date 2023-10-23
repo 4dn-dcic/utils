@@ -150,23 +150,6 @@ def validate_data_against_schemas(data: TabbedSheetData,
 
     schema_manager = SchemaManager(portal_vapp=portal_vapp, schemas=schemas)
 
-    # def fetch_relevant_schemas(schema_names: List, portal_vapp: VirtualApp) -> List:
-    #     def fetch_schema(schema_name: str) -> Optional[Dict]:
-    #         return schema_name, get_schema(schema_name, portal_vapp=portal_vapp)
-    #     return {schema_name: schema for schema_name, schema in pmap(fetch_schema, schema_names)}
-    #
-    # errors = []
-    #
-    # if not schemas:
-    #     if not portal_vapp:
-    #         raise Exception("Must specify portal_vapp if no schemas specified.")
-    #     try:
-    #         schema_names = [data_type for data_type in data]
-    #         schemas = fetch_relevant_schemas(schema_names, portal_vapp=portal_vapp)
-    #     except Exception as e:
-    #         errors.append({"exception": f"Exception fetching relevant schemas: {get_error_message(e)}"})
-    #         schemas = {}
-
     errors = []
     schemas = schema_manager.fetch_relevant_schemas(list(data.keys()))
 
@@ -242,7 +225,8 @@ def validate_data_item_against_schemas(data_item: AnyJsonData, data_type: str,
     return errors
 
 
-def summary_of_data_validation_errors(data_validation_errors: Dict,  # submission: SmahtSubmissionFolio,
+def summary_of_data_validation_errors(data_validation_errors: Dict,
+                                      # These next three items are available from a portal's SubmissionFolio
                                       data_file_name: str,
                                       s3_data_file_location: str,
                                       s3_details_location: str) -> List[str]:
@@ -276,15 +260,12 @@ def summary_of_data_validation_errors(data_validation_errors: Dict,  # submissio
 
     return [
         f"Ingestion data validation error summary:",
-        # f"Data file: {submission.data_file_name}",
         f"Data file: {data_file_name}",
-        # f"Data file in S3: {submission.s3_data_file_location}",
         f"Data file in S3: {s3_data_file_location}",
         f"Items unidentified: {unidentified_count}",
         f"Items missing properties: {missing_properties_count}",
         f"Items with extraneous properties: {extraneous_properties_count}",
         f"Other errors: {unclassified_error_count}",
         f"Exceptions: {exception_count}",
-        # f"Details: {submission.s3_details_location}"
         f"Details: {s3_details_location}"
     ]

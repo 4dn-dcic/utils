@@ -1,8 +1,6 @@
 import contextlib
 
 import chardet
-# import contextlib
-# import copy
 import csv
 import glob
 import io
@@ -11,19 +9,15 @@ import openpyxl
 import os
 import re
 import subprocess
-# import uuid
 import yaml
 
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.workbook.workbook import Workbook
 from tempfile import TemporaryFile, TemporaryDirectory
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
-from .common import AnyJsonData, Regexp
-# from .env_utils import public_env_name, EnvUtils
-# from .ff_utils import get_schema
+from .common import AnyJsonData, Regexp, JsonSchema
 from .lang_utils import conjoined_list, disjoined_list, maybe_pluralize  # , there_are
 from .misc_utils import ignored, pad_to, JsonLinesReader, remove_suffix  # , PRINT, AbstractVirtualApp
-# from .task_utils import pmap
 
 
 Header = str
@@ -37,7 +31,6 @@ SheetRow = List[SheetCellValue]
 CsvReader = type(csv.reader(TemporaryFile()))
 SheetData = List[dict]
 TabbedSheetData = Dict[str, SheetData]
-JsonSchema = Dict
 TabbedJsonSchemas = Dict[str, JsonSchema]
 
 
@@ -77,6 +70,17 @@ def unwanted_kwargs(*, context, kwargs, context_plural=False, detailed=False):
 
 
 def prefer_number(value: SheetCellValue, kind='num'):
+    """
+    Given a string, if the string has number syntax, returns the number it represents. Otherwise, returns its argument.
+    (It follows from this that if given an int or a float, it just returns that argument.)
+
+    Using a kind= argument (as in kind='int' or kind='float') can better restrict what kind of number a string
+    is coerced to, but it has no effect when the argument is a number, even a number of the wrong kind.
+
+    :param value: a string, int, or float
+    :param kind: one of 'num', 'int', or 'float'
+    :returns: the argument coerced to a number of the appropriate kind, if possible, or else the argument literally
+    """
     if isinstance(value, str):  # the given value might be an int or float, in which case just fall through
         if not value:
             return None
@@ -95,10 +99,26 @@ def prefer_number(value: SheetCellValue, kind='num'):
                     pass
         # If we couldn't parse it as an int or float, fall through to returning the original value
         pass
+    # NOTE WELL:
+    #   In the case where we already have a number, even if it's the wrong type, we just leave it as we got it.
+    #   The job of this function is not to do type enforcement or correctness checking, but rather to adjust
+    #   for the fact that spreadsheets and csv files often pass string data where they mean to pass numbers.
+    #   If some human has already been thinking about what to pass in a JSON or other such setting,
+    #   this function is not trying to be smart enough to second-guess that.
     return value
 
 
 def expand_string_escape_sequences(text: str) -> str:
+    """
+    Expands string escape sequences in a commonly used way.
+    A backslash followed by one of the following characters is expanded as indicated:
+        r (return or CR) - ASCII 13 decimal, 15 octal, 0d hex
+        n (newline or linefeed or LF) - ASCII 10 decimal, 12 octal, 0a hex
+        t (tab) - ASCII 9 decimal, 11 octal, 9 hex
+        f (formfeed or page) - ASCII 12 decimal, 14 octal, 0c hex
+        \\ (backslash) - ASCII 92 decimal, 134 octal, 5c hex
+    In all other situations, the backslash is left uninterpreted.
+    """
     s = io.StringIO()
     escaping = False
     for ch in text:
@@ -134,13 +154,6 @@ def open_unicode_text_input_file_respecting_byte_order_mark(filename):
     return io.open(filename, 'r', encoding=use_encoding)
 
 
-# TODO: Consider whether this might want to be an abstract base class. Some change might be needed.
-#
-# Doug thinks we might want (metaclass=ABCMeta) here to make this an abstract base class.
-# I am less certain but open to discussion. Among other things, as implemented now,
-# the __init__ method here needs to run and the documentation says that ABC's won't appear
-# in the method resolution order. -kmp 17-Aug-2023
-# See also discussion at https://github.com/4dn-dcic/utils/pull/276#discussion_r1297775535
 class AbstractTableSetManager:
     """
     The TableSetManager is the spanning class of anything that wants to be able to load a table set,
@@ -176,7 +189,6 @@ class AbstractTableSetManager:
         self.filename: str = filename
         unwanted_kwargs(context=self.__class__.__name__, kwargs=kwargs)
 
-    # TODO: Consider whether this should be an abstractmethod (but first see detailed design note at top of class.)
     @classmethod
     def load(cls, filename: str, **kwargs) -> TabbedSheetData:
         """

@@ -1,45 +1,21 @@
 import copy
 
-from typing import Any, Dict, List, Optional, Union  # , Type
-from .common import AnyJsonData  # , Regexp, CsvReader
+from typing import Any, Dict, List, Optional, Union
+from .common import AnyJsonData
 from .env_utils import EnvUtils, public_env_name
-from .ff_utils import get_metadata  # , get_schema
+from .ff_utils import get_metadata
 from .lang_utils import there_are
 from .misc_utils import AbstractVirtualApp, ignored, PRINT, to_camel_case
 from .sheet_utils import (
-    TabbedJsonSchemas, LoadTableError, prefer_number,
-    Header, Headers, TabbedHeaders,
-    ParsedHeader, ParsedHeaders, TabbedParsedHeaders,
-    SheetCellValue, TabbedSheetData,  # SheetRow, SheetData,
-    TableSetManagerRegistry, AbstractTableSetManager,  # BasicTableSetManager,
-    # CsvManager, TsvManager, XlsxManager,
-    # SimpleJsonInsertsManager, SimpleYamlInsertsManager, SimpleJsonLinesInsertsManager,
-    # TabbedJsonInsertsManager, TabbedYamlInsertsManager,
-    # InsertsDirectoryManager,
-    InsertsManager,
-    load_table_set
+    LoadTableError, prefer_number, TabbedJsonSchemas,
+    Header, Headers, TabbedHeaders, ParsedHeader, ParsedHeaders, TabbedParsedHeaders, SheetCellValue, TabbedSheetData,
+    TableSetManagerRegistry, AbstractTableSetManager, InsertsManager, load_table_set,
 )
-# from .task_utils import pmap
 from .validation_utils import SchemaManager
 
 
 PatchPrototype = Dict
 TabbedPatchPrototypes = Dict[str, PatchPrototype]
-
-
-# @contextlib.contextmanager
-# def deferred_problems():
-#     problems = []
-#
-#     def note_problem(problem):
-#         problems.append(problem)
-#
-#     yield note_problem
-#
-#     if problems:
-#         for problem in problems:
-#             PRINT(f"Problem: {problem}")
-#         raise Exception(there_are(problems, kind='problem while compiling hints', tense='past', show=False))
 
 
 class TypeHintContext:
@@ -240,14 +216,28 @@ class ItemTools:
     @classmethod
     def parse_item_value(cls, value: SheetCellValue,
                          apply_heuristics: bool = False, split_pipe: bool = False) -> AnyJsonData:
+        """
+        Returns the item value unmodified, unless apply_heuristics=True is given,
+        in which case heuristics ARE applied. This is intended to be used for spreadsheet
+        values that look like non-strings and should perhaps be interepreted as such.
+
+        This is a vestige of an older plan to have these things happen magically behind the scenes early in
+        the process. Unfortunately, that was found to impede correct processing later, so now this is disabled
+        by default. It may still be useful in some cases when dealing with data that has no schema, so the
+        functionality is still here and must be explicitly requested.
+
+        :param value: a value in a table (such as a spreadsheet)
+        :param apply_heuristics: whether to apply heuristic coercions based on what the value looks like (default False)
+        :param split_pipe: whether to apply the 'split pipe' heuristic, changing 'a|1' to ['a', 1], even if
+           apply_heuristics=True was given (default False)
+        """
         if not apply_heuristics:
+            # In order to not interfere with schema-driven processing, we mostly default to
+            # NOT applying heuristics. You have to ask for them explicitly if you want them.
+            # -kmp 23-Oct-2023
             return value
-        # TODO: Remodularize this for easier testing and more Schema-driven effect
-        # Doug asks that this be broken up into different mechanisms, more modular and separately testable.
-        # I pretty much agree with that. I'm just waiting for suggestions on what kinds of features are desired.
         if isinstance(value, str):
             lvalue = value.lower()
-            # TODO: We could consult a schema to make this less heuristic, but this may do for now
             if lvalue == 'true':
                 return True
             elif lvalue == 'false':
@@ -314,66 +304,6 @@ class ItemTools:
                             return finder(subheader=other_headers, subschema=def1)
 
         return finder(subheader=parsed_header, subschema=schema)
-
-
-# class SchemaManager:
-#
-#     SCHEMA_CACHE = {}  # Shared cache. Do not override. Use .clear_schema_cache() to clear it.
-#
-#     @classmethod
-#     @contextlib.contextmanager
-#     def fresh_schema_manager_context_for_testing(cls):
-#         old_schema_cache = cls.SCHEMA_CACHE
-#         try:
-#             cls.SCHEMA_CACHE = {}
-#             yield
-#         finally:
-#             cls.SCHEMA_CACHE = old_schema_cache
-#
-#     def __init__(self, schemas: Optional[TabbedSchemas] = None,
-#                  portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
-#         if portal_env is None and portal_vapp is None:
-#             portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
-#             PRINT(f"The portal_env was not explicitly supplied. Schemas will come from portal_env={portal_env!r}.")
-#         self.portal_env = portal_env
-#         self.portal_vapp = portal_vapp
-#         self.schemas = {} if schemas is None else schemas.copy()
-#
-#     def fetch_relevant_schemas(self, schema_names: List[str]):  # , schemas: Optional[TabbedSchemas] = None):
-#         # if schemas is None:
-#         #     schemas = self.schemas
-#         # The schema_names argument is not normally given, but it is there for easier testing
-#         def fetch_schema(schema_name):
-#             cached_schema = self.schemas.get(schema_name)  # schemas.get(schema_name)
-#             schema = self.fetch_schema(schema_name) if cached_schema is None else cached_schema
-#             return schema_name, schema
-#         return {schema_name: schema
-#                 for schema_name, schema in pmap(fetch_schema, schema_names)}
-#
-#     def schema_exists(self, schema_name: str):
-#         return bool(self.fetch_schema(schema_name=schema_name))
-#
-#     def fetch_schema(self, schema_name: str):
-#         schema: Optional[AnyJsonData] = self.SCHEMA_CACHE.get(schema_name)
-#         if schema is None and schema_name not in self.SCHEMA_CACHE:  # If None is already stored, don't look up again
-#             schema = get_schema(schema_name, portal_env=self.portal_env, portal_vapp=self.portal_vapp)
-#             self.SCHEMA_CACHE[schema_name] = schema
-#         return schema
-#
-#     @classmethod
-#     def clear_schema_cache(cls):
-#         for key in list(cls.SCHEMA_CACHE.keys()):  # important to get the list of keys as a separate object first
-#             cls.SCHEMA_CACHE.pop(key, None)
-#
-#     def identifying_properties(self, schema=None, schema_name=None, among: Optional[List[str]] = None):
-#         schema = schema if schema is not None else self.fetch_schema(schema_name)
-#         possible_identifying_properties = set(schema.get("identifyingProperties") or []) | {'uuid'}
-#         identifying_properties = sorted(possible_identifying_properties
-#                                         if among is None
-#                                         else (prop
-#                                               for prop in among
-#                                               if prop in possible_identifying_properties))
-#         return identifying_properties
 
 
 ITEM_MANAGER_REGISTRY = TableSetManagerRegistry()
@@ -486,11 +416,6 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         self._problems.append(problem)
 
     def build_lookup_table_for_tab(self, tab_name: str, *, rows: List[Dict]) -> Dict[str, Dict]:
-        # schema = self.schema_for_tab(tab_name)
-        # possible_identifying_properties = set(schema.get("identifyingProperties") or []) | {'uuid'}
-        # identifying_properties = [prop
-        #                           for prop in self.headers_by_tab_name[tab_name]
-        #                           if prop in possible_identifying_properties]
         identifying_properties = self.schema_manager.identifying_properties(schema_name=tab_name)
         if not identifying_properties:
             # Maybe issue a warning here that we're going to lose
@@ -621,5 +546,9 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
     checked_items = check(tabbed_rows, schemas=schemas, portal_env=portal_env, portal_vapp=portal_vapp,
                           apply_heuristics=apply_heuristics)
     if validate:
-        raise NotImplementedError("Need to implement validation.")  # TODO: Implement validation
+        # TODO: Maybe connect validation here. Although another option is to just call validation separately
+        #       once this is successfully loaded. Needs thought. However, David's validation_utils can do
+        #       the validation if we decide to do it, it would just need to be connected up.
+        #       -kmp 23-Oct-2023
+        raise NotImplementedError("Need to implement validation.")
     return checked_items

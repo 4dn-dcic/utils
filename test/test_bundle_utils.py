@@ -1,12 +1,10 @@
 import contextlib
-# import copy
 import glob
 import json
 import os
 import pytest
 import re
 
-# from collections import namedtuple
 from dcicutils import (
     bundle_utils as bundle_utils_module,
     ff_utils as ff_utils_module,
@@ -14,11 +12,11 @@ from dcicutils import (
 )
 from dcicutils.bundle_utils import (
     # High-level interfaces
-    load_table_structures, load_items,  # inflate,
+    load_table_structures, load_items,
     # Low-level implementation
     SchemaManager, ItemTools, TableChecker,
-    # XlsxItemManager, CsvItemManager, TsvItemManager, ...
-    BoolHint,  # NumHint, TypeHint, EnumHint, RefHint, ...
+    BoolHint,
+    # Probably we should test NumHint, TypeHint, EnumHint, RefHint, etc. as well. -kmp 23-Oct-2023
 )
 from dcicutils.common import AnyJsonData
 from dcicutils.env_utils import EnvUtils, public_env_name
@@ -27,19 +25,9 @@ from dcicutils.misc_utils import (
 )
 from dcicutils.qa_utils import printed_output, mock_not_called, MockResponse
 from dcicutils.sheet_utils import (
-    # High-level interfaces
-    # TABLE_SET_MANAGER_REGISTRY,
-    # Low-level implementation
-    # BasicTableSetManager,
-    # XlsxManager,
-    CsvManager,  # TsvManager,
-    # Error handling
-    LoadArgumentsError, LoadTableError,  # LoadFailure,
-    # Utilities
-    infer_tab_name_from_filename,  # prefer_number, unwanted_kwargs, expand_string_escape_sequences,
-    load_table_set,
+    CsvManager, LoadArgumentsError, LoadTableError,
+    infer_tab_name_from_filename, load_table_set,
 )
-# from dcicutils.validation_utils import validate_data_against_schemas, summary_of_data_validation_errors
 from typing import Dict
 from unittest import mock
 from .conftest_settings import TEST_DIR
@@ -420,21 +408,6 @@ def test_sample_items_json_vs_yaml():
     tabs_data_from_json = load_items(SAMPLE_JSON_TABS_FILE)
     tabs_data_from_yaml = load_items(SAMPLE_YAML_TABS_FILE)
     assert tabs_data_from_json == tabs_data_from_yaml
-
-
-# @pytest.mark.parametrize('instaguids_enabled', [True, False])
-# def test_load_items_with_schema_and_instaguids(instaguids_enabled):
-#
-#     with local_attrs(ItemTools, INSTAGUIDS_ENABLED=instaguids_enabled):
-#
-#         expected = SAMPLE_CSV_FILE3_PERSON_CONTENT_HINTED
-#         print("expected=", json.dumps(expected, indent=2))
-#         actual = load_items(SAMPLE_CSV_FILE3, schemas=SAMPLE_CSV_FILE3_SCHEMAS, tab_name='Person')
-#         print("actual=", json.dumps(actual, indent=2))
-#         if instaguids_enabled:
-#             assert matches_template(actual, expected)
-#         else:
-#             assert actual == expected  # no substitution performed
 
 
 @using_fresh_ff_state_for_testing()

@@ -39,8 +39,6 @@ OrchestratedApp = Literal['cgap', 'fourfront', 'smaht']
 
 LIBRARY_DIR = os.path.dirname(__file__)
 
-Regexp = type(re.compile("sample"))
-
 # ===== Auth Data =====
 
 AuthStr = str
@@ -58,6 +56,8 @@ AuthData = Union[AuthDict, SimpleAuthPair]
 AnyAuthData = Union[LegacyAuthDict, AuthData]
 
 # ===== JSON Data =====
+
+JsonSchema = Dict
 
 AnyJsonData = Union[Dict[str, 'AnyJsonData'], List['AnyJsonData'], str, bool, int, float, None]
 
