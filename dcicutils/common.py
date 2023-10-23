@@ -67,8 +67,7 @@ KeyValueDictList = List[KeyValueDict]
 KeyValuestringDict = Dict[Literal['Key', 'Value'], str]
 KeyValuestringDictList = List[KeyValuestringDict]
 
-S3KeyName = str
-S3BucketName = str
+# ===== Miscellaneous Data =====
 
 UrlString = str
 
@@ -79,6 +78,9 @@ Regexp = type(re.compile("sample"))
 CsvReader = type(csv.reader(TemporaryFile()))
 
 # ===== AWS Data =====
+
+S3KeyName = str
+S3BucketName = str
 
 # Refs:
 #  * https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
