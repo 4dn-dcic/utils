@@ -9,9 +9,9 @@ from .misc_utils import AbstractVirtualApp, ignored, PRINT, to_camel_case
 from .sheet_utils import (
     LoadTableError, prefer_number, TabbedJsonSchemas,
     Header, Headers, TabbedHeaders, ParsedHeader, ParsedHeaders, TabbedParsedHeaders, SheetCellValue, TabbedSheetData,
-    TableSetManagerRegistry, AbstractTableSetManager, InsertsManager, load_table_set,
+    TableSetManagerRegistry, AbstractTableSetManager, InsertsManager, TableSetManager, load_table_set,
 )
-from .validation_utils import SchemaManager
+from .validation_utils import SchemaManager, validate_data_against_schemas, summary_of_data_validation_errors
 
 
 PatchPrototype = Dict
@@ -378,9 +378,18 @@ def load_table_structures(filename: str, *, apply_heuristics: bool = True,
 
 class TableChecker(InflatableTabbedDataManager, TypeHintContext):
 
-    def __init__(self, tabbed_sheet_data: TabbedSheetData, schemas: Optional[TabbedJsonSchemas] = None,
+    def __init__(self, tabbed_sheet_data: TabbedSheetData, *, flattened: bool,
+                 override_schemas: Optional[TabbedJsonSchemas] = None,
                  portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None,
                  apply_heuristics: bool = False):
+
+        self.flattened = flattened
+        if not flattened:
+            # TODO: Need to implement something that depends on this flattened attribute.
+            # Also, it's possible that we can default this once we see if the new strategy is general-purpose,
+            # rather than it being a required argument. But for now let's require it be passed.
+            # -kmp 25-Oct-2023
+            raise ValueError("Only flattened=True is supported by TableChecker for now.")
 
         if portal_env is None and portal_vapp is None:
             portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
@@ -394,7 +403,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         self.portal_env = portal_env
         self.portal_vapp = portal_vapp
         self.schema_manager: SchemaManager = SchemaManager(portal_env=portal_env, portal_vapp=portal_vapp,
-                                                           schemas=schemas)
+                                                           override_schemas=override_schemas)
         self.schemas = self.schema_manager.fetch_relevant_schemas(self.tab_names)  # , schemas=schemas)
         self.lookup_tables_by_tab_name: Dict[str, Dict[str, Dict]] = {
             tab_name: self.build_lookup_table_for_tab(tab_name, rows=rows)
@@ -463,6 +472,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         if self.contains_ref(item_type=item_type, item_ref=item_ref):
             return True
         try:
+            # TODO: This probably needs a cache
             info = get_metadata(f"/{to_camel_case(item_type)}/{item_ref}")
             # Basically return True if there's a value at all,
             # but still check it's not an error message that didn't get raised.
@@ -499,10 +509,13 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         return patch_item
 
     @classmethod
-    def check(cls, tabbed_sheet_data: TabbedSheetData, schemas: Optional[TabbedJsonSchemas] = None,
+    def check(cls, tabbed_sheet_data: TabbedSheetData, *,
+              flattened: bool,
+              override_schemas: Optional[TabbedJsonSchemas] = None,
               apply_heuristics: bool = False,
               portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
-        checker = cls(tabbed_sheet_data, schemas=schemas, apply_heuristics=apply_heuristics,
+        checker = cls(tabbed_sheet_data, flattened=flattened,
+                      override_schemas=override_schemas, apply_heuristics=apply_heuristics,
                       portal_env=portal_env, portal_vapp=portal_vapp)
         checked = checker.check_tabs()
         return checked
@@ -538,14 +551,34 @@ check = TableChecker.check
 
 
 def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
-               schemas: Optional[TabbedJsonSchemas] = None, apply_heuristics: bool = False,
+               override_schemas: Optional[TabbedJsonSchemas] = None, apply_heuristics: bool = False,
                portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None,
-               validate: bool = False, **kwargs):
-    tabbed_rows = load_table_set(filename=filename, tab_name=tab_name, escaping=escaping, prefer_number=False,
+               # TODO: validate= is presently False (i.e., disabled) by default while being debugged,
+               #       but for production use maybe should not be? -kmp 25-Oct-2023
+               validate: bool = False,
+               **kwargs):
+    annotated_data = TableSetManager.load_annotated(filename=filename, tab_name=tab_name, escaping=escaping, prefer_number=False,
                                  **kwargs)
-    checked_items = check(tabbed_rows, schemas=schemas, portal_env=portal_env, portal_vapp=portal_vapp,
-                          apply_heuristics=apply_heuristics)
+    tabbed_rows = annotated_data['content']
+    flattened = annotated_data['flattened']
+    if flattened:
+        checked_items = TableChecker.check(tabbed_rows, flattened=flattened,
+                                           override_schemas=override_schemas,
+                                           portal_env=portal_env, portal_vapp=portal_vapp,
+                                           apply_heuristics=apply_heuristics)
+    else:
+        # No fancy checking for things like .json, etc. for now. Only check things that came from
+        # spreadsheet-like data, where structural datatypes are forced into strings.
+        checked_items = tabbed_rows
+
     if validate:
+        problems = validate_data_against_schemas(checked_items, portal_env=portal_env, portal_vapp=portal_vapp,
+                                                 override_schemas=override_schemas)
+        error_summary = summary_of_data_validation_errors(problems)
+        if error_summary:
+            for item in error_summary:
+                print(item)
+            raise Exception("Validation problems were seen.")
         # TODO: Maybe connect validation here. Although another option is to just call validation separately
         #       once this is successfully loaded. Needs thought. However, David's validation_utils can do
         #       the validation if we decide to do it, it would just need to be connected up.

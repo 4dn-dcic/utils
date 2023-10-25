@@ -682,10 +682,30 @@ class TableSetManager(AbstractTableSetManager):
         """
         Given a filename and various options
         """
+        annotated_content = cls.load_annotated(filename=filename, tab_name=tab_name, escaping=escaping, **kwargs)
+        content: TabbedSheetData = annotated_content['content']
+        return content
+
+    @classmethod
+    def load_annotated(cls, filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
+                       **kwargs) -> Dict:
+        """
+        Given a filename and various options
+        """
+        orig_filename = filename
         with maybe_unpack(filename) as filename:
             manager = cls.create_implementation_manager(filename=filename, tab_name=tab_name, escaping=escaping,
                                                         **kwargs)
-            return manager.load_content()
+            content: TabbedSheetData = manager.load_content()
+            return {
+                'filename': filename,
+                'content': content,
+                'tab_name': tab_name,
+                'escaping': escaping,
+                'singleton': isinstance(manager, SingleTableMixin),
+                'flattened': isinstance(manager, FlattenedTableSetManager),
+                'packed': orig_filename != filename,  # tar or zip file that had to be unpacked somehow
+            }
 
 
 load_table_set = TableSetManager.load

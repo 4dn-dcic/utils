@@ -218,10 +218,19 @@ def test_load_table_structures():
     assert str(exc.value) == "Unknown file type: something.else"
 
 
-def test_load_items():
+@contextlib.contextmanager
+def no_schemas():
 
     with mock.patch.object(validation_utils_module, "get_schema") as mock_get_schema:
         mock_get_schema.return_value = {}
+        yield
+
+
+def test_load_items():
+
+    # with mock.patch.object(validation_utils_module, "get_schema") as mock_get_schema:
+    #     mock_get_schema.return_value = {}
+    with no_schemas():
 
         assert load_items(SAMPLE_XLSX_FILE, apply_heuristics=True) == SAMPLE_XLSX_FILE_ITEM_CONTENT
         assert load_items(SAMPLE_CSV_FILE, apply_heuristics=True) == SAMPLE_CSV_FILE_ITEM_CONTENT
@@ -385,29 +394,35 @@ def test_load_items_with_schema():
     print("Case 2")
     file_base_name = os.path.splitext(os.path.basename(SAMPLE_CSV_FILE2))[0]
     expected = SAMPLE_CSV_FILE2_ITEM_CONTENT
-    actual = load_items(SAMPLE_CSV_FILE2, schemas={file_base_name: {}}, apply_heuristics=True)
+    actual = load_items(SAMPLE_CSV_FILE2, override_schemas={file_base_name: {}}, apply_heuristics=True)
     assert actual == expected
 
     print("Case 3")
     expected = SAMPLE_CSV_FILE2_PERSON_CONTENT_HINTED
-    actual = load_items(SAMPLE_CSV_FILE2, schemas=SAMPLE_CSV_FILE2_SCHEMAS, tab_name='Person')
+    actual = load_items(SAMPLE_CSV_FILE2, override_schemas=SAMPLE_CSV_FILE2_SCHEMAS, tab_name='Person')
     assert actual == expected
 
 
 def test_sample_items_csv_vs_json():
 
-    csv_content = load_items(SAMPLE_CSV_FILE2, tab_name='Person', schemas=SAMPLE_CSV_FILE2_SCHEMAS)
+    csv_content = load_items(SAMPLE_CSV_FILE2, tab_name='Person', override_schemas=SAMPLE_CSV_FILE2_SCHEMAS)
 
-    json_content = load_items(SAMPLE_JSON_FILE2, tab_name="Person", schemas=SAMPLE_CSV_FILE2_SCHEMAS)
+    json_content = load_items(SAMPLE_JSON_FILE2, tab_name="Person", override_schemas=SAMPLE_CSV_FILE2_SCHEMAS)
 
     assert csv_content == json_content
 
 
 def test_sample_items_json_vs_yaml():
 
-    tabs_data_from_json = load_items(SAMPLE_JSON_TABS_FILE)
-    tabs_data_from_yaml = load_items(SAMPLE_YAML_TABS_FILE)
-    assert tabs_data_from_json == tabs_data_from_yaml
+    with SchemaManager.fresh_schema_manager_context_for_testing():
+
+        # with mock.patch.object(validation_utils_module, "get_schema") as mock_get_schema:
+        #     mock_get_schema.return_value = {}  # no schema checking
+        with no_schemas():
+
+            tabs_data_from_json = load_items(SAMPLE_JSON_TABS_FILE)
+            tabs_data_from_yaml = load_items(SAMPLE_YAML_TABS_FILE)
+            assert tabs_data_from_json == tabs_data_from_yaml
 
 
 @using_fresh_ff_state_for_testing()
@@ -421,7 +436,7 @@ def test_schema_autoload_mixin_caching(portal_env):
 
         assert schema_manager.portal_env == 'data'  # it should have defaulted even if we didn't supply it
 
-        assert SchemaManager.SCHEMA_CACHE == {}
+        assert schema_manager.SCHEMA_CACHE == {}
 
         sample_schema_name = 'foo'
         sample_schema = {'mock_schema_for': 'foo'}
@@ -431,7 +446,7 @@ def test_schema_autoload_mixin_caching(portal_env):
             assert schema_manager.fetch_schema(sample_schema_name) == sample_schema
 
         schema_cache_with_sample_schema = {sample_schema_name: sample_schema}
-        assert SchemaManager.SCHEMA_CACHE == schema_cache_with_sample_schema
+        assert schema_manager.SCHEMA_CACHE == schema_cache_with_sample_schema
 
 
 @using_fresh_ff_state_for_testing()
@@ -639,7 +654,9 @@ def test_table_checker():
 
         with printed_output() as printed:
             with pytest.raises(Exception) as exc:
-                checker = TableChecker(SAMPLE_WORKBOOK_WITH_UNMATCHED_UUID_REFS, portal_env=mock_ff_env)
+                checker = TableChecker(SAMPLE_WORKBOOK_WITH_UNMATCHED_UUID_REFS,
+                                       flattened=True,
+                                       portal_env=mock_ff_env)
                 checker.check_tabs()
             assert str(exc.value) == "There were 2 problems while compiling hints."
             assert printed.lines == [
@@ -648,8 +665,12 @@ def test_table_checker():
                  f" {SAMPLE_INSTITUTION_UUID!r}")
             ]
 
-        checker = TableChecker(SAMPLE_WORKBOOK_WITH_MATCHED_UUID_REFS, portal_env=mock_ff_env)
+        checker = TableChecker(SAMPLE_WORKBOOK_WITH_MATCHED_UUID_REFS,
+                               flattened=True,
+                               portal_env=mock_ff_env)
         checker.check_tabs()
 
-        checker = TableChecker(SAMPLE_WORKBOOK_WITH_NAME_REFS, portal_env=mock_ff_env)
+        checker = TableChecker(SAMPLE_WORKBOOK_WITH_NAME_REFS,
+                               flattened=True,
+                               portal_env=mock_ff_env)
         checker.check_tabs()

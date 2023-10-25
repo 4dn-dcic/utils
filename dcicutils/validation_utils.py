@@ -8,33 +8,39 @@ from .common import AnyJsonData
 from .ff_utils import get_schema
 from .env_utils import EnvUtils, public_env_name
 from .lang_utils import there_are, maybe_pluralize, disjoined_list
-from .misc_utils import AbstractVirtualApp, PRINT
+from .misc_utils import AbstractVirtualApp, PRINT, to_snake_case
 from .sheet_utils import JsonSchema, TabbedJsonSchemas, SheetData, TabbedSheetData
 from .task_utils import pmap
 
 
 class SchemaManager:
 
-    SCHEMA_CACHE = {}  # Shared cache. Do not override. Use .clear_schema_cache() to clear it.
-
     @classmethod
     @contextlib.contextmanager
     def fresh_schema_manager_context_for_testing(cls):
-        old_schema_cache = cls.SCHEMA_CACHE
-        try:
-            cls.SCHEMA_CACHE = {}
-            yield
-        finally:
-            cls.SCHEMA_CACHE = old_schema_cache
+        # TODO: Remove references to this once reimplementation using an instance variable for SCHEMA_CACHE is working.
+        yield
+        # old_schema_cache = cls.SCHEMA_CACHE
+        # try:
+        #     cls.SCHEMA_CACHE = {}
+        #     yield
+        # finally:
+        #     cls.SCHEMA_CACHE = old_schema_cache
 
-    def __init__(self, schemas: Optional[TabbedJsonSchemas] = None,
+    def __init__(self, *, override_schemas: Optional[TabbedJsonSchemas] = None,
                  portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
+        self.SCHEMA_CACHE = {}  # Shared cache. Do not override. Use .clear_schema_cache() to clear it.
         if portal_env is None and portal_vapp is None:
             portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
             PRINT(f"The portal_env was not explicitly supplied. Schemas will come from portal_env={portal_env!r}.")
         self.portal_env = portal_env
         self.portal_vapp = portal_vapp
-        self.schemas = {} if schemas is None else schemas.copy()
+        self.override_schemas = (
+            {}
+            if override_schemas is None
+            else {to_snake_case(key): value  # important to both canonicalize the case and copy the dict
+                  for key, value in override_schemas.items()}
+        )
 
     def fetch_relevant_schemas(self, schema_names: List[str]):  # , schemas: Optional[TabbedSchemas] = None):
         # if schemas is None:
@@ -51,7 +57,8 @@ class SchemaManager:
         return bool(self.fetch_schema(schema_name=schema_name))
 
     def fetch_schema(self, schema_name: str):
-        override_schema = self.schemas.get(schema_name)
+        schema_name = to_snake_case(schema_name)
+        override_schema = self.override_schemas.get(schema_name)
         if override_schema is not None:
             return override_schema
         schema: Optional[AnyJsonData] = self.SCHEMA_CACHE.get(schema_name)
@@ -60,10 +67,12 @@ class SchemaManager:
             self.SCHEMA_CACHE[schema_name] = schema
         return schema
 
-    @classmethod
-    def clear_schema_cache(cls):
-        for key in list(cls.SCHEMA_CACHE.keys()):  # important to get the list of keys as a separate object first
-            cls.SCHEMA_CACHE.pop(key, None)
+    # Should not be needed given SCHEMA_CACHE is an instance variable.
+    #
+    # @classmethod
+    # def clear_schema_cache(cls):
+    #     for key in list(cls.SCHEMA_CACHE.keys()):  # important to get the list of keys as a separate object first
+    #         cls.SCHEMA_CACHE.pop(key, None)
 
     def identifying_properties(self, schema: Optional[JsonSchema] = None, schema_name: Optional[str] = None,
                                among: Optional[List[str]] = None):
@@ -76,7 +85,7 @@ class SchemaManager:
                                               if prop in possible_identifying_properties))
         return identifying_properties
 
-    @classmethod
+    @classmethod  # This operation doesn't actually use the schemas so is safe as a class method
     def identifying_value(cls, data_item: Dict[str, AnyJsonData], identifying_properties) -> AnyJsonData:
         if not identifying_properties:
             raise ValueError("No identifying properties were specified.")
@@ -89,9 +98,10 @@ class SchemaManager:
                          f' in {json.dumps(data_item)}.')
 
 
-def validate_data_against_schemas(data: TabbedSheetData,
+def validate_data_against_schemas(data: TabbedSheetData, *,
+                                  portal_env: Optional[str] = None,
                                   portal_vapp: Optional[AbstractVirtualApp] = None,
-                                  schemas: Optional[TabbedJsonSchemas] = None) -> Optional[Dict]:
+                                  override_schemas: Optional[TabbedJsonSchemas] = None) -> Optional[Dict]:
     """
     Validates the given data against the corresponding schema(s). The given data is assumed to
     be in a format as returned by sheet_utils, i.e. a dictionary of lists of objects where each
@@ -148,7 +158,7 @@ def validate_data_against_schemas(data: TabbedSheetData,
     the given data, which can be useful in identifying the object in the source data if it is unidentified.
     """
 
-    schema_manager = SchemaManager(portal_vapp=portal_vapp, schemas=schemas)
+    schema_manager = SchemaManager(portal_env=portal_env, portal_vapp=portal_vapp, override_schemas=override_schemas)
 
     errors = []
     schemas = schema_manager.fetch_relevant_schemas(list(data.keys()))
@@ -156,7 +166,8 @@ def validate_data_against_schemas(data: TabbedSheetData,
     for data_type in data:
         schema = schemas.get(data_type)
         if not schema:
-            errors.append({"error": f"No schema found for: {data_type}"})
+            if schema is None:  # if Schema is {}, we're deliberately suppressing schema checking (not an error)
+                errors.append({"error": f"No schema found for: {data_type}"})
             continue
         data_errors = validate_data_items_against_schemas(data[data_type], data_type, schema)
         errors.extend(data_errors)
