@@ -4,6 +4,7 @@ import pytest
 import re
 
 from dcicutils.bundle_utils import inflate
+from .helpers import using_fresh_ff_state_for_testing
 from dcicutils.misc_utils import AbstractVirtualApp, NamedObject, json_file_contents, to_snake_case, to_camel_case
 from dcicutils.qa_utils import MockResponse, printed_output
 from dcicutils.validation_utils import SchemaManager, validate_data_against_schemas, summary_of_data_validation_errors
@@ -11,6 +12,7 @@ from .conftest_settings import TEST_DIR
 from .helpers_for_bundles import SAMPLE_WORKBOOK_WITH_NAME_REFS
 
 
+@using_fresh_ff_state_for_testing()
 def test_schema_manager_simple():
 
     print()  # start on a fresh line
@@ -33,6 +35,7 @@ def test_schema_manager_simple():
         assert schema_manager_1.override_schemas == {}
 
 
+@using_fresh_ff_state_for_testing()
 @pytest.mark.parametrize('schema_id', ['user', 'User'])
 def test_schema_manager_with_schemas(schema_id):
 
@@ -66,6 +69,7 @@ def test_schema_manager_with_schemas(schema_id):
         assert schema_manager_2.SCHEMA_CACHE == {}
 
 
+@using_fresh_ff_state_for_testing()
 def test_schema_manager_identifying_value():
 
     with pytest.raises(ValueError) as exc:
