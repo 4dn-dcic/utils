@@ -316,9 +316,25 @@ class ItemTools:
             cls.set_path_value(datum[key], more_path, value)
 
     @classmethod
-    def find_type_hint(cls, parsed_header: Optional[ParsedHeader], schema: Any,
-                       context: Optional[TypeHintContext] = None):
+    def find_type_hint_for_subschema(cls, subschema: Any, context: Optional[TypeHintContext] = None):
+        if subschema is not None:
+            t = subschema.get('type')
+            if t == 'string':
+                enum = subschema.get('enum')
+                if enum:
+                    mapping = {e.lower(): e for e in enum}
+                    return EnumHint(mapping)
+                link_to = subschema.get('linkTo')
+                if link_to and context.schema_exists(link_to):
+                    return RefHint(schema_name=link_to, context=context)
+            elif t in ('integer', 'float', 'number'):
+                return NumHint(declared_type=t)
+            elif t == 'boolean':
+                return BoolHint()
 
+    @classmethod
+    def find_type_hint_for_parsed_header(cls, parsed_header: Optional[ParsedHeader], schema: Any,
+                                         context: Optional[TypeHintContext] = None):
         def finder(subheader, subschema):
             if not parsed_header:
                 return None
@@ -326,28 +342,15 @@ class ItemTools:
                 [key1, *other_headers] = subheader
                 if isinstance(key1, str) and isinstance(subschema, dict):
                     if subschema.get('type') == 'object':
-                        def1 = subschema.get('properties', {}).get(key1)
+                        subsubschema = subschema.get('properties', {}).get(key1)
                         if not other_headers:
-                            if def1 is not None:
-                                t = def1.get('type')
-                                if t == 'string':
-                                    enum = def1.get('enum')
-                                    if enum:
-                                        mapping = {e.lower(): e for e in enum}
-                                        return EnumHint(mapping)
-                                    link_to = def1.get('linkTo')
-                                    if link_to and context.schema_exists(link_to):
-                                        return RefHint(schema_name=link_to, context=context)
-                                elif t in ('integer', 'float', 'number'):
-                                    return NumHint(declared_type=t)
-                                elif t == 'boolean':
-                                    return BoolHint()
-                                else:
-                                    pass  # fall through to asking super()
+                            hint = cls.find_type_hint_for_subschema(subsubschema, context=context)
+                            if hint:
+                                return hint
                             else:
                                 pass  # fall through to asking super()
                         else:
-                            return finder(subheader=other_headers, subschema=def1)
+                            return finder(subheader=other_headers, subschema=subsubschema)
 
         return finder(subheader=parsed_header, subschema=schema)
 
@@ -609,7 +612,9 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         for required_header in self._schema_required_headers(schema):
             if required_header not in parsed_headers:
                 self.note_problem("Missing required header")
-        positional_type_hints = [ItemTools.find_type_hint(parsed_header, schema, context=self) if schema else None
+        positional_type_hints = [(ItemTools.find_type_hint_for_parsed_header(parsed_header, schema, context=self)
+                                  if schema
+                                  else None)
                                  for parsed_header in parsed_headers]
         type_hints = OptionalTypeHints(positional_type_hints, positional_breadcrumbs=parsed_headers)
         return type_hints

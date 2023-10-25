@@ -219,13 +219,13 @@ def test_item_tools_set_path_value():
 
 
 def test_item_tools_find_type_hint():
-    assert ItemTools.find_type_hint(None, 'anything') is None
+    assert ItemTools.find_type_hint_for_parsed_header(None, 'anything') is None
 
-    assert ItemTools.find_type_hint(['foo', 'bar'], None) is None
-    assert ItemTools.find_type_hint(['foo', 'bar'], "something") is None
-    assert ItemTools.find_type_hint(['foo', 'bar'], {}) is None
+    assert ItemTools.find_type_hint_for_parsed_header(['foo', 'bar'], None) is None
+    assert ItemTools.find_type_hint_for_parsed_header(['foo', 'bar'], "something") is None
+    assert ItemTools.find_type_hint_for_parsed_header(['foo', 'bar'], {}) is None
 
-    actual = ItemTools.find_type_hint(['foo', 'bar'], {"type": "object"})
+    actual = ItemTools.find_type_hint_for_parsed_header(['foo', 'bar'], {"type": "object"})
     assert actual is None
 
     schema = {
@@ -236,10 +236,10 @@ def test_item_tools_find_type_hint():
             }
         }
     }
-    actual = ItemTools.find_type_hint(['foo', 'bar'], schema)
+    actual = ItemTools.find_type_hint_for_parsed_header(['foo', 'bar'], schema)
     assert actual is None
 
-    actual = ItemTools.find_type_hint(['foo'], schema)
+    actual = ItemTools.find_type_hint_for_parsed_header(['foo'], schema)
     assert isinstance(actual, BoolHint)
 
     schema = {
@@ -255,10 +255,10 @@ def test_item_tools_find_type_hint():
             }
         }
     }
-    actual = ItemTools.find_type_hint(['foo', 'bar'], schema)
+    actual = ItemTools.find_type_hint_for_parsed_header(['foo', 'bar'], schema)
     assert isinstance(actual, BoolHint)
 
-    actual = ItemTools.find_type_hint(['foo'], schema)
+    actual = ItemTools.find_type_hint_for_parsed_header(['foo'], schema)
     assert actual is None
 
 
