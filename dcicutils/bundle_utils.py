@@ -557,8 +557,8 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
                #       but for production use maybe should not be? -kmp 25-Oct-2023
                validate: bool = False,
                **kwargs):
-    annotated_data = TableSetManager.load_annotated(filename=filename, tab_name=tab_name, escaping=escaping, prefer_number=False,
-                                 **kwargs)
+    annotated_data = TableSetManager.load_annotated(filename=filename, tab_name=tab_name, escaping=escaping,
+                                                    prefer_number=False, **kwargs)
     tabbed_rows = annotated_data['content']
     flattened = annotated_data['flattened']
     if flattened:

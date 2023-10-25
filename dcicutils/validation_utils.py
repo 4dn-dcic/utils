@@ -67,7 +67,7 @@ class SchemaManager:
             self.SCHEMA_CACHE[schema_name] = schema
         return schema
 
-    # Should not be needed given SCHEMA_CACHE is an instance variable.
+    # Should not be needed, given that SCHEMA_CACHE is an instance variable.
     #
     # @classmethod
     # def clear_schema_cache(cls):
@@ -238,9 +238,9 @@ def validate_data_item_against_schemas(data_item: AnyJsonData, data_type: str,
 
 def summary_of_data_validation_errors(data_validation_errors: Dict,
                                       # These next three items are available from a portal's SubmissionFolio
-                                      data_file_name: str,
-                                      s3_data_file_location: str,
-                                      s3_details_location: str) -> List[str]:
+                                      data_file_name: Optional[str] = None,
+                                      s3_data_file_location: Optional[str] = None,
+                                      s3_details_location: Optional[str] = None) -> List[str]:
     """
     Summarize the given data validation errors into a simple short list of English phrases;
     this will end up going into the additional_properties of the IngestionSubmission object
@@ -269,14 +269,21 @@ def summary_of_data_validation_errors(data_validation_errors: Dict,
         if error.get("exception"):
             exception_count += 1
 
-    return [
-        f"Ingestion data validation error summary:",
-        f"Data file: {data_file_name}",
-        f"Data file in S3: {s3_data_file_location}",
+    result = [
+        f"Ingestion data validation error summary:"
+    ]
+    if data_file_name:
+        result.append(f"Data file: {data_file_name}")
+    if s3_data_file_location:
+        result.append(f"Data file in S3: {s3_data_file_location}")
+    result = result + [
         f"Items unidentified: {unidentified_count}",
         f"Items missing properties: {missing_properties_count}",
         f"Items with extraneous properties: {extraneous_properties_count}",
         f"Other errors: {unclassified_error_count}",
         f"Exceptions: {exception_count}",
-        f"Details: {s3_details_location}"
     ]
+    if s3_details_location:
+        result.append(f"Details: {s3_details_location}")
+
+    return result
