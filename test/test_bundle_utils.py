@@ -14,8 +14,8 @@ from dcicutils.bundle_utils import (
     # High-level interfaces
     load_table_structures, load_items,
     # Low-level implementation
-    SchemaManager, ItemTools, TableChecker,
-    BoolHint,
+    SchemaManager, ItemTools, TableChecker, OptionalTypeHints,
+    BoolHint, NumHint,
     # Probably we should test NumHint, TypeHint, EnumHint, RefHint, etc. as well. -kmp 23-Oct-2023
 )
 from dcicutils.common import AnyJsonData
@@ -47,6 +47,66 @@ from .test_sheet_utils import (
     SAMPLE_JSON_TABS_FILE, SAMPLE_JSON_TABS_FILE_ITEM_CONTENT,
     SAMPLE_YAML_TABS_FILE,
 )
+
+
+def test_optional_type_hints():
+
+    x = OptionalTypeHints()
+    assert x.positional_hints == []
+    assert x.other_hints == {}
+    assert x[0] is None
+    assert x[100] is None
+    with pytest.raises(ValueError) as exc:
+        print(x[-1])
+    assert str(exc.value) == "Negative hint positions are not allowed: -1"
+
+    bh = BoolHint()
+    nh = NumHint()
+    ih = NumHint(declared_type='int')
+
+    x = OptionalTypeHints([bh, nh])
+    assert x.positional_hints == [bh, nh]
+    assert x.other_hints == {}
+    assert x[0] is bh
+    assert x[1] is nh
+    assert x[2] is None
+
+    x = OptionalTypeHints([bh, nh], positional_breadcrumbs=[('foo', 'x'), ('foo', 'y')])
+    assert x.positional_hints == [bh, nh]
+    assert x.other_hints == {
+        ('foo', 'x'): bh,
+        ('foo', 'y'): nh,
+    }
+    assert x[0] is bh
+    assert x[1] is nh
+    assert x[2] is None
+    assert x[('something',)] is None
+    assert x[('foo', 'x')] is bh
+    assert x[('foo', 'y')] is nh
+    assert x[('foo', 'z')] is None
+
+    with pytest.raises(ValueError) as exc:
+        x[2] = bh
+    assert str(exc.value) == "Cannot assign OptionalTypeHints by position after initial creation: 2"
+    assert x.positional_hints == [bh, nh]
+
+    with pytest.raises(ValueError) as exc:
+        x['something'] = bh
+    assert str(exc.value) == "Attempt to set an OptionalTypeHints key to other than a breadcrumbs tuple: 'something'"
+    assert x.positional_hints == [bh, nh]
+
+    x[('something',)] = ih
+    assert x.positional_hints == [bh, nh]
+    assert x.other_hints == {
+        ('foo', 'x'): bh,
+        ('foo', 'y'): nh,
+        ('something',): ih,
+    }
+    assert x[('something',)] == ih
+
+    with pytest.raises(ValueError) as exc:
+        x[('something',)] = ih
+    assert str(exc.value) == "Attempt to redefine OptionalTypeHint key ('something',)."
 
 
 def test_item_tools_parse_sheet_header():
