@@ -1,0 +1,6 @@
+[
+    {"name": "john", "sex": "Male", "member": false},
+    {"name": "juan", "sex": "Male", "member": true},
+    {"name": "igor", "sex": "unknown", "member": null},
+    {"name": "mary", "sex": "Female", "member": true}
+]

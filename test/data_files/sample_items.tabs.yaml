@@ -1,0 +1,40 @@
+Sheet1:
+- x: 1
+  y:
+    a: 1
+    z: 1
+- x: 1
+  y:
+    a: 2
+    z: 3
+- x: alpha
+  y:
+    a: beta
+    z: gamma|delta
+Sheet2:
+- age: 23
+  father:
+    age: 63
+    name: fred
+  friends:
+  - age: 22
+    name: sam
+  - age: 19
+    name: arthur
+  mother:
+    age: 58
+    name: mary
+  name: bill
+- age: 9
+  father:
+    age: 34
+    name: anthony
+  friends:
+  - age: 9
+    name: anders
+  - age: null
+    name: null
+  mother:
+    age: 35
+    name: estrella
+  name: joe
