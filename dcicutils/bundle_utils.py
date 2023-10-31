@@ -1,17 +1,17 @@
 import copy
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from .common import AnyJsonData
 from .env_utils import EnvUtils, public_env_name
 from .ff_utils import get_metadata
 from .lang_utils import there_are
-from .misc_utils import AbstractVirtualApp, ignored, PRINT, to_camel_case
+from .misc_utils import AbstractVirtualApp, ignored, ignorable, PRINT, to_camel_case
 from .sheet_utils import (
     LoadTableError, prefer_number, TabbedJsonSchemas,
     Header, Headers, TabbedHeaders, ParsedHeader, ParsedHeaders, TabbedParsedHeaders, SheetCellValue, TabbedSheetData,
-    TableSetManagerRegistry, AbstractTableSetManager, InsertsManager, load_table_set,
+    TableSetManagerRegistry, AbstractTableSetManager, InsertsManager, TableSetManager, load_table_set,
 )
-from .validation_utils import SchemaManager
+from .validation_utils import SchemaManager, validate_data_against_schemas, summary_of_data_validation_errors
 
 
 PatchPrototype = Dict
@@ -75,7 +75,9 @@ class NumHint(TypeHint):
 
     PREFERENCE_MAP = {'number': 'num', 'integer': 'int', 'float': 'float'}
 
-    def __init__(self, declared_type):
+    def __init__(self, declared_type: Optional[str] = None):
+        if declared_type is None:
+            declared_type = 'num'
         self.preferred_type = self.PREFERENCE_MAP.get(declared_type)
 
     def apply_hint(self, value):
@@ -128,7 +130,51 @@ class RefHint(TypeHint):
         return value
 
 
-OptionalTypeHints = List[Optional[TypeHint]]
+class OptionalTypeHints:
+
+    def __init__(self, positional_hints: Optional[List[Optional[TypeHint]]] = None,
+                 positional_breadcrumbs: Optional[List[Union[List, Tuple]]] = None):
+        self.other_hints: Dict[Any, TypeHint] = {}
+        self.positional_hints: List[Optional[TypeHint]] = [] if positional_hints is None else positional_hints
+        if positional_breadcrumbs and positional_hints:
+            n = len(positional_breadcrumbs)
+            if n != len(positional_hints):
+                raise Exception("positional_hints and positional_breadcrumbs must have the same length.")
+            for i in range(n):
+                # for convenience, we accept this as a list or tuple, but it must be a tuple to be a key
+                breadcrumbs = tuple(positional_breadcrumbs[i])
+                if not isinstance(breadcrumbs, tuple):
+                    raise Exception(f"Each of the positional breadcrumbs must be a tuple: {breadcrumbs}")
+                hint = positional_hints[i]
+                self.other_hints[breadcrumbs] = hint
+
+    def __getitem__(self, key: Any) -> Optional[TypeHint]:
+        """
+        For enumerated positional information, we consult our initial type vector.
+        For other situations, we do a general lookup of the hint in our lookup table.
+        """
+        if isinstance(key, int):
+            hints = self.positional_hints
+            if key < 0:
+                raise ValueError(f"Negative hint positions are not allowed: {key}")
+            elif key >= len(hints):
+                return None
+            else:
+                return hints[key]
+        elif isinstance(key, tuple):  # a parsed header (or schema breadcrumbs)
+            return self.other_hints.get(key)
+        else:
+            raise ValueError(f"Key of unexpected type for OptionalTypeHints: {key}")
+
+    def __setitem__(self, key: Any, value: TypeHint):
+        if isinstance(key, int):
+            raise ValueError(f"Cannot assign OptionalTypeHints by position after initial creation: {key!r}")
+        elif key in self.other_hints:
+            raise ValueError(f"Attempt to redefine OptionalTypeHint key {key!r}.")
+        elif isinstance(key, tuple):
+            self.other_hints[key] = value
+        else:
+            raise ValueError(f"Attempt to set an OptionalTypeHints key to other than a breadcrumbs tuple: {key!r}")
 
 
 class AbstractStructureManager(AbstractTableSetManager):
@@ -270,9 +316,25 @@ class ItemTools:
             cls.set_path_value(datum[key], more_path, value)
 
     @classmethod
-    def find_type_hint(cls, parsed_header: Optional[ParsedHeader], schema: Any,
-                       context: Optional[TypeHintContext] = None):
+    def find_type_hint_for_subschema(cls, subschema: Any, context: Optional[TypeHintContext] = None):
+        if subschema is not None:
+            t = subschema.get('type')
+            if t == 'string':
+                enum = subschema.get('enum')
+                if enum:
+                    mapping = {e.lower(): e for e in enum}
+                    return EnumHint(mapping)
+                link_to = subschema.get('linkTo')
+                if link_to and context.schema_exists(link_to):
+                    return RefHint(schema_name=link_to, context=context)
+            elif t in ('integer', 'float', 'number'):
+                return NumHint(declared_type=t)
+            elif t == 'boolean':
+                return BoolHint()
 
+    @classmethod
+    def find_type_hint_for_parsed_header(cls, parsed_header: Optional[ParsedHeader], schema: Any,
+                                         context: Optional[TypeHintContext] = None):
         def finder(subheader, subschema):
             if not parsed_header:
                 return None
@@ -280,28 +342,15 @@ class ItemTools:
                 [key1, *other_headers] = subheader
                 if isinstance(key1, str) and isinstance(subschema, dict):
                     if subschema.get('type') == 'object':
-                        def1 = subschema.get('properties', {}).get(key1)
+                        subsubschema = subschema.get('properties', {}).get(key1)
                         if not other_headers:
-                            if def1 is not None:
-                                t = def1.get('type')
-                                if t == 'string':
-                                    enum = def1.get('enum')
-                                    if enum:
-                                        mapping = {e.lower(): e for e in enum}
-                                        return EnumHint(mapping)
-                                    link_to = def1.get('linkTo')
-                                    if link_to and context.schema_exists(link_to):
-                                        return RefHint(schema_name=link_to, context=context)
-                                elif t in ('integer', 'float', 'number'):
-                                    return NumHint(declared_type=t)
-                                elif t == 'boolean':
-                                    return BoolHint()
-                                else:
-                                    pass  # fall through to asking super()
+                            hint = cls.find_type_hint_for_subschema(subsubschema, context=context)
+                            if hint:
+                                return hint
                             else:
                                 pass  # fall through to asking super()
                         else:
-                            return finder(subheader=other_headers, subschema=def1)
+                            return finder(subheader=other_headers, subschema=subsubschema)
 
         return finder(subheader=parsed_header, subschema=schema)
 
@@ -378,9 +427,18 @@ def load_table_structures(filename: str, *, apply_heuristics: bool = True,
 
 class TableChecker(InflatableTabbedDataManager, TypeHintContext):
 
-    def __init__(self, tabbed_sheet_data: TabbedSheetData, schemas: Optional[TabbedJsonSchemas] = None,
+    def __init__(self, tabbed_sheet_data: TabbedSheetData, *, flattened: bool,
+                 override_schemas: Optional[TabbedJsonSchemas] = None,
                  portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None,
                  apply_heuristics: bool = False):
+
+        self.flattened = flattened
+        # if not flattened:
+        #     # TODO: Need to implement something that depends on this flattened attribute.
+        #     # Also, it's possible that we can default this once we see if the new strategy is general-purpose,
+        #     # rather than it being a required argument. But for now let's require it be passed.
+        #     # -kmp 25-Oct-2023
+        #     raise ValueError("Only flattened=True is supported by TableChecker for now.")
 
         if portal_env is None and portal_vapp is None:
             portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
@@ -394,7 +452,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         self.portal_env = portal_env
         self.portal_vapp = portal_vapp
         self.schema_manager: SchemaManager = SchemaManager(portal_env=portal_env, portal_vapp=portal_vapp,
-                                                           schemas=schemas)
+                                                           override_schemas=override_schemas)
         self.schemas = self.schema_manager.fetch_relevant_schemas(self.tab_names)  # , schemas=schemas)
         self.lookup_tables_by_tab_name: Dict[str, Dict[str, Dict]] = {
             tab_name: self.build_lookup_table_for_tab(tab_name, rows=rows)
@@ -463,6 +521,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         if self.contains_ref(item_type=item_type, item_ref=item_ref):
             return True
         try:
+            # TODO: This probably needs a cache
             info = get_metadata(f"/{to_camel_case(item_type)}/{item_ref}")
             # Basically return True if there's a value at all,
             # but still check it's not an error message that didn't get raised.
@@ -484,6 +543,37 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
 
     def check_row(self, row: Dict, *, tab_name: str, row_number: int, prototype: Dict,
                   parsed_headers: ParsedHeaders, type_hints: OptionalTypeHints):
+        if self.flattened:
+            return self.check_flattened_row(row=row, tab_name=tab_name, row_number=row_number, prototype=prototype,
+                                            parsed_headers=parsed_headers, type_hints=type_hints)
+        else:
+            return self.check_inflated_row(row=row, tab_name=tab_name, row_number=row_number, prototype=prototype,
+                                           parsed_headers=parsed_headers, type_hints=type_hints)
+
+    def check_inflated_row(self, row: Dict, *, tab_name: str, row_number: int, prototype: Dict,
+                           parsed_headers: ParsedHeaders, type_hints: OptionalTypeHints):
+        ignorable(self, tab_name, row_number, prototype, parsed_headers, type_hints)  #
+        # TODO: Make this work...
+        # def traverse(item, *, subschema, breadcrumbs):
+        #     if isinstance(item, list):
+        #         # check schema here to make sure it's supposed to be a list before proceeding
+        #         for i, elem in enumerate(item):
+        #             traverse(item, subschema=..., breadcrumbs=(*breadcrumbs, i))
+        #     elif isinstance(item, dict):
+        #         # check schema here to make sure it's supposed to be a dict before proceeding
+        #         for k, v in item.items():
+        #             traverse(v, subschema=..., breadcrumbs=(*breadcrumbs, k))
+        #     else:
+        #         # look up hint. if there's not a hint for these breadcrumbs, make one
+        #         # apply the hint for side-effect, to get an error if we have a bad value
+        #         pass
+        # schema = self.schemas[tab_name]
+        # if schema:
+        #     traverse(row, subschema=schema, breadcrumbs=())  # for side-effect
+        return row
+
+    def check_flattened_row(self, row: Dict, *, tab_name: str, row_number: int, prototype: Dict,
+                            parsed_headers: ParsedHeaders, type_hints: OptionalTypeHints):
         patch_item = copy.deepcopy(prototype)
         for column_number, column_value in enumerate(row.values()):
             parsed_value = ItemTools.parse_item_value(column_value, apply_heuristics=self.apply_heuristics)
@@ -499,10 +589,13 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         return patch_item
 
     @classmethod
-    def check(cls, tabbed_sheet_data: TabbedSheetData, schemas: Optional[TabbedJsonSchemas] = None,
+    def check(cls, tabbed_sheet_data: TabbedSheetData, *,
+              flattened: bool,
+              override_schemas: Optional[TabbedJsonSchemas] = None,
               apply_heuristics: bool = False,
               portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
-        checker = cls(tabbed_sheet_data, schemas=schemas, apply_heuristics=apply_heuristics,
+        checker = cls(tabbed_sheet_data, flattened=flattened,
+                      override_schemas=override_schemas, apply_heuristics=apply_heuristics,
                       portal_env=portal_env, portal_vapp=portal_vapp)
         checked = checker.check_tabs()
         return checked
@@ -519,8 +612,11 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         for required_header in self._schema_required_headers(schema):
             if required_header not in parsed_headers:
                 self.note_problem("Missing required header")
-        type_hints = [ItemTools.find_type_hint(parsed_header, schema, context=self) if schema else None
-                      for parsed_header in parsed_headers]
+        positional_type_hints = [(ItemTools.find_type_hint_for_parsed_header(parsed_header, schema, context=self)
+                                  if schema
+                                  else None)
+                                 for parsed_header in parsed_headers]
+        type_hints = OptionalTypeHints(positional_type_hints, positional_breadcrumbs=parsed_headers)
         return type_hints
 
     @classmethod
@@ -538,14 +634,34 @@ check = TableChecker.check
 
 
 def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
-               schemas: Optional[TabbedJsonSchemas] = None, apply_heuristics: bool = False,
+               override_schemas: Optional[TabbedJsonSchemas] = None, apply_heuristics: bool = False,
                portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None,
-               validate: bool = False, **kwargs):
-    tabbed_rows = load_table_set(filename=filename, tab_name=tab_name, escaping=escaping, prefer_number=False,
-                                 **kwargs)
-    checked_items = check(tabbed_rows, schemas=schemas, portal_env=portal_env, portal_vapp=portal_vapp,
-                          apply_heuristics=apply_heuristics)
+               # TODO: validate= is presently False (i.e., disabled) by default while being debugged,
+               #       but for production use maybe should not be? -kmp 25-Oct-2023
+               validate: bool = False,
+               **kwargs):
+    annotated_data = TableSetManager.load_annotated(filename=filename, tab_name=tab_name, escaping=escaping,
+                                                    prefer_number=False, **kwargs)
+    tabbed_rows = annotated_data['content']
+    flattened = annotated_data['flattened']
+    if flattened:
+        checked_items = TableChecker.check(tabbed_rows, flattened=flattened,
+                                           override_schemas=override_schemas,
+                                           portal_env=portal_env, portal_vapp=portal_vapp,
+                                           apply_heuristics=apply_heuristics)
+    else:
+        # No fancy checking for things like .json, etc. for now. Only check things that came from
+        # spreadsheet-like data, where structural datatypes are forced into strings.
+        checked_items = tabbed_rows
+
     if validate:
+        problems = validate_data_against_schemas(checked_items, portal_env=portal_env, portal_vapp=portal_vapp,
+                                                 override_schemas=override_schemas)
+        error_summary = summary_of_data_validation_errors(problems)
+        if error_summary:
+            for item in error_summary:
+                PRINT(item)
+            raise Exception("Validation problems were seen.")
         # TODO: Maybe connect validation here. Although another option is to just call validation separately
         #       once this is successfully loaded. Needs thought. However, David's validation_utils can do
         #       the validation if we decide to do it, it would just need to be connected up.

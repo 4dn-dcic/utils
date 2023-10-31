@@ -28,6 +28,9 @@ Change Log
   * Add "while" to "which" and "that" as clause handlers in the string pluralizer
     (e.g., so that "error while parsing x" pluralizes as "errors while parsing x")
 
+  * ``conjoin_list`` and ``disjoin_list`` now call ``str`` on their sequence elements so that things like
+    ``conjoined_list([2, 3, 4])`` are possible.
+
 * In ``misc_utils.py``, miscellaneous new functionality:
 
   * New class ``AbstractVirtualApp`` that is either an actual VirtualApp or can be used to make mocks

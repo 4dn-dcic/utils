@@ -522,6 +522,10 @@ class EnglishUtils:
                                   whitespace=whitespace, nothing=nothing)
 
     @classmethod
+    def _item_strings(cls, items):
+        return [str(x) for x in (sorted(items) if isinstance(items, set) else items)]
+
+    @classmethod
     def conjoined_list(cls, items, conjunction: str = 'and', comma: Union[bool, str] = ",",
                        oxford_comma: Union[bool, str] = False, whitespace: str = " ",
                        nothing: Optional[str] = None) -> str:
@@ -554,6 +558,7 @@ class EnglishUtils:
         :param nothing: a string to use if there are no items, to avoid an error being raised.
         """
 
+        items = cls._item_strings(items)
         assert isinstance(conjunction, str), "The 'conjunction' argument must a string or boolean."
         conj = conjunction + whitespace
 

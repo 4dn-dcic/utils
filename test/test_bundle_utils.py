@@ -14,8 +14,8 @@ from dcicutils.bundle_utils import (
     # High-level interfaces
     load_table_structures, load_items,
     # Low-level implementation
-    SchemaManager, ItemTools, TableChecker,
-    BoolHint,
+    SchemaManager, ItemTools, TableChecker, OptionalTypeHints,
+    BoolHint, NumHint,
     # Probably we should test NumHint, TypeHint, EnumHint, RefHint, etc. as well. -kmp 23-Oct-2023
 )
 from dcicutils.common import AnyJsonData
@@ -47,6 +47,66 @@ from .test_sheet_utils import (
     SAMPLE_JSON_TABS_FILE, SAMPLE_JSON_TABS_FILE_ITEM_CONTENT,
     SAMPLE_YAML_TABS_FILE,
 )
+
+
+def test_optional_type_hints():
+
+    x = OptionalTypeHints()
+    assert x.positional_hints == []
+    assert x.other_hints == {}
+    assert x[0] is None
+    assert x[100] is None
+    with pytest.raises(ValueError) as exc:
+        print(x[-1])
+    assert str(exc.value) == "Negative hint positions are not allowed: -1"
+
+    bh = BoolHint()
+    nh = NumHint()
+    ih = NumHint(declared_type='int')
+
+    x = OptionalTypeHints([bh, nh])
+    assert x.positional_hints == [bh, nh]
+    assert x.other_hints == {}
+    assert x[0] is bh
+    assert x[1] is nh
+    assert x[2] is None
+
+    x = OptionalTypeHints([bh, nh], positional_breadcrumbs=[('foo', 'x'), ('foo', 'y')])
+    assert x.positional_hints == [bh, nh]
+    assert x.other_hints == {
+        ('foo', 'x'): bh,
+        ('foo', 'y'): nh,
+    }
+    assert x[0] is bh
+    assert x[1] is nh
+    assert x[2] is None
+    assert x[('something',)] is None
+    assert x[('foo', 'x')] is bh
+    assert x[('foo', 'y')] is nh
+    assert x[('foo', 'z')] is None
+
+    with pytest.raises(ValueError) as exc:
+        x[2] = bh
+    assert str(exc.value) == "Cannot assign OptionalTypeHints by position after initial creation: 2"
+    assert x.positional_hints == [bh, nh]
+
+    with pytest.raises(ValueError) as exc:
+        x['something'] = bh
+    assert str(exc.value) == "Attempt to set an OptionalTypeHints key to other than a breadcrumbs tuple: 'something'"
+    assert x.positional_hints == [bh, nh]
+
+    x[('something',)] = ih
+    assert x.positional_hints == [bh, nh]
+    assert x.other_hints == {
+        ('foo', 'x'): bh,
+        ('foo', 'y'): nh,
+        ('something',): ih,
+    }
+    assert x[('something',)] == ih
+
+    with pytest.raises(ValueError) as exc:
+        x[('something',)] = ih
+    assert str(exc.value) == "Attempt to redefine OptionalTypeHint key ('something',)."
 
 
 def test_item_tools_parse_sheet_header():
@@ -159,13 +219,13 @@ def test_item_tools_set_path_value():
 
 
 def test_item_tools_find_type_hint():
-    assert ItemTools.find_type_hint(None, 'anything') is None
+    assert ItemTools.find_type_hint_for_parsed_header(None, 'anything') is None
 
-    assert ItemTools.find_type_hint(['foo', 'bar'], None) is None
-    assert ItemTools.find_type_hint(['foo', 'bar'], "something") is None
-    assert ItemTools.find_type_hint(['foo', 'bar'], {}) is None
+    assert ItemTools.find_type_hint_for_parsed_header(['foo', 'bar'], None) is None
+    assert ItemTools.find_type_hint_for_parsed_header(['foo', 'bar'], "something") is None
+    assert ItemTools.find_type_hint_for_parsed_header(['foo', 'bar'], {}) is None
 
-    actual = ItemTools.find_type_hint(['foo', 'bar'], {"type": "object"})
+    actual = ItemTools.find_type_hint_for_parsed_header(['foo', 'bar'], {"type": "object"})
     assert actual is None
 
     schema = {
@@ -176,10 +236,10 @@ def test_item_tools_find_type_hint():
             }
         }
     }
-    actual = ItemTools.find_type_hint(['foo', 'bar'], schema)
+    actual = ItemTools.find_type_hint_for_parsed_header(['foo', 'bar'], schema)
     assert actual is None
 
-    actual = ItemTools.find_type_hint(['foo'], schema)
+    actual = ItemTools.find_type_hint_for_parsed_header(['foo'], schema)
     assert isinstance(actual, BoolHint)
 
     schema = {
@@ -195,10 +255,10 @@ def test_item_tools_find_type_hint():
             }
         }
     }
-    actual = ItemTools.find_type_hint(['foo', 'bar'], schema)
+    actual = ItemTools.find_type_hint_for_parsed_header(['foo', 'bar'], schema)
     assert isinstance(actual, BoolHint)
 
-    actual = ItemTools.find_type_hint(['foo'], schema)
+    actual = ItemTools.find_type_hint_for_parsed_header(['foo'], schema)
     assert actual is None
 
 
@@ -218,10 +278,19 @@ def test_load_table_structures():
     assert str(exc.value) == "Unknown file type: something.else"
 
 
-def test_load_items():
+@contextlib.contextmanager
+def no_schemas():
 
     with mock.patch.object(validation_utils_module, "get_schema") as mock_get_schema:
         mock_get_schema.return_value = {}
+        yield
+
+
+def test_load_items():
+
+    # with mock.patch.object(validation_utils_module, "get_schema") as mock_get_schema:
+    #     mock_get_schema.return_value = {}
+    with no_schemas():
 
         assert load_items(SAMPLE_XLSX_FILE, apply_heuristics=True) == SAMPLE_XLSX_FILE_ITEM_CONTENT
         assert load_items(SAMPLE_CSV_FILE, apply_heuristics=True) == SAMPLE_CSV_FILE_ITEM_CONTENT
@@ -385,29 +454,35 @@ def test_load_items_with_schema():
     print("Case 2")
     file_base_name = os.path.splitext(os.path.basename(SAMPLE_CSV_FILE2))[0]
     expected = SAMPLE_CSV_FILE2_ITEM_CONTENT
-    actual = load_items(SAMPLE_CSV_FILE2, schemas={file_base_name: {}}, apply_heuristics=True)
+    actual = load_items(SAMPLE_CSV_FILE2, override_schemas={file_base_name: {}}, apply_heuristics=True)
     assert actual == expected
 
     print("Case 3")
     expected = SAMPLE_CSV_FILE2_PERSON_CONTENT_HINTED
-    actual = load_items(SAMPLE_CSV_FILE2, schemas=SAMPLE_CSV_FILE2_SCHEMAS, tab_name='Person')
+    actual = load_items(SAMPLE_CSV_FILE2, override_schemas=SAMPLE_CSV_FILE2_SCHEMAS, tab_name='Person')
     assert actual == expected
 
 
 def test_sample_items_csv_vs_json():
 
-    csv_content = load_items(SAMPLE_CSV_FILE2, tab_name='Person', schemas=SAMPLE_CSV_FILE2_SCHEMAS)
+    csv_content = load_items(SAMPLE_CSV_FILE2, tab_name='Person', override_schemas=SAMPLE_CSV_FILE2_SCHEMAS)
 
-    json_content = load_items(SAMPLE_JSON_FILE2, tab_name="Person", schemas=SAMPLE_CSV_FILE2_SCHEMAS)
+    json_content = load_items(SAMPLE_JSON_FILE2, tab_name="Person", override_schemas=SAMPLE_CSV_FILE2_SCHEMAS)
 
     assert csv_content == json_content
 
 
 def test_sample_items_json_vs_yaml():
 
-    tabs_data_from_json = load_items(SAMPLE_JSON_TABS_FILE)
-    tabs_data_from_yaml = load_items(SAMPLE_YAML_TABS_FILE)
-    assert tabs_data_from_json == tabs_data_from_yaml
+    with SchemaManager.fresh_schema_manager_context_for_testing():
+
+        # with mock.patch.object(validation_utils_module, "get_schema") as mock_get_schema:
+        #     mock_get_schema.return_value = {}  # no schema checking
+        with no_schemas():
+
+            tabs_data_from_json = load_items(SAMPLE_JSON_TABS_FILE)
+            tabs_data_from_yaml = load_items(SAMPLE_YAML_TABS_FILE)
+            assert tabs_data_from_json == tabs_data_from_yaml
 
 
 @using_fresh_ff_state_for_testing()
@@ -421,7 +496,7 @@ def test_schema_autoload_mixin_caching(portal_env):
 
         assert schema_manager.portal_env == 'data'  # it should have defaulted even if we didn't supply it
 
-        assert SchemaManager.SCHEMA_CACHE == {}
+        assert schema_manager.SCHEMA_CACHE == {}
 
         sample_schema_name = 'foo'
         sample_schema = {'mock_schema_for': 'foo'}
@@ -431,7 +506,7 @@ def test_schema_autoload_mixin_caching(portal_env):
             assert schema_manager.fetch_schema(sample_schema_name) == sample_schema
 
         schema_cache_with_sample_schema = {sample_schema_name: sample_schema}
-        assert SchemaManager.SCHEMA_CACHE == schema_cache_with_sample_schema
+        assert schema_manager.SCHEMA_CACHE == schema_cache_with_sample_schema
 
 
 @using_fresh_ff_state_for_testing()
@@ -639,7 +714,9 @@ def test_table_checker():
 
         with printed_output() as printed:
             with pytest.raises(Exception) as exc:
-                checker = TableChecker(SAMPLE_WORKBOOK_WITH_UNMATCHED_UUID_REFS, portal_env=mock_ff_env)
+                checker = TableChecker(SAMPLE_WORKBOOK_WITH_UNMATCHED_UUID_REFS,
+                                       flattened=True,
+                                       portal_env=mock_ff_env)
                 checker.check_tabs()
             assert str(exc.value) == "There were 2 problems while compiling hints."
             assert printed.lines == [
@@ -648,8 +725,12 @@ def test_table_checker():
                  f" {SAMPLE_INSTITUTION_UUID!r}")
             ]
 
-        checker = TableChecker(SAMPLE_WORKBOOK_WITH_MATCHED_UUID_REFS, portal_env=mock_ff_env)
+        checker = TableChecker(SAMPLE_WORKBOOK_WITH_MATCHED_UUID_REFS,
+                               flattened=True,
+                               portal_env=mock_ff_env)
         checker.check_tabs()
 
-        checker = TableChecker(SAMPLE_WORKBOOK_WITH_NAME_REFS, portal_env=mock_ff_env)
+        checker = TableChecker(SAMPLE_WORKBOOK_WITH_NAME_REFS,
+                               flattened=True,
+                               portal_env=mock_ff_env)
         checker.check_tabs()
