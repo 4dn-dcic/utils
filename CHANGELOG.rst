@@ -6,6 +6,12 @@ dcicutils
 Change Log
 ----------
 
+8.0.0.1c1
+=========
+
+* Updates for RAS to Redis API
+
+
 8.0.0
 =====
 

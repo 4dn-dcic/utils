@@ -23,6 +23,7 @@ class TestRedisSession:
         rd = RedisBase(redisdb)
         session_token = RedisSessionToken(
             namespace=self.NAMESPACE,
+            email=self.DUMMY_EMAIL,
             jwt=self.DUMMY_JWT
         )
         session_token.store_session_token(redis_handler=rd)
@@ -34,7 +35,7 @@ class TestRedisSession:
         assert not session_token.validate_session_token(redis_handler=rd)
         # update with a new token and expiration
         session_token.redis_key = working_token
-        session_token.update_session_token(redis_handler=rd, jwt=self.DUMMY_JWT)
+        session_token.update_session_token(redis_handler=rd, email=self.DUMMY_EMAIL, jwt=self.DUMMY_JWT)
         assert session_token.validate_session_token(redis_handler=rd)
         session_token.redis_key = working_token
         assert not session_token.validate_session_token(redis_handler=rd)
@@ -47,13 +48,14 @@ class TestRedisSession:
         with mock.patch.object(RedisSessionToken, '_build_session_expiration', self.mock_build_session_expiration):
             session_token = RedisSessionToken(
                 namespace=self.NAMESPACE,
+                email=self.DUMMY_EMAIL,
                 jwt=self.DUMMY_JWT
             )
             session_token.store_session_token(redis_handler=rd)
             time.sleep(2)
             assert not session_token.validate_session_token(redis_handler=rd)
         # update then should validate
-        session_token.update_session_token(redis_handler=rd, jwt=self.DUMMY_JWT)
+        session_token.update_session_token(redis_handler=rd, email=self.DUMMY_EMAIL, jwt=self.DUMMY_JWT)
         assert session_token.validate_session_token(redis_handler=rd)
 
     def test_redis_session_many_sessions(self, redisdb):
@@ -65,6 +67,7 @@ class TestRedisSession:
         for _ in range(5):
             session_token = RedisSessionToken(
                 namespace=self.NAMESPACE,
+                email=self.DUMMY_EMAIL,
                 jwt=self.DUMMY_JWT
             )
             session_token.store_session_token(redis_handler=rd)
@@ -92,6 +95,7 @@ class TestRedisSession:
         rd = RedisBase(redisdb)
         session_token_local = RedisSessionToken(
             namespace=self.NAMESPACE,
+            email=self.DUMMY_EMAIL,
             jwt=self.DUMMY_JWT
         )
         session_token_local.store_session_token(redis_handler=rd)
