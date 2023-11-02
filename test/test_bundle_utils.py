@@ -14,7 +14,7 @@ from dcicutils.bundle_utils import (
     # High-level interfaces
     load_table_structures, load_items,
     # Low-level implementation
-    SchemaManager, ItemTools, TableChecker, OptionalTypeHints,
+    SchemaManager, ItemTools, TableChecker, OptionalTypeHints, ValidationProblem,
     BoolHint, NumHint,
     # Probably we should test NumHint, TypeHint, EnumHint, RefHint, etc. as well. -kmp 23-Oct-2023
 )
@@ -635,10 +635,7 @@ def test_workbook_with_schemas_and_portal_vapp():
         old_count = portal_vapp.call_count
         with mock.patch.object(ff_utils_module, "get_authentication_with_server",
                                mock_not_called("get_authentication_with_server")):
-            with mock.patch.object(ff_utils_module, "get_metadata",
-                                   mock_not_called("get_metadata")):
-                actual_items = load_items(SAMPLE_ITEMS_FOR_REAL_SCHEMAS_FILE,
-                                          tab_name='ExperimentSeq', portal_vapp=portal_vapp)
+            actual_items = load_items(SAMPLE_ITEMS_FOR_REAL_SCHEMAS_FILE, tab_name='ExperimentSeq', portal_vapp=portal_vapp)
 
         assert portal_vapp.call_count == old_count + 1
         assert actual_items == expected_items
@@ -718,12 +715,13 @@ def test_table_checker():
                                        flattened=True,
                                        portal_env=mock_ff_env)
                 checker.check_tabs()
-            assert str(exc.value) == "There were 2 problems while compiling hints."
-            assert printed.lines == [
-                f"Problem: User[0].project: Unable to validate Project reference: {SAMPLE_PROJECT_UUID!r}",
-                (f"Problem: User[0].user_institution: Unable to validate Institution reference:"
-                 f" {SAMPLE_INSTITUTION_UUID!r}")
+            expected_problems = [
+                f"User[0].project: Unable to validate Project reference: {SAMPLE_PROJECT_UUID!r}",
+                f"User[0].user_institution: Unable to validate Institution reference: {SAMPLE_INSTITUTION_UUID!r}"
             ]
+            expected_problem_lines = [f"Problem: {problem}" for problem in expected_problems]
+            assert exc.value.problems == expected_problems
+            assert printed.lines == expected_problem_lines
 
         checker = TableChecker(SAMPLE_WORKBOOK_WITH_MATCHED_UUID_REFS,
                                flattened=True,
