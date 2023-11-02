@@ -654,19 +654,8 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
         # No fancy checking for things like .json, etc. for now. Only check things that came from
         # spreadsheet-like data, where structural datatypes are forced into strings.
         checked_items = tabbed_rows
-
     if validate:
         problems = validate_data_against_schemas(checked_items, portal_env=portal_env, portal_vapp=portal_vapp,
                                                  override_schemas=override_schemas)
         return checked_items, problems
-        error_summary = summary_of_data_validation_errors(problems)
-        if error_summary:
-            for item in error_summary:
-                PRINT(item)
-            raise Exception("Validation problems were seen.")
-        # TODO: Maybe connect validation here. Although another option is to just call validation separately
-        #       once this is successfully loaded. Needs thought. However, David's validation_utils can do
-        #       the validation if we decide to do it, it would just need to be connected up.
-        #       -kmp 23-Oct-2023
-        raise NotImplementedError("Need to implement validation.")
     return checked_items
