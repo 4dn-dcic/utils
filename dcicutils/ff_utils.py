@@ -996,7 +996,19 @@ def get_schema(name, key=None, ff_env: Optional[str] = None, portal_env: Optiona
     portal_env = resolve_portal_env(ff_env=ff_env, portal_env=portal_env, portal_vapp=portal_vapp)
     base_url = f"profiles/{to_camel_case(name)}.json"
     add_on = 'frame=raw'
-    return get_metadata(obj_id=base_url, key=key, ff_env=portal_env, add_on=add_on, vapp=portal_vapp)
+
+    # TODO
+    # Now that get_metadata supported portal_vapp we can do:
+    # return get_metadata(obj_id=base_url, key=key, ff_env=portal_env, add_on=add_on, vapp=portal_vapp)
+    # however this breaks test_ff_utils.test_get_schema_with_vapp and no time to fix. 2023-11-02.
+
+    if portal_vapp:
+        full_url = f"/{base_url}?{add_on}"
+        res = portal_vapp.get(full_url)
+        return get_response_json(res)
+    else:
+        schema = get_metadata(obj_id=base_url, key=key, ff_env=portal_env, add_on=add_on)
+        return schema
 
 
 def get_schemas(key=None, ff_env: Optional[str] = None, *, allow_abstract: bool = True, require_id: bool = False,
