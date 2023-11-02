@@ -4,14 +4,13 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from .common import AnyJsonData
 from .env_utils import EnvUtils, public_env_name
 from .ff_utils import get_metadata
-from .lang_utils import there_are
 from .misc_utils import AbstractVirtualApp, ignored, ignorable, PRINT, to_camel_case
 from .sheet_utils import (
     LoadTableError, prefer_number, TabbedJsonSchemas,
     Header, Headers, TabbedHeaders, ParsedHeader, ParsedHeaders, TabbedParsedHeaders, SheetCellValue, TabbedSheetData,
     TableSetManagerRegistry, AbstractTableSetManager, InsertsManager, TableSetManager, load_table_set,
 )
-from .validation_utils import SchemaManager, validate_data_against_schemas, summary_of_data_validation_errors
+from .validation_utils import SchemaManager, validate_data_against_schemas
 
 
 PatchPrototype = Dict
@@ -40,7 +39,8 @@ class TypeHintContext:
 
 
 class ValidationProblem(Exception):
-    pass
+    def __init__(self, problems: Optional[dict] = None):
+        self.problems = problems
 
 
 class TypeHint:
@@ -506,7 +506,8 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         if problems:
             for problem in problems:
                 PRINT(f"Problem: {problem}")
-            raise Exception(there_are(problems, kind='problem while compiling hints', tense='past', show=False))
+            raise ValidationProblem(problems)
+            # raise Exception(there_are(problems, kind='problem while compiling hints', tense='past', show=False))
 
     def check_tabs(self):
         result = {tab_name: self.check_tab(tab_name)
@@ -522,7 +523,8 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
             return True
         try:
             # TODO: This probably needs a cache
-            info = get_metadata(f"/{to_camel_case(item_type)}/{item_ref}")
+            info = get_metadata(f"/{to_camel_case(item_type)}/{item_ref}",
+                                ff_env=self.portal_env, vapp=self.portal_vapp)
             # Basically return True if there's a value at all,
             # but still check it's not an error message that didn't get raised.
             return isinstance(info, dict) and 'uuid' in info
@@ -653,18 +655,8 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
         # No fancy checking for things like .json, etc. for now. Only check things that came from
         # spreadsheet-like data, where structural datatypes are forced into strings.
         checked_items = tabbed_rows
-
     if validate:
         problems = validate_data_against_schemas(checked_items, portal_env=portal_env, portal_vapp=portal_vapp,
                                                  override_schemas=override_schemas)
-        error_summary = summary_of_data_validation_errors(problems)
-        if error_summary:
-            for item in error_summary:
-                PRINT(item)
-            raise Exception("Validation problems were seen.")
-        # TODO: Maybe connect validation here. Although another option is to just call validation separately
-        #       once this is successfully loaded. Needs thought. However, David's validation_utils can do
-        #       the validation if we decide to do it, it would just need to be connected up.
-        #       -kmp 23-Oct-2023
-        raise NotImplementedError("Need to implement validation.")
+        return checked_items, problems
     return checked_items
