@@ -14,7 +14,7 @@ from dcicutils.bundle_utils import (
     # High-level interfaces
     load_table_structures, load_items,
     # Low-level implementation
-    SchemaManager, ItemTools, TableChecker, OptionalTypeHints, ValidationProblem,
+    SchemaManager, ItemTools, TableChecker, OptionalTypeHints,
     BoolHint, NumHint,
     # Probably we should test NumHint, TypeHint, EnumHint, RefHint, etc. as well. -kmp 23-Oct-2023
 )
@@ -635,7 +635,8 @@ def test_workbook_with_schemas_and_portal_vapp():
         old_count = portal_vapp.call_count
         with mock.patch.object(ff_utils_module, "get_authentication_with_server",
                                mock_not_called("get_authentication_with_server")):
-            actual_items = load_items(SAMPLE_ITEMS_FOR_REAL_SCHEMAS_FILE, tab_name='ExperimentSeq', portal_vapp=portal_vapp)
+            actual_items = load_items(SAMPLE_ITEMS_FOR_REAL_SCHEMAS_FILE,
+                                      tab_name='ExperimentSeq', portal_vapp=portal_vapp)
 
         assert portal_vapp.call_count == old_count + 1
         assert actual_items == expected_items
