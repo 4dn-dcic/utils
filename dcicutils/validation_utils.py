@@ -77,7 +77,7 @@ class SchemaManager:
     def identifying_properties(self, schema: Optional[JsonSchema] = None, schema_name: Optional[str] = None,
                                among: Optional[List[str]] = None):
         schema = schema if schema is not None else self.fetch_schema(schema_name)
-        possible_identifying_properties = set(schema.get("identifyingProperties") or []) | {'uuid'}
+        possible_identifying_properties = set(self.get_identifying_properties(schema)) | {'uuid'}
         identifying_properties = sorted(possible_identifying_properties
                                         if among is None
                                         else (prop
@@ -96,6 +96,16 @@ class SchemaManager:
                          f' no {maybe_pluralize(identifying_properties, "identifying property")}'
                          f' {disjoined_list([repr(x) for x in identifying_properties])}'
                          f' in {json.dumps(data_item)}.')
+
+    @staticmethod
+    def get_identifying_properties(schema: dict) -> list:
+        if not schema:
+            return []
+        identifying_properties = schema.get("identifyingProperties", [])
+        # Implicitly add "identifier" to "identifyingProperties", if it exists.
+        if "identifier" not in identifying_properties and "identifier" in schema.get("properties", {}):
+            identifying_properties.append("identifier")
+        return identifying_properties
 
 
 def validate_data_against_schemas(data: TabbedSheetData, *,
@@ -196,7 +206,7 @@ def validate_data_item_against_schemas(data_item: AnyJsonData, data_type: str,
     """
     errors = []
 
-    identifying_properties = schema.get("identifyingProperties", [])
+    identifying_properties = SchemaManager.get_identifying_properties(schema)
     identifying_value = SchemaManager.identifying_value(data_item, identifying_properties)
     if not identifying_value:
         errors.append({
@@ -264,7 +274,7 @@ def summary_of_data_validation_errors(data_validation_errors: Dict,
             missing_properties_count += 1
         if error.get("extraneous_properties"):
             extraneous_properties_count += 1
-        if error.get("unclassified_error_count"):
+        if error.get("unclassified_error"):
             unclassified_error_count += 1
         if error.get("exception"):
             exception_count += 1

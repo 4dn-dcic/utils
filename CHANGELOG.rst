@@ -6,6 +6,14 @@ dcicutils
 Change Log
 ----------
 
+8.2.0
+=====
+* 2023-11-02
+* Added ``SchemaManager.get_identifying_properties`` in ``bundle_utils``
+  which implicitly adds ``identifier`` to ``identifyingProperties``.
+* Added support for ``portal_vapp`` to to `ff_utils.get_metadata``.
+
+
 8.1.0
 =====
 

@@ -522,7 +522,8 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
             return True
         try:
             # TODO: This probably needs a cache
-            info = get_metadata(f"/{to_camel_case(item_type)}/{item_ref}")
+            info = get_metadata(f"/{to_camel_case(item_type)}/{item_ref}",
+                                ff_env=self.portal_env, vapp=self.portal_vapp)
             # Basically return True if there's a value at all,
             # but still check it's not an error message that didn't get raised.
             return isinstance(info, dict) and 'uuid' in info
@@ -657,6 +658,7 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
     if validate:
         problems = validate_data_against_schemas(checked_items, portal_env=portal_env, portal_vapp=portal_vapp,
                                                  override_schemas=override_schemas)
+        return checked_items, problems
         error_summary = summary_of_data_validation_errors(problems)
         if error_summary:
             for item in error_summary:
