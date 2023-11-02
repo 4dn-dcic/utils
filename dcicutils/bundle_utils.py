@@ -4,14 +4,13 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from .common import AnyJsonData
 from .env_utils import EnvUtils, public_env_name
 from .ff_utils import get_metadata
-from .lang_utils import there_are
 from .misc_utils import AbstractVirtualApp, ignored, ignorable, PRINT, to_camel_case
 from .sheet_utils import (
     LoadTableError, prefer_number, TabbedJsonSchemas,
     Header, Headers, TabbedHeaders, ParsedHeader, ParsedHeaders, TabbedParsedHeaders, SheetCellValue, TabbedSheetData,
     TableSetManagerRegistry, AbstractTableSetManager, InsertsManager, TableSetManager, load_table_set,
 )
-from .validation_utils import SchemaManager, validate_data_against_schemas, summary_of_data_validation_errors
+from .validation_utils import SchemaManager, validate_data_against_schemas
 
 
 PatchPrototype = Dict
@@ -40,7 +39,8 @@ class TypeHintContext:
 
 
 class ValidationProblem(Exception):
-    pass
+    def __init__(self, problems: Optional[dict] = None):
+        self.problems = problems
 
 
 class TypeHint:
@@ -506,7 +506,8 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         if problems:
             for problem in problems:
                 PRINT(f"Problem: {problem}")
-            raise Exception(there_are(problems, kind='problem while compiling hints', tense='past', show=False))
+            raise ValidationProblem(problems)
+            # raise Exception(there_are(problems, kind='problem while compiling hints', tense='past', show=False))
 
     def check_tabs(self):
         result = {tab_name: self.check_tab(tab_name)

@@ -278,7 +278,6 @@ def _sls(val):
 
 
 def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on='', vapp: Optional[VirtualApp] = None):
-               
     """
     Function to get metadata for a given obj_id (uuid or @id, most likely).
     Either takes a dictionary form authentication (MUST include 'server')
@@ -998,6 +997,7 @@ def get_schema(name, key=None, ff_env: Optional[str] = None, portal_env: Optiona
     base_url = f"profiles/{to_camel_case(name)}.json"
     add_on = 'frame=raw'
     return get_metadata(obj_id=base_url, key=key, ff_env=portal_env, add_on=add_on, vapp=portal_vapp)
+
 
 def get_schemas(key=None, ff_env: Optional[str] = None, *, allow_abstract: bool = True, require_id: bool = False,
                 portal_env: Optional[str] = None, portal_vapp: Optional[VirtualApp] = None) -> Dict[str, Dict]:
