@@ -997,18 +997,7 @@ def get_schema(name, key=None, ff_env: Optional[str] = None, portal_env: Optiona
     portal_env = resolve_portal_env(ff_env=ff_env, portal_env=portal_env, portal_vapp=portal_vapp)
     base_url = f"profiles/{to_camel_case(name)}.json"
     add_on = 'frame=raw'
-
-    schema = get_metadata(obj_id=base_url, key=key, ff_env=portal_env, add_on=add_on, vapp=portal_vapp)  # xyzzy: is this okay? test
-    return schema
-
-    if portal_vapp:
-        full_url = f"/{base_url}?{add_on}"
-        res = portal_vapp.get(full_url)
-        return get_response_json(res)
-    else:
-        schema = get_metadata(obj_id=base_url, key=key, ff_env=portal_env, add_on=add_on)
-        return schema
-
+    return get_metadata(obj_id=base_url, key=key, ff_env=portal_env, add_on=add_on, vapp=portal_vapp)
 
 def get_schemas(key=None, ff_env: Optional[str] = None, *, allow_abstract: bool = True, require_id: bool = False,
                 portal_env: Optional[str] = None, portal_vapp: Optional[VirtualApp] = None) -> Dict[str, Dict]:
