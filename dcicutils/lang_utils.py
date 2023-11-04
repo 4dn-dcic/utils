@@ -107,7 +107,7 @@ class EnglishUtils:
         f"^an?[ -]+([^ -].*)$",
         re.IGNORECASE)
 
-    _NOUN_WITH_THAT_OR_WHICH_QUALIFIER = re.compile("^(.*[^,])(,|)[ ]+(that|which)[ ]+(.*)$", re.IGNORECASE)
+    _NOUN_WITH_CLAUSE_QUALIFIER = re.compile("^(.*[^,])(,|)[ ]+(that|which|while)[ ]+(.*)$", re.IGNORECASE)
     _IS_QUALIFIER = re.compile("^(is|was|has)[ ]+(.*)$", re.IGNORECASE)
 
     @classmethod
@@ -125,7 +125,7 @@ class EnglishUtils:
         capitalize = word[0].isupper()
         upcase = word.isupper()  # capitalize and not any(ch.islower() for ch in word)
 
-        qual_matched = cls._NOUN_WITH_THAT_OR_WHICH_QUALIFIER.match(word)
+        qual_matched = cls._NOUN_WITH_CLAUSE_QUALIFIER.match(word)
         if qual_matched:
             qualified, comma, connective, qualifier = qual_matched.groups()
             word = qualified
@@ -352,7 +352,7 @@ class EnglishUtils:
     def there_are(cls, items, *, kind: str = "thing", count: Optional[int] = None, there: str = "there",
                   capitalize=True, joiner=None, zero: object = "no", punctuate=None, punctuate_none=None,
                   use_article=False, show=True, context=None, tense='present', punctuation_mark: str = ".",
-                  **joiner_options) -> str:
+                  just_are=False, **joiner_options) -> str:
         """
         Constructs a sentence that enumerates a set of things.
 
@@ -372,6 +372,7 @@ class EnglishUtils:
         :param show: whether to show the items if there are any (default True)
         :param context: an optional prepositional phrase indicating the context of the item(s) (default None)
         :param tense: one of 'past', 'present', 'future', 'conditional', or 'hypothetical' for the verbs used
+        :param just_are: whether to stop at "There is" or "There are" without anything else.
 
         By far the most common uses are likely to be:
 
@@ -403,7 +404,10 @@ class EnglishUtils:
         n = len(items) if count is None else count
         # If the items is not in the tenses table, it's assumed to be a modal like 'might', 'may', 'must', 'can' etc.
         is_or_are = cls._conjugate_be(count=n, tense=tense)
-        part1 = f"{there} {is_or_are} {n_of(n, kind, num_format=lambda n, thing: zero if n == 0 else None)}"
+        part0 = f"{there} {is_or_are}"
+        if just_are:
+            return part0
+        part1 = f"{part0} {n_of(n, kind, num_format=lambda n, thing: zero if n == 0 else None)}"
         if context:
             part1 += f" {context}"
         if n == 0 or not show:
@@ -518,6 +522,10 @@ class EnglishUtils:
                                   whitespace=whitespace, nothing=nothing)
 
     @classmethod
+    def _item_strings(cls, items):
+        return [str(x) for x in (sorted(items) if isinstance(items, set) else items)]
+
+    @classmethod
     def conjoined_list(cls, items, conjunction: str = 'and', comma: Union[bool, str] = ",",
                        oxford_comma: Union[bool, str] = False, whitespace: str = " ",
                        nothing: Optional[str] = None) -> str:
@@ -550,6 +558,7 @@ class EnglishUtils:
         :param nothing: a string to use if there are no items, to avoid an error being raised.
         """
 
+        items = cls._item_strings(items)
         assert isinstance(conjunction, str), "The 'conjunction' argument must a string or boolean."
         conj = conjunction + whitespace
 

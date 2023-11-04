@@ -23,6 +23,13 @@ beanstalk_utils
    :members:
 
 
+bundle_utils
+^^^^^^^^^^^^
+
+.. automodule:: dcicutils.bundle_utils
+   :members:
+
+
 codebuild_utils
 ^^^^^^^^^^^^^^^
 
@@ -281,6 +288,13 @@ secrets_utils
   :members:
 
 
+sheet_utils
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.sheet_utils
+  :members:
+
+
 snapshot_utils
 ^^^^^^^^^^^^^^
 
@@ -306,6 +320,13 @@ trace_utils
 ^^^^^^^^^^^
 
 .. automodule:: dcicutils.trace_utils
+  :members:
+
+
+validation_utils
+^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.validation_utils
   :members:
 
 

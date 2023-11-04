@@ -192,7 +192,11 @@ class _VirtualAppHelper(webtest.TestApp):
     pass
 
 
-class VirtualApp:
+class AbstractVirtualApp:
+    pass
+
+
+class VirtualApp(AbstractVirtualApp):
     """
     Wrapper class for TestApp, to allow custom control over submitting Encoded requests,
     simulating a number of conditions, including permissions.
@@ -297,7 +301,7 @@ class VirtualApp:
         return self.wrapped_app.app
 
 
-VirtualAppResponse = webtest.response.TestResponse
+VirtualAppResponse = webtest.response.TestResponse  # NoQA - PyCharm sees a problem, but none occurs in practice
 
 
 def exported(*variables):
@@ -1354,12 +1358,38 @@ def to_camel_case(s):
         return snake_case_to_camel_case(s)
 
 
+def to_snake_case(s):
+    """
+    Converts a string that might be in snake_case or CamelCase into CamelCase.
+    """
+    return camel_case_to_snake_case(to_camel_case(s))
+
+
 def capitalize1(s):
     """
     Capitalizes the first letter of a string and leaves the others alone.
     This is in contrast to the string's .capitalize() method, which would force the rest of the string to lowercase.
     """
     return s[:1].upper() + s[1:]
+
+
+"""
+Python's UUID ignores all dashes, whereas Postgres is more strict
+http://www.postgresql.org/docs/9.2/static/datatype-uuid.html
+See also http://www.postgresql.org/docs/9.2/static/datatype-uuid.html
+And, anyway, this pattern is what our portals have been doing
+for quite a while, so it's the most stable choice for us now.
+"""
+
+uuid_re = re.compile(r'(?i)[{]?(?:[0-9a-f]{4}-?){8}[}]?')
+
+
+def is_uuid(instance):
+    """
+    Predicate returns true for any group of 32 hex characters with optional hyphens every four characters.
+    We insist on lowercase to make matching faster. See other notes on this design choice above.
+    """
+    return bool(uuid_re.match(instance))
 
 
 def string_list(s):
@@ -2323,3 +2353,73 @@ def parse_in_radix(text: str, *, radix: int):
     except Exception:
         pass
     raise ValueError(f"Unable to parse: {text!r}")
+
+
+def pad_to(target_size: int, data: list, *, padding=None):
+    """
+    This will pad to a given target size, a list of a potentially different actual size, using given padding.
+    e.g., pad_to(3, [1, 2]) will return [1, 2, None]
+    """
+    actual_size = len(data)
+    if actual_size < target_size:
+        data = data + [padding] * (target_size - actual_size)
+    return data
+
+
+class JsonLinesReader:
+
+    def __init__(self, fp, padded=False, padding=None):
+        """
+        Given an fp (the conventional name for a "file pointer", the thing a call to io.open returns,
+        this creates an object that can be used to iterate across the lines in the JSON lines file
+        that the fp is reading from.
+
+        There are two possible formats that this will return.
+
+        For files that contain a series of dictionaries, such as:
+            {"something": 1, "else": "a"}
+            {"something": 2, "else": "b"}
+            ...etc
+        this will just return thos those dictionaries one-by-one when iterated over.
+
+        The same set of dictionaries will also be yielded by a file containing:
+            ["something", "else"]
+            [1, "a"]
+            [2, "b"]
+            ...etc
+        this will just return thos those dictionaries one-by-one when iterated over.
+
+        NOTES:
+
+        * In the second case, shorter lists on subsequent lines return only partial dictionaries.
+        * In the second case, longer lists on subsequent lines will quietly drop any extra elements.
+        """
+
+        self.fp = fp
+        self.padded: bool = padded
+        self.padding = padding
+        self.headers = None  # Might change after we see first line
+
+    def __iter__(self):
+        first_line = True
+        n_headers = 0
+        for raw_line in self.fp:
+            line = json.loads(raw_line)
+            if first_line:
+                first_line = False
+                if isinstance(line, list):
+                    self.headers = line
+                    n_headers = len(line)
+                    continue
+            # If length of line is more than we expect, ignore it. Let user put comments beyond our table
+            # But if length of line is less than we expect, extend the line with None
+            if self.headers:
+                if not isinstance(line, list):
+                    raise Exception("If the first line is a list, all lines must be.")
+                if self.padded and len(line) < n_headers:
+                    line = pad_to(n_headers, line, padding=self.padding)
+                yield dict(zip(self.headers, line))
+            elif isinstance(line, dict):
+                yield line
+            else:
+                raise Exception(f"If the first line is not a list, all lines must be dictionaries: {line!r}")

@@ -6,6 +6,80 @@ dcicutils
 Change Log
 ----------
 
+8.2.0
+=====
+* 2023-11-02
+* Added ``SchemaManager.get_identifying_properties`` in ``bundle_utils``
+  which implicitly adds ``identifier`` to ``identifyingProperties``.
+* Added support for ``portal_vapp`` to to `ff_utils.get_metadata``.
+
+
+8.1.0
+=====
+
+* New module ``bundle_utils.py`` that is intended for schema-respecting worksheets ("metadata bundle").
+  There are various modular bits of functionality here, but the main entry point here is:
+
+  * ``load_items`` to load data from a given table set, doing certain notational canonicalizations, and
+    checking that things are in the appropriate format.
+
+* In ``common.py``, new hint types:
+
+  * ``CsvReader``
+  * ``JsonSchema``
+  * ``Regexp``
+
+* In ``lang_utils.py``:
+
+  * New arguments ``just_are=`` to ``there_are`` get verb conjugation without the details.
+
+  * Add "while" to "which" and "that" as clause handlers in the string pluralizer
+    (e.g., so that "error while parsing x" pluralizes as "errors while parsing x")
+
+  * ``conjoin_list`` and ``disjoin_list`` now call ``str`` on their sequence elements so that things like
+    ``conjoined_list([2, 3, 4])`` are possible.
+
+* In ``misc_utils.py``, miscellaneous new functionality:
+
+  * New class ``AbstractVirtualApp`` that is either an actual VirtualApp or can be used to make mocks
+    if the thing being called expects an ``AbstractVirtualApp`` instead of a ``VirtualApp``.
+
+  * New function ``to_snake_case`` that assumes its argument is either a CamelCase string or snake_case string
+    and returns the snake_case form.
+
+  * New function ``is_uuid`` (migrated from Fourfront)
+
+  * New function ``pad_to``
+
+  * New class ``JsonLinesReader``
+
+* In ``qa_checkers.py``:
+
+  * Change the ``VERSION_IS_BETA_PATTERN`` to recognize alpha or beta patterns. Probably a rename would be better,
+    but also incompatible. As far as I know, this is used only to not fuss if you haven't made a changelog entry
+    for a beta (or now also alpha).
+
+* New module ``sheet_utils.py`` for loading workbooks in a variety of formats, but without schema interpretation.
+
+  A lot of this is implementation classes for each of the kinds of files, but the main entry point
+  is intended to be ``load_table_set`` if you are not working with schemas. For schema-related support,
+  see ``bundle_utils.py``.
+
+* New module ``validation_utils.py`` with these facilities:
+
+  * New class ``SchemaManager`` for managing a set of schemas so that programs asking for a schema by name
+    only download one time and then use a cache. There are also facilities here for populating a dictionary
+    with all schemas in a table set (the kind of thing returned by ``load_table_set`` in ``sheet_utils.py``)
+    in order to pre-process it as a metadata bundle for checking purposes.
+
+  * New functions:
+
+    * ``validate_data_against_schemas`` to validate that table sets (workbooks, or the equivalent) have rows
+      in each tab conforming to the schema for that tab.
+
+    * ``summary_of_data_validation_errors`` to summarize the errors obtained from ``validate_data_against_schemas``.
+
+
 8.0.0
 =====
 
@@ -16,6 +90,7 @@ Change Log
   The only incompatible change seems to be that yaml.load now requires a Loader argument;
   and searching our GitHub organizations (4dn-dcic, dbmi-bgm, smaht-dac) the only ones which might
   be affected are cwltools and parliament2, neither of which are dependent on dcicutils in any way.
+
 
 7.13.0
 ======
