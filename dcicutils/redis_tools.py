@@ -82,7 +82,7 @@ class RedisSessionToken:
     def get_jwt(self) -> str:
         """ Returns the JWT set on this session token object """
         return self.jwt
-    
+
     def get_email(self) -> str:
         """ Returns the email set on this session token object """
         return self.email
