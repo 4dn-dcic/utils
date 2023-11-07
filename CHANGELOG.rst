@@ -6,6 +6,12 @@ dcicutils
 Change Log
 ----------
 
+
+8.3.0
+======
+* More work related to SMaHT ingestion.
+
+
 8.2.0
 =====
 * 2023-11-02
