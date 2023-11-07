@@ -15,6 +15,7 @@ from .validation_utils import SchemaManager, validate_data_against_schemas
 
 PatchPrototype = Dict
 TabbedPatchPrototypes = Dict[str, PatchPrototype]
+ARRAY_VALUE_DELIMITER = "|"
 
 
 class TypeHintContext:
@@ -113,6 +114,20 @@ class EnumHint(TypeHint):
                     result = self.value_map[only_found]
                     return result
         return super().apply_hint(value)
+
+
+class ArrayHint(TypeHint):
+    def apply_hint(self, value):
+        if value is None or value == '':
+            return []
+        if isinstance(value, str):
+            return [value.strip() for value in value.split(ARRAY_VALUE_DELIMITER)]
+        return super().apply_hint(value)
+
+
+class StringHint(TypeHint):
+    def apply_hint(self, value):
+        return str(value).strip() if value is not None else ""
 
 
 class RefHint(TypeHint):
@@ -288,8 +303,11 @@ class ItemTools:
                 return True
             elif lvalue == 'false':
                 return False
-            elif lvalue == 'null' or lvalue == '':
+            # elif lvalue == 'null' or lvalue == '':
+            elif lvalue == 'null':
                 return None
+            elif lvalue == '':
+                return lvalue
             elif split_pipe and '|' in value:
                 if value == '|':  # Use '|' for []
                     return []
@@ -307,7 +325,8 @@ class ItemTools:
 
     @classmethod
     def set_path_value(cls, datum: Union[List, Dict], path: ParsedHeader, value: Any, force: bool = False):
-        if (value is None or value == '') and not force:
+        # if (value is None or value == '') and not force:
+        if value is None and not force:
             return
         [key, *more_path] = path
         if not more_path:
@@ -327,10 +346,13 @@ class ItemTools:
                 link_to = subschema.get('linkTo')
                 if link_to and context.schema_exists(link_to):
                     return RefHint(schema_name=link_to, context=context)
+                return StringHint()
             elif t in ('integer', 'float', 'number'):
                 return NumHint(declared_type=t)
             elif t == 'boolean':
                 return BoolHint()
+            elif t == 'array':
+                return ArrayHint()
 
     @classmethod
     def find_type_hint_for_parsed_header(cls, parsed_header: Optional[ParsedHeader], schema: Any,
@@ -641,6 +663,7 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
                # TODO: validate= is presently False (i.e., disabled) by default while being debugged,
                #       but for production use maybe should not be? -kmp 25-Oct-2023
                validate: bool = False,
+               retain_empty_properties: bool = False,
                **kwargs):
     annotated_data = TableSetManager.load_annotated(filename=filename, tab_name=tab_name, escaping=escaping,
                                                     prefer_number=False, **kwargs)
@@ -655,8 +678,23 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
         # No fancy checking for things like .json, etc. for now. Only check things that came from
         # spreadsheet-like data, where structural datatypes are forced into strings.
         checked_items = tabbed_rows
+    if not retain_empty_properties:
+        remove_empty_properties(checked_items)
     if validate:
         problems = validate_data_against_schemas(checked_items, portal_env=portal_env, portal_vapp=portal_vapp,
                                                  override_schemas=override_schemas)
         return checked_items, problems
     return checked_items
+
+
+def remove_empty_properties(data: Optional[Union[list,dict]]) -> None:
+    if isinstance(data, dict):
+        for key in list(data.keys()):
+            value = data[key]
+            if not value:
+                del data[key]
+            else:
+                remove_empty_properties(value)
+    elif isinstance(data, list):
+        for item in data:
+            remove_empty_properties(item)

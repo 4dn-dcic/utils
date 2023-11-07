@@ -87,15 +87,19 @@ class SchemaManager:
 
     @classmethod  # This operation doesn't actually use the schemas so is safe as a class method
     def identifying_value(cls, data_item: Dict[str, AnyJsonData], identifying_properties) -> AnyJsonData:
-        if not identifying_properties:
-            raise ValueError("No identifying properties were specified.")
-        for identifying_property in identifying_properties:
+        for identifying_property in identifying_properties or []:
             if identifying_property in data_item:
                 return data_item[identifying_property]
-        raise ValueError(f'{there_are(identifying_properties, just_are=True)}'
-                         f' no {maybe_pluralize(identifying_properties, "identifying property")}'
-                         f' {disjoined_list([repr(x) for x in identifying_properties])}'
-                         f' in {json.dumps(data_item)}.')
+        if False:
+            if not identifying_properties:
+                raise ValueError("No identifying properties were specified.")
+            for identifying_property in identifying_properties:
+                if identifying_property in data_item:
+                    return data_item[identifying_property]
+            raise ValueError(f'{there_are(identifying_properties, just_are=True)}'
+                             f' no {maybe_pluralize(identifying_properties, "identifying property")}'
+                             f' {disjoined_list([repr(x) for x in identifying_properties])}'
+                             f' in {json.dumps(data_item)}.')
 
     @staticmethod
     def get_identifying_properties(schema: dict) -> list:
