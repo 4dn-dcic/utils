@@ -1,6 +1,8 @@
+import csv
 import os
 import re
 
+from tempfile import TemporaryFile
 from typing import Dict, Union, Tuple, List, Any
 from typing_extensions import Literal
 
@@ -37,8 +39,6 @@ OrchestratedApp = Literal['cgap', 'fourfront', 'smaht']
 
 LIBRARY_DIR = os.path.dirname(__file__)
 
-Regexp = type(re.compile("sample"))
-
 # ===== Auth Data =====
 
 AuthStr = str
@@ -57,6 +57,8 @@ AnyAuthData = Union[LegacyAuthDict, AuthData]
 
 # ===== JSON Data =====
 
+JsonSchema = Dict
+
 AnyJsonData = Union[Dict[str, 'AnyJsonData'], List['AnyJsonData'], str, bool, int, float, None]
 
 KeyValueDict = Dict[Literal['Key', 'Value'], Any]
@@ -65,15 +67,20 @@ KeyValueDictList = List[KeyValueDict]
 KeyValuestringDict = Dict[Literal['Key', 'Value'], str]
 KeyValuestringDictList = List[KeyValuestringDict]
 
-S3KeyName = str
-S3BucketName = str
+# ===== Miscellaneous Data =====
 
 UrlString = str
 
 PortalEnvName = str
 
+Regexp = type(re.compile("sample"))
+
+CsvReader = type(csv.reader(TemporaryFile()))
 
 # ===== AWS Data =====
+
+S3KeyName = str
+S3BucketName = str
 
 # Refs:
 #  * https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html

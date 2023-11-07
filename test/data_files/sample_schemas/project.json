@@ -1,0 +1,592 @@
+{
+    "title": "Project",
+    "$id": "/profiles/project.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "required": [
+        "name",
+        "title"
+    ],
+    "identifyingProperties": [
+        "uuid",
+        "name",
+        "title",
+        "aliases"
+    ],
+    "additionalProperties": false,
+    "mixinProperties": [
+        {
+            "$ref": "mixins.json#/schema_version"
+        },
+        {
+            "$ref": "mixins.json#/uuid"
+        },
+        {
+            "$ref": "mixins.json#/aliases"
+        },
+        {
+            "$ref": "mixins.json#/submitted"
+        },
+        {
+            "$ref": "mixins.json#/modified"
+        },
+        {
+            "$ref": "mixins.json#/tags"
+        },
+        {
+            "$ref": "mixins.json#/status"
+        },
+        {
+            "$ref": "mixins.json#/static_embeds"
+        }
+    ],
+    "type": "object",
+    "properties": {
+        "static_headers": {
+            "title": "Static Headers",
+            "description": "Array of linkTos for static sections to be displayed at the top of an item page",
+            "type": "array",
+            "uniqueItems": true,
+            "permission": "restricted_fields",
+            "items": {
+                "title": "Static Header",
+                "description": "Static section displayed at the top of an item page",
+                "type": "string",
+                "linkTo": "UserContent"
+            }
+        },
+        "static_content": {
+            "title": "Static Content",
+            "description": "Array of objects containing linkTo UserContent and 'position' to be placed on Item view(s).",
+            "type": "array",
+            "uniqueItems": true,
+            "permission": "restricted_fields",
+            "items": {
+                "title": "Static Content Definition",
+                "description": "Link to UserContent Item plus location.",
+                "type": "object",
+                "required": [
+                    "location",
+                    "content"
+                ],
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "linkTo": "UserContent",
+                        "title": "Link to Content",
+                        "description": "A UserContent Item."
+                    },
+                    "location": {
+                        "type": "string",
+                        "title": "Location of Content",
+                        "description": "Where this content should be displayed. Item schemas could potentially define an enum to contrain values.",
+                        "default": "header"
+                    },
+                    "description": {
+                        "type": "string",
+                        "title": "Description",
+                        "description": "Description or note about this content. Might be displayed as a footnote or caption, if applicable for view."
+                    }
+                }
+            }
+        },
+        "status": {
+            "title": "Status",
+            "type": "string",
+            "default": "shared",
+            "permission": "restricted_fields",
+            "enum": [
+                "shared",
+                "obsolete",
+                "current",
+                "inactive",
+                "in review",
+                "deleted"
+            ]
+        },
+        "tags": {
+            "title": "Tags",
+            "description": "Key words that can tag an item - useful for filtering.",
+            "type": "array",
+            "lookup": 1000,
+            "uniqueItems": true,
+            "ff_flag": "clear clone",
+            "items": {
+                "title": "Tag",
+                "description": "A tag for the item.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50,
+                "pattern": "^[a-zA-Z0-9_\\-][a-zA-Z0-9_\\-\\s]+[a-zA-Z0-9_\\-]$"
+            }
+        },
+        "last_modified": {
+            "title": "Last Modified",
+            "exclude_from": [
+                "FFedit-create"
+            ],
+            "type": "object",
+            "additionalProperties": false,
+            "lookup": 1000,
+            "properties": {
+                "date_modified": {
+                    "title": "Date Modified",
+                    "description": "Do not submit, value is assigned by the server. The date the object is modified.",
+                    "type": "string",
+                    "anyOf": [
+                        {
+                            "format": "date-time"
+                        },
+                        {
+                            "format": "date"
+                        }
+                    ],
+                    "permission": "restricted_fields"
+                },
+                "modified_by": {
+                    "title": "Modified By",
+                    "description": "Do not submit, value is assigned by the server. The user that modfied the object.",
+                    "type": "string",
+                    "linkTo": "User",
+                    "permission": "restricted_fields"
+                }
+            }
+        },
+        "date_created": {
+            "rdfs:subPropertyOf": "dc:created",
+            "title": "Date Created",
+            "lookup": 1000,
+            "exclude_from": [
+                "FFedit-create"
+            ],
+            "type": "string",
+            "anyOf": [
+                {
+                    "format": "date-time"
+                },
+                {
+                    "format": "date"
+                }
+            ],
+            "serverDefault": "now",
+            "permission": "restricted_fields"
+        },
+        "submitted_by": {
+            "rdfs:subPropertyOf": "dc:creator",
+            "title": "Submitted By",
+            "exclude_from": [
+                "FFedit-create"
+            ],
+            "type": "string",
+            "linkTo": "User",
+            "lookup": 1000,
+            "serverDefault": "userid",
+            "permission": "restricted_fields"
+        },
+        "aliases": {
+            "title": "Aliases",
+            "description": "Institution-specific ID (e.g. bgm:cohort-1234-a).",
+            "type": "array",
+            "comment": "Colon separated lab name and lab identifier, no slash. (e.g. dcic-lab:42).",
+            "lookup": 1,
+            "uniqueItems": true,
+            "ff_flag": "clear clone",
+            "items": {
+                "uniqueKey": "alias",
+                "title": "ID Alias",
+                "description": "Institution-specific ID (e.g. bgm:cohort-1234-a).",
+                "type": "string",
+                "pattern": "^[^\\s\\\\\\/]+:[^\\s\\\\\\/]+$"
+            }
+        },
+        "uuid": {
+            "title": "UUID",
+            "type": "string",
+            "format": "uuid",
+            "exclude_from": [
+                "FFedit-create"
+            ],
+            "serverDefault": "uuid4",
+            "permission": "restricted_fields",
+            "requestMethod": "POST"
+        },
+        "schema_version": {
+            "title": "Schema Version",
+            "internal_comment": "Do not submit, value is assigned by the server. The version of the JSON schema that the server uses to validate the object. Schema version indicates generation of schema used to save version to to enable upgrade steps to work. Individual schemas should set the default.",
+            "type": "string",
+            "exclude_from": [
+                "FFedit-create"
+            ],
+            "pattern": "^\\d+(\\.\\d+)*$",
+            "requestMethod": [],
+            "default": "1"
+        },
+        "name": {
+            "title": "Name",
+            "description": "The name of the project.",
+            "type": "string",
+            "lookup": 20,
+            "uniqueKey": true,
+            "permission": "restricted_fields",
+            "pattern": "^[A-Za-z0-9\\-]+$"
+        },
+        "title": {
+            "title": "Title",
+            "description": "A title for the instituion.",
+            "type": "string",
+            "permission": "restricted_fields"
+        },
+        "description": {
+            "title": "Description",
+            "type": "string",
+            "formInput": "textarea",
+            "lookup": 40
+        },
+        "start_date": {
+            "title": "Start date",
+            "description": "YYYY-MM-DD formatted date.",
+            "comment": "Date can be submitted as YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSTZD (TZD is the time zone designator; use Z to express time in UTC or for time expressed in local time add a time zone offset froaam UTC +HH:MM or -HH:MM).",
+            "type": "string",
+            "lookup": 50,
+            "anyOf": [
+                {
+                    "format": "date-time"
+                },
+                {
+                    "format": "date"
+                }
+            ]
+        },
+        "end_date": {
+            "title": "End date",
+            "description": "YYYY-MM-DD formatted date.",
+            "comment": "Date can be submitted as YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSTZD (TZD is the time zone designator; use Z to express time in UTC or for time expressed in local time add a time zone offset from UTC +HH:MM or -HH:MM).",
+            "type": "string",
+            "lookup": 60,
+            "anyOf": [
+                {
+                    "format": "date-time"
+                },
+                {
+                    "format": "date"
+                }
+            ]
+        },
+        "url": {
+            "@type": "@id",
+            "title": "URL",
+            "description": "An external resource with additional information about the project.",
+            "type": "string",
+            "format": "uri",
+            "lookup": 70
+        },
+        "pi": {
+            "title": "Project Lead",
+            "description": "The leader of the project.",
+            "type": "string",
+            "lookup": 80,
+            "linkTo": "User"
+        },
+        "lifecycle_management_active": {
+            "title": "Lifecycle management",
+            "type": "boolean",
+            "description": "Whether lifecycle management is active or not",
+            "default": false
+        },
+        "lifecycle_policy": {
+            "title": "Lifecycle policy",
+            "description": "Contains rules for how different categories of files are managed during their lifetime",
+            "type": "object",
+            "patternProperties": {
+                "^(?!(ignore)$).+$": {
+                    "type": "object",
+                    "description": "Custom lifecycle policy",
+                    "comment": "Ensure custom lifecycle policies have the right structure",
+                    "minProperties": 1,
+                    "additionalProperties": false,
+                    "properties": {
+                        "move_to_infrequent_access_after": {
+                            "title": "Move to Infrequent Access after",
+                            "description": "Time (in months) after which files are moved to Infrequent Access",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "move_to_glacier_after": {
+                            "title": "Move to Glacier Instant Retrieval after",
+                            "description": "Time (in months) after which files are moved to Glacier Instant Retrieval",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "move_to_deep_archive_after": {
+                            "title": "Move to Deep Archive after",
+                            "description": "Time (in months) after which files are moved to Glacier Deep Archive",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "expire_after": {
+                            "title": "Expire after",
+                            "description": "Time (in months) after which files are deleted",
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    }
+                }
+            },
+            "additionalProperties": false,
+            "properties": {
+                "short_term_access_long_term_archive": {
+                    "title": "short_term_access_long_term_archive",
+                    "description": "Files that require shorter term accessibility and are long term archived after that",
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": false,
+                    "properties": {
+                        "move_to_infrequent_access_after": {
+                            "title": "Move to Infrequent Access after",
+                            "description": "Time (in months) after which files are moved to Infrequent Access",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "move_to_glacier_after": {
+                            "title": "Move to Glacier Instant Retrieval after",
+                            "description": "Time (in months) after which files are moved to Glacier Instant Retrieval",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "move_to_deep_archive_after": {
+                            "title": "Move to Deep Archive after",
+                            "description": "Time (in months) after which files are moved to Glacier Deep Archive",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "expire_after": {
+                            "title": "Expire after",
+                            "description": "Time (in months) after which files are deleted",
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    }
+                },
+                "long_term_access_long_term_archive": {
+                    "title": "long_term_access_long_term_archive",
+                    "description": "Files that require longer term accessibility and are long term archived after that",
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": false,
+                    "properties": {
+                        "move_to_infrequent_access_after": {
+                            "title": "Move to Infrequent Access after",
+                            "description": "Time (in months) after which files are moved to Infrequent Access",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "move_to_glacier_after": {
+                            "title": "Move to Glacier Instant Retrieval after",
+                            "description": "Time (in months) after which files are moved to Glacier Instant Retrieval",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "move_to_deep_archive_after": {
+                            "title": "Move to Deep Archive after",
+                            "description": "Time (in months) after which files are moved to Glacier Deep Archive",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "expire_after": {
+                            "title": "Expire after",
+                            "description": "Time (in months) after which files are deleted",
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    }
+                },
+                "long_term_access": {
+                    "title": "long_term_access",
+                    "description": "Files that require long term accessibility and are deleted after that",
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": false,
+                    "properties": {
+                        "move_to_infrequent_access_after": {
+                            "title": "Move to Infrequent Access after",
+                            "description": "Time (in months) after which files are moved to Infrequent Access",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "move_to_glacier_after": {
+                            "title": "Move to Glacier Instant Retrieval after",
+                            "description": "Time (in months) after which files are moved to Glacier Instant Retrieval",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "move_to_deep_archive_after": {
+                            "title": "Move to Deep Archive after",
+                            "description": "Time (in months) after which files are moved to Glacier Deep Archive",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "expire_after": {
+                            "title": "Expire after",
+                            "description": "Time (in months) after which files are deleted",
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    }
+                },
+                "short_term_access": {
+                    "title": "short_term_access",
+                    "description": "Files that require short term accessibility and are deleted after that",
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": false,
+                    "properties": {
+                        "move_to_infrequent_access_after": {
+                            "title": "Move to Infrequent Access after",
+                            "description": "Time (in months) after which files are moved to Infrequent Access",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "move_to_glacier_after": {
+                            "title": "Move to Glacier Instant Retrieval after",
+                            "description": "Time (in months) after which files are moved to Glacier Instant Retrieval",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "move_to_deep_archive_after": {
+                            "title": "Move to Deep Archive after",
+                            "description": "Time (in months) after which files are moved to Glacier Deep Archive",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "expire_after": {
+                            "title": "Expire after",
+                            "description": "Time (in months) after which files are deleted",
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    }
+                },
+                "long_term_archive": {
+                    "title": "long_term_archive",
+                    "description": "Files that are immediately archived long term and deleted after that",
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": false,
+                    "properties": {
+                        "move_to_infrequent_access_after": {
+                            "title": "Move to Infrequent Access after",
+                            "description": "Time (in months) after which files are moved to Infrequent Access",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "move_to_glacier_after": {
+                            "title": "Move to Glacier Instant Retrieval after",
+                            "description": "Time (in months) after which files are moved to Glacier Instant Retrieval",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "move_to_deep_archive_after": {
+                            "title": "Move to Deep Archive after",
+                            "description": "Time (in months) after which files are moved to Glacier Deep Archive",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "expire_after": {
+                            "title": "Expire after",
+                            "description": "Time (in months) after which files are deleted",
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    }
+                },
+                "short_term_archive": {
+                    "title": "short_term_archive",
+                    "description": "Files that are immediately archived short term and deleted after that",
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": false,
+                    "properties": {
+                        "move_to_infrequent_access_after": {
+                            "title": "Move to Infrequent Access after",
+                            "description": "Time (in months) after which files are moved to Infrequent Access",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "move_to_glacier_after": {
+                            "title": "Move to Glacier Instant Retrieval after",
+                            "description": "Time (in months) after which files are moved to Glacier Instant Retrieval",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "move_to_deep_archive_after": {
+                            "title": "Move to Deep Archive after",
+                            "description": "Time (in months) after which files are moved to Glacier Deep Archive",
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "expire_after": {
+                            "title": "Expire after",
+                            "description": "Time (in months) after which files are deleted",
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    }
+                },
+                "no_storage": {
+                    "title": "no_storage",
+                    "description": "Files that are deleted immediately",
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": false,
+                    "properties": {
+                        "expire_after": {
+                            "title": "Expire after",
+                            "description": "Time (in months) after which files are deleted",
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    }
+                }
+            }
+        },
+        "@id": {
+            "title": "ID",
+            "type": "string",
+            "calculatedProperty": true
+        },
+        "@type": {
+            "title": "Type",
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "calculatedProperty": true
+        },
+        "principals_allowed": {
+            "title": "principals_allowed",
+            "description": "Calculated permissions used for ES filtering",
+            "type": "object",
+            "properties": {
+                "view": {
+                    "type": "string"
+                },
+                "edit": {
+                    "type": "string"
+                }
+            },
+            "calculatedProperty": true
+        },
+        "display_title": {
+            "title": "Display Title",
+            "description": "A calculated title for every object in 4DN",
+            "type": "string",
+            "calculatedProperty": true
+        }
+    },
+    "@type": [
+        "JSONSchema"
+    ],
+    "rdfs:seeAlso": "/terms/Project",
+    "children": [],
+    "rdfs:subClassOf": "/profiles/Item.json",
+    "isAbstract": false
+}

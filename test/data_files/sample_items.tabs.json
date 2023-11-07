@@ -1,0 +1,71 @@
+{
+    "Sheet1": [
+        {
+            "x": 1,
+            "y": {
+                "a": 1,
+                "z": 1
+            }
+        },
+        {
+            "x": 1,
+            "y": {
+                "a": 2,
+                "z": 3
+            }
+        },
+        {
+            "x": "alpha",
+            "y": {
+                "a": "beta",
+                "z": "gamma|delta"
+            }
+        }
+    ],
+    "Sheet2": [
+        {
+            "name": "bill",
+            "age": 23,
+            "mother": {
+                "name": "mary",
+                "age": 58
+            },
+            "father": {
+                "name": "fred",
+                "age": 63
+            },
+            "friends": [
+                {
+                    "name": "sam",
+                    "age": 22
+                },
+                {
+                    "name": "arthur",
+                    "age": 19
+                }
+            ]
+        },
+        {
+            "name": "joe",
+            "age": 9,
+            "mother": {
+                "name": "estrella",
+                "age": 35
+            },
+            "father": {
+                "name": "anthony",
+                "age": 34
+            },
+            "friends": [
+                {
+                    "name": "anders",
+                    "age": 9
+                },
+                {
+                    "name": null,
+                    "age": null
+                }
+            ]
+        }
+    ]
+}

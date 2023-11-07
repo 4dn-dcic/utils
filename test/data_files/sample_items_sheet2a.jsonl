@@ -1,0 +1,3 @@
+["name", "age", "mother.name", "mother.age", "father.name", "father.age", "friends#0.name", "friends#0.age", "friends#1.name", "friends#1.age"]
+["bill", 23,    "mary",        58,           "fred",        63,           "sam",            22,              "arthur",         19]
+["joe",  9,     "estrella",    35,           "anthony",     34,           "anders",         9]

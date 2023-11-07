@@ -438,6 +438,9 @@ def test_conjoined_list():
     # For a set, we use the elements sorted.
     assert conjoined_list({'apple', 'lemon', 'grape'}) == 'apple, grape and lemon'
 
+    # We allow non-numbers, which will be converted to strings with str.
+    assert conjoined_list([2, 3, 4]) == "2, 3 and 4"
+
     # For dictionary, we use the keys in the order they occur.
     assert conjoined_list({'apple': 'delicious', 'lemon': 'meyer', 'grape': 'seedless'}) == 'apple, lemon and grape'
 
@@ -459,6 +462,9 @@ def test_disjoined_list():
 
     # For dictionary, we use the keys in the order they occur.
     assert disjoined_list({'apple': 'delicious', 'lemon': 'meyer', 'grape': 'seedless'}) == 'apple, lemon or grape'
+
+    # We allow non-numbers, which will be converted to strings with str.
+    assert disjoined_list([2, 3, 4]) == "2, 3 or 4"
 
 
 def test_there_are():

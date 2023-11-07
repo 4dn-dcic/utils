@@ -277,7 +277,7 @@ def _sls(val):
     return val.lstrip('/')
 
 
-def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
+def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on='', vapp: Optional[VirtualApp] = None):
     """
     Function to get metadata for a given obj_id (uuid or @id, most likely).
     Either takes a dictionary form authentication (MUST include 'server')
@@ -290,6 +290,13 @@ def get_metadata(obj_id, key=None, ff_env=None, check_queue=False, add_on=''):
     "frame=object&force_md5"
     *REQUIRES ff_env if check_queue is used*
     """
+    if vapp:
+        url = f"/{obj_id}?{add_on}"
+        response = vapp.get(url)
+        if response and response.status_code in [301, 302, 303, 307, 308]:
+            response = response.follow()
+        return get_response_json(response)
+
     auth = get_authentication_with_server(key, ff_env)
     if check_queue and stuff_in_queues(ff_env, check_secondary=False):
         add_on += '&datastore=database'
@@ -989,6 +996,12 @@ def get_schema(name, key=None, ff_env: Optional[str] = None, portal_env: Optiona
     portal_env = resolve_portal_env(ff_env=ff_env, portal_env=portal_env, portal_vapp=portal_vapp)
     base_url = f"profiles/{to_camel_case(name)}.json"
     add_on = 'frame=raw'
+
+    # TODO
+    # Now that get_metadata supported portal_vapp we can do:
+    # return get_metadata(obj_id=base_url, key=key, ff_env=portal_env, add_on=add_on, vapp=portal_vapp)
+    # however this breaks test_ff_utils.test_get_schema_with_vapp and no time to fix. 2023-11-02.
+
     if portal_vapp:
         full_url = f"/{base_url}?{add_on}"
         res = portal_vapp.get(full_url)

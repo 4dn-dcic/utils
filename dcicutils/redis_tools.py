@@ -113,9 +113,8 @@ class RedisSessionToken:
         :param leeway: numerical value in seconds to account for clock drift
         :return: a decoded JWT in dictionary format
         """
-        #TODO: verify_signature should be True
         return jwt.decode(self.jwt, secret, audience=audience, leeway=leeway,
-                          options={'verify_signature': False}, algorithms=algorithms)
+                          options={'verify_signature': True}, algorithms=algorithms)
 
     def store_session_token(self, *, redis_handler: RedisBase) -> bool:
         """ Stores the created session token object as an hset in Redis
