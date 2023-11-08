@@ -302,8 +302,7 @@ class FlattenedTableSetManager(BasicTableSetManager):
                 if processed_row_data is CommentRow:
                     continue
                 sheet_content.append(processed_row_data)
-            normalized_tab_name = to_snake_case(tab_name.replace(" ", ""))
-            self.content_by_tab_name[normalized_tab_name] = sheet_content
+            self.content_by_tab_name[tab_name] = sheet_content
         return self.content_by_tab_name
 
     def parse_cell_value(self, value: SheetCellValue, override_prefer_number: Optional[bool] = None) -> AnyJsonData:
@@ -752,8 +751,6 @@ class TableSetManager(AbstractTableSetManager):
             manager = cls.create_implementation_manager(filename=filename, tab_name=tab_name, escaping=escaping,
                                                         **kwargs)
             content: TabbedSheetData = manager.load_content()
-            if not retain_empty_properties:
-                remove_empty_properties(content)
             return {
                 'filename': filename,
                 'content': content,
@@ -767,15 +764,3 @@ class TableSetManager(AbstractTableSetManager):
 
 load_table_set = TableSetManager.load
 load_table_annotated = TableSetManager.load_annotated
-
-def remove_empty_properties(data: Optional[Union[list,dict]]) -> None:
-    if isinstance(data, dict):
-        for key in list(data.keys()):
-            value = data[key]
-            if not value:
-                del data[key]
-            else:
-                remove_empty_properties(value)
-    elif isinstance(data, list):
-        for item in data:
-            remove_empty_properties(item)
