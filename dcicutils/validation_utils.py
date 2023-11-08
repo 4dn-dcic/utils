@@ -63,6 +63,7 @@ class SchemaManager:
             return override_schema
         schema: Optional[AnyJsonData] = self.SCHEMA_CACHE.get(schema_name)
         if schema is None and schema_name not in self.SCHEMA_CACHE:  # If None is already stored, don't look it up again
+            schema_name = schema_name.replace(" ", "")
             schema = get_schema(schema_name, portal_env=self.portal_env, portal_vapp=self.portal_vapp)
             self.SCHEMA_CACHE[schema_name] = schema
         return schema
