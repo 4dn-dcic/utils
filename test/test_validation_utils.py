@@ -73,20 +73,20 @@ def test_schema_manager_with_schemas(schema_id):
 def test_schema_manager_identifying_value():
 
     with pytest.raises(ValueError) as exc:
-        assert SchemaManager.identifying_value({'any': 'thing'}, [])
+        assert SchemaManager.identifying_value({'any': 'thing'}, [], raise_exception=True)
     assert str(exc.value) == "No identifying properties were specified."
 
     person_named_fred = {'age': 33, 'name': 'Fred', 'favorite-color': 'yellow'}
-    assert SchemaManager.identifying_value(person_named_fred, ['uuid', 'name']) == 'Fred'
+    assert SchemaManager.identifying_value(person_named_fred, ['uuid', 'name'], raise_exception=True) == 'Fred'
 
     person_nicknamed_fred = {'age': 33, 'nickname': 'Fred', 'favorite-color': 'yellow'}
     with pytest.raises(ValueError) as exc:
-        SchemaManager.identifying_value(person_nicknamed_fred, ['uuid', 'name'])
+        SchemaManager.identifying_value(person_nicknamed_fred, ['uuid', 'name'], raise_exception=True)
     assert str(exc.value) == ("""There are no identifying properties 'uuid' or 'name'"""
                               """ in {"age": 33, "nickname": "Fred", "favorite-color": "yellow"}.""")
 
     with pytest.raises(ValueError) as exc:
-        SchemaManager.identifying_value(person_nicknamed_fred, ['name'])
+        SchemaManager.identifying_value(person_nicknamed_fred, ['name'], raise_exception=True)
     assert str(exc.value) == ("""There is no identifying property 'name'"""
                               """ in {"age": 33, "nickname": "Fred", "favorite-color": "yellow"}.""")
 
