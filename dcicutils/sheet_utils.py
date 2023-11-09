@@ -17,7 +17,7 @@ from tempfile import TemporaryFile, TemporaryDirectory
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
 from .common import AnyJsonData, Regexp, JsonSchema
 from .lang_utils import conjoined_list, disjoined_list, maybe_pluralize
-from .misc_utils import ignored, pad_to, JsonLinesReader, remove_suffix, to_snake_case
+from .misc_utils import ignored, pad_to, JsonLinesReader, remove_suffix
 
 
 Header = str

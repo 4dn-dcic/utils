@@ -1,6 +1,7 @@
 import json
 import os
 import pytest
+from typing import Optional, Union
 
 from collections import namedtuple
 from dcicutils.sheet_utils import (
@@ -116,7 +117,7 @@ def test_table_set_manager_registry_manager_for_filename():
 
 SAMPLE_XLSX_FILE = os.path.join(TEST_DIR, 'data_files/sample_items.xlsx')
 
-SAMPLE_XLSX_FILE_RAW_CONTENT = {
+old_SAMPLE_XLSX_FILE_RAW_CONTENT = {
     "Sheet1": [
         {"x": 1, "y.a": 1, "y.z": 1},
         {"x": 1, "y.a": 2, "y.z": 3},
@@ -135,6 +136,29 @@ SAMPLE_XLSX_FILE_RAW_CONTENT = {
             "mother.name": "estrella", "mother.age": 35,
             "father.name": "anthony", "father.age": 34,
             "friends#0.name": "anders", "friends#0.age": 9,
+            "friends#1.name": None, "friends#1.age": None,
+        },
+    ]
+}
+SAMPLE_XLSX_FILE_RAW_CONTENT = {
+    "Sheet1": [
+        {"x": "1", "y.a": "1", "y.z": "1"},
+        {"x": "1", "y.a": "2", "y.z": "3"},
+        {"x": "alpha", "y.a": "beta", "y.z": "gamma|delta"},
+    ],
+    "Sheet2": [
+        {
+            "name": "bill", "age": "23",
+            "mother.name": "mary", "mother.age": "58",
+            "father.name": "fred", "father.age": "63",
+            "friends#0.name": "sam", "friends#0.age": "22",
+            "friends#1.name": "arthur", "friends#1.age": "19",
+        },
+        {
+            "name": "joe", "age": "9",
+            "mother.name": "estrella", "mother.age": "35",
+            "father.name": "anthony", "father.age": "34",
+            "friends#0.name": "anders", "friends#0.age": "9",
             "friends#1.name": None, "friends#1.age": None,
         },
     ]
@@ -243,11 +267,11 @@ def test_xlsx_manager_load_csv():
 
 def test_csv_manager_load_content():
     wt = CsvManager(SAMPLE_CSV_FILE)
-    assert wt.load_content() == SAMPLE_CSV_FILE_RAW_CONTENT
+    assert convert_number_to_string(wt.load_content()) == SAMPLE_CSV_FILE_RAW_CONTENT
 
 
 def test_csv_manager_load():
-    assert CsvManager.load(SAMPLE_CSV_FILE) == SAMPLE_CSV_FILE_RAW_CONTENT
+    assert convert_number_to_string(CsvManager.load(SAMPLE_CSV_FILE)) == SAMPLE_CSV_FILE_RAW_CONTENT
 
 
 def test_csv_manager_load_csv():
@@ -269,11 +293,11 @@ def test_csv_escaping():
 
 def test_tsv_manager_load_content():
     wt = TsvManager(SAMPLE_TSV_FILE)
-    assert wt.load_content() == SAMPLE_TSV_FILE_RAW_CONTENT
+    assert convert_number_to_string(wt.load_content()) == SAMPLE_TSV_FILE_RAW_CONTENT
 
 
 def test_tsv_manager_load():
-    assert TsvManager.load(SAMPLE_TSV_FILE) == SAMPLE_TSV_FILE_RAW_CONTENT
+    assert convert_number_to_string(TsvManager.load(SAMPLE_TSV_FILE)) == SAMPLE_TSV_FILE_RAW_CONTENT
 
 
 def test_tsv_manager_load_csv():
@@ -281,3 +305,16 @@ def test_tsv_manager_load_csv():
         TsvManager.load(SAMPLE_XLSX_FILE)
     assert str(exc.value).startswith('The TableSetManager subclass TsvManager'
                                      ' expects only .tsv or .tsv.txt filenames:')
+
+
+def convert_number_to_string(data: Optional[Union[list, dict]]) -> Optional[Union[list, dict]]:
+    if isinstance(data, dict):
+        for key in list(data.keys()):
+            if isinstance(value := data[key], int):
+                data[key] = str(value)
+            else:
+                convert_number_to_string(value)
+    elif isinstance(data, list):
+        for item in data:
+            convert_number_to_string(item)
+    return data

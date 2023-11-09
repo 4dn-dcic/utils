@@ -687,11 +687,10 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
     return checked_items
 
 
-def remove_empty_properties(data: Optional[Union[list,dict]]) -> None:
+def remove_empty_properties(data: Optional[Union[list, dict]]) -> None:
     if isinstance(data, dict):
         for key in list(data.keys()):
-            value = data[key]
-            if not value:
+            if (value := data[key]) is None:
                 del data[key]
             else:
                 remove_empty_properties(value)
