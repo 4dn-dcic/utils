@@ -27,10 +27,10 @@ class SchemaManager:
         # finally:
         #     cls.SCHEMA_CACHE = old_schema_cache
 
-    def __init__(self, *, override_schemas: Optional[TabbedJsonSchemas] = None,
+    def __init__(self, *, override_schemas: Optional[TabbedJsonSchemas] = None, noschemas: bool = False,
                  portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
         self.SCHEMA_CACHE = {}  # Shared cache. Do not override. Use .clear_schema_cache() to clear it.
-        if portal_env is None and portal_vapp is None:
+        if portal_env is None and portal_vapp is None and not noschemas:
             portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
             PRINT(f"The portal_env was not explicitly supplied. Schemas will come from portal_env={portal_env!r}.")
         self.portal_env = portal_env
@@ -174,7 +174,9 @@ def validate_data_against_schemas(data: TabbedSheetData, *,
     schema_manager = SchemaManager(portal_env=portal_env, portal_vapp=portal_vapp, override_schemas=override_schemas)
 
     errors = []
-    schemas = schema_manager.fetch_relevant_schemas(list(data.keys()))
+
+    schema_names_to_fetch = [key for key, value in data.items() if value]
+    schemas = schema_manager.fetch_relevant_schemas(schema_names_to_fetch)
 
     for data_type in data:
         schema = schemas.get(data_type)

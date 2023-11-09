@@ -74,11 +74,11 @@ class BoolHint(TypeHint):
 
 class NumHint(TypeHint):
 
-    PREFERENCE_MAP = {'number': 'num', 'integer': 'int', 'float': 'float'}
+    PREFERENCE_MAP = {'number': 'number', 'integer': 'integer'}
 
     def __init__(self, declared_type: Optional[str] = None):
         if declared_type is None:
-            declared_type = 'num'
+            declared_type = 'number'
         self.preferred_type = self.PREFERENCE_MAP.get(declared_type)
 
     def apply_hint(self, value):
@@ -347,7 +347,7 @@ class ItemTools:
                 if link_to and context.schema_exists(link_to):
                     return RefHint(schema_name=link_to, context=context)
                 return StringHint()
-            elif t in ('integer', 'float', 'number'):
+            elif t in ('integer', 'number'):
                 return NumHint(declared_type=t)
             elif t == 'boolean':
                 return BoolHint()
@@ -452,7 +452,8 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
     def __init__(self, tabbed_sheet_data: TabbedSheetData, *, flattened: bool,
                  override_schemas: Optional[TabbedJsonSchemas] = None,
                  portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None,
-                 apply_heuristics: bool = False):
+                 apply_heuristics: bool = False,
+                 noschemas: bool = False):
 
         self.flattened = flattened
         # if not flattened:
@@ -462,7 +463,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         #     # -kmp 25-Oct-2023
         #     raise ValueError("Only flattened=True is supported by TableChecker for now.")
 
-        if portal_env is None and portal_vapp is None:
+        if portal_env is None and portal_vapp is None and not noschemas:
             portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
         # InflatableTabbedDataManager supplies:
         #   self.tabbed_sheet_data: TabbedSheetData =
@@ -473,9 +474,14 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         super().__init__(tabbed_sheet_data=tabbed_sheet_data, apply_heuristics=apply_heuristics)
         self.portal_env = portal_env
         self.portal_vapp = portal_vapp
-        self.schema_manager: SchemaManager = SchemaManager(portal_env=portal_env, portal_vapp=portal_vapp,
-                                                           override_schemas=override_schemas)
-        self.schemas = self.schema_manager.fetch_relevant_schemas(self.tab_names)  # , schemas=schemas)
+        if not noschemas:
+            self.schema_manager: SchemaManager = SchemaManager(portal_env=portal_env, portal_vapp=portal_vapp,
+                                                               override_schemas=override_schemas, noschemas=noschemas)
+            schema_names_to_fetch = [key for key, value in tabbed_sheet_data.items() if value]
+            self.schemas = self.schema_manager.fetch_relevant_schemas(schema_names_to_fetch) if not noschemas else None # , schemas=schemas)
+        else:
+            self.schema_manager = None
+            self.schemas = {}
         self.lookup_tables_by_tab_name: Dict[str, Dict[str, Dict]] = {
             tab_name: self.build_lookup_table_for_tab(tab_name, rows=rows)
             for tab_name, rows in tabbed_sheet_data.items()
@@ -496,6 +502,8 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         self._problems.append(problem)
 
     def build_lookup_table_for_tab(self, tab_name: str, *, rows: List[Dict]) -> Dict[str, Dict]:
+        if not self.schema_manager or not rows:
+            return []
         identifying_properties = self.schema_manager.identifying_properties(schema_name=tab_name)
         if not identifying_properties:
             # Maybe issue a warning here that we're going to lose
@@ -554,7 +562,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
             return False
 
     def schema_exists(self, schema_name: str) -> bool:
-        return self.schema_manager.schema_exists(schema_name)
+        return self.schema_manager.schema_exists(schema_name) if self.schema_manager else False
 
     def check_tab(self, tab_name: str):
         prototype = self.patch_prototypes_by_tab_name[tab_name]
@@ -617,10 +625,11 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
               flattened: bool,
               override_schemas: Optional[TabbedJsonSchemas] = None,
               apply_heuristics: bool = False,
+              noschemas: bool = False,
               portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
         checker = cls(tabbed_sheet_data, flattened=flattened,
                       override_schemas=override_schemas, apply_heuristics=apply_heuristics,
-                      portal_env=portal_env, portal_vapp=portal_vapp)
+                      portal_env=portal_env, portal_vapp=portal_vapp, noschemas=noschemas)
         checked = checker.check_tabs()
         return checked
 
@@ -654,7 +663,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
                                type_hints=self.type_hints_by_tab_name[tab_name])
 
 
-check = TableChecker.check
+# check = TableChecker.check
 
 
 def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
@@ -664,6 +673,7 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
                #       but for production use maybe should not be? -kmp 25-Oct-2023
                validate: bool = False,
                retain_empty_properties: bool = False,
+               noschemas: bool = False,
                **kwargs):
     annotated_data = TableSetManager.load_annotated(filename=filename, tab_name=tab_name, escaping=escaping,
                                                     prefer_number=False, **kwargs)
@@ -673,14 +683,15 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
         checked_items = TableChecker.check(tabbed_rows, flattened=flattened,
                                            override_schemas=override_schemas,
                                            portal_env=portal_env, portal_vapp=portal_vapp,
-                                           apply_heuristics=apply_heuristics)
+                                           apply_heuristics=apply_heuristics,
+                                           noschemas=noschemas)
     else:
         # No fancy checking for things like .json, etc. for now. Only check things that came from
         # spreadsheet-like data, where structural datatypes are forced into strings.
         checked_items = tabbed_rows
     if not retain_empty_properties:
         remove_empty_properties(checked_items)
-    if validate:
+    if validate and not noschemas:
         problems = validate_data_against_schemas(checked_items, portal_env=portal_env, portal_vapp=portal_vapp,
                                                  override_schemas=override_schemas)
         return checked_items, problems
@@ -690,7 +701,7 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
 def remove_empty_properties(data: Optional[Union[list, dict]]) -> None:
     if isinstance(data, dict):
         for key in list(data.keys()):
-            if (value := data[key]) is None:
+            if (value := data[key]) in [None, ""]:
                 del data[key]
             else:
                 remove_empty_properties(value)

@@ -70,7 +70,7 @@ def unwanted_kwargs(*, context, kwargs, context_plural=False, detailed=False):
                                      f" {maybe_pluralize(unwanted, 'keyword argument')} {conjoined_list(unwanted)}.")
 
 
-def prefer_number(value: SheetCellValue, kind='num'):
+def prefer_number(value: SheetCellValue, kind='number'):
     """
     Given a string, if the string has number syntax, returns the number it represents. Otherwise, returns its argument.
     (It follows from this that if given an int or a float, it just returns that argument.)
@@ -79,7 +79,7 @@ def prefer_number(value: SheetCellValue, kind='num'):
     is coerced to, but it has no effect when the argument is a number, even a number of the wrong kind.
 
     :param value: a string, int, or float
-    :param kind: one of 'num', 'int', or 'float'
+    :param kind: one of 'number' or 'integer'
     :returns: the argument coerced to a number of the appropriate kind, if possible, or else the argument literally
     """
     if isinstance(value, str):  # the given value might be an int or float, in which case just fall through
@@ -88,12 +88,12 @@ def prefer_number(value: SheetCellValue, kind='num'):
         value = value
         ch0 = value[0]
         if ch0 == '+' or ch0 == '-' or ch0.isdigit():
-            if kind == 'num' or kind == 'int':
+            if kind == 'integer':
                 try:
                     return int(value)
                 except Exception:
                     pass
-            if kind == 'num' or kind == 'float':
+            if kind == 'number':
                 try:
                     return float(value)
                 except Exception:
@@ -302,7 +302,7 @@ class FlattenedTableSetManager(BasicTableSetManager):
                 if processed_row_data is CommentRow:
                     continue
                 sheet_content.append(processed_row_data)
-            self.content_by_tab_name[tab_name] = sheet_content
+            self.content_by_tab_name[tab_name.replace(" ", "")] = sheet_content
         return self.content_by_tab_name
 
     def parse_cell_value(self, value: SheetCellValue, override_prefer_number: Optional[bool] = None) -> AnyJsonData:
@@ -395,8 +395,10 @@ class XlsxManager(FlattenedTableSetManager):
         results = []
         for col in self._all_cols(sheet):
             value = sheet.cell(row=row, column=col).value
-            if value is not None and XlsxManager.CONVERT_VALUES_TO_STRING:
-                value = str(value).strip()
+#           if value is not None and XlsxManager.CONVERT_VALUES_TO_STRING:
+#               value = str(value).strip()
+            if XlsxManager.CONVERT_VALUES_TO_STRING:
+                value = str(value).strip() if value is not None else ""
             results.append(value)
         return results
 
@@ -642,10 +644,10 @@ class CsvManager(SingleTableMixin, FlattenedTableSetManager):
     def _process_row(self, tab_name: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
         ignored(tab_name)
         if self.escaping:
-            return {headers[i]: self.parse_cell_value(self._escape_cell_text(cell_text))
+            return {headers[i]: self.parse_cell_value(self._escape_cell_text(cell_text), override_prefer_number=False)
                     for i, cell_text in enumerate(row_data)}
         else:
-            return {headers[i]: self.parse_cell_value(cell_text)
+            return {headers[i]: self.parse_cell_value(cell_text, override_prefer_number=False)
                     for i, cell_text in enumerate(row_data)}
 
 

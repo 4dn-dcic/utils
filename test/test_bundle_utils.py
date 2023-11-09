@@ -326,7 +326,7 @@ SAMPLE_CSV_FILE2_CONTENT = {
     SAMPLE_CSV_FILE2_SHEET_NAME: [
         {"name": "john", "sex": "M", "member": "false"},
         {"name": "juan", "sex": "male", "member": "true"},
-        {"name": "igor", "sex": "unknown", "member": None},
+        {"name": "igor", "sex": "unknown", "member": ""},
         {"name": "mary", "sex": "Female", "member": "t"}
     ]
 }
@@ -335,7 +335,7 @@ SAMPLE_CSV_FILE2_ITEM_CONTENT = {
     SAMPLE_CSV_FILE2_SHEET_NAME: [
         {"name": "john", "sex": "M", "member": False},
         {"name": "juan", "sex": "male", "member": True},
-        {"name": "igor", "sex": "unknown", "member": ""},
+        {"name": "igor", "sex": "unknown"},
         {"name": "mary", "sex": "Female", "member": "t"}
     ]
 }
@@ -344,7 +344,7 @@ SAMPLE_CSV_FILE2_PERSON_CONTENT_HINTED = {
     "Person": [
         {"name": "john", "sex": "Male", "member": False},
         {"name": "juan", "sex": "Male", "member": True},
-        {"name": "igor", "sex": "unknown", "member": ""},
+        {"name": "igor", "sex": "unknown"},
         {"name": "mary", "sex": "Female", "member": True}
     ]
 }
@@ -466,6 +466,7 @@ def test_load_items_with_schema():
     print("Case 3")
     expected = SAMPLE_CSV_FILE2_PERSON_CONTENT_HINTED
     actual = load_items(SAMPLE_CSV_FILE2, override_schemas=SAMPLE_CSV_FILE2_SCHEMAS, tab_name='Person')
+    import pdb ; pdb.set_trace()
     assert actual == expected
 
 

@@ -117,25 +117,25 @@ def test_table_set_manager_registry_manager_for_filename():
 
 SAMPLE_XLSX_FILE = os.path.join(TEST_DIR, 'data_files/sample_items.xlsx')
 
-old_SAMPLE_XLSX_FILE_RAW_CONTENT = {
+backup_SAMPLE_XLSX_FILE_RAW_CONTENT = {
     "Sheet1": [
-        {"x": 1, "y.a": 1, "y.z": 1},
-        {"x": 1, "y.a": 2, "y.z": 3},
+        {"x": "1", "y.a": "1", "y.z": "1"},
+        {"x": "1", "y.a": "2", "y.z": "3"},
         {"x": "alpha", "y.a": "beta", "y.z": "gamma|delta"},
     ],
     "Sheet2": [
         {
-            "name": "bill", "age": 23,
-            "mother.name": "mary", "mother.age": 58,
-            "father.name": "fred", "father.age": 63,
-            "friends#0.name": "sam", "friends#0.age": 22,
-            "friends#1.name": "arthur", "friends#1.age": 19,
+            "name": "bill", "age": "23",
+            "mother.name": "mary", "mother.age": "58",
+            "father.name": "fred", "father.age": "63",
+            "friends#0.name": "sam", "friends#0.age": "22",
+            "friends#1.name": "arthur", "friends#1.age": "19",
         },
         {
-            "name": "joe", "age": 9,
-            "mother.name": "estrella", "mother.age": 35,
-            "father.name": "anthony", "father.age": 34,
-            "friends#0.name": "anders", "friends#0.age": 9,
+            "name": "joe", "age": "9",
+            "mother.name": "estrella", "mother.age": "35",
+            "father.name": "anthony", "father.age": "34",
+            "friends#0.name": "anders", "friends#0.age": "9",
             "friends#1.name": None, "friends#1.age": None,
         },
     ]
@@ -159,7 +159,7 @@ SAMPLE_XLSX_FILE_RAW_CONTENT = {
             "mother.name": "estrella", "mother.age": "35",
             "father.name": "anthony", "father.age": "34",
             "friends#0.name": "anders", "friends#0.age": "9",
-            "friends#1.name": None, "friends#1.age": None,
+            "friends#1.name": "", "friends#1.age": "",
         },
     ]
 }
@@ -186,7 +186,7 @@ SAMPLE_XLSX_FILE_INFLATED_CONTENT = {
             "father": {"name": "anthony", "age": 34},
             "friends": [
                 {"name": "anders", "age": 9},
-                {"name": None, "age": None}
+                {"name": "", "age": ""}
             ]
         },
     ],
