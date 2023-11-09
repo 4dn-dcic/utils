@@ -443,7 +443,7 @@ class XlsxManager(FlattenedTableSetManager):
         return False
 
     @staticmethod
-    def remove_trailing_none_values(values: list[Any]) -> list[Any]:
+    def remove_trailing_none_values(values: List[Any]) -> list[Any]:
         for index in range(len(values) - 1, -1, -1):
             if values[index] is not None:
                 break
