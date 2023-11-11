@@ -432,7 +432,7 @@ class XlsxManager(FlattenedTableSetManager):
     @staticmethod
     def is_terminating_row(row: List[Optional[Any]]) -> bool:
         # TODO: This is may change; currently an all blank row signals the end of input.
-        return all(cell is None for cell in row) and XlsxManager.TERMINATE_ON_EMPTY_ROW
+        return all(cell is None or cell == "" for cell in row) and XlsxManager.TERMINATE_ON_EMPTY_ROW
 
     @staticmethod
     def is_comment_row(row: Tuple[Optional[Any]]) -> bool:
