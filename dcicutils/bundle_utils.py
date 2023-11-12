@@ -1,3 +1,4 @@
+import json
 import copy
 
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -45,6 +46,9 @@ class ValidationProblem(Exception):
 
 
 class TypeHint:
+    def __init__(self):
+        self.is_array = False
+
     def apply_hint(self, value):
         return value
 
@@ -56,6 +60,8 @@ class TypeHint:
 
 
 class BoolHint(TypeHint):
+    def __init__(self):
+        super().__init__()
 
     # We could use other ways to do this, such as initial substring, but this is more likely to be right.
     # Then again, we might want to consder accepting athers like 'yes/no', 'y/n', 'on/off', '1/0'.
@@ -80,6 +86,7 @@ class NumHint(TypeHint):
         if declared_type is None:
             declared_type = 'number'
         self.preferred_type = self.PREFERENCE_MAP.get(declared_type)
+        super().__init__()
 
     def apply_hint(self, value):
         if isinstance(value, str) and value:
@@ -97,6 +104,7 @@ class EnumHint(TypeHint):
 
     def __init__(self, value_map):
         self.value_map = value_map
+        super().__init__()
 
     def apply_hint(self, value):
         if isinstance(value, str):
@@ -117,6 +125,9 @@ class EnumHint(TypeHint):
 
 
 class ArrayHint(TypeHint):
+    def __init__(self):
+        super().__init__()
+
     def apply_hint(self, value):
         if value is None or value == '':
             return []
@@ -126,6 +137,9 @@ class ArrayHint(TypeHint):
 
 
 class StringHint(TypeHint):
+    def __init__(self):
+        super().__init__()
+
     def apply_hint(self, value):
         return str(value).strip() if value is not None else ""
 
@@ -138,9 +152,16 @@ class RefHint(TypeHint):
     def __init__(self, schema_name: str, context: TypeHintContext):
         self.schema_name = schema_name
         self.context = context
+        super().__init__()
 
     def apply_hint(self, value):
-        if not self.context.validate_ref(item_type=self.schema_name, item_ref=value):
+        if self.is_array:
+            value = [value.strip() for value in value.split(ARRAY_VALUE_DELIMITER)]
+            for item in value:
+                if item and not self.context.validate_ref(item_type=self.schema_name, item_ref=item):
+                    raise ValidationProblem(f"Unable to validate {self.schema_name} reference: {item!r}")
+            return value
+        if value and not self.context.validate_ref(item_type=self.schema_name, item_ref=value):
             raise ValidationProblem(f"Unable to validate {self.schema_name} reference: {value!r}")
         return value
 
@@ -352,6 +373,10 @@ class ItemTools:
             elif t == 'boolean':
                 return BoolHint()
             elif t == 'array':
+                array_type_hint = cls.find_type_hint_for_subschema(subschema.get("items"), context)
+                if type(array_type_hint) == RefHint:
+                    array_type_hint.is_array = True
+                    return array_type_hint
                 return ArrayHint()
 
     @classmethod
@@ -527,7 +552,15 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
     def resolve_ref(self, item_type, item_ref):
         lookup_table = self.lookup_tables_by_tab_name.get(item_type)
         if lookup_table:  # Is it a type we're tracking?
-            return lookup_table.get(item_ref) or None
+            if isinstance(item_ref, list):
+                found = True
+                for item in item_ref:
+                    if not lookup_table.get(item):
+                        found = False
+                        break
+                return True if found else None
+            else:
+                return lookup_table.get(item_ref) or None
         else:  # Apparently some stray type not in our tables
             return None
 
@@ -553,8 +586,18 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
             return True
         try:
             # TODO: This probably needs a cache
-            info = get_metadata(f"/{to_camel_case(item_type)}/{item_ref}",
-                                ff_env=self.portal_env, vapp=self.portal_vapp)
+            if isinstance(item_ref, list):
+                found = True
+                for item in item_ref:
+                    info = get_metadata(f"/{to_camel_case(item_type)}/{item_ref}",
+                                        ff_env=self.portal_env, vapp=self.portal_vapp)
+                    if not isinstance(info, dict) or 'uuid' not in info:
+                        found = False
+                        break
+                return found
+            else:
+                info = get_metadata(f"/{to_camel_case(item_type)}/{item_ref}",
+                                    ff_env=self.portal_env, vapp=self.portal_vapp)
             # Basically return True if there's a value at all,
             # but still check it's not an error message that didn't get raised.
             return isinstance(info, dict) and 'uuid' in info
