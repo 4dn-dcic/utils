@@ -466,7 +466,6 @@ def test_load_items_with_schema():
     print("Case 3")
     expected = SAMPLE_CSV_FILE2_PERSON_CONTENT_HINTED
     actual = load_items(SAMPLE_CSV_FILE2, override_schemas=SAMPLE_CSV_FILE2_SCHEMAS, tab_name='Person')
-    import pdb ; pdb.set_trace()
     assert actual == expected
 
 
