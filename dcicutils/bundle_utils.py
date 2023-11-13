@@ -132,6 +132,8 @@ class ArrayHint(TypeHint):
         if value is None or value == '':
             return []
         if isinstance(value, str):
+            if not value:
+                return []
             return [value.strip() for value in value.split(ARRAY_VALUE_DELIMITER)]
         return super().apply_hint(value)
 
@@ -156,7 +158,7 @@ class RefHint(TypeHint):
 
     def apply_hint(self, value):
         if self.is_array:
-            value = [value.strip() for value in value.split(ARRAY_VALUE_DELIMITER)]
+            value = [value.strip() for value in value.split(ARRAY_VALUE_DELIMITER)] if value else []
             for item in value:
                 if item and not self.context.validate_ref(item_type=self.schema_name, item_ref=item):
                     raise ValidationProblem(f"Unable to validate {self.schema_name} reference: {item!r}")
@@ -589,7 +591,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
             if isinstance(item_ref, list):
                 found = True
                 for item in item_ref:
-                    info = get_metadata(f"/{to_camel_case(item_type)}/{item_ref}",
+                    info = get_metadata(f"/{to_camel_case(item_type)}/{item}",
                                         ff_env=self.portal_env, vapp=self.portal_vapp)
                     if not isinstance(info, dict) or 'uuid' not in info:
                         found = False
