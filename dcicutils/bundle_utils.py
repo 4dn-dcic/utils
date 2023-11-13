@@ -1,4 +1,3 @@
-import json
 import copy
 
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -505,7 +504,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
             self.schema_manager: SchemaManager = SchemaManager(portal_env=portal_env, portal_vapp=portal_vapp,
                                                                override_schemas=override_schemas, noschemas=noschemas)
             schema_names_to_fetch = [key for key, value in tabbed_sheet_data.items() if value]
-            self.schemas = self.schema_manager.fetch_relevant_schemas(schema_names_to_fetch) if not noschemas else None # , schemas=schemas)
+            self.schemas = self.schema_manager.fetch_relevant_schemas(schema_names_to_fetch) if not noschemas else None
         else:
             self.schema_manager = None
             self.schemas = {}
