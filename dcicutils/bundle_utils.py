@@ -158,14 +158,15 @@ class RefHint(TypeHint):
     def apply_hint(self, value):
         if self.is_array:
             value = [value.strip() for value in value.split(ARRAY_VALUE_DELIMITER)] if value else []
-            for item in value:
-                if item and not self.context.validate_ref(item_type=self.schema_name, item_ref=item):
-                    raise ValidationProblem(f"Unable to validate {self.schema_name} reference: {item!r}")
             return value
         self._apply_ref_hint(value)
         return value
 
     def _apply_ref_hint(self, value):
+        if self.is_array:
+            for item in value:
+                if item and not self.context.validate_ref(item_type=self.schema_name, item_ref=item):
+                    raise ValidationProblem(f"Unable to validate {self.schema_name} reference: {item!r}")
         if value and not self.context.validate_ref(item_type=self.schema_name, item_ref=value):
             raise ValidationProblem(f"Unable to validate {self.schema_name} reference: {value!r}")
         return value
@@ -269,7 +270,7 @@ class ItemTools:
     def compute_patch_prototype(cls, parsed_headers: ParsedHeaders):
         prototype = {}
         for parsed_header in parsed_headers:
-            parsed_header0 = parsed_header[0]
+            parsed_header0 = parsed_header[0] if parsed_header else ""
             if isinstance(parsed_header0, int):
                 raise LoadTableError(f"A header cannot begin with a numeric ref: {parsed_header0}")
             cls.assure_patch_prototype_shape(parent=prototype, keys=parsed_header)
@@ -277,7 +278,9 @@ class ItemTools:
 
     @classmethod
     def assure_patch_prototype_shape(cls, *, parent: Union[Dict, List], keys: ParsedHeader):
-        [key0, *more_keys] = keys
+        key0 = None
+        more_keys = None
+        [key0, *more_keys] = keys if keys else [None]
         key1 = more_keys[0] if more_keys else None
         if isinstance(key1, int):
             placeholder = []
@@ -354,7 +357,7 @@ class ItemTools:
         # if (value is None or value == '') and not force:
         if value is None and not force:
             return
-        [key, *more_path] = path
+        [key, *more_path] = path if path else [None]
         if not more_path:
             datum[key] = value
         else:
