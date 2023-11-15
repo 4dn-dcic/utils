@@ -17,7 +17,7 @@ from tempfile import TemporaryFile, TemporaryDirectory
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
 from .common import AnyJsonData, Regexp, JsonSchema
 from .lang_utils import conjoined_list, disjoined_list, maybe_pluralize
-from .misc_utils import ignored, pad_to, JsonLinesReader, remove_suffix
+from .misc_utils import ignored, pad_to, JsonLinesReader, remove_suffix, to_camel_case
 
 
 Header = str
@@ -199,10 +199,10 @@ class AbstractTableSetManager:
         raise NotImplementedError(f".load(...) is not implemented for {cls.__name__}.")  # noQA
 
     @property
-    def tab_names(self) -> List[str]:
+    def tab_names(self, order: Optional[List[str]] = None) -> List[str]:
         raise NotImplementedError(f".tab_names is not implemented for {self.__class__.__name__}..")  # noQA
 
-    def load_content(self) -> Any:
+    def load_content(self, sheet_order: Optional[List[str]] = None) -> Any:
         raise NotImplementedError(f".load_content() is not implemented for {self.__class__.__name__}.")  # noQA
 
 
@@ -291,8 +291,8 @@ class FlattenedTableSetManager(BasicTableSetManager):
         """
         raise NotImplementedError(f"._process_row(...) is not implemented for {self.__class__.__name__}.")  # noQA
 
-    def load_content(self) -> AnyJsonData:
-        for tab_name in self.tab_names:
+    def load_content(self, sheet_order: Optional[List[str]] = None) -> AnyJsonData:
+        for tab_name in self.tab_names(sheet_order):
             sheet_content = []
             state = self._create_tab_processor_state(tab_name)
             for row_data in self._raw_row_generator_for_tab_name(tab_name):
@@ -378,9 +378,20 @@ class XlsxManager(FlattenedTableSetManager):
         for col in range(1, col_max + 1):
             yield col
 
-    @property
-    def tab_names(self) -> List[str]:
-        return self.reader_agent.sheetnames
+    def tab_names(self, order: Optional[List[str]] = None) -> List[str]:
+        def ordered_sheet_names(sheet_names: List[str]) -> List[str]:
+            if not order:
+                return sheet_names
+            ordered_sheet_names = []
+            for item in order:
+                for sheet_name in sheet_names:
+                    if to_camel_case(item.replace(" ", "")) == to_camel_case(sheet_name.replace(" ", "")):
+                        ordered_sheet_names.append(sheet_name)
+            for sheet_name in sheet_names:
+                if sheet_name not in ordered_sheet_names:
+                    ordered_sheet_names.append(sheet_name)
+            return ordered_sheet_names
+        return ordered_sheet_names(self.reader_agent.sheetnames)
 
     def _get_reader_agent(self) -> Workbook:
         return openpyxl.load_workbook(self.filename)
@@ -464,8 +475,7 @@ class SingleTableMixin(AbstractTableSetManager):
         self._tab_name = tab_name or infer_tab_name_from_filename(filename)
         super().__init__(filename=filename, **kwargs)
 
-    @property
-    def tab_names(self) -> List[str]:
+    def tab_names(self, order: Optional[List[str]] = None) -> List[str]:
         return [self._tab_name]
 
 
@@ -492,8 +502,7 @@ class InsertsManager(BasicTableSetManager):
         ignored(filename)
         return data
 
-    @property
-    def tab_names(self) -> List[str]:
+    def tab_names(self, order: Optional[List[str]] = None) -> List[str]:
         return list(self.content_by_tab_name.keys())
 
     def _get_reader_agent(self) -> Any:
@@ -512,7 +521,7 @@ class InsertsManager(BasicTableSetManager):
             result[tab] = headers
         return result
 
-    def load_content(self) -> Dict[str, AnyJsonData]:
+    def load_content(self, sheet_order: Optional[List[str]] = None) -> Dict[str, AnyJsonData]:
         data = self._load_inserts_data(self.filename)
         self.content_by_tab_name = data
         self.headers_by_tab_name = self.extract_tabbed_headers(data)
@@ -743,7 +752,7 @@ class TableSetManager(AbstractTableSetManager):
 
     @classmethod
     def load_annotated(cls, filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
-                       retain_empty_properties: bool = False,
+                       retain_empty_properties: bool = False, sheet_order: Optional[List[str]] = None,
                        **kwargs) -> Dict:
         """
         Given a filename and various options
@@ -752,7 +761,7 @@ class TableSetManager(AbstractTableSetManager):
         with maybe_unpack(filename) as filename:
             manager = cls.create_implementation_manager(filename=filename, tab_name=tab_name, escaping=escaping,
                                                         **kwargs)
-            content: TabbedSheetData = manager.load_content()
+            content: TabbedSheetData = manager.load_content(sheet_order)
             return {
                 'filename': filename,
                 'content': content,

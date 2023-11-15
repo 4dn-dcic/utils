@@ -718,9 +718,10 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
                validate: bool = False,
                retain_empty_properties: bool = False,
                noschemas: bool = False,
+               sheet_order: Optional[List[str]] = None,
                **kwargs):
     annotated_data = TableSetManager.load_annotated(filename=filename, tab_name=tab_name, escaping=escaping,
-                                                    prefer_number=False, **kwargs)
+                                                    prefer_number=False, sheet_order=sheet_order, **kwargs)
     tabbed_rows = annotated_data['content']
     flattened = annotated_data['flattened']
     if flattened:
