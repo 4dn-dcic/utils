@@ -750,7 +750,7 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
 def remove_empty_properties(data: Optional[Union[list, dict]]) -> None:
     if isinstance(data, dict):
         for key in list(data.keys()):
-            if (value := data[key]) in [None, ""]:
+            if (value := data[key]) in [None, "", {}, []]:
                 del data[key]
             else:
                 remove_empty_properties(value)
