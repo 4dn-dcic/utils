@@ -162,6 +162,10 @@ class RefHint(TypeHint):
                 if item and not self.context.validate_ref(item_type=self.schema_name, item_ref=item):
                     raise ValidationProblem(f"Unable to validate {self.schema_name} reference: {item!r}")
             return value
+        self._apply_ref_hint(value)
+        return value
+
+    def _apply_ref_hint(self, value):
         if value and not self.context.validate_ref(item_type=self.schema_name, item_ref=value):
             raise ValidationProblem(f"Unable to validate {self.schema_name} reference: {value!r}")
         return value
