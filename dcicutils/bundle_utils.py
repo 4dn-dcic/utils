@@ -157,9 +157,8 @@ class RefHint(TypeHint):
         super().__init__()
 
     def apply_hint(self, value):
-        if self.is_array:
+        if self.is_array and isinstance(value, str):
             value = [value.strip() for value in value.split(ARRAY_VALUE_DELIMITER)] if value else []
-            return value
         self._apply_ref_hint(value)
         return value
 
