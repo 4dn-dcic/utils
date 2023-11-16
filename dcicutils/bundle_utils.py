@@ -150,9 +150,10 @@ class RefHint(TypeHint):
     def __str__(self):
         return f"<RefHint {self.schema_name} context={self.context}>"
 
-    def __init__(self, schema_name: str, context: TypeHintContext):
+    def __init__(self, schema_name: str, required: bool, context: TypeHintContext):
         self.schema_name = schema_name
         self.context = context
+        self.required = required
         super().__init__()
 
     def apply_hint(self, value):
@@ -163,6 +164,8 @@ class RefHint(TypeHint):
         return value
 
     def _apply_ref_hint(self, value):
+        if not value and self.required:
+            raise ValidationProblem(f"Missing required {self.schema_name} reference")
         if self.is_array:
             for item in value:
                 if item and not self.context.validate_ref(item_type=self.schema_name, item_ref=item):
@@ -364,7 +367,8 @@ class ItemTools:
             cls.set_path_value(datum[key], more_path, value)
 
     @classmethod
-    def find_type_hint_for_subschema(cls, subschema: Any, context: Optional[TypeHintContext] = None):
+    def find_type_hint_for_subschema(cls, subschema: Any, required: bool = False,
+                                     context: Optional[TypeHintContext] = None):
         if subschema is not None:
             t = subschema.get('type')
             if t == 'string':
@@ -374,14 +378,14 @@ class ItemTools:
                     return EnumHint(mapping)
                 link_to = subschema.get('linkTo')
                 if link_to and context.schema_exists(link_to):
-                    return RefHint(schema_name=link_to, context=context)
+                    return RefHint(schema_name=link_to, required=required, context=context)
                 return StringHint()
             elif t in ('integer', 'number'):
                 return NumHint(declared_type=t)
             elif t == 'boolean':
                 return BoolHint()
             elif t == 'array':
-                array_type_hint = cls.find_type_hint_for_subschema(subschema.get("items"), context)
+                array_type_hint = cls.find_type_hint_for_subschema(subschema.get("items"), required=required, context=context)
                 if type(array_type_hint) == RefHint:
                     array_type_hint.is_array = True
                     return array_type_hint
@@ -399,7 +403,8 @@ class ItemTools:
                     if subschema.get('type') == 'object':
                         subsubschema = subschema.get('properties', {}).get(key1)
                         if not other_headers:
-                            hint = cls.find_type_hint_for_subschema(subsubschema, context=context)
+                            required = key1 and subschema and key1 in subschema.get('required', [])
+                            hint = cls.find_type_hint_for_subschema(subsubschema, required=required, context=context)
                             if hint:
                                 return hint
                             else:
@@ -655,6 +660,9 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         patch_item = copy.deepcopy(prototype)
         for column_number, column_value in enumerate(row.values()):
             parsed_value = ItemTools.parse_item_value(column_value, apply_heuristics=self.apply_heuristics)
+            if len(row) > column_number and (list(row.keys())[column_number] or "").endswith("#"):
+                if isinstance(parsed_value, str):
+                    parsed_value = [value.strip() for value in parsed_value.split(ARRAY_VALUE_DELIMITER) if value]
             type_hint = type_hints[column_number]
             if type_hint:
                 try:
