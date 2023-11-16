@@ -485,8 +485,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
     def __init__(self, tabbed_sheet_data: TabbedSheetData, *, flattened: bool,
                  override_schemas: Optional[TabbedJsonSchemas] = None,
                  portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None,
-                 apply_heuristics: bool = False,
-                 noschemas: bool = False):
+                 apply_heuristics: bool = False):
 
         self.flattened = flattened
         # if not flattened:
@@ -496,7 +495,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         #     # -kmp 25-Oct-2023
         #     raise ValueError("Only flattened=True is supported by TableChecker for now.")
 
-        if portal_env is None and portal_vapp is None and not noschemas:
+        if portal_env is None and portal_vapp is None:
             portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
         # InflatableTabbedDataManager supplies:
         #   self.tabbed_sheet_data: TabbedSheetData =
@@ -507,14 +506,10 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         super().__init__(tabbed_sheet_data=tabbed_sheet_data, apply_heuristics=apply_heuristics)
         self.portal_env = portal_env
         self.portal_vapp = portal_vapp
-        if not noschemas:
-            self.schema_manager: SchemaManager = SchemaManager(portal_env=portal_env, portal_vapp=portal_vapp,
-                                                               override_schemas=override_schemas, noschemas=noschemas)
-            schema_names_to_fetch = [key for key, value in tabbed_sheet_data.items() if value]
-            self.schemas = self.schema_manager.fetch_relevant_schemas(schema_names_to_fetch) if not noschemas else None
-        else:
-            self.schema_manager = None
-            self.schemas = {}
+        self.schema_manager: SchemaManager = SchemaManager(portal_env=portal_env, portal_vapp=portal_vapp,
+                                                           override_schemas=override_schemas)
+        schema_names_to_fetch = [key for key, value in tabbed_sheet_data.items() if value]
+        self.schemas = self.schema_manager.fetch_relevant_schemas(schema_names_to_fetch)
         self.lookup_tables_by_tab_name: Dict[str, Dict[str, Dict]] = {
             tab_name: self.build_lookup_table_for_tab(tab_name, rows=rows)
             for tab_name, rows in tabbed_sheet_data.items()
@@ -676,11 +671,10 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
               flattened: bool,
               override_schemas: Optional[TabbedJsonSchemas] = None,
               apply_heuristics: bool = False,
-              noschemas: bool = False,
               portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
         checker = cls(tabbed_sheet_data, flattened=flattened,
                       override_schemas=override_schemas, apply_heuristics=apply_heuristics,
-                      portal_env=portal_env, portal_vapp=portal_vapp, noschemas=noschemas)
+                      portal_env=portal_env, portal_vapp=portal_vapp)
         checked = checker.check_tabs()
         return checked
 
@@ -724,7 +718,6 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
                #       but for production use maybe should not be? -kmp 25-Oct-2023
                validate: bool = False,
                retain_empty_properties: bool = False,
-               noschemas: bool = False,
                sheet_order: Optional[List[str]] = None,
                **kwargs):
     annotated_data = TableSetManager.load_annotated(filename=filename, tab_name=tab_name, escaping=escaping,
@@ -735,15 +728,14 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
         checked_items = TableChecker.check(tabbed_rows, flattened=flattened,
                                            override_schemas=override_schemas,
                                            portal_env=portal_env, portal_vapp=portal_vapp,
-                                           apply_heuristics=apply_heuristics,
-                                           noschemas=noschemas)
+                                           apply_heuristics=apply_heuristics)
     else:
         # No fancy checking for things like .json, etc. for now. Only check things that came from
         # spreadsheet-like data, where structural datatypes are forced into strings.
         checked_items = tabbed_rows
     if not retain_empty_properties:
         remove_empty_properties(checked_items)
-    if validate and not noschemas:
+    if validate:
         problems = validate_data_against_schemas(checked_items, portal_env=portal_env, portal_vapp=portal_vapp,
                                                  override_schemas=override_schemas)
         return checked_items, problems

@@ -27,10 +27,10 @@ class SchemaManager:
         # finally:
         #     cls.SCHEMA_CACHE = old_schema_cache
 
-    def __init__(self, *, override_schemas: Optional[TabbedJsonSchemas] = None, noschemas: bool = False,
+    def __init__(self, *, override_schemas: Optional[TabbedJsonSchemas] = None,
                  portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
         self.SCHEMA_CACHE = {}  # Shared cache. Do not override. Use .clear_schema_cache() to clear it.
-        if portal_env is None and portal_vapp is None and not noschemas:
+        if portal_env is None and portal_vapp is None:
             portal_env = public_env_name(EnvUtils.PRD_ENV_NAME)
             PRINT(f"The portal_env was not explicitly supplied. Schemas will come from portal_env={portal_env!r}.")
         self.portal_env = portal_env
@@ -64,9 +64,13 @@ class SchemaManager:
         schema: Optional[AnyJsonData] = self.SCHEMA_CACHE.get(schema_name)
         if schema is None and schema_name not in self.SCHEMA_CACHE:  # If None is already stored, don't look it up again
             schema_name = schema_name.replace(" ", "")
-            schema = get_schema(schema_name, portal_env=self.portal_env, portal_vapp=self.portal_vapp)
+            schema = SchemaManager.get_schema(schema_name, portal_env=self.portal_env, portal_vapp=self.portal_vapp)
             self.SCHEMA_CACHE[schema_name] = schema
         return schema
+
+    @staticmethod
+    def get_schema(name: str, portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
+        return get_schema(name, portal_env=portal_env, portal_vapp=portal_vapp)
 
     # Should not be needed, given that SCHEMA_CACHE is an instance variable.
     #
