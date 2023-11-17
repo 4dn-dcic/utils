@@ -48,7 +48,7 @@ class TypeHint:
     def __init__(self):
         self.is_array = False
 
-    def apply_hint(self, value):
+    def apply_hint(self, value, src):
         return value
 
     def __str__(self):
@@ -67,14 +67,14 @@ class BoolHint(TypeHint):
     TRUE_VALUES = ['true', 't']
     FALSE_VALUES = ['false', 'f']
 
-    def apply_hint(self, value):
+    def apply_hint(self, value, src):
         if isinstance(value, str) and value:
             l_value = value.lower()
             if l_value in self.TRUE_VALUES:
                 return True
             elif l_value in self.FALSE_VALUES:
                 return False
-        return super().apply_hint(value)
+        return super().apply_hint(value, src)
 
 
 class NumHint(TypeHint):
@@ -87,13 +87,13 @@ class NumHint(TypeHint):
         self.preferred_type = self.PREFERENCE_MAP.get(declared_type)
         super().__init__()
 
-    def apply_hint(self, value):
+    def apply_hint(self, value, src):
         if isinstance(value, str) and value:
             if self.preferred_type:
                 return prefer_number(value, kind=self.preferred_type)
             else:
                 return value
-        return super().apply_hint(value)
+        return super().apply_hint(value, src)
 
 
 class EnumHint(TypeHint):
@@ -105,7 +105,7 @@ class EnumHint(TypeHint):
         self.value_map = value_map
         super().__init__()
 
-    def apply_hint(self, value):
+    def apply_hint(self, value, src):
         if isinstance(value, str):
             if value in self.value_map:
                 result = self.value_map[value]
@@ -120,28 +120,28 @@ class EnumHint(TypeHint):
                     [only_found] = found
                     result = self.value_map[only_found]
                     return result
-        return super().apply_hint(value)
+        return super().apply_hint(value, src)
 
 
 class ArrayHint(TypeHint):
     def __init__(self):
         super().__init__()
 
-    def apply_hint(self, value):
+    def apply_hint(self, value, src):
         if value is None or value == '':
             return []
         if isinstance(value, str):
             if not value:
                 return []
             return [value.strip() for value in value.split(ARRAY_VALUE_DELIMITER)]
-        return super().apply_hint(value)
+        return super().apply_hint(value, src)
 
 
 class StringHint(TypeHint):
     def __init__(self):
         super().__init__()
 
-    def apply_hint(self, value):
+    def apply_hint(self, value, src):
         return str(value).strip() if value is not None else ""
 
 
@@ -156,21 +156,23 @@ class RefHint(TypeHint):
         self.required = required
         super().__init__()
 
-    def apply_hint(self, value):
+    def apply_hint(self, value, src):
         if self.is_array and isinstance(value, str):
             value = [value.strip() for value in value.split(ARRAY_VALUE_DELIMITER)] if value else []
-        self._apply_ref_hint(value)
+        if self.is_array and isinstance(value, list):
+            for item in value:
+                self._apply_ref_hint(item, src)
+        else:
+            self._apply_ref_hint(value, src)
         return value
 
-    def _apply_ref_hint(self, value):
+    def _apply_ref_hint(self, value, src):
         if not value and self.required:
-            raise ValidationProblem(f"Missing required {self.schema_name} reference")
-        if self.is_array:
-            for item in value:
-                if item and not self.context.validate_ref(item_type=self.schema_name, item_ref=item):
-                    raise ValidationProblem(f"Unable to validate {self.schema_name} reference: {item!r}")
+            raise ValidationProblem(f"No required reference (linkTo) value for: {self.schema_name}"
+                                    f"{f' from {src}' if src else ''}")
         if value and not self.context.validate_ref(item_type=self.schema_name, item_ref=value):
-            raise ValidationProblem(f"Unable to validate {self.schema_name} reference: {value!r}")
+            raise ValidationProblem(f"Cannot resolve reference (linkTo) for: {self.schema_name}"
+                                    f"{f'/{value}' if value else ''}{f' from {src}' if src else ''}")
         return value
 
 
@@ -660,13 +662,15 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         patch_item = copy.deepcopy(prototype)
         for column_number, column_value in enumerate(row.values()):
             parsed_value = ItemTools.parse_item_value(column_value, apply_heuristics=self.apply_heuristics)
-            if len(row) > column_number and (list(row.keys())[column_number] or "").endswith("#"):
+            column_name = (list(row.keys())[column_number] or "") if len(row) > column_number else ""
+            if column_name.endswith("#"):
                 if isinstance(parsed_value, str):
                     parsed_value = [value.strip() for value in parsed_value.split(ARRAY_VALUE_DELIMITER) if value]
             type_hint = type_hints[column_number]
             if type_hint:
                 try:
-                    parsed_value = type_hint.apply_hint(parsed_value)
+                    src = f"{tab_name}{f'.{column_name}' if column_name else ''}"
+                    parsed_value = type_hint.apply_hint(parsed_value, src)
                 except ValidationProblem as e:
                     headers = self.headers_by_tab_name[tab_name]
                     column_name = headers[column_number]
