@@ -384,8 +384,9 @@ class ItemTools:
             elif t == 'boolean':
                 return BoolHint()
             elif t == 'array':
-                array_type_hint = cls.find_type_hint_for_subschema(subschema.get("items"), required=required, context=context)
-                if type(array_type_hint) == RefHint:
+                array_type_hint = cls.find_type_hint_for_subschema(subschema.get("items"),
+                                                                   required=required, context=context)
+                if type(array_type_hint) is RefHint:
                     array_type_hint.is_array = True
                     return array_type_hint
                 return ArrayHint()
