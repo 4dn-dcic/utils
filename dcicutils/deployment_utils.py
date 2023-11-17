@@ -426,7 +426,7 @@ class IniFileManager:
                                      indexer=None, index_server=None, sentry_dsn=None, tibanna_cwls_bucket=None,
                                      tibanna_output_bucket=None,
                                      application_bucket_prefix=None, foursight_bucket_prefix=None,
-                                     auth0_domain=DEFAULT_AUTH0_DOMAIN, auth0_client=None, auth0_secret=None,
+                                     auth0_domain=None, auth0_client=None, auth0_secret=None,
                                      auth0_allowed_connections=None,
                                      re_captcha_key=None, re_captcha_secret=None,
                                      redis_server=None,
@@ -680,7 +680,7 @@ class IniFileManager:
         sentry_dsn = sentry_dsn or os.environ.get("ENCODED_SENTRY_DSN", "")
 
         # Auth0 Configuration
-        auth0_domain = auth0_domain or os.environ.get("ENCODED_AUTH0_DOMAIN", "")
+        auth0_domain = auth0_domain or os.environ.get("ENCODED_AUTH0_DOMAIN", cls.DEFAULT_AUTH0_DOMAIN)
         auth0_client = auth0_client or os.environ.get("ENCODED_AUTH0_CLIENT", "")
         auth0_secret = auth0_secret or os.environ.get("ENCODED_AUTH0_SECRET", "")
         auth0_allowed_connections = auth0_allowed_connections or os.environ.get("ENCODED_AUTH0_ALLOWED_CONNECTIONS", "")
