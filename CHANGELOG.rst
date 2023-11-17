@@ -6,7 +6,7 @@ dcicutils
 Change Log
 ----------
 
-8.0.0.0a3
+8.3.0
 =========
 
 * Updates for RAS to Redis API
@@ -83,7 +83,6 @@ Change Log
       in each tab conforming to the schema for that tab.
 
     * ``summary_of_data_validation_errors`` to summarize the errors obtained from ``validate_data_against_schemas``.
->>>>>>> fcc02fe7d91831f823ce65e5f09658d00e3461f4
 
 
 8.0.0
