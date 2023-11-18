@@ -723,12 +723,10 @@ def test_table_checker():
                                        portal_env=mock_ff_env)
                 checker.check_tabs()
             expected_problems = [
-                # f"User[0].project: Unable to validate Project reference: {SAMPLE_PROJECT_UUID!r}",
-                # f"User[0].user_institution: Unable to validate Institution reference: {SAMPLE_INSTITUTION_UUID!r}"
-                # "User[0].project: Cannot resolve reference (linkTo) for: Project/dac6d5b3-6ef6-4271-9715-a78329acf846 from User.project",
-                # "User[0].user_institution: Cannot resolve reference (linkTo) for: Institution/87199845-51b5-4352-bdea-583edae4bb6a from User.user_institution"
-                f"User[0].project: Cannot resolve reference (linkTo) for: Project/{SAMPLE_PROJECT_UUID} from User.project",
-                f"User[0].user_institution: Cannot resolve reference (linkTo) for: Institution/{SAMPLE_INSTITUTION_UUID} from User.user_institution"
+                f"User[0].project: Cannot resolve reference (linkTo) for:"
+                f" Project/{SAMPLE_PROJECT_UUID} from User.project",
+                f"User[0].user_institution: Cannot resolve reference (linkTo) for:"
+                f" Institution/{SAMPLE_INSTITUTION_UUID} from User.user_institution"
             ]
             expected_problem_lines = [f"Problem: {problem}" for problem in expected_problems]
             assert exc.value.problems == expected_problems
