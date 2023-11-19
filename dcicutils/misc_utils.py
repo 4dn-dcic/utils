@@ -23,7 +23,7 @@ import webtest  # importing the library makes it easier to mock testing
 from collections import defaultdict
 from datetime import datetime as datetime_type
 from dateutil.parser import parse as dateutil_parse
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional, Tuple, Union
 
 
 # Is this the right place for this? I feel like this should be done in an application, not a library.
@@ -1438,6 +1438,13 @@ def split_string(value: str, delimiter: str, escape: Optional[str] = None) -> Li
             escaped = False
     result.append(item.strip())
     return [item for item in result if item]
+
+
+def right_trim_tuple(t: Tuple[Any]) -> Tuple[Any]:
+    i = len(t) - 1
+    while i >= 0 and t[i] is None:
+        i -= 1
+    return t[:i + 1]
 
 
 def is_c4_arn(arn: str) -> bool:
