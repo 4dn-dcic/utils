@@ -1107,6 +1107,18 @@ def remove_suffix(suffix: str, text: str, required: bool = False):
     return text[:len(text)-len(suffix)]
 
 
+def remove_empty_properties(data: Optional[Union[list, dict]]) -> None:
+    if isinstance(data, dict):
+        for key in list(data.keys()):
+            if (value := data[key]) in [None, "", {}, []]:
+                del data[key]
+            else:
+                remove_empty_properties(value)
+    elif isinstance(data, list):
+        for item in data:
+            remove_empty_properties(item)
+
+
 class ObsoleteError(Exception):
     pass
 

@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from .common import AnyJsonData
 from .env_utils import EnvUtils, public_env_name
 from .ff_utils import get_metadata
-from .misc_utils import AbstractVirtualApp, ignored, ignorable, PRINT, to_camel_case
+from .misc_utils import AbstractVirtualApp, ignored, ignorable, PRINT, remove_empty_properties, to_camel_case
 from .sheet_utils import (
     LoadTableError, prefer_number, TabbedJsonSchemas,
     Header, Headers, TabbedHeaders, ParsedHeader, ParsedHeaders, TabbedParsedHeaders, SheetCellValue, TabbedSheetData,
@@ -752,15 +752,3 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
                                                  override_schemas=override_schemas)
         return checked_items, problems
     return checked_items
-
-
-def remove_empty_properties(data: Optional[Union[list, dict]]) -> None:
-    if isinstance(data, dict):
-        for key in list(data.keys()):
-            if (value := data[key]) in [None, "", {}, []]:
-                del data[key]
-            else:
-                remove_empty_properties(value)
-    elif isinstance(data, list):
-        for item in data:
-            remove_empty_properties(item)
