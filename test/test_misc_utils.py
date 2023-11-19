@@ -31,7 +31,7 @@ from dcicutils.misc_utils import (
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
     MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case, json_file_contents,
-    pad_to, JsonLinesReader,
+    pad_to, JsonLinesReader, split_string
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -3590,3 +3590,22 @@ def test_json_lines_reader_lists():
             parsed = [line for line in JsonLinesReader(fp)]
             expected = [item1, item2]
             assert parsed == expected
+
+
+def test_split_array_string():
+    def split_array_string(value: str) -> List[str]:
+        return split_string(value, "|", "\\")
+    assert split_array_string(r"abc|def|ghi") == ["abc", "def", "ghi"]
+    assert split_array_string(r"abc\|def|ghi") == ["abc|def", "ghi"]
+    assert split_array_string(r"abc\\|def|ghi") == ["abc\\", "def", "ghi"]
+    assert split_array_string(r"abc\\\|def|ghi") == ["abc\\|def", "ghi"]
+    assert split_array_string(r"abc\\\|def\|ghi") == ["abc\\|def|ghi"]
+    assert split_array_string(r"abc\\|\\def\|ghi") == ["abc\\", "\\def|ghi"]
+    assert split_array_string(r"abc\\|\\def\|ghi||") == ["abc\\", "\\def|ghi"]
+    assert split_array_string(r"|abcdefghi|") == ["abcdefghi"]
+    assert split_array_string(r"|abcdefghi||xyzzy") == ["abcdefghi", "xyzzy"]
+    assert split_array_string(r"") == []
+    assert split_array_string(None) == []
+    assert split_array_string(r"|") == []
+    assert split_array_string(r"\|") == ["|"]
+    assert split_array_string(r"\\|") == ["\\"]
