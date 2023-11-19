@@ -23,7 +23,7 @@ import webtest  # importing the library makes it easier to mock testing
 from collections import defaultdict
 from datetime import datetime as datetime_type
 from dateutil.parser import parse as dateutil_parse
-from typing import List, Optional
+from typing import Any, List, Optional, Union
 
 
 # Is this the right place for this? I feel like this should be done in an application, not a library.
@@ -2072,6 +2072,21 @@ def merge_key_value_dict_lists(x, y):
     for pair in y:
         merged[pair['Key']] = pair['Value']
     return [key_value_dict(k, v) for k, v in merged.items()]
+
+
+def merge_objects(target: Union[dict, List[Any]], source: Union[dict, List[Any]]) -> dict:
+    if isinstance(target, dict) and isinstance(source, dict) and source:
+        for key, value in source.items():
+            target[key] = merge_objects(target[key], value) if key in target else value
+    elif isinstance(target, list) and isinstance(source, list) and source:
+        for i in range(max(len(source), len(target))):
+            if i < len(target):
+                target[i] = merge_objects(target[i], source[i] if i < len(source) else source[len(source) - 1])
+            else:
+                target.append(source[i])
+    elif source:
+        target = source
+    return target
 
 
 # Stealing topological sort classes below from python's graphlib module introduced
