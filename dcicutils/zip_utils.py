@@ -59,7 +59,7 @@ def temporary_directory() -> str:
 
 @contextmanager
 def temporary_file(name: Optional[str] = None, suffix: Optional[str] = None,
-                   content: Optional[Union[str, List[str]]] = None) -> str:
+                   content: Optional[Union[str, bytes, List[str]]] = None) -> str:
     with temporary_directory() as tmp_directory_name:
         tmp_file_name = os.path.join(tmp_directory_name, name or tempfile.mktemp(dir="")) + (suffix or "")
         if content is not None:
