@@ -23,7 +23,7 @@ import webtest  # importing the library makes it easier to mock testing
 from collections import defaultdict
 from datetime import datetime as datetime_type
 from dateutil.parser import parse as dateutil_parse
-from typing import Optional
+from typing import List, Optional
 
 
 # Is this the right place for this? I feel like this should be done in an application, not a library.
@@ -1402,6 +1402,30 @@ def string_list(s):
     if not isinstance(s, str):
         raise ValueError(f"Not a string: {s!r}")
     return [p for p in [part.strip() for part in s.split(",")] if p]
+
+
+def split_string(value: str, delimiter: str, escape: Optional[str] = None) -> List[str]:
+    """
+    Splits the given string into an array of string based on the given delimiter, and an optional escape character.
+    """
+    if not isinstance(value, str) or not (value := value.strip()):
+        return []
+    if not isinstance(escape, str) or not escape:
+        return [item.strip() for item in value.split(delimiter)]
+    result = []
+    item = r""
+    escaped = False
+    for c in value:
+        if c == delimiter and not escaped:
+            result.append(item.strip())
+            item = r""
+        elif c == escape and not escaped:
+            escaped = True
+        else:
+            item += c
+            escaped = False
+    result.append(item.strip())
+    return [item for item in result if item]
 
 
 def is_c4_arn(arn: str) -> bool:
