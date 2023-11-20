@@ -992,6 +992,15 @@ def to_float(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
         return fallback
 
 
+def to_boolean(value: str, fallback: Optional[Any]) -> Optional[Any]:
+    if isinstance(value, str) and (value := value.strip().lower()):
+        if (lower_value := value.lower()) in ["true", "t"]:
+            return True
+        elif lower_value in ["false", "f"]:
+            return False
+    return fallback
+
+
 @contextlib.contextmanager
 def override_environ(**overrides):
     """
