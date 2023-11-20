@@ -335,3 +335,10 @@ variant_utils
 
 .. automodule:: dcicutils.variant_utils
   :members:
+
+
+zip_utils
+^^^^^^^^^
+
+.. automodule:: dcicutils.zip_utils
+   :members:
