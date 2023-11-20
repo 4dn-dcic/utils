@@ -1001,6 +1001,20 @@ def to_boolean(value: str, fallback: Optional[Any]) -> Optional[Any]:
     return fallback
 
 
+def to_enum(value: str, enumerators: List[str]) -> Optional[str]:
+    matches = []
+    if isinstance(value, str) and (value := value.strip()) and isinstance(enumerators, List):
+        enum_specifiers = {str(enum).lower(): enum for enum in enumerators}
+        if (enum_value := enum_specifiers.get(lower_value := value.lower())) is not None:
+            return enum_value
+        for enum_canonical, _ in enum_specifiers.items():
+            if enum_canonical.startswith(lower_value):
+                matches.append(enum_canonical)
+        if len(matches) == 1:
+            return enum_specifiers[matches[0]]
+    return enum_specifiers[matches[0]] if len(matches) == 1 else value
+
+
 @contextlib.contextmanager
 def override_environ(**overrides):
     """
