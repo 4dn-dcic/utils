@@ -1440,11 +1440,15 @@ def split_string(value: str, delimiter: str, escape: Optional[str] = None) -> Li
     return [item for item in result if item]
 
 
-def right_trim_tuple(t: Tuple[Any]) -> Tuple[Any]:
-    i = len(t) - 1
-    while i >= 0 and t[i] is None:
+def right_trim(list_or_tuple: Union[List[Any], Tuple[Any]]) -> Union[List[Any], Tuple[Any]]:
+    """
+    Removes training None (or emptry string) values from the give tuple or list arnd returns;
+    does NOT change the given value.
+    """
+    i = len(list_or_tuple) - 1
+    while i >= 0 and list_or_tuple[i] in (None, ""):
         i -= 1
-    return t[:i + 1]
+    return list_or_tuple[:i + 1]
 
 
 def is_c4_arn(arn: str) -> bool:
@@ -2093,14 +2097,21 @@ def merge_key_value_dict_lists(x, y):
     return [key_value_dict(k, v) for k, v in merged.items()]
 
 
-def merge_objects(target: Union[dict, List[Any]], source: Union[dict, List[Any]]) -> dict:
+def merge_objects(target: Union[dict, List[Any]], source: Union[dict, List[Any]], full: bool = False) -> dict:
+    """
+    Merges the given source dictionary or list into the target dictionary or list.
+    This DOES change the given target (dictionary or list) IN PLACE.
+    """
     if isinstance(target, dict) and isinstance(source, dict) and source:
         for key, value in source.items():
-            target[key] = merge_objects(target[key], value) if key in target else value
+            target[key] = merge_objects(target[key], value, full) if key in target else value
     elif isinstance(target, list) and isinstance(source, list) and source:
         for i in range(max(len(source), len(target))):
             if i < len(target):
-                target[i] = merge_objects(target[i], source[i] if i < len(source) else source[len(source) - 1])
+                if i < len(source):
+                    target[i] = merge_objects(target[i], source[i], full)
+                elif full:
+                    target[i] = merge_objects(target[i], source[len(source) - 1], full)
             else:
                 target.append(source[i])
     elif source:
