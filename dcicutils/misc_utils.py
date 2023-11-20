@@ -978,6 +978,20 @@ def str_to_bool(x: Optional[str]) -> Optional[bool]:
         raise ValueError(f"An argument to str_or_bool must be a string or None: {x!r}")
 
 
+def to_integer(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
+    try:
+        return int(value)
+    except Exception:
+        return fallback
+
+
+def to_float(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
+    try:
+        return float(value)
+    except Exception:
+        return fallback
+
+
 @contextlib.contextmanager
 def override_environ(**overrides):
     """
