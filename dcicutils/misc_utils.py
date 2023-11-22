@@ -1369,6 +1369,15 @@ def json_file_contents(filename):
         return json.load(fp)
 
 
+def load_json_if(s: str, is_array: bool = False, is_object: bool = False) -> Optional[Any]:
+    if ((is_object and s.startswith("{") and s.endswith("}")) or (is_array and s.startswith("[") and s.endswith("]"))):
+        try:
+            return json.loads(s)
+        except Exception:
+            pass
+    return s
+
+
 def camel_case_to_snake_case(s, separator='_'):
     """
     Converts CamelCase to snake_case.
