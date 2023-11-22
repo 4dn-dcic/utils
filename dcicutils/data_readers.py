@@ -5,7 +5,7 @@ from typing import Any, Generator, Iterator, List, Optional, Tuple, Union
 from dcicutils.misc_utils import right_trim
 
 
-class RowReader(abc.ABC):  # These readers may evenutally go into dcicutils.
+class RowReader(abc.ABC):
 
     def __init__(self):
         self.header = None
