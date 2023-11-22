@@ -2146,8 +2146,10 @@ def merge_key_value_dict_lists(x, y):
 def merge_objects(target: Union[dict, List[Any]], source: Union[dict, List[Any]], full: bool = False) -> dict:
     """
     Merges the given source dictionary or list into the target dictionary or list.
-    This DOES change the given target (dictionary or list) IN PLACE.
+    This MAY change the given target (dictionary or list) IN PLACE.
     """
+    if target is None:
+        return source
     if isinstance(target, dict) and isinstance(source, dict) and source:
         for key, value in source.items():
             target[key] = merge_objects(target[key], value, full) if key in target else value
