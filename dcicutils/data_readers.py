@@ -1,7 +1,7 @@
 import abc
 import csv
 import openpyxl
-from typing import Any, Generator, Iterator, List, Optional, Tuple, Union
+from typing import Any, Generator, Iterator, List, Optional, Type, Tuple, Union
 from dcicutils.misc_utils import right_trim
 
 
@@ -17,6 +17,8 @@ class RowReader(abc.ABC):
     def __iter__(self) -> Iterator:
         for row in self.rows:
             self.location += 1
+            if self.is_comment_row(row):
+                continue
             if self.is_terminating_row(row):
                 break
             if len(self.header) < len(row):  # Row values beyond what there are headers for are ignored.
@@ -33,6 +35,9 @@ class RowReader(abc.ABC):
 
     def rows(self) -> Generator[Union[List[Optional[Any]], Tuple[Optional[Any], ...]], None, None]:
         yield
+
+    def is_comment_row(self, row: Union[List[Optional[Any]], Tuple[Optional[Any]]]) -> bool:
+        return False
 
     def is_terminating_row(self, row: Union[List[Optional[Any]], Tuple[Optional[Any]]]) -> bool:
         return False
@@ -118,14 +123,18 @@ class ExcelSheetReader(RowReader):
 
 class Excel:
 
-    def __init__(self, file: str) -> None:
+    def __init__(self, file: str, reader_class: Optional[Type] = None) -> None:
         self._file = file
         self._workbook = None
         self.sheet_names = None
+        if isinstance(reader_class, Type) and issubclass(reader_class, ExcelSheetReader):
+            self._reader_class = reader_class
+        else:
+            self._reader_class = ExcelSheetReader
         self.open()
 
     def sheet_reader(self, sheet_name: str) -> ExcelSheetReader:
-        return ExcelSheetReader(sheet_name=sheet_name, workbook=self._workbook)
+        return self._reader_class(sheet_name=sheet_name, workbook=self._workbook)
 
     def open(self) -> None:
         if self._workbook is None:
