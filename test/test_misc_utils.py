@@ -3650,6 +3650,7 @@ def test_merge_objects_5():
     merge_objects(target, source, False)
     assert target == expected
 
+
 def test_merge_objects_6():
     target = {"abc": {"def": {"ghi": None}}, "xyzzy": ["mno"]}
     source = {"xyzzy": [{"foo": None}, {"goo": None}]}
@@ -3669,6 +3670,7 @@ def test_merge_objects_7():
 def test_merge_objects_8():
     target = {"abc": {"def": {"ghi": None}}, "xyzzy": [None, None, "abc", "def", 123]}
     source = {"xyzzy": [{"foo": None}, {"goo": None}, {"hoo": None}]}
-    expected = {"abc": {"def": {"ghi": None}}, "xyzzy": [{"foo": None}, {"goo": None}, {"hoo": None}, {"hoo": None}, {"hoo": None}]}
+    expected = {"abc": {"def": {"ghi": None}},
+                "xyzzy": [{"foo": None}, {"goo": None}, {"hoo": None}, {"hoo": None}, {"hoo": None}]}
     merge_objects(target, source, True)
     assert target == expected
