@@ -3625,3 +3625,50 @@ def test_merge_objects_2():
     expected = {"abc": {"def": {"ghi": None}}, "xyzzy": [{"foo": None}, {"goo": None}, {"goo": None}]}
     merge_objects(target, source, True)
     assert target == expected
+
+
+def test_merge_objects_3():
+    target = {"abc": {"def": {"ghi": None}}, "xyzzy": [None, None]}
+    source = {"xyzzy": [{"foo": None}, {"goo": None}]}
+    expected = {"abc": {"def": {"ghi": None}}, "xyzzy": [{"foo": None}, {"goo": None}]}
+    merge_objects(target, source, False)
+    assert target == expected
+
+
+def test_merge_objects_4():
+    target = {"abc": {"def": {"ghi": None}}, "xyzzy": [None, None]}
+    source = {"xyzzy": [{"foo": None}, {"goo": None}]}
+    expected = {"abc": {"def": {"ghi": None}}, "xyzzy": [{"foo": None}, {"goo": None}]}
+    merge_objects(target, source, True)
+    assert target == expected
+
+
+def test_merge_objects_5():
+    target = {"abc": {"def": {"ghi": None}}, "xyzzy": ["mno"]}
+    source = {"xyzzy": [{"foo": None}, {"goo": None}]}
+    expected = {"abc": {"def": {"ghi": None}}, "xyzzy": [{"foo": None}, {"goo": None}]}
+    merge_objects(target, source, False)
+    assert target == expected
+
+def test_merge_objects_6():
+    target = {"abc": {"def": {"ghi": None}}, "xyzzy": ["mno"]}
+    source = {"xyzzy": [{"foo": None}, {"goo": None}]}
+    expected = {"abc": {"def": {"ghi": None}}, "xyzzy": [{"foo": None}, {"goo": None}]}
+    merge_objects(target, source, True)
+    assert target == expected
+
+
+def test_merge_objects_7():
+    target = {"abc": {"def": {"ghi": None}}, "xyzzy": [None, None, "abc", "def", 123]}
+    source = {"xyzzy": [{"foo": None}, {"goo": None}, {"hoo": None}]}
+    expected = {"abc": {"def": {"ghi": None}}, "xyzzy": [{"foo": None}, {"goo": None}, {"hoo": None}, "def", 123]}
+    merge_objects(target, source, False)
+    assert target == expected
+
+
+def test_merge_objects_8():
+    target = {"abc": {"def": {"ghi": None}}, "xyzzy": [None, None, "abc", "def", 123]}
+    source = {"xyzzy": [{"foo": None}, {"goo": None}, {"hoo": None}]}
+    expected = {"abc": {"def": {"ghi": None}}, "xyzzy": [{"foo": None}, {"goo": None}, {"hoo": None}, {"hoo": None}, {"hoo": None}]}
+    merge_objects(target, source, True)
+    assert target == expected

@@ -2149,7 +2149,9 @@ def merge_key_value_dict_lists(x, y):
 def merge_objects(target: Union[dict, List[Any]], source: Union[dict, List[Any]], full: bool = False) -> dict:
     """
     Merges the given source dictionary or list into the target dictionary or list.
-    This MAY change the given target (dictionary or list) IN PLACE.
+    This MAY well change the given target (dictionary or list) IN PLACE.
+    The the full argument is True then any target lists longer than the
+    source be will be filled out with the last element(s) of the source.
     """
     if target is None:
         return source
