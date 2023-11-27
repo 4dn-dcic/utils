@@ -31,7 +31,7 @@ from dcicutils.misc_utils import (
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
     MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case, json_file_contents,
-    pad_to, JsonLinesReader, split_string
+    pad_to, JsonLinesReader, split_string, merge_objects
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -3609,3 +3609,19 @@ def test_split_array_string():
     assert split_array_string(r"|") == []
     assert split_array_string(r"\|") == ["|"]
     assert split_array_string(r"\\|") == ["\\"]
+
+
+def test_merge_objects_1():
+    target = {"abc": {"def": {"ghi": None}}, "xyzzy": [None, None, None]}
+    source = {"xyzzy": [{"foo": None}, {"goo": None}]}
+    expected = {"abc": {"def": {"ghi": None}}, "xyzzy": [{"foo": None}, {"goo": None}, None]}
+    merge_objects(target, source, False)
+    assert target == expected
+
+
+def test_merge_objects_2():
+    target = {"abc": {"def": {"ghi": None}}, "xyzzy": [None, None, None]}
+    source = {"xyzzy": [{"foo": None}, {"goo": None}]}
+    expected = {"abc": {"def": {"ghi": None}}, "xyzzy": [{"foo": None}, {"goo": None}, {"goo": None}]}
+    merge_objects(target, source, True)
+    assert target == expected
