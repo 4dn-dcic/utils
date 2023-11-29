@@ -1,10 +1,11 @@
 import os
 import subprocess
 import concurrent.futures
-from env_utils import is_cgap_env
-from creds_utils import CGAPKeyManager, SMaHTKeyManager
-from ff_utils import search_metadata, get_download_url, get_metadata, patch_metadata
-from misc_utils import PRINT
+from typing import Optional
+from .env_utils import is_cgap_env
+from .creds_utils import CGAPKeyManager, SMaHTKeyManager
+from .ff_utils import search_metadata, get_download_url, get_metadata, patch_metadata
+from .misc_utils import PRINT
 
 
 class TransferUtilsError(Exception):
@@ -25,7 +26,7 @@ class TransferUtils:
     """ Utility class for downloading files to a local system """
     O2_PATH_FIELD = 'o2_path'  # set this field on files to indicate download location on o2
 
-    def __init__(self, *, ff_env, num_processes=8, download_path, downloader=Downloader.CURL):
+    def __init__(self, *, ff_env, num_processes=8, download_path='./', downloader=Downloader.CURL):
         """ Builds the TransferUtils object, initializing Auth etc """
         self.num_processes = num_processes
         self.download_path = download_path
@@ -57,7 +58,7 @@ class TransferUtils:
             mapping[filename] = download_url
         return mapping
 
-    def get_exiting_o2_path(self, atid: str) -> Optional[str, None]:
+    def get_exiting_o2_path(self, atid: str) -> Optional[str]:
         """ Does a GET for a file and checks if there is an existing O2 path, if so return the path, else
             return None
         """
