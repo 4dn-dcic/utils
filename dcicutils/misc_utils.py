@@ -23,7 +23,7 @@ import webtest  # importing the library makes it easier to mock testing
 from collections import defaultdict
 from datetime import datetime as datetime_type
 from dateutil.parser import parse as dateutil_parse
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 
 # Is this the right place for this? I feel like this should be done in an application, not a library.
@@ -1489,13 +1489,14 @@ def split_string(value: str, delimiter: str, escape: Optional[str] = None) -> Li
     return [item for item in result if item]
 
 
-def right_trim(list_or_tuple: Union[List[Any], Tuple[Any]]) -> Union[List[Any], Tuple[Any]]:
+def right_trim(list_or_tuple: Union[List[Any], Tuple[Any]],
+               remove: Optional[Callable] = None) -> Union[List[Any], Tuple[Any]]:
     """
     Removes training None (or emptry string) values from the give tuple or list arnd returns;
     does NOT change the given value.
     """
     i = len(list_or_tuple) - 1
-    while i >= 0 and list_or_tuple[i] in (None, ""):
+    while i >= 0 and ((remove and remove(list_or_tuple[i])) or (not remove and list_or_tuple[i] in (None, ""))):
         i -= 1
     return list_or_tuple[:i + 1]
 
