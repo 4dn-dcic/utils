@@ -3540,7 +3540,7 @@ def is_subdict(json1, json2, desc1="json1", desc2="json2", verbose=True):
                 if not result:
                     # out(f"Recursive failure at {path!r} in list comparison")
                     pass
-        elif type(json1) == type(json2):
+        elif type(json1) is type(json2):
             result = json1 == json2
             if not result:
                 out(f"Failed at {path!r} due to value mismatch: {json.dumps(json1)} != {json.dumps(json2)}")

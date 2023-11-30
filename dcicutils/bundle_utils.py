@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from .common import AnyJsonData
 from .env_utils import EnvUtils, public_env_name
 from .ff_utils import get_metadata
-from .misc_utils import AbstractVirtualApp, ignored, ignorable, PRINT, to_camel_case
+from .misc_utils import AbstractVirtualApp, ignored, ignorable, PRINT, remove_empty_properties, to_camel_case
 from .sheet_utils import (
     LoadTableError, prefer_number, TabbedJsonSchemas,
     Header, Headers, TabbedHeaders, ParsedHeader, ParsedHeaders, TabbedParsedHeaders, SheetCellValue, TabbedSheetData,
@@ -15,6 +15,7 @@ from .validation_utils import SchemaManager, validate_data_against_schemas
 
 PatchPrototype = Dict
 TabbedPatchPrototypes = Dict[str, PatchPrototype]
+ARRAY_VALUE_DELIMITER = "|"
 
 
 class TypeHintContext:
@@ -44,7 +45,10 @@ class ValidationProblem(Exception):
 
 
 class TypeHint:
-    def apply_hint(self, value):
+    def __init__(self):
+        self.is_array = False
+
+    def apply_hint(self, value, src):
         return value
 
     def __str__(self):
@@ -55,38 +59,41 @@ class TypeHint:
 
 
 class BoolHint(TypeHint):
+    def __init__(self):
+        super().__init__()
 
     # We could use other ways to do this, such as initial substring, but this is more likely to be right.
     # Then again, we might want to consder accepting athers like 'yes/no', 'y/n', 'on/off', '1/0'.
     TRUE_VALUES = ['true', 't']
     FALSE_VALUES = ['false', 'f']
 
-    def apply_hint(self, value):
+    def apply_hint(self, value, src):
         if isinstance(value, str) and value:
             l_value = value.lower()
             if l_value in self.TRUE_VALUES:
                 return True
             elif l_value in self.FALSE_VALUES:
                 return False
-        return super().apply_hint(value)
+        return super().apply_hint(value, src)
 
 
 class NumHint(TypeHint):
 
-    PREFERENCE_MAP = {'number': 'num', 'integer': 'int', 'float': 'float'}
+    PREFERENCE_MAP = {'number': 'number', 'integer': 'integer'}
 
     def __init__(self, declared_type: Optional[str] = None):
         if declared_type is None:
-            declared_type = 'num'
+            declared_type = 'number'
         self.preferred_type = self.PREFERENCE_MAP.get(declared_type)
+        super().__init__()
 
-    def apply_hint(self, value):
+    def apply_hint(self, value, src):
         if isinstance(value, str) and value:
             if self.preferred_type:
                 return prefer_number(value, kind=self.preferred_type)
             else:
                 return value
-        return super().apply_hint(value)
+        return super().apply_hint(value, src)
 
 
 class EnumHint(TypeHint):
@@ -96,8 +103,9 @@ class EnumHint(TypeHint):
 
     def __init__(self, value_map):
         self.value_map = value_map
+        super().__init__()
 
-    def apply_hint(self, value):
+    def apply_hint(self, value, src):
         if isinstance(value, str):
             if value in self.value_map:
                 result = self.value_map[value]
@@ -112,7 +120,29 @@ class EnumHint(TypeHint):
                     [only_found] = found
                     result = self.value_map[only_found]
                     return result
-        return super().apply_hint(value)
+        return super().apply_hint(value, src)
+
+
+class ArrayHint(TypeHint):
+    def __init__(self):
+        super().__init__()
+
+    def apply_hint(self, value, src):
+        if value is None or value == '':
+            return []
+        if isinstance(value, str):
+            if not value:
+                return []
+            return [value.strip() for value in value.split(ARRAY_VALUE_DELIMITER)]
+        return super().apply_hint(value, src)
+
+
+class StringHint(TypeHint):
+    def __init__(self):
+        super().__init__()
+
+    def apply_hint(self, value, src):
+        return str(value).strip() if value is not None else ""
 
 
 class RefHint(TypeHint):
@@ -120,13 +150,29 @@ class RefHint(TypeHint):
     def __str__(self):
         return f"<RefHint {self.schema_name} context={self.context}>"
 
-    def __init__(self, schema_name: str, context: TypeHintContext):
+    def __init__(self, schema_name: str, required: bool, context: TypeHintContext):
         self.schema_name = schema_name
         self.context = context
+        self.required = required
+        super().__init__()
 
-    def apply_hint(self, value):
-        if not self.context.validate_ref(item_type=self.schema_name, item_ref=value):
-            raise ValidationProblem(f"Unable to validate {self.schema_name} reference: {value!r}")
+    def apply_hint(self, value, src):
+        if self.is_array and isinstance(value, str):
+            value = [value.strip() for value in value.split(ARRAY_VALUE_DELIMITER)] if value else []
+        if self.is_array and isinstance(value, list):
+            for item in value:
+                self._apply_ref_hint(item, src)
+        else:
+            self._apply_ref_hint(value, src)
+        return value
+
+    def _apply_ref_hint(self, value, src):
+        if not value and self.required:
+            raise ValidationProblem(f"No required reference (linkTo) value for: {self.schema_name}"
+                                    f"{f' from {src}' if src else ''}")
+        if value and not self.context.validate_ref(item_type=self.schema_name, item_ref=value):
+            raise ValidationProblem(f"Cannot resolve reference (linkTo) for: {self.schema_name}"
+                                    f"{f'/{value}' if value else ''}{f' from {src}' if src else ''}")
         return value
 
 
@@ -228,7 +274,7 @@ class ItemTools:
     def compute_patch_prototype(cls, parsed_headers: ParsedHeaders):
         prototype = {}
         for parsed_header in parsed_headers:
-            parsed_header0 = parsed_header[0]
+            parsed_header0 = parsed_header[0] if parsed_header else ""
             if isinstance(parsed_header0, int):
                 raise LoadTableError(f"A header cannot begin with a numeric ref: {parsed_header0}")
             cls.assure_patch_prototype_shape(parent=prototype, keys=parsed_header)
@@ -236,7 +282,9 @@ class ItemTools:
 
     @classmethod
     def assure_patch_prototype_shape(cls, *, parent: Union[Dict, List], keys: ParsedHeader):
-        [key0, *more_keys] = keys
+        key0 = None
+        more_keys = None
+        [key0, *more_keys] = keys if keys else [None]
         key1 = more_keys[0] if more_keys else None
         if isinstance(key1, int):
             placeholder = []
@@ -288,8 +336,11 @@ class ItemTools:
                 return True
             elif lvalue == 'false':
                 return False
-            elif lvalue == 'null' or lvalue == '':
+            # elif lvalue == 'null' or lvalue == '':
+            elif lvalue == 'null':
                 return None
+            elif lvalue == '':
+                return lvalue
             elif split_pipe and '|' in value:
                 if value == '|':  # Use '|' for []
                     return []
@@ -307,16 +358,18 @@ class ItemTools:
 
     @classmethod
     def set_path_value(cls, datum: Union[List, Dict], path: ParsedHeader, value: Any, force: bool = False):
-        if (value is None or value == '') and not force:
+        # if (value is None or value == '') and not force:
+        if value is None and not force:
             return
-        [key, *more_path] = path
+        [key, *more_path] = path if path else [None]
         if not more_path:
             datum[key] = value
         else:
             cls.set_path_value(datum[key], more_path, value)
 
     @classmethod
-    def find_type_hint_for_subschema(cls, subschema: Any, context: Optional[TypeHintContext] = None):
+    def find_type_hint_for_subschema(cls, subschema: Any, required: bool = False,
+                                     context: Optional[TypeHintContext] = None):
         if subschema is not None:
             t = subschema.get('type')
             if t == 'string':
@@ -326,11 +379,19 @@ class ItemTools:
                     return EnumHint(mapping)
                 link_to = subschema.get('linkTo')
                 if link_to and context.schema_exists(link_to):
-                    return RefHint(schema_name=link_to, context=context)
-            elif t in ('integer', 'float', 'number'):
+                    return RefHint(schema_name=link_to, required=required, context=context)
+                return StringHint()
+            elif t in ('integer', 'number'):
                 return NumHint(declared_type=t)
             elif t == 'boolean':
                 return BoolHint()
+            elif t == 'array':
+                array_type_hint = cls.find_type_hint_for_subschema(subschema.get("items"),
+                                                                   required=required, context=context)
+                if type(array_type_hint) is RefHint:
+                    array_type_hint.is_array = True
+                    return array_type_hint
+                return ArrayHint()
 
     @classmethod
     def find_type_hint_for_parsed_header(cls, parsed_header: Optional[ParsedHeader], schema: Any,
@@ -344,7 +405,8 @@ class ItemTools:
                     if subschema.get('type') == 'object':
                         subsubschema = subschema.get('properties', {}).get(key1)
                         if not other_headers:
-                            hint = cls.find_type_hint_for_subschema(subsubschema, context=context)
+                            required = key1 and subschema and key1 in subschema.get('required', [])
+                            hint = cls.find_type_hint_for_subschema(subsubschema, required=required, context=context)
                             if hint:
                                 return hint
                             else:
@@ -453,7 +515,8 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         self.portal_vapp = portal_vapp
         self.schema_manager: SchemaManager = SchemaManager(portal_env=portal_env, portal_vapp=portal_vapp,
                                                            override_schemas=override_schemas)
-        self.schemas = self.schema_manager.fetch_relevant_schemas(self.tab_names)  # , schemas=schemas)
+        schema_names_to_fetch = [key for key, value in tabbed_sheet_data.items() if value]
+        self.schemas = self.schema_manager.fetch_relevant_schemas(schema_names_to_fetch)
         self.lookup_tables_by_tab_name: Dict[str, Dict[str, Dict]] = {
             tab_name: self.build_lookup_table_for_tab(tab_name, rows=rows)
             for tab_name, rows in tabbed_sheet_data.items()
@@ -474,6 +537,8 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         self._problems.append(problem)
 
     def build_lookup_table_for_tab(self, tab_name: str, *, rows: List[Dict]) -> Dict[str, Dict]:
+        if not self.schema_manager or not rows:
+            return []
         identifying_properties = self.schema_manager.identifying_properties(schema_name=tab_name)
         if not identifying_properties:
             # Maybe issue a warning here that we're going to lose
@@ -497,7 +562,15 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
     def resolve_ref(self, item_type, item_ref):
         lookup_table = self.lookup_tables_by_tab_name.get(item_type)
         if lookup_table:  # Is it a type we're tracking?
-            return lookup_table.get(item_ref) or None
+            if isinstance(item_ref, list):
+                found = True
+                for item in item_ref:
+                    if not lookup_table.get(item):
+                        found = False
+                        break
+                return True if found else None
+            else:
+                return lookup_table.get(item_ref) or None
         else:  # Apparently some stray type not in our tables
             return None
 
@@ -523,8 +596,18 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
             return True
         try:
             # TODO: This probably needs a cache
-            info = get_metadata(f"/{to_camel_case(item_type)}/{item_ref}",
-                                ff_env=self.portal_env, vapp=self.portal_vapp)
+            if isinstance(item_ref, list):
+                found = True
+                for item in item_ref:
+                    info = get_metadata(f"/{to_camel_case(item_type)}/{item}",
+                                        ff_env=self.portal_env, vapp=self.portal_vapp)
+                    if not isinstance(info, dict) or 'uuid' not in info:
+                        found = False
+                        break
+                return found
+            else:
+                info = get_metadata(f"/{to_camel_case(item_type)}/{item_ref}",
+                                    ff_env=self.portal_env, vapp=self.portal_vapp)
             # Basically return True if there's a value at all,
             # but still check it's not an error message that didn't get raised.
             return isinstance(info, dict) and 'uuid' in info
@@ -532,7 +615,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
             return False
 
     def schema_exists(self, schema_name: str) -> bool:
-        return self.schema_manager.schema_exists(schema_name)
+        return self.schema_manager.schema_exists(schema_name) if self.schema_manager else False
 
     def check_tab(self, tab_name: str):
         prototype = self.patch_prototypes_by_tab_name[tab_name]
@@ -579,10 +662,15 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
         patch_item = copy.deepcopy(prototype)
         for column_number, column_value in enumerate(row.values()):
             parsed_value = ItemTools.parse_item_value(column_value, apply_heuristics=self.apply_heuristics)
+            column_name = (list(row.keys())[column_number] or "") if len(row) > column_number else ""
+            if column_name.endswith("#"):
+                if isinstance(parsed_value, str):
+                    parsed_value = [value.strip() for value in parsed_value.split(ARRAY_VALUE_DELIMITER) if value]
             type_hint = type_hints[column_number]
             if type_hint:
                 try:
-                    parsed_value = type_hint.apply_hint(parsed_value)
+                    src = f"{tab_name}{f'.{column_name}' if column_name else ''}"
+                    parsed_value = type_hint.apply_hint(parsed_value, src)
                 except ValidationProblem as e:
                     headers = self.headers_by_tab_name[tab_name]
                     column_name = headers[column_number]
@@ -632,7 +720,7 @@ class TableChecker(InflatableTabbedDataManager, TypeHintContext):
                                type_hints=self.type_hints_by_tab_name[tab_name])
 
 
-check = TableChecker.check
+# check = TableChecker.check
 
 
 def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
@@ -641,9 +729,11 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
                # TODO: validate= is presently False (i.e., disabled) by default while being debugged,
                #       but for production use maybe should not be? -kmp 25-Oct-2023
                validate: bool = False,
+               retain_empty_properties: bool = False,
+               sheet_order: Optional[List[str]] = None,
                **kwargs):
     annotated_data = TableSetManager.load_annotated(filename=filename, tab_name=tab_name, escaping=escaping,
-                                                    prefer_number=False, **kwargs)
+                                                    prefer_number=False, sheet_order=sheet_order, **kwargs)
     tabbed_rows = annotated_data['content']
     flattened = annotated_data['flattened']
     if flattened:
@@ -655,6 +745,8 @@ def load_items(filename: str, tab_name: Optional[str] = None, escaping: Optional
         # No fancy checking for things like .json, etc. for now. Only check things that came from
         # spreadsheet-like data, where structural datatypes are forced into strings.
         checked_items = tabbed_rows
+    if not retain_empty_properties:
+        remove_empty_properties(checked_items)
     if validate:
         problems = validate_data_against_schemas(checked_items, portal_env=portal_env, portal_vapp=portal_vapp,
                                                  override_schemas=override_schemas)

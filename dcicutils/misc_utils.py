@@ -23,7 +23,7 @@ import webtest  # importing the library makes it easier to mock testing
 from collections import defaultdict
 from datetime import datetime as datetime_type
 from dateutil.parser import parse as dateutil_parse
-from typing import Optional
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 
 # Is this the right place for this? I feel like this should be done in an application, not a library.
@@ -978,6 +978,43 @@ def str_to_bool(x: Optional[str]) -> Optional[bool]:
         raise ValueError(f"An argument to str_or_bool must be a string or None: {x!r}")
 
 
+def to_integer(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
+    try:
+        return int(value)
+    except Exception:
+        return fallback
+
+
+def to_float(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
+    try:
+        return float(value)
+    except Exception:
+        return fallback
+
+
+def to_boolean(value: str, fallback: Optional[Any]) -> Optional[Any]:
+    if isinstance(value, str) and (value := value.strip().lower()):
+        if (lower_value := value.lower()) in ["true", "t"]:
+            return True
+        elif lower_value in ["false", "f"]:
+            return False
+    return fallback
+
+
+def to_enum(value: str, enumerators: List[str]) -> Optional[str]:
+    matches = []
+    if isinstance(value, str) and (value := value.strip()) and isinstance(enumerators, List):
+        enum_specifiers = {str(enum).lower(): enum for enum in enumerators}
+        if (enum_value := enum_specifiers.get(lower_value := value.lower())) is not None:
+            return enum_value
+        for enum_canonical, _ in enum_specifiers.items():
+            if enum_canonical.startswith(lower_value):
+                matches.append(enum_canonical)
+        if len(matches) == 1:
+            return enum_specifiers[matches[0]]
+    return enum_specifiers[matches[0]] if len(matches) == 1 else value
+
+
 @contextlib.contextmanager
 def override_environ(**overrides):
     """
@@ -1105,6 +1142,18 @@ def remove_suffix(suffix: str, text: str, required: bool = False):
         else:
             return text
     return text[:len(text)-len(suffix)]
+
+
+def remove_empty_properties(data: Optional[Union[list, dict]]) -> None:
+    if isinstance(data, dict):
+        for key in list(data.keys()):
+            if (value := data[key]) in [None, "", {}, []]:
+                del data[key]
+            else:
+                remove_empty_properties(value)
+    elif isinstance(data, list):
+        for item in data:
+            remove_empty_properties(item)
 
 
 class ObsoleteError(Exception):
@@ -1320,6 +1369,18 @@ def json_file_contents(filename):
         return json.load(fp)
 
 
+def load_json_if(s: str, is_array: bool = False, is_object: bool = False,
+                 fallback: Optional[Any] = None) -> Optional[Any]:
+    if (isinstance(s, str) and
+        ((is_object and s.startswith("{") and s.endswith("}")) or
+         (is_array and s.startswith("[") and s.endswith("]")))):
+        try:
+            return json.loads(s)
+        except Exception:
+            pass
+    return fallback
+
+
 def camel_case_to_snake_case(s, separator='_'):
     """
     Converts CamelCase to snake_case.
@@ -1402,6 +1463,42 @@ def string_list(s):
     if not isinstance(s, str):
         raise ValueError(f"Not a string: {s!r}")
     return [p for p in [part.strip() for part in s.split(",")] if p]
+
+
+def split_string(value: str, delimiter: str, escape: Optional[str] = None) -> List[str]:
+    """
+    Splits the given string into an array of string based on the given delimiter, and an optional escape character.
+    """
+    if not isinstance(value, str) or not (value := value.strip()):
+        return []
+    if not isinstance(escape, str) or not escape:
+        return [item.strip() for item in value.split(delimiter)]
+    result = []
+    item = r""
+    escaped = False
+    for c in value:
+        if c == delimiter and not escaped:
+            result.append(item.strip())
+            item = r""
+        elif c == escape and not escaped:
+            escaped = True
+        else:
+            item += c
+            escaped = False
+    result.append(item.strip())
+    return [item for item in result if item]
+
+
+def right_trim(list_or_tuple: Union[List[Any], Tuple[Any]],
+               remove: Optional[Callable] = None) -> Union[List[Any], Tuple[Any]]:
+    """
+    Removes training None (or emptry string) values from the give tuple or list arnd returns;
+    does NOT change the given value.
+    """
+    i = len(list_or_tuple) - 1
+    while i >= 0 and ((remove and remove(list_or_tuple[i])) or (not remove and list_or_tuple[i] in (None, ""))):
+        i -= 1
+    return list_or_tuple[:i + 1]
 
 
 def is_c4_arn(arn: str) -> bool:
@@ -2048,6 +2145,32 @@ def merge_key_value_dict_lists(x, y):
     for pair in y:
         merged[pair['Key']] = pair['Value']
     return [key_value_dict(k, v) for k, v in merged.items()]
+
+
+def merge_objects(target: Union[dict, List[Any]], source: Union[dict, List[Any]], full: bool = False) -> dict:
+    """
+    Merges the given source dictionary or list into the target dictionary or list.
+    This MAY well change the given target (dictionary or list) IN PLACE.
+    The the full argument is True then any target lists longer than the
+    source be will be filled out with the last element(s) of the source.
+    """
+    if target is None:
+        return source
+    if isinstance(target, dict) and isinstance(source, dict) and source:
+        for key, value in source.items():
+            target[key] = merge_objects(target[key], value, full) if key in target else value
+    elif isinstance(target, list) and isinstance(source, list) and source:
+        for i in range(max(len(source), len(target))):
+            if i < len(target):
+                if i < len(source):
+                    target[i] = merge_objects(target[i], source[i], full)
+                elif full:
+                    target[i] = merge_objects(target[i], source[len(source) - 1], full)
+            else:
+                target.append(source[i])
+    elif source:
+        target = source
+    return target
 
 
 # Stealing topological sort classes below from python's graphlib module introduced

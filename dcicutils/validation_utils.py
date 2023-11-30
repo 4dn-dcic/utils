@@ -63,9 +63,14 @@ class SchemaManager:
             return override_schema
         schema: Optional[AnyJsonData] = self.SCHEMA_CACHE.get(schema_name)
         if schema is None and schema_name not in self.SCHEMA_CACHE:  # If None is already stored, don't look it up again
-            schema = get_schema(schema_name, portal_env=self.portal_env, portal_vapp=self.portal_vapp)
+            schema_name = schema_name.replace(" ", "")
+            schema = SchemaManager.get_schema(schema_name, portal_env=self.portal_env, portal_vapp=self.portal_vapp)
             self.SCHEMA_CACHE[schema_name] = schema
         return schema
+
+    @staticmethod
+    def get_schema(name: str, portal_env: Optional[str] = None, portal_vapp: Optional[AbstractVirtualApp] = None):
+        return get_schema(name, portal_env=portal_env, portal_vapp=portal_vapp)
 
     # Should not be needed, given that SCHEMA_CACHE is an instance variable.
     #
@@ -86,16 +91,18 @@ class SchemaManager:
         return identifying_properties
 
     @classmethod  # This operation doesn't actually use the schemas so is safe as a class method
-    def identifying_value(cls, data_item: Dict[str, AnyJsonData], identifying_properties) -> AnyJsonData:
-        if not identifying_properties:
+    def identifying_value(cls, data_item: Dict[str, AnyJsonData],
+                          identifying_properties, raise_exception: bool = False) -> AnyJsonData:
+        if not identifying_properties and raise_exception:
             raise ValueError("No identifying properties were specified.")
-        for identifying_property in identifying_properties:
+        for identifying_property in identifying_properties or []:
             if identifying_property in data_item:
                 return data_item[identifying_property]
-        raise ValueError(f'{there_are(identifying_properties, just_are=True)}'
-                         f' no {maybe_pluralize(identifying_properties, "identifying property")}'
-                         f' {disjoined_list([repr(x) for x in identifying_properties])}'
-                         f' in {json.dumps(data_item)}.')
+        if raise_exception:
+            raise ValueError(f'{there_are(identifying_properties, just_are=True)}'
+                             f' no {maybe_pluralize(identifying_properties, "identifying property")}'
+                             f' {disjoined_list([repr(x) for x in identifying_properties])}'
+                             f' in {json.dumps(data_item)}.')
 
     @staticmethod
     def get_identifying_properties(schema: dict) -> list:
@@ -171,7 +178,9 @@ def validate_data_against_schemas(data: TabbedSheetData, *,
     schema_manager = SchemaManager(portal_env=portal_env, portal_vapp=portal_vapp, override_schemas=override_schemas)
 
     errors = []
-    schemas = schema_manager.fetch_relevant_schemas(list(data.keys()))
+
+    schema_names_to_fetch = [key for key, value in data.items() if value]
+    schemas = schema_manager.fetch_relevant_schemas(schema_names_to_fetch)
 
     for data_type in data:
         schema = schemas.get(data_type)

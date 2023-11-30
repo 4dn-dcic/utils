@@ -6,8 +6,13 @@ dcicutils
 Change Log
 ----------
 
+8.4.0
+=====
+* More work related to SMaHT ingestion (bundle/sheet_utils, data_readers, etc).
+
+
 8.3.0
-=========
+=====
 
 * Updates for RAS to Redis API
 

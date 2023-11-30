@@ -16,8 +16,8 @@ from openpyxl.workbook.workbook import Workbook
 from tempfile import TemporaryFile, TemporaryDirectory
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
 from .common import AnyJsonData, Regexp, JsonSchema
-from .lang_utils import conjoined_list, disjoined_list, maybe_pluralize  # , there_are
-from .misc_utils import ignored, pad_to, JsonLinesReader, remove_suffix  # , PRINT, AbstractVirtualApp
+from .lang_utils import conjoined_list, disjoined_list, maybe_pluralize
+from .misc_utils import ignored, pad_to, JsonLinesReader, remove_suffix, to_camel_case
 
 
 Header = str
@@ -32,6 +32,7 @@ CsvReader = type(csv.reader(TemporaryFile()))
 SheetData = List[dict]
 TabbedSheetData = Dict[str, SheetData]
 TabbedJsonSchemas = Dict[str, JsonSchema]
+CommentRow = object()
 
 
 class LoadFailure(Exception):
@@ -69,7 +70,7 @@ def unwanted_kwargs(*, context, kwargs, context_plural=False, detailed=False):
                                      f" {maybe_pluralize(unwanted, 'keyword argument')} {conjoined_list(unwanted)}.")
 
 
-def prefer_number(value: SheetCellValue, kind='num'):
+def prefer_number(value: SheetCellValue, kind='number'):
     """
     Given a string, if the string has number syntax, returns the number it represents. Otherwise, returns its argument.
     (It follows from this that if given an int or a float, it just returns that argument.)
@@ -78,7 +79,7 @@ def prefer_number(value: SheetCellValue, kind='num'):
     is coerced to, but it has no effect when the argument is a number, even a number of the wrong kind.
 
     :param value: a string, int, or float
-    :param kind: one of 'num', 'int', or 'float'
+    :param kind: one of 'number' or 'integer'
     :returns: the argument coerced to a number of the appropriate kind, if possible, or else the argument literally
     """
     if isinstance(value, str):  # the given value might be an int or float, in which case just fall through
@@ -87,12 +88,12 @@ def prefer_number(value: SheetCellValue, kind='num'):
         value = value
         ch0 = value[0]
         if ch0 == '+' or ch0 == '-' or ch0.isdigit():
-            if kind == 'num' or kind == 'int':
+            if kind == 'integer':
                 try:
                     return int(value)
                 except Exception:
                     pass
-            if kind == 'num' or kind == 'float':
+            if kind == 'number':
                 try:
                     return float(value)
                 except Exception:
@@ -198,10 +199,10 @@ class AbstractTableSetManager:
         raise NotImplementedError(f".load(...) is not implemented for {cls.__name__}.")  # noQA
 
     @property
-    def tab_names(self) -> List[str]:
+    def tab_names(self, order: Optional[List[str]] = None) -> List[str]:
         raise NotImplementedError(f".tab_names is not implemented for {self.__class__.__name__}..")  # noQA
 
-    def load_content(self) -> Any:
+    def load_content(self, sheet_order: Optional[List[str]] = None) -> Any:
         raise NotImplementedError(f".load_content() is not implemented for {self.__class__.__name__}.")  # noQA
 
 
@@ -290,18 +291,24 @@ class FlattenedTableSetManager(BasicTableSetManager):
         """
         raise NotImplementedError(f"._process_row(...) is not implemented for {self.__class__.__name__}.")  # noQA
 
-    def load_content(self) -> AnyJsonData:
-        for tab_name in self.tab_names:
+    def load_content(self, sheet_order: Optional[List[str]] = None) -> AnyJsonData:
+        for tab_name in self.tab_names(sheet_order):
             sheet_content = []
             state = self._create_tab_processor_state(tab_name)
             for row_data in self._raw_row_generator_for_tab_name(tab_name):
                 processed_row_data: AnyJsonData = self._process_row(tab_name, state, row_data)
+                if not processed_row_data:
+                    break
+                if processed_row_data is CommentRow:
+                    continue
                 sheet_content.append(processed_row_data)
-            self.content_by_tab_name[tab_name] = sheet_content
+            self.content_by_tab_name[tab_name.replace(" ", "")] = sheet_content
         return self.content_by_tab_name
 
-    def parse_cell_value(self, value: SheetCellValue) -> AnyJsonData:
-        return prefer_number(value) if self.prefer_number else value
+    def parse_cell_value(self, value: SheetCellValue, override_prefer_number: Optional[bool] = None) -> AnyJsonData:
+        if override_prefer_number is None:
+            override_prefer_number = self.prefer_number
+        return prefer_number(value) if override_prefer_number else value
 
 
 class TableSetManagerRegistry:
@@ -355,8 +362,9 @@ class XlsxManager(FlattenedTableSetManager):
     """
     This implements the mechanism to get a series of rows out of the sheets in an XLSX file.
     """
-
     ALLOWED_FILE_EXTENSIONS = ['.xlsx']
+    TERMINATE_ON_EMPTY_ROW = True
+    CONVERT_VALUES_TO_STRING = True
 
     @classmethod
     def _all_rows(cls, sheet: Worksheet):
@@ -370,9 +378,20 @@ class XlsxManager(FlattenedTableSetManager):
         for col in range(1, col_max + 1):
             yield col
 
-    @property
-    def tab_names(self) -> List[str]:
-        return self.reader_agent.sheetnames
+    def tab_names(self, order: Optional[List[str]] = None) -> List[str]:
+        def ordered_sheet_names(sheet_names: List[str]) -> List[str]:
+            if not order:
+                return sheet_names
+            ordered_sheet_names = []
+            for item in order:
+                for sheet_name in sheet_names:
+                    if to_camel_case(item.replace(" ", "")) == to_camel_case(sheet_name.replace(" ", "")):
+                        ordered_sheet_names.append(sheet_name)
+            for sheet_name in sheet_names:
+                if sheet_name not in ordered_sheet_names:
+                    ordered_sheet_names.append(sheet_name)
+            return ordered_sheet_names
+        return ordered_sheet_names(self.reader_agent.sheetnames)
 
     def _get_reader_agent(self) -> Workbook:
         return openpyxl.load_workbook(self.filename)
@@ -383,20 +402,67 @@ class XlsxManager(FlattenedTableSetManager):
                 for row in self._all_rows(sheet))
 
     def _get_raw_row_content_tuple(self, sheet: Worksheet, row: int) -> SheetRow:
-        return [sheet.cell(row=row, column=col).value
-                for col in self._all_cols(sheet)]
+        # return [str(sheet.cell(row=row, column=col).value) for col in self._all_cols(sheet)]
+        results = []
+        for col in self._all_cols(sheet):
+            value = sheet.cell(row=row, column=col).value
+#           if value is not None and XlsxManager.CONVERT_VALUES_TO_STRING:
+#               value = str(value).strip()
+            if XlsxManager.CONVERT_VALUES_TO_STRING:
+                value = str(value).strip() if value is not None else ""
+            results.append(value)
+        return results
 
     def _create_tab_processor_state(self, tab_name: str) -> Headers:
         sheet = self.reader_agent[tab_name]
+        """
         headers: Headers = [str(sheet.cell(row=1, column=col).value)
                             for col in self._all_cols(sheet)]
-        self.headers_by_tab_name[sheet.title] = headers
-        return headers
+        """
+        headers = []
+        for col in self._all_cols(sheet):
+            cell = sheet.cell(row=1, column=col).value
+            if cell is not None and XlsxManager.CONVERT_VALUES_TO_STRING:
+                cell = str(cell).strip()
+            headers.append(cell)
+        self.headers_by_tab_name[sheet.title] = XlsxManager.remove_trailing_none_values(headers)
+        return self.headers_by_tab_name[sheet.title]
 
     def _process_row(self, tab_name: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
         ignored(tab_name)
-        return {headers[i]: self.parse_cell_value(row_datum)
+        if XlsxManager.is_terminating_row(row_data):
+            return None
+        if XlsxManager.is_comment_row(row_data):
+            return CommentRow
+        if len(headers) < len(row_data):
+            row_data = row_data[:len(headers)]
+        override_prefer_number = False if XlsxManager.CONVERT_VALUES_TO_STRING else None
+        return {headers[i]: self.parse_cell_value(row_datum, override_prefer_number=override_prefer_number)
                 for i, row_datum in enumerate(row_data)}
+
+    @staticmethod
+    def is_terminating_row(row: List[Optional[Any]]) -> bool:
+        # TODO: This is may change; currently an all blank row signals the end of input.
+        return all(cell is None or cell == "" for cell in row) and XlsxManager.TERMINATE_ON_EMPTY_ROW
+
+    @staticmethod
+    def is_comment_row(row: Tuple[Optional[Any]]) -> bool:
+        # TODO: This will probably change; currently a row starting only with #, *, or ^ signals a comment.
+        for cell in row:
+            if cell is None:
+                continue
+            if (cell := str(cell)).startswith("#") or cell.startswith("*") or cell.startswith("^"):
+                return True
+        return False
+
+    @staticmethod
+    def remove_trailing_none_values(values: List[Any]) -> List[Any]:
+        for index in range(len(values) - 1, -1, -1):
+            if values[index] is not None:
+                break
+        else:
+            return []
+        return values[:index + 1]
 
 
 def infer_tab_name_from_filename(filename):
@@ -409,8 +475,7 @@ class SingleTableMixin(AbstractTableSetManager):
         self._tab_name = tab_name or infer_tab_name_from_filename(filename)
         super().__init__(filename=filename, **kwargs)
 
-    @property
-    def tab_names(self) -> List[str]:
+    def tab_names(self, order: Optional[List[str]] = None) -> List[str]:
         return [self._tab_name]
 
 
@@ -437,8 +502,7 @@ class InsertsManager(BasicTableSetManager):
         ignored(filename)
         return data
 
-    @property
-    def tab_names(self) -> List[str]:
+    def tab_names(self, order: Optional[List[str]] = None) -> List[str]:
         return list(self.content_by_tab_name.keys())
 
     def _get_reader_agent(self) -> Any:
@@ -457,7 +521,7 @@ class InsertsManager(BasicTableSetManager):
             result[tab] = headers
         return result
 
-    def load_content(self) -> Dict[str, AnyJsonData]:
+    def load_content(self, sheet_order: Optional[List[str]] = None) -> Dict[str, AnyJsonData]:
         data = self._load_inserts_data(self.filename)
         self.content_by_tab_name = data
         self.headers_by_tab_name = self.extract_tabbed_headers(data)
@@ -589,10 +653,10 @@ class CsvManager(SingleTableMixin, FlattenedTableSetManager):
     def _process_row(self, tab_name: str, headers: Headers, row_data: SheetRow) -> AnyJsonData:
         ignored(tab_name)
         if self.escaping:
-            return {headers[i]: self.parse_cell_value(self._escape_cell_text(cell_text))
+            return {headers[i]: self.parse_cell_value(self._escape_cell_text(cell_text), override_prefer_number=False)
                     for i, cell_text in enumerate(row_data)}
         else:
-            return {headers[i]: self.parse_cell_value(cell_text)
+            return {headers[i]: self.parse_cell_value(cell_text, override_prefer_number=False)
                     for i, cell_text in enumerate(row_data)}
 
 
@@ -688,6 +752,7 @@ class TableSetManager(AbstractTableSetManager):
 
     @classmethod
     def load_annotated(cls, filename: str, tab_name: Optional[str] = None, escaping: Optional[bool] = None,
+                       retain_empty_properties: bool = False, sheet_order: Optional[List[str]] = None,
                        **kwargs) -> Dict:
         """
         Given a filename and various options
@@ -696,7 +761,7 @@ class TableSetManager(AbstractTableSetManager):
         with maybe_unpack(filename) as filename:
             manager = cls.create_implementation_manager(filename=filename, tab_name=tab_name, escaping=escaping,
                                                         **kwargs)
-            content: TabbedSheetData = manager.load_content()
+            content: TabbedSheetData = manager.load_content(sheet_order)
             return {
                 'filename': filename,
                 'content': content,
@@ -709,3 +774,4 @@ class TableSetManager(AbstractTableSetManager):
 
 
 load_table_set = TableSetManager.load
+load_table_annotated = TableSetManager.load_annotated

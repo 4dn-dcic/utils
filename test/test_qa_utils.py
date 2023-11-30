@@ -568,7 +568,7 @@ def test_occasionally_errors():
                                         error_message="something")
         fail_for_a_while(1)
     except Exception as e:
-        assert type(e) == SyntaxError
+        assert type(e) is SyntaxError
         assert str(e) == "something"
 
 

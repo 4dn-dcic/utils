@@ -5,56 +5,56 @@
       "unquoted": "\\",
       "doublequoted": "\\",
       "singlequoted": "'\\'",
-      "overflow": null
+      "overflow": ""
     },
     {
       "name": "formfeed",
       "unquoted": "\\f",
       "doublequoted": "\\f",
       "singlequoted": "'\\f'",
-      "overflow": null
+      "overflow": ""
     },
     {
       "name": "newline",
       "unquoted": "\n",
       "doublequoted": "\n",
       "singlequoted": "'\n'",
-      "overflow": null
+      "overflow": ""
     },
     {
       "name": "return",
       "unquoted": "\r",
       "doublequoted": "\r",
       "singlequoted": "'\r'",
-      "overflow": null
+      "overflow": ""
     },
     {
       "name": "tab",
       "unquoted": "\t",
       "doublequoted": "\t",
       "singlequoted": "'\t'",
-      "overflow": null
+      "overflow": ""
     },
     {
       "name": "misc",
       "unquoted": "\\m",
       "doublequoted": "\\m",
       "singlequoted": "'\\m'",
-      "overflow": null
+      "overflow": ""
     },
     {
       "name": "quote1",
       "unquoted": "N/A",
       "doublequoted": "x,,z",
       "singlequoted": "N/A",
-      "overflow": null
+      "overflow": ""
     },
     {
       "name": "quotelong",
       "unquoted": "N/A",
       "doublequoted": "x,,z,N/A\nquotlongcontinued,",
       "singlequoted": "N/A",
-      "overflow": null
+      "overflow": ""
     },
     {
       "name": "comma",

@@ -318,7 +318,7 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
                                       SSECustomerKey=os.environ['S3_ENCRYPT_KEY'],
                                       SSECustomerAlgorithm='AES256')
         body_data: Union[bytes, str] = response['Body'].read()
-        auth_text: str = body_data.decode() if type(body_data) == bytes else body_data
+        auth_text: str = body_data.decode() if type(body_data) is bytes else body_data
         try:
             return json.loads(auth_text)
         except (ValueError, TypeError):

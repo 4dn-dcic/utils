@@ -79,6 +79,13 @@ cloudformation_utils
    :members:
 
 
+data_readers
+^^^^^^^^^^
+
+.. automodule:: dcicutils.data_readers
+   :members:
+
+
 data_utils
 ^^^^^^^^^^
 
@@ -335,3 +342,10 @@ variant_utils
 
 .. automodule:: dcicutils.variant_utils
   :members:
+
+
+zip_utils
+^^^^^^^^^
+
+.. automodule:: dcicutils.zip_utils
+   :members:
