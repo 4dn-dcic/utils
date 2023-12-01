@@ -139,7 +139,7 @@ class Excel:
     def open(self) -> None:
         if self._workbook is None:
             self._workbook = openpyxl.load_workbook(self._file, data_only=True)
-            self.sheet_names = self._workbook.sheetnames or []
+            self.sheet_names = [(sheet_name or "").strip() for sheet_name in (self._workbook.sheetnames or [])]
 
     def __del__(self) -> None:
         if (workbook := self._workbook) is not None:
