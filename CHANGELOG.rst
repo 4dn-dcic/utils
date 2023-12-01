@@ -6,6 +6,11 @@ dcicutils
 Change Log
 ----------
 
+8.4.1
+=====
+* Strip sheet name in data_readers.Excel.
+
+
 8.4.0
 =====
 * More work related to SMaHT ingestion (bundle/sheet_utils, data_readers, etc).
