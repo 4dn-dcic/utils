@@ -619,9 +619,8 @@ class PortalBase:
     @staticmethod
     def _create_testapp(value: Union[str, Router, TestApp] = "development.ini") -> TestApp:
         """
-        Creates and returns a TestApp; and also adds a get_with_follow method to it.
-        Refactored out of above loadxl code (2023-09) to consolidate at a single point,
-        and also for use by the generate_local_access_key and view_local_object scripts.
+        Creates and returns a TestApp. Refactored out of above loadxl code to consolidate at a
+        single point; also for use by the generate_local_access_key and view_local_object scripts.
         """
         if isinstance(value, TestApp):
             return value
