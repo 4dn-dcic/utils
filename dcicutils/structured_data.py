@@ -477,7 +477,7 @@ class Schema:
 class PortalBase:
 
     def __init__(self,
-                 arg: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None,
+                 arg: Optional[Union[VirtualApp, TestApp, Router, Portal, dict, tuple, str]] = None,
                  env: Optional[str] = None, app: OrchestratedApp = APP_SMAHT, server: Optional[str] = None,
                  key: Optional[Union[dict, tuple]] = None,
                  portal: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None) -> PortalBase:
@@ -489,7 +489,7 @@ class PortalBase:
             portal = arg
         elif isinstance(arg, Portal) and not portal:
             portal = arg
-        elif isinstance(arg, str) and arg.endswith(".ini"):
+        elif isinstance(arg, str) and arg.endswith(".ini") and not portal:
             portal = arg
         elif isinstance(arg, str) and not env:
             env = arg
@@ -632,7 +632,7 @@ class PortalBase:
 class Portal(PortalBase):
 
     def __init__(self,
-                 arg: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None,
+                 arg: Optional[Union[VirtualApp, TestApp, Router, Portal, dict, tuple, str]] = None,
                  env: Optional[str] = None, app: OrchestratedApp = APP_SMAHT, server: Optional[str] = None,
                  key: Optional[Union[dict, tuple]] = None,
                  portal: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None,
