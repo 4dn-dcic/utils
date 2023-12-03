@@ -481,15 +481,8 @@ class PortalBase:
                  env: Optional[str] = None, app: OrchestratedApp = APP_SMAHT, server: Optional[str] = None,
                  key: Optional[Union[dict, tuple]] = None,
                  portal: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None) -> PortalBase:
-        if isinstance(arg, VirtualApp) and not portal:
-            portal = arg
-        elif isinstance(arg, TestApp) and not portal:
-            portal = arg
-        elif isinstance(arg, Router) and not portal:
-            portal = arg
-        elif isinstance(arg, Portal) and not portal:
-            portal = arg
-        elif isinstance(arg, str) and arg.endswith(".ini") and not portal:
+        if (isinstance(arg, (VirtualApp, TestApp, Router, Portal)) or
+            isinstance(arg, str) and arg.endswith(".ini")) and not portal
             portal = arg
         elif isinstance(arg, str) and not env:
             env = arg
