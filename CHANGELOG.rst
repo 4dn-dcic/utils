@@ -9,6 +9,7 @@ Change Log
 8.4.1
 =====
 * Strip sheet name in data_readers.Excel.
+* Moved structured_data.py from smaht-portal to here.
 
 
 8.4.0
