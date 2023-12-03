@@ -317,7 +317,7 @@ ssl_certificate_utils
 
 
 structured_data
-^^^^^^^^^^
+^^^^^^^^^^^^^^^
 
 .. automodule:: dcicutils.structured_data
    :members:
