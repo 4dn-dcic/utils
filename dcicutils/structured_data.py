@@ -9,7 +9,7 @@ import re
 import requests
 from requests.models import Response as RequestResponse
 import sys
-from typing import Any, Callable, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, List, Optional, Set, Tuple, Type, Union
 from webtest.app import TestApp, TestResponse
 from dcicutils.common import OrchestratedApp, APP_CGAP, APP_FOURFRONT, APP_SMAHT, ORCHESTRATED_APPS
 from dcicutils.creds_utils import CGAPKeyManager, FourfrontKeyManager, SMaHTKeyManager
@@ -53,6 +53,8 @@ class StructuredDataSet:
         self._order = order
         self._prune = prune
         self._issues = None
+        self._refs_resolved = set()
+        self._refs_unresolved = set()
         self._load_file(file) if file else None
 
     @staticmethod
@@ -71,6 +73,9 @@ class StructuredDataSet:
                     if (validation_issues := schema.validate(data)) is not None:
                         issues.extend([f"{schema.name} [{item_number}]: {issue}" for issue in validation_issues])
         return issues + (self._issues or [])
+
+    def refs(self) -> Tuple[List[str], List[str]]:
+        return (sorted(self._refs_resolved), sorted(self._refs_unresolved))
 
     def _load_file(self, file: str) -> None:
         # Returns a dictionary where each property is the name (i.e. the type) of the data,
@@ -128,6 +133,8 @@ class StructuredDataSet:
                 structured_row_template.set_value(structured_row, column_name, value, reader.location)
             if schema and (schema_name := schema.name):
                 type_name = schema_name
+                self._refs_resolved = self._refs_resolved | schema._refs_resolved
+                self._refs_unresolved = self._refs_unresolved | schema._refs_unresolved
             self._add(type_name, structured_row)
 
     def _add(self, type_name: str, data: Union[dict, List[dict]]) -> None:
@@ -262,6 +269,8 @@ class Schema:
             "number": self._map_function_number,
             "string": self._map_function_string
         }
+        self._refs_resolved = set()
+        self._refs_unresolved = set()
         self._typeinfo = self._create_typeinfo(schema_json)
 
     @staticmethod
@@ -336,11 +345,14 @@ class Schema:
             exception = None
             if not value:
                 if (column := typeinfo.get("column")) and column in self.data.get("required", []):
+                    self._refs_unresolved.add(f"/{link_to}/<null>")
                     exception = f"No required reference (linkTo) value for: {link_to}"
             elif portal and not portal.ref_exists(link_to, value):
+                self._refs_unresolved.add(f"/{link_to}/{value}")
                 exception = f"Cannot resolve reference (linkTo) for: {link_to}"
             if exception:
                 raise Exception(exception + f"{f'/{value}' if value else ''}{f' from {src}' if src else ''}")
+            self._refs_resolved.add(f"/{link_to}/{value}")
             return value
         return lambda value, src: map_ref(value, typeinfo.get("linkTo"), self._portal, src)
 
