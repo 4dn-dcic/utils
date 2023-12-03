@@ -3,15 +3,21 @@ from functools import lru_cache
 import json
 from jsonschema import Draft7Validator as SchemaValidator
 import os
+from pyramid.paster import get_app
+from pyramid.router import Router
 import re
+import requests
+from requests.models import Response as RequestResponse
 import sys
 from typing import Any, Callable, List, Optional, Tuple, Type, Union
-from webtest.app import TestApp
+from webtest.app import TestApp, TestResponse
+from dcicutils.common import OrchestratedApp, APP_CGAP, APP_FOURFRONT, APP_SMAHT, ORCHESTRATED_APPS
+from dcicutils.creds_utils import CGAPKeyManager, FourfrontKeyManager, SMaHTKeyManager
 from dcicutils.data_readers import CsvReader, Excel, RowReader
-from dcicutils.ff_utils import get_metadata, get_schema
+from dcicutils.ff_utils import get_metadata, get_schema, patch_metadata, post_metadata
 from dcicutils.misc_utils import (load_json_if, merge_objects, remove_empty_properties, right_trim, split_string,
                                   to_boolean, to_camel_case, to_enum, to_float, to_integer, VirtualApp)
-from dcicutils.zip_utils import unpack_gz_file_to_temporary_file, unpack_files
+from dcicutils.zip_utils import temporary_file, unpack_gz_file_to_temporary_file, unpack_files
 
 
 # Classes/functions to parse a CSV or Excel Spreadsheet into structured data, using a specialized
@@ -32,25 +38,26 @@ DOTTED_NAME_DELIMITER_CHAR = "."
 
 # Forward type references for type hints.
 Portal = Type["Portal"]
-PortalAny = Union[VirtualApp, TestApp, Portal]
+PortalBase = Type["PortalBase"]
 Schema = Type["Schema"]
 StructuredDataSet = Type["StructuredDataSet"]
 
 
 class StructuredDataSet:
 
-    def __init__(self, file: Optional[str] = None, portal: Optional[PortalAny] = None,
+    def __init__(self, file: Optional[str] = None, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
                  schemas: Optional[List[dict]] = None, data: Optional[List[dict]] = None,
                  order: Optional[List[str]] = None, prune: bool = True) -> None:
-        self.data = {} if not data else data
-        self._portal = Portal.create(portal, data=self.data, schemas=schemas)  # If None then no schemas nor refs.
+        self.data = {} if not data else data  # If portal is None then no schemas nor refs.
+        self._portal = Portal(portal, data=self.data, schemas=schemas) if portal else None
         self._order = order
         self._prune = prune
         self._issues = None
         self._load_file(file) if file else None
 
     @staticmethod
-    def load(file: str, portal: Optional[PortalAny] = None, schemas: Optional[List[dict]] = None,
+    def load(file: str, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
+             schemas: Optional[List[dict]] = None,
              order: Optional[List[str]] = None, prune: bool = True) -> StructuredDataSet:
         return StructuredDataSet(file=file, portal=portal, schemas=schemas, order=order, prune=prune)
 
@@ -137,6 +144,7 @@ class StructuredDataSet:
                 self._issues = []
             self._issues.append({source: issues})
 
+
 class _StructuredRowTemplate:
 
     def __init__(self, column_names: List[str], schema: Optional[Schema] = None) -> None:
@@ -155,7 +163,8 @@ class _StructuredRowTemplate:
 
     def _create_row_template(self, column_names: List[str]) -> dict:  # Surprisingly tricky code here.
 
-        def parse_array_components(column_name: str, value: Optional[Any], path: List[Union[str, int]]) -> Tuple[Optional[str], Optional[List[Any]]]:
+        def parse_array_components(column_name: str, value: Optional[Any],
+                                   path: List[Union[str, int]]) -> Tuple[Optional[str], Optional[List[Any]]]:
             array_name, array_indices = Schema.array_indices(column_name)
             if not array_name:
                 return None, None
@@ -274,7 +283,7 @@ class Schema:
         if not info and isinstance(info := self._typeinfo.get(self.unadorn_column_name(column_name)), str):
             info = self._typeinfo.get(info)
         return info
-        
+
     def _map_function(self, typeinfo: dict) -> Optional[Callable]:
         if isinstance(typeinfo, dict) and (typeinfo_type := typeinfo.get("type")) is not None:
             if isinstance(typeinfo_type, list):
@@ -465,37 +474,203 @@ class Schema:
         return (name, indices) if indices else (None, None)
 
 
-class Portal:
+class PortalBase:
 
-    def __init__(self, portal: PortalAny, data: Optional[dict] = None, schemas: Optional[List[dict]] = None) -> None:
-        self.vapp = portal.vapp if isinstance(portal, Portal) else portal
-        self._data = data  # Data set being loaded (e.g. by StructuredDataSet).
-        self._schemas = schemas  # Explicitly specified known schemas.
+    def __init__(self,
+                 arg: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None,
+                 env: Optional[str] = None, app: OrchestratedApp = APP_SMAHT, server: Optional[str] = None,
+                 key: Optional[Union[dict, tuple]] = None,
+                 portal: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None) -> PortalBase:
+        if isinstance(arg, VirtualApp) and not portal:
+            portal = arg
+        elif isinstance(arg, TestApp) and not portal:
+            portal = arg
+        elif isinstance(arg, Router) and not portal:
+            portal = arg
+        elif isinstance(arg, Portal) and not portal:
+            portal = arg
+        elif isinstance(arg, str) and arg.endswith(".ini"):
+            portal = arg
+        elif isinstance(arg, str) and not env:
+            env = arg
+        elif (isinstance(arg, dict) or isinstance(arg, tuple)) and not key:
+            key = arg
+        self._vapp = None
+        self._key = None
+        self._key_pair = None
+        self._server = None
+        if isinstance(portal, Portal):
+            self._vapp = portal._vapp
+            self._key = portal._key
+            self._key_pair = portal._key_pair
+            self._server = portal._server
+        elif isinstance(portal, (VirtualApp, TestApp)):
+            self._vapp = portal
+        elif isinstance(portal, (Router, str)):
+            self._vapp = PortalBase._create_testapp(portal)
+        elif isinstance(key, dict):
+            self._key = key
+            self._key_pair = (key.get("key"), key.get("secret")) if key else None
+        elif isinstance(key, tuple) and len(key) >= 2:
+            self._key = {"key": key[0], "secret": key[1]}
+            self._key_pair = key
+        elif isinstance(env, str):
+            key_managers = {APP_CGAP: CGAPKeyManager, APP_FOURFRONT: FourfrontKeyManager, APP_SMAHT: SMaHTKeyManager}
+            if not (key_manager := key_managers.get(app)) or not (key_manager := key_manager()):
+                raise Exception(f"Invalid app name: {app} (valid: {', '.join(ORCHESTRATED_APPS)}).")
+            if isinstance(env, str):
+                self._key = key_manager.get_keydict_for_env(env)
+                self._server = self._key.get("server") if self._key else None
+            elif isinstance(server, str):
+                self._key = key_manager.get_keydict_for_server(server)
+                self._server = server
+            self._key_pair = key_manager.keydict_to_keypair(self._key) if self._key else None
 
-    @lru_cache(maxsize=256)
+    def get_metadata(self, object_id: str) -> Optional[dict]:
+        return get_metadata(obj_id=object_id, vapp=self._vapp, key=self._key)
+
+    def patch_metadata(self, object_id: str, data: str) -> Optional[dict]:
+        if self._key:
+            return patch_metadata(obj_id=object_id, patch_item=data, key=self._key)
+        return self.patch(f"/{object_id}", data)
+
+    def post_metadata(self, object_type: str, data: str) -> Optional[dict]:
+        if self._key:
+            return post_metadata(schema_name=object_type, post_item=data, key=self._key)
+        return self.post(f"/{object_type}", data)
+
     def get_schema(self, schema_name: str) -> Optional[dict]:
-        def get_schema_internal(schema_name: str) -> Optional[dict]:
-            return (next((schema for schema in self._schemas or []
-                         if Schema.type_name(schema.get("title")) == Schema.type_name(schema_name)), None) or
-                    get_schema(schema_name, portal_vapp=self.vapp))
-        try:
-            if (schema := get_schema_internal(schema_name)):
-                return schema
-        except Exception:  # Try/force camel-case if all upper/lower-case.
-            if schema_name == schema_name.upper():
-                if (schema := get_schema_internal(schema_name.lower().title())):
-                    return schema
-            elif schema_name == schema_name.lower():
-                if (schema := get_schema_internal(schema_name.title())):
-                    return schema
-            raise
+        return get_schema(schema_name, portal_vapp=self._vapp, key=self._key)
+
+    def get(self, uri: str, follow: bool = True, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
+        if isinstance(self._vapp, (VirtualApp, TestApp)):
+            response = self._vapp.get(self._uri(uri), **self._kwargs(**kwargs))
+            if response and response.status_code in [301, 302, 303, 307, 308] and follow:
+                response = response.follow()
+            return response
+        return requests.get(self._uri(uri), allow_redirects=follow, **self._kwargs(**kwargs))
+
+    def patch(self, uri: str, data: Optional[dict] = None,
+              json: Optional[dict] = None, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
+        if isinstance(self._vapp, (VirtualApp, TestApp)):
+            return self._vapp.patch_json(self._uri(uri), json or data, **self._kwargs(**kwargs))
+        return requests.patch(self._uri(uri), json=json or data, **self._kwargs(**kwargs))
+
+    def post(self, uri: str, data: Optional[dict] = None, json: Optional[dict] = None,
+             files: Optional[dict] = None, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
+        if isinstance(self._vapp, (VirtualApp, TestApp)):
+            if files:
+                return self._vapp.post(self._uri(uri), json or data, upload_files=files, **self._kwargs(**kwargs))
+            else:
+                return self._vapp.post_json(self._uri(uri), json or data, upload_files=files, **self._kwargs(**kwargs))
+        return requests.post(self._uri(uri), json=json or data, files=files, **self._kwargs(**kwargs))
+
+    def _uri(self, uri: str) -> str:
+        if not isinstance(uri, str) or not uri:
+            return "/"
+        if uri.lower().startswith("http://") or uri.lower().startswith("https://"):
+            return uri
+        uri = re.sub(r"/+", "/", uri)
+        return (self._server + ("/" if uri.startswith("/") else "") + uri) if self._server else uri
+
+    def _kwargs(self, **kwargs) -> dict:
+        result_kwargs = {"headers":
+                         kwargs.get("headers", {"Content-type": "application/json", "Accept": "application/json"})}
+        if self._key_pair:
+            result_kwargs["auth"] = self._key_pair
+        if isinstance(timeout := kwargs.get("timeout"), int):
+            result_kwargs["timeout"] = timeout
+        return result_kwargs
+
+    @staticmethod
+    def create_for_testing(ini_file: Optional[str] = None) -> PortalBase:
+        if isinstance(ini_file, str):
+            return Portal(Portal._create_testapp(ini_file))
+        minimal_ini_for_unit_testing = "[app:app]\nuse = egg:encoded\nsqlalchemy.url = postgresql://dummy\n"
+        with temporary_file(content=minimal_ini_for_unit_testing, suffix=".ini") as ini_file:
+            return Portal(Portal._create_testapp(ini_file))
+
+    @staticmethod
+    def create_for_testing_local(ini_file: Optional[str] = None) -> Portal:
+        if isinstance(ini_file, str):
+            return Portal(Portal._create_testapp(ini_file))
+        minimal_ini_for_testing_local = "\n".join([
+            "[app:app]\nuse = egg:encoded\nfile_upload_bucket = dummy",
+            "sqlalchemy.url = postgresql://postgres@localhost:5441/postgres?host=/tmp/snovault/pgdata",
+            "multiauth.groupfinder = encoded.authorization.smaht_groupfinder",
+            "multiauth.policies = auth0 session remoteuser accesskey",
+            "multiauth.policy.session.namespace = mailto",
+            "multiauth.policy.session.use = encoded.authentication.NamespacedAuthenticationPolicy",
+            "multiauth.policy.session.base = pyramid.authentication.SessionAuthenticationPolicy",
+            "multiauth.policy.remoteuser.namespace = remoteuser",
+            "multiauth.policy.remoteuser.use = encoded.authentication.NamespacedAuthenticationPolicy",
+            "multiauth.policy.remoteuser.base = pyramid.authentication.RemoteUserAuthenticationPolicy",
+            "multiauth.policy.accesskey.namespace = accesskey",
+            "multiauth.policy.accesskey.use = encoded.authentication.NamespacedAuthenticationPolicy",
+            "multiauth.policy.accesskey.base = encoded.authentication.BasicAuthAuthenticationPolicy",
+            "multiauth.policy.accesskey.check = encoded.authentication.basic_auth_check",
+            "multiauth.policy.auth0.use = encoded.authentication.NamespacedAuthenticationPolicy",
+            "multiauth.policy.auth0.namespace = auth0",
+            "multiauth.policy.auth0.base = encoded.authentication.Auth0AuthenticationPolicy"
+        ])
+        with temporary_file(content=minimal_ini_for_testing_local, suffix=".ini") as minimal_ini_file:
+            return Portal(Portal._create_testapp(minimal_ini_file))
+
+    @staticmethod
+    def _create_testapp(value: Union[str, Router, TestApp] = "development.ini") -> TestApp:
+        """
+        Creates and returns a TestApp; and also adds a get_with_follow method to it.
+        Refactored out of above loadxl code (2023-09) to consolidate at a single point,
+        and also for use by the generate_local_access_key and view_local_object scripts.
+        """
+        if isinstance(value, TestApp):
+            return value
+        app = value if isinstance(value, Router) else get_app(value, "app")
+        return TestApp(app, {"HTTP_ACCEPT": "application/json", "REMOTE_USER": "TEST"})
+
+
+class Portal(PortalBase):
+
+    def __init__(self,
+                 arg: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None,
+                 env: Optional[str] = None, app: OrchestratedApp = APP_SMAHT, server: Optional[str] = None,
+                 key: Optional[Union[dict, tuple]] = None,
+                 portal: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None,
+                 data: Optional[dict] = None, schemas: Optional[List[dict]] = None) -> Optional[Portal]:
+        super(Portal, self).__init__(arg, env=env, app=app, server=server, key=key, portal=portal)
+        if isinstance(arg, Portal) and not portal:
+            portal = arg
+        if isinstance(portal, Portal):
+            self._schemas = schemas if schemas is not None else portal._schemas  # Explicitly specified/known schemas.
+            self._data = data if data is not None else portal._data  # Data set being loaded; e.g. by StructuredDataSet.
+        else:
+            self._schemas = schemas
+            self._data = data
 
     @lru_cache(maxsize=256)
     def get_metadata(self, object_name: str) -> Optional[dict]:
         try:
-            return get_metadata(object_name, vapp=self.vapp)
+            return super(Portal, self).get_metadata(object_name)
         except Exception:
             return None
+
+    @lru_cache(maxsize=256)
+    def get_schema(self, schema_name: str) -> Optional[dict]:
+        def get_schema_exact(schema_name: str) -> Optional[dict]:  # noqa
+            return (next((schema for schema in self._schemas or []
+                         if Schema.type_name(schema.get("title")) == Schema.type_name(schema_name)), None) or
+                    super(Portal, self).get_schema(schema_name))
+        try:
+            if (schema := get_schema_exact(schema_name)):
+                return schema
+        except Exception:  # Try/force camel-case if all upper/lower-case.
+            if schema_name == schema_name.upper():
+                if (schema := get_schema_exact(schema_name.lower().title())):
+                    return schema
+            elif schema_name == schema_name.lower():
+                if (schema := get_schema_exact(schema_name.title())):
+                    return schema
+            raise
 
     def ref_exists(self, type_name: str, value: str) -> bool:
         if self._data and (items := self._data.get(type_name)) and (schema := self.get_schema(type_name)):
@@ -507,15 +682,12 @@ class Portal:
         return self.get_metadata(f"/{type_name}/{value}") is not None
 
     @staticmethod
-    def create(portal: Optional[PortalAny] = None,
-               data: Optional[dict] = None, schemas: Optional[List[dict]] = None) -> Optional[Portal]:
-        if isinstance(portal, Portal):
-            if data is not None:
-                portal._data = data
-            if schemas is not None:
-                portal._schemas = schemas
-            return portal
-        return Portal(portal, data=data, schemas=schemas) if portal else None
+    def create_for_testing(ini_file: Optional[str] = None, schemas: Optional[List[dict]] = None) -> Portal:
+        return Portal(PortalBase.create_for_testing(ini_file), schemas=schemas)
+
+    @staticmethod
+    def create_for_testing_local(ini_file: Optional[str] = None, schemas: Optional[List[dict]] = None) -> Portal:
+        return Portal(PortalBase.create_for_testing_local(ini_file), schemas=schemas)
 
 
 def _split_dotted_string(value: str):
