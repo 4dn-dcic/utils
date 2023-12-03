@@ -316,6 +316,13 @@ ssl_certificate_utils
    :members:
 
 
+structured_data
+^^^^^^^^^^
+
+.. automodule:: dcicutils.structured_data
+   :members:
+
+
 task_utils
 ^^^^^^^^^^
 
