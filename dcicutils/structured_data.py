@@ -668,7 +668,7 @@ class Portal(PortalBase):
             return schema
         if schema_name == schema_name.upper() and (schema := self.get_schemas(schema_name.lower().title())):
             return schema
-        if schema_name == schema_name.lower() and (schema := get_schema_exact(schema_name.title())):
+        if schema_name == schema_name.lower() and (schema := self.get_schemas(schema_name.title())):
             return schema
 
     @lru_cache(maxsize=1)
