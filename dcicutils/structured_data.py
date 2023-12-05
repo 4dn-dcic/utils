@@ -597,9 +597,9 @@ class PortalBase:
                 def __init__(self, respnose, **kwargs):
                     super().__init__(**kwargs)
                     self._response = response
-                def __getattr__(self, attr):
+                def __getattr__(self, attr):  # noqa
                     return getattr(self._response, attr)
-                def json(self):
+                def json(self):  # noqa
                     return self._response.json
             response = RequestResponseWrapper(response)
         return response
