@@ -1,3 +1,4 @@
+from collections import deque
 import copy
 from functools import lru_cache
 import json
@@ -9,7 +10,7 @@ import re
 import requests
 from requests.models import Response as RequestResponse
 import sys
-from typing import Any, Callable, List, Optional, Set, Tuple, Type, Union
+from typing import Any, Callable, List, Optional, Tuple, Type, Union
 from webtest.app import TestApp, TestResponse
 from dcicutils.common import OrchestratedApp, APP_CGAP, APP_FOURFRONT, APP_SMAHT, ORCHESTRATED_APPS
 from dcicutils.creds_utils import CGAPKeyManager, FourfrontKeyManager, SMaHTKeyManager
@@ -544,9 +545,6 @@ class PortalBase:
             return post_metadata(schema_name=object_type, post_item=data, key=self._key)
         return self.post(f"/{object_type}", data)
 
-    def get_schema(self, schema_name: str) -> Optional[dict]:
-        return get_schema(schema_name, portal_vapp=self._vapp, key=self._key)
-
     def get(self, uri: str, follow: bool = True, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
         if isinstance(self._vapp, (VirtualApp, TestApp)):
             response = self._vapp.get(self._uri(uri), **self._kwargs(**kwargs))
@@ -569,6 +567,40 @@ class PortalBase:
             else:
                 return self._vapp.post_json(self._uri(uri), json or data, upload_files=files, **self._kwargs(**kwargs))
         return requests.post(self._uri(uri), json=json or data, files=files, **self._kwargs(**kwargs))
+
+    def get_schema(self, schema_name: str) -> Optional[dict]:
+        return get_schema(schema_name, portal_vapp=self._vapp, key=self._key)
+
+    @lru_cache(maxsize=1)
+    def get_schemas_super_type_map(self) -> dict:
+        """
+        Returns the "super type map" for all of the known schemas.
+        This is a dictionary of all top-level types which have sub-types whose value is and
+        array of all of those sub-types (direct and all descendents), in breadth first order.
+        """
+        def breadth_first(super_type_map: dict, super_type_name: str) -> dict:
+            result = []
+            queue = deque(super_type_map.get(super_type_name, []))
+            while queue:
+                result.append(sub_type_name := queue.popleft())
+                if sub_type_name in super_type_map:
+                    queue.extend(super_type_map[sub_type_name])
+            return result
+        if not (schemas := self.get("/profiles/")) or not (schemas := schemas.json):
+            return {}
+        super_type_map = {}
+        for type_name in schemas:
+            if super_type_name := schemas[type_name].get("rdfs:subClassOf"):
+                super_type_name = super_type_name.replace("/profiles/", "").replace(".json", "")
+                if super_type_name != "Item":
+                    if not super_type_map.get(super_type_name):
+                        super_type_map[super_type_name] = [type_name]
+                    elif type_name not in super_type_map[super_type_name]:
+                        super_type_map[super_type_name].append(type_name)
+        super_type_map_flattened = {}
+        for super_type_name in super_type_map:
+            super_type_map_flattened[super_type_name] = breadth_first(super_type_map, super_type_name)
+        return super_type_map_flattened
 
     def _uri(self, uri: str) -> str:
         if not isinstance(uri, str) or not uri:
@@ -660,6 +692,8 @@ class Portal(PortalBase):
 
     @lru_cache(maxsize=256)
     def get_schema(self, schema_name: str) -> Optional[dict]:
+        # TODO: Now that we have get_schemas_super_type_map which gets all schemas, might as
+        # well use it and not hit the portal for each get_schema request (even though lru cached).
         def get_schema_exact(schema_name: str) -> Optional[dict]:  # noqa
             return (next((schema for schema in self._schemas or []
                          if Schema.type_name(schema.get("title")) == Schema.type_name(schema_name)), None) or
@@ -677,6 +711,16 @@ class Portal(PortalBase):
             raise
 
     def ref_exists(self, type_name: str, value: str) -> bool:
+        if self._ref_exists_single(type_name, value):
+            return True
+        if (schemas_super_type_map := self.get_schemas_super_type_map()):
+            if (sub_type_names := schemas_super_type_map.get(type_name)):
+                for sub_type_name in sub_type_names:
+                    if self._ref_exists_single(sub_type_name, value):
+                        return True
+        return False
+
+    def _ref_exists_single(self, type_name: str, value: str) -> bool:
         if self._data and (items := self._data.get(type_name)) and (schema := self.get_schema(type_name)):
             iproperties = set(schema.get("identifyingProperties", [])) | {"identifier", "uuid"}
             for item in items:
