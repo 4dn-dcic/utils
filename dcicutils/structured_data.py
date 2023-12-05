@@ -676,9 +676,9 @@ class Portal(PortalBase):
         schemas = super(Portal, self).get_schemas()
         if self._schemas:
             schemas = copy.deepcopy(schemas)
-            for portal_schemas in self._schemas:
-                if portal_schema.get("title"):
-                    schemas[portal_schema["title"]] = portal_schema
+            for user_specified_schema in self._schemas:
+                if user_specified_schema.get("title"):
+                    schemas[user_specified_schema["title"]] = user_specified_schema
         return schemas
 
     @lru_cache(maxsize=1)
