@@ -347,10 +347,10 @@ class Schema:
             if not value:
                 if (column := typeinfo.get("column")) and column in self.data.get("required", []):
                     self._refs_unresolved.add(f"/{link_to}/<null>")
-                    exception = f"No required reference (linkTo) value for: {link_to}"
+                    exception = f"No required reference (linkTo) value for: /{link_to}"
             elif portal and not portal.ref_exists(link_to, value):
                 self._refs_unresolved.add(f"/{link_to}/{value}")
-                exception = f"Cannot resolve reference (linkTo) for: {link_to}"
+                exception = f"Cannot resolve reference (linkTo) for: /{link_to}"
             if exception:
                 raise Exception(exception + f"{f'/{value}' if value else ''}{f' from {src}' if src else ''}")
             self._refs_resolved.add(f"/{link_to}/{value}")
@@ -550,7 +550,7 @@ class PortalBase:
             response = self._vapp.get(self._uri(uri), **self._kwargs(**kwargs))
             if response and response.status_code in [301, 302, 303, 307, 308] and follow:
                 response = response.follow()
-            return response
+            return self._response(response)
         return requests.get(self._uri(uri), allow_redirects=follow, **self._kwargs(**kwargs))
 
     def patch(self, uri: str, data: Optional[dict] = None,
@@ -572,7 +572,7 @@ class PortalBase:
         return get_schema(schema_name, portal_vapp=self._vapp, key=self._key)
 
     def get_schemas(self) -> dict:
-        return self.get("/profiles/").json
+        return self.get("/profiles/").json()
 
     def _uri(self, uri: str) -> str:
         if not isinstance(uri, str) or not uri:
@@ -590,6 +590,19 @@ class PortalBase:
         if isinstance(timeout := kwargs.get("timeout"), int):
             result_kwargs["timeout"] = timeout
         return result_kwargs
+
+    def _response(self, response) -> Optional[RequestResponse]:
+        if response and isinstance(getattr(response.__class__, "json"), property):
+            class RequestResponseWrapper:  # For consistency change json property to method.
+                def __init__(self, respnose, **kwargs):
+                    super().__init__(**kwargs)
+                    self._response = response
+                def __getattr__(self, attr):
+                    return getattr(self._response, attr)
+                def json(self):
+                    return self._response.json
+            response = RequestResponseWrapper(response)
+        return response
 
     @staticmethod
     def create_for_testing(ini_file: Optional[str] = None) -> PortalBase:
@@ -664,11 +677,11 @@ class Portal(PortalBase):
 
     @lru_cache(maxsize=256)
     def get_schema(self, schema_name: str) -> Optional[dict]:
-        if (schema := self.get_schemas().get(schema_name)):
+        if (schemas := self.get_schemas()) and (schema := schemas.get(schema_name := Schema.type_name(schema_name))):
             return schema
-        if schema_name == schema_name.upper() and (schema := self.get_schemas(schema_name.lower().title())):
+        if schema_name == schema_name.upper() and (schema := schemas.get(schema_name.lower().title())):
             return schema
-        if schema_name == schema_name.lower() and (schema := self.get_schemas(schema_name.title())):
+        if schema_name == schema_name.lower() and (schema := schemas.get(schema_name.title())):
             return schema
 
     @lru_cache(maxsize=1)
