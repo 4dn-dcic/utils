@@ -2,27 +2,30 @@ import abc
 import csv
 import openpyxl
 from typing import Any, Generator, Iterator, List, Optional, Type, Tuple, Union
-from dcicutils.misc_utils import right_trim
+from dcicutils.misc_utils import create_object, right_trim
+
+# Forward type references for type hints.
+Excel = Type["Excel"]
 
 
 class RowReader(abc.ABC):
 
     def __init__(self):
         self.header = None
-        self.location = 0
+        self.row_number = 0
         self._warning_empty_headers = False
         self._warning_extra_values = []  # Line numbers.
         self.open()
 
     def __iter__(self) -> Iterator:
         for row in self.rows:
-            self.location += 1
+            self.row_number += 1
             if self.is_comment_row(row):
                 continue
             if self.is_terminating_row(row):
                 break
             if len(self.header) < len(row):  # Row values beyond what there are headers for are ignored.
-                self._warning_extra_values.append(self.location)
+                self._warning_extra_values.append(self.row_number)
             yield {column: self.cell_value(value) for column, value in zip(self.header, row)}
 
     def _define_header(self, header: List[Optional[Any]]) -> None:
@@ -49,13 +52,20 @@ class RowReader(abc.ABC):
         pass
 
     @property
-    def issues(self) -> Optional[List[str]]:
+    def file(self) -> Optional[str]:
+        return self._file if hasattr(self, "_file") else None
+
+    @property
+    def issues(self) -> List[str]:
         issues = []
         if self._warning_empty_headers:
-            issues.append("Empty header column encountered; ignoring it and all subsequent columns.")
+            issues.append({"src": create_object(file=self.file),
+                           "warning": "Empty header column encountered; ignoring it and all subsequent columns."})
         if self._warning_extra_values:
-            issues.extend([f"Extra column values on row [{row_number}]" for row_number in self._warning_extra_values])
-        return issues if issues else None
+            for row_number in self._warning_extra_values:
+                issues.append({"src": create_object(file=self.file, row=row_number),
+                               "warning": f"Extra row column values."})
+        return issues
 
 
 class ListReader(RowReader):
@@ -101,9 +111,10 @@ class CsvReader(RowReader):
 
 class ExcelSheetReader(RowReader):
 
-    def __init__(self, sheet_name: str, workbook: openpyxl.workbook.workbook.Workbook) -> None:
+    def __init__(self, excel: Excel, sheet_name: str, workbook: openpyxl.workbook.workbook.Workbook) -> None:
         self.sheet_name = sheet_name or "Sheet1"
         self._workbook = workbook
+        self._file = excel._file
         self._rows = None
         super().__init__()
 
@@ -134,7 +145,7 @@ class Excel:
         self.open()
 
     def sheet_reader(self, sheet_name: str) -> ExcelSheetReader:
-        return self._reader_class(sheet_name=sheet_name, workbook=self._workbook)
+        return self._reader_class(self, sheet_name=sheet_name, workbook=self._workbook)
 
     def open(self) -> None:
         if self._workbook is None:

@@ -1501,6 +1501,14 @@ def right_trim(list_or_tuple: Union[List[Any], Tuple[Any]],
     return list_or_tuple[:i + 1]
 
 
+def create_object(**kwargs) -> dict:
+    result = {}
+    for name in kwargs:
+        if kwargs[name]:
+            result[name] = kwargs[name]
+    return result
+
+
 def is_c4_arn(arn: str) -> bool:
     """
     Returns True iff the given (presumed) AWS ARN string value looks like it
