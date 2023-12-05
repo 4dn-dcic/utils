@@ -571,36 +571,8 @@ class PortalBase:
     def get_schema(self, schema_name: str) -> Optional[dict]:
         return get_schema(schema_name, portal_vapp=self._vapp, key=self._key)
 
-    @lru_cache(maxsize=1)
-    def get_schemas_super_type_map(self) -> dict:
-        """
-        Returns the "super type map" for all of the known schemas.
-        This is a dictionary of all top-level types which have sub-types whose value is and
-        array of all of those sub-types (direct and all descendents), in breadth first order.
-        """
-        def breadth_first(super_type_map: dict, super_type_name: str) -> dict:
-            result = []
-            queue = deque(super_type_map.get(super_type_name, []))
-            while queue:
-                result.append(sub_type_name := queue.popleft())
-                if sub_type_name in super_type_map:
-                    queue.extend(super_type_map[sub_type_name])
-            return result
-        if not (schemas := self.get("/profiles/")) or not (schemas := schemas.json):
-            return {}
-        super_type_map = {}
-        for type_name in schemas:
-            if super_type_name := schemas[type_name].get("rdfs:subClassOf"):
-                super_type_name = super_type_name.replace("/profiles/", "").replace(".json", "")
-                if super_type_name != "Item":
-                    if not super_type_map.get(super_type_name):
-                        super_type_map[super_type_name] = [type_name]
-                    elif type_name not in super_type_map[super_type_name]:
-                        super_type_map[super_type_name].append(type_name)
-        super_type_map_flattened = {}
-        for super_type_name in super_type_map:
-            super_type_map_flattened[super_type_name] = breadth_first(super_type_map, super_type_name)
-        return super_type_map_flattened
+    def get_schemas(self) -> dict:
+        return self.get("/profiles/").json
 
     def _uri(self, uri: str) -> str:
         if not isinstance(uri, str) or not uri:
@@ -629,7 +601,7 @@ class PortalBase:
 
     @staticmethod
     def create_for_testing_local(ini_file: Optional[str] = None) -> Portal:
-        if isinstance(ini_file, str):
+        if isinstance(ini_file, str) and ini_file:
             return Portal(Portal._create_testapp(ini_file))
         minimal_ini_for_testing_local = "\n".join([
             "[app:app]\nuse = egg:encoded\nfile_upload_bucket = dummy",
@@ -692,27 +664,58 @@ class Portal(PortalBase):
 
     @lru_cache(maxsize=256)
     def get_schema(self, schema_name: str) -> Optional[dict]:
-        # TODO: Now that we have get_schemas_super_type_map which gets all schemas, might as
-        # well use it and not hit the portal for each get_schema request (even though lru cached).
-        def get_schema_exact(schema_name: str) -> Optional[dict]:  # noqa
-            return (next((schema for schema in self._schemas or []
-                         if Schema.type_name(schema.get("title")) == Schema.type_name(schema_name)), None) or
-                    super(Portal, self).get_schema(schema_name))
-        try:
-            if (schema := get_schema_exact(schema_name)):
-                return schema
-        except Exception:  # Try/force camel-case if all upper/lower-case.
-            if schema_name == schema_name.upper():
-                if (schema := get_schema_exact(schema_name.lower().title())):
-                    return schema
-            elif schema_name == schema_name.lower():
-                if (schema := get_schema_exact(schema_name.title())):
-                    return schema
-            raise
+        if (schema := self.get_schemas().get(schema_name)):
+            return schema
+        if schema_name == schema_name.upper() and (schema := self.get_schemas(schema_name.lower().title())):
+            return schema
+        if schema_name == schema_name.lower() and (schema := get_schema_exact(schema_name.title())):
+            return schema
+
+    @lru_cache(maxsize=1)
+    def get_schemas(self) -> dict:
+        schemas = super(Portal, self).get_schemas()
+        if self._schemas:
+            schemas = copy.deepcopy(schemas)
+            for portal_schemas in self._schemas:
+                if portal_schema.get("title"):
+                    schemas[portal_schema["title"]] = portal_schema
+        return schemas
+
+    @lru_cache(maxsize=1)
+    def get_schemas_super_type_map(self) -> dict:
+        """
+        Returns the "super type map" for all of the known schemas (via /profiles).
+        This is a dictionary of all types which have (one or more) sub-types whose value is
+        an array of all of those sub-types (direct and all descendents), in breadth first order.
+        """
+        def breadth_first(super_type_map: dict, super_type_name: str) -> dict:
+            result = []
+            queue = deque(super_type_map.get(super_type_name, []))
+            while queue:
+                result.append(sub_type_name := queue.popleft())
+                if sub_type_name in super_type_map:
+                    queue.extend(super_type_map[sub_type_name])
+            return result
+        if not (schemas := self.get_schemas()):
+            return {}
+        super_type_map = {}
+        for type_name in schemas:
+            if super_type_name := schemas[type_name].get("rdfs:subClassOf"):
+                super_type_name = super_type_name.replace("/profiles/", "").replace(".json", "")
+                if super_type_name != "Item":
+                    if not super_type_map.get(super_type_name):
+                        super_type_map[super_type_name] = [type_name]
+                    elif type_name not in super_type_map[super_type_name]:
+                        super_type_map[super_type_name].append(type_name)
+        super_type_map_flattened = {}
+        for super_type_name in super_type_map:
+            super_type_map_flattened[super_type_name] = breadth_first(super_type_map, super_type_name)
+        return super_type_map_flattened
 
     def ref_exists(self, type_name: str, value: str) -> bool:
         if self._ref_exists_single(type_name, value):
             return True
+        # Check for the given ref in all sub-types of the given type.
         if (schemas_super_type_map := self.get_schemas_super_type_map()):
             if (sub_type_names := schemas_super_type_map.get(type_name)):
                 for sub_type_name in sub_type_names:
