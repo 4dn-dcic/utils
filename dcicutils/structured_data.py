@@ -80,11 +80,15 @@ class StructuredDataSet:
                                               "error": validation_error}, "validation")
 
     @property
-    def warnings(self):
+    def warnings(self) -> dict:
         return self._warnings
 
     @property
-    def errors(self):
+    def reader_warnings(self) -> List[dict]:
+        return self._warnings.get("reader") or []
+
+    @property
+    def errors(self) -> dict:
         return self._errors
 
     @property
@@ -98,6 +102,42 @@ class StructuredDataSet:
     @property
     def resolved_refs(self) -> List[str]:
         return self._resolved_refs
+
+    @staticmethod
+    def format_issue(issue: dict, original_file: Optional[str] = None) -> str:
+        def src_string(issue: dict) -> str:
+            show_file = original_file and (original_file.endswith(".zip") or
+                                           original_file.endswith(".tgz") or original_file.endswith(".gz"))
+            issue_src = issue.get("src")
+            src_file = issue_src.get("file") if show_file else ""
+            src_type = issue_src.get("type")
+            src_column = issue_src.get("column")
+            src_row = issue_src.get("row", 0)
+            if src_file:
+                src = f"{os.path.basename(src_file)}{':' if src_type or src_column or src_row > 0 else ''}"
+            else:
+                src = ""
+            if src_type:
+                src += ("." if src else "") + src_type
+            if src_column:
+                src += ("." if src else "") + src_column
+            if src_row > 0:
+                src += (" " if src else "") + f"[{src_row}]"
+            if not src:
+                if issue.get("warning"):
+                    src = "Warning"
+                elif issue.get("error"):
+                    src = "Error"
+                else:
+                    src = "Issue"
+            return src
+        issue_message = None
+        if issue:
+            if error := issue.get("error"):
+                issue_message = error
+            elif warning := issue.get("warning"):
+                issue_message = warning
+        return f"{src_string(issue)}: {issue_message}" if issue_message else ""
 
     def _load_file(self, file: str) -> None:
         # Returns a dictionary where each property is the name (i.e. the type) of the data,
@@ -127,13 +167,13 @@ class StructuredDataSet:
             self._load_file(file)
 
     def _load_csv_file(self, file: str) -> None:
-        self._load_reader(reader := CsvReader(file), type_name=Schema.type_name(file))
+        self._load_reader(CsvReader(file), type_name=Schema.type_name(file))
 
     def _load_excel_file(self, file: str) -> None:
         excel = Excel(file)  # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
-            self._load_reader(reader := excel.sheet_reader(sheet_name), type_name=Schema.type_name(sheet_name))
+            self._load_reader(excel.sheet_reader(sheet_name), type_name=Schema.type_name(sheet_name))
 
     def _load_json_file(self, file: str) -> None:
         with open(file) as f:
@@ -299,7 +339,7 @@ class Schema:
             "number": self._map_function_number,
             "string": self._map_function_string
         }
-        self._resolved_refs = []
+        self._resolved_refs = set()
         self._unresolved_refs = []
         self._typeinfo = self._create_typeinfo(schema_json)
 
@@ -319,7 +359,7 @@ class Schema:
 
     @property
     def resolved_refs(self) -> List[str]:
-        return self._resolved_refs
+        return list(self._resolved_refs)
 
     def get_map_value_function(self, column_name: str) -> Optional[Any]:
         return (self._get_typeinfo(column_name) or {}).get("map")
@@ -382,14 +422,14 @@ class Schema:
             nonlocal self, typeinfo
             if not value:
                 if (column := typeinfo.get("column")) and column in self.data.get("required", []):
-                    self._unresolved_refs.append({"src": src, "ref": f"/{link_to}/<null>"})
+                    self._unresolved_refs.append({"src": src, "error": f"/{link_to}/<null>"})
             elif portal:
                 if not (resolved := portal.ref_exists(link_to, value)):
-                    self._unresolved_refs.append({"src": src, "ref": f"/{link_to}/{value}"})
+                    self._unresolved_refs.append({"src": src, "error": f"/{link_to}/{value}"})
                 elif len(resolved) > 1:
-                    self._unresolved_refs.append({"src": src, "ref": f"/{link_to}/{value}", "types": resolved})
+                    self._unresolved_refs.append({"src": src, "error": f"/{link_to}/{value}", "types": resolved})
                 else:
-                    self._resolved_refs.append(f"/{link_to}/{value}")
+                    self._resolved_refs.add(f"/{link_to}/{value}")
             return value
         return lambda value, src: map_ref(value, typeinfo.get("linkTo"), self._portal, src)
 
