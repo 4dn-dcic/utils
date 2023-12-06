@@ -56,16 +56,16 @@ class RowReader(abc.ABC):
         return self._file if hasattr(self, "_file") else None
 
     @property
-    def issues(self) -> List[str]:
-        issues = []
+    def warnings(self) -> List[str]:
+        warnings = []
         if self._warning_empty_headers:
-            issues.append({"src": create_object(file=self.file),
-                           "warning": "Empty header column encountered; ignoring it and all subsequent columns."})
+            warnings.append({"src": create_object(file=self.file),
+                             "warning": "Empty header column encountered; ignoring it and all subsequent columns."})
         if self._warning_extra_values:
             for row_number in self._warning_extra_values:
-                issues.append({"src": create_object(file=self.file, row=row_number),
-                               "warning": f"Extra row column values."})
-        return issues
+                warnings.append({"src": create_object(file=self.file, row=row_number),
+                                 "warning": f"Extra row column values."})
+        return warnings
 
 
 class ListReader(RowReader):

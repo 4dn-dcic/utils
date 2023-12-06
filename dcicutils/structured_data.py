@@ -53,8 +53,9 @@ class StructuredDataSet:
         self._portal = Portal(portal, data=self.data, schemas=schemas) if portal else None
         self._order = order
         self._prune = prune
-        self._issues = {}
-        self._refs_resolved = []
+        self._warnings = {}
+        self._errors = {}
+        self._resolved_refs = []
         self._validated = False
         self._load_file(file) if file else None
 
@@ -73,30 +74,30 @@ class StructuredDataSet:
                 row_number = 0
                 for data in self.data[type_name]:
                     row_number += 1
-                    if (validation_issues := schema.validate(data)) is not None:
-                        for validation_issue in validation_issues:
-                            self._note_issue({"src": create_object(type=schema.name, row=row_number),
-                                              "error": validation_issue}, "validation")
+                    if (validation_errors := schema.validate(data)) is not None:
+                        for validation_error in validation_errors:
+                            self._note_error({"src": create_object(type=schema.name, row=row_number),
+                                              "error": validation_error}, "validation")
 
     @property
-    def issues(self):
-        return self._issues
+    def warnings(self):
+        return self._warnings
 
     @property
-    def issues_reader(self) -> List[dict]:
-        return self._issues.get("reader") or []
+    def errors(self):
+        return self._errors
 
     @property
-    def issues_linkto(self) -> List[dict]:
-        return self._issues.get("linkto") or []
+    def ref_errors(self) -> List[dict]:
+        return self._errors.get("ref") or []
 
     @property
-    def issues_validation(self) -> List[dict]:
-        return self._issues.get("validation") or []
+    def validation_errors(self) -> List[dict]:
+        return self._errors.get("validation") or []
 
     @property
-    def refs_resolved(self) -> List[str]:
-        return self._refs_resolved
+    def resolved_refs(self) -> List[str]:
+        return self._resolved_refs
 
     def _load_file(self, file: str) -> None:
         # Returns a dictionary where each property is the name (i.e. the type) of the data,
@@ -153,10 +154,10 @@ class StructuredDataSet:
             for column_name, value in row.items():
                 structured_row_template.set_value(structured_row, column_name, value, reader.file, reader.row_number)
             self._add(type_name, structured_row)
-        self._note_issue(reader.issues, "reader")
+        self._note_warning(reader.warnings, "reader")
         if schema:
-            self._note_issue(schema._refs_unresolved, "linkto")
-            self._refs_resolved = schema._refs_resolved
+            self._note_error(schema._unresolved_refs, "ref")
+            self._resolved_refs = schema._resolved_refs
 
     def _add(self, type_name: str, data: Union[dict, List[dict]]) -> None:
         if self._prune:
@@ -166,13 +167,19 @@ class StructuredDataSet:
         else:
             self.data[type_name] = [data] if isinstance(data, dict) else data
 
-    def _note_issue(self, issue: Optional[Union[dict, List[dict]]], group: str) -> None:
-        if isinstance(issue, dict) and issue:
-            issue = [issue]
-        if isinstance(issue, list) and issue:
-            if not self._issues.get(group):
-                self._issues[group] = []
-            self._issues[group].extend(issue)
+    def _note_warning(self, item: Optional[Union[dict, List[dict]]], group: str) -> None:
+        self._note_issue(self._warnings, item, group)
+
+    def _note_error(self, item: Optional[Union[dict, List[dict]]], group: str) -> None:
+        self._note_issue(self._errors, item, group)
+
+    def _note_issue(self, issues: dict, item: Optional[Union[dict, List[dict]]], group: str) -> None:
+        if isinstance(item, dict) and item:
+            item = [item]
+        if isinstance(item, list) and item:
+            if not issues.get(group):
+                issues[group] = []
+            issues[group].extend(item)
 
 
 class _StructuredRowTemplate:
@@ -292,8 +299,8 @@ class Schema:
             "number": self._map_function_number,
             "string": self._map_function_string
         }
-        self._refs_resolved = []
-        self._refs_unresolved = []
+        self._resolved_refs = []
+        self._unresolved_refs = []
         self._typeinfo = self._create_typeinfo(schema_json)
 
     @staticmethod
@@ -301,18 +308,18 @@ class Schema:
         return Schema(portal.get_schema(Schema.type_name(name)), portal) if portal else None
 
     def validate(self, data: dict) -> List[str]:
-        issues = []
-        for issue in SchemaValidator(self.data, format_checker=SchemaValidator.FORMAT_CHECKER).iter_errors(data):
-            issues.append(issue.message)
-        return issues
+        errors = []
+        for error in SchemaValidator(self.data, format_checker=SchemaValidator.FORMAT_CHECKER).iter_errors(data):
+            errors.append(error.message)
+        return errors
 
     @property
-    def refs_unresolved(self) -> List[dict]:
-        return self._refs_unresolved
+    def unresolved_refs(self) -> List[dict]:
+        return self._unresolved_refs
 
     @property
-    def refs_resolved(self) -> List[str]:
-        return self._refs_resolved
+    def resolved_refs(self) -> List[str]:
+        return self._resolved_refs
 
     def get_map_value_function(self, column_name: str) -> Optional[Any]:
         return (self._get_typeinfo(column_name) or {}).get("map")
@@ -375,14 +382,14 @@ class Schema:
             nonlocal self, typeinfo
             if not value:
                 if (column := typeinfo.get("column")) and column in self.data.get("required", []):
-                    self._refs_unresolved.append({"src": src, "ref": f"/{link_to}/<null>"})
+                    self._unresolved_refs.append({"src": src, "ref": f"/{link_to}/<null>"})
             elif portal:
                 if not (resolved := portal.ref_exists(link_to, value)):
-                    self._refs_unresolved.append({"src": src, "ref": f"/{link_to}/{value}"})
+                    self._unresolved_refs.append({"src": src, "ref": f"/{link_to}/{value}"})
                 elif len(resolved) > 1:
-                    self._refs_unresolved.append({"src": src, "ref": f"/{link_to}/{value}", "types": resolved})
+                    self._unresolved_refs.append({"src": src, "ref": f"/{link_to}/{value}", "types": resolved})
                 else:
-                    self._refs_resolved.append(f"/{link_to}/{value}")
+                    self._resolved_refs.append(f"/{link_to}/{value}")
             return value
         return lambda value, src: map_ref(value, typeinfo.get("linkTo"), self._portal, src)
 
