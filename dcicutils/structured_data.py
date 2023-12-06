@@ -36,6 +36,8 @@ ARRAY_VALUE_DELIMITER_ESCAPE_CHAR = "\\"
 ARRAY_NAME_SUFFIX_CHAR = "#"
 ARRAY_NAME_SUFFIX_REGEX = re.compile(rf"{ARRAY_NAME_SUFFIX_CHAR}\d+")
 DOTTED_NAME_DELIMITER_CHAR = "."
+FILE_SCHEMA_NAME = "File"
+FILE_SCHEMA_NAME_PROPERTY = "filename"
 
 # Forward type references for type hints.
 Portal = Type["Portal"]
@@ -190,7 +192,7 @@ class StructuredDataSet:
         noschema = False
         structured_row_template = None
         for row in reader:
-            if not structured_row_template:  # Delay schema creation so we don't reference it if there are no rows.
+            if not structured_row_template:  # Delay creation just so we don't reference schema if there are no rows.
                 if not schema and not noschema and not (schema := Schema.load_by_name(type_name, portal=self._portal)):
                     noschema = True
                 elif schema and (schema_name := schema.name):
@@ -366,6 +368,9 @@ class Schema:
     @property
     def resolved_refs(self) -> List[str]:
         return list(self._resolved_refs)
+
+    def is_file_type(self) -> bool:
+        return (self.name == FILE_SCHEMA_NAME) or (self._portal and self._portal.is_file_schema(self.name))
 
     def get_map_value_function(self, column_name: str) -> Optional[Any]:
         return (self._get_typeinfo(column_name) or {}).get("map")
@@ -775,6 +780,12 @@ class Portal(PortalBase):
                 if user_specified_schema.get("title"):
                     schemas[user_specified_schema["title"]] = user_specified_schema
         return schemas
+
+    def is_file_schema(self, schema_name: str) -> bool:
+        if super_type_map := self.get_schemas_super_type_map():
+            if file_super_type := super_type_map.get(FILE_SCHEMA_NAME):
+                return Schema.type_name(schema_name) in file_super_type
+        return False
 
     @lru_cache(maxsize=1)
     def get_schemas_super_type_map(self) -> dict:
