@@ -37,7 +37,6 @@ ARRAY_NAME_SUFFIX_CHAR = "#"
 ARRAY_NAME_SUFFIX_REGEX = re.compile(rf"{ARRAY_NAME_SUFFIX_CHAR}\d+")
 DOTTED_NAME_DELIMITER_CHAR = "."
 FILE_SCHEMA_NAME = "File"
-FILE_SCHEMA_NAME_PROPERTY = "filename"
 
 # Forward type references for type hints.
 Portal = Type["Portal"]
