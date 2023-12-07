@@ -104,48 +104,6 @@ class StructuredDataSet:
     def resolved_refs(self) -> List[str]:
         return self._resolved_refs
 
-    @staticmethod
-    def format_issue(issue: dict, original_file: Optional[str] = None) -> str:
-        def src_string(issue: dict) -> str:
-            if not isinstance(issue, dict) or not isinstance(issue_src := issue.get("src"), dict):
-                return ""
-            show_file = original_file and (original_file.endswith(".zip") or
-                                           original_file.endswith(".tgz") or original_file.endswith(".gz"))
-            src_file = issue_src.get("file") if show_file else ""
-            src_type = issue_src.get("type")
-            src_column = issue_src.get("column")
-            src_row = issue_src.get("row", 0)
-            if src_file:
-                src = f"{os.path.basename(src_file)}"
-                sep = ":"
-            else:
-                src = ""
-                sep = "."
-            if src_type:
-                src += (sep if src else "") + src_type
-                sep = "."
-            if src_column:
-                src += (sep if src else "") + src_column
-            if src_row > 0:
-                src += (" " if src else "") + f"[{src_row}]"
-            if not src:
-                if issue.get("warning"):
-                    src = "Warning"
-                elif issue.get("error"):
-                    src = "Error"
-                else:
-                    src = "Issue"
-            return src
-        issue_message = None
-        if issue:
-            if error := issue.get("error"):
-                issue_message = error
-            elif warning := issue.get("warning"):
-                issue_message = warning
-            elif issue.get("truncated"):
-                return f"Truncated result set | More: {issue.get('more')} | See: {issue.get('details')}"
-        return f"{src_string(issue)}: {issue_message}" if issue_message else ""
-
     def _load_file(self, file: str) -> None:
         # Returns a dictionary where each property is the name (i.e. the type) of the data,
         # and the value is array of dictionaries for the data itself. Handle these kinds of files:
