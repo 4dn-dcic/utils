@@ -558,6 +558,7 @@ class PortalBase:
         elif isinstance(key, dict):
             self._key = key
             self._key_pair = (key.get("key"), key.get("secret")) if key else None
+            self._server = key.get("server")
         elif isinstance(key, tuple) and len(key) >= 2:
             self._key = {"key": key[0], "secret": key[1]}
             self._key_pair = key
