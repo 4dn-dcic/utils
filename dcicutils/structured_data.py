@@ -326,9 +326,6 @@ class Schema:
     def resolved_refs(self) -> List[str]:
         return list(self._resolved_refs)
 
-    def is_file_type(self) -> bool:
-        return (self.name == FILE_SCHEMA_NAME) or (self._portal and self._portal.is_file_schema(self.name))
-
     def get_map_value_function(self, column_name: str) -> Optional[Any]:
         return (self._get_typeinfo(column_name) or {}).get("map")
 
