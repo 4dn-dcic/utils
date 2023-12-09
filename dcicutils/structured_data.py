@@ -547,6 +547,7 @@ class PortalBase:
                  env: Optional[str] = None, app: OrchestratedApp = APP_SMAHT, server: Optional[str] = None,
                  key: Optional[Union[dict, tuple]] = None,
                  portal: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None) -> PortalBase:
+        import pdb ; pdb.set_trace()
         if ((isinstance(arg, (VirtualApp, TestApp, Router, Portal)) or
              isinstance(arg, str) and arg.endswith(".ini")) and not portal):
             portal = arg
@@ -557,6 +558,8 @@ class PortalBase:
         self._vapp = None
         self._key = None
         self._key_pair = None
+        self._env = env
+        self._app = app
         self._server = None
         if isinstance(portal, Portal):
             self._vapp = portal._vapp
@@ -585,6 +588,35 @@ class PortalBase:
                 self._key = key_manager.get_keydict_for_server(server)
                 self._server = server
             self._key_pair = key_manager.keydict_to_keypair(self._key) if self._key else None
+            self._key_file = key_manager.keys_file
+
+    @property
+    def env(self):
+        return self._env
+
+    @property
+    def app(self):
+        return self._app
+
+    @property
+    def key(self):
+        return self._key
+
+    @property
+    def key_pair(self):
+        return self._key_pair
+
+    @property
+    def key_file(self):
+        return self._key_file
+
+    @property
+    def server(self):
+        return self._server
+
+    @property
+    def vapp(self):
+        return self._vapp
 
     def get_metadata(self, object_id: str) -> Optional[dict]:
         return get_metadata(obj_id=object_id, vapp=self._vapp, key=self._key)
