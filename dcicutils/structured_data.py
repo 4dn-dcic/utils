@@ -543,11 +543,11 @@ class Schema:
 class PortalBase:
 
     def __init__(self,
-                 arg: Optional[Union[VirtualApp, TestApp, Router, Portal, dict, tuple, str]] = None,
+                 arg: Optional[Union[VirtualApp, TestApp, Router, PortalBase, dict, tuple, str]] = None,
                  env: Optional[str] = None, app: OrchestratedApp = APP_SMAHT, server: Optional[str] = None,
                  key: Optional[Union[dict, tuple]] = None,
-                 portal: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None) -> PortalBase:
-        if ((isinstance(arg, (VirtualApp, TestApp, Router, Portal)) or
+                 portal: Optional[Union[VirtualApp, TestApp, Router, PortalBase, str]] = None) -> PortalBase:
+        if ((isinstance(arg, (VirtualApp, TestApp, Router, PortalBase)) or
              isinstance(arg, str) and arg.endswith(".ini")) and not portal):
             portal = arg
         elif isinstance(arg, str) and not env:
@@ -561,7 +561,7 @@ class PortalBase:
         self._env = env
         self._app = app
         self._server = None
-        if isinstance(portal, Portal):
+        if isinstance(portal, PortalBase):
             self._vapp = portal._vapp
             self._key = portal._key
             self._key_pair = portal._key_pair
@@ -693,15 +693,15 @@ class PortalBase:
     @staticmethod
     def create_for_testing(ini_file: Optional[str] = None) -> PortalBase:
         if isinstance(ini_file, str):
-            return Portal(Portal._create_testapp(ini_file))
+            return PortalBase(PortalBase._create_testapp(ini_file))
         minimal_ini_for_unit_testing = "[app:app]\nuse = egg:encoded\nsqlalchemy.url = postgresql://dummy\n"
         with temporary_file(content=minimal_ini_for_unit_testing, suffix=".ini") as ini_file:
-            return Portal(Portal._create_testapp(ini_file))
+            return PortalBase(PortalBase._create_testapp(ini_file))
 
     @staticmethod
-    def create_for_testing_local(ini_file: Optional[str] = None) -> Portal:
+    def create_for_testing_local(ini_file: Optional[str] = None) -> PortalBase:
         if isinstance(ini_file, str) and ini_file:
-            return Portal(Portal._create_testapp(ini_file))
+            return PortalBase(PortalBase._create_testapp(ini_file))
         minimal_ini_for_testing_local = "\n".join([
             "[app:app]\nuse = egg:encoded\nfile_upload_bucket = dummy",
             "sqlalchemy.url = postgresql://postgres@localhost:5441/postgres?host=/tmp/snovault/pgdata",
@@ -722,7 +722,7 @@ class PortalBase:
             "multiauth.policy.auth0.base = encoded.authentication.Auth0AuthenticationPolicy"
         ])
         with temporary_file(content=minimal_ini_for_testing_local, suffix=".ini") as minimal_ini_file:
-            return Portal(Portal._create_testapp(minimal_ini_file))
+            return PortalBase(PortalBase._create_testapp(minimal_ini_file))
 
     @staticmethod
     def _create_testapp(value: Union[str, Router, TestApp] = "development.ini") -> TestApp:
