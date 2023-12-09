@@ -37,6 +37,7 @@ ARRAY_NAME_SUFFIX_CHAR = "#"
 ARRAY_NAME_SUFFIX_REGEX = re.compile(rf"{ARRAY_NAME_SUFFIX_CHAR}\d+")
 DOTTED_NAME_DELIMITER_CHAR = "."
 FILE_SCHEMA_NAME = "File"
+FILE_SCHEMA_NAME_PROPERTY = "filename"
 
 # Forward type references for type hints.
 Portal = Type["Portal"]
@@ -103,6 +104,17 @@ class StructuredDataSet:
     @property
     def resolved_refs(self) -> List[str]:
         return self._resolved_refs
+
+    @property
+    def upload_files(self) -> List[str]:
+        result = []
+        if self._portal:
+            for type_name in self.data:
+                if self._portal.is_file_schema(type_name):
+                    for item in self.data[type_name]:
+                        if (file_name := item.get(FILE_SCHEMA_NAME_PROPERTY)):
+                            result.append({"type": type_name, "file": file_name})
+        return result
 
     def _load_file(self, file: str) -> None:
         # Returns a dictionary where each property is the name (i.e. the type) of the data,
