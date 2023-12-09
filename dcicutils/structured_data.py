@@ -557,6 +557,7 @@ class PortalBase:
         self._vapp = None
         self._key = None
         self._key_pair = None
+        self._key_file = None
         self._env = env
         self._app = app
         self._server = None
