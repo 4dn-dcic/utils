@@ -636,7 +636,7 @@ class PortalBase:
     def _response(self, response) -> Optional[RequestResponse]:
         if response and isinstance(getattr(response.__class__, "json"), property):
             class RequestResponseWrapper:  # For consistency change json property to method.
-                def __init__(self, respnose, **kwargs):
+                def __init__(self, response, **kwargs):
                     super().__init__(**kwargs)
                     self._response = response
                 def __getattr__(self, attr):  # noqa
