@@ -246,6 +246,13 @@ opensearch_utils
    :members:
 
 
+portal_utils
+^^^^^^^^^^^^
+
+.. automodule:: dcicutils.portal_utils
+   :members:
+
+
 project_utils
 ^^^^^^^^^^^^^
 
