@@ -541,7 +541,7 @@ class Portal(PortalBase):
                  key: Optional[Union[dict, tuple]] = None,
                  portal: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None,
                  data: Optional[dict] = None, schemas: Optional[List[dict]] = None) -> Optional[Portal]:
-        super(Portal, self).__init__(arg, env=env, app=app, server=server, key=key, portal=portal)
+        super().__init__(arg, env=env, app=app, server=server, key=key, portal=portal)
         if isinstance(arg, Portal) and not portal:
             portal = arg
         if isinstance(portal, Portal):
@@ -554,7 +554,7 @@ class Portal(PortalBase):
     @lru_cache(maxsize=256)
     def get_metadata(self, object_name: str) -> Optional[dict]:
         try:
-            return super(Portal, self).get_metadata(object_name)
+            return super().get_metadata(object_name)
         except Exception:
             return None
 
@@ -569,7 +569,7 @@ class Portal(PortalBase):
 
     @lru_cache(maxsize=1)
     def get_schemas(self) -> dict:
-        schemas = super(Portal, self).get_schemas()
+        schemas = super().get_schemas()
         if self._schemas:
             schemas = copy.deepcopy(schemas)
             for user_specified_schema in self._schemas:
@@ -579,7 +579,7 @@ class Portal(PortalBase):
 
     @lru_cache(maxsize=1)
     def get_schemas_super_type_map(self) -> dict:
-        return super(Portal, self).get_schemas_super_type_map()
+        return super().get_schemas_super_type_map()
 
     def ref_exists(self, type_name: str, value: str) -> List[str]:
         resolved = []
