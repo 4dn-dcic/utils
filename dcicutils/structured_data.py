@@ -11,7 +11,7 @@ from webtest.app import TestApp
 from dcicutils.common import OrchestratedApp
 from dcicutils.data_readers import CsvReader, Excel, RowReader
 from dcicutils.misc_utils import (create_object, load_json_if, merge_objects, remove_empty_properties, right_trim,
-                                  split_string, to_boolean, to_camel_case, to_enum, to_float, to_integer, VirtualApp)
+                                  split_string, to_boolean, to_enum, to_float, to_integer, VirtualApp)
 from dcicutils.portal_utils import Portal as PortalBase
 from dcicutils.zip_utils import unpack_gz_file_to_temporary_file, unpack_files
 
