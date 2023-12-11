@@ -8,8 +8,8 @@ Change Log
 
 8.4.1
 =====
-* Strip sheet name in data_readers.Excel.
-* Moved structured_data.py from smaht-portal to here.
+* Moved structured_data.py from smaht-portal to here; new portal_utils and data_readers modules.
+* Strip sheet name in data_readers.Excel; respecte (ignore) hidden sheets.
 
 
 8.4.0
