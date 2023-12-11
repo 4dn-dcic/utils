@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "8.4.0"
+version = "8.5.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -53,6 +53,7 @@ openpyxl = "^3.1.2"
 opensearch-py = "^2.0.1"
 pyOpenSSL = "^23.1.1"
 PyJWT = "^2.6.0"
+pyramid = "1.10.4"
 pytz = ">=2020.4"
 redis = "^4.5.1"
 PyYAML = "^6.0.1"

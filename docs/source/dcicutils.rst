@@ -246,6 +246,13 @@ opensearch_utils
    :members:
 
 
+portal_utils
+^^^^^^^^^^^^
+
+.. automodule:: dcicutils.portal_utils
+   :members:
+
+
 project_utils
 ^^^^^^^^^^^^^
 
@@ -313,6 +320,13 @@ ssl_certificate_utils
 ^^^^^^^^^^^^^^^^^^^^^
 
 .. automodule:: dcicutils.ssl_certificate_utils
+   :members:
+
+
+structured_data
+^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.structured_data
    :members:
 
 
