@@ -59,7 +59,7 @@ class Portal:
         if isinstance(portal, (VirtualApp, TestApp)):
             self._vapp = portal
         elif isinstance(portal, (Router, str)):
-            self._vapp = Portal._create_testapp(portal)
+            self._vapp = Portal._create_vapp(portal)
         elif isinstance(key, dict):
             self._key = key
             self._key_pair = (key.get("key"), key.get("secret")) if key else None
@@ -224,15 +224,15 @@ class Portal:
     @staticmethod
     def create_for_testing(ini_file: Optional[str] = None) -> Portal:
         if isinstance(ini_file, str):
-            return Portal(Portal._create_testapp(ini_file))
+            return Portal(Portal._create_vapp(ini_file))
         minimal_ini_for_unit_testing = "[app:app]\nuse = egg:encoded\nsqlalchemy.url = postgresql://dummy\n"
         with temporary_file(content=minimal_ini_for_unit_testing, suffix=".ini") as ini_file:
-            return Portal(Portal._create_testapp(ini_file))
+            return Portal(Portal._create_vapp(ini_file))
 
     @staticmethod
     def create_for_testing_local(ini_file: Optional[str] = None) -> Portal:
         if isinstance(ini_file, str) and ini_file:
-            return Portal(Portal._create_testapp(ini_file))
+            return Portal(Portal._create_vapp(ini_file))
         minimal_ini_for_testing_local = "\n".join([
             "[app:app]\nuse = egg:encoded\nfile_upload_bucket = dummy",
             "sqlalchemy.url = postgresql://postgres@localhost:5441/postgres?host=/tmp/snovault/pgdata",
@@ -253,15 +253,11 @@ class Portal:
             "multiauth.policy.auth0.base = encoded.authentication.Auth0AuthenticationPolicy"
         ])
         with temporary_file(content=minimal_ini_for_testing_local, suffix=".ini") as minimal_ini_file:
-            return Portal(Portal._create_testapp(minimal_ini_file))
+            return Portal(Portal._create_vapp(minimal_ini_file))
 
     @staticmethod
-    def _create_testapp(value: Union[str, Router, TestApp] = "development.ini") -> TestApp:
-        """
-        Creates and returns a TestApp. Refactored out of above loadxl code to consolidate at a
-        single point; also for use by the generate_local_access_key and view_local_object scripts.
-        """
+    def _create_vapp(value: Union[str, Router, TestApp] = "development.ini", app_name: str = "app") -> TestApp:
         if isinstance(value, TestApp):
             return value
-        app = value if isinstance(value, Router) else get_app(value, "app")
+        app = value if isinstance(value, Router) else get_app(value, app_name)
         return TestApp(app, {"HTTP_ACCEPT": "application/json", "REMOTE_USER": "TEST"})
