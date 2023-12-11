@@ -10,7 +10,7 @@ from typing import Any, Callable, List, Optional, Tuple, Type, Union
 from webtest.app import TestApp
 from dcicutils.common import OrchestratedApp
 from dcicutils.data_readers import CsvReader, Excel, RowReader
-from dcicutils.misc_utils import (create_object, load_json_if, merge_objects, remove_empty_properties, right_trim,
+from dcicutils.misc_utils import (create_dict, load_json_if, merge_objects, remove_empty_properties, right_trim,
                                   split_string, to_boolean, to_enum, to_float, to_integer, VirtualApp)
 from dcicutils.portal_utils import Portal as PortalBase
 from dcicutils.zip_utils import unpack_gz_file_to_temporary_file, unpack_files
@@ -71,7 +71,7 @@ class StructuredDataSet:
                     row_number += 1
                     if (validation_errors := schema.validate(data)) is not None:
                         for validation_error in validation_errors:
-                            self._note_error({"src": create_object(type=schema.name, row=row_number),
+                            self._note_error({"src": create_dict(type=schema.name, row=row_number),
                                               "error": validation_error}, "validation")
 
     @property
@@ -204,8 +204,8 @@ class _StructuredRowTemplate:
 
     def set_value(self, data: dict, column_name: str, value: str, file: Optional[str], row_number: int = -1) -> None:
         if (set_value_function := self._set_value_functions.get(column_name)):
-            src = create_object(type=self._schema.name if self._schema else None,
-                                column=column_name, file=file, row=row_number)
+            src = create_dict(type=self._schema.name if self._schema else None,
+                              column=column_name, file=file, row=row_number)
             set_value_function(data, value, src)
 
     def _create_row_template(self, column_names: List[str]) -> dict:  # Surprisingly tricky code here.

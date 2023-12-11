@@ -1501,7 +1501,7 @@ def right_trim(list_or_tuple: Union[List[Any], Tuple[Any]],
     return list_or_tuple[:i + 1]
 
 
-def create_object(**kwargs) -> dict:
+def create_dict(**kwargs) -> dict:
     result = {}
     for name in kwargs:
         if kwargs[name]:

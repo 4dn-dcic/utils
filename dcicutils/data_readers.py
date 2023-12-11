@@ -2,7 +2,7 @@ import abc
 import csv
 import openpyxl
 from typing import Any, Generator, Iterator, List, Optional, Type, Tuple, Union
-from dcicutils.misc_utils import create_object, right_trim
+from dcicutils.misc_utils import create_dict, right_trim
 
 # Forward type references for type hints.
 Excel = Type["Excel"]
@@ -59,11 +59,11 @@ class RowReader(abc.ABC):
     def warnings(self) -> List[str]:
         warnings = []
         if self._warning_empty_headers:
-            warnings.append({"src": create_object(file=self.file),
+            warnings.append({"src": create_dict(file=self.file),
                              "warning": "Empty header column encountered; ignoring it and all subsequent columns."})
         if self._warning_extra_values:
             for row_number in self._warning_extra_values:
-                warnings.append({"src": create_object(file=self.file, row=row_number),
+                warnings.append({"src": create_dict(file=self.file, row=row_number),
                                  "warning": f"Extra row column values."})
         return warnings
 
