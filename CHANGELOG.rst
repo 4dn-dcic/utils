@@ -6,7 +6,7 @@ dcicutils
 Change Log
 ----------
 
-8.4.1
+8.5.0
 =====
 * Moved structured_data.py from smaht-portal to here; new portal_utils and data_readers modules.
 * Strip sheet name in data_readers.Excel; respecte (ignore) hidden sheets.
