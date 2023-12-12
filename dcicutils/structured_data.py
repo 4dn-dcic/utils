@@ -50,7 +50,7 @@ class StructuredDataSet:
         self._prune = prune
         self._warnings = {}
         self._errors = {}
-        self._resolved_refs = []
+        self._resolved_refs = set()
         self._validated = False
         self._load_file(file) if file else None
 
@@ -96,7 +96,7 @@ class StructuredDataSet:
 
     @property
     def resolved_refs(self) -> List[str]:
-        return self._resolved_refs
+        return list(self._resolved_refs)
 
     @property
     def upload_files(self) -> List[str]:
@@ -167,7 +167,7 @@ class StructuredDataSet:
         self._note_warning(reader.warnings, "reader")
         if schema:
             self._note_error(schema._unresolved_refs, "ref")
-            self._resolved_refs = schema._resolved_refs
+            self._resolved_refs.update(schema._resolved_refs)
 
     def _add(self, type_name: str, data: Union[dict, List[dict]]) -> None:
         if self._prune:

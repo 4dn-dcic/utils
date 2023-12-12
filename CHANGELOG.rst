@@ -9,6 +9,7 @@ Change Log
 8.6.0
 =====
 * Minor fix to misc_utils.to_integer to handle float strings.
+* Minor fix to structured_data to accumulate unique resolved_refs across schemas.
 
 
 8.5.0
