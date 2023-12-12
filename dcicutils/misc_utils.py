@@ -982,7 +982,11 @@ def to_integer(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
     try:
         return int(value)
     except Exception:
-        return fallback
+        try:
+            return int(float(value))
+        except:
+            pass
+    return fallback
 
 
 def to_float(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
