@@ -1469,28 +1469,33 @@ def string_list(s):
     return [p for p in [part.strip() for part in s.split(",")] if p]
 
 
-def split_string(value: str, delimiter: str, escape: Optional[str] = None) -> List[str]:
+def split_string(value: str, delimiter: str, escape: Optional[str] = None, unique: bool = False) -> List[str]:
     """
     Splits the given string into an array of string based on the given delimiter, and an optional escape character.
     """
     if not isinstance(value, str) or not (value := value.strip()):
         return []
-    if not isinstance(escape, str) or not escape:
-        return [item.strip() for item in value.split(delimiter)]
     result = []
+    if not isinstance(escape, str) or not escape:
+        for item in value.split(delimiter):
+            if (item := item.strip()) and (unique is not True or item not in result):
+                result.append(item)
+        return result
     item = r""
     escaped = False
     for c in value:
         if c == delimiter and not escaped:
-            result.append(item.strip())
+            if (item := item.strip()) and (unique is not True or item not in result):
+                result.append(item)
             item = r""
         elif c == escape and not escaped:
             escaped = True
         else:
             item += c
             escaped = False
-    result.append(item.strip())
-    return [item for item in result if item]
+    if (item := item.strip()) and (unique is not True or item not in result):
+        result.append(item)
+    return result
 
 
 def right_trim(list_or_tuple: Union[List[Any], Tuple[Any]],

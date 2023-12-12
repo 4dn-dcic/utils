@@ -3593,8 +3593,8 @@ def test_json_lines_reader_lists():
 
 
 def test_split_array_string():
-    def split_array_string(value: str) -> List[str]:
-        return split_string(value, "|", "\\")
+    def split_array_string(value: str, unique: bool = False) -> List[str]:
+        return split_string(value, "|", "\\", unique=unique)
     assert split_array_string(r"abc|def|ghi") == ["abc", "def", "ghi"]
     assert split_array_string(r"abc\|def|ghi") == ["abc|def", "ghi"]
     assert split_array_string(r"abc\\|def|ghi") == ["abc\\", "def", "ghi"]
@@ -3609,6 +3609,12 @@ def test_split_array_string():
     assert split_array_string(r"|") == []
     assert split_array_string(r"\|") == ["|"]
     assert split_array_string(r"\\|") == ["\\"]
+    assert split_array_string(r"abc|def|abc|ghi", unique=False) == ["abc", "def", "abc", "ghi"]
+    assert split_array_string(r"abc|def|abc|ghi", unique=True) == ["abc", "def", "ghi"]
+    assert split_array_string(r"abc\\\|def\|ghi|jkl|mno|jkl", unique=False) == ["abc\\|def|ghi", "jkl", "mno", "jkl"]
+    assert split_array_string(r"abc\\\|def\|ghi|jkl|mno|jkl", unique=True) == ["abc\\|def|ghi", "jkl", "mno"]
+    assert split_string(r"abc|def|ghi|def", delimiter="|", unique=False) == ["abc", "def", "ghi", "def"]
+    assert split_string(r"abc|def|ghi|def", delimiter="|", unique=True) == ["abc", "def", "ghi"]
 
 
 def test_merge_objects_1():

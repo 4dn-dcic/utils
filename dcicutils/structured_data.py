@@ -237,7 +237,7 @@ class _StructuredRowTemplate:
             return {array_name: array} if array_name else {column_component: value}
 
         def set_value_internal(data: Union[dict, list], value: Optional[Any], src: Optional[str],
-                               path: List[Union[str, int]], mapv: Optional[Callable]) -> None:
+                               path: List[Union[str, int]], typeinfo: Optional[dict], mapv: Optional[Callable]) -> None:
 
             def set_value_backtrack_object(path_index: int, path_element: str) -> None:
                 nonlocal data, path, original_data
@@ -257,7 +257,7 @@ class _StructuredRowTemplate:
                     set_value_backtrack_object(i, p)
                 data = data[p]
             if (p := path[-1]) == -1 and isinstance(value, str):
-                values = _split_array_string(value)
+                values = _split_array_string(value, unique=typeinfo.get("unique") if typeinfo else False)
                 if mapv:
                     values = [mapv(value, src) for value in values]
                 merge_objects(data, values)
@@ -288,11 +288,13 @@ class _StructuredRowTemplate:
         for column_name in column_names or []:
             ensure_column_consistency(column_name)
             rational_column_name = self._schema.rationalize_column_name(column_name) if self._schema else column_name
-            map_value_function = self._schema.get_map_value_function(rational_column_name) if self._schema else None
+            column_typeinfo = self._schema.get_typeinfo(rational_column_name) if self._schema else None
+            map_value_function = column_typeinfo.get("map") if column_typeinfo else None
             if (column_components := _split_dotted_string(rational_column_name)):
                 merge_objects(structured_row_template, parse_components(column_components, path := []), True)
-                self._set_value_functions[column_name] = (lambda data, value, src, path=path, mapv=map_value_function:
-                                                          set_value_internal(data, value, src, path, mapv))
+                self._set_value_functions[column_name] = (
+                    lambda data, value, src, path=path, typeinfo=column_typeinfo, mapv=map_value_function:
+                        set_value_internal(data, value, src, path, typeinfo, mapv))
         return structured_row_template
 
 
@@ -331,10 +333,7 @@ class Schema:
     def resolved_refs(self) -> List[str]:
         return list(self._resolved_refs)
 
-    def get_map_value_function(self, column_name: str) -> Optional[Any]:
-        return (self._get_typeinfo(column_name) or {}).get("map")
-
-    def _get_typeinfo(self, column_name: str) -> Optional[dict]:
+    def get_typeinfo(self, column_name: str) -> Optional[dict]:
         if isinstance(info := self._typeinfo.get(column_name), str):
             info = self._typeinfo.get(info)
         if not info and isinstance(info := self._typeinfo.get(self.unadorn_column_name(column_name)), str):
@@ -467,9 +466,15 @@ class Schema:
                             raise Exception(f"Array of undefined or multiple types in JSON schema NOT supported: {key}")
                         raise Exception(f"Invalid array type specifier in JSON schema: {key}")
                     key = key + ARRAY_NAME_SUFFIX_CHAR
+                    if unique := (property_value.get("uniqueItems") is True):
+                        pass
                     property_value = array_property_items
                     property_value_type = property_value.get("type")
-                result.update(self._create_typeinfo(array_property_items, parent_key=key))
+                typeinfo = self._create_typeinfo(array_property_items, parent_key=key)
+                if unique:
+                    typeinfo[key]["unique"] = True
+                result.update(typeinfo)
+#               result.update(self._create_typeinfo(array_property_items, parent_key=key))
                 continue
             result[key] = {"type": property_value_type, "map": self._map_function({**property_value, "column": key})}
             if ARRAY_NAME_SUFFIX_CHAR in key:
@@ -615,5 +620,5 @@ def _split_dotted_string(value: str):
     return split_string(value, DOTTED_NAME_DELIMITER_CHAR)
 
 
-def _split_array_string(value: str):
-    return split_string(value, ARRAY_VALUE_DELIMITER_CHAR, ARRAY_VALUE_DELIMITER_ESCAPE_CHAR)
+def _split_array_string(value: str, unique: bool = False):
+    return split_string(value, ARRAY_VALUE_DELIMITER_CHAR, ARRAY_VALUE_DELIMITER_ESCAPE_CHAR, unique=unique)

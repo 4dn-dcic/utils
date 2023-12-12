@@ -10,6 +10,7 @@ Change Log
 =====
 * Minor fix to misc_utils.to_integer to handle float strings.
 * Minor fix to structured_data to accumulate unique resolved_refs across schemas.
+* Changes to structured_data to respect uniqueItems for arrays.
 
 
 8.5.0
