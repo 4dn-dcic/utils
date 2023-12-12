@@ -31,7 +31,7 @@ from dcicutils.misc_utils import (
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
     MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case, json_file_contents,
-    pad_to, JsonLinesReader, split_string, merge_objects
+    pad_to, JsonLinesReader, split_string, merge_objects, to_integer
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -3674,3 +3674,14 @@ def test_merge_objects_8():
                 "xyzzy": [{"foo": None}, {"goo": None}, {"hoo": None}, {"hoo": None}, {"hoo": None}]}
     merge_objects(target, source, True)
     assert target == expected
+
+
+def test_to_integer():
+    assert to_integer("17") == 17
+    assert to_integer("17.0") == 17
+    assert to_integer("17.1") == 17
+    assert to_integer("17.9", "123") == 17
+    assert to_integer("0") == 0
+    assert to_integer("0.0") == 0
+    assert to_integer("asdf") is None
+    assert to_integer("asdf", "myfallback") == "myfallback"
