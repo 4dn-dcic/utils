@@ -62,6 +62,7 @@ class Portal:
             self._server = portal._server
             self._key = portal._key
             self._key_pair = portal._key_pair
+            self._key_id = portal._key_id
             self._key_file = portal._key_file
             return
         self._vapp = None
@@ -70,6 +71,7 @@ class Portal:
         self._server = server
         self._key = None
         self._key_pair = None
+        self._key_id = None
         self._key_file = None
         if isinstance(portal, (VirtualApp, TestApp)):
             self._vapp = portal
@@ -95,6 +97,10 @@ class Portal:
                 self._key = key_manager.get_keydict_for_server(self._server)
             self._key_pair = key_manager.keydict_to_keypair(self._key) if self._key else None
             self._key_file = key_manager.keys_file
+        if self._key and (key_id := self._key.get("key")):
+            self._key_id = key_id
+        elif self._key_pair and (key_id := self._key_pair[1]):
+            self._key_id = key_id
 
     @property
     def env(self):
@@ -115,6 +121,10 @@ class Portal:
     @property
     def key_pair(self):
         return self._key_pair
+
+    @property
+    def key_id(self):
+        return self._key_id
 
     @property
     def key_file(self):
@@ -206,13 +216,19 @@ class Portal:
             super_type_map_flattened[super_type_name] = breadth_first(super_type_map, super_type_name)
         return super_type_map_flattened
 
+    def ping(self) -> bool:
+        try:
+            return self.get("/health").status_code == 200
+        except Exception:
+            return False
+
     def _uri(self, uri: str) -> str:
         if not isinstance(uri, str) or not uri:
             return "/"
         if uri.lower().startswith("http://") or uri.lower().startswith("https://"):
             return uri
         uri = re.sub(r"/+", "/", uri)
-        return (self._server + ("/" if uri.startswith("/") else "") + uri) if self._server else uri
+        return (self._server + ("/" if not uri.startswith("/") else "") + uri) if self._server else uri
 
     def _kwargs(self, **kwargs) -> dict:
         result_kwargs = {"headers":

@@ -317,7 +317,8 @@ class Schema:
 
     @staticmethod
     def load_by_name(name: str, portal: Portal) -> Optional[dict]:
-        return Schema(portal.get_schema(Schema.type_name(name)), portal) if portal else None
+        schema_json = portal.get_schema(Schema.type_name(name)) if portal else None
+        return Schema(schema_json, portal) if schema_json else None
 
     def validate(self, data: dict) -> List[str]:
         errors = []
@@ -565,7 +566,9 @@ class Portal(PortalBase):
 
     @lru_cache(maxsize=256)
     def get_schema(self, schema_name: str) -> Optional[dict]:
-        if (schemas := self.get_schemas()) and (schema := schemas.get(schema_name := Schema.type_name(schema_name))):
+        if not (schemas := self.get_schemas()):
+            return None
+        if schema := schemas.get(schema_name := Schema.type_name(schema_name)):
             return schema
         if schema_name == schema_name.upper() and (schema := schemas.get(schema_name.lower().title())):
             return schema
@@ -573,8 +576,9 @@ class Portal(PortalBase):
             return schema
 
     @lru_cache(maxsize=1)
-    def get_schemas(self) -> dict:
-        schemas = super().get_schemas()
+    def get_schemas(self) -> Optional[dict]:
+        if not (schemas := super().get_schemas()) or (schemas.get("status") == "error"):
+            return None
         if self._schemas:
             schemas = copy.deepcopy(schemas)
             for user_specified_schema in self._schemas:
