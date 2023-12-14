@@ -43,8 +43,8 @@ class StructuredDataSet:
 
     def __init__(self, file: Optional[str] = None, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
                  schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
-                 data: Optional[List[dict]] = None, order: Optional[List[str]] = None, prune: bool = True) -> None:
-        self.data = {} if not data else data  # If portal is None then no schemas nor refs.
+                 order: Optional[List[str]] = None, prune: bool = True) -> None:
+        self.data = {}
         self._portal = Portal(portal, data=self.data, schemas=schemas) if portal else None
         self._order = order
         self._prune = prune
