@@ -10,6 +10,9 @@ Change Log
 =====
 * Minor fix to misc_utils.to_integer to handle float strings.
 * Minor fix to structured_data to accumulate unique resolved_refs across schemas.
+* Added ability to autoadd properties structured_data.StructuredDataSet;
+  to automatically pass in submission_centers on submission, and
+  not require that the user explicitly set this in the spreadsheet.
 * Changes to structured_data to respect uniqueItems for arrays.
 * Handle no schemas better in structured_data.
 * Added portal_utils.Portal.ping().

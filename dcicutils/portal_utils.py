@@ -23,15 +23,14 @@ class Portal:
     2. From a key dictionary, containing "key" and "secret" property values.
     3. From a key tuple, containing (in order) a key and secret values.
     4. From a keys file assumed to reside in ~/.{app}-keys.json where the given "app" value is either "smaht", "cgap",
-       or "fourfront"; and where this file is assumed to contain a dictionary with a key equal to the given "env"
-       value (e.g. smaht-localhost) and with a dictionary value containing "key" and "secret" property values; if
-       an "app" value is not specified but the given "env" value begins with one of the app values then that value
-       will be used, i.e. e.g. if env is "smaht-localhost" and app is unspecified than it is assumed to be "smaht".
+       or "fourfront"; where is assumed to contain a dictionary with a key for the given "env" value, e.g. smaht-local;
+       and with a dictionary value containing "key" and "secret" property values, and an optional "server" property;
+       if an "app" value is not specified but the given "env" value begins with one of the app values then that value
+       will be used, i.e. e.g. if "env" is "smaht-local" and app is unspecified than it is assumed to be "smaht".
     5. From a keys file as described above (#4) but rather than be identified by the given "env" value it
-       is looked up by the given "server" name and the "server" key dictionary value in the key file.
+       is looked up via the given "server" name and the "server" key dictionary value in the key file.
     6. From a given "vapp" value (which is assumed to be a TestApp or VirtualApp).
-    7. From another Portal object.
-    8. From a a pyramid Router object.
+    7. From another Portal object; or from a a pyramid Router object.
     """
     def __init__(self,
                  arg: Optional[Union[VirtualApp, TestApp, Router, Portal, dict, tuple, str]] = None,

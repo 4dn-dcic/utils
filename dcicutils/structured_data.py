@@ -42,8 +42,8 @@ StructuredDataSet = Type["StructuredDataSet"]
 class StructuredDataSet:
 
     def __init__(self, file: Optional[str] = None, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
-                 schemas: Optional[List[dict]] = None, data: Optional[List[dict]] = None,
-                 order: Optional[List[str]] = None, prune: bool = True) -> None:
+                 schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
+                 data: Optional[List[dict]] = None, order: Optional[List[str]] = None, prune: bool = True) -> None:
         self.data = {} if not data else data  # If portal is None then no schemas nor refs.
         self._portal = Portal(portal, data=self.data, schemas=schemas) if portal else None
         self._order = order
@@ -52,13 +52,14 @@ class StructuredDataSet:
         self._errors = {}
         self._resolved_refs = set()
         self._validated = False
+        self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
         self._load_file(file) if file else None
 
     @staticmethod
     def load(file: str, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
-             schemas: Optional[List[dict]] = None,
+             schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
              order: Optional[List[str]] = None, prune: bool = True) -> StructuredDataSet:
-        return StructuredDataSet(file=file, portal=portal, schemas=schemas, order=order, prune=prune)
+        return StructuredDataSet(file=file, portal=portal, schemas=schemas, autoadd=autoadd, order=order, prune=prune)
 
     def validate(self, force: bool = False) -> None:
         if self._validated and not force:
@@ -163,6 +164,8 @@ class StructuredDataSet:
             structured_row = structured_row_template.create_row()
             for column_name, value in row.items():
                 structured_row_template.set_value(structured_row, column_name, value, reader.file, reader.row_number)
+                if self._autoadd_properties:
+                    self._add_properties(structured_row, self._autoadd_properties, schema)
             self._add(type_name, structured_row)
         self._note_warning(reader.warnings, "reader")
         if schema:
@@ -176,6 +179,11 @@ class StructuredDataSet:
             self.data[type_name].extend([data] if isinstance(data, dict) else data)
         else:
             self.data[type_name] = [data] if isinstance(data, dict) else data
+
+    def _add_properties(self, structured_row: dict, properties: dict, schema: Optional[dict] = None) -> None:
+        for name in properties:
+            if name not in structured_row and (not schema or schema.data.get("properties", {}).get(name)):
+                structured_row[name] = properties[name]
 
     def _note_warning(self, item: Optional[Union[dict, List[dict]]], group: str) -> None:
         self._note_issue(self._warnings, item, group)
