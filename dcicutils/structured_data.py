@@ -113,7 +113,7 @@ class StructuredDataSet:
     def _load_file(self, file: str) -> None:
         # Returns a dictionary where each property is the name (i.e. the type) of the data,
         # and the value is array of dictionaries for the data itself. Handle these kinds of files:
-        # 1.  Single CSV of JSON file, where the (base) name of the file is the data type name.
+        # 1.  Single CSV, TSV, or JSON file, where the (base) name of the file is the data type name.
         # 2.  Single Excel file containing one or more sheets, where each sheet
         #     represents (i.e. is named for, and contains data for) a different type.
         # 3.  Zip file (.zip or .tar.gz or .tgz or .tar), containing data files to load, where the
@@ -483,7 +483,6 @@ class Schema:
                 if unique:
                     typeinfo[key]["unique"] = True
                 result.update(typeinfo)
-#               result.update(self._create_typeinfo(array_property_items, parent_key=key))
                 continue
             result[key] = {"type": property_value_type, "map": self._map_function({**property_value, "column": key})}
             if ARRAY_NAME_SUFFIX_CHAR in key:
