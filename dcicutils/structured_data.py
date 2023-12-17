@@ -550,16 +550,13 @@ class Portal(PortalBase):
 
     def __init__(self,
                  arg: Optional[Union[VirtualApp, TestApp, Router, Portal, dict, tuple, str]] = None,
-                 env: Optional[str] = None, app: OrchestratedApp = None, server: Optional[str] = None,
-                 key: Optional[Union[dict, tuple]] = None,
-                 portal: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None,
-                 data: Optional[dict] = None, schemas: Optional[List[dict]] = None) -> Optional[Portal]:
-        super().__init__(arg, env=env, app=app, server=server, key=key, portal=portal)
-        if isinstance(arg, Portal) and not portal:
-            portal = arg
-        if isinstance(portal, Portal):
-            self._schemas = schemas if schemas is not None else portal._schemas  # Explicitly specified/known schemas.
-            self._data = data if data is not None else portal._data  # Data set being loaded; e.g. by StructuredDataSet.
+                 env: Optional[str] = None, server: Optional[str] = None,
+                 app: Optional[OrchestratedApp] = None,
+                 data: Optional[dict] = None, schemas: Optional[List[dict]] = None) -> None:
+        super().__init__(arg, env=env, server=server, app=app)
+        if isinstance(arg, Portal):
+            self._schemas = schemas if schemas is not None else arg._schemas  # Explicitly specified/known schemas.
+            self._data = data if data is not None else arg._data  # Data set being loaded; e.g. by StructuredDataSet.
         else:
             self._schemas = schemas
             self._data = data

@@ -1,13 +1,15 @@
 from collections import deque
+import io
+import json
 from pyramid.paster import get_app
 from pyramid.router import Router
+import os
 import re
 import requests
 from requests.models import Response as RequestResponse
 from typing import Optional, Type, Union
 from webtest.app import TestApp, TestResponse
-from dcicutils.common import OrchestratedApp, APP_CGAP, APP_FOURFRONT, APP_SMAHT, ORCHESTRATED_APPS
-from dcicutils.creds_utils import CGAPKeyManager, FourfrontKeyManager, SMaHTKeyManager
+from dcicutils.common import OrchestratedApp, ORCHESTRATED_APPS
 from dcicutils.ff_utils import get_metadata, get_schema, patch_metadata, post_metadata
 from dcicutils.misc_utils import to_camel_case, VirtualApp
 from dcicutils.zip_utils import temporary_file
@@ -33,104 +35,144 @@ class Portal:
     7. From another Portal object; or from a a pyramid Router object.
     """
     def __init__(self,
-                 arg: Optional[Union[VirtualApp, TestApp, Router, Portal, dict, tuple, str]] = None,
-                 env: Optional[str] = None, app: Optional[OrchestratedApp] = None, server: Optional[str] = None,
-                 key: Optional[Union[dict, tuple]] = None,
-                 vapp: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None,
-                 portal: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None) -> Portal:
-        if vapp and not portal:
-            portal = vapp
-        if ((isinstance(arg, (VirtualApp, TestApp, Router, Portal)) or
-             isinstance(arg, str) and arg.endswith(".ini")) and not portal):
-            portal = arg
-        elif isinstance(arg, str) and not env:
-            env = arg
-        elif (isinstance(arg, dict) or isinstance(arg, tuple)) and not key:
-            key = arg
-        if not app and env:
-            if env.startswith(APP_SMAHT):
-                app = APP_SMAHT
-            elif env.startswith(APP_CGAP):
-                app = APP_CGAP
-            elif env.startswith(APP_FOURFRONT):
-                app = APP_FOURFRONT
-        if isinstance(portal, Portal):
-            self._vapp = portal._vapp
-            self._env = portal._env
-            self._app = portal._app
-            self._server = portal._server
+                 arg: Optional[Union[Portal, TestApp, VirtualApp, Router, dict, tuple, str]] = None,
+                 env: Optional[str] = None, server: Optional[str] = None,
+                 app: Optional[OrchestratedApp] = None) -> None:
+
+        def init(unspecified: Optional[list] = []) -> None:
+            self._ini_file = None
+            self._key = None
+            self._key_pair = None
+            self._key_id = None
+            self._keys_file = None
+            self._env = None
+            self._server = None
+            self._app = None
+            self._vapp = None
+            for arg in unspecified:
+                if arg is not None:
+                    raise Exception("Portal init error; extraneous args.")
+
+        def init_from_portal(portal: Portal, unspecified: Optional[list] = None) -> None:
+            init(unspecified)
+            self._ini_file = portal._ini_file
             self._key = portal._key
             self._key_pair = portal._key_pair
             self._key_id = portal._key_id
-            self._key_file = portal._key_file
-            return
-        self._vapp = None
-        self._env = env
-        self._app = app
-        self._server = server
-        self._key = None
-        self._key_pair = None
-        self._key_id = None
-        self._key_file = None
-        if isinstance(portal, (VirtualApp, TestApp)):
-            self._vapp = portal
-        elif isinstance(portal, (Router, str)):
-            self._vapp = Portal._create_vapp(portal)
-        elif isinstance(key, dict):
-            self._key = key
-            self._key_pair = (key.get("key"), key.get("secret")) if key else None
-            if key_server := key.get("server"):
-                self._server = key_server
-        elif isinstance(key, tuple) and len(key) >= 2:
-            self._key = {"key": key[0], "secret": key[1]}
-            self._key_pair = key
-        elif isinstance(env, str):
-            key_managers = {APP_CGAP: CGAPKeyManager, APP_FOURFRONT: FourfrontKeyManager, APP_SMAHT: SMaHTKeyManager}
-            if not (key_manager := key_managers.get(self._app)) or not (key_manager := key_manager()):
-                raise Exception(f"Invalid app name: {self._app} (valid: {', '.join(ORCHESTRATED_APPS)}).")
-            if isinstance(env, str):
-                self._key = key_manager.get_keydict_for_env(env)
-                if key_server := self._key.get("server"):
-                    self._server = key_server
-            elif isinstance(self._server, str):
-                self._key = key_manager.get_keydict_for_server(self._server)
-            self._key_pair = key_manager.keydict_to_keypair(self._key) if self._key else None
-            self._key_file = key_manager.keys_file
-        if self._key and (key_id := self._key.get("key")):
-            self._key_id = key_id
-        elif self._key_pair and (key_id := self._key_pair[1]):
-            self._key_id = key_id
+            self._keys_file = portal._keys_file
+            self._env = portal._env
+            self._server = portal._server
+            self._app = portal._app
+            self._vapp = portal._vapp
+
+        def init_from_vapp(vapp: Union[TestApp, VirtualApp, Router], unspecified: Optional[list] = []) -> None:
+            init(unspecified)
+            self._vapp = Portal._create_testapp(vapp)
+
+        def init_from_ini_file(ini_file: str, unspecified: Optional[list] = []) -> None:
+            init(unspecified)
+            self._ini_file = ini_file
+            self._vapp = Portal._create_testapp(ini_file)
+
+        def init_from_key(key: dict, server: Optional[str], unspecified: Optional[list] = []) -> None:
+            init(unspecified)
+            if (isinstance(key_id := key.get("key"), str) and key_id and
+                isinstance(secret := key.get("secret"), str) and secret):  # noqa
+                self._key = {"key": key_id, "secret": secret}
+                self._key_id = key_id
+                self._key_pair = (key_id, secret)
+                if ((isinstance(server, str) and server) or (isinstance(server := key.get("server"), str) and server)):
+                    self._key["server"] = self._server = server
+            if not self._key:
+                raise Exception("Portal init error; from key.")
+
+        def init_from_key_pair(key_pair: tuple, server: Optional[str], unspecified: Optional[list] = []) -> None:
+            if len(key_pair) == 2:
+                init_from_key({"key": key_pair[0], "secret": key_pair[1]}, server, unspecified)
+            else:
+                raise Exception("Portal init error; from key-pair.")
+
+        def init_from_keys_file(keys_file: str, env: Optional[str], server: Optional[str],
+                                unspecified: Optional[list] = []) -> None:
+            init(unspecified)
+            with io.open(self.keys_file) as f:
+                keys = json.load(f)
+                if isinstance(env, str) and env and isinstance(key := keys.get(env), dict):
+                    init_from_key(key, server)
+                    self._env = env
+                elif isinstance(server, str) and server and (key := [k for k in keys if k.get("server") == server]):
+                    init_from_key(key, server)
+            if not self._keys_file:
+                raise Exception("Portal init error; from key-file.")
+
+        def init_from_env_server_app(env: str, server: str, app: Optional[str],
+                                     unspecified: Optional[list] = None) -> None:
+            return init_from_keys_file(get_default_keys_file(app, env), unspecified)
+
+        def get_default_keys_file(app: Optional[str], env: Optional[str] = None) -> Optional[str]:
+            def is_valid_app(app: Optional[str]) -> bool:  # noqa
+                return app and app.lower() in [name.lower() for name in ORCHESTRATED_APPS]
+            def infer_app_from_env(env: str) -> Optional[str]:  # noqa
+                if isinstance(env, str) and env:
+                    if app := [app for app in ORCHESTRATED_APPS if app.lower().startswith(env.lower())]:
+                        return app[0]
+            if is_valid_app(app) or (app := infer_app_from_env(env)):
+                return os.path.expanduser(f"~/{app.lower()}-keys.json")
+            return None
+
+        if isinstance(arg, Portal):
+            init_from_portal(arg, unspecified=[env, server, app])
+        elif isinstance(arg, (TestApp, VirtualApp, Router)):
+            init_from_vapp(arg, unspecified=[env, server, app])
+        elif isinstance(arg, str) and arg.endswith(".ini"):
+            init_from_ini_file(arg, unspecified=[env, server, app])
+        elif isinstance(arg, dict):
+            init_from_key(arg, server, unspecified=[env, app])
+        elif isinstance(arg, tuple):
+            init_from_key_pair(arg, server, unspecified=[env, app])
+        elif isinstance(arg, str) and arg.endswith(".json"):
+            init_from_keys_file(arg, env, server, unspecified=[app])
+        elif isinstance(arg, str) and arg:
+            init_from_env_server_app(arg, server, app, unspecified=[env])
+        elif isinstance(env, str) and env:
+            init_from_env_server_app(env, server, app, unspecified=[arg])
+        else:
+            raise Exception("Portal construction error [0].")
 
     @property
-    def env(self):
-        return self._env
+    def ini_file(self) -> Optional[str]:
+        return self._ini_file
 
     @property
-    def app(self):
-        return self._app
+    def keys_file(self) -> Optional[str]:
+        return self._keys_file
 
     @property
-    def server(self):
-        return self._server
-
-    @property
-    def key(self):
+    def key(self) -> Optional[dict]:
         return self._key
 
     @property
-    def key_pair(self):
+    def key_pair(self) -> Optional[tuple]:
         return self._key_pair
 
     @property
-    def key_id(self):
+    def key_id(self) -> Optional[str]:
         return self._key_id
 
     @property
-    def key_file(self):
-        return self._key_file
+    def env(self) -> Optional[str]:
+        return self._env
 
     @property
-    def vapp(self):
+    def app(self) -> Optional[str]:
+        return self._app
+
+    @property
+    def server(self) -> Optional[str]:
+        return self._server
+
+    @property
+    def vapp(self) -> Optional[TestApp]:
         return self._vapp
 
     def get_metadata(self, object_id: str) -> Optional[dict]:
@@ -147,7 +189,7 @@ class Portal:
         return self.post(f"/{object_type}", data)
 
     def get(self, uri: str, follow: bool = True, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
-        if isinstance(self._vapp, (VirtualApp, TestApp)):
+        if self._vapp:
             response = self._vapp.get(self._uri(uri), **self._kwargs(**kwargs))
             if response and response.status_code in [301, 302, 303, 307, 308] and follow:
                 response = response.follow()
@@ -156,13 +198,13 @@ class Portal:
 
     def patch(self, uri: str, data: Optional[dict] = None,
               json: Optional[dict] = None, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
-        if isinstance(self._vapp, (VirtualApp, TestApp)):
+        if self._vapp:
             return self._vapp.patch_json(self._uri(uri), json or data, **self._kwargs(**kwargs))
         return requests.patch(self._uri(uri), json=json or data, **self._kwargs(**kwargs))
 
     def post(self, uri: str, data: Optional[dict] = None, json: Optional[dict] = None,
              files: Optional[dict] = None, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
-        if isinstance(self._vapp, (VirtualApp, TestApp)):
+        if self._vapp:
             if files:
                 return self._vapp.post(self._uri(uri), json or data, upload_files=files, **self._kwargs(**kwargs))
             else:
@@ -254,15 +296,15 @@ class Portal:
     @staticmethod
     def create_for_testing(ini_file: Optional[str] = None) -> Portal:
         if isinstance(ini_file, str):
-            return Portal(Portal._create_vapp(ini_file))
+            return Portal(Portal._create_testapp(ini_file))
         minimal_ini_for_unit_testing = "[app:app]\nuse = egg:encoded\nsqlalchemy.url = postgresql://dummy\n"
         with temporary_file(content=minimal_ini_for_unit_testing, suffix=".ini") as ini_file:
-            return Portal(Portal._create_vapp(ini_file))
+            return Portal(Portal._create_testapp(ini_file))
 
     @staticmethod
     def create_for_testing_local(ini_file: Optional[str] = None) -> Portal:
         if isinstance(ini_file, str) and ini_file:
-            return Portal(Portal._create_vapp(ini_file))
+            return Portal(Portal._create_testapp(ini_file))
         minimal_ini_for_testing_local = "\n".join([
             "[app:app]\nuse = egg:encoded\nfile_upload_bucket = dummy",
             "sqlalchemy.url = postgresql://postgres@localhost:5441/postgres?host=/tmp/snovault/pgdata",
@@ -283,11 +325,20 @@ class Portal:
             "multiauth.policy.auth0.base = encoded.authentication.Auth0AuthenticationPolicy"
         ])
         with temporary_file(content=minimal_ini_for_testing_local, suffix=".ini") as minimal_ini_file:
-            return Portal(Portal._create_vapp(minimal_ini_file))
+            return Portal(Portal._create_testapp(minimal_ini_file))
 
     @staticmethod
-    def _create_vapp(value: Union[str, Router, TestApp] = "development.ini", app_name: str = "app") -> TestApp:
-        if isinstance(value, TestApp):
-            return value
-        app = value if isinstance(value, Router) else get_app(value, app_name)
-        return TestApp(app, {"HTTP_ACCEPT": "application/json", "REMOTE_USER": "TEST"})
+    def _create_testapp(arg: Union[TestApp, VirtualApp, Router, str] = None, app_name: Optional[str] = None) -> TestApp:
+        if isinstance(arg, TestApp):
+            return arg
+        elif isinstance(arg, VirtualApp):
+            if not isinstance(arg.wrapped_app, TestApp):
+                raise Exception("Portal._create_testapp VirtualApp argument error.")
+            return arg.wrapped_app
+        if isinstance(arg, Router):
+            router = arg
+        elif isinstance(arg, str) or arg is None:
+            router = get_app(arg or "development.ini", app_name or "app")
+        else:
+            raise Exception("Portal._create_testapp argument error.")
+        return TestApp(router, {"HTTP_ACCEPT": "application/json", "REMOTE_USER": "TEST"})
