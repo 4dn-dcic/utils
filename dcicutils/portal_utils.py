@@ -360,6 +360,3 @@ class Portal:
         else:
             raise Exception("Portal._create_testapp argument error.")
         return TestApp(router, {"HTTP_ACCEPT": "application/json", "REMOTE_USER": "TEST"})
-
-p = Portal("smaht-localhost", server="http://abc.com")
-print(p.server)
