@@ -13,16 +13,20 @@ _TEST_KEY_PAIR = (_TEST_KEY_ID, _TEST_SECRET)
 def test_portal_constructor_a():
 
     def assert_for_server(server, expected):
+
         portal = Portal(_TEST_KEY, server=server) if server is not None else Portal(_TEST_KEY)
         assert portal.key_id == _TEST_KEY_ID
+        assert portal.secret == _TEST_SECRET
         assert portal.key_pair == _TEST_KEY_PAIR
         assert portal.server == expected
         assert portal.keys_file is None
         assert portal.app is None
         assert portal.env is None
         assert portal.vapp is None
+
         portal = Portal({**_TEST_KEY, "server": server}) if server is not None else Portal(_TEST_KEY)
         assert portal.key_id == _TEST_KEY_ID
+        assert portal.secret == _TEST_SECRET
         assert portal.key_pair == _TEST_KEY_PAIR
         assert portal.server == expected
         assert portal.keys_file is None
@@ -59,6 +63,7 @@ def test_portal_constructor_b():
 
         portal = Portal(keys_file, env="smaht-local")
         assert portal.key_id == "ABCDEFGHI"
+        assert portal.secret == "adfxdloiebvhzp"
         assert portal.key_pair == ("ABCDEFGHI", "adfxdloiebvhzp")
         assert portal.server == "http://localhost:8080"
         assert portal.key == {"key": "ABCDEFGHI", "secret": "adfxdloiebvhzp", "server": "http://localhost:8080"}
@@ -70,6 +75,7 @@ def test_portal_constructor_b():
 
         portal = Portal(keys_file, env="smaht-remote")
         assert portal.key_id == "GHIDEFABC"
+        assert portal.secret == "zpadfxdloiebvh"
         assert portal.key_pair == ("GHIDEFABC", "zpadfxdloiebvh")
         assert portal.server == "https://smaht.hms.harvard.edu"
         assert portal.key == {"key": "GHIDEFABC", "secret": "zpadfxdloiebvh", "server": "https://smaht.hms.harvard.edu"}
@@ -82,6 +88,7 @@ def test_portal_constructor_b():
         Portal.KEYS_FILE_DIRECTORY = os.path.dirname(keys_file)
         portal = Portal("smaht-local", app="smaht")
         assert portal.key_id == "ABCDEFGHI"
+        assert portal.secret == "adfxdloiebvhzp"
         assert portal.key_pair == ("ABCDEFGHI", "adfxdloiebvhzp")
         assert portal.server == "http://localhost:8080"
         assert portal.key == {"key": "ABCDEFGHI", "secret": "adfxdloiebvhzp", "server": "http://localhost:8080"}
@@ -121,6 +128,7 @@ def test_portal_constructor_c():
         assert portal.key == portal_copy.key
         assert portal.key_pair == portal_copy.key_pair
         assert portal.key_id == portal_copy.key_id
+        assert portal.secret == portal_copy.secret
         assert portal.keys_file == portal_copy.keys_file
         assert portal.env == portal_copy.env
         assert portal.server == portal_copy.server
