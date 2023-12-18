@@ -95,8 +95,11 @@ class Portal:
 
         def init_from_keys_file(keys_file: str, env: Optional[str], server: Optional[str],
                                 unspecified: Optional[list] = []) -> None:
-            with io.open(keys_file) as f:
-                keys = json.load(f)
+            try:
+                with io.open(keys_file) as f:
+                    keys = json.load(f)
+            except Exception:
+                raise Exception(f"Portal init error; cannot open keys-file: {keys_file}")
             if isinstance(env, str) and env and isinstance(key := keys.get(env), dict):
                 init_from_key(key, server)
                 self._keys_file = keys_file
@@ -105,8 +108,7 @@ class Portal:
                 init_from_key(key, server)
                 self._keys_file = keys_file
             else:
-                raise Exception((f"Portal init error; " +
-                                 f"env ({env}) or server ({server}) not found in keys-file: {keys_file}"))
+                raise Exception(f"Portal init error; {env or server or None} not found in keys-file: {keys_file}")
 
         def init_from_env_server_app(env: str, server: str, app: Optional[str],
                                      unspecified: Optional[list] = None) -> None:
