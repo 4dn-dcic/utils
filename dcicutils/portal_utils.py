@@ -46,6 +46,7 @@ class Portal:
             self._key = None
             self._key_pair = None
             self._key_id = None
+            self._secret = None
             self._keys_file = None
             self._env = None
             self._server = None
@@ -61,6 +62,7 @@ class Portal:
             self._key = portal._key
             self._key_pair = portal._key_pair
             self._key_id = portal._key_id
+            self._secret = portal._secret
             self._keys_file = portal._keys_file
             self._env = portal._env
             self._server = portal._server
@@ -82,6 +84,7 @@ class Portal:
                 isinstance(secret := key.get("secret"), str) and secret):  # noqa
                 self._key = {"key": key_id, "secret": secret}
                 self._key_id = key_id
+                self._secret = secret
                 self._key_pair = (key_id, secret)
                 if ((isinstance(server, str) and server) or (isinstance(server := key.get("server"), str) and server)):
                     if server := normalize_server(server):
@@ -167,6 +170,10 @@ class Portal:
     @property
     def key_id(self) -> Optional[str]:
         return self._key_id
+
+    @property
+    def secret(self) -> Optional[str]:
+        return self._secret
 
     @property
     def keys_file(self) -> Optional[str]:

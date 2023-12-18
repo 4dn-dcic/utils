@@ -106,6 +106,7 @@ def test_portal_constructor_c():
 
         portal = Portal(keys_file)
         assert portal.key_id == "ABCDEFGHI"
+        assert portal.secret == "adfxdloiebvhzp"
         assert portal.key_pair == ("ABCDEFGHI", "adfxdloiebvhzp")
         assert portal.server == "http://localhost:8080"
         assert portal.key == {"key": "ABCDEFGHI", "secret": "adfxdloiebvhzp", "server": "http://localhost:8080"}
@@ -114,3 +115,15 @@ def test_portal_constructor_c():
         assert portal.app is None
         assert portal.vapp is None
         assert portal.ini_file is None
+
+        portal_copy = Portal(portal)
+        assert portal.ini_file == portal_copy.ini_file
+        assert portal.key == portal_copy.key
+        assert portal.key_pair == portal_copy.key_pair
+        assert portal.key_id == portal_copy.key_id
+        assert portal.keys_file == portal_copy.keys_file
+        assert portal.env == portal_copy.env
+        assert portal.server == portal_copy.server
+        assert portal.app == portal_copy.app
+        assert portal.vapp == portal_copy.vapp
+        assert portal.secret == portal_copy.secret
