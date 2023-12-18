@@ -210,26 +210,26 @@ class Portal:
 
     def get(self, uri: str, follow: bool = True, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
         if self._vapp:
-            response = self._vapp.get(self._uri(uri), **self._kwargs(**kwargs))
+            response = self._vapp.get(self.url(uri), **self._kwargs(**kwargs))
             if response and response.status_code in [301, 302, 303, 307, 308] and follow:
                 response = response.follow()
             return self._response(response)
-        return requests.get(self._uri(uri), allow_redirects=follow, **self._kwargs(**kwargs))
+        return requests.get(self.url(uri), allow_redirects=follow, **self._kwargs(**kwargs))
 
     def patch(self, uri: str, data: Optional[dict] = None,
               json: Optional[dict] = None, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
         if self._vapp:
-            return self._vapp.patch_json(self._uri(uri), json or data, **self._kwargs(**kwargs))
-        return requests.patch(self._uri(uri), json=json or data, **self._kwargs(**kwargs))
+            return self._vapp.patch_json(self.url(uri), json or data, **self._kwargs(**kwargs))
+        return requests.patch(self.url(uri), json=json or data, **self._kwargs(**kwargs))
 
     def post(self, uri: str, data: Optional[dict] = None, json: Optional[dict] = None,
              files: Optional[dict] = None, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
         if self._vapp:
             if files:
-                return self._vapp.post(self._uri(uri), json or data, upload_files=files, **self._kwargs(**kwargs))
+                return self._vapp.post(self.url(uri), json or data, upload_files=files, **self._kwargs(**kwargs))
             else:
-                return self._vapp.post_json(self._uri(uri), json or data, upload_files=files, **self._kwargs(**kwargs))
-        return requests.post(self._uri(uri), json=json or data, files=files, **self._kwargs(**kwargs))
+                return self._vapp.post_json(self.url(uri), json or data, upload_files=files, **self._kwargs(**kwargs))
+        return requests.post(self.url(uri), json=json or data, files=files, **self._kwargs(**kwargs))
 
     def get_schema(self, schema_name: str) -> Optional[dict]:
         return get_schema(self.schema_name(schema_name), portal_vapp=self._vapp, key=self._key)
@@ -283,17 +283,7 @@ class Portal:
         except Exception:
             return False
 
-    def _default_keys_file(self, app: Optional[str], env: Optional[str] = None) -> Optional[str]:
-        def is_valid_app(app: Optional[str]) -> bool:  # noqa
-            return app and app.lower() in [name.lower() for name in ORCHESTRATED_APPS]
-        def infer_app_from_env(env: str) -> Optional[str]:  # noqa
-            if isinstance(env, str) and (lenv := env.lower()):
-                if app := [app for app in ORCHESTRATED_APPS if lenv.startswith(app.lower())]:
-                    return app[0]
-        if is_valid_app(app) or (app := infer_app_from_env(env)):
-            return os.path.join(Portal.KEYS_FILE_DIRECTORY, f".{app.lower()}-keys.json")
-
-    def _uri(self, uri: str) -> str:
+    def url(self, uri: str) -> str:
         if not isinstance(uri, str) or not uri:
             return "/"
         if (luri := uri.lower()).startswith("http://") or luri.startswith("https://"):
@@ -310,6 +300,16 @@ class Portal:
         if isinstance(timeout := kwargs.get("timeout"), int):
             result_kwargs["timeout"] = timeout
         return result_kwargs
+
+    def _default_keys_file(self, app: Optional[str], env: Optional[str] = None) -> Optional[str]:
+        def is_valid_app(app: Optional[str]) -> bool:  # noqa
+            return app and app.lower() in [name.lower() for name in ORCHESTRATED_APPS]
+        def infer_app_from_env(env: str) -> Optional[str]:  # noqa
+            if isinstance(env, str) and (lenv := env.lower()):
+                if app := [app for app in ORCHESTRATED_APPS if lenv.startswith(app.lower())]:
+                    return app[0]
+        if is_valid_app(app) or (app := infer_app_from_env(env)):
+            return os.path.join(Portal.KEYS_FILE_DIRECTORY, f".{app.lower()}-keys.json")
 
     def _response(self, response) -> Optional[RequestResponse]:
         if response and isinstance(getattr(response.__class__, "json"), property):
