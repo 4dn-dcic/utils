@@ -220,7 +220,7 @@ class Portal:
               json: Optional[dict] = None, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
         if self._vapp:
             return self._vapp.patch_json(self.url(uri), json or data, **self._kwargs(**kwargs))
-        return requests.patch(self.url(uri), json=json or data, **self._kwargs(**kwargs))
+        return requests.patch(self.url(uri), data=json or data, **self._kwargs(**kwargs))
 
     def post(self, uri: str, data: Optional[dict] = None, json: Optional[dict] = None,
              files: Optional[dict] = None, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
@@ -229,7 +229,7 @@ class Portal:
                 return self._vapp.post(self.url(uri), json or data, upload_files=files, **self._kwargs(**kwargs))
             else:
                 return self._vapp.post_json(self.url(uri), json or data, upload_files=files, **self._kwargs(**kwargs))
-        return requests.post(self.url(uri), json=json or data, files=files, **self._kwargs(**kwargs))
+        return requests.post(self.url(uri), data=json or data, files=files, **self._kwargs(**kwargs))
 
     def get_schema(self, schema_name: str) -> Optional[dict]:
         return get_schema(self.schema_name(schema_name), portal_vapp=self._vapp, key=self._key)
