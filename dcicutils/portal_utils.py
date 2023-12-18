@@ -109,6 +109,10 @@ class Portal:
             elif isinstance(server, str) and server and (key := [k for k in keys if keys[k].get("server") == server]):
                 init_from_key(key, server)
                 self._keys_file = keys_file
+            elif len(keys) == 1 and (env := next(iter(keys))) and isinstance(key := keys[env], dict) and key:
+                init_from_key(key, server)
+                self._keys_file = keys_file
+                self._env = env
             else:
                 raise Exception(f"Portal init error; {env or server or None} not found in keys-file: {keys_file}")
 
@@ -156,7 +160,7 @@ class Portal:
         elif isinstance(env, str) and env:
             init_from_env_server_app(env, server, app, unspecified=[arg])
         else:
-            raise Exception("Portal construction error [0].")
+            raise Exception("Portal init error; invalid args.")
 
     @property
     def ini_file(self) -> Optional[str]:
