@@ -15,7 +15,6 @@ from dcicutils.misc_utils import to_camel_case, VirtualApp
 from dcicutils.zip_utils import temporary_file
 
 Portal = Type["Portal"]  # Forward type reference for type hints.
-FILE_SCHEMA_NAME = "File"
 
 
 class Portal:
@@ -34,6 +33,9 @@ class Portal:
     6. From a given "vapp" value (which is assumed to be a TestApp or VirtualApp).
     7. From another Portal object; or from a a pyramid Router object.
     """
+    FILE_SCHEMA_NAME = "File"
+    KEYS_FILE_DIRECTORY = os.path.expanduser(f"~")
+
     def __init__(self,
                  arg: Optional[Union[Portal, TestApp, VirtualApp, Router, dict, tuple, str]] = None,
                  env: Optional[str] = None, server: Optional[str] = None,
@@ -122,7 +124,7 @@ class Portal:
                     if app := [app for app in ORCHESTRATED_APPS if lenv.startswith(app.lower())]:
                         return app[0]
             if is_valid_app(app) or (app := infer_app_from_env(env)):
-                return os.path.expanduser(f"~/.{app.lower()}-keys.json")
+                return os.path.join(Portal.KEYS_FILE_DIRECTORY, f".{app.lower()}-keys.json")
 
         def normalize_server(server: str) -> Optional[str]:
             prefix = ""
@@ -240,7 +242,7 @@ class Portal:
 
     def is_file_schema(self, schema_name: str) -> bool:
         if super_type_map := self.get_schemas_super_type_map():
-            if file_super_type := super_type_map.get(FILE_SCHEMA_NAME):
+            if file_super_type := super_type_map.get(Portal.FILE_SCHEMA_NAME):
                 return self.schema_name(schema_name) in file_super_type
         return False
 
@@ -286,7 +288,7 @@ class Portal:
         if (luri := uri.lower()).startswith("http://") or luri.startswith("https://"):
             return uri
         if not (uri := re.sub(r"/+", "/", uri)).startswith("/"):
-            uri = "/" + uri
+            uri = "/"
         return self._server + uri if self._server else uri
 
     def _kwargs(self, **kwargs) -> dict:
