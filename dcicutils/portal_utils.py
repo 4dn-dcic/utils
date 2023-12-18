@@ -82,7 +82,8 @@ class Portal:
                 self._key_id = key_id
                 self._key_pair = (key_id, secret)
                 if ((isinstance(server, str) and server) or (isinstance(server := key.get("server"), str) and server)):
-                    self._key["server"] = self._server = server
+                    if server := normalize_server(server):
+                        self._key["server"] = self._server = server
             if not self._key:
                 raise Exception("Portal init error; from key.")
 
@@ -94,31 +95,45 @@ class Portal:
 
         def init_from_keys_file(keys_file: str, env: Optional[str], server: Optional[str],
                                 unspecified: Optional[list] = []) -> None:
-            init(unspecified)
-            with io.open(self.keys_file) as f:
+            with io.open(keys_file) as f:
                 keys = json.load(f)
-                if isinstance(env, str) and env and isinstance(key := keys.get(env), dict):
-                    init_from_key(key, server)
-                    self._env = env
-                elif isinstance(server, str) and server and (key := [k for k in keys if k.get("server") == server]):
-                    init_from_key(key, server)
-            if not self._keys_file:
-                raise Exception("Portal init error; from key-file.")
+            if isinstance(env, str) and env and isinstance(key := keys.get(env), dict):
+                init_from_key(key, server)
+                self._keys_file = keys_file
+                self._env = env
+            elif isinstance(server, str) and server and (key := [k for k in keys if keys[k].get("server") == server]):
+                init_from_key(key, server)
+                self._keys_file = keys_file
+            else:
+                raise Exception((f"Portal init error; " +
+                                 f"env ({env}) or server ({server}) not found in keys-file: {keys_file}"))
 
         def init_from_env_server_app(env: str, server: str, app: Optional[str],
                                      unspecified: Optional[list] = None) -> None:
-            return init_from_keys_file(get_default_keys_file(app, env), unspecified)
+            return init_from_keys_file(default_keys_file(app, env), env, server, unspecified)
 
-        def get_default_keys_file(app: Optional[str], env: Optional[str] = None) -> Optional[str]:
+        def default_keys_file(app: Optional[str], env: Optional[str] = None) -> Optional[str]:
             def is_valid_app(app: Optional[str]) -> bool:  # noqa
                 return app and app.lower() in [name.lower() for name in ORCHESTRATED_APPS]
             def infer_app_from_env(env: str) -> Optional[str]:  # noqa
-                if isinstance(env, str) and env:
-                    if app := [app for app in ORCHESTRATED_APPS if app.lower().startswith(env.lower())]:
+                if isinstance(env, str) and (lenv := env.lower()):
+                    if app := [app for app in ORCHESTRATED_APPS if lenv.startswith(app.lower())]:
                         return app[0]
             if is_valid_app(app) or (app := infer_app_from_env(env)):
-                return os.path.expanduser(f"~/{app.lower()}-keys.json")
-            return None
+                return os.path.expanduser(f"~/.{app.lower()}-keys.json")
+
+        def normalize_server(server: str) -> Optional[str]:
+            prefix = ""
+            if (lserver := server.lower()).startswith("http://"):
+                prefix = "http://"
+            elif lserver.startswith("https://"):
+                prefix = "https://"
+            if prefix:
+                if (server := re.sub(r"/+", "/", server[len(prefix):])).startswith("/"):
+                    server = server[1:]
+                if len(server) > 1 and server.endswith("/"):
+                    server = server[:-1]
+                return prefix + server if server else None
 
         if isinstance(arg, Portal):
             init_from_portal(arg, unspecified=[env, server, app])
@@ -144,10 +159,6 @@ class Portal:
         return self._ini_file
 
     @property
-    def keys_file(self) -> Optional[str]:
-        return self._keys_file
-
-    @property
     def key(self) -> Optional[dict]:
         return self._key
 
@@ -160,16 +171,20 @@ class Portal:
         return self._key_id
 
     @property
+    def keys_file(self) -> Optional[str]:
+        return self._keys_file
+
+    @property
     def env(self) -> Optional[str]:
         return self._env
 
     @property
-    def app(self) -> Optional[str]:
-        return self._app
-
-    @property
     def server(self) -> Optional[str]:
         return self._server
+
+    @property
+    def app(self) -> Optional[str]:
+        return self._app
 
     @property
     def vapp(self) -> Optional[TestApp]:
@@ -266,10 +281,11 @@ class Portal:
     def _uri(self, uri: str) -> str:
         if not isinstance(uri, str) or not uri:
             return "/"
-        if uri.lower().startswith("http://") or uri.lower().startswith("https://"):
+        if (luri := uri.lower()).startswith("http://") or luri.startswith("https://"):
             return uri
-        uri = re.sub(r"/+", "/", uri)
-        return (self._server + ("/" if not uri.startswith("/") else "") + uri) if self._server else uri
+        if not (uri := re.sub(r"/+", "/", uri)).startswith("/"):
+            uri = "/" + uri
+        return self._server + uri if self._server else uri
 
     def _kwargs(self, **kwargs) -> dict:
         result_kwargs = {"headers":
@@ -342,3 +358,6 @@ class Portal:
         else:
             raise Exception("Portal._create_testapp argument error.")
         return TestApp(router, {"HTTP_ACCEPT": "application/json", "REMOTE_USER": "TEST"})
+
+p = Portal("smaht-localhost", server="http://abc.com")
+print(p.server)
