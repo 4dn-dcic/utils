@@ -1,8 +1,5 @@
-import io
 import json
 import os
-import pytest
-from unittest import mock
 from dcicutils.portal_utils import Portal
 from dcicutils.zip_utils import temporary_file
 
@@ -93,6 +90,7 @@ def test_portal_constructor_b():
         assert portal.app is None
         assert portal.vapp is None
         assert portal.ini_file is None
+
 
 def test_portal_constructor_c():
 
