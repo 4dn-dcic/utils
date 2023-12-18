@@ -118,17 +118,7 @@ class Portal:
 
         def init_from_env_server_app(env: str, server: str, app: Optional[str],
                                      unspecified: Optional[list] = None) -> None:
-            return init_from_keys_file(default_keys_file(app, env), env, server, unspecified)
-
-        def default_keys_file(app: Optional[str], env: Optional[str] = None) -> Optional[str]:
-            def is_valid_app(app: Optional[str]) -> bool:  # noqa
-                return app and app.lower() in [name.lower() for name in ORCHESTRATED_APPS]
-            def infer_app_from_env(env: str) -> Optional[str]:  # noqa
-                if isinstance(env, str) and (lenv := env.lower()):
-                    if app := [app for app in ORCHESTRATED_APPS if lenv.startswith(app.lower())]:
-                        return app[0]
-            if is_valid_app(app) or (app := infer_app_from_env(env)):
-                return os.path.join(Portal.KEYS_FILE_DIRECTORY, f".{app.lower()}-keys.json")
+            return init_from_keys_file(self._default_keys_file(app, env), env, server, unspecified)
 
         def normalize_server(server: str) -> Optional[str]:
             prefix = ""
@@ -285,6 +275,16 @@ class Portal:
             return self.get("/health").status_code == 200
         except Exception:
             return False
+
+    def _default_keys_file(self, app: Optional[str], env: Optional[str] = None) -> Optional[str]:
+        def is_valid_app(app: Optional[str]) -> bool:  # noqa
+            return app and app.lower() in [name.lower() for name in ORCHESTRATED_APPS]
+        def infer_app_from_env(env: str) -> Optional[str]:  # noqa
+            if isinstance(env, str) and (lenv := env.lower()):
+                if app := [app for app in ORCHESTRATED_APPS if lenv.startswith(app.lower())]:
+                    return app[0]
+        if is_valid_app(app) or (app := infer_app_from_env(env)):
+            return os.path.join(Portal.KEYS_FILE_DIRECTORY, f".{app.lower()}-keys.json")
 
     def _uri(self, uri: str) -> str:
         if not isinstance(uri, str) or not uri:
