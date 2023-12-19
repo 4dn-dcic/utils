@@ -5,7 +5,9 @@ class JsonSchemaConstants:
     ANY_OF = "anyOf"
     ARRAY = "array"
     BOOLEAN = "boolean"
+    DEFAULT = "default"
     ENUM = "enum"
+    FORMAT = "format"
     INTEGER = "integer"
     ITEMS = "items"
     NUMBER = "number"
@@ -13,19 +15,17 @@ class JsonSchemaConstants:
     ONE_OF = "oneOf"
     PATTERN = "pattern"
     PROPERTIES = "properties"
+    REF = "$ref"
     REQUIRED = "required"
     STRING = "string"
     TYPE = "type"
 
 
 class EncodedSchemaConstants:
-    DEFAULT = "default"
-    FORMAT = "format"
     IDENTIFYING_PROPERTIES = "identifyingProperties"
     LINK_TO = "linkTo"
     MERGE_REF = "$merge"
     MIXIN_PROPERTIES = "mixinProperties"
-    REF = "$ref"
     UNIQUE_KEY = "uniqueKey"
 
 
