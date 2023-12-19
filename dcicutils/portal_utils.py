@@ -268,7 +268,7 @@ class Portal:
         This is a dictionary of all types which have (one or more) sub-types whose value is
         an array of all of those sub-types (direct and all descendents), in breadth first order.
         """
-        def breadth_first(super_type_map: dict, super_type_name: str) -> dict:
+        def list_breadth_first(super_type_map: dict, super_type_name: str) -> dict:
             result = []
             queue = deque(super_type_map.get(super_type_name, []))
             while queue:
@@ -289,7 +289,7 @@ class Portal:
                         super_type_map[super_type_name].append(type_name)
         super_type_map_flattened = {}
         for super_type_name in super_type_map:
-            super_type_map_flattened[super_type_name] = breadth_first(super_type_map, super_type_name)
+            super_type_map_flattened[super_type_name] = list_breadth_first(super_type_map, super_type_name)
         return super_type_map_flattened
 
     def url(self, url: str) -> str:
@@ -320,7 +320,7 @@ class Portal:
         if is_valid_app(app) or (app := infer_app_from_env(env)):
             return os.path.join(Portal.KEYS_FILE_DIRECTORY, f".{app.lower()}-keys.json")
 
-    def _response(self, response: TestResponse) -> Optional[Response]:
+    def _response(self, response: TestResponse) -> TestResponse:
         if response and isinstance(getattr(response.__class__, "json"), property):
             class TestResponseWrapper(TestResponse):  # For consistency change json property to method.
                 def __init__(self, response, **kwargs):
