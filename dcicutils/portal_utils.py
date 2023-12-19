@@ -389,7 +389,7 @@ class Portal:
             for endpoint in endpoints:
                 if (endpoint_path := endpoint.get("path")) and (endpoint_function := endpoint.get("function")):
                     endpoint_method = endpoint.get("method", "GET")
-                    def endpoint_wrapper(request):
+                    def endpoint_wrapper(request):  # noqa
                         response = endpoint_function(request)
                         return PyramidResponse(json.dumps(response), content_type="application/json; charset=utf-8")
                     endpoint_id = str(uuid())
