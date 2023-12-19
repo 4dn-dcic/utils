@@ -9,10 +9,11 @@ import os
 import re
 import requests
 from requests.models import Response as RequestResponse
+from threading import Thread
 from typing import Callable, Dict, List, Optional, Type, Union
 from uuid import uuid4 as uuid
-# from waitress import serve
 from webtest.app import TestApp, TestResponse
+from wsgiref.simple_server import make_server as wsgi_make_server
 from dcicutils.common import OrchestratedApp, ORCHESTRATED_APPS
 from dcicutils.ff_utils import get_metadata, get_schema, patch_metadata, post_metadata
 from dcicutils.misc_utils import to_camel_case, VirtualApp
@@ -377,7 +378,7 @@ class Portal:
         return TestApp(router, {"HTTP_ACCEPT": "application/json", "REMOTE_USER": "TEST"})
 
     @staticmethod
-    def _create_router_for_testing(endpoints: Optional[List[Dict[str, Union[str, Callable]]]] = None):
+    def _create_router_for_testing(endpoints: Optional[List[Dict[str, Union[str, Callable]]]] = None) -> PyramidRouter:
         if isinstance(endpoints, dict):
             endpoints = [endpoints]
         elif isinstance(endpoints, Callable):
@@ -399,3 +400,15 @@ class Portal:
             if nendpoints == 0:
                 return Portal._create_router_for_testing([])
             return config.make_wsgi_app()
+
+    def start(self, port: int = 8080, asynchronous: bool = False) -> Optional[Thread]:
+        if isinstance(self._vapp, TestApp) and hasattr(self._vapp, "app") and isinstance(self._vapp.app, PyramidRouter):
+            def start_server() -> None:  # noqa
+                with wsgi_make_server('0.0.0.0', port, self._vapp.app) as server:
+                    server.serve_forever()
+            if asynchronous:
+                server_thread = Thread(target=start_server)
+                server_thread.daemon = True
+                server_thread.start()
+                return server_thread
+            start_server(self._vapp.app, port)
