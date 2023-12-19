@@ -404,11 +404,11 @@ class Portal:
     def start(self, port: int = 8080, asynchronous: bool = False) -> Optional[Thread]:
         if isinstance(self._vapp, TestApp) and hasattr(self._vapp, "app") and isinstance(self._vapp.app, PyramidRouter):
             def start_server() -> None:  # noqa
-                with wsgi_make_server('0.0.0.0', port, self._vapp.app) as server:
+                with wsgi_make_server("0.0.0.0", port, self._vapp.app) as server:
                     server.serve_forever()
             if asynchronous:
                 server_thread = Thread(target=start_server)
                 server_thread.daemon = True
                 server_thread.start()
                 return server_thread
-            start_server(self._vapp.app, port)
+            start_server()
