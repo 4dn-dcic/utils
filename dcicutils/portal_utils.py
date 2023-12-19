@@ -401,7 +401,7 @@ class Portal:
                 return Portal._create_router_for_testing([])
             return config.make_wsgi_app()
 
-    def start(self, port: int = 8080, asynchronous: bool = False) -> Optional[Thread]:
+    def start_for_testing(self, port: int = 8080, asynchronous: bool = False) -> Optional[Thread]:
         if isinstance(self._vapp, TestApp) and hasattr(self._vapp, "app") and isinstance(self._vapp.app, PyramidRouter):
             def start_server() -> None:  # noqa
                 with wsgi_make_server("0.0.0.0", port, self._vapp.app) as server:
