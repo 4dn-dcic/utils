@@ -8,7 +8,7 @@ from pyramid.router import Router as PyramidRouter
 import os
 import re
 import requests
-from requests.models import Response as RequestResponse
+from requests.models import Response
 from threading import Thread
 from typing import Callable, Dict, List, Optional, Type, Union
 from uuid import uuid4 as uuid
@@ -20,6 +20,7 @@ from dcicutils.misc_utils import to_camel_case, VirtualApp
 from dcicutils.zip_utils import temporary_file
 
 Portal = Type["Portal"]  # Forward type reference for type hints.
+OptionalResponse = Optional[Union[Response, TestResponse]]
 
 
 class Portal:
@@ -200,6 +201,29 @@ class Portal:
     def vapp(self) -> Optional[TestApp]:
         return self._vapp
 
+    def get(self, url: str, follow: bool = True, **kwargs) -> OptionalResponse:
+        if not self._vapp:
+            return requests.get(self.url(url), allow_redirects=follow, **self._kwargs(**kwargs))
+        response = self._vapp.get(self.url(url), **self._kwargs(**kwargs))
+        if response and response.status_code in [301, 302, 303, 307, 308] and follow:
+            response = response.follow()
+        return self._response(response)
+
+    def patch(self, url: str, data: Optional[dict] = None, json: Optional[dict] = None, **kwargs) -> OptionalResponse:
+        if not self._vapp:
+            return requests.patch(self.url(url), data=data, json=json, **self._kwargs(**kwargs))
+        return self._response(self._vapp.patch_json(self.url(url), json or data, **self._kwargs(**kwargs)))
+
+    def post(self, url: str, data: Optional[dict] = None, json: Optional[dict] = None,
+             files: Optional[dict] = None, **kwargs) -> OptionalResponse:
+        if not self._vapp:
+            return requests.post(self.url(url), data=data, json=json, files=files, **self._kwargs(**kwargs))
+        if files:
+            response = self._vapp.post(self.url(url), json or data, upload_files=files, **self._kwargs(**kwargs))
+        else:
+            response = self._vapp.post_json(self.url(url), json or data, upload_files=files, **self._kwargs(**kwargs))
+        return self._response(response)
+
     def get_metadata(self, object_id: str) -> Optional[dict]:
         return get_metadata(obj_id=object_id, vapp=self._vapp, key=self._key)
 
@@ -213,29 +237,14 @@ class Portal:
             return post_metadata(schema_name=object_type, post_item=data, key=self._key)
         return self.post(f"/{object_type}", data).json()
 
-    def get(self, uri: str, follow: bool = True, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
-        if not self._vapp:
-            return requests.get(self.url(uri), allow_redirects=follow, **self._kwargs(**kwargs))
-        response = self._vapp.get(self.url(uri), **self._kwargs(**kwargs))
-        if response and response.status_code in [301, 302, 303, 307, 308] and follow:
-            response = response.follow()
-        return self._response(response)
+    def get_health(self) -> Optional[Union[Response, TestResponse]]:
+        return self.get("/health")
 
-    def patch(self, uri: str, data: Optional[dict] = None,
-              json: Optional[dict] = None, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
-        if not self._vapp:
-            return requests.patch(self.url(uri), data=data, json=json, **self._kwargs(**kwargs))
-        return self._response(self._vapp.patch_json(self.url(uri), json or data, **self._kwargs(**kwargs)))
-
-    def post(self, uri: str, data: Optional[dict] = None, json: Optional[dict] = None,
-             files: Optional[dict] = None, **kwargs) -> Optional[Union[RequestResponse, TestResponse]]:
-        if not self._vapp:
-            return requests.post(self.url(uri), data=data, json=json, files=files, **self._kwargs(**kwargs))
-        if files:
-            response = self._vapp.post(self.url(uri), json or data, upload_files=files, **self._kwargs(**kwargs))
-        else:
-            response = self._vapp.post_json(self.url(uri), json or data, upload_files=files, **self._kwargs(**kwargs))
-        return self._response(response)
+    def ping(self) -> bool:
+        try:
+            return self.get_health().status_code == 200
+        except Exception:
+            return False
 
     def get_schema(self, schema_name: str) -> Optional[dict]:
         return get_schema(self.schema_name(schema_name), portal_vapp=self._vapp, key=self._key)
@@ -283,20 +292,14 @@ class Portal:
             super_type_map_flattened[super_type_name] = breadth_first(super_type_map, super_type_name)
         return super_type_map_flattened
 
-    def ping(self) -> bool:
-        try:
-            return self.get("/health").status_code == 200
-        except Exception:
-            return False
-
-    def url(self, uri: str) -> str:
-        if not isinstance(uri, str) or not uri:
+    def url(self, url: str) -> str:
+        if not isinstance(url, str) or not url:
             return "/"
-        if (luri := uri.lower()).startswith("http://") or luri.startswith("https://"):
-            return uri
-        if not (uri := re.sub(r"/+", "/", uri)).startswith("/"):
-            uri = "/"
-        return self._server + uri if self._server else uri
+        if (lurl := url.lower()).startswith("http://") or lurl.startswith("https://"):
+            return url
+        if not (url := re.sub(r"/+", "/", url)).startswith("/"):
+            url = "/"
+        return self._server + url if self._server else url
 
     def _kwargs(self, **kwargs) -> dict:
         result_kwargs = {"headers":
@@ -317,9 +320,9 @@ class Portal:
         if is_valid_app(app) or (app := infer_app_from_env(env)):
             return os.path.join(Portal.KEYS_FILE_DIRECTORY, f".{app.lower()}-keys.json")
 
-    def _response(self, response: TestResponse) -> Optional[RequestResponse]:
+    def _response(self, response: TestResponse) -> Optional[Response]:
         if response and isinstance(getattr(response.__class__, "json"), property):
-            class RequestResponseWrapper:  # For consistency change json property to method.
+            class TestResponseWrapper(TestResponse):  # For consistency change json property to method.
                 def __init__(self, response, **kwargs):
                     super().__init__(**kwargs)
                     self._response = response
@@ -327,7 +330,7 @@ class Portal:
                     return getattr(self._response, attr)
                 def json(self):  # noqa
                     return self._response.json
-            response = RequestResponseWrapper(response)
+            response = TestResponseWrapper(response)
         return response
 
     @staticmethod
