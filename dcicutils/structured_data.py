@@ -6,7 +6,7 @@ import os
 from pyramid.router import Router
 import re
 import sys
-from typing import Any, Callable, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 from webtest.app import TestApp
 from dcicutils.common import OrchestratedApp
 from dcicutils.data_readers import CsvReader, Excel, RowReader
@@ -616,12 +616,9 @@ class Portal(PortalBase):
         return self.get_metadata(f"/{type_name}/{value}") is not None
 
     @staticmethod
-    def create_for_testing(ini_file: Optional[str] = None, schemas: Optional[List[dict]] = None) -> Portal:
-        return Portal(PortalBase.create_for_testing(ini_file), schemas=schemas)
-
-    @staticmethod
-    def create_for_testing_local(ini_file: Optional[str] = None, schemas: Optional[List[dict]] = None) -> Portal:
-        return Portal(PortalBase.create_for_testing_local(ini_file), schemas=schemas)
+    def create_for_testing(arg: Optional[Union[str, bool, List[dict], dict, Callable]] = None,
+                           schemas: Optional[List[dict]] = None) -> Portal:
+        return Portal(PortalBase.create_for_testing(arg), schemas=schemas)
 
 
 def _split_dotted_string(value: str):
