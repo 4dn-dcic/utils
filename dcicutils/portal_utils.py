@@ -367,14 +367,14 @@ class Portal:
             return arg
         elif isinstance(arg, VirtualApp):
             if not isinstance(arg.wrapped_app, TestApp):
-                raise Exception("Portal._create_vapp VirtualApp arguement error.")
+                raise Exception("Portal._create_vapp VirtualApp argument error.")
             return arg.wrapped_app
         if isinstance(arg, PyramidRouter):
             router = arg
         elif isinstance(arg, str) or not arg:
             router = pyramid_get_app(arg or "development.ini", "app")
         else:
-            raise Exception("Portal._create_vapp arguement error.")
+            raise Exception("Portal._create_vapp argument error.")
         return TestApp(router, {"HTTP_ACCEPT": "application/json", "REMOTE_USER": "TEST"})
 
     @staticmethod
