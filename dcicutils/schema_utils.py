@@ -38,6 +38,11 @@ def get_properties(schema: Dict[str, Any]) -> Dict[str, Any]:
     return schema.get(SchemaConstants.PROPERTIES, {})
 
 
+def has_property(schema: Dict[str, Any], property_name: str) -> bool:
+    """Return True if the schema has the given property."""
+    return property_name in get_properties(schema)
+
+
 def get_required(schema: Dict[str, Any]) -> List[str]:
     """Return the required properties of a schema."""
     return schema.get(SchemaConstants.REQUIRED, [])
@@ -53,7 +58,7 @@ def get_one_of(schema: Dict[str, Any]) -> List[Dict[str, Any]]:
     return schema.get(SchemaConstants.ONE_OF, [])
 
 
-def get_conditionally_required_properties(schema: Dict[str, Any]) -> List[str]:
+def get_conditional_required(schema: Dict[str, Any]) -> List[str]:
     """Get required + possibly required properties.
 
     Using heuristics here; update as needed.
@@ -62,14 +67,14 @@ def get_conditionally_required_properties(schema: Dict[str, Any]) -> List[str]:
         list(
             set(
                 get_required(schema)
-                + get_any_of_required_properties(schema)
-                + get_one_of_required_properties(schema)
+                + get_any_of_required(schema)
+                + get_one_of_required(schema)
             )
         )
     )
 
 
-def get_any_of_required_properties(schema: Dict[str, Any]) -> List[str]:
+def get_any_of_required(schema: Dict[str, Any]) -> List[str]:
     """Get required properties from anyOf."""
     return [
         property_name
@@ -78,7 +83,7 @@ def get_any_of_required_properties(schema: Dict[str, Any]) -> List[str]:
     ]
 
 
-def get_one_of_required_properties(schema: Dict[str, Any]) -> List[str]:
+def get_one_of_required(schema: Dict[str, Any]) -> List[str]:
     """Get required properties from oneOf."""
     return [
         property_name
@@ -137,6 +142,34 @@ def get_items(schema: Dict[str, Any]) -> Dict[str, Any]:
     return schema.get(SchemaConstants.ITEMS, {})
 
 
-def has_property(schema: Dict[str, Any], property_name: str) -> bool:
-    """Return True if the schema has the given property."""
-    return property_name in get_properties(schema)
+def get_format(schema: Dict[str, Any]) -> str:
+    """Return the format of a schema."""
+    return schema.get(EncodedSchemaConstants.FORMAT, "")
+
+
+def get_conditional_formats(schema: Dict[str, Any]) -> List[str]:
+    """Return the format of a schema, as directly given or as listed
+    as an option via oneOf or anyOf.
+    """
+    formats = set(
+        get_any_of_formats(schema) + get_one_of_formats(schema) + [get_format(schema)]
+    )
+    return sorted(list([format_ for format_ in formats if format_]))
+
+
+def get_any_of_formats(schema: Dict[str, Any]) -> List[str]:
+    """Return the formats of a schema's anyOf properties."""
+    return [
+        get_format(any_of_schema)
+        for any_of_schema in get_any_of(schema)
+        if get_format(any_of_schema)
+    ]
+
+
+def get_one_of_formats(schema: Dict[str, Any]) -> List[str]:
+    """Return the formats of a schema's oneOf properties."""
+    return [
+        get_format(one_of_schema)
+        for one_of_schema in get_one_of(schema)
+        if get_format(one_of_schema)
+    ]

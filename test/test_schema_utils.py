@@ -53,7 +53,8 @@ SCHEMA = {
     "mixinProperties": MIXIN_PROPERTIES,
     "properties": PROPERTIES,
 }
-STRING_SCHEMA = {"type": "string"}
+FORMAT = "email"
+STRING_SCHEMA = {"type": "string", "format": FORMAT}
 ARRAY_SCHEMA = {
     "type": "array",
     "items": [STRING_SCHEMA],
@@ -67,6 +68,23 @@ OBJECT_SCHEMA = {
 NUMBER_SCHEMA = {"type": "number"}
 BOOLEAN_SCHEMA = {"type": "boolean"}
 INTEGER_SCHEMA = {"type": "integer"}
+FORMAT_SCHEMA = {
+    "type": "string",
+    "format": "date-time",
+    "oneOf": [
+        {
+            "format": "date",
+        },
+    ],
+    "anyOf": [
+        {
+            "format": "time",
+        },
+        {
+            "format": "date-time",
+        },
+    ],
+}
 
 
 @pytest.mark.parametrize(
@@ -123,10 +141,10 @@ def test_get_one_of(schema: Dict[str, Any], expected: Dict[str, Any]) -> None:
         (SCHEMA, CONDITIONAL_REQUIRED),
     ]
 )
-def test_get_conditionally_required_properties(
+def test_get_conditional_required(
     schema: Dict[str, Any], expected: Dict[str, Any]
 ) -> None:
-    assert schema_utils.get_conditionally_required_properties(schema) == expected
+    assert schema_utils.get_conditional_required(schema) == expected
 
 
 @pytest.mark.parametrize(
@@ -136,10 +154,10 @@ def test_get_conditionally_required_properties(
         (SCHEMA, ANY_OF_REQUIRED),
     ]
 )
-def test_get_any_of_required_properties(
+def test_get_any_of_required(
     schema: Dict[str, Any], expected: Dict[str, Any]
 ) -> None:
-    assert schema_utils.get_any_of_required_properties(schema) == expected
+    assert schema_utils.get_any_of_required(schema) == expected
 
 
 @pytest.mark.parametrize(
@@ -149,10 +167,10 @@ def test_get_any_of_required_properties(
         (SCHEMA, ONE_OF_REQUIRED),
     ]
 )
-def test_get_one_of_required_properties(
+def test_get_one_of_required(
     schema: Dict[str, Any], expected: Dict[str, Any]
 ) -> None:
-    assert schema_utils.get_one_of_required_properties(schema) == expected
+    assert schema_utils.get_one_of_required(schema) == expected
 
 
 @pytest.mark.parametrize(
@@ -308,3 +326,30 @@ def test_has_property(
     schema: Dict[str, Any], property_name: str, expected: Dict[str, Any]
 ) -> None:
     assert schema_utils.has_property(schema, property_name) == expected
+
+
+@pytest.mark.parametrize(
+    "schema,expected",
+    [
+        ({}, ""),
+        (STRING_SCHEMA, FORMAT),
+    ]
+)
+def test_get_format(
+    schema: Dict[str, Any], expected: Dict[str, Any]
+) -> None:
+    assert schema_utils.get_format(schema) == expected
+
+
+@pytest.mark.parametrize(
+    "schema,expected",
+    [
+        ({}, []),
+        (STRING_SCHEMA, [FORMAT]),
+        (FORMAT_SCHEMA, ["date", "date-time", "time"]),
+    ]
+)
+def test_get_conditional_formats(
+    schema: Dict[str, Any], expected: Dict[str, Any]
+) -> None:
+    assert schema_utils.get_conditional_formats(schema) == expected
