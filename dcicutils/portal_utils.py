@@ -115,7 +115,8 @@ class Portal:
                 init_from_key(key, server)
                 self._keys_file = keys_file
                 self._env = env
-            elif isinstance(server, str) and server and (key := [keys[k] for k in keys if keys[k].get("server") == server]):
+            elif (isinstance(server, str) and (server := normalize_server(server)) and
+                  (key := [keys[k] for k in keys if normalize_server(keys[k].get("server")) == server])):
                 init_from_key(key[0], server)
                 self._keys_file = keys_file
             elif len(keys) == 1 and (env := next(iter(keys))) and isinstance(key := keys[env], dict) and key:
