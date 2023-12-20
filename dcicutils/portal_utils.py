@@ -28,15 +28,15 @@ class Portal:
     This is meant to be an uber wrapper for Portal access. It can be created in a variety of ways:
     1. From a (Portal) .ini file (e.g. development.ini)
     2. From a key dictionary, containing "key" and "secret" property values.
-    3. From a key tuple, containing (in order) a key and secret values.
+    3. From a key pair tuple, containing (in order) a key and secret values.
     4. From a keys file assumed to reside in ~/.{app}-keys.json where the given "app" value is either "smaht", "cgap",
        or "fourfront"; where is assumed to contain a dictionary with a key for the given "env" value, e.g. smaht-local;
        and with a dictionary value containing "key" and "secret" property values, and an optional "server" property;
        if an "app" value is not specified but the given "env" value begins with one of the app values then that value
-       will be used, i.e. e.g. if "env" is "smaht-local" and app is unspecified than it is assumed to be "smaht".
+       will be used, i.e. e.g. if "env" is "smaht-local" and app is unspecified than app is assumed to be "smaht".
     5. From a keys file as described above (#4) but rather than be identified by the given "env" value it
        is looked up via the given "server" name and the "server" key dictionary value in the key file.
-    6. From a given "vapp" value (which is assumed to be a TestApp or VirtualApp).
+    6. From a given "vapp" value (which may be a webtest/TestApp or VirtualApp or even a pyramid/Router).
     7. From another Portal object; or from a a pyramid Router object.
     """
     FILE_SCHEMA_NAME = "File"
@@ -237,7 +237,7 @@ class Portal:
             return post_metadata(schema_name=object_type, post_item=data, key=self._key)
         return self.post(f"/{object_type}", data).json()
 
-    def get_health(self) -> Optional[Union[Response, TestResponse]]:
+    def get_health(self) -> OptionalResponse:
         return self.get("/health")
 
     def ping(self) -> bool:
@@ -254,7 +254,7 @@ class Portal:
 
     @staticmethod
     def schema_name(name: str) -> str:
-        return to_camel_case(name)
+        return to_camel_case(name if not name.endswith(".json") else name[:-5]) if isinstance(name, str) else ""
 
     def is_file_schema(self, schema_name: str) -> bool:
         if super_type_map := self.get_schemas_super_type_map():
@@ -404,10 +404,10 @@ class Portal:
                 return Portal._create_router_for_testing([])
             return config.make_wsgi_app()
 
-    def start_for_testing(self, port: int = 8080, asynchronous: bool = False) -> Optional[Thread]:
+    def start_for_testing(self, port: int = 7070, asynchronous: bool = False) -> Optional[Thread]:
         if isinstance(self._vapp, TestApp) and hasattr(self._vapp, "app") and isinstance(self._vapp.app, PyramidRouter):
             def start_server() -> None:  # noqa
-                with wsgi_make_server("0.0.0.0", port, self._vapp.app) as server:
+                with wsgi_make_server("0.0.0.0", port or 7070, self._vapp.app) as server:
                     server.serve_forever()
             if asynchronous:
                 server_thread = Thread(target=start_server)
