@@ -94,12 +94,12 @@ def get_one_of_required(schema: Dict[str, Any]) -> List[str]:
 
 def get_mixin_properties(schema: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Return the mixin properties of a schema."""
-    return schema.get(EncodedSchemaConstants.MIXIN_PROPERTIES, [])
+    return schema.get(SchemaConstants.MIXIN_PROPERTIES, [])
 
 
 def get_identifying_properties(schema: Dict[str, Any]) -> List[str]:
     """Return the identifying properties of a schema."""
-    return schema.get(EncodedSchemaConstants.IDENTIFYING_PROPERTIES, [])
+    return schema.get(SchemaConstants.IDENTIFYING_PROPERTIES, [])
 
 
 def get_schema_type(schema: Dict[str, Any]) -> str:
@@ -144,7 +144,7 @@ def get_items(schema: Dict[str, Any]) -> Dict[str, Any]:
 
 def get_format(schema: Dict[str, Any]) -> str:
     """Return the format of a schema."""
-    return schema.get(EncodedSchemaConstants.FORMAT, "")
+    return schema.get(SchemaConstants.FORMAT, "")
 
 
 def get_conditional_formats(schema: Dict[str, Any]) -> List[str]:
