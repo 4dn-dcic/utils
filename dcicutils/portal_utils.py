@@ -17,7 +17,7 @@ from wsgiref.simple_server import make_server as wsgi_make_server
 from dcicutils.common import OrchestratedApp, ORCHESTRATED_APPS
 from dcicutils.ff_utils import get_metadata, get_schema, patch_metadata, post_metadata
 from dcicutils.misc_utils import to_camel_case, VirtualApp
-from dcicutils.zip_utils import temporary_file
+from dcicutils.tmpfile_utils import temporary_file
 
 Portal = Type["Portal"]  # Forward type reference for type hints.
 OptionalResponse = Optional[Union[Response, TestResponse]]

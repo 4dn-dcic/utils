@@ -2190,6 +2190,20 @@ def merge_objects(target: Union[dict, List[Any]], source: Union[dict, List[Any]]
     return target
 
 
+def load_json_from_file_expanding_environment_variables(file: str) -> Union[dict, list]:
+    def expand_envronment_variables(data):  # noqa
+        if isinstance(data, dict):
+            return {key: expand_envronment_variables(value) for key, value in data.items()}
+        if isinstance(data, list):
+            return [expand_envronment_variables(element) for element in data]
+        if isinstance(data, str):
+            return re.sub(r"\$\{([^}]+)\}|\$([a-zA-Z_][a-zA-Z0-9_]*)",
+                          lambda match: os.environ.get(match.group(1) or match.group(2), match.group(0)), data)
+        return data
+    with open(file, "r") as file:
+        return expand_envronment_variables(json.load(file))
+
+
 # Stealing topological sort classes below from python's graphlib module introduced
 # in v3.9 with minor refactoring.
 # Source: https://github.com/python/cpython/blob/3.11/Lib/graphlib.py
