@@ -31,12 +31,14 @@ from dcicutils.misc_utils import (
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
     MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case, json_file_contents,
-    pad_to, JsonLinesReader, split_string, merge_objects
+    pad_to, JsonLinesReader, split_string, merge_objects, to_integer,
+    load_json_from_file_expanding_environment_variables
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
     raises_regexp, MockId, MockLog, input_series,
 )
+from dcicutils.tmpfile_utils import temporary_file
 from typing import Any, Dict, List
 from unittest import mock
 
@@ -3593,8 +3595,8 @@ def test_json_lines_reader_lists():
 
 
 def test_split_array_string():
-    def split_array_string(value: str) -> List[str]:
-        return split_string(value, "|", "\\")
+    def split_array_string(value: str, unique: bool = False) -> List[str]:
+        return split_string(value, "|", "\\", unique=unique)
     assert split_array_string(r"abc|def|ghi") == ["abc", "def", "ghi"]
     assert split_array_string(r"abc\|def|ghi") == ["abc|def", "ghi"]
     assert split_array_string(r"abc\\|def|ghi") == ["abc\\", "def", "ghi"]
@@ -3609,6 +3611,12 @@ def test_split_array_string():
     assert split_array_string(r"|") == []
     assert split_array_string(r"\|") == ["|"]
     assert split_array_string(r"\\|") == ["\\"]
+    assert split_array_string(r"abc|def|abc|ghi", unique=False) == ["abc", "def", "abc", "ghi"]
+    assert split_array_string(r"abc|def|abc|ghi", unique=True) == ["abc", "def", "ghi"]
+    assert split_array_string(r"abc\\\|def\|ghi|jkl|mno|jkl", unique=False) == ["abc\\|def|ghi", "jkl", "mno", "jkl"]
+    assert split_array_string(r"abc\\\|def\|ghi|jkl|mno|jkl", unique=True) == ["abc\\|def|ghi", "jkl", "mno"]
+    assert split_string(r"abc|def|ghi|def", delimiter="|", unique=False) == ["abc", "def", "ghi", "def"]
+    assert split_string(r"abc|def|ghi|def", delimiter="|", unique=True) == ["abc", "def", "ghi"]
 
 
 def test_merge_objects_1():
@@ -3674,3 +3682,22 @@ def test_merge_objects_8():
                 "xyzzy": [{"foo": None}, {"goo": None}, {"hoo": None}, {"hoo": None}, {"hoo": None}]}
     merge_objects(target, source, True)
     assert target == expected
+
+
+def test_to_integer():
+    assert to_integer("17") == 17
+    assert to_integer("17.0") == 17
+    assert to_integer("17.1") == 17
+    assert to_integer("17.9", "123") == 17
+    assert to_integer("0") == 0
+    assert to_integer("0.0") == 0
+    assert to_integer("asdf") is None
+    assert to_integer("asdf", "myfallback") == "myfallback"
+
+
+def test_load_json_from_file_expanding_environment_variables():
+    with mock.patch.object(os, "environ", {"Auth0Secret": "dgakjhdgretqobv", "SomeEnvVar": "xyzzy"}):
+        some_json = {"Auth0Secret": "${Auth0Secret}", "abc": "def", "someproperty": "$SomeEnvVar"}
+        with temporary_file(content=json.dumps(some_json), suffix=".json") as tmpfile:
+            expanded_json = load_json_from_file_expanding_environment_variables(tmpfile)
+            assert expanded_json == {"Auth0Secret": "dgakjhdgretqobv", "abc": "def", "someproperty": "xyzzy"}

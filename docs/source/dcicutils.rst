@@ -337,6 +337,13 @@ task_utils
   :members:
 
 
+tmpfile_utils
+^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.tmpfile_utils
+   :members:
+
+
 trace_utils
 ^^^^^^^^^^^
 
