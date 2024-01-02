@@ -1472,6 +1472,7 @@ def string_list(s):
 def split_string(value: str, delimiter: str, escape: Optional[str] = None, unique: bool = False) -> List[str]:
     """
     Splits the given string into an array of string based on the given delimiter, and an optional escape character.
+    If the given unique flag is True then duplicate values will not be included.
     """
     if not isinstance(value, str) or not (value := value.strip()):
         return []
