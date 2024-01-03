@@ -38,6 +38,11 @@ def get_properties(schema: Dict[str, Any]) -> Dict[str, Any]:
     return schema.get(SchemaConstants.PROPERTIES, {})
 
 
+def get_property(schema: Dict[str, Any], property_name: str) -> Dict[str, Any]:
+    """Return property in properties, if found."""
+    return get_properties(schema).get(property_name, {})
+
+
 def has_property(schema: Dict[str, Any], property_name: str) -> bool:
     """Return True if the schema has the given property."""
     return property_name in get_properties(schema)
@@ -46,6 +51,11 @@ def has_property(schema: Dict[str, Any], property_name: str) -> bool:
 def get_required(schema: Dict[str, Any]) -> List[str]:
     """Return the required properties of a schema."""
     return schema.get(SchemaConstants.REQUIRED, [])
+
+
+def get_pattern(schema: Dict[str, Any]) -> str:
+    """Return the pattern property of a schema."""
+    return schema.get(SchemaConstants.PATTERN, "")
 
 
 def get_any_of(schema: Dict[str, Any]) -> List[Dict[str, Any]]:

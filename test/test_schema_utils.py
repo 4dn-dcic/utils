@@ -18,8 +18,9 @@ ONE_OF = [
 ]
 CONDITIONAL_REQUIRED = ["bar", "baz", "fa", "foo", "fu"]
 IDENTIFYING_PROPERTIES = ["bar", "foo"]
+FOO_SCHEMA = {"type": "string"}
 PROPERTIES = {
-    "foo": {"type": "string"},
+    "foo": FOO_SCHEMA,
     "bar": {
         "type": "object",
         "properties": {
@@ -39,7 +40,8 @@ SCHEMA = {
     "properties": PROPERTIES,
 }
 FORMAT = "email"
-STRING_SCHEMA = {"type": "string", "format": FORMAT}
+PATTERN = "some_regex"
+STRING_SCHEMA = {"type": "string", "format": FORMAT, "pattern": PATTERN}
 ARRAY_SCHEMA = {"type": "array", "items": [STRING_SCHEMA]}
 OBJECT_SCHEMA = {"type": "object", "properties": {"foo": STRING_SCHEMA}}
 NUMBER_SCHEMA = {"type": "number"}
@@ -67,12 +69,35 @@ def test_get_properties(schema: Dict[str, Any], expected: Dict[str, Any]) -> Non
 @pytest.mark.parametrize(
     "schema,expected",
     [
+        ({}, {}),
+        (STRING_SCHEMA, {}),
+        (SCHEMA, FOO_SCHEMA),
+    ],
+)
+def test_get_property(schema: Dict[str, Any], expected: Dict[str, any]) -> None:
+    assert schema_utils.get_property(schema, "foo") == expected
+
+
+@pytest.mark.parametrize(
+    "schema,expected",
+    [
         ({}, []),
         (SCHEMA, REQUIRED),
     ],
 )
 def test_get_required(schema: Dict[str, Any], expected: Dict[str, Any]) -> None:
     assert schema_utils.get_required(schema) == expected
+
+
+@pytest.mark.parametrize(
+    "schema,expected",
+    [
+        ({}, ""),
+        (STRING_SCHEMA, PATTERN),
+    ],
+)
+def test_get_pattern(schema: Dict[str, Any], expected: Dict[str, Any]) -> None:
+    assert schema_utils.get_pattern(schema) == expected
 
 
 @pytest.mark.parametrize(
