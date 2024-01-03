@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+8.6.1
+=====
+* Changed scripts/publish_to_pypi.py to allow untracked gitinfo.json to exist;
+  this so that we can (optionally) have repos write relevant git info to this
+  file (via GitHub Actions) and make it accessible to the package for inspection.
+
+
 8.6.0
 =====
 * Minor fix to misc_utils.to_integer to handle float strings.

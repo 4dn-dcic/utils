@@ -197,7 +197,7 @@ def verify_untracked_files() -> bool:
     continue, and returns True for a yes response, otherwise returns False.
     """
     untracked_files = get_untracked_files()
-    if untracked_files:
+    if untracked_files and not (len(untracked_files) == 1 and os.path.basename(untracked_files[0]) == "gitinfo.json"):
         PRINT(f"You are about to PUBLISH the following ({len(untracked_files)})"
               f" UNTRACKED file{'' if len(untracked_files) == 1 else 's' } -> SECURITY risk:")
         for untracked_file in untracked_files:
