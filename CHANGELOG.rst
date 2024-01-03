@@ -6,8 +6,15 @@ dcicutils
 Change Log
 ----------
 
+8.7.0
+=====
+
+* Add new schema_utils module for schema parsing
+
+
 8.6.0
 =====
+
 * Minor fix to misc_utils.to_integer to handle float strings.
 * Minor fix to structured_data to accumulate unique resolved_refs across schemas.
 * Added ability to autoadd properties structured_data.StructuredDataSet;
@@ -21,12 +28,14 @@ Change Log
 
 8.5.0
 =====
+
 * Moved structured_data.py from smaht-portal to here; new portal_utils and data_readers modules.
 * Strip sheet name in data_readers.Excel; respecte (ignore) hidden sheets.
 
 
 8.4.0
 =====
+
 * More work related to SMaHT ingestion (bundle/sheet_utils, data_readers, etc).
 
 
@@ -37,6 +46,7 @@ Change Log
 
 8.2.0
 =====
+
 * 2023-11-02
 * Added ``SchemaManager.get_identifying_properties`` in ``bundle_utils``
   which implicitly adds ``identifier`` to ``identifyingProperties``.
