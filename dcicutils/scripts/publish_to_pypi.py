@@ -197,7 +197,7 @@ def verify_untracked_files() -> bool:
     continue, and returns True for a yes response, otherwise returns False.
     """
     untracked_files = get_untracked_files()
-    if untracked_files and not (len(untracked_files) == 1 and os.path.basename(untracked_files[0]) == "gitinfo.json"):
+    if untracked_files:
         PRINT(f"You are about to PUBLISH the following ({len(untracked_files)})"
               f" UNTRACKED file{'' if len(untracked_files) == 1 else 's' } -> SECURITY risk:")
         for untracked_file in untracked_files:
@@ -242,6 +242,9 @@ def get_untracked_files() -> list:
                 if untracked_file:
                     # Ignore any __pycache__ directories as they are already ignored by poetry publish.
                     if os.path.isdir(untracked_file) and os.path.basename(untracked_file.rstrip("/")) == "__pycache__":
+                        continue
+                    # Ignore gitinfo.json which may exist if the repo wants to create this via GitHub Actions. 
+                    if os.path.basename(untracked_file) == "gitinfo.json":
                         continue
                     untracked_files.append(untracked_file)
     return untracked_files
