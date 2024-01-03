@@ -243,7 +243,7 @@ def get_untracked_files() -> list:
                     # Ignore any __pycache__ directories as they are already ignored by poetry publish.
                     if os.path.isdir(untracked_file) and os.path.basename(untracked_file.rstrip("/")) == "__pycache__":
                         continue
-                    # Ignore gitinfo.json which may exist if the repo wants to create this via GitHub Actions. 
+                    # Ignore gitinfo.json which may exist if the repo wants to create this via GitHub Actions.
                     if os.path.basename(untracked_file) == "gitinfo.json":
                         continue
                     untracked_files.append(untracked_file)
