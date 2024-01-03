@@ -258,6 +258,9 @@ class Portal:
         return to_camel_case(name if not name.endswith(".json") else name[:-5]) if isinstance(name, str) else ""
 
     def is_file_schema(self, schema_name: str) -> bool:
+        """
+        Returns True iff the given schema name isa File type, i.e. has an ancestor which is of type File.
+        """
         if super_type_map := self.get_schemas_super_type_map():
             if file_super_type := super_type_map.get(Portal.FILE_SCHEMA_NAME):
                 return self.schema_name(schema_name) in file_super_type
@@ -266,8 +269,9 @@ class Portal:
     def get_schemas_super_type_map(self) -> dict:
         """
         Returns the "super type map" for all of the known schemas (via /profiles).
-        This is a dictionary of all types which have (one or more) sub-types whose value is
-        an array of all of those sub-types (direct and all descendents), in breadth first order.
+        This is a dictionary with property names which are all known schema type names which
+        have (one or more) sub-types, and the value each such property name is an array of
+        all of those sub-types (direct and all descendents), in breadth first order.
         """
         def list_breadth_first(super_type_map: dict, super_type_name: str) -> dict:
             result = []
