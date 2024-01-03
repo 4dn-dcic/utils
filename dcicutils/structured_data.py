@@ -42,23 +42,24 @@ StructuredDataSet = Type["StructuredDataSet"]
 class StructuredDataSet:
 
     def __init__(self, file: Optional[str] = None, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
-                 schemas: Optional[List[dict]] = None, data: Optional[List[dict]] = None,
+                 schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
                  order: Optional[List[str]] = None, prune: bool = True) -> None:
-        self.data = {} if not data else data  # If portal is None then no schemas nor refs.
+        self.data = {}
         self._portal = Portal(portal, data=self.data, schemas=schemas) if portal else None
         self._order = order
         self._prune = prune
         self._warnings = {}
         self._errors = {}
-        self._resolved_refs = []
+        self._resolved_refs = set()
         self._validated = False
+        self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
         self._load_file(file) if file else None
 
     @staticmethod
     def load(file: str, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
-             schemas: Optional[List[dict]] = None,
+             schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
              order: Optional[List[str]] = None, prune: bool = True) -> StructuredDataSet:
-        return StructuredDataSet(file=file, portal=portal, schemas=schemas, order=order, prune=prune)
+        return StructuredDataSet(file=file, portal=portal, schemas=schemas, autoadd=autoadd, order=order, prune=prune)
 
     def validate(self, force: bool = False) -> None:
         if self._validated and not force:
@@ -96,7 +97,7 @@ class StructuredDataSet:
 
     @property
     def resolved_refs(self) -> List[str]:
-        return self._resolved_refs
+        return list(self._resolved_refs)
 
     @property
     def upload_files(self) -> List[str]:
@@ -112,7 +113,7 @@ class StructuredDataSet:
     def _load_file(self, file: str) -> None:
         # Returns a dictionary where each property is the name (i.e. the type) of the data,
         # and the value is array of dictionaries for the data itself. Handle these kinds of files:
-        # 1.  Single CSV of JSON file, where the (base) name of the file is the data type name.
+        # 1.  Single CSV, TSV, or JSON file, where the (base) name of the file is the data type name.
         # 2.  Single Excel file containing one or more sheets, where each sheet
         #     represents (i.e. is named for, and contains data for) a different type.
         # 3.  Zip file (.zip or .tar.gz or .tgz or .tar), containing data files to load, where the
@@ -163,11 +164,13 @@ class StructuredDataSet:
             structured_row = structured_row_template.create_row()
             for column_name, value in row.items():
                 structured_row_template.set_value(structured_row, column_name, value, reader.file, reader.row_number)
+                if self._autoadd_properties:
+                    self._add_properties(structured_row, self._autoadd_properties, schema)
             self._add(type_name, structured_row)
         self._note_warning(reader.warnings, "reader")
         if schema:
             self._note_error(schema._unresolved_refs, "ref")
-            self._resolved_refs = schema._resolved_refs
+            self._resolved_refs.update(schema._resolved_refs)
 
     def _add(self, type_name: str, data: Union[dict, List[dict]]) -> None:
         if self._prune:
@@ -176,6 +179,11 @@ class StructuredDataSet:
             self.data[type_name].extend([data] if isinstance(data, dict) else data)
         else:
             self.data[type_name] = [data] if isinstance(data, dict) else data
+
+    def _add_properties(self, structured_row: dict, properties: dict, schema: Optional[dict] = None) -> None:
+        for name in properties:
+            if name not in structured_row and (not schema or schema.data.get("properties", {}).get(name)):
+                structured_row[name] = properties[name]
 
     def _note_warning(self, item: Optional[Union[dict, List[dict]]], group: str) -> None:
         self._note_issue(self._warnings, item, group)
@@ -237,7 +245,7 @@ class _StructuredRowTemplate:
             return {array_name: array} if array_name else {column_component: value}
 
         def set_value_internal(data: Union[dict, list], value: Optional[Any], src: Optional[str],
-                               path: List[Union[str, int]], mapv: Optional[Callable]) -> None:
+                               path: List[Union[str, int]], typeinfo: Optional[dict], mapv: Optional[Callable]) -> None:
 
             def set_value_backtrack_object(path_index: int, path_element: str) -> None:
                 nonlocal data, path, original_data
@@ -257,7 +265,7 @@ class _StructuredRowTemplate:
                     set_value_backtrack_object(i, p)
                 data = data[p]
             if (p := path[-1]) == -1 and isinstance(value, str):
-                values = _split_array_string(value)
+                values = _split_array_string(value, unique=typeinfo.get("unique") if typeinfo else False)
                 if mapv:
                     values = [mapv(value, src) for value in values]
                 merge_objects(data, values)
@@ -288,11 +296,13 @@ class _StructuredRowTemplate:
         for column_name in column_names or []:
             ensure_column_consistency(column_name)
             rational_column_name = self._schema.rationalize_column_name(column_name) if self._schema else column_name
-            map_value_function = self._schema.get_map_value_function(rational_column_name) if self._schema else None
+            column_typeinfo = self._schema.get_typeinfo(rational_column_name) if self._schema else None
+            map_value_function = column_typeinfo.get("map") if column_typeinfo else None
             if (column_components := _split_dotted_string(rational_column_name)):
                 merge_objects(structured_row_template, parse_components(column_components, path := []), True)
-                self._set_value_functions[column_name] = (lambda data, value, src, path=path, mapv=map_value_function:
-                                                          set_value_internal(data, value, src, path, mapv))
+                self._set_value_functions[column_name] = (
+                    lambda data, value, src, path=path, typeinfo=column_typeinfo, mapv=map_value_function:
+                        set_value_internal(data, value, src, path, typeinfo, mapv))
         return structured_row_template
 
 
@@ -315,7 +325,8 @@ class Schema:
 
     @staticmethod
     def load_by_name(name: str, portal: Portal) -> Optional[dict]:
-        return Schema(portal.get_schema(Schema.type_name(name)), portal) if portal else None
+        schema_json = portal.get_schema(Schema.type_name(name)) if portal else None
+        return Schema(schema_json, portal) if schema_json else None
 
     def validate(self, data: dict) -> List[str]:
         errors = []
@@ -331,10 +342,7 @@ class Schema:
     def resolved_refs(self) -> List[str]:
         return list(self._resolved_refs)
 
-    def get_map_value_function(self, column_name: str) -> Optional[Any]:
-        return (self._get_typeinfo(column_name) or {}).get("map")
-
-    def _get_typeinfo(self, column_name: str) -> Optional[dict]:
+    def get_typeinfo(self, column_name: str) -> Optional[dict]:
         if isinstance(info := self._typeinfo.get(column_name), str):
             info = self._typeinfo.get(info)
         if not info and isinstance(info := self._typeinfo.get(self.unadorn_column_name(column_name)), str):
@@ -467,9 +475,14 @@ class Schema:
                             raise Exception(f"Array of undefined or multiple types in JSON schema NOT supported: {key}")
                         raise Exception(f"Invalid array type specifier in JSON schema: {key}")
                     key = key + ARRAY_NAME_SUFFIX_CHAR
+                    if unique := (property_value.get("uniqueItems") is True):
+                        pass
                     property_value = array_property_items
                     property_value_type = property_value.get("type")
-                result.update(self._create_typeinfo(array_property_items, parent_key=key))
+                typeinfo = self._create_typeinfo(array_property_items, parent_key=key)
+                if unique:
+                    typeinfo[key]["unique"] = True
+                result.update(typeinfo)
                 continue
             result[key] = {"type": property_value_type, "map": self._map_function({**property_value, "column": key})}
             if ARRAY_NAME_SUFFIX_CHAR in key:
@@ -537,16 +550,13 @@ class Portal(PortalBase):
 
     def __init__(self,
                  arg: Optional[Union[VirtualApp, TestApp, Router, Portal, dict, tuple, str]] = None,
-                 env: Optional[str] = None, app: OrchestratedApp = None, server: Optional[str] = None,
-                 key: Optional[Union[dict, tuple]] = None,
-                 portal: Optional[Union[VirtualApp, TestApp, Router, Portal, str]] = None,
-                 data: Optional[dict] = None, schemas: Optional[List[dict]] = None) -> Optional[Portal]:
-        super().__init__(arg, env=env, app=app, server=server, key=key, portal=portal)
-        if isinstance(arg, Portal) and not portal:
-            portal = arg
-        if isinstance(portal, Portal):
-            self._schemas = schemas if schemas is not None else portal._schemas  # Explicitly specified/known schemas.
-            self._data = data if data is not None else portal._data  # Data set being loaded; e.g. by StructuredDataSet.
+                 env: Optional[str] = None, server: Optional[str] = None,
+                 app: Optional[OrchestratedApp] = None,
+                 data: Optional[dict] = None, schemas: Optional[List[dict]] = None) -> None:
+        super().__init__(arg, env=env, server=server, app=app)
+        if isinstance(arg, Portal):
+            self._schemas = schemas if schemas is not None else arg._schemas  # Explicitly specified/known schemas.
+            self._data = data if data is not None else arg._data  # Data set being loaded; e.g. by StructuredDataSet.
         else:
             self._schemas = schemas
             self._data = data
@@ -560,7 +570,9 @@ class Portal(PortalBase):
 
     @lru_cache(maxsize=256)
     def get_schema(self, schema_name: str) -> Optional[dict]:
-        if (schemas := self.get_schemas()) and (schema := schemas.get(schema_name := Schema.type_name(schema_name))):
+        if not (schemas := self.get_schemas()):
+            return None
+        if schema := schemas.get(schema_name := Schema.type_name(schema_name)):
             return schema
         if schema_name == schema_name.upper() and (schema := schemas.get(schema_name.lower().title())):
             return schema
@@ -568,8 +580,9 @@ class Portal(PortalBase):
             return schema
 
     @lru_cache(maxsize=1)
-    def get_schemas(self) -> dict:
-        schemas = super().get_schemas()
+    def get_schemas(self) -> Optional[dict]:
+        if not (schemas := super().get_schemas()) or (schemas.get("status") == "error"):
+            return None
         if self._schemas:
             schemas = copy.deepcopy(schemas)
             for user_specified_schema in self._schemas:
@@ -603,17 +616,14 @@ class Portal(PortalBase):
         return self.get_metadata(f"/{type_name}/{value}") is not None
 
     @staticmethod
-    def create_for_testing(ini_file: Optional[str] = None, schemas: Optional[List[dict]] = None) -> Portal:
-        return Portal(PortalBase.create_for_testing(ini_file), schemas=schemas)
-
-    @staticmethod
-    def create_for_testing_local(ini_file: Optional[str] = None, schemas: Optional[List[dict]] = None) -> Portal:
-        return Portal(PortalBase.create_for_testing_local(ini_file), schemas=schemas)
+    def create_for_testing(arg: Optional[Union[str, bool, List[dict], dict, Callable]] = None,
+                           schemas: Optional[List[dict]] = None) -> Portal:
+        return Portal(PortalBase.create_for_testing(arg), schemas=schemas)
 
 
 def _split_dotted_string(value: str):
     return split_string(value, DOTTED_NAME_DELIMITER_CHAR)
 
 
-def _split_array_string(value: str):
-    return split_string(value, ARRAY_VALUE_DELIMITER_CHAR, ARRAY_VALUE_DELIMITER_ESCAPE_CHAR)
+def _split_array_string(value: str, unique: bool = False):
+    return split_string(value, ARRAY_VALUE_DELIMITER_CHAR, ARRAY_VALUE_DELIMITER_ESCAPE_CHAR, unique=unique)

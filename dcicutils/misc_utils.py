@@ -982,7 +982,11 @@ def to_integer(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
     try:
         return int(value)
     except Exception:
-        return fallback
+        try:
+            return int(float(value))
+        except Exception:
+            pass
+    return fallback
 
 
 def to_float(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
@@ -1465,28 +1469,34 @@ def string_list(s):
     return [p for p in [part.strip() for part in s.split(",")] if p]
 
 
-def split_string(value: str, delimiter: str, escape: Optional[str] = None) -> List[str]:
+def split_string(value: str, delimiter: str, escape: Optional[str] = None, unique: bool = False) -> List[str]:
     """
     Splits the given string into an array of string based on the given delimiter, and an optional escape character.
+    If the given unique flag is True then duplicate values will not be included.
     """
     if not isinstance(value, str) or not (value := value.strip()):
         return []
-    if not isinstance(escape, str) or not escape:
-        return [item.strip() for item in value.split(delimiter)]
     result = []
+    if not isinstance(escape, str) or not escape:
+        for item in value.split(delimiter):
+            if (item := item.strip()) and (unique is not True or item not in result):
+                result.append(item)
+        return result
     item = r""
     escaped = False
     for c in value:
         if c == delimiter and not escaped:
-            result.append(item.strip())
+            if (item := item.strip()) and (unique is not True or item not in result):
+                result.append(item)
             item = r""
         elif c == escape and not escaped:
             escaped = True
         else:
             item += c
             escaped = False
-    result.append(item.strip())
-    return [item for item in result if item]
+    if (item := item.strip()) and (unique is not True or item not in result):
+        result.append(item)
+    return result
 
 
 def right_trim(list_or_tuple: Union[List[Any], Tuple[Any]],
@@ -2179,6 +2189,20 @@ def merge_objects(target: Union[dict, List[Any]], source: Union[dict, List[Any]]
     elif source:
         target = source
     return target
+
+
+def load_json_from_file_expanding_environment_variables(file: str) -> Union[dict, list]:
+    def expand_envronment_variables(data):  # noqa
+        if isinstance(data, dict):
+            return {key: expand_envronment_variables(value) for key, value in data.items()}
+        if isinstance(data, list):
+            return [expand_envronment_variables(element) for element in data]
+        if isinstance(data, str):
+            return re.sub(r"\$\{([^}]+)\}|\$([a-zA-Z_][a-zA-Z0-9_]*)",
+                          lambda match: os.environ.get(match.group(1) or match.group(2), match.group(0)), data)
+        return data
+    with open(file, "r") as file:
+        return expand_envronment_variables(json.load(file))
 
 
 # Stealing topological sort classes below from python's graphlib module introduced
