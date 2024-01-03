@@ -49,6 +49,7 @@ class HealthPageKey:  # This is moving here from cgap-portal.
     FILE_UPLOAD_BUCKET = 'file_upload_bucket'                # = s3Utils.RAW_BUCKET_HEALTH_PAGE_KEY
     FOURSIGHT = 'foursight'
     FOURSIGHT_BUCKET_PREFIX = 'foursight_bucket_prefix'
+    GIT = 'git'
     HIGLASS = 'higlass'
     IDENTITY = 'identity'
     INDEXER = 'indexer'
