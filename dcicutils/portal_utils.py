@@ -275,7 +275,7 @@ class Portal:
 
     @staticmethod
     def schema_name(name: str) -> str:
-        return to_camel_case(name if not name.endswith(".json") else name[:-5]) if isinstance(name, str) else ""
+        return to_camel_case(name.replace(" ", "") if not name.endswith(".json") else name[:-5])
 
     def is_schema_type(self, value: dict, schema_type: str) -> bool:
         """
