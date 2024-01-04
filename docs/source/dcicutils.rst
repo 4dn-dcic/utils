@@ -295,6 +295,13 @@ s3_utils
   :members:
 
 
+schema_utils
+^^^^^^^^
+
+.. automodule:: dcicutils.schema_utils
+  :members:
+
+
 secrets_utils
 ^^^^^^^^^^^^^
 
