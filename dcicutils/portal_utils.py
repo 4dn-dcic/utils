@@ -92,10 +92,11 @@ class Portal:
                 self._key_id = key_id
                 self._secret = secret
                 self._key_pair = (key_id, secret)
-                if ((isinstance(server, str) and server) or (isinstance(server := key.get("server"), str) and server)):
+                if (isinstance(server, str) and server) or (isinstance(server := key.get("server"), str) and server):
                     if server := normalize_server(server):
-                        if isinstance(key_server := key.get("server"), str) and key_server and key_server != server:
-                            raise Exception(f"Portal server inconsistency: {server} vs {key_server}")
+                        if isinstance(key_server := key.get("server"), str) and key_server:
+                            if normalize_server(key_server) != server:
+                                raise Exception(f"Portal server inconsistency: {server} vs {key_server}")
                         self._key["server"] = self._server = server
             if not self._key:
                 raise Exception("Portal init error; from key.")
