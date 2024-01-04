@@ -202,28 +202,45 @@ class Portal:
     def vapp(self) -> Optional[TestApp]:
         return self._vapp
 
-    def get(self, url: str, follow: bool = True, **kwargs) -> OptionalResponse:
+    def get(self, url: str, follow: bool = True, raise_for_status: bool = False, **kwargs) -> OptionalResponse:
+        url = self.url(url)
         if not self._vapp:
-            return requests.get(self.url(url), allow_redirects=follow, **self._kwargs(**kwargs))
-        response = self._vapp.get(self.url(url), **self._kwargs(**kwargs))
-        if response and response.status_code in [301, 302, 303, 307, 308] and follow:
-            response = response.follow()
-        return self._response(response)
-
-    def patch(self, url: str, data: Optional[dict] = None, json: Optional[dict] = None, **kwargs) -> OptionalResponse:
-        if not self._vapp:
-            return requests.patch(self.url(url), data=data, json=json, **self._kwargs(**kwargs))
-        return self._response(self._vapp.patch_json(self.url(url), json or data, **self._kwargs(**kwargs)))
-
-    def post(self, url: str, data: Optional[dict] = None, json: Optional[dict] = None,
-             files: Optional[dict] = None, **kwargs) -> OptionalResponse:
-        if not self._vapp:
-            return requests.post(self.url(url), data=data, json=json, files=files, **self._kwargs(**kwargs))
-        if files:
-            response = self._vapp.post(self.url(url), json or data, upload_files=files, **self._kwargs(**kwargs))
+            response = requests.get(url, allow_redirects=follow, **self._kwargs(**kwargs))
         else:
-            response = self._vapp.post_json(self.url(url), json or data, upload_files=files, **self._kwargs(**kwargs))
-        return self._response(response)
+            response = self._vapp.get(url, **self._kwargs(**kwargs))
+            if response and response.status_code in [301, 302, 303, 307, 308] and follow:
+                response = response.follow()
+            response = self._response(response)
+        if raise_for_status:
+            response.raise_for_status()
+        return response
+
+    def patch(self, url: str, data: Optional[dict] = None, json: Optional[dict] = None,
+              raise_for_status: bool = False, **kwargs) -> OptionalResponse:
+        url = self.url(url)
+        if not self._vapp:
+            response = requests.patch(url, data=data, json=json, **self._kwargs(**kwargs))
+        else:
+            response = self._vapp.patch_json(url, json or data, **self._kwargs(**kwargs))
+            response = self._response(response)
+        if raise_for_status:
+            response.raise_for_status()
+        return response
+
+    def post(self, url: str, data: Optional[dict] = None, json: Optional[dict] = None, files: Optional[dict] = None,
+             raise_for_status: bool = False, **kwargs) -> OptionalResponse:
+        url = self.url(url)
+        if not self._vapp:
+            response = requests.post(url, data=data, json=json, files=files, **self._kwargs(**kwargs))
+        else:
+            if files:
+                response = self._vapp.post(url, json or data, upload_files=files, **self._kwargs(**kwargs))
+            else:
+                response = self._vapp.post_json(url, json or data, upload_files=files, **self._kwargs(**kwargs))
+            response = self._response(response)
+        if raise_for_status:
+            response.raise_for_status()
+        return response
 
     def get_metadata(self, object_id: str) -> Optional[dict]:
         return get_metadata(obj_id=object_id, vapp=self._vapp, key=self._key)
