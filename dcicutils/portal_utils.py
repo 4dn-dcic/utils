@@ -207,10 +207,10 @@ class Portal:
 
     def get(self, url: str, follow: bool = True, raise_for_status: bool = False, **kwargs) -> OptionalResponse:
         url = self.url(url)
-        if not self._vapp:
+        if not self.vapp:
             response = requests.get(url, allow_redirects=follow, **self._kwargs(**kwargs))
         else:
-            response = self._vapp.get(url, **self._kwargs(**kwargs))
+            response = self.vapp.get(url, **self._kwargs(**kwargs))
             if response and response.status_code in [301, 302, 303, 307, 308] and follow:
                 response = response.follow()
             response = self._response(response)
@@ -221,10 +221,10 @@ class Portal:
     def patch(self, url: str, data: Optional[dict] = None, json: Optional[dict] = None,
               raise_for_status: bool = False, **kwargs) -> OptionalResponse:
         url = self.url(url)
-        if not self._vapp:
+        if not self.vapp:
             response = requests.patch(url, data=data, json=json, **self._kwargs(**kwargs))
         else:
-            response = self._vapp.patch_json(url, json or data, **self._kwargs(**kwargs))
+            response = self.vapp.patch_json(url, json or data, **self._kwargs(**kwargs))
             response = self._response(response)
         if raise_for_status:
             response.raise_for_status()
@@ -233,29 +233,29 @@ class Portal:
     def post(self, url: str, data: Optional[dict] = None, json: Optional[dict] = None, files: Optional[dict] = None,
              raise_for_status: bool = False, **kwargs) -> OptionalResponse:
         url = self.url(url)
-        if not self._vapp:
+        if not self.vapp:
             response = requests.post(url, data=data, json=json, files=files, **self._kwargs(**kwargs))
         else:
             if files:
-                response = self._vapp.post(url, json or data, upload_files=files, **self._kwargs(**kwargs))
+                response = self.vapp.post(url, json or data, upload_files=files, **self._kwargs(**kwargs))
             else:
-                response = self._vapp.post_json(url, json or data, upload_files=files, **self._kwargs(**kwargs))
+                response = self.vapp.post_json(url, json or data, upload_files=files, **self._kwargs(**kwargs))
             response = self._response(response)
         if raise_for_status:
             response.raise_for_status()
         return response
 
     def get_metadata(self, object_id: str) -> Optional[dict]:
-        return get_metadata(obj_id=object_id, vapp=self._vapp, key=self._key)
+        return get_metadata(obj_id=object_id, vapp=self.vapp, key=self.key)
 
     def patch_metadata(self, object_id: str, data: str) -> Optional[dict]:
-        if self._key:
-            return patch_metadata(obj_id=object_id, patch_item=data, key=self._key)
+        if self.key:
+            return patch_metadata(obj_id=object_id, patch_item=data, key=self.key)
         return self.patch(f"/{object_id}", data).json()
 
     def post_metadata(self, object_type: str, data: str) -> Optional[dict]:
-        if self._key:
-            return post_metadata(schema_name=object_type, post_item=data, key=self._key)
+        if self.key:
+            return post_metadata(schema_name=object_type, post_item=data, key=self.key)
         return self.post(f"/{object_type}", data).json()
 
     def get_health(self) -> OptionalResponse:
@@ -268,7 +268,7 @@ class Portal:
             return False
 
     def get_schema(self, schema_name: str) -> Optional[dict]:
-        return get_schema(self.schema_name(schema_name), portal_vapp=self._vapp, key=self._key)
+        return get_schema(self.schema_name(schema_name), portal_vapp=self.vapp, key=self.key)
 
     def get_schemas(self) -> dict:
         return self.get("/profiles/").json()
@@ -348,13 +348,13 @@ class Portal:
             return url
         if not (url := re.sub(r"/+", "/", url)).startswith("/"):
             url = "/"
-        return self._server + url if self._server else url
+        return self.server + url if self.server else url
 
     def _kwargs(self, **kwargs) -> dict:
         result_kwargs = {"headers":
                          kwargs.get("headers", {"Content-type": "application/json", "Accept": "application/json"})}
-        if self._key_pair:
-            result_kwargs["auth"] = self._key_pair
+        if self.key_pair:
+            result_kwargs["auth"] = self.key_pair
         if isinstance(timeout := kwargs.get("timeout"), int):
             result_kwargs["timeout"] = timeout
         return result_kwargs
@@ -457,9 +457,9 @@ class Portal:
             return config.make_wsgi_app()
 
     def start_for_testing(self, port: int = 7070, asynchronous: bool = False) -> Optional[Thread]:
-        if isinstance(self._vapp, TestApp) and hasattr(self._vapp, "app") and isinstance(self._vapp.app, PyramidRouter):
+        if isinstance(self.vapp, TestApp) and hasattr(self.vapp, "app") and isinstance(self.vapp.app, PyramidRouter):
             def start_server() -> None:  # noqa
-                with wsgi_make_server("0.0.0.0", port or 7070, self._vapp.app) as server:
+                with wsgi_make_server("0.0.0.0", port or 7070, self.vapp.app) as server:
                     server.serve_forever()
             if asynchronous:
                 server_thread = Thread(target=start_server)
