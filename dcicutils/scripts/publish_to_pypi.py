@@ -145,7 +145,7 @@ def verify_unstaged_changes() -> bool:
     """
     If the current git repo has NO unstaged changes then returns True,
     otherwise prints an error message and returns False. HOWEVER, we DO
-    allow unstaged changes to just the file gitinfo.json if such exists; to 
+    allow unstaged changes to just the file gitinfo.json if such exists; to
     allow GitHub Actions to update with latest git (repo, branch, commit) info.
     """
     git_diff_results, _ = execute_command("git diff --name-only")
