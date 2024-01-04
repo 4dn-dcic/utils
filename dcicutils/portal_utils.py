@@ -257,14 +257,21 @@ class Portal:
     def schema_name(name: str) -> str:
         return to_camel_case(name if not name.endswith(".json") else name[:-5]) if isinstance(name, str) else ""
 
+    def is_specified_schema(self, schema_name: str, schema_type: str) -> bool:
+        """
+        Returns True iff the given schema name isa type of the given schema type name,
+        i.e. has an ancestor which is of type that given type.
+        """
+        if super_type_map := self.get_schemas_super_type_map():
+            if super_type := super_type_map.get(schema_type):
+                return self.schema_name(schema_name) in super_type
+        return False
+
     def is_file_schema(self, schema_name: str) -> bool:
         """
         Returns True iff the given schema name isa File type, i.e. has an ancestor which is of type File.
         """
-        if super_type_map := self.get_schemas_super_type_map():
-            if file_super_type := super_type_map.get(Portal.FILE_SCHEMA_NAME):
-                return self.schema_name(schema_name) in file_super_type
-        return False
+        return self.is_specified_schema(schema_name, Portal.FILE_SCHEMA_NAME)
 
     def get_schemas_super_type_map(self) -> dict:
         """
