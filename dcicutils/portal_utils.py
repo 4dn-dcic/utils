@@ -342,6 +342,9 @@ class Portal:
                     return getattr(self._response, attr)
                 def json(self):  # noqa
                     return self._response.json
+                def raise_for_status(self):  # noqa
+                    if self.status_code < 200 or self.status_code > 399:
+                        raise requests.exceptions.HTTPError(f"HTTP Error: {self.status_code}", response=self)
             response = TestResponseWrapper(response)
         return response
 
