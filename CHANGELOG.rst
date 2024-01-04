@@ -10,9 +10,9 @@ Change Log
 8.7.1
 =====
 
-* Changed scripts/publish_to_pypi.py to allow untracked gitinfo.json to exist;
-  this so that we can (optionally) have repos write relevant git info to this
-  file (via GitHub Actions) and make it accessible to the package for inspection.
+* Changed scripts/publish_to_pypi.py to allow gitinfo.json to have unstaged changes;
+  this is so we can optionally have repos write relevant git (repo, branch, commit) info
+  to this file (via GitHub Actions) and make it accessible to the package for inspection.
 
 
 8.7.0
