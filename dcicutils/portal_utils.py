@@ -10,7 +10,7 @@ import re
 import requests
 from requests.models import Response
 from threading import Thread
-from typing import Callable, Dict, List, Optional, Type, Union
+from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 from uuid import uuid4 as uuid
 from webtest.app import TestApp, TestResponse
 from wsgiref.simple_server import make_server as wsgi_make_server
@@ -25,22 +25,25 @@ OptionalResponse = Optional[Union[Response, TestResponse]]
 
 class Portal:
     """
-    This is meant to be an uber wrapper for Portal access. It can be created in a variety of ways:
-    1. From a (Portal) .ini file (e.g. development.ini)
+    This is meant to be an Über wrapper for Portal access. It can be created in a variety of ways:
+    1. From a (Portal) .ini file (e.g. development.ini).
     2. From a key dictionary, containing "key" and "secret" property values.
     3. From a key pair tuple, containing (in order) a key and secret values.
-    4. From a keys file assumed to reside in ~/.{app}-keys.json where the given "app" value is either "smaht", "cgap",
+    4. From a keys .json file residing in ~/.{app}-keys.json where the given "app" value is either "smaht", "cgap",
        or "fourfront"; where is assumed to contain a dictionary with a key for the given "env" value, e.g. smaht-local;
        and with a dictionary value containing "key" and "secret" property values, and an optional "server" property;
        if an "app" value is not specified but the given "env" value begins with one of the app values then that value
        will be used, i.e. e.g. if "env" is "smaht-local" and app is unspecified than app is assumed to be "smaht".
-    5. From a keys file as described above (#4) but rather than be identified by the given "env" value it
+    5. From a keys .json file as described above (#4) but rather than be identified by the given "env" value it
        is looked up via the given "server" name and the "server" key dictionary value in the key file.
-    6. From a given "vapp" value (which may be a webtest/TestApp or VirtualApp or even a pyramid/Router).
-    7. From another Portal object; or from a a pyramid Router object.
+    6. From a full path to a keys file .json.
+    7. From a given "vapp" value; which may be a webtest.app.TestApp,
+       or a dcicutils.misc_utils.VirtualApp, or even a pyramid.router.Router.
+    8. From another Portal object (i.e. copy constructor).
     """
     FILE_SCHEMA_NAME = "File"
-    KEYS_FILE_DIRECTORY = os.path.expanduser(f"~")
+    KEYS_FILE_DIRECTORY = "~"
+    MIME_TYPE_JSON = "application/json"
 
     def __init__(self,
                  arg: Optional[Union[Portal, TestApp, VirtualApp, PyramidRouter, dict, tuple, str]] = None,
@@ -50,9 +53,6 @@ class Portal:
         def init(unspecified: Optional[list] = []) -> None:
             self._ini_file = None
             self._key = None
-            self._key_pair = None
-            self._key_id = None
-            self._secret = None
             self._keys_file = None
             self._env = None
             self._server = None
@@ -66,9 +66,6 @@ class Portal:
             init(unspecified)
             self._ini_file = portal._ini_file
             self._key = portal._key
-            self._key_pair = portal._key_pair
-            self._key_id = portal._key_id
-            self._secret = portal._secret
             self._keys_file = portal._keys_file
             self._env = portal._env
             self._server = portal._server
@@ -89,9 +86,6 @@ class Portal:
             if (isinstance(key_id := key.get("key"), str) and key_id and
                 isinstance(secret := key.get("secret"), str) and secret):  # noqa
                 self._key = {"key": key_id, "secret": secret}
-                self._key_id = key_id
-                self._secret = secret
-                self._key_pair = (key_id, secret)
                 if (isinstance(server, str) and server) or (isinstance(server := key.get("server"), str) and server):
                     if server := normalize_server(server):
                         if isinstance(key_server := key.get("server"), str) and key_server:
@@ -110,7 +104,7 @@ class Portal:
         def init_from_keys_file(keys_file: str, env: Optional[str], server: Optional[str],
                                 unspecified: Optional[list] = []) -> None:
             try:
-                with io.open(keys_file) as f:
+                with io.open(keys_file := os.path.expanduser(keys_file)) as f:
                     keys = json.load(f)
             except Exception:
                 raise Exception(f"Portal init error; cannot open keys-file: {keys_file}")
@@ -140,9 +134,9 @@ class Portal:
 
         def normalize_server(server: str) -> Optional[str]:
             prefix = ""
-            if (lserver := server.lower()).startswith("http://"):
+            if (lowercase_server := server.lower()).startswith("http://"):
                 prefix = "http://"
-            elif lserver.startswith("https://"):
+            elif lowercase_server.startswith("https://"):
                 prefix = "https://"
             if prefix:
                 if (server := re.sub(r"/+", "/", server[len(prefix):])).startswith("/"):
@@ -179,22 +173,16 @@ class Portal:
         return self._key
 
     @property
-    def key_pair(self) -> Optional[tuple]:
-        if (key := self.key) and (key_id := key.get("key")) and (secret := key.get("secret")):
-            return (key_id, secret)
-        return self._key_pair
+    def key_pair(self) -> Optional[Tuple[str, str]]:
+        return (key.get("key"), key.get("secret")) if (key := self.key) else None
 
     @property
     def key_id(self) -> Optional[str]:
-        if (key := self.key) and (key_id := key.get("key")):
-            return key_id
-        return self._key_id
+        return key.get("key") if (key := self.key) else None
 
     @property
     def secret(self) -> Optional[str]:
-        if (key := self.key) and (secret := key.get("secret")):
-            return secret
-        return self._secret
+        return key.get("secret") if (key := self.key) else None
 
     @property
     def keys_file(self) -> Optional[str]:
@@ -206,9 +194,7 @@ class Portal:
 
     @property
     def server(self) -> Optional[str]:
-        if (key := self.key) and key.get("server"):
-            return key.get("server")
-        return self._server
+        return key.get("server") if (key := self.key) and key.get("server") else self._server
 
     @property
     def app(self) -> Optional[str]:
@@ -364,8 +350,8 @@ class Portal:
         return self.server + url if self.server else url
 
     def _kwargs(self, **kwargs) -> dict:
-        result_kwargs = {"headers":
-                         kwargs.get("headers", {"Content-type": "application/json", "Accept": "application/json"})}
+        result_kwargs = {"headers": kwargs.get("headers", {"Content-type": Portal.MIME_TYPE_JSON,
+                                                           "Accept": Portal.MIME_TYPE_JSON})}
         if self.key_pair:
             result_kwargs["auth"] = self.key_pair
         if isinstance(timeout := kwargs.get("timeout"), int):
@@ -443,7 +429,7 @@ class Portal:
             router = pyramid_get_app(arg or "development.ini", "app")
         else:
             raise Exception("Portal._create_vapp argument error.")
-        return TestApp(router, {"HTTP_ACCEPT": "application/json", "REMOTE_USER": "TEST"})
+        return TestApp(router, {"HTTP_ACCEPT": Portal.MIME_TYPE_JSON, "REMOTE_USER": "TEST"})
 
     @staticmethod
     def _create_router_for_testing(endpoints: Optional[List[Dict[str, Union[str, Callable]]]] = None) -> PyramidRouter:
@@ -460,7 +446,8 @@ class Portal:
                     endpoint_method = endpoint.get("method", "GET")
                     def endpoint_wrapper(request):  # noqa
                         response = endpoint_function(request)
-                        return PyramidResponse(json.dumps(response), content_type="application/json; charset=utf-8")
+                        return PyramidResponse(json.dumps(response),
+                                               content_type=f"{Portal.MIME_TYPE_JSON}; charset=utf-8")
                     endpoint_id = str(uuid())
                     config.add_route(endpoint_id, endpoint_path)
                     config.add_view(endpoint_wrapper, route_name=endpoint_id, request_method=endpoint_method)
