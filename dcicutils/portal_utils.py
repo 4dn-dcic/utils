@@ -36,7 +36,7 @@ class Portal:
        will be used, i.e. e.g. if "env" is "smaht-local" and app is unspecified than app is assumed to be "smaht".
     5. From a keys .json file as described above (#4) but rather than be identified by the given "env" value it
        is looked up via the given "server" name and the "server" key dictionary value in the key file.
-    6. From a full path to a keys file .json.
+    6. From a full path to a keys .json file.
     7. From a given "vapp" value; which may be a webtest.app.TestApp,
        or a dcicutils.misc_utils.VirtualApp, or even a pyramid.router.Router.
     8. From another Portal object (i.e. copy constructor).
