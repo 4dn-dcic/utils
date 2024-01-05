@@ -131,7 +131,12 @@ class Portal:
 
         def init_from_env_server_app(env: str, server: str, app: Optional[str],
                                      unspecified: Optional[list] = None) -> None:
-            return init_from_keys_file(self._default_keys_file(app, env), env, server, unspecified)
+            if keys_file := self._default_keys_file(app, env):
+                return init_from_keys_file(keys_file, env, server, unspecified)
+            init(unspecified)
+            self._env = env
+            self._server = server
+            self._app = app
 
         def normalize_server(server: str) -> Optional[str]:
             prefix = ""
@@ -175,14 +180,20 @@ class Portal:
 
     @property
     def key_pair(self) -> Optional[tuple]:
+        if (key := self.key) and (key_id := key.get("key")) and (secret := key.get("secret")):
+            return (key_id, secret)
         return self._key_pair
 
     @property
     def key_id(self) -> Optional[str]:
+        if (key := self.key) and (key_id := key.get("key")):
+            return key_id
         return self._key_id
 
     @property
     def secret(self) -> Optional[str]:
+        if (key := self.key) and (secret := key.get("secret")):
+            return secret
         return self._secret
 
     @property
@@ -195,6 +206,8 @@ class Portal:
 
     @property
     def server(self) -> Optional[str]:
+        if (key := self.key) and key.get("server"):
+            return key.get("server")
         return self._server
 
     @property
