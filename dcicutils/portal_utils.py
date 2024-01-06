@@ -145,6 +145,8 @@ class Portal:
                     server = server[:-1]
                 return prefix + server if server else None
 
+        if app and not Portal._is_valid_app(app):
+            raise Exception(f"Portal init error; invalid app: {app}")
         if isinstance(arg, Portal):
             init_from_portal(arg, unspecified=[env, server, app])
         elif isinstance(arg, (TestApp, VirtualApp, PyramidRouter)):
@@ -343,7 +345,7 @@ class Portal:
     def url(self, url: str) -> str:
         if not isinstance(url, str) or not url:
             return "/"
-        if (lurl := url.lower()).startswith("http://") or lurl.startswith("https://"):
+        if (lowercase_url := url.lower()).startswith("http://") or lowercase_url.startswith("https://"):
             return url
         if not (url := re.sub(r"/+", "/", url)).startswith("/"):
             url = "/"
@@ -359,14 +361,16 @@ class Portal:
         return result_kwargs
 
     def _default_keys_file(self, app: Optional[str], env: Optional[str] = None) -> Optional[str]:
-        def is_valid_app(app: Optional[str]) -> bool:  # noqa
-            return app and app.lower() in [name.lower() for name in ORCHESTRATED_APPS]
         def infer_app_from_env(env: str) -> Optional[str]:  # noqa
-            if isinstance(env, str) and (lenv := env.lower()):
-                if app := [app for app in ORCHESTRATED_APPS if lenv.startswith(app.lower())]:
+            if isinstance(env, str) and (lowercase_env := env.lower()):
+                if app := [app for app in ORCHESTRATED_APPS if lowercase_env.startswith(app.lower())]:
                     return app[0]
-        if is_valid_app(app) or (app := infer_app_from_env(env)):
+        if Portal._is_valid_app(app) or (app := infer_app_from_env(env)):
             return os.path.join(Portal.KEYS_FILE_DIRECTORY, f".{app.lower()}-keys.json")
+
+    @staticmethod
+    def _is_valid_app(app: Optional[str]) -> bool:
+        return isinstance(app, str) and app.lower() in [name.lower() for name in ORCHESTRATED_APPS]
 
     def _response(self, response: TestResponse) -> TestResponse:
         if response and isinstance(getattr(response.__class__, "json"), property):
@@ -388,9 +392,9 @@ class Portal:
     def create_for_testing(arg: Optional[Union[str, bool, List[dict], dict, Callable]] = None) -> Portal:
         if isinstance(arg, list) or isinstance(arg, dict) or isinstance(arg, Callable):
             return Portal(Portal._create_router_for_testing(arg))
-        if isinstance(arg, str) and arg.endswith(".ini"):
+        elif isinstance(arg, str) and arg.endswith(".ini"):
             return Portal(Portal._create_vapp(arg))
-        if arg == "local" or arg is True:
+        elif arg == "local" or arg is True:
             minimal_ini_for_testing = "\n".join([
                 "[app:app]\nuse = egg:encoded\nfile_upload_bucket = dummy",
                 "sqlalchemy.url = postgresql://postgres@localhost:5441/postgres?host=/tmp/snovault/pgdata",
