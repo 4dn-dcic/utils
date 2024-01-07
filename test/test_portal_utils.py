@@ -94,7 +94,7 @@ def test_portal_constructor_b():
         assert portal.key == {"key": "ABCDEFGHI", "secret": "adfxdloiebvhzp", "server": "http://localhost:8080"}
         assert portal.keys_file == keys_file
         assert portal.env == "smaht-local"
-        assert portal.app is "smaht"
+        assert portal.app == "smaht"
         assert portal.vapp is None
         assert portal.ini_file is None
 
