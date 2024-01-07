@@ -164,8 +164,10 @@ class Portal:
         elif (isinstance(env, str) and env) or (isinstance(server, str) and server):
             init_from_env_server_app(env, server, app, unspecified=[arg])
         else:
-            raise Exception("Portal init error; invalid args.")
+            raise Exception("Portal init error; insufficient args.")
         self._app = app
+        if not self.vapp and not self.key:
+            raise Exception("Portal init error; neither key nor vapp defined.")
 
     @property
     def ini_file(self) -> Optional[str]:
@@ -235,6 +237,9 @@ class Portal:
     def post(self, url: str, data: Optional[dict] = None, json: Optional[dict] = None, files: Optional[dict] = None,
              raise_for_status: bool = False, **kwargs) -> OptionalResponse:
         url = self.url(url)
+        if files and not ("headers" in kwargs):
+            # Setting headers to None when using files implies content-type multipart/form-data.
+            kwargs["headers"] = None
         if not self.vapp:
             response = requests.post(url, data=data, json=json, files=files, **self._kwargs(**kwargs))
         else:
@@ -353,8 +358,10 @@ class Portal:
         return self.server + url if self.server else url
 
     def _kwargs(self, **kwargs) -> dict:
-        result_kwargs = {"headers": kwargs.get("headers", {"Content-type": Portal.MIME_TYPE_JSON,
-                                                           "Accept": Portal.MIME_TYPE_JSON})}
+        if "headers" in kwargs:
+            result_kwargs = {"headers": kwargs["headers"]}
+        else:
+            result_kwargs = {"headers": {"Content-type": Portal.MIME_TYPE_JSON, "Accept": Portal.MIME_TYPE_JSON}}
         if self.key_pair:
             result_kwargs["auth"] = self.key_pair
         if isinstance(timeout := kwargs.get("timeout"), int):
