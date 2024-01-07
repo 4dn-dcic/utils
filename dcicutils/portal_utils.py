@@ -367,7 +367,8 @@ class Portal:
                 if app := [app for app in ORCHESTRATED_APPS if lowercase_env.startswith(app.lower())]:
                     return app[0]
         if Portal._is_valid_app(app) or (app := infer_app_from_env(env)):
-            return os.path.join(Portal.KEYS_FILE_DIRECTORY, f".{app.lower()}-keys.json")
+            default_keys_file = os.path.join(Portal.KEYS_FILE_DIRECTORY, f".{app.lower()}-keys.json")
+            return default_keys_file if os.path.exists(default_keys_file) else None
 
     @staticmethod
     def _is_valid_app(app: Optional[str]) -> bool:
