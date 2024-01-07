@@ -145,9 +145,8 @@ class Portal:
                     server = server[:-1]
                 return prefix + server if server else None
 
-        if app and not Portal._is_valid_app(app):
+        if app and not (app := Portal._valid_app(app)):
             raise Exception(f"Portal init error; invalid app: {app}")
-        self._app = app
         if isinstance(arg, Portal):
             init_from_portal(arg, unspecified=[env, server, app])
         elif isinstance(arg, (TestApp, VirtualApp, PyramidRouter)):
@@ -166,6 +165,7 @@ class Portal:
             init_from_env_server_app(env, server, app, unspecified=[arg])
         else:
             raise Exception("Portal init error; invalid args.")
+        self._app = app
 
     @property
     def ini_file(self) -> Optional[str]:
@@ -366,13 +366,16 @@ class Portal:
             if isinstance(env, str) and (lowercase_env := env.lower()):
                 if app := [app for app in ORCHESTRATED_APPS if lowercase_env.startswith(app.lower())]:
                     return app[0]
-        if Portal._is_valid_app(app) or (app := infer_app_from_env(env)):
-            default_keys_file = os.path.join(Portal.KEYS_FILE_DIRECTORY, f".{app.lower()}-keys.json")
-            return default_keys_file if os.path.exists(default_keys_file) else None
+        if (app := Portal._valid_app(app)) or (app := infer_app_from_env(env)):
+            keys_file = os.path.expanduser(os.path.join(Portal.KEYS_FILE_DIRECTORY, f".{app.lower()}-keys.json"))
+            return keys_file if os.path.exists(keys_file) else None
 
     @staticmethod
-    def _is_valid_app(app: Optional[str]) -> bool:
-        return isinstance(app, str) and app.lower() in [name.lower() for name in ORCHESTRATED_APPS]
+    def _valid_app(app: Optional[str]) -> Optional[str]:
+        if isinstance(app, str) and (app_lowercase := app.lower()):
+            for value in ORCHESTRATED_APPS:
+                if value.lower() == app_lowercase:
+                    return value
 
     def _response(self, response: TestResponse) -> TestResponse:
         if response and isinstance(getattr(response.__class__, "json"), property):
