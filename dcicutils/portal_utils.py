@@ -63,7 +63,7 @@ class Portal:
                     raise Exception("Portal init error; extraneous args.")
 
         def init_from_portal(portal: Portal, unspecified: Optional[list] = None) -> None:
-            init(unspecified)
+            init(unspecified=unspecified)
             self._ini_file = portal._ini_file
             self._key = portal._key
             self._keys_file = portal._keys_file
@@ -73,16 +73,16 @@ class Portal:
             self._vapp = portal._vapp
 
         def init_from_vapp(vapp: Union[TestApp, VirtualApp, PyramidRouter], unspecified: Optional[list] = []) -> None:
-            init(unspecified)
+            init(unspecified=unspecified)
             self._vapp = Portal._create_vapp(vapp)
 
         def init_from_ini_file(ini_file: str, unspecified: Optional[list] = []) -> None:
-            init(unspecified)
+            init(unspecified=unspecified)
             self._ini_file = ini_file
             self._vapp = Portal._create_vapp(ini_file)
 
         def init_from_key(key: dict, server: Optional[str], unspecified: Optional[list] = []) -> None:
-            init(unspecified)
+            init(unspecified=unspecified)
             if (isinstance(key_id := key.get("key"), str) and key_id and
                 isinstance(secret := key.get("secret"), str) and secret):  # noqa
                 self._key = {"key": key_id, "secret": secret}
@@ -97,7 +97,7 @@ class Portal:
 
         def init_from_key_pair(key_pair: tuple, server: Optional[str], unspecified: Optional[list] = []) -> None:
             if len(key_pair) == 2:
-                init_from_key({"key": key_pair[0], "secret": key_pair[1]}, server, unspecified)
+                init_from_key({"key": key_pair[0], "secret": key_pair[1]}, server, unspecified=unspecified)
             else:
                 raise Exception("Portal init error; from key-pair.")
 
@@ -126,11 +126,11 @@ class Portal:
         def init_from_env_server_app(env: str, server: str, app: Optional[str],
                                      unspecified: Optional[list] = None) -> None:
             if keys_file := self._default_keys_file(app, env):
-                return init_from_keys_file(keys_file, env, server, unspecified)
-            init(unspecified)
-            self._env = env
-            self._server = server
-            self._app = app
+                init_from_keys_file(keys_file, env, server, unspecified=unspecified)
+            else:
+                init(unspecified=unspecified)
+                self._env = env
+                self._server = server
 
         def normalize_server(server: str) -> Optional[str]:
             prefix = ""
@@ -147,18 +147,19 @@ class Portal:
 
         if app and not Portal._is_valid_app(app):
             raise Exception(f"Portal init error; invalid app: {app}")
+        self._app = app
         if isinstance(arg, Portal):
             init_from_portal(arg, unspecified=[env, server, app])
         elif isinstance(arg, (TestApp, VirtualApp, PyramidRouter)):
             init_from_vapp(arg, unspecified=[env, server, app])
         elif isinstance(arg, str) and arg.endswith(".ini"):
-            init_from_ini_file(arg, unspecified=[env, server, app])
+            init_from_ini_file(arg, unspecified=[env, server])
         elif isinstance(arg, dict):
-            init_from_key(arg, server, unspecified=[env, app])
+            init_from_key(arg, server, unspecified=[env])
         elif isinstance(arg, tuple):
-            init_from_key_pair(arg, server, unspecified=[env, app])
+            init_from_key_pair(arg, server, unspecified=[env])
         elif isinstance(arg, str) and arg.endswith(".json"):
-            init_from_keys_file(arg, env, server, unspecified=[app])
+            init_from_keys_file(arg, env, server)
         elif isinstance(arg, str) and arg:
             init_from_env_server_app(arg, server, app, unspecified=[env])
         elif (isinstance(env, str) and env) or (isinstance(server, str) and server):
