@@ -48,7 +48,8 @@ class Portal:
     def __init__(self,
                  arg: Optional[Union[Portal, TestApp, VirtualApp, PyramidRouter, dict, tuple, str]] = None,
                  env: Optional[str] = None, server: Optional[str] = None,
-                 app: Optional[OrchestratedApp] = None) -> None:
+                 app: Optional[OrchestratedApp] = None,
+                 raise_exception: bool = True) -> None:
 
         def init(unspecified: Optional[list] = []) -> None:
             self._ini_file = None
@@ -56,7 +57,6 @@ class Portal:
             self._keys_file = None
             self._env = None
             self._server = None
-            self._app = None
             self._vapp = None
             for arg in unspecified:
                 if arg is not None:
@@ -96,7 +96,7 @@ class Portal:
                 raise Exception("Portal init error; from key.")
 
         def init_from_key_pair(key_pair: tuple, server: Optional[str], unspecified: Optional[list] = []) -> None:
-            if len(key_pair) == 2:
+            if len(key_pair) >= 2:
                 init_from_key({"key": key_pair[0], "secret": key_pair[1]}, server, unspecified=unspecified)
             else:
                 raise Exception("Portal init error; from key-pair.")
@@ -147,6 +147,7 @@ class Portal:
 
         if app and not (app := Portal._valid_app(app)):
             raise Exception(f"Portal init error; invalid app: {app}")
+        self._app = app
         if isinstance(arg, Portal):
             init_from_portal(arg, unspecified=[env, server, app])
         elif isinstance(arg, (TestApp, VirtualApp, PyramidRouter)):
@@ -163,10 +164,9 @@ class Portal:
             init_from_env_server_app(arg, server, app, unspecified=[env])
         elif (isinstance(env, str) and env) or (isinstance(server, str) and server):
             init_from_env_server_app(env, server, app, unspecified=[arg])
-        else:
+        elif raise_exception:
             raise Exception("Portal init error; insufficient args.")
-        self._app = app
-        if not self.vapp and not self.key:
+        if not self.vapp and not self.key and raise_exception:
             raise Exception("Portal init error; neither key nor vapp defined.")
 
     @property
@@ -372,7 +372,7 @@ class Portal:
         def infer_app_from_env(env: str) -> Optional[str]:  # noqa
             if isinstance(env, str) and (lowercase_env := env.lower()):
                 if app := [app for app in ORCHESTRATED_APPS if lowercase_env.startswith(app.lower())]:
-                    return app[0]
+                    return self._valid_app(app[0])
         if (app := Portal._valid_app(app)) or (app := infer_app_from_env(env)):
             keys_file = os.path.expanduser(os.path.join(Portal.KEYS_FILE_DIRECTORY, f".{app.lower()}-keys.json"))
             return keys_file if os.path.exists(keys_file) else None
