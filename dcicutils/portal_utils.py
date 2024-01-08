@@ -287,12 +287,12 @@ class Portal:
     def schema_name(name: str) -> str:
         return to_camel_case(name.replace(" ", "") if not name.endswith(".json") else name[:-5])
 
-    def is_schema(self, schema_name_or_object: Union[str, dict], target_schema_name: str,
-                  _schemas_super_type_map: Optional[list] = None) -> bool:
+    def is_schema_type(self, schema_name_or_object: Union[str, dict], target_schema_name: str,
+                       _schemas_super_type_map: Optional[list] = None) -> bool:
         """
         If the given (first) schema_name_or_object argument is a string then returns True iff the
-        given schema (type) name isa type of the given target schema (type) name, i.e. is the
-        given schema type is the given target schema type or has an ancestor which is that type.
+        given schema (type) name isa type of the given target schema (type) name, i.e. the given
+        schema type is the given target schema type or has an ancestor which is that type.
         If the given (first) schema_name_or_object argument is a dictionary then
         returns True iff this object value isa type of the given target schema type.
         """
@@ -326,9 +326,12 @@ class Portal:
             if value_types:
                 schemas_super_type_map = self.get_schemas_super_type_map()
                 for value_type in value_types:
-                    if self.is_schema(value_type, target_schema_name, schemas_super_type_map):
+                    if self.is_schema_type(value_type, target_schema_name, schemas_super_type_map):
                         return True
         return False
+
+    def get_schema_type(self, value: dict) -> Optional[str]:
+        return value.get("@type", value.get("data_type")) if isinstance(value, dict) else None
 
     @lru_cache(maxsize=1)
     def get_schemas_super_type_map(self) -> dict:

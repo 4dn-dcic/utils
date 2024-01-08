@@ -148,13 +148,13 @@ def test_portal_schemas_super_type_map():
 
         portal = Portal(raise_exception=False)
 
-        assert portal.is_schema("UnalignedReads", "UnalignedReads") is True
-        assert portal.is_schema("UnalignedReads", "unalignedreads") is True
-        assert portal.is_schema("UnalignedReads", "unaligned_reads") is True
-        assert portal.is_schema("UnalignedReads", "SubmittedFile") is True
-        assert portal.is_schema("UnalignedReads", "SUBMITTEDfILE") is True
-        assert portal.is_schema("UnalignedReads", "File") is True
-        assert portal.is_schema("UnalignedReads", "file") is True
+        assert portal.is_schema_type("UnalignedReads", "UnalignedReads") is True
+        assert portal.is_schema_type("UnalignedReads", "unalignedreads") is True
+        assert portal.is_schema_type("UnalignedReads", "unaligned_reads") is True
+        assert portal.is_schema_type("UnalignedReads", "SubmittedFile") is True
+        assert portal.is_schema_type("UnalignedReads", "SUBMITTEDfILE") is True
+        assert portal.is_schema_type("UnalignedReads", "File") is True
+        assert portal.is_schema_type("UnalignedReads", "file") is True
 
         assert portal.isinstance_schema({"@type": "UnalignedReads"}, "UnalignedReads") is True
         assert portal.isinstance_schema({"@type": "UnalignedReads"}, "UNALIGNEDREADS") is True
@@ -166,12 +166,12 @@ def test_portal_schemas_super_type_map():
         assert portal.isinstance_schema({"@type": "SubmittedFile"}, "File") is True
         assert portal.isinstance_schema({"@type": "foo", "data_type": "UnalignedReads"}, "UnalignedReads") is True
 
-        assert portal.is_schema({"@type": "UnalignedReads"}, "UnalignedReads") is True
-        assert portal.is_schema({"@type": "UnalignedReads"}, "UNALIGNEDREADS") is True
-        assert portal.is_schema({"@type": "UnalignedReads"}, "Unaligned_Reads") is True
-        assert portal.is_schema({"@type": "UnalignedReads"}, "SubmittedFile") is True
-        assert portal.is_schema({"@type": "UnalignedReads"}, "SUBMITTEDFILE") is True
-        assert portal.is_schema({"@type": "UnalignedReads"}, "SUBMITTED_FILE") is True
-        assert portal.is_schema({"@type": "SubmittedFile"}, "SUBMITTED_FILE") is True
-        assert portal.is_schema({"@type": "SubmittedFile"}, "File") is True
-        assert portal.is_schema({"@type": "foo", "data_type": "UnalignedReads"}, "UnalignedReads") is True
+        assert portal.is_schema_type({"@type": "UnalignedReads"}, "UnalignedReads") is True
+        assert portal.is_schema_type({"@type": "UnalignedReads"}, "UNALIGNEDREADS") is True
+        assert portal.is_schema_type({"@type": "UnalignedReads"}, "Unaligned_Reads") is True
+        assert portal.is_schema_type({"@type": "UnalignedReads"}, "SubmittedFile") is True
+        assert portal.is_schema_type({"@type": "UnalignedReads"}, "SUBMITTEDFILE") is True
+        assert portal.is_schema_type({"@type": "UnalignedReads"}, "SUBMITTED_FILE") is True
+        assert portal.is_schema_type({"@type": "SubmittedFile"}, "SUBMITTED_FILE") is True
+        assert portal.is_schema_type({"@type": "SubmittedFile"}, "File") is True
+        assert portal.is_schema_type({"@type": "foo", "data_type": "UnalignedReads"}, "UnalignedReads") is True

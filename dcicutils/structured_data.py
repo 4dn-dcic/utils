@@ -595,7 +595,7 @@ class Portal(PortalBase):
         """
         Returns True iff the given schema name isa File type, i.e. has an ancestor which is of type File.
         """
-        return self.is_schema(schema_name, FILE_SCHEMA_NAME)
+        return self.is_schema_type(schema_name, FILE_SCHEMA_NAME)
 
     def ref_exists(self, type_name: str, value: str) -> List[str]:
         resolved = []
