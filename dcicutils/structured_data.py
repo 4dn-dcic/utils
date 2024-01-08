@@ -31,6 +31,7 @@ ARRAY_VALUE_DELIMITER_ESCAPE_CHAR = "\\"
 ARRAY_NAME_SUFFIX_CHAR = "#"
 ARRAY_NAME_SUFFIX_REGEX = re.compile(rf"{ARRAY_NAME_SUFFIX_CHAR}\d+")
 DOTTED_NAME_DELIMITER_CHAR = "."
+FILE_SCHEMA_NAME = "File"
 FILE_SCHEMA_NAME_PROPERTY = "filename"
 
 # Forward type references for type hints.
@@ -590,9 +591,11 @@ class Portal(PortalBase):
                     schemas[user_specified_schema["title"]] = user_specified_schema
         return schemas
 
-    @lru_cache(maxsize=1)
-    def get_schemas_super_type_map(self) -> dict:
-        return super().get_schemas_super_type_map()
+    def is_file_schema(self, schema_name: str) -> bool:
+        """
+        Returns True iff the given schema name isa File type, i.e. has an ancestor which is of type File.
+        """
+        return self.is_schema(schema_name, FILE_SCHEMA_NAME)
 
     def ref_exists(self, type_name: str, value: str) -> List[str]:
         resolved = []

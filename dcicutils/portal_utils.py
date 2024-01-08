@@ -1,4 +1,5 @@
 from collections import deque
+from functools import lru_cache
 import io
 import json
 from pyramid.config import Configurator as PyramidConfigurator
@@ -41,7 +42,6 @@ class Portal:
        or a dcicutils.misc_utils.VirtualApp, or even a pyramid.router.Router.
     8. From another Portal object (i.e. copy constructor).
     """
-    FILE_SCHEMA_NAME = "File"
     KEYS_FILE_DIRECTORY = "~"
     MIME_TYPE_JSON = "application/json"
 
@@ -166,6 +166,8 @@ class Portal:
             init_from_env_server_app(env, server, app, unspecified=[arg])
         elif raise_exception:
             raise Exception("Portal init error; insufficient args.")
+        else:
+            init()
         if not self.vapp and not self.key and raise_exception:
             raise Exception("Portal init error; neither key nor vapp defined.")
 
@@ -277,6 +279,7 @@ class Portal:
     def get_schema(self, schema_name: str) -> Optional[dict]:
         return get_schema(self.schema_name(schema_name), portal_vapp=self.vapp, key=self.key)
 
+    @lru_cache(maxsize=1)
     def get_schemas(self) -> dict:
         return self.get("/profiles/").json()
 
@@ -284,39 +287,50 @@ class Portal:
     def schema_name(name: str) -> str:
         return to_camel_case(name.replace(" ", "") if not name.endswith(".json") else name[:-5])
 
-    def is_schema_type(self, value: dict, schema_type: str) -> bool:
+    def is_schema(self, schema_name_or_object: Union[str, dict], target_schema_name: str,
+                  _schemas_super_type_map: Optional[list] = None) -> bool:
+        """
+        If the given (first) schema_name_or_object argument is a string then returns True iff the
+        given schema (type) name isa type of the given target schema (type) name, i.e. is the
+        given schema type is the given target schema type or has an ancestor which is that type.
+        If the given (first) schema_name_or_object argument is a dictionary then
+        returns True iff this object value isa type of the given target schema type.
+        """
+        if isinstance(schema_name_or_object, dict):
+            return self.isinstance_schema(schema_name_or_object, target_schema_name)
+        schema_name = self.schema_name(schema_name_or_object).lower()
+        target_schema_name = self.schema_name(target_schema_name).lower()
+        if schema_name == target_schema_name:
+            return True
+        if super_type_map := (_schemas_super_type_map or self.get_schemas_super_type_map()):
+            for super_type in super_type_map:
+                if super_type.lower() == target_schema_name:
+                    for value in super_type_map[super_type]:
+                        if value.lower() == schema_name:
+                            return True
+        return False
+
+    def isinstance_schema(self, value: dict, target_schema_name: str) -> bool:
         """
         Returns True iff the given object isa type of the given schema type.
         """
-        if isinstance(value, dict) and (value_types := value.get("@type")):
-            if isinstance(value_types, str):
-                return self.is_specified_schema(value_types, schema_type)
-            elif isinstance(value_types, list):
+        if isinstance(value, dict):
+            if isinstance(value_types := value.get("@type"), str):
+                value_types = [value_types]
+            else:
+                value_types = []
+            if isinstance(data_type := value.get("data_type"), list):
+                value_types.extend(data_type)
+            elif isinstance(data_type, str):
+                value_types.append(data_type)
+            if value_types:
+                schemas_super_type_map = self.get_schemas_super_type_map()
                 for value_type in value_types:
-                    if self.is_specified_schema(value_type, schema_type):
+                    if self.is_schema(value_type, target_schema_name, schemas_super_type_map):
                         return True
         return False
 
-    def is_specified_schema(self, schema_name: str, schema_type: str) -> bool:
-        """
-        Returns True iff the given schema name isa type of the given schema type name,
-        i.e. has an ancestor which is of type that given type.
-        """
-        schema_name = self.schema_name(schema_name)
-        schema_type = self.schema_name(schema_type)
-        if schema_name == schema_type:
-            return True
-        if super_type_map := self.get_schemas_super_type_map():
-            if super_type := super_type_map.get(schema_type):
-                return self.schema_name(schema_name) in super_type
-        return False
-
-    def is_file_schema(self, schema_name: str) -> bool:
-        """
-        Returns True iff the given schema name isa File type, i.e. has an ancestor which is of type File.
-        """
-        return self.is_specified_schema(schema_name, Portal.FILE_SCHEMA_NAME)
-
+    @lru_cache(maxsize=1)
     def get_schemas_super_type_map(self) -> dict:
         """
         Returns the "super type map" for all of the known schemas (via /profiles).
