@@ -331,7 +331,10 @@ class Portal:
         return False
 
     def get_schema_type(self, value: dict) -> Optional[str]:
-        return value.get("@type", value.get("data_type")) if isinstance(value, dict) else None
+        value_type = value.get("@type", value.get("data_type")) if isinstance(value, dict) else None
+        if isinstance(value_type, list):
+            value_type = value_type[0] if value_type else None
+        return value_type
 
     @lru_cache(maxsize=1)
     def get_schemas_super_type_map(self) -> dict:
@@ -353,13 +356,14 @@ class Portal:
             return {}
         super_type_map = {}
         for type_name in schemas:
-            if super_type_name := schemas[type_name].get("rdfs:subClassOf"):
-                super_type_name = super_type_name.replace("/profiles/", "").replace(".json", "")
-                if super_type_name != "Item":
-                    if not super_type_map.get(super_type_name):
-                        super_type_map[super_type_name] = [type_name]
-                    elif type_name not in super_type_map[super_type_name]:
-                        super_type_map[super_type_name].append(type_name)
+            if isinstance(schema_type := schemas[type_name], dict):
+                if super_type_name := schema_type.get("rdfs:subClassOf"):
+                    super_type_name = super_type_name.replace("/profiles/", "").replace(".json", "")
+                    if super_type_name != "Item":
+                        if not super_type_map.get(super_type_name):
+                            super_type_map[super_type_name] = [type_name]
+                        elif type_name not in super_type_map[super_type_name]:
+                            super_type_map[super_type_name].append(type_name)
         super_type_map_flattened = {}
         for super_type_name in super_type_map:
             super_type_map_flattened[super_type_name] = list_breadth_first(super_type_map, super_type_name)
