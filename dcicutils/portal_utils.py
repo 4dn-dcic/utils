@@ -317,7 +317,7 @@ class Portal:
         if isinstance(value, dict):
             if isinstance(value_types := value.get("@type"), str):
                 value_types = [value_types]
-            else:
+            elif not isinstance(value_types, list):
                 value_types = []
             if isinstance(data_type := value.get("data_type"), list):
                 value_types.extend(data_type)
