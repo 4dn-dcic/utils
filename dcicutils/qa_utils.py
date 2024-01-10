@@ -25,7 +25,7 @@ from botocore.credentials import Credentials as Boto3Credentials
 from botocore.exceptions import ClientError
 from collections import defaultdict
 from json import dumps as json_dumps, loads as json_loads
-from typing import Any, Optional, List, DefaultDict, Union, Type, Dict
+from typing import Any, Optional, List, DefaultDict, Union, Type, Dict, Callable
 from typing_extensions import Literal
 from unittest import mock
 from . import misc_utils as misc_utils_module, command_utils as command_utils_module
@@ -46,6 +46,31 @@ from .qa_checkers import QA_EXCEPTION_PATTERN, find_uses, confirm_no_uses, Versi
 # Using these names via qa_utils is deprecated. Their proper, supported home is now in qa_checkers.
 # Please rewrite imports to get them from qa_checkers, not qa_utils. -kmp 21-Sep-2022
 exported(QA_EXCEPTION_PATTERN, find_uses, confirm_no_uses, VersionChecker, ChangeLogChecker)
+
+
+def generate_yield_mock(object_base: object, prop_name: str, replacement: Any) -> Callable:
+    @contextlib.contextmanager
+    def mocker():
+        with mock.patch.object(object_base, prop_name, replacement):
+            yield
+    return mocker
+
+
+@contextlib.contextmanager
+def conditional_mock(conditional_mocks: List):
+    """ This function is intended to process a list of conditional mocks and apply them if the condition is met.
+        When combined with the above generic function, you are able to pass a list of condition, mock pairs where
+        the mocker will only be executed if the condition evaluated to True ie:
+
+        conditional_mocks = [True, generate_yield_mock(sample_object, sample_prop, sample_replacement)]
+            will result in sample_object.sample_prop being mocked out to sample_replacement
+    """
+
+    with contextlib.ExitStack() as stack:
+        for condition, context_manager in conditional_mocks:
+            if condition:
+                stack.enter_context(context_manager(condition))
+        yield
 
 
 def show_elapsed_time(start, end):
