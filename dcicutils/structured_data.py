@@ -553,8 +553,9 @@ class Portal(PortalBase):
                  arg: Optional[Union[VirtualApp, TestApp, Router, Portal, dict, tuple, str]] = None,
                  env: Optional[str] = None, server: Optional[str] = None,
                  app: Optional[OrchestratedApp] = None,
-                 data: Optional[dict] = None, schemas: Optional[List[dict]] = None) -> None:
-        super().__init__(arg, env=env, server=server, app=app)
+                 data: Optional[dict] = None, schemas: Optional[List[dict]] = None,
+                 raise_exception: bool = True) -> None:
+        super().__init__(arg, env=env, server=server, app=app, raise_exception=raise_exception)
         if isinstance(arg, Portal):
             self._schemas = schemas if schemas is not None else arg._schemas  # Explicitly specified/known schemas.
             self._data = data if data is not None else arg._data  # Data set being loaded; e.g. by StructuredDataSet.
