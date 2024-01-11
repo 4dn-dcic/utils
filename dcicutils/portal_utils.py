@@ -298,6 +298,8 @@ class Portal:
         """
         if isinstance(schema_name_or_object, dict):
             return self.isinstance_schema(schema_name_or_object, target_schema_name)
+        elif not isinstance(schema_name_or_object, str) or not schema_name_or_object:
+            return False
         schema_name = self.schema_name(schema_name_or_object).lower()
         target_schema_name = self.schema_name(target_schema_name).lower()
         if schema_name == target_schema_name:
