@@ -145,7 +145,7 @@ class Portal:
                     server = server[:-1]
                 return prefix + server if server else None
 
-        if app and not (valid_app := Portal._valid_app(app)):
+        if (valid_app := app) and not (valid_app := Portal._valid_app(app)):
             raise Exception(f"Portal init error; invalid app: {app}")
         self._app = valid_app
         if isinstance(arg, Portal):
