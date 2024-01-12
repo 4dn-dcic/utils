@@ -69,8 +69,8 @@ class Portal:
             self._keys_file = portal._keys_file
             self._env = portal._env
             self._server = portal._server
-            self._app = portal._app
             self._vapp = portal._vapp
+            self._app = portal._app
 
         def init_from_vapp(vapp: Union[TestApp, VirtualApp, PyramidRouter], unspecified: Optional[list] = []) -> None:
             init(unspecified=unspecified)
@@ -343,8 +343,8 @@ class Portal:
         """
         Returns the "super type map" for all of the known schemas (via /profiles).
         This is a dictionary with property names which are all known schema type names which
-        have (one or more) sub-types, and the value each such property name is an array of
-        all of those sub-types (direct and all descendents), in breadth first order.
+        have (one or more) sub-types, and the value of each such property name is an array
+        of all of those sub-types (direct and all descendents), in breadth first order.
         """
         def list_breadth_first(super_type_map: dict, super_type_name: str) -> dict:
             result = []
