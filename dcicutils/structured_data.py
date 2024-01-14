@@ -602,12 +602,22 @@ class Portal(PortalBase):
         resolved = []
         if self._ref_exists_single(type_name, value):
             resolved.append(type_name)
+            # TODO: Added this return on 2024-01-14 (dmichaels).
+            # Why did I orginally check for multiple existing values?
+            # Why not just return right away if I find that the ref exists?
+            # Getting multiple values because, for example, we find
+            # both this /Sample/UW_CELL-CULTURE-SAMPLE_COLO-829BL_HI-C_1
+            # and /CellSample/UW_CELL-CULTURE-SAMPLE_COLO-829BL_HI-C_1
+            # Why does that matter at all? Same thing.
+            return resolved
         # Check for the given ref in all sub-types of the given type.
         if (schemas_super_type_map := self.get_schemas_super_type_map()):
             if (sub_type_names := schemas_super_type_map.get(type_name)):
                 for sub_type_name in sub_type_names:
                     if self._ref_exists_single(sub_type_name, value):
                         resolved.append(type_name)
+                        # TODO: Added this return on 2024-01-14 (dmichaels). See above TODO.
+                        return resolved
         return resolved
 
     def _ref_exists_single(self, type_name: str, value: str) -> bool:
