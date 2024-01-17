@@ -211,8 +211,9 @@ class Portal:
     def vapp(self) -> Optional[TestApp]:
         return self._vapp
 
-    def get(self, url: str, follow: bool = True, raise_for_status: bool = False, **kwargs) -> OptionalResponse:
-        url = self.url(url)
+    def get(self, url: str, follow: bool = True,
+            raw: bool = False, database: bool = False, raise_for_status: bool = False, **kwargs) -> OptionalResponse:
+        url = self.url(url, raw, database)
         if not self.vapp:
             response = requests.get(url, allow_redirects=follow, **self._kwargs(**kwargs))
         else:
@@ -254,8 +255,14 @@ class Portal:
             response.raise_for_status()
         return response
 
-    def get_metadata(self, object_id: str) -> Optional[dict]:
-        return get_metadata(obj_id=object_id, vapp=self.vapp, key=self.key)
+    def get_metadata(self, object_id: str, raw: bool = False, database: bool = False) -> Optional[dict]:
+        if isinstance(raw, bool) and raw:
+            add_on = "frame=raw" + ("&datastore=database" if isinstance(database, bool) and database else "")
+        elif database:
+            add_on = "datastore=database"
+        else:
+            add_on = ""
+        return get_metadata(obj_id=object_id, vapp=self.vapp, key=self.key, add_on=add_on)
 
     def patch_metadata(self, object_id: str, data: str) -> Optional[dict]:
         if self.key:
@@ -371,14 +378,19 @@ class Portal:
             super_type_map_flattened[super_type_name] = list_breadth_first(super_type_map, super_type_name)
         return super_type_map_flattened
 
-    def url(self, url: str) -> str:
+    def url(self, url: str, raw: bool = False, database: bool = False) -> str:
         if not isinstance(url, str) or not url:
             return "/"
-        if (lowercase_url := url.lower()).startswith("http://") or lowercase_url.startswith("https://"):
+        elif (lowercase_url := url.lower()).startswith("http://") or lowercase_url.startswith("https://"):
             return url
-        if not (url := re.sub(r"/+", "/", url)).startswith("/"):
+        elif not (url := re.sub(r"/+", "/", url)).startswith("/"):
             url = "/"
-        return self.server + url if self.server else url
+        url = self.server + url if self.server else url
+        if isinstance(raw, bool) and raw:
+            url += ("&" if "?" in url else "?") + "frame=raw"
+        if isinstance(database, bool) and database:
+            url += ("&" if "?" in url else "?") + "datastore=database"
+        return url
 
     def _kwargs(self, **kwargs) -> dict:
         if "headers" in kwargs:
