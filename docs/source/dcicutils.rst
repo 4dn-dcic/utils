@@ -253,6 +253,13 @@ portal_utils
    :members:
 
 
+portal_object_utils
+^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.portal_object_utils
+   :members:
+
+
 project_utils
 ^^^^^^^^^^^^^
 
