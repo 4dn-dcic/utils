@@ -1,5 +1,6 @@
 import copy
 from functools import lru_cache
+import glob
 import json
 from jsonschema import Draft7Validator as SchemaValidator
 import os
@@ -110,6 +111,14 @@ class StructuredDataSet:
                         if (file_name := item.get(FILE_SCHEMA_NAME_PROPERTY)):
                             result.append({"type": type_name, "file": file_name})
         return result
+
+    def upload_files_located(self,
+                             location: Union[str, Optional[List[str]]] = None, recursive: bool = False) -> List[str]:
+        upload_files = copy.deepcopy(self.upload_files)
+        for upload_file in upload_files:
+            if file_path := _search_for_file(upload_file["file"], location=location, recursive=recursive):
+                upload_file["path"] = file_path
+        return upload_files
 
     def _load_file(self, file: str) -> None:
         # Returns a dictionary where each property is the name (i.e. the type) of the data,
@@ -641,3 +650,23 @@ def _split_dotted_string(value: str):
 
 def _split_array_string(value: str, unique: bool = False):
     return split_string(value, ARRAY_VALUE_DELIMITER_CHAR, ARRAY_VALUE_DELIMITER_ESCAPE_CHAR, unique=unique)
+
+
+def _search_for_file(file: str,
+                     location: Union[str, Optional[List[str]]] = None, recursive: bool = False) -> Optional[str]:
+    if isinstance(file, str) or not file:
+        if not location:
+            location = "."
+        if location:
+            if isinstance(location, str):
+                location = [location]
+            if isinstance(location, list):
+                for directory in location:
+                    if isinstance(directory, str) and os.path.exists(os.path.join(directory, file)):
+                        return os.path.normpath(os.path.join(directory, file))
+        if recursive:
+            if not file.startswith("**/"):
+                file = "**/" + file
+            files = glob.glob(file, recursive=recursive)
+            if files:
+                return files[0]
