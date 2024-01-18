@@ -35,6 +35,15 @@ class PortalObject:
 
     @property
     @lru_cache(maxsize=1)
+    def uuid(self) -> Optional[str]:
+        return PortalObject.get_uuid(self._object)
+
+    @staticmethod
+    def get_uuid(portal_object: dict) -> Optional[str]:
+        return portal_object.get("uuid") if isinstance(portal_object, dict) else None
+
+    @property
+    @lru_cache(maxsize=1)
     def identifying_properties(self) -> List[str]:
         """
         Returns the list of all identifying property names of this Portal object which actually have values.
@@ -89,16 +98,17 @@ class PortalObject:
         if identifying_paths := self.identifying_paths:
             return identifying_paths[0]
 
-    def lookup(self, include_identifying_path: bool = False) -> Optional[Union[Tuple[dict, str], dict]]:
-        return self._lookup() if include_identifying_path else self._lookup()[0]
+    def lookup(self, include_identifying_path: bool = False,
+               raw: bool = False) -> Optional[Union[Tuple[dict, str], dict]]:
+        return self._lookup(raw=raw) if include_identifying_path else self._lookup(raw=raw)[0]
 
     def lookup_identifying_path(self) -> Optional[str]:
         return self._lookup()[1]
 
-    def _lookup(self) -> Tuple[Optional[dict], Optional[str]]:
+    def _lookup(self, raw: bool = False) -> Tuple[Optional[dict], Optional[str]]:
         try:
             for identifying_path in self.identifying_paths:
-                if (value := self._portal.get(identifying_path)) and (value.status_code == 200):
+                if (value := self._portal.get(identifying_path, raw=raw)) and (value.status_code == 200):
                     return value.json(), identifying_path
         except Exception:
             pass
