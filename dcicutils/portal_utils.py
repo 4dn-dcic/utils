@@ -294,20 +294,20 @@ class Portal:
     def schema_name(name: str) -> str:
         return to_camel_case(name.replace(" ", "") if not name.endswith(".json") else name[:-5])
 
-    def is_schema_type(self, schema_name_or_object: Union[str, dict], target_schema_name: str,
+    def is_schema_type(self, schema_name_or_portal_object: Union[str, dict], target_schema_name: str,
                        _schemas_super_type_map: Optional[list] = None) -> bool:
         """
-        If the given (first) schema_name_or_object argument is a string then returns True iff the
-        given schema (type) name isa type of the given target schema (type) name, i.e. the given
+        If the given (first) schema_name_or_portal_object argument is a string then returns True iff
+        the given schema (type) name isa type of the given target schema (type) name, i.e. the given
         schema type is the given target schema type or has an ancestor which is that type.
-        If the given (first) schema_name_or_object argument is a dictionary then
+        If the given (first) schema_name_or_portal_object argument is a dictionary then
         returns True iff this object value isa type of the given target schema type.
         """
-        if isinstance(schema_name_or_object, dict):
-            return self.isinstance_schema(schema_name_or_object, target_schema_name)
-        elif not isinstance(schema_name_or_object, str) or not schema_name_or_object:
+        if isinstance(schema_name_or_portal_object, dict):
+            return self.isinstance_schema(schema_name_or_portal_object, target_schema_name)
+        elif not isinstance(schema_name_or_portal_object, str) or not schema_name_or_portal_object:
             return False
-        schema_name = self.schema_name(schema_name_or_object).lower()
+        schema_name = self.schema_name(schema_name_or_portal_object).lower()
         target_schema_name = self.schema_name(target_schema_name).lower()
         if schema_name == target_schema_name:
             return True
@@ -319,31 +319,34 @@ class Portal:
                             return True
         return False
 
-    def isinstance_schema(self, value: dict, target_schema_name: str) -> bool:
+    def isinstance_schema(self, portal_object: dict, target_schema_name: str) -> bool:
         """
         Returns True iff the given object isa type of the given schema type.
         """
-        if isinstance(value, dict):
-            if isinstance(value_types := value.get("@type"), str):
-                value_types = [value_types]
+        if value_types := self.get_schema_types(portal_object):
+            schemas_super_type_map = self.get_schemas_super_type_map()
+            for value_type in value_types:
+                if self.is_schema_type(value_type, target_schema_name, schemas_super_type_map):
+                    return True
+        return False
+
+    @staticmethod
+    def get_schema_types(portal_object: dict) -> Optional[List[str]]:
+        if isinstance(portal_object, dict):
+            if isinstance(value_types := portal_object.get("@type"), str):
+                value_types = [value_types] if value_types else []
             elif not isinstance(value_types, list):
                 value_types = []
-            if isinstance(data_type := value.get("data_type"), list):
+            if isinstance(data_type := portal_object.get("data_type"), list):
                 value_types.extend(data_type)
             elif isinstance(data_type, str):
                 value_types.append(data_type)
-            if value_types:
-                schemas_super_type_map = self.get_schemas_super_type_map()
-                for value_type in value_types:
-                    if self.is_schema_type(value_type, target_schema_name, schemas_super_type_map):
-                        return True
-        return False
+            return value_types if value_types else None
 
-    def get_schema_type(self, value: dict) -> Optional[str]:
-        value_type = value.get("@type", value.get("data_type")) if isinstance(value, dict) else None
-        if isinstance(value_type, list):
-            value_type = value_type[0] if value_type else None
-        return value_type
+    @staticmethod
+    def get_schema_type(portal_object: dict) -> Optional[str]:
+        if value_types := Portal.get_schema_types(portal_object):
+            return value_types[0]
 
     @lru_cache(maxsize=1)
     def get_schemas_super_type_map(self) -> dict:

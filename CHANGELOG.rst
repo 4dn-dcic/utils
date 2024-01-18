@@ -14,7 +14,7 @@ Change Log
   this is so we can optionally have repos write relevant git (repo, branch, commit) info
   to this file (via GitHub Actions) and make it accessible to the package for inspection.
 * Added is_schema_type and is_specified_schema to portal_utils.Portal.
-* Refactoring in portal_utils.
+* Refactoring in portal_utils; added portal_object_utils.
 
 
 8.7.0
