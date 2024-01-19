@@ -116,7 +116,7 @@ class StructuredDataSet:
                              location: Union[str, Optional[List[str]]] = None, recursive: bool = False) -> List[str]:
         upload_files = copy.deepcopy(self.upload_files)
         for upload_file in upload_files:
-            if file_path := search_for_file(upload_file["file"], location, multiple=False, recursive=recursive):
+            if file_path := search_for_file(upload_file["file"], location, recursive=recursive, single=True):
                 upload_file["path"] = file_path
         return upload_files
 
