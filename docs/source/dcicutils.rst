@@ -191,6 +191,13 @@ ff_utils
    :members:
 
 
+file_utils
+^^^^^^^^^^
+
+.. automodule:: dcicutils.file_utils
+   :members:
+
+
 function_cache_decorator
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
