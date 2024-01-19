@@ -1,6 +1,5 @@
 import copy
 from functools import lru_cache
-import glob
 import json
 from jsonschema import Draft7Validator as SchemaValidator
 import os
@@ -11,6 +10,7 @@ from typing import Any, Callable, List, Optional, Tuple, Type, Union
 from webtest.app import TestApp
 from dcicutils.common import OrchestratedApp
 from dcicutils.data_readers import CsvReader, Excel, RowReader
+from dcicutils.file_utils import search_for_file
 from dcicutils.misc_utils import (create_dict, load_json_if, merge_objects, remove_empty_properties, right_trim,
                                   split_string, to_boolean, to_enum, to_float, to_integer, VirtualApp)
 from dcicutils.portal_utils import Portal as PortalBase
@@ -116,7 +116,7 @@ class StructuredDataSet:
                              location: Union[str, Optional[List[str]]] = None, recursive: bool = False) -> List[str]:
         upload_files = copy.deepcopy(self.upload_files)
         for upload_file in upload_files:
-            if file_path := _search_for_file(upload_file["file"], location=location, recursive=recursive):
+            if file_path := search_for_file(upload_file["file"], location=location, recursive=recursive):
                 upload_file["path"] = file_path
         return upload_files
 
@@ -650,23 +650,3 @@ def _split_dotted_string(value: str):
 
 def _split_array_string(value: str, unique: bool = False):
     return split_string(value, ARRAY_VALUE_DELIMITER_CHAR, ARRAY_VALUE_DELIMITER_ESCAPE_CHAR, unique=unique)
-
-
-def _search_for_file(file: str,
-                     location: Union[str, Optional[List[str]]] = None, recursive: bool = False) -> Optional[str]:
-    if isinstance(file, str) or not file:
-        if not location:
-            location = "."
-        if location:
-            if isinstance(location, str):
-                location = [location]
-            if isinstance(location, list):
-                for directory in location:
-                    if isinstance(directory, str) and os.path.exists(os.path.join(directory, file)):
-                        return os.path.normpath(os.path.join(directory, file))
-        if recursive:
-            if not file.startswith("**/"):
-                file = "**/" + file
-            files = glob.glob(file, recursive=recursive)
-            if files:
-                return files[0]
