@@ -8,8 +8,12 @@ class PortalObject:
 
     def __init__(self, portal: Portal, portal_object: dict, portal_object_type: Optional[str] = None) -> None:
         self._portal = portal
-        self._object = portal_object
+        self._data = portal_object
         self._type = portal_object_type if isinstance(portal_object_type, str) and portal_object_type else None
+
+    @property
+    def data(self):
+        return self._data
 
     @property
     @lru_cache(maxsize=1)
@@ -19,12 +23,12 @@ class PortalObject:
     @property
     @lru_cache(maxsize=1)
     def schema_type(self):
-        return self._type or Portal.get_schema_type(self._object)
+        return self._type or Portal.get_schema_type(self._data)
 
     @property
     @lru_cache(maxsize=1)
     def schema_types(self):
-        return self._type or Portal.get_schema_types(self._object)
+        return self._type or Portal.get_schema_types(self._data)
 
     @property
     @lru_cache(maxsize=1)
@@ -36,7 +40,7 @@ class PortalObject:
     @property
     @lru_cache(maxsize=1)
     def uuid(self) -> Optional[str]:
-        return PortalObject.get_uuid(self._object)
+        return PortalObject.get_uuid(self._data)
 
     @staticmethod
     def get_uuid(portal_object: dict) -> Optional[str]:
@@ -53,13 +57,13 @@ class PortalObject:
         identifying_properties = []
         for identifying_property in self.schema_identifying_properties:
             if identifying_property not in ["uuid", "identifier", "aliases"]:
-                if self._object.get(identifying_property):
+                if self._data.get(identifying_property):
                     identifying_properties.append(identifying_property)
-        if self._object.get("identifier"):
+        if self._data.get("identifier"):
             identifying_properties.insert(0, "identifier")
-        if self._object.get("uuid"):
+        if self._data.get("uuid"):
             identifying_properties.insert(0, "uuid")
-        if "aliases" in self.schema_identifying_properties and self._object.get("aliases"):
+        if "aliases" in self.schema_identifying_properties and self._data.get("aliases"):
             identifying_properties.append("aliases")
         return identifying_properties
 
@@ -73,7 +77,7 @@ class PortalObject:
             return []
         identifying_paths = []
         for identifying_property in identifying_properties:
-            if (identifying_value := self._object.get(identifying_property)):
+            if (identifying_value := self._data.get(identifying_property)):
                 if identifying_property == "uuid":
                     identifying_paths.append(f"/{identifying_value}")
                 # For now at least we include the path both with and without the schema type component
