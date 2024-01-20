@@ -1,7 +1,8 @@
+from functools import lru_cache
+import re
+from typing import List, Optional, Tuple, Union
 from dcicutils.schema_utils import get_identifying_properties
 from dcicutils.portal_utils import Portal
-from functools import lru_cache
-from typing import List, Optional, Tuple, Union
 
 
 class PortalObject:
@@ -117,3 +118,41 @@ class PortalObject:
         except Exception:
             pass
         return None, self.identifying_path
+
+    def compare(self, value: dict) -> dict:
+        """
+        Compares this Portal object against the given Portal object value; noting differences values of properites
+        which they have in common; and properties which are in this Portal object and not in the given Portal object;
+        we do NOT check the converse, i.e. properties in the given Portal object which are not in this Portal object.
+        Returns a dictionary with a description of the differences.
+        """
+        return PortalObject._compare(self._data, value.data if isinstance(value, PortalObject) else value)
+
+    _ARRAY_KEY_REGULAR_EXPRESSION = re.compile(r"^(#\d+)$")
+
+    @staticmethod
+    def _compare(a: dict, b: dict, _path: Optional[str] = None) -> dict:
+        def key_to_path(key: str) -> Optional[str]:  # noqa
+            nonlocal _path
+            if match := PortalObject._ARRAY_KEY_REGULAR_EXPRESSION.search(key):
+                return f"{_path}{match.group(1)}" if _path else match.group(1)
+            return f"{_path}.{key}" if _path else key
+        def list_to_dictionary(value: list) -> dict:  # noqa
+            result = {}
+            for index, item in enumerate(sorted(value)):  # ignore array order
+                result[f"#{index}"] = item
+            return result
+        diffs = {}
+        for key in a:
+            path = key_to_path(key)
+            if key not in b:
+                diffs[path] = {"value": a[key], "missing_value": True}
+            else:
+                if isinstance(a[key], dict) and isinstance(b[key], dict):
+                    diffs.update(PortalObject._compare(a[key], b[key], _path=path))
+                elif isinstance(a[key], list) and isinstance(b[key], list):
+                    diffs.update(PortalObject._compare(list_to_dictionary(a[key]),
+                                                       list_to_dictionary(b[key]), _path=path))
+                elif a[key] != b[key]:
+                    diffs[path] = {"value": a[key], "differing_value": b[key]}
+        return diffs
