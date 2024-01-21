@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class JsonSchemaConstants:
@@ -183,3 +183,63 @@ def get_one_of_formats(schema: Dict[str, Any]) -> List[str]:
         for one_of_schema in get_one_of(schema)
         if get_format(one_of_schema)
     ]
+
+
+class Schema:
+
+    def __init__(self, schema: dict) -> None:
+        self._schema = schema
+
+    def get_property_by_path(self, property_path: str) -> Optional[dict]:
+        """
+        TODO
+        """
+        return Schema._get_property_by_path(self._schema, property_path)
+
+    _ARRAY_NAME_SUFFIX_CHAR = "#"
+    _DOTTED_NAME_DELIMITER_CHAR = "."
+
+    @staticmethod
+    def _get_property_by_path(schema: dict, property_path: str) -> Optional[dict]:
+        def unarrayize_property_name(property_name: str) -> Tuple[str, Optional[List[int]]]:
+            if len(components := (property_name := property_name.strip()).split(Schema._ARRAY_NAME_SUFFIX_CHAR)) < 2:
+                return property_name, None
+            unarrayized_property_name = components[0].strip()
+            array_specifiers = []
+            for component in components[1:]:
+                if component.isdigit():
+                    array_specifiers.append(int(component))
+                elif component == "":
+                    array_specifiers.append(0)
+                else:
+                    return property_name, None
+            return unarrayized_property_name, array_specifiers
+        if not isinstance(schema, dict) or not isinstance(property_path, str):
+            return None
+        elif not (schema_properties := schema.get("properties")):
+            return None
+        property_paths = property_path.split(Schema._DOTTED_NAME_DELIMITER_CHAR)
+        for property_index, property_name in enumerate(property_paths):
+            property_name, array_specifiers = unarrayize_property_name(property_name)
+            if not (property_value := schema_properties.get(property_name)):
+                return None
+            elif (property_type := property_value.get("type")) == "object":
+                property_paths_tail = Schema._DOTTED_NAME_DELIMITER_CHAR.join(property_paths[property_index + 1:])
+                return Schema._get_property_by_path(property_value, property_paths_tail)
+            elif (property_type := property_value.get("type")) == "array":
+                if not array_specifiers:
+                    if property_index == len(property_paths) - 1:
+                        return property_value
+                    return None
+                for array_index in range(len(array_specifiers)):
+                    if property_type != "array":
+                        return None
+                    elif not (array_items := property_value.get("items")):
+                        return None
+                    property_type = (property_value := array_items).get("type")
+                if property_type == "object":
+                    if property_index == len(property_paths) - 1:
+                        return property_value
+                    property_paths_tail = Schema._DOTTED_NAME_DELIMITER_CHAR.join(property_paths[property_index + 1:])
+                    return Schema._get_property_by_path(property_value, property_paths_tail)
+        return property_value
