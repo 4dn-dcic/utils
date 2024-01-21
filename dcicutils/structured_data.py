@@ -74,7 +74,7 @@ class StructuredDataSet:
                     row_number += 1
                     if (validation_errors := schema.validate(data)) is not None:
                         for validation_error in validation_errors:
-                            self._note_error({"src": create_dict(type=schema.name, row=row_number),
+                            self._note_error({"src": create_dict(type=schema.type, row=row_number),
                                               "error": validation_error}, "validation")
 
     @property
@@ -168,7 +168,7 @@ class StructuredDataSet:
             if not structured_row_template:  # Delay creation just so we don't reference schema if there are no rows.
                 if not schema and not noschema and not (schema := Schema.load_by_name(type_name, portal=self._portal)):
                     noschema = True
-                elif schema and (schema_name := schema.name):
+                elif schema and (schema_name := schema.type):
                     type_name = schema_name
                 structured_row_template = _StructuredRowTemplate(reader.header, schema)
             structured_row = structured_row_template.create_row()
@@ -222,7 +222,7 @@ class _StructuredRowTemplate:
 
     def set_value(self, data: dict, column_name: str, value: str, file: Optional[str], row_number: int = -1) -> None:
         if (set_value_function := self._set_value_functions.get(column_name)):
-            src = create_dict(type=self._schema.name if self._schema else None,
+            src = create_dict(type=self._schema.type if self._schema else None,
                               column=column_name, file=file, row=row_number)
             set_value_function(data, value, src)
 
@@ -319,8 +319,8 @@ class _StructuredRowTemplate:
 class Schema:
 
     def __init__(self, schema_json: dict, portal: Optional[Portal] = None) -> None:
-        self.data = schema_json
-        self.name = Schema.type_name(schema_json.get("title", "")) if schema_json else ""
+        self._data = schema_json if isinstance(schema_json, dict) else {}
+        self._type = Schema.type_name(schema_json.get("title", ""))
         self._portal = portal  # Needed only to resolve linkTo references.
         self._map_value_functions = {
             "boolean": self._map_function_boolean,
@@ -332,6 +332,14 @@ class Schema:
         self._resolved_refs = set()
         self._unresolved_refs = []
         self._typeinfo = self._create_typeinfo(schema_json)
+
+    @property
+    def data(self) -> dict:
+        return self._data
+
+    @property
+    def type(self) -> str:
+        return self._type
 
     @staticmethod
     def load_by_name(name: str, portal: Portal) -> Optional[dict]:
