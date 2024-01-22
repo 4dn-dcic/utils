@@ -1,8 +1,6 @@
 from functools import lru_cache
-import re
-from typing import Any, Callable, List, Optional, Tuple, Type, Union
+from typing import List, Optional, Tuple, Type, Union
 from dcicutils.portal_utils import Portal
-from dcicutils.schema_utils import Schema
 
 PortalObject = Type["PortalObject"]  # Forward type reference for type hints.
 

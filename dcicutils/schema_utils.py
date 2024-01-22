@@ -1,6 +1,4 @@
-import os
-from typing import Any, Dict, List, Optional, Tuple
-from dcicutils.misc_utils import to_camel_case
+from typing import Any, Dict, List
 
 
 class JsonSchemaConstants:
