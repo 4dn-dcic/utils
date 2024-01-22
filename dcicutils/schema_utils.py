@@ -208,7 +208,13 @@ class Schema:
 
     def property_by_path(self, property_path: str) -> Optional[dict]:
         """
-        TODO
+        Looks for the given property path within this Portal schema and returns its dictionary value.
+        This given property path can be either a simple property name, or a series of dot-separated
+        property names representing nested (object) properties; and/or the property names may be
+        suffixed with a pound (#) characteter, optionally followed by an integer, representing an
+        array type property and its optional array index (this integer, if specified, is ignored
+        for the purposes of this function, but it may have been created by another process/function,
+        for example by PortalObject.compare). If the property is not found  then None is returned.
         """
         return Schema.get_property_by_path(self._data, property_path)
 
