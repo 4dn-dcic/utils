@@ -73,6 +73,7 @@ class PortalObject:
         for identifying_property in identifying_properties:
             if (identifying_value := self._data.get(identifying_property)):
                 if identifying_property == "uuid":
+                    identifying_paths.append(f"/{self.type}/{identifying_value}")
                     identifying_paths.append(f"/{identifying_value}")
                 # For now at least we include the path both with and without the schema type component,
                 # as for some identifying values, it works (only) with, and some, it works (only) without.
@@ -125,6 +126,14 @@ class PortalObject:
             nonlocal self
             if (schema := self.schema) and (property_type := Schema.get_property_by_path(schema, property_path)):
                 if link_to := property_type.get("linkTo"):
+                    """
+                    This works basically except not WRT sub/super-types (e.g. CellCultureSample vs Sample);
+                    this is only preferable as it only requires one Portal GET rather than two, as below.
+                    if (a := self._portal.get(f"/{link_to}/{property_value_a}")) and (a.status_code == 200):
+                        if a_identifying_paths := PortalObject(self._portal, a.json()).identifying_paths:
+                            if f"/{link_to}/{property_value_b}" in a_identifying_paths:
+                                return True
+                    """
                     if a := self._portal.get(f"/{link_to}/{property_value_a}", raw=True):
                         if (a.status_code == 200) and (a := a.json()):
                             if b := self._portal.get(f"/{link_to}/{property_value_b}", raw=True):
