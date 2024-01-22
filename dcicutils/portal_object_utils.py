@@ -118,7 +118,8 @@ class PortalObject:
         Compares this Portal object against the given Portal object value; noting differences values of properites
         which they have in common; and properties which are in this Portal object and not in the given Portal object;
         we do NOT check the converse, i.e. properties in the given Portal object which are not in this Portal object.
-        Returns a dictionary with a description of the differences. If the given consider_link_to flag is True then TODO.
+        Returns a dictionary with a description of the differences. If the given consider_link_to flag is True then
+        TODO.
         """
         def are_properties_equal(property_path: str, property_value_a: Any, property_value_b: Any) -> bool:
             if property_value_a == property_value_b:
