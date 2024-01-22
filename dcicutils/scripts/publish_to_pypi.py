@@ -143,11 +143,14 @@ def verify_git_repo() -> bool:
 
 def verify_unstaged_changes() -> bool:
     """
-    If the current git repo has no unstaged changes then returns True,
-    otherwise prints an error message and returns False.
+    If the current git repo has NO unstaged changes then returns True,
+    otherwise prints an error message and returns False. HOWEVER, we DO
+    allow unstaged changes to just the file gitinfo.json if such exists; to
+    allow GitHub Actions to update with latest git (repo, branch, commit) info.
     """
-    git_diff_results, _ = execute_command("git diff")
-    if git_diff_results:
+    git_diff_results, _ = execute_command("git diff --name-only")
+    if git_diff_results and not (len(git_diff_results) == 1 and
+                                 os.path.basename(git_diff_results[0]) == "gitinfo.json"):
         ERROR_PRINT("You have changes to this branch that you have not staged for commit.")
         return False
     return True

@@ -10,6 +10,7 @@ from typing import Any, Callable, List, Optional, Tuple, Type, Union
 from webtest.app import TestApp
 from dcicutils.common import OrchestratedApp
 from dcicutils.data_readers import CsvReader, Excel, RowReader
+from dcicutils.file_utils import search_for_file
 from dcicutils.misc_utils import (create_dict, load_json_if, merge_objects, remove_empty_properties, right_trim,
                                   split_string, to_boolean, to_enum, to_float, to_integer, VirtualApp)
 from dcicutils.portal_utils import Portal as PortalBase
@@ -31,6 +32,7 @@ ARRAY_VALUE_DELIMITER_ESCAPE_CHAR = "\\"
 ARRAY_NAME_SUFFIX_CHAR = "#"
 ARRAY_NAME_SUFFIX_REGEX = re.compile(rf"{ARRAY_NAME_SUFFIX_CHAR}\d+")
 DOTTED_NAME_DELIMITER_CHAR = "."
+FILE_SCHEMA_NAME = "File"
 FILE_SCHEMA_NAME_PROPERTY = "filename"
 
 # Forward type references for type hints.
@@ -72,7 +74,7 @@ class StructuredDataSet:
                     row_number += 1
                     if (validation_errors := schema.validate(data)) is not None:
                         for validation_error in validation_errors:
-                            self._note_error({"src": create_dict(type=schema.name, row=row_number),
+                            self._note_error({"src": create_dict(type=schema.type, row=row_number),
                                               "error": validation_error}, "validation")
 
     @property
@@ -109,6 +111,14 @@ class StructuredDataSet:
                         if (file_name := item.get(FILE_SCHEMA_NAME_PROPERTY)):
                             result.append({"type": type_name, "file": file_name})
         return result
+
+    def upload_files_located(self,
+                             location: Union[str, Optional[List[str]]] = None, recursive: bool = False) -> List[str]:
+        upload_files = copy.deepcopy(self.upload_files)
+        for upload_file in upload_files:
+            if file_path := search_for_file(upload_file["file"], location, recursive=recursive, single=True):
+                upload_file["path"] = file_path
+        return upload_files
 
     def _load_file(self, file: str) -> None:
         # Returns a dictionary where each property is the name (i.e. the type) of the data,
@@ -158,7 +168,7 @@ class StructuredDataSet:
             if not structured_row_template:  # Delay creation just so we don't reference schema if there are no rows.
                 if not schema and not noschema and not (schema := Schema.load_by_name(type_name, portal=self._portal)):
                     noschema = True
-                elif schema and (schema_name := schema.name):
+                elif schema and (schema_name := schema.type):
                     type_name = schema_name
                 structured_row_template = _StructuredRowTemplate(reader.header, schema)
             structured_row = structured_row_template.create_row()
@@ -212,7 +222,7 @@ class _StructuredRowTemplate:
 
     def set_value(self, data: dict, column_name: str, value: str, file: Optional[str], row_number: int = -1) -> None:
         if (set_value_function := self._set_value_functions.get(column_name)):
-            src = create_dict(type=self._schema.name if self._schema else None,
+            src = create_dict(type=self._schema.type if self._schema else None,
                               column=column_name, file=file, row=row_number)
             set_value_function(data, value, src)
 
@@ -309,8 +319,8 @@ class _StructuredRowTemplate:
 class Schema:
 
     def __init__(self, schema_json: dict, portal: Optional[Portal] = None) -> None:
-        self.data = schema_json
-        self.name = Schema.type_name(schema_json.get("title", "")) if schema_json else ""
+        self._data = schema_json if isinstance(schema_json, dict) else {}
+        self._type = Schema.type_name(schema_json.get("title", ""))
         self._portal = portal  # Needed only to resolve linkTo references.
         self._map_value_functions = {
             "boolean": self._map_function_boolean,
@@ -322,6 +332,14 @@ class Schema:
         self._resolved_refs = set()
         self._unresolved_refs = []
         self._typeinfo = self._create_typeinfo(schema_json)
+
+    @property
+    def data(self) -> dict:
+        return self._data
+
+    @property
+    def type(self) -> str:
+        return self._type
 
     @staticmethod
     def load_by_name(name: str, portal: Portal) -> Optional[dict]:
@@ -552,8 +570,9 @@ class Portal(PortalBase):
                  arg: Optional[Union[VirtualApp, TestApp, Router, Portal, dict, tuple, str]] = None,
                  env: Optional[str] = None, server: Optional[str] = None,
                  app: Optional[OrchestratedApp] = None,
-                 data: Optional[dict] = None, schemas: Optional[List[dict]] = None) -> None:
-        super().__init__(arg, env=env, server=server, app=app)
+                 data: Optional[dict] = None, schemas: Optional[List[dict]] = None,
+                 raise_exception: bool = True) -> None:
+        super().__init__(arg, env=env, server=server, app=app, raise_exception=raise_exception)
         if isinstance(arg, Portal):
             self._schemas = schemas if schemas is not None else arg._schemas  # Explicitly specified/known schemas.
             self._data = data if data is not None else arg._data  # Data set being loaded; e.g. by StructuredDataSet.
@@ -590,20 +609,32 @@ class Portal(PortalBase):
                     schemas[user_specified_schema["title"]] = user_specified_schema
         return schemas
 
-    @lru_cache(maxsize=1)
-    def get_schemas_super_type_map(self) -> dict:
-        return super().get_schemas_super_type_map()
+    def is_file_schema(self, schema_name: str) -> bool:
+        """
+        Returns True iff the given schema name isa File type, i.e. has an ancestor which is of type File.
+        """
+        return self.is_schema_type(schema_name, FILE_SCHEMA_NAME)
 
     def ref_exists(self, type_name: str, value: str) -> List[str]:
         resolved = []
         if self._ref_exists_single(type_name, value):
             resolved.append(type_name)
+            # TODO: Added this return on 2024-01-14 (dmichaels).
+            # Why did I orginally check for multiple existing values?
+            # Why not just return right away if I find that the ref exists?
+            # Getting multiple values because, for example, we find
+            # both this /Sample/UW_CELL-CULTURE-SAMPLE_COLO-829BL_HI-C_1
+            # and /CellSample/UW_CELL-CULTURE-SAMPLE_COLO-829BL_HI-C_1
+            # Why does that matter at all? Same thing.
+            return resolved
         # Check for the given ref in all sub-types of the given type.
         if (schemas_super_type_map := self.get_schemas_super_type_map()):
             if (sub_type_names := schemas_super_type_map.get(type_name)):
                 for sub_type_name in sub_type_names:
                     if self._ref_exists_single(sub_type_name, value):
                         resolved.append(type_name)
+                        # TODO: Added this return on 2024-01-14 (dmichaels). See above TODO.
+                        return resolved
         return resolved
 
     def _ref_exists_single(self, type_name: str, value: str) -> bool:
