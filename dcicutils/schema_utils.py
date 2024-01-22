@@ -1,4 +1,6 @@
-from typing import Any, Dict, List
+import os
+from typing import Any, Dict, List, Optional, Tuple
+from dcicutils.misc_utils import to_camel_case
 
 
 class JsonSchemaConstants:
@@ -183,3 +185,85 @@ def get_one_of_formats(schema: Dict[str, Any]) -> List[str]:
         for one_of_schema in get_one_of(schema)
         if get_format(one_of_schema)
     ]
+
+
+class Schema:
+
+    def __init__(self, schema: dict, schema_type: Optional[str] = None) -> None:
+        self._data = schema if isinstance(schema, dict) else (schema.data if isinstance(schema, Schema) else {})
+        self._type = (isinstance(schema_type, str) and schema_type) or Schema.type_name(self._data.get("title", ""))
+
+    @property
+    def data(self) -> dict:
+        return self._data
+
+    @property
+    def type(self) -> str:
+        return self._type
+
+    @staticmethod
+    def type_name(value: str) -> Optional[str]:  # File or other name.
+        if isinstance(value, str) and (value := os.path.basename(value.replace(" ", ""))):
+            return to_camel_case(value[0:dot] if (dot := value.rfind(".")) >= 0 else value)
+
+    def property_by_path(self, property_path: str) -> Optional[dict]:
+        """
+        Looks for the given property path within this Portal schema and returns its dictionary value.
+        This given property path can be either a simple property name, or a series of dot-separated
+        property names representing nested (object) properties; and/or the property names may be
+        suffixed with a pound (#) characteter, optionally followed by an integer, representing an
+        array type property and its optional array index (this integer, if specified, is ignored
+        for the purposes of this function, but it may have been created by another process/function,
+        for example by PortalObject.compare). If the property is not found  then None is returned.
+        """
+        return Schema.get_property_by_path(self._data, property_path)
+
+    _ARRAY_NAME_SUFFIX_CHAR = "#"
+    _DOTTED_NAME_DELIMITER_CHAR = "."
+
+    @staticmethod
+    def get_property_by_path(schema: dict, property_path: str) -> Optional[dict]:
+        if not isinstance(schema, dict) or not isinstance(property_path, str):
+            return None
+        elif not (schema_properties := schema.get("properties")):
+            return None
+        property_paths = property_path.split(Schema._DOTTED_NAME_DELIMITER_CHAR)
+        for property_index, property_name in enumerate(property_paths):
+            property_name, array_specifiers = Schema._unarrayize_property_name(property_name)
+            if not (property_value := schema_properties.get(property_name)):
+                return None
+            elif (property_type := property_value.get("type")) == "object":
+                property_paths_tail = Schema._DOTTED_NAME_DELIMITER_CHAR.join(property_paths[property_index + 1:])
+                return Schema.get_property_by_path(property_value, property_paths_tail)
+            elif (property_type := property_value.get("type")) == "array":
+                if not array_specifiers:
+                    if property_index == len(property_paths) - 1:
+                        return property_value
+                    return None
+                for array_index in range(len(array_specifiers)):
+                    if property_type != "array":
+                        return None
+                    elif not (array_items := property_value.get("items")):
+                        return None
+                    property_type = (property_value := array_items).get("type")
+                if property_type == "object":
+                    if property_index == len(property_paths) - 1:
+                        return property_value
+                    property_paths_tail = Schema._DOTTED_NAME_DELIMITER_CHAR.join(property_paths[property_index + 1:])
+                    return Schema.get_property_by_path(property_value, property_paths_tail)
+        return property_value
+
+    @staticmethod
+    def _unarrayize_property_name(property_name: str) -> Tuple[str, Optional[List[int]]]:
+        if len(components := (property_name := property_name.strip()).split(Schema._ARRAY_NAME_SUFFIX_CHAR)) < 2:
+            return property_name, None
+        unarrayized_property_name = components[0].strip()
+        array_specifiers = []
+        for component in components[1:]:
+            if component.isdigit():
+                array_specifiers.append(int(component))
+            elif component == "":
+                array_specifiers.append(0)
+            else:
+                return property_name, None
+        return unarrayized_property_name, array_specifiers

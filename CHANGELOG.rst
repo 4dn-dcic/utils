@@ -7,6 +7,12 @@ Change Log
 ----------
 
 
+8.7.2
+=====
+
+* Changes to itemize SMaHT submission ingestion create/update/diff situation.
+
+
 8.7.1
 =====
 
