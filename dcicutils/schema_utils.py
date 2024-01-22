@@ -210,11 +210,11 @@ class Schema:
         """
         Looks for the given property path within this Portal schema and returns its dictionary value.
         This given property path can be either a simple property name, or a series of dot-separated
-        property names representing nested (object) properties; and/or the property names may be
-        suffixed with a pound (#) characteter, optionally followed by an integer, representing an
-        array type property and its optional array index (this integer, if specified, is ignored
+        property names representing nested (object) properties; and/or the property names may also
+        be suffixed with a pound (#) characteter, optionally followed by an integer, representing
+        an array type property and its optional array index (this integer, if specified, is ignored
         for the purposes of this function, but it may have been created by another process/function,
-        for example by PortalObject.compare). If the property is not found  then None is returned.
+        for example by PortalObject.compare). If the property is not found then None is returned.
         """
         return Schema.get_property_by_path(self._data, property_path)
 
@@ -225,28 +225,28 @@ class Schema:
     def get_property_by_path(schema: dict, property_path: str) -> Optional[dict]:
         if not isinstance(schema, dict) or not isinstance(property_path, str):
             return None
-        elif not (schema_properties := schema.get("properties")):
+        elif not (schema_properties := schema.get(JsonSchemaConstants.PROPERTIES)):
             return None
         property_paths = property_path.split(Schema._DOTTED_NAME_DELIMITER_CHAR)
         for property_index, property_name in enumerate(property_paths):
             property_name, array_specifiers = Schema._unarrayize_property_name(property_name)
             if not (property_value := schema_properties.get(property_name)):
                 return None
-            elif (property_type := property_value.get("type")) == "object":
+            elif (property_type := property_value.get(JsonSchemaConstants.TYPE)) == JsonSchemaConstants.OBJECT:
                 property_paths_tail = Schema._DOTTED_NAME_DELIMITER_CHAR.join(property_paths[property_index + 1:])
                 return Schema.get_property_by_path(property_value, property_paths_tail)
-            elif (property_type := property_value.get("type")) == "array":
+            elif (property_type := property_value.get(JsonSchemaConstants.TYPE)) == JsonSchemaConstants.ARRAY:
                 if not array_specifiers:
                     if property_index == len(property_paths) - 1:
                         return property_value
                     return None
                 for array_index in range(len(array_specifiers)):
-                    if property_type != "array":
+                    if property_type != JsonSchemaConstants.ARRAY:
                         return None
-                    elif not (array_items := property_value.get("items")):
+                    elif not (array_items := property_value.get(JsonSchemaConstants.ITEMS)):
                         return None
-                    property_type = (property_value := array_items).get("type")
-                if property_type == "object":
+                    property_type = (property_value := array_items).get(JsonSchemaConstants.TYPE)
+                if property_type == JsonSchemaConstants.OBJECT:
                     if property_index == len(property_paths) - 1:
                         return property_value
                     property_paths_tail = Schema._DOTTED_NAME_DELIMITER_CHAR.join(property_paths[property_index + 1:])
