@@ -1,6 +1,7 @@
 from functools import lru_cache
 import re
 from typing import Any, Callable, List, Optional, Tuple, Type, Union
+from dcicutils.data_readers import RowReader
 from dcicutils.portal_utils import Portal
 from dcicutils.schema_utils import Schema
 
@@ -157,21 +158,33 @@ class PortalObject:
             return f"{_path}.{key}" if _path else key
         def list_to_dictionary(value: list) -> dict:  # noqa
             result = {}
-            for index, item in enumerate(sorted(value)):  # ignore array order
+            for index, item in enumerate(value):
                 result[f"#{index}"] = item
             return result
         diffs = {}
         for key in a:
             path = key_to_path(key)
             if key not in b:
-                diffs[path] = {"value": a[key], "missing_value": True}
+                if a[key] != RowReader.CELL_DELETION_SENTINEL:
+                    diffs[path] = {"value": a[key], "creating_value": True}
             else:
                 if isinstance(a[key], dict) and isinstance(b[key], dict):
                     diffs.update(PortalObject._compare(a[key], b[key], compare=compare, _path=path))
                 elif isinstance(a[key], list) and isinstance(b[key], list):
+                    # Note that lists will be compared in order, which means the when dealing with
+                    # insertions/deletions to/from the list, we my easily mistakenly regard elements
+                    # of the list to be different when they are really the same, since they occupy
+                    # different indices within the array. This is just a known restriction of this
+                    # comparison functionality; and perhaps actually technically correct, but probably
+                    # in practice, at the application/semantic level, we likely regard the order of
+                    # lists as unimportant, and with a little more work here we could try to detect
+                    # and exclude from the diffs for a list, those elements in the list which are
+                    # equal to each other but which reside at different indices with then two lists.
                     diffs.update(PortalObject._compare(list_to_dictionary(a[key]),
                                                        list_to_dictionary(b[key]), compare=compare, _path=path))
                 elif a[key] != b[key]:
-                    if not callable(compare) or not compare(path, a[key], b[key]):
-                        diffs[path] = {"value": a[key], "differing_value": b[key]}
+                    if a[key] == RowReader.CELL_DELETION_SENTINEL:
+                        diffs[path] = {"value": b[key], "deleting_value": True}
+                    elif not callable(compare) or not compare(path, a[key], b[key]):
+                        diffs[path] = {"value": a[key], "updating_value": b[key]}
         return diffs
