@@ -264,12 +264,12 @@ class Portal:
             add_on = ""
         return get_metadata(obj_id=object_id, vapp=self.vapp, key=self.key, add_on=add_on)
 
-    def patch_metadata(self, object_id: str, data: str) -> Optional[dict]:
+    def patch_metadata(self, object_id: str, data: dict) -> Optional[dict]:
         if self.key:
             return patch_metadata(obj_id=object_id, patch_item=data, key=self.key)
         return self.patch(f"/{object_id}", data).json()
 
-    def post_metadata(self, object_type: str, data: str) -> Optional[dict]:
+    def post_metadata(self, object_type: str, data: dict) -> Optional[dict]:
         if self.key:
             return post_metadata(schema_name=object_type, post_item=data, key=self.key)
         return self.post(f"/{object_type}", data).json()
