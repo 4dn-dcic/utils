@@ -10,7 +10,8 @@ Excel = Type["Excel"]
 
 class RowReader(abc.ABC):
 
-    DELETION_CELL_VALUE = "*delete*"
+    CELL_DELETION_VALUES = ["*delete*"]  # cell values(s) indicating property deletion
+    CELL_DELETION_SENTINEL = object()  # special cell deletion sentinel value
 
     def __init__(self):
         self.header = None
@@ -50,8 +51,8 @@ class RowReader(abc.ABC):
     def cell_value(self, value: Optional[Any]) -> str:
         if value is None:
             return ""
-        elif (value := str(value).strip()) == RowReader.DELETION_CELL_VALUE:
-            return RowReader.DELETION_CELL_VALUE
+        elif (value := str(value).strip()) in RowReader.CELL_DELETION_VALUES:
+            return RowReader.CELL_DELETION_SENTINEL
         else:
             return value
 

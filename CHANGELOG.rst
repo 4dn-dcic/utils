@@ -11,6 +11,7 @@ Change Log
 =====
 
 * Changes to itemize SMaHT submission ingestion create/update/diff situation.
+* Changes to structured_data to handle property deletes.
 
 
 8.7.1

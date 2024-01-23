@@ -64,6 +64,12 @@ class StructuredDataSet:
         return StructuredDataSet(file=file, portal=portal, schemas=schemas, autoadd=autoadd, order=order, prune=prune)
 
     def validate(self, force: bool = False) -> None:
+        def data_without_deleted_properties(data: dict) -> dict:
+            nonlocal self
+            if self._prune:
+                return {key: value for key, value in data.items() if value != RowReader.CELL_DELETION_SENTINEL}
+            else:
+                return {key: "" if value == RowReader.CELL_DELETION_SENTINEL else value for key, value in data.items()}
         if self._validated and not force:
             return
         self._validated = True
@@ -71,6 +77,7 @@ class StructuredDataSet:
             if (schema := Schema.load_by_name(type_name, portal=self._portal)):
                 row_number = 0
                 for data in self.data[type_name]:
+                    data = data_without_deleted_properties(data)
                     row_number += 1
                     if (validation_errors := schema.validate(data)) is not None:
                         for validation_error in validation_errors:
