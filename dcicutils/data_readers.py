@@ -10,6 +10,8 @@ Excel = Type["Excel"]
 
 class RowReader(abc.ABC):
 
+    DELETION_CELL_VALUE = "*delete*"
+
     def __init__(self):
         self.header = None
         self.row_number = 0
@@ -45,8 +47,13 @@ class RowReader(abc.ABC):
     def is_terminating_row(self, row: Union[List[Optional[Any]], Tuple[Optional[Any]]]) -> bool:
         return False
 
-    def cell_value(self, value: Optional[Any]) -> Optional[Any]:
-        return str(value).strip() if value is not None else ""
+    def cell_value(self, value: Optional[Any]) -> str:
+        if value is None:
+            return ""
+        elif (value := str(value).strip()) == RowReader.DELETION_CELL_VALUE:
+            return RowReader.DELETION_CELL_VALUE
+        else:
+            return value
 
     def open(self) -> None:
         pass
