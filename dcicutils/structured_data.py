@@ -666,7 +666,7 @@ class Portal(PortalBase):
                 if (ivalue := next((item[iproperty] for iproperty in iproperties if iproperty in item), None)):
                     if isinstance(ivalue, list) and value in ivalue or ivalue == value:
                         return True, None
-        if not (value := self.get_metadata(f"/{type_name}/{value}") is not None):
+        if (value := self.get_metadata(f"/{type_name}/{value}")) is None:
             return False, None
         return True, value.get("uuid")
 
