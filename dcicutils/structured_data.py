@@ -74,8 +74,10 @@ class StructuredDataSet:
                 if value == RowReader.CELL_DELETION_SENTINEL:
                     return True
                 return self._prune and value in [None, "", {}, []]
+            def isempty_array_element(value: Any) -> bool:  # noqa
+                return value == RowReader.CELL_DELETION_SENTINEL
             data = copy.deepcopy(data)
-            remove_empty_properties(data, isempty=isempty)
+            remove_empty_properties(data, isempty=isempty, isempty_array_element=isempty_array_element)
             return data
         if self._validated and not force:
             return
