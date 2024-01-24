@@ -11,6 +11,8 @@ PortalObject = Type["PortalObject"]  # Forward type reference for type hints.
 
 class PortalObject:
 
+    _PROPERTY_DELETION_SENTINEL = RowReader.CELL_DELETION_SENTINEL
+
     def __init__(self, portal: Portal, portal_object: dict, portal_object_type: Optional[str] = None) -> None:
         self._portal = portal
         self._data = portal_object
@@ -145,7 +147,7 @@ class PortalObject:
             for key in a:
                 path = f"{_path}.{key}" if _path else key
                 if key not in b:
-                    if a[key] != RowReader.CELL_DELETION_SENTINEL:
+                    if a[key] != PortalObject._PROPERTY_DELETION_SENTINEL:
                         diffs[path] = {"value": a[key], "creating_value": True}
                 else:
                     diffs.update(PortalObject._compare(a[key], b[key], _path=path))
@@ -155,17 +157,20 @@ class PortalObject:
                 path = f"{_path or ''}#{index}"
                 if not isinstance(a[index], dict) and not isinstance(a[index], list):
                     if a[index] not in b:
-                        if a[index] != RowReader.CELL_DELETION_SENTINEL:
-                            if len(b) < index:
+                        if a[index] != PortalObject._PROPERTY_DELETION_SENTINEL:
+                            if index < len(b):
                                 diffs[path] = {"value": a[index], "updating_value": b[index]}
                             else:
                                 diffs[path] = {"value": a[index], "creating_value": True}
+                        else:
+                            if index < len(b):
+                                diffs[path] = {"value": b[index], "deleting_value": True}
                 elif len(b) < index:
                     diffs.update(PortalObject._compare(a[index], b[index], _path=path))
                 else:
                     diffs[path] = {"value": a[index], "creating_value": True}
         elif a != b:
-            if a == RowReader.CELL_DELETION_SENTINEL:
+            if a == PortalObject._PROPERTY_DELETION_SENTINEL:
                 diffs[_path] = {"value": b, "deleting_value": True}
             else:
                 diffs[_path] = {"value": a, "updating_value": b}

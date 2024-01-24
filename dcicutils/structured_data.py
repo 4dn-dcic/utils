@@ -70,10 +70,13 @@ class StructuredDataSet:
     def validate(self, force: bool = False) -> None:
         def data_without_deleted_properties(data: dict) -> dict:
             nonlocal self
-            if self._prune:
-                return {key: value for key, value in data.items() if value != RowReader.CELL_DELETION_SENTINEL}
-            else:
-                return {key: "" if value == RowReader.CELL_DELETION_SENTINEL else value for key, value in data.items()}
+            def isempty(value: Any) -> bool:  # noqa
+                if value == RowReader.CELL_DELETION_SENTINEL:
+                    return True
+                return self._prune and value in [None, "", {}, []]
+            data = copy.deepcopy(data)
+            remove_empty_properties(data, isempty=isempty)
+            return data
         if self._validated and not force:
             return
         self._validated = True
