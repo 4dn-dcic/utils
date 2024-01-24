@@ -17,7 +17,7 @@ class RowReader(abc.ABC):
     class _CellDeletionSentinal(object):
         def __str__(self):
             return RowReader._CELL_DELETION_VALUES[0]
-        def __deepcopy__(self, memo):
+        def __deepcopy__(self, memo):  # noqa
             return self
 
     CELL_DELETION_SENTINEL = _CellDeletionSentinal()
