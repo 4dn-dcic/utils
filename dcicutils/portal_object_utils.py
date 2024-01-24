@@ -1,7 +1,7 @@
 from copy import deepcopy
 from functools import lru_cache
 import re
-from typing import Any, Callable, List, Optional, Tuple, Type, Union
+from typing import Any, List, Optional, Tuple, Type, Union
 from dcicutils.data_readers import RowReader
 from dcicutils.portal_utils import Portal
 from dcicutils.schema_utils import Schema
@@ -43,6 +43,9 @@ class PortalObject:
     @lru_cache(maxsize=1)
     def schema(self):
         return self._portal.get_schema(self.type)
+
+    def copy(self) -> PortalObject:
+        return PortalObject(self.portal, deepcopy(self.data), self.type)
 
     @property
     @lru_cache(maxsize=1)
@@ -121,81 +124,51 @@ class PortalObject:
 
     def compare(self, value: Union[dict, PortalObject],
                 consider_refs: bool = False, resolved_refs: List[dict] = None) -> dict:
-        """
-        Compares this Portal object against the given Portal object value; noting differences values of properites
-        which they have in common; and properties which are in this Portal object and not in the given Portal object;
-        we do NOT check the converse, i.e. properties in the given Portal object which are not in this Portal object.
-        Returns a dictionary with a description of the differences. If the given consider_refs flag is True then
-        for differences detected linkTo reference values, we will actually check that the object which is being
-        referenced is different or the same, e.g. the file_format reference (linkTo) property value "fastq" looks
-        different from "eb417c0a-70dd-42e3-9841-ac7f1ee22962" but they (may) refer to the same object.
-        """
-        def are_properties_equal(property_path: str, property_value_a: Any, property_value_b: Any) -> bool:
-            nonlocal self
-            if property_value_a == property_value_b:
-                return True
-            if (schema := self.schema) and (property_type := Schema.get_property_by_path(schema, property_path)):
-                if link_to := property_type.get("linkTo"):
-                    """
-                    This works basically except not WRT sub/super-types (e.g. CellCultureSample vs Sample);
-                    this is only preferable as it only requires one Portal GET rather than two, as below.
-                    if (a := self._portal.get(f"/{link_to}/{property_value_a}")) and (a.status_code == 200):
-                        if a_identifying_paths := PortalObject(self._portal, a.json()).identifying_paths:
-                            if f"/{link_to}/{property_value_b}" in a_identifying_paths:
-                                return True
-                    """
-                    if a := self._portal.get(f"/{link_to}/{property_value_a}", raw=True):
-                        if (a.status_code == 200) and (a := a.json()):
-                            if b := self._portal.get(f"/{link_to}/{property_value_b}", raw=True):
-                                if (b.status_code == 200) and (b := b.json()):
-                                    return a == b
-            return False
-        return PortalObject._compare(self._data, value.data if isinstance(value, PortalObject) else value,
-                                     compare=are_properties_equal if consider_refs else None)
+        if consider_refs and isinstance(resolved_refs, list):
+            this_data = self.normalized_refs(refs=resolved_refs).data
+        else:
+            this_data = self.data
+        if isinstance(value, PortalObject):
+            comparing_data = value.data
+        elif isinstance(value, dict):
+            comparing_data = value
+        else:
+            return {}
+        return PortalObject._compare(this_data, comparing_data)
 
     _ARRAY_KEY_REGULAR_EXPRESSION = re.compile(rf"^({Schema._ARRAY_NAME_SUFFIX_CHAR}\d+)$")
 
     @staticmethod
-    def _compare(a: dict, b: dict, compare: Optional[Callable] = None, _path: Optional[str] = None) -> dict:
-
-        def key_to_path(key: str) -> Optional[str]:
-            nonlocal _path
-            if match := PortalObject._ARRAY_KEY_REGULAR_EXPRESSION.search(key):
-                return f"{_path}{match.group(1)}" if _path else match.group(1)
-            return f"{_path}.{key}" if _path else key
-
-        def list_to_dictionary(value: list) -> dict:
-            result = {}
-            for index, item in enumerate(value):
-                result[f"#{index}"] = item
-            return result
-
+    def _compare(a: Any, b: Any, _path: Optional[str] = None) -> dict:
         diffs = {}
-        for key in a:
-            path = key_to_path(key)
-            if key not in b:
-                if a[key] != RowReader.CELL_DELETION_SENTINEL:
-                    diffs[path] = {"value": a[key], "creating_value": True}
+        if isinstance(a, dict) and isinstance(b, dict):
+            for key in a:
+                path = f"{_path}.{key}" if _path else key
+                if key not in b:
+                    if a[key] != RowReader.CELL_DELETION_SENTINEL:
+                        diffs[path] = {"value": a[key], "creating_value": True}
+                else:
+                    diffs.update(PortalObject._compare(a[key], b[key], _path=path))
+        elif isinstance(a, list) and isinstance(b, list):
+            # Ignore order of array elements; not absolutely technically correct but suits our purpose.
+            for index in range(len(a)):
+                path = f"{_path or ''}#{index}"
+                if not isinstance(a[index], dict) and not isinstance(a[index], list):
+                    if a[index] not in b:
+                        if a[index] != RowReader.CELL_DELETION_SENTINEL:
+                            if len(b) < index:
+                                diffs[path] = {"value": a[index], "updating_value": b[index]}
+                            else:
+                                diffs[path] = {"value": a[index], "creating_value": True}
+                elif len(b) < index:
+                    diffs.update(PortalObject._compare(a[index], b[index], _path=path))
+                else:
+                    diffs[path] = {"value": a[index], "creating_value": True}
+        elif a != b:
+            if a == RowReader.CELL_DELETION_SENTINEL:
+                diffs[_path] = {"value": b, "deleting_value": True}
             else:
-                if isinstance(a[key], dict) and isinstance(b[key], dict):
-                    diffs.update(PortalObject._compare(a[key], b[key], compare=compare, _path=path))
-                elif isinstance(a[key], list) and isinstance(b[key], list):
-                    # Note that lists will be compared in order, which means the when dealing with
-                    # insertions/deletions to/from the list, we my easily mistakenly regard elements
-                    # of the list to be different when they are really the same, since they occupy
-                    # different indices within the array. This is just a known restriction of this
-                    # comparison functionality; and perhaps actually technically correct, but probably
-                    # in practice, at the application/semantic level, we likely regard the order of
-                    # lists as unimportant, and with a little more work here we could try to detect
-                    # and exclude from the diffs for a list, those elements in the list which are
-                    # equal to each other but which reside at different indices with then two lists.
-                    diffs.update(PortalObject._compare(list_to_dictionary(a[key]),
-                                                       list_to_dictionary(b[key]), compare=compare, _path=path))
-                elif a[key] != b[key]:
-                    if a[key] == RowReader.CELL_DELETION_SENTINEL:
-                        diffs[path] = {"value": b[key], "deleting_value": True}
-                    elif not callable(compare) or not compare(path, a[key], b[key]):
-                        diffs[path] = {"value": a[key], "updating_value": b[key]}
+                diffs[_path] = {"value": a, "updating_value": b}
         return diffs
 
     def normalize_refs(self, refs: List[dict]) -> None:
@@ -206,6 +179,7 @@ class PortalObject:
         contains a "path" and a "uuid" property; this list is typically (for our first usage of
         this function) the value of structured_data.StructuredDataSet.resolved_refs_with_uuid.
         Change is made to this Portal object in place; use normalized_refs function to make a copy.
+        If there are no "refs" (None or empty) then the references will be looked up via Portal calls.
         """
         PortalObject._normalize_refs(self.data, refs=refs, schema=self.schema, portal=self.portal)
 
@@ -214,12 +188,14 @@ class PortalObject:
         Same as normalize_ref but does not make this change to this Portal object in place,
         rather it returns a new instance of this Portal object wrapped in a new PortalObject.
         """
-        portal_object = PortalObject(self.portal, deepcopy(self.data), self.type)
+        portal_object = self.copy()
         portal_object.normalize_refs(refs)
         return portal_object
 
     @staticmethod
     def _normalize_refs(value: Any, refs: List[dict], schema: dict, portal: Portal, _path: Optional[str] = None) -> Any:
+        if not value or not isinstance(schema, dict):
+            return value
         if isinstance(value, dict):
             for key in value:
                 path = f"{_path}.{key}" if _path else key
@@ -233,18 +209,21 @@ class PortalObject:
         elif value_type := Schema.get_property_by_path(schema, _path):
             if link_to := value_type.get("linkTo"):
                 ref_path = f"/{link_to}/{value}"
+                if not isinstance(refs, list):
+                    refs = []
                 if ref_uuids := [ref.get("uuid") for ref in refs if ref.get("path") == ref_path]:
                     ref_uuid = ref_uuids[0]
                 else:
                     ref_uuid = None
                 if ref_uuid:
                     return ref_uuid
-                # Here our (linkTo) reference appears not to be in the given refs; if this refs came
+                # Here our (linkTo) reference appears not to be in the given refs; if these refs came
                 # from structured_data.StructuredDataSet.resolved_refs_with_uuid (in the context of
                 # smaht-submitr, which is the typical/first use case for this function) then this could
-                # be because the reference as to an internal object, i.e. another object existing within
+                # be because the reference was to an internal object, i.e. another object existing within
                 # the data/spreadsheet being submitted. In any case, we don't have the associated uuid
                 # so let us look it up here.
-                if (ref_object := portal.get_metadata(ref_path)) and (ref_uuid := ref_object.get("uuid")):
-                    return ref_uuid
+                if isinstance(portal, Portal):
+                    if (ref_object := portal.get_metadata(ref_path)) and (ref_uuid := ref_object.get("uuid")):
+                        return ref_uuid
         return value

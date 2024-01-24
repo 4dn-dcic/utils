@@ -13,10 +13,12 @@ class RowReader(abc.ABC):
     # Cell values(s) indicating property deletion.
     _CELL_DELETION_VALUES = ["*delete*"]
 
-    # Special cell deletion sentinel value.
+    # Special cell deletion sentinel value (note make sure on deepcopy it remains the same).
     class _CellDeletionSentinal(object):
         def __str__(self):
             return RowReader._CELL_DELETION_VALUES[0]
+        def __deepcopy__(self, memo):
+            return self
 
     CELL_DELETION_SENTINEL = _CellDeletionSentinal()
 
