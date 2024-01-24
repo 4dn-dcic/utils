@@ -46,8 +46,8 @@ class StructuredDataSet:
     def __init__(self, file: Optional[str] = None, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
                  schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
                  order: Optional[List[str]] = None, prune: bool = True) -> None:
-        self.data = {}
-        self._portal = Portal(portal, data=self.data, schemas=schemas) if portal else None
+        self._data = {}
+        self._portal = Portal(portal, data=self._data, schemas=schemas) if portal else None
         self._order = order
         self._prune = prune
         self._warnings = {}
@@ -56,6 +56,10 @@ class StructuredDataSet:
         self._validated = False
         self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
         self._load_file(file) if file else None
+
+    @property
+    def data(self) -> dict:
+        return self._data
 
     @staticmethod
     def load(file: str, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
@@ -196,10 +200,10 @@ class StructuredDataSet:
     def _add(self, type_name: str, data: Union[dict, List[dict]]) -> None:
         if self._prune:
             remove_empty_properties(data)
-        if type_name in self.data:
-            self.data[type_name].extend([data] if isinstance(data, dict) else data)
+        if type_name in self._data:
+            self._data[type_name].extend([data] if isinstance(data, dict) else data)
         else:
-            self.data[type_name] = [data] if isinstance(data, dict) else data
+            self._data[type_name] = [data] if isinstance(data, dict) else data
 
     def _add_properties(self, structured_row: dict, properties: dict, schema: Optional[dict] = None) -> None:
         for name in properties:
@@ -362,18 +366,6 @@ class Schema:
         for error in SchemaValidator(self.data, format_checker=SchemaValidator.FORMAT_CHECKER).iter_errors(data):
             errors.append(error.message)
         return errors
-
-    @property
-    def unresolved_refs(self) -> List[dict]:
-        return self._unresolved_refs
-
-    @property
-    def resolved_refs(self) -> List[str]:
-        return list([resolved_ref[0] for resolved_ref in self._resolved_refs])
-
-    @property
-    def resolved_refs_with_uuids(self) -> List[str]:
-        return list([{"path": resolved_ref[0], "uuid": resolved_ref[1]} for resolved_ref in self._resolved_refs])
 
     def get_typeinfo(self, column_name: str) -> Optional[dict]:
         if isinstance(info := self._typeinfo.get(column_name), str):

@@ -114,20 +114,21 @@ class PortalObject:
             pass
         return None, self.identifying_path
 
-    def compare(self, value: Union[dict, PortalObject], consider_link_to: bool = False) -> dict:
+    def compare(self, value: Union[dict, PortalObject],
+                consider_refs: bool = False, resolved_refs: List[dict] = None) -> dict:
         """
         Compares this Portal object against the given Portal object value; noting differences values of properites
         which they have in common; and properties which are in this Portal object and not in the given Portal object;
         we do NOT check the converse, i.e. properties in the given Portal object which are not in this Portal object.
-        Returns a dictionary with a description of the differences. If the given consider_link_to flag is True then
+        Returns a dictionary with a description of the differences. If the given consider_refs flag is True then
         for differences detected linkTo reference values, we will actually check that the object which is being
         referenced is different or the same, e.g. the file_format reference (linkTo) property value "fastq" looks
         different from "eb417c0a-70dd-42e3-9841-ac7f1ee22962" but they (may) refer to the same object.
         """
         def are_properties_equal(property_path: str, property_value_a: Any, property_value_b: Any) -> bool:
+            nonlocal self
             if property_value_a == property_value_b:
                 return True
-            nonlocal self
             if (schema := self.schema) and (property_type := Schema.get_property_by_path(schema, property_path)):
                 if link_to := property_type.get("linkTo"):
                     """
@@ -144,23 +145,29 @@ class PortalObject:
                                 if (b.status_code == 200) and (b := b.json()):
                                     return a == b
             return False
+
+        if resolved_refs:
+            consider_refs = True
         return PortalObject._compare(self._data, value.data if isinstance(value, PortalObject) else value,
-                                     compare=are_properties_equal if consider_link_to else None)
+                                     compare=are_properties_equal if consider_refs else None)
 
     _ARRAY_KEY_REGULAR_EXPRESSION = re.compile(rf"^({Schema._ARRAY_NAME_SUFFIX_CHAR}\d+)$")
 
     @staticmethod
     def _compare(a: dict, b: dict, compare: Optional[Callable] = None, _path: Optional[str] = None) -> dict:
-        def key_to_path(key: str) -> Optional[str]:  # noqa
+
+        def key_to_path(key: str) -> Optional[str]:
             nonlocal _path
             if match := PortalObject._ARRAY_KEY_REGULAR_EXPRESSION.search(key):
                 return f"{_path}{match.group(1)}" if _path else match.group(1)
             return f"{_path}.{key}" if _path else key
-        def list_to_dictionary(value: list) -> dict:  # noqa
+
+        def list_to_dictionary(value: list) -> dict:
             result = {}
             for index, item in enumerate(value):
                 result[f"#{index}"] = item
             return result
+
         diffs = {}
         for key in a:
             path = key_to_path(key)
