@@ -106,7 +106,11 @@ class StructuredDataSet:
 
     @property
     def resolved_refs(self) -> List[str]:
-        return list(self._resolved_refs)
+        return list([resolved_ref[0] for resolved_ref in self._resolved_refs])
+
+    @property
+    def resolved_refs_with_uuids(self) -> List[str]:
+        return list([{"path": resolved_ref[0], "uuid": resolved_ref[1]} for resolved_ref in self._resolved_refs])
 
     @property
     def upload_files(self) -> List[str]:
@@ -365,7 +369,11 @@ class Schema:
 
     @property
     def resolved_refs(self) -> List[str]:
-        return list(self._resolved_refs)
+        return list([resolved_ref[0] for resolved_ref in self._resolved_refs])
+
+    @property
+    def resolved_refs_with_uuids(self) -> List[str]:
+        return list([{"path": resolved_ref[0], "uuid": resolved_ref[1]} for resolved_ref in self._resolved_refs])
 
     def get_typeinfo(self, column_name: str) -> Optional[dict]:
         if isinstance(info := self._typeinfo.get(column_name), str):
@@ -430,9 +438,14 @@ class Schema:
                 if not (resolved := portal.ref_exists(link_to, value)):
                     self._unresolved_refs.append({"src": src, "error": f"/{link_to}/{value}"})
                 elif len(resolved) > 1:
-                    self._unresolved_refs.append({"src": src, "error": f"/{link_to}/{value}", "types": resolved})
+                    # TODO: Don't think we need this anymore; see TODO on Portal.ref_exists.
+                    self._unresolved_refs.append({
+                        "src": src,
+                        "error": f"/{link_to}/{value}",
+                        "types": [resolved_ref["type"] for resolved_ref in resolved]})
                 else:
-                    self._resolved_refs.add(f"/{link_to}/{value}")
+                    # A resolved-ref set value is a tuple of the reference path and its uuid.
+                    self._resolved_refs.add((f"/{link_to}/{value}", resolved[0].get("uuid")))
             return value
         return lambda value, src: map_ref(value, typeinfo.get("linkTo"), self._portal, src)
 
@@ -624,8 +637,9 @@ class Portal(PortalBase):
 
     def ref_exists(self, type_name: str, value: str) -> List[str]:
         resolved = []
-        if self._ref_exists_single(type_name, value):
-            resolved.append(type_name)
+        is_resolved, resolved_uuid = self._ref_exists_single(type_name, value)
+        if is_resolved:
+            resolved.append({"type": type_name, "uuid": resolved_uuid})
             # TODO: Added this return on 2024-01-14 (dmichaels).
             # Why did I orginally check for multiple existing values?
             # Why not just return right away if I find that the ref exists?
@@ -638,20 +652,23 @@ class Portal(PortalBase):
         if (schemas_super_type_map := self.get_schemas_super_type_map()):
             if (sub_type_names := schemas_super_type_map.get(type_name)):
                 for sub_type_name in sub_type_names:
-                    if self._ref_exists_single(sub_type_name, value):
-                        resolved.append(type_name)
+                    is_resolved, resolved_uuid = self._ref_exists_single(sub_type_name, value)
+                    if is_resolved:
+                        resolved.append({"type": type_name, "uuid": resolved_uuid})
                         # TODO: Added this return on 2024-01-14 (dmichaels). See above TODO.
                         return resolved
         return resolved
 
-    def _ref_exists_single(self, type_name: str, value: str) -> bool:
+    def _ref_exists_single(self, type_name: str, value: str) -> Tuple[bool, Optional[str]]:
         if self._data and (items := self._data.get(type_name)) and (schema := self.get_schema(type_name)):
             iproperties = set(schema.get("identifyingProperties", [])) | {"identifier", "uuid"}
             for item in items:
                 if (ivalue := next((item[iproperty] for iproperty in iproperties if iproperty in item), None)):
                     if isinstance(ivalue, list) and value in ivalue or ivalue == value:
-                        return True
-        return self.get_metadata(f"/{type_name}/{value}") is not None
+                        return True, None
+        if not (value := self.get_metadata(f"/{type_name}/{value}") is not None):
+            return False, None
+        return True, value.get("uuid")
 
     @staticmethod
     def create_for_testing(arg: Optional[Union[str, bool, List[dict], dict, Callable]] = None,
