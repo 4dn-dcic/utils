@@ -1,3 +1,4 @@
+from copy import deepcopy
 from functools import lru_cache
 import re
 from typing import Any, Callable, List, Optional, Tuple, Type, Union
@@ -18,6 +19,10 @@ class PortalObject:
     @property
     def data(self):
         return self._data
+
+    @property
+    def portal(self):
+        return self._portal
 
     @property
     @lru_cache(maxsize=1)
@@ -145,9 +150,6 @@ class PortalObject:
                                 if (b.status_code == 200) and (b := b.json()):
                                     return a == b
             return False
-
-        if resolved_refs:
-            consider_refs = True
         return PortalObject._compare(self._data, value.data if isinstance(value, PortalObject) else value,
                                      compare=are_properties_equal if consider_refs else None)
 
@@ -195,3 +197,54 @@ class PortalObject:
                     elif not callable(compare) or not compare(path, a[key], b[key]):
                         diffs[path] = {"value": a[key], "updating_value": b[key]}
         return diffs
+
+    def normalize_refs(self, refs: List[dict]) -> None:
+        """
+        Turns any (linkTo) references which are paths (e.g. /SubmissionCenter/uwsc_gcc) within
+        this Portal object into the uuid style reference (e.g. d1b67068-300f-483f-bfe8-63d23c93801f),
+        based on the given "refs" list which is assumed to be a list of dictionaries, where each
+        contains a "path" and a "uuid" property; this list is typically (for our first usage of
+        this function) the value of structured_data.StructuredDataSet.resolved_refs_with_uuid.
+        Change is made to this Portal object in place; use normalized_refs function to make a copy.
+        """
+        PortalObject._normalize_refs(self.data, refs=refs, schema=self.schema, portal=self.portal)
+
+    def normalized_refs(self, refs: List[dict]) -> PortalObject:
+        """
+        Same as normalize_ref but does not make this change to this Portal object in place,
+        rather it returns a new instance of this Portal object wrapped in a new PortalObject.
+        """
+        portal_object = PortalObject(self.portal, deepcopy(self.data), self.type)
+        portal_object.normalize_refs(refs)
+        return portal_object
+
+    @staticmethod
+    def _normalize_refs(value: Any, refs: List[dict], schema: dict, portal: Portal, _path: Optional[str] = None) -> Any:
+        if isinstance(value, dict):
+            for key in value:
+                path = f"{_path}.{key}" if _path else key
+                value[key] = PortalObject._normalize_refs(value[key], refs=refs,
+                                                          schema=schema, portal=portal, _path=path)
+        elif isinstance(value, list):
+            for index in range(len(value)):
+                path = f"{_path or ''}#{index}"
+                value[index] = PortalObject._normalize_refs(value[index], refs=refs,
+                                                            schema=schema, portal=portal, _path=path)
+        elif value_type := Schema.get_property_by_path(schema, _path):
+            if link_to := value_type.get("linkTo"):
+                ref_path = f"/{link_to}/{value}"
+                if ref_uuids := [ref.get("uuid") for ref in refs if ref.get("path") == ref_path]:
+                    ref_uuid = ref_uuids[0]
+                else:
+                    ref_uuid = None
+                if ref_uuid:
+                    return ref_uuid
+                # Here our (linkTo) reference appears not to be in the given refs; if this refs came
+                # from structured_data.StructuredDataSet.resolved_refs_with_uuid (in the context of
+                # smaht-submitr, which is the typical/first use case for this function) then this could
+                # be because the reference as to an internal object, i.e. another object existing within
+                # the data/spreadsheet being submitted. In any case, we don't have the associated uuid
+                # so let us look it up here.
+                if (ref_object := portal.get_metadata(ref_path)) and (ref_uuid := ref_object.get("uuid")):
+                    return ref_uuid
+        return value
