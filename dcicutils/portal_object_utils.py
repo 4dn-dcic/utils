@@ -183,8 +183,9 @@ class PortalObject:
         based on the given "refs" list which is assumed to be a list of dictionaries, where each
         contains a "path" and a "uuid" property; this list is typically (for our first usage of
         this function) the value of structured_data.StructuredDataSet.resolved_refs_with_uuid.
-        Change is made to this Portal object in place; use normalized_refs function to make a copy.
-        If there are no "refs" (None or empty) then the references will be looked up via Portal calls.
+        Changes are made to this Portal object in place; use normalized_refs function to make a copy.
+        If there are no "refs" (None or empty) or if the speicified reference is not found in this
+        list then the references will be looked up via Portal calls (via Portal.get_metadata).
         """
         PortalObject._normalize_refs(self.data, refs=refs, schema=self.schema, portal=self.portal)
 
