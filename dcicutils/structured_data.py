@@ -369,7 +369,7 @@ class Schema:
     def validate(self, data: dict) -> List[str]:
         errors = []
         for error in SchemaValidator(self.data, format_checker=SchemaValidator.FORMAT_CHECKER).iter_errors(data):
-            errors.append(error.message)
+            errors.append(f"Validation error at '{error.json_path}': {error.message}")
         return errors
 
     def get_typeinfo(self, column_name: str) -> Optional[dict]:
