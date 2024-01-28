@@ -2,6 +2,7 @@
 This file contains functions that might be generally useful.
 """
 
+from collections import namedtuple
 import contextlib
 import datetime
 import functools
@@ -17,6 +18,7 @@ import re
 import rfc3986.validators
 import rfc3986.exceptions
 import time
+import uuid
 import warnings
 import webtest  # importing the library makes it easier to mock testing
 
@@ -1523,6 +1525,17 @@ def create_dict(**kwargs) -> dict:
         if kwargs[name]:
             result[name] = kwargs[name]
     return result
+
+
+def create_readonly_object(**kwargs):
+    """
+    Returns a new/unique object instance with readonly properties equal to the give kwargs.
+    """
+    readonly_class_name = "readonlyclass_" + str(uuid.uuid4()).replace("-", "")
+    readonly_class_args = " ".join(kwargs.keys())
+    readonly_class = namedtuple(readonly_class_name, readonly_class_args)
+    readonly_object = readonly_class(**kwargs)
+    return readonly_object
 
 
 def is_c4_arn(arn: str) -> bool:

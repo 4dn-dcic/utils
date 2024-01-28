@@ -3,6 +3,7 @@ from functools import lru_cache
 import re
 from typing import Any, List, Optional, Tuple, Type, Union
 from dcicutils.data_readers import RowReader
+from dcicutils.misc_utils import create_readonly_object
 from dcicutils.portal_utils import Portal
 from dcicutils.schema_utils import Schema
 
@@ -136,21 +137,33 @@ class PortalObject:
             comparing_data = value
         else:
             return {}
-        return PortalObject._compare(this_data, comparing_data)
+        return PortalObject._compare(this_data, comparing_data, self.type)
 
     _ARRAY_KEY_REGULAR_EXPRESSION = re.compile(rf"^({Schema._ARRAY_NAME_SUFFIX_CHAR}\d+)$")
 
     @staticmethod
-    def _compare(a: Any, b: Any, _path: Optional[str] = None) -> dict:
+    def _compare(a: Any, b: Any, value_type: str, _path: Optional[str] = None) -> dict:
+        def diff_creating(value: Any) -> object:  # noqa
+            nonlocal value_type
+            return create_readonly_object(value=value, type=value_type,
+                                          creating_value=True, updating_value=None, deleting_value=False)
+        def diff_updating(value: Any, updating_value: Any) -> object:  # noqa
+            nonlocal value_type
+            return create_readonly_object(value=value, type=value_type,
+                                          creating_value=False, updating_value=updating_value, deleting_value=False)
+        def diff_deleting(value: Any) -> object:  # noqa
+            nonlocal value_type
+            return create_readonly_object(value=value, type=value_type,
+                                          creating_value=False, updating_value=None, deleting_value=True)
         diffs = {}
         if isinstance(a, dict) and isinstance(b, dict):
             for key in a:
                 path = f"{_path}.{key}" if _path else key
                 if key not in b:
                     if a[key] != PortalObject._PROPERTY_DELETION_SENTINEL:
-                        diffs[path] = {"value": a[key], "creating_value": True}
+                        diffs[path] = diff_creating(a[key])
                 else:
-                    diffs.update(PortalObject._compare(a[key], b[key], _path=path))
+                    diffs.update(PortalObject._compare(a[key], b[key], type, _path=path))
         elif isinstance(a, list) and isinstance(b, list):
             # Ignore order of array elements; not absolutely technically correct but suits our purpose.
             for index in range(len(a)):
@@ -159,21 +172,21 @@ class PortalObject:
                     if a[index] not in b:
                         if a[index] != PortalObject._PROPERTY_DELETION_SENTINEL:
                             if index < len(b):
-                                diffs[path] = {"value": a[index], "updating_value": b[index]}
+                                diffs[path] = diff_updating(a[index], b[index])
                             else:
-                                diffs[path] = {"value": a[index], "creating_value": True}
+                                diffs[path] = diff_creating(a[index])
                         else:
                             if index < len(b):
-                                diffs[path] = {"value": b[index], "deleting_value": True}
+                                diffs[path] = diff_deleting(b[index])
                 elif len(b) < index:
-                    diffs.update(PortalObject._compare(a[index], b[index], _path=path))
+                    diffs.update(PortalObject._compare(a[index], b[index], value_type, _path=path))
                 else:
-                    diffs[path] = {"value": a[index], "creating_value": True}
+                    diffs[path] = diff_creating(a[index])
         elif a != b:
             if a == PortalObject._PROPERTY_DELETION_SENTINEL:
-                diffs[_path] = {"value": b, "deleting_value": True}
+                diffs[_path] = diff_deleting(b)
             else:
-                diffs[_path] = {"value": a, "updating_value": b}
+                diffs[_path] = diff_updating(a, b)
         return diffs
 
     def normalize_refs(self, refs: List[dict]) -> None:
