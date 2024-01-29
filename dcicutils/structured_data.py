@@ -11,8 +11,10 @@ from webtest.app import TestApp
 from dcicutils.common import OrchestratedApp
 from dcicutils.data_readers import CsvReader, Excel, RowReader
 from dcicutils.file_utils import search_for_file
-from dcicutils.misc_utils import (create_dict, load_json_if, merge_objects, remove_empty_properties, right_trim,
+from dcicutils.misc_utils import (create_dict, create_readonly_object, load_json_if,
+                                  merge_objects, remove_empty_properties, right_trim,
                                   split_string, to_boolean, to_enum, to_float, to_integer, VirtualApp)
+from dcicutils.portal_object_utils import PortalObject
 from dcicutils.portal_utils import Portal as PortalBase
 from dcicutils.zip_utils import unpack_gz_file_to_temporary_file, unpack_files
 
@@ -60,6 +62,10 @@ class StructuredDataSet:
     @property
     def data(self) -> dict:
         return self._data
+
+    @property
+    def portal(self) -> Optional[Portal]:
+        return self._portal
 
     @staticmethod
     def load(file: str, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
@@ -139,6 +145,27 @@ class StructuredDataSet:
             if file_path := search_for_file(upload_file["file"], location, recursive=recursive, single=True):
                 upload_file["path"] = file_path
         return upload_files
+
+    def compare(self) -> dict:
+        diffs = {}
+        if self.data or self.portal:
+            refs = self.resolved_refs_with_uuids
+            for object_type in self.data:
+                if not diffs.get(object_type):
+                    diffs[object_type] = []
+                for portal_object in self.data[object_type]:
+                    portal_object = PortalObject(self.portal, portal_object, object_type)
+                    existing_object, identifying_path = portal_object.lookup(include_identifying_path=True, raw=True)
+                    if existing_object:
+                        object_diffs = portal_object.compare(existing_object, consider_refs=True, resolved_refs=refs)
+                        diffs[object_type].append(create_readonly_object(path=identifying_path,
+                                                                         uuid=existing_object.uuid,
+                                                                         diffs=object_diffs or None))
+                    else:
+                        # If there is no existing object we still create a record for this object
+                        # but with no uuid which will be the indication that it does not exist.
+                        diffs[object_type].append(create_readonly_object(path=identifying_path, uuid=None, diffs=None))
+        return diffs
 
     def _load_file(self, file: str) -> None:
         # Returns a dictionary where each property is the name (i.e. the type) of the data,

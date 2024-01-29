@@ -137,23 +137,20 @@ class PortalObject:
             comparing_data = value
         else:
             return {}
-        return PortalObject._compare(this_data, comparing_data, self.type)
+        return PortalObject._compare(this_data, comparing_data)
 
     _ARRAY_KEY_REGULAR_EXPRESSION = re.compile(rf"^({Schema._ARRAY_NAME_SUFFIX_CHAR}\d+)$")
 
     @staticmethod
-    def _compare(a: Any, b: Any, value_type: str, _path: Optional[str] = None) -> dict:
+    def _compare(a: Any, b: Any, _path: Optional[str] = None) -> dict:
         def diff_creating(value: Any) -> object:  # noqa
-            nonlocal value_type
-            return create_readonly_object(value=value, type=value_type,
+            return create_readonly_object(value=value,
                                           creating_value=True, updating_value=None, deleting_value=False)
         def diff_updating(value: Any, updating_value: Any) -> object:  # noqa
-            nonlocal value_type
-            return create_readonly_object(value=value, type=value_type,
+            return create_readonly_object(value=value,
                                           creating_value=False, updating_value=updating_value, deleting_value=False)
         def diff_deleting(value: Any) -> object:  # noqa
-            nonlocal value_type
-            return create_readonly_object(value=value, type=value_type,
+            return create_readonly_object(value=value,
                                           creating_value=False, updating_value=None, deleting_value=True)
         diffs = {}
         if isinstance(a, dict) and isinstance(b, dict):
@@ -163,7 +160,7 @@ class PortalObject:
                     if a[key] != PortalObject._PROPERTY_DELETION_SENTINEL:
                         diffs[path] = diff_creating(a[key])
                 else:
-                    diffs.update(PortalObject._compare(a[key], b[key], type, _path=path))
+                    diffs.update(PortalObject._compare(a[key], b[key], _path=path))
         elif isinstance(a, list) and isinstance(b, list):
             # Ignore order of array elements; not absolutely technically correct but suits our purpose.
             for index in range(len(a)):
@@ -179,7 +176,7 @@ class PortalObject:
                             if index < len(b):
                                 diffs[path] = diff_deleting(b[index])
                 elif len(b) < index:
-                    diffs.update(PortalObject._compare(a[index], b[index], value_type, _path=path))
+                    diffs.update(PortalObject._compare(a[index], b[index], _path=path))
                 else:
                     diffs[path] = diff_creating(a[index])
         elif a != b:
