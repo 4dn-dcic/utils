@@ -15,7 +15,7 @@ from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 from uuid import uuid4 as uuid
 from webtest.app import TestApp, TestResponse
 from wsgiref.simple_server import make_server as wsgi_make_server
-from dcicutils.common import OrchestratedApp, ORCHESTRATED_APPS
+from dcicutils.common import APP_SMAHT, OrchestratedApp, ORCHESTRATED_APPS
 from dcicutils.ff_utils import get_metadata, get_schema, patch_metadata, post_metadata
 from dcicutils.misc_utils import to_camel_case, VirtualApp
 from dcicutils.tmpfile_utils import temporary_file
@@ -42,6 +42,7 @@ class Portal:
        or a dcicutils.misc_utils.VirtualApp, or even a pyramid.router.Router.
     8. From another Portal object (i.e. copy constructor).
     """
+    DEFAULT_APP = APP_SMAHT
     KEYS_FILE_DIRECTORY = "~"
     MIME_TYPE_JSON = "application/json"
 
@@ -60,7 +61,7 @@ class Portal:
             self._vapp = None
             for arg in unspecified:
                 if arg is not None:
-                    raise Exception("Portal init error; extraneous args.")
+                    raise Exception("Portal initialization error; extraneous arguments.")
 
         def init_from_portal(portal: Portal, unspecified: Optional[list] = None) -> None:
             init(unspecified=unspecified)
@@ -93,13 +94,13 @@ class Portal:
                                 raise Exception(f"Portal server inconsistency: {server} vs {key_server}")
                         self._key["server"] = self._server = server
             if not self._key:
-                raise Exception("Portal init error; from key.")
+                raise Exception("Portal initialization error; from key.")
 
         def init_from_key_pair(key_pair: tuple, server: Optional[str], unspecified: Optional[list] = []) -> None:
             if len(key_pair) >= 2:
                 init_from_key({"key": key_pair[0], "secret": key_pair[1]}, server, unspecified=unspecified)
             else:
-                raise Exception("Portal init error; from key-pair.")
+                raise Exception("Portal initialization error; from key-pair.")
 
         def init_from_keys_file(keys_file: str, env: Optional[str], server: Optional[str],
                                 unspecified: Optional[list] = []) -> None:
@@ -107,7 +108,7 @@ class Portal:
                 with io.open(keys_file := os.path.expanduser(keys_file)) as f:
                     keys = json.load(f)
             except Exception:
-                raise Exception(f"Portal init error; cannot open keys-file: {keys_file}")
+                raise Exception(f"Portal initialization error; cannot open keys-file: {keys_file}")
             if isinstance(env, str) and env and isinstance(key := keys.get(env), dict):
                 init_from_key(key, server)
                 self._keys_file = keys_file
@@ -121,7 +122,8 @@ class Portal:
                 self._keys_file = keys_file
                 self._env = env
             else:
-                raise Exception(f"Portal init error; {env or server or None} not found in keys-file: {keys_file}")
+                raise Exception(f"Portal initialization error;"
+                                f" {env or server or None} not found in keys-file: {keys_file}")
 
         def init_from_env_server_app(env: str, server: str, app: Optional[str],
                                      unspecified: Optional[list] = None) -> None:
@@ -146,7 +148,7 @@ class Portal:
                 return prefix + server if server else None
 
         if (valid_app := app) and not (valid_app := Portal._valid_app(app)):
-            raise Exception(f"Portal init error; invalid app: {app}")
+            raise Exception(f"Portal initialization error; invalid app: {app}")
         self._app = valid_app
         if isinstance(arg, Portal):
             init_from_portal(arg, unspecified=[env, server, app])
@@ -164,12 +166,15 @@ class Portal:
             init_from_env_server_app(arg, server, app, unspecified=[env])
         elif (isinstance(env, str) and env) or (isinstance(server, str) and server):
             init_from_env_server_app(env, server, app, unspecified=[arg])
+        elif not arg and (keys_file := self._default_keys_file(app=self._app or Portal.DEFAULT_APP, env=env)):
+            # If no initial arg then look for default app keys file.
+            init_from_keys_file(keys_file, env, server)
         elif raise_exception:
-            raise Exception("Portal init error; insufficient args.")
+            raise Exception("Portal initialization error; insufficient arguments.")
         else:
             init()
         if not self.vapp and not self.key and raise_exception:
-            raise Exception("Portal init error; neither key nor vapp defined.")
+            raise Exception("Portal initialization error; neither key nor vapp defined.")
 
     @property
     def ini_file(self) -> Optional[str]:
