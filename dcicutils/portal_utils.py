@@ -443,7 +443,7 @@ class Portal:
         if isinstance(arg, list) or isinstance(arg, dict) or isinstance(arg, Callable):
             return Portal(Portal._create_router_for_testing(arg))
         elif isinstance(arg, str) and arg.endswith(".ini"):
-            return Portal(Portal._create_vapp(arg))
+            return Portal(arg)
         elif arg == "local" or arg is True:
             minimal_ini_for_testing = "\n".join([
                 "[app:app]\nuse = egg:encoded\nfile_upload_bucket = dummy",
@@ -467,7 +467,7 @@ class Portal:
         else:
             minimal_ini_for_testing = "[app:app]\nuse = egg:encoded\nsqlalchemy.url = postgresql://dummy\n"
         with temporary_file(content=minimal_ini_for_testing, suffix=".ini") as ini_file:
-            return Portal(Portal._create_vapp(ini_file))
+            return Portal(ini_file)
 
     @staticmethod
     def _create_vapp(arg: Union[TestApp, VirtualApp, PyramidRouter, str] = None) -> TestApp:
