@@ -20,22 +20,22 @@ class PortalObject:
         self._type = portal_object_type if isinstance(portal_object_type, str) and portal_object_type else None
 
     @property
-    def data(self):
+    def data(self) -> dict:
         return self._data
 
     @property
-    def portal(self):
+    def portal(self) -> Optional[Portal]:
         return self._portal
 
     @property
     @lru_cache(maxsize=1)
-    def type(self):
+    def type(self) -> Optional[str]:
         return self._type or Portal.get_schema_type(self._data)
 
     @property
     @lru_cache(maxsize=1)
-    def types(self):
-        return self._type or Portal.get_schema_types(self._data)
+    def types(self) -> Optional[List[str]]:
+        return [self._type] if self._type else Portal.get_schema_types(self._data)
 
     @property
     @lru_cache(maxsize=1)
@@ -44,22 +44,22 @@ class PortalObject:
 
     @property
     @lru_cache(maxsize=1)
-    def schema(self):
-        return self._portal.get_schema(self.type)
+    def schema(self) -> Optional[dict]:
+        return self._portal.get_schema(self.type) if self._portal else None
 
     def copy(self) -> PortalObject:
         return PortalObject(self.portal, deepcopy(self.data), self.type)
 
     @property
     @lru_cache(maxsize=1)
-    def identifying_properties(self) -> List[str]:
+    def identifying_properties(self) -> Optional[List[str]]:
         """
         Returns the list of all identifying property names of this Portal object which actually have values.
         Implicitly include "uuid" and "identifier" properties as identifying properties if they are actually
         properties in the object schema, and favor these (first); defavor "aliases"; no other ordering defined.
         """
         if not (schema := self.schema) or not (schema_identifying_properties := schema.get("identifyingProperties")):
-            return []
+            return None
         identifying_properties = []
         for identifying_property in schema_identifying_properties:
             if identifying_property not in ["uuid", "identifier", "aliases"]:
@@ -71,16 +71,16 @@ class PortalObject:
             identifying_properties.insert(0, "uuid")
         if "aliases" in schema_identifying_properties and self._data.get("aliases"):
             identifying_properties.append("aliases")
-        return identifying_properties
+        return identifying_properties or None
 
     @property
     @lru_cache(maxsize=1)
-    def identifying_paths(self) -> List[str]:
+    def identifying_paths(self) -> Optional[List[str]]:
         """
         Returns a list of the possible Portal URL paths identifying this Portal object.
         """
         if not (identifying_properties := self.identifying_properties):
-            return []
+            return [f"/{self.type}/{self.uuid}", f"/{self.uuid}"] if self.type and self.uuid else None
         identifying_paths = []
         for identifying_property in identifying_properties:
             if (identifying_value := self._data.get(identifying_property)):
@@ -101,7 +101,7 @@ class PortalObject:
                 else:
                     identifying_paths.append(f"/{self.type}/{identifying_value}")
                     identifying_paths.append(f"/{identifying_value}")
-        return identifying_paths
+        return identifying_paths or None
 
     @property
     @lru_cache(maxsize=1)
@@ -118,9 +118,10 @@ class PortalObject:
 
     def _lookup(self, raw: bool = False) -> Tuple[Optional[PortalObject], Optional[str]]:
         try:
-            for identifying_path in self.identifying_paths:
-                if (value := self._portal.get(identifying_path, raw=raw)) and (value.status_code == 200):
-                    return PortalObject(self._portal, value.json(), self.type if raw else None), identifying_path
+            if identifying_paths := self.identifying_paths:
+                for identifying_path in identifying_paths:
+                    if (value := self._portal.get(identifying_path, raw=raw)) and (value.status_code == 200):
+                        return PortalObject(self._portal, value.json(), self.type if raw else None), identifying_path
         except Exception:
             pass
         return None, self.identifying_path
