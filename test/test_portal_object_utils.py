@@ -615,7 +615,6 @@ def test_compare():
 
     with mock.patch("dcicutils.portal_utils.Portal", MockPortal()) as portal:
 
-        return  # xyzzy
         portal_object = PortalObject(portal, TEST_OBJECT_RAW_JSON)
         assert portal_object.data == TEST_OBJECT_RAW_JSON
         assert portal_object.portal == portal
