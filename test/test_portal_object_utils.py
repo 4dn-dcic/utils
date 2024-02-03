@@ -568,7 +568,7 @@ TEST_OBJECT_TYPES = ["IngestionSubmission", "Item"]
 class MockPortal(Portal):
     def __init__(self, arg=None, env=None, server=None, app=None, raise_exception=True):
         pass
-    class _Response:
+    class _Response:  # noqa
         def __init__(self, data, status_code):
             self._data = data
             self._status_code = status_code
