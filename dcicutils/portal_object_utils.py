@@ -175,7 +175,7 @@ class PortalObject:
                         else:
                             if index < len(b):
                                 diffs[path] = diff_deleting(b[index])
-                elif len(b) < index:
+                elif index < len(b):
                     diffs.update(PortalObject._compare(a[index], b[index], _path=path))
                 else:
                     diffs[path] = diff_creating(a[index])
