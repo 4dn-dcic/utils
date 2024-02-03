@@ -610,7 +610,6 @@ def test_compare():
     portal_object_copy = portal_object.copy()
     assert portal_object.data == portal_object_copy.data
     assert portal_object.portal == portal_object_copy.portal
-    return  # xyzzy
 
     with mock.patch("dcicutils.portal_utils.Portal", MockPortal()) as portal:
 
@@ -622,6 +621,7 @@ def test_compare():
         assert not portal_object.types
         assert portal_object.schema == TEST_OBJECT_SCHEMA_JSON
         assert portal_object.identifying_properties == ["uuid"]
+        return  # xyzzy
 
         portal_object_found = portal_object.lookup()
         assert portal_object_found.uuid == portal_object.uuid
