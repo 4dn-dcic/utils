@@ -635,3 +635,43 @@ def test_compare():
                                                          f"/{TEST_OBJECT_UUID}",
                                                          "/IngestionSubmission/foo", "/foo",
                                                          "/IngestionSubmission/bar", "/bar"]
+
+        portal_object_copy = portal_object.copy()
+        portal_object_copy.data["xyzzy"] = 123
+        assert portal_object.compare(portal_object_copy) == {}
+
+        portal_object.data["xyzzy"] = 123
+        assert portal_object.compare(portal_object_copy) == {}
+
+        portal_object.data["xyzzy"] = 456
+        diffs = portal_object.compare(portal_object_copy)
+        assert diffs["xyzzy"].value == 456
+        assert diffs["xyzzy"].creating_value == False
+        assert diffs["xyzzy"].updating_value == 123
+        assert diffs["xyzzy"].deleting_value == False
+
+        portal_object.data["xyzzy"] = PortalObject._PROPERTY_DELETION_SENTINEL
+        diffs = portal_object.compare(portal_object_copy)
+        assert diffs["xyzzy"].value == 123
+        assert diffs["xyzzy"].creating_value == False
+        assert diffs["xyzzy"].updating_value == None
+        assert diffs["xyzzy"].deleting_value == True
+
+        portal_object.data["xyzzy"] = 456
+        del portal_object_copy.data["xyzzy"]
+        diffs = portal_object.compare(portal_object_copy)
+        assert diffs["xyzzy"].value == 456
+        assert diffs["xyzzy"].creating_value == True
+        assert diffs["xyzzy"].updating_value == None
+        assert diffs["xyzzy"].deleting_value == False
+
+        portal_object.data["additional_data"]["upload_info"][1]["uuid"] = "foobar"
+        diffs = portal_object.compare(portal_object_copy)
+        assert diffs["additional_data.upload_info#1.uuid"].value == "foobar"
+        assert diffs["additional_data.upload_info#1.uuid"].creating_value == False
+        assert diffs["additional_data.upload_info#1.uuid"].updating_value == "f5ac5d98-1f85-44f4-8bad-b4488fbdda7e"
+        assert diffs["additional_data.upload_info#1.uuid"].deleting_value == False
+        assert diffs["xyzzy"].value == 456
+        assert diffs["xyzzy"].creating_value == True
+        assert diffs["xyzzy"].updating_value == None
+        assert diffs["xyzzy"].deleting_value == False
