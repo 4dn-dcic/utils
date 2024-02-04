@@ -154,7 +154,7 @@ class StructuredDataSet:
                 if not diffs.get(object_type):
                     diffs[object_type] = []
                 for portal_object in self.data[object_type]:
-                    portal_object = PortalObject(self.portal, portal_object, object_type)
+                    portal_object = PortalObject(portal_object, portal=self.portal, type=object_type)
                     existing_object, identifying_path = portal_object.lookup(include_identifying_path=True, raw=True)
                     if existing_object:
                         object_diffs = portal_object.compare(existing_object, consider_refs=True, resolved_refs=refs)

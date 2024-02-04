@@ -581,7 +581,7 @@ class MockPortal(Portal):
 
 def test_compare():
 
-    portal_object = PortalObject(None, TEST_OBJECT_RAW_JSON)
+    portal_object = PortalObject(TEST_OBJECT_RAW_JSON)
     assert portal_object.data == TEST_OBJECT_RAW_JSON
     assert not portal_object.portal
     assert portal_object.uuid == TEST_OBJECT_UUID
@@ -593,7 +593,7 @@ def test_compare():
     assert portal_object.identifying_paths == [f"/{TEST_OBJECT_UUID}"]
     assert portal_object.compare(TEST_OBJECT_RAW_JSON) == {}
 
-    portal_object = PortalObject(None, TEST_OBJECT_DATABASE_JSON)
+    portal_object = PortalObject(TEST_OBJECT_DATABASE_JSON)
     assert portal_object.data == TEST_OBJECT_DATABASE_JSON
     assert not portal_object.portal
     assert portal_object.uuid == TEST_OBJECT_UUID
@@ -612,7 +612,7 @@ def test_compare():
 
     with mock.patch("dcicutils.portal_utils.Portal", MockPortal()) as portal:
 
-        portal_object = PortalObject(portal, TEST_OBJECT_RAW_JSON)
+        portal_object = PortalObject(TEST_OBJECT_RAW_JSON, portal=portal)
         assert portal_object.data == TEST_OBJECT_RAW_JSON
         assert portal_object.portal == portal
         assert portal_object.uuid == TEST_OBJECT_UUID
@@ -676,7 +676,7 @@ def test_compare():
         assert diffs["xyzzy"].updating_value is None
         assert diffs["xyzzy"].deleting_value is False
 
-        portal_object = PortalObject(None, TEST_OBJECT_DATABASE_JSON)
+        portal_object = PortalObject(TEST_OBJECT_DATABASE_JSON)
         portal_object_copy = portal_object.copy()
         portal_object_copy.data["submitted_by"]["display_title"] = "J. Alfred Prufrock"
         diffs = portal_object.compare(portal_object_copy)

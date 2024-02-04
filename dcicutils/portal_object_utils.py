@@ -14,10 +14,10 @@ class PortalObject:
 
     _PROPERTY_DELETION_SENTINEL = RowReader.CELL_DELETION_SENTINEL
 
-    def __init__(self, portal: Portal, portal_object: dict, portal_object_type: Optional[str] = None) -> None:
-        self._portal = portal
+    def __init__(self, portal_object: dict, portal: Portal = None, type: Optional[str] = None) -> None:
         self._data = portal_object
-        self._type = portal_object_type if isinstance(portal_object_type, str) and portal_object_type else None
+        self._portal = portal
+        self._type = type if isinstance(type, str) and type else None
 
     @property
     def data(self) -> dict:
@@ -48,7 +48,7 @@ class PortalObject:
         return self._portal.get_schema(self.type) if self._portal else None
 
     def copy(self) -> PortalObject:
-        return PortalObject(self.portal, deepcopy(self.data), self.type)
+        return PortalObject(deepcopy(self.data), portal=self.portal, type=self.type)
 
     @property
     @lru_cache(maxsize=1)
@@ -127,7 +127,8 @@ class PortalObject:
             if identifying_paths := self.identifying_paths:
                 for identifying_path in identifying_paths:
                     if (value := self._portal.get(identifying_path, raw=raw)) and (value.status_code == 200):
-                        return PortalObject(self._portal, value.json(), self.type if raw else None), identifying_path
+                        return PortalObject(value.json(),
+                                            portal=self._portal, type=self.type if raw else None), identifying_path
         except Exception:
             pass
         return None, self.identifying_path
