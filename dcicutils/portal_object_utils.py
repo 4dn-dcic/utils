@@ -1,6 +1,5 @@
 from copy import deepcopy
 from functools import lru_cache
-import re
 from typing import Any, List, Optional, Tuple, Type, Union
 from dcicutils.data_readers import RowReader
 from dcicutils.misc_utils import create_readonly_object
@@ -146,8 +145,6 @@ class PortalObject:
         else:
             return {}
         return PortalObject._compare(this_data, comparing_data)
-
-    _ARRAY_KEY_REGULAR_EXPRESSION = re.compile(rf"^({Schema._ARRAY_NAME_SUFFIX_CHAR}\d+)$")
 
     @staticmethod
     def _compare(a: Any, b: Any, _path: Optional[str] = None) -> dict:

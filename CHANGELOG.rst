@@ -10,8 +10,8 @@ Change Log
 8.7.2
 =====
 
-* Changes to itemize SMaHT submission ingestion create/update/diff situation.
-* Changes to structured_data to handle property deletes.
+* Changes to itemize SMaHT submission ingestion create/update/diff situation (portal_object_utils).
+* Changes to structured_data to handle property deletes (portal_object_utils).
 
 
 8.7.1

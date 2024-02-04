@@ -28,7 +28,7 @@ class Portal:
     """
     This is meant to be an Über wrapper for Portal access. It can be created in a variety of ways:
     1. From a (Portal) .ini file (e.g. development.ini).
-    2. From a key dictionary, containing "key" and "secret" property values.
+    2. From a key dictionary, containing "key" and "secret" and (optional) "server" property values.
     3. From a key pair tuple, containing (in order) a key and secret values.
     4. From a keys .json file residing in ~/.{app}-keys.json where the given "app" value is either "smaht", "cgap",
        or "fourfront"; where is assumed to contain a dictionary with a key for the given "env" value, e.g. smaht-local;
