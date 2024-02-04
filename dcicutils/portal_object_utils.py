@@ -79,9 +79,13 @@ class PortalObject:
         """
         Returns a list of the possible Portal URL paths identifying this Portal object.
         """
-        if not (identifying_properties := self.identifying_properties):
-            return [f"/{self.type}/{self.uuid}", f"/{self.uuid}"] if self.type and self.uuid else None
         identifying_paths = []
+        if not (identifying_properties := self.identifying_properties):
+            if self.uuid:
+                if self.type:
+                    identifying_paths.append(f"/{self.type}/{self.uuid}")
+                identifying_paths.append(f"/{self.uuid}")
+            return identifying_paths
         for identifying_property in identifying_properties:
             if (identifying_value := self._data.get(identifying_property)):
                 if identifying_property == "uuid":
@@ -96,10 +100,12 @@ class PortalObject:
                 # not work but /FileSet/UW_FILE-SET_COLO-829BL_HI-C_1 does work.
                 elif isinstance(identifying_value, list):
                     for identifying_value_item in identifying_value:
-                        identifying_paths.append(f"/{self.type}/{identifying_value_item}")
+                        if self.type:
+                            identifying_paths.append(f"/{self.type}/{identifying_value_item}")
                         identifying_paths.append(f"/{identifying_value_item}")
                 else:
-                    identifying_paths.append(f"/{self.type}/{identifying_value}")
+                    if self.type:
+                        identifying_paths.append(f"/{self.type}/{identifying_value}")
                     identifying_paths.append(f"/{identifying_value}")
         return identifying_paths or None
 

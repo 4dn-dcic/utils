@@ -559,10 +559,6 @@ TEST_OBJECT_SCHEMA_JSON = {
 }
 
 TEST_OBJECT_UUID = TEST_OBJECT_RAW_JSON["uuid"]
-TEST_OBJECT_IDENTIFYING_PATH = f"/{TEST_OBJECT_DATABASE_JSON['@type'][0]}/{TEST_OBJECT_UUID}"
-TEST_OBJECT_IDENTIFYING_PATHS = [TEST_OBJECT_IDENTIFYING_PATH, f"/{TEST_OBJECT_UUID}"]
-TEST_OBJECT_TYPE = "IngestionSubmission"
-TEST_OBJECT_TYPES = ["IngestionSubmission", "Item"]
 
 
 class MockPortal(Portal):
@@ -589,24 +585,25 @@ def test_compare():
     assert portal_object.data == TEST_OBJECT_RAW_JSON
     assert not portal_object.portal
     assert portal_object.uuid == TEST_OBJECT_UUID
-    assert not portal_object.types
     assert not portal_object.type
+    assert not portal_object.types
     assert not portal_object.schema
     assert not portal_object.identifying_properties
-    assert not portal_object.identifying_paths
-    assert not portal_object.identifying_path
+    assert portal_object.identifying_path == f"/{TEST_OBJECT_UUID}"
+    assert portal_object.identifying_paths == [f"/{TEST_OBJECT_UUID}"]
     assert portal_object.compare(TEST_OBJECT_RAW_JSON) == {}
 
     portal_object = PortalObject(None, TEST_OBJECT_DATABASE_JSON)
     assert portal_object.data == TEST_OBJECT_DATABASE_JSON
     assert not portal_object.portal
     assert portal_object.uuid == TEST_OBJECT_UUID
-    assert portal_object.types == TEST_OBJECT_TYPES
-    assert portal_object.type == TEST_OBJECT_TYPE
+    assert portal_object.type == "IngestionSubmission"
+    assert portal_object.types == ["IngestionSubmission", "Item"]
     assert not portal_object.schema
     assert not portal_object.identifying_properties
-    assert portal_object.identifying_paths == TEST_OBJECT_IDENTIFYING_PATHS
-    assert portal_object.identifying_path == TEST_OBJECT_IDENTIFYING_PATH
+    assert portal_object.identifying_path == f"/{TEST_OBJECT_DATABASE_JSON['@type'][0]}/{TEST_OBJECT_UUID}"
+    assert portal_object.identifying_paths == [f"/{TEST_OBJECT_DATABASE_JSON['@type'][0]}/{TEST_OBJECT_UUID}",
+                                               f"/{TEST_OBJECT_UUID}"]
     assert portal_object.compare(TEST_OBJECT_DATABASE_JSON) == {}
 
     portal_object_copy = portal_object.copy()
@@ -623,13 +620,18 @@ def test_compare():
         assert not portal_object.types
         assert portal_object.schema == TEST_OBJECT_SCHEMA_JSON
         assert portal_object.identifying_properties == ["uuid"]
+        assert not portal_object.identifying_path == [f"/{TEST_OBJECT_UUID}"]
+        assert not portal_object.identifying_paths == f"/{TEST_OBJECT_UUID}"
 
         portal_object_found = portal_object.lookup()
         assert portal_object_found.uuid == portal_object.uuid
-        assert portal_object_found.types == ["IngestionSubmission", "Item"]
+        assert portal_object_found.portal == portal_object.portal
         assert portal_object_found.type == "IngestionSubmission"
+        assert portal_object_found.types == ["IngestionSubmission", "Item"]
+        assert portal_object_found.schema == TEST_OBJECT_SCHEMA_JSON
         assert portal_object_found.identifying_properties == ["uuid", "aliases"]
-        assert portal_object_found.identifying_path == TEST_OBJECT_IDENTIFYING_PATH
-        assert portal_object_found.identifying_paths == [*TEST_OBJECT_IDENTIFYING_PATHS,
+        assert portal_object_found.identifying_path == f"/{TEST_OBJECT_DATABASE_JSON['@type'][0]}/{TEST_OBJECT_UUID}"
+        assert portal_object_found.identifying_paths == [f"/{TEST_OBJECT_DATABASE_JSON['@type'][0]}/{TEST_OBJECT_UUID}",
+                                                         f"/{TEST_OBJECT_UUID}",
                                                          "/IngestionSubmission/foo", "/foo",
                                                          "/IngestionSubmission/bar", "/bar"]
