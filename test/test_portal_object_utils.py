@@ -675,3 +675,12 @@ def test_compare():
         assert diffs["xyzzy"].creating_value is True
         assert diffs["xyzzy"].updating_value is None
         assert diffs["xyzzy"].deleting_value is False
+
+        portal_object = PortalObject(None, TEST_OBJECT_DATABASE_JSON)
+        portal_object_copy = portal_object.copy()
+        portal_object_copy.data["submitted_by"]["display_title"] = "J. Alfred Prufrock"
+        diffs = portal_object.compare(portal_object_copy)
+        assert diffs["submitted_by.display_title"].value == "David Michaels"
+        assert diffs["submitted_by.display_title"].creating_value is False
+        assert diffs["submitted_by.display_title"].updating_value == "J. Alfred Prufrock"
+        assert diffs["submitted_by.display_title"].deleting_value is False
