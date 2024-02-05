@@ -16,6 +16,7 @@ from dcicutils.misc_utils import (create_dict, create_readonly_object, load_json
                                   split_string, to_boolean, to_enum, to_float, to_integer, VirtualApp)
 from dcicutils.portal_object_utils import PortalObject
 from dcicutils.portal_utils import Portal as PortalBase
+from dcicutils.schema_utils import Schema as SchemaBase
 from dcicutils.zip_utils import unpack_gz_file_to_temporary_file, unpack_files
 
 
@@ -363,11 +364,12 @@ class _StructuredRowTemplate:
         return structured_row_template
 
 
-class Schema:
+class Schema(SchemaBase):
 
     def __init__(self, schema_json: dict, portal: Optional[Portal] = None) -> None:
-        self._data = schema_json if isinstance(schema_json, dict) else {}
-        self._type = Schema.type_name(schema_json.get("title", ""))
+        super().__init__(schema_json)
+#       self._data = schema_json if isinstance(schema_json, dict) else {}
+#       self._type = Schema.type_name(schema_json.get("title", ""))
         self._portal = portal  # Needed only to resolve linkTo references.
         self._map_value_functions = {
             "boolean": self._map_function_boolean,
@@ -380,13 +382,13 @@ class Schema:
         self._unresolved_refs = []
         self._typeinfo = self._create_typeinfo(schema_json)
 
-    @property
-    def data(self) -> dict:
-        return self._data
+#   @property
+#   def data(self) -> dict:
+#       return self._data
 
-    @property
-    def type(self) -> str:
-        return self._type
+#   @property
+#   def type(self) -> str:
+#       return self._type
 
     @staticmethod
     def load_by_name(name: str, portal: Portal) -> Optional[dict]:

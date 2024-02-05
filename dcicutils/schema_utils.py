@@ -189,9 +189,9 @@ def get_one_of_formats(schema: Dict[str, Any]) -> List[str]:
 
 class Schema:
 
-    def __init__(self, schema: dict, schema_type: Optional[str] = None) -> None:
+    def __init__(self, schema: dict, type: Optional[str] = None) -> None:
         self._data = schema if isinstance(schema, dict) else (schema.data if isinstance(schema, Schema) else {})
-        self._type = (isinstance(schema_type, str) and schema_type) or Schema.type_name(self._data.get("title", ""))
+        self._type = (type if isinstance(type, str) else "") or Schema.type_name(self._data.get("title", ""))
 
     @property
     def data(self) -> dict:
