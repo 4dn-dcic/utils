@@ -7,8 +7,21 @@ from dcicutils.misc_utils import create_dict, right_trim
 # Forward type references for type hints.
 Excel = Type["Excel"]
 
+# Cell values(s) indicating property deletion.
+_CELL_DELETION_VALUES = ["*delete*"]
+
+
+# Special cell deletion sentinel value (note make sure on deepcopy it remains the same).
+class _CellDeletionSentinal(str):
+    def __new__(cls):
+        return super(_CellDeletionSentinal, cls).__new__(cls, _CELL_DELETION_VALUES[0])
+    def __deepcopy__(self, memo):  # noqa
+        return self
+
 
 class RowReader(abc.ABC):
+
+    CELL_DELETION_SENTINEL = _CellDeletionSentinal()
 
     def __init__(self):
         self.header = None
@@ -45,8 +58,13 @@ class RowReader(abc.ABC):
     def is_terminating_row(self, row: Union[List[Optional[Any]], Tuple[Optional[Any]]]) -> bool:
         return False
 
-    def cell_value(self, value: Optional[Any]) -> Optional[Any]:
-        return str(value).strip() if value is not None else ""
+    def cell_value(self, value: Optional[Any]) -> str:
+        if value is None:
+            return ""
+        elif (value := str(value).strip()) in _CELL_DELETION_VALUES:
+            return RowReader.CELL_DELETION_SENTINEL
+        else:
+            return value
 
     def open(self) -> None:
         pass

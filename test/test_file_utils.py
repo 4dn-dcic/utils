@@ -22,7 +22,8 @@ def test_search_for_file():
         filename = "foo.txt"
         with open(filepath := os.path.join(dirname, filename), "w"):
             with open(subfilepath := os.path.join(subdirname, filename), "w"):
-                assert search_for_file(filename, location=dirname, recursive=True) == [filepath, subfilepath]
+                assert (set(search_for_file(filename, location=dirname, recursive=True)) ==
+                        set([filepath, subfilepath]))
                 assert search_for_file(filename, location=dirname, recursive=False) == [filepath]
 
     with temporary_directory() as dirname:
@@ -34,5 +35,6 @@ def test_search_for_file():
         filename = "foo.txt"
         with open(filepath := os.path.join(dirname, filename), "w"):
             with open(subfilepath := os.path.join(subdirname, filename), "w"):
-                assert search_for_file(filename, location=topdirname, recursive=True) == [filepath, subfilepath]
+                assert (set(search_for_file(filename, location=topdirname, recursive=True)) ==
+                        set([filepath, subfilepath]))
                 assert search_for_file(filename, location=topdirname, recursive=False) == []

@@ -2,6 +2,7 @@
 This file contains functions that might be generally useful.
 """
 
+from collections import namedtuple
 import contextlib
 import datetime
 import functools
@@ -17,6 +18,7 @@ import re
 import rfc3986.validators
 import rfc3986.exceptions
 import time
+import uuid
 import warnings
 import webtest  # importing the library makes it easier to mock testing
 
@@ -1148,16 +1150,22 @@ def remove_suffix(suffix: str, text: str, required: bool = False):
     return text[:len(text)-len(suffix)]
 
 
-def remove_empty_properties(data: Optional[Union[list, dict]]) -> None:
+def remove_empty_properties(data: Optional[Union[list, dict]],
+                            isempty: Optional[Callable] = None,
+                            isempty_array_element: Optional[Callable] = None) -> None:
+    def _isempty(value: Any) -> bool:  # noqa
+        return isempty(value) if callable(isempty) else value in [None, "", {}, []]
     if isinstance(data, dict):
         for key in list(data.keys()):
-            if (value := data[key]) in [None, "", {}, []]:
+            if _isempty(value := data[key]):
                 del data[key]
             else:
-                remove_empty_properties(value)
+                remove_empty_properties(value, isempty=isempty, isempty_array_element=isempty_array_element)
     elif isinstance(data, list):
         for item in data:
-            remove_empty_properties(item)
+            remove_empty_properties(item, isempty=isempty, isempty_array_element=isempty_array_element)
+        if callable(isempty_array_element):
+            data[:] = [item for item in data if not isempty_array_element(item)]
 
 
 class ObsoleteError(Exception):
@@ -1517,6 +1525,17 @@ def create_dict(**kwargs) -> dict:
         if kwargs[name]:
             result[name] = kwargs[name]
     return result
+
+
+def create_readonly_object(**kwargs):
+    """
+    Returns a new/unique object instance with readonly properties equal to the give kwargs.
+    """
+    readonly_class_name = "readonlyclass_" + str(uuid.uuid4()).replace("-", "")
+    readonly_class_args = " ".join(kwargs.keys())
+    readonly_class = namedtuple(readonly_class_name, readonly_class_args)
+    readonly_object = readonly_class(**kwargs)
+    return readonly_object
 
 
 def is_c4_arn(arn: str) -> bool:

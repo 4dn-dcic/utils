@@ -32,7 +32,7 @@ from dcicutils.misc_utils import (
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
     MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case, json_file_contents,
     pad_to, JsonLinesReader, split_string, merge_objects, to_integer,
-    load_json_from_file_expanding_environment_variables
+    load_json_from_file_expanding_environment_variables, create_readonly_object
 )
 from dcicutils.qa_utils import (
     Occasionally, ControlledTime, override_environ as qa_override_environ, MockFileSystem, printed_output,
@@ -3701,3 +3701,13 @@ def test_load_json_from_file_expanding_environment_variables():
         with temporary_file(content=json.dumps(some_json), suffix=".json") as tmpfile:
             expanded_json = load_json_from_file_expanding_environment_variables(tmpfile)
             assert expanded_json == {"Auth0Secret": "dgakjhdgretqobv", "abc": "def", "someproperty": "xyzzy"}
+
+
+def test_create_readonly_object():
+    a = create_readonly_object(foo="bar")
+    assert a.foo == "bar"
+    a = create_readonly_object(abcdef=123, ghi=456, jk="xyzzy", lmnop={"greeting": "Hello, world!"})
+    assert a.abcdef == 123
+    assert a.ghi == 456
+    assert a.jk == "xyzzy"
+    assert a.lmnop == {"greeting": "Hello, world!"}

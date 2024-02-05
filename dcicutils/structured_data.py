@@ -11,9 +11,12 @@ from webtest.app import TestApp
 from dcicutils.common import OrchestratedApp
 from dcicutils.data_readers import CsvReader, Excel, RowReader
 from dcicutils.file_utils import search_for_file
-from dcicutils.misc_utils import (create_dict, load_json_if, merge_objects, remove_empty_properties, right_trim,
+from dcicutils.misc_utils import (create_dict, create_readonly_object, load_json_if,
+                                  merge_objects, remove_empty_properties, right_trim,
                                   split_string, to_boolean, to_enum, to_float, to_integer, VirtualApp)
+from dcicutils.portal_object_utils import PortalObject
 from dcicutils.portal_utils import Portal as PortalBase
+from dcicutils.schema_utils import Schema as SchemaBase
 from dcicutils.zip_utils import unpack_gz_file_to_temporary_file, unpack_files
 
 
@@ -46,8 +49,8 @@ class StructuredDataSet:
     def __init__(self, file: Optional[str] = None, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
                  schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
                  order: Optional[List[str]] = None, prune: bool = True) -> None:
-        self.data = {}
-        self._portal = Portal(portal, data=self.data, schemas=schemas) if portal else None
+        self._data = {}
+        self._portal = Portal(portal, data=self._data, schemas=schemas) if portal else None
         self._order = order
         self._prune = prune
         self._warnings = {}
@@ -57,6 +60,14 @@ class StructuredDataSet:
         self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
         self._load_file(file) if file else None
 
+    @property
+    def data(self) -> dict:
+        return self._data
+
+    @property
+    def portal(self) -> Optional[Portal]:
+        return self._portal
+
     @staticmethod
     def load(file: str, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
              schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
@@ -64,6 +75,17 @@ class StructuredDataSet:
         return StructuredDataSet(file=file, portal=portal, schemas=schemas, autoadd=autoadd, order=order, prune=prune)
 
     def validate(self, force: bool = False) -> None:
+        def data_without_deleted_properties(data: dict) -> dict:
+            nonlocal self
+            def isempty(value: Any) -> bool:  # noqa
+                if value == RowReader.CELL_DELETION_SENTINEL:
+                    return True
+                return self._prune and value in [None, "", {}, []]
+            def isempty_array_element(value: Any) -> bool:  # noqa
+                return value == RowReader.CELL_DELETION_SENTINEL
+            data = copy.deepcopy(data)
+            remove_empty_properties(data, isempty=isempty, isempty_array_element=isempty_array_element)
+            return data
         if self._validated and not force:
             return
         self._validated = True
@@ -71,6 +93,7 @@ class StructuredDataSet:
             if (schema := Schema.load_by_name(type_name, portal=self._portal)):
                 row_number = 0
                 for data in self.data[type_name]:
+                    data = data_without_deleted_properties(data)
                     row_number += 1
                     if (validation_errors := schema.validate(data)) is not None:
                         for validation_error in validation_errors:
@@ -99,7 +122,11 @@ class StructuredDataSet:
 
     @property
     def resolved_refs(self) -> List[str]:
-        return list(self._resolved_refs)
+        return list([resolved_ref[0] for resolved_ref in self._resolved_refs])
+
+    @property
+    def resolved_refs_with_uuids(self) -> List[str]:
+        return list([{"path": resolved_ref[0], "uuid": resolved_ref[1]} for resolved_ref in self._resolved_refs])
 
     @property
     def upload_files(self) -> List[str]:
@@ -119,6 +146,27 @@ class StructuredDataSet:
             if file_path := search_for_file(upload_file["file"], location, recursive=recursive, single=True):
                 upload_file["path"] = file_path
         return upload_files
+
+    def compare(self) -> dict:
+        diffs = {}
+        if self.data or self.portal:
+            refs = self.resolved_refs_with_uuids
+            for object_type in self.data:
+                if not diffs.get(object_type):
+                    diffs[object_type] = []
+                for portal_object in self.data[object_type]:
+                    portal_object = PortalObject(portal_object, portal=self.portal, type=object_type)
+                    existing_object, identifying_path = portal_object.lookup(include_identifying_path=True, raw=True)
+                    if existing_object:
+                        object_diffs = portal_object.compare(existing_object, consider_refs=True, resolved_refs=refs)
+                        diffs[object_type].append(create_readonly_object(path=identifying_path,
+                                                                         uuid=existing_object.uuid,
+                                                                         diffs=object_diffs or None))
+                    else:
+                        # If there is no existing object we still create a record for this object
+                        # but with no uuid which will be the indication that it does not exist.
+                        diffs[object_type].append(create_readonly_object(path=identifying_path, uuid=None, diffs=None))
+        return diffs
 
     def _load_file(self, file: str) -> None:
         # Returns a dictionary where each property is the name (i.e. the type) of the data,
@@ -185,10 +233,10 @@ class StructuredDataSet:
     def _add(self, type_name: str, data: Union[dict, List[dict]]) -> None:
         if self._prune:
             remove_empty_properties(data)
-        if type_name in self.data:
-            self.data[type_name].extend([data] if isinstance(data, dict) else data)
+        if type_name in self._data:
+            self._data[type_name].extend([data] if isinstance(data, dict) else data)
         else:
-            self.data[type_name] = [data] if isinstance(data, dict) else data
+            self._data[type_name] = [data] if isinstance(data, dict) else data
 
     def _add_properties(self, structured_row: dict, properties: dict, schema: Optional[dict] = None) -> None:
         for name in properties:
@@ -316,11 +364,12 @@ class _StructuredRowTemplate:
         return structured_row_template
 
 
-class Schema:
+class Schema(SchemaBase):
 
     def __init__(self, schema_json: dict, portal: Optional[Portal] = None) -> None:
-        self._data = schema_json if isinstance(schema_json, dict) else {}
-        self._type = Schema.type_name(schema_json.get("title", ""))
+        super().__init__(schema_json)
+#       self._data = schema_json if isinstance(schema_json, dict) else {}
+#       self._type = Schema.type_name(schema_json.get("title", ""))
         self._portal = portal  # Needed only to resolve linkTo references.
         self._map_value_functions = {
             "boolean": self._map_function_boolean,
@@ -333,13 +382,13 @@ class Schema:
         self._unresolved_refs = []
         self._typeinfo = self._create_typeinfo(schema_json)
 
-    @property
-    def data(self) -> dict:
-        return self._data
+#   @property
+#   def data(self) -> dict:
+#       return self._data
 
-    @property
-    def type(self) -> str:
-        return self._type
+#   @property
+#   def type(self) -> str:
+#       return self._type
 
     @staticmethod
     def load_by_name(name: str, portal: Portal) -> Optional[dict]:
@@ -349,16 +398,8 @@ class Schema:
     def validate(self, data: dict) -> List[str]:
         errors = []
         for error in SchemaValidator(self.data, format_checker=SchemaValidator.FORMAT_CHECKER).iter_errors(data):
-            errors.append(error.message)
+            errors.append(f"Validation error at '{error.json_path}': {error.message}")
         return errors
-
-    @property
-    def unresolved_refs(self) -> List[dict]:
-        return self._unresolved_refs
-
-    @property
-    def resolved_refs(self) -> List[str]:
-        return list(self._resolved_refs)
 
     def get_typeinfo(self, column_name: str) -> Optional[dict]:
         if isinstance(info := self._typeinfo.get(column_name), str):
@@ -423,9 +464,14 @@ class Schema:
                 if not (resolved := portal.ref_exists(link_to, value)):
                     self._unresolved_refs.append({"src": src, "error": f"/{link_to}/{value}"})
                 elif len(resolved) > 1:
-                    self._unresolved_refs.append({"src": src, "error": f"/{link_to}/{value}", "types": resolved})
+                    # TODO: Don't think we need this anymore; see TODO on Portal.ref_exists.
+                    self._unresolved_refs.append({
+                        "src": src,
+                        "error": f"/{link_to}/{value}",
+                        "types": [resolved_ref["type"] for resolved_ref in resolved]})
                 else:
-                    self._resolved_refs.add(f"/{link_to}/{value}")
+                    # A resolved-ref set value is a tuple of the reference path and its uuid.
+                    self._resolved_refs.add((f"/{link_to}/{value}", resolved[0].get("uuid")))
             return value
         return lambda value, src: map_ref(value, typeinfo.get("linkTo"), self._portal, src)
 
@@ -617,8 +663,9 @@ class Portal(PortalBase):
 
     def ref_exists(self, type_name: str, value: str) -> List[str]:
         resolved = []
-        if self._ref_exists_single(type_name, value):
-            resolved.append(type_name)
+        is_resolved, resolved_uuid = self._ref_exists_single(type_name, value)
+        if is_resolved:
+            resolved.append({"type": type_name, "uuid": resolved_uuid})
             # TODO: Added this return on 2024-01-14 (dmichaels).
             # Why did I orginally check for multiple existing values?
             # Why not just return right away if I find that the ref exists?
@@ -631,20 +678,23 @@ class Portal(PortalBase):
         if (schemas_super_type_map := self.get_schemas_super_type_map()):
             if (sub_type_names := schemas_super_type_map.get(type_name)):
                 for sub_type_name in sub_type_names:
-                    if self._ref_exists_single(sub_type_name, value):
-                        resolved.append(type_name)
+                    is_resolved, resolved_uuid = self._ref_exists_single(sub_type_name, value)
+                    if is_resolved:
+                        resolved.append({"type": type_name, "uuid": resolved_uuid})
                         # TODO: Added this return on 2024-01-14 (dmichaels). See above TODO.
                         return resolved
         return resolved
 
-    def _ref_exists_single(self, type_name: str, value: str) -> bool:
+    def _ref_exists_single(self, type_name: str, value: str) -> Tuple[bool, Optional[str]]:
         if self._data and (items := self._data.get(type_name)) and (schema := self.get_schema(type_name)):
             iproperties = set(schema.get("identifyingProperties", [])) | {"identifier", "uuid"}
             for item in items:
                 if (ivalue := next((item[iproperty] for iproperty in iproperties if iproperty in item), None)):
                     if isinstance(ivalue, list) and value in ivalue or ivalue == value:
-                        return True
-        return self.get_metadata(f"/{type_name}/{value}") is not None
+                        return True, None
+        if (value := self.get_metadata(f"/{type_name}/{value}")) is None:
+            return False, None
+        return True, value.get("uuid")
 
     @staticmethod
     def create_for_testing(arg: Optional[Union[str, bool, List[dict], dict, Callable]] = None,
