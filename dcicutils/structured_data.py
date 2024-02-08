@@ -454,8 +454,6 @@ class Schema(SchemaBase):
     def _map_function_date(self, typeinfo: dict) -> Callable:
         def map_date(value: str, src: Optional[str]) -> str:
             value = normalize_date_string(value)
-#           if value and value.endswith(" 00:00:00"):
-#               value = value[:-9]
             return value if value is not None else ""
         return map_date
 
