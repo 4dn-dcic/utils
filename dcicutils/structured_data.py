@@ -10,6 +10,7 @@ from typing import Any, Callable, List, Optional, Tuple, Type, Union
 from webtest.app import TestApp
 from dcicutils.common import OrchestratedApp
 from dcicutils.data_readers import CsvReader, Excel, RowReader
+from dcicutils.datetime_utils import normalize_date_string, normalize_datetime_string
 from dcicutils.file_utils import search_for_file
 from dcicutils.misc_utils import (create_dict, create_readonly_object, load_json_if,
                                   merge_objects, remove_empty_properties, right_trim,
@@ -368,27 +369,19 @@ class Schema(SchemaBase):
 
     def __init__(self, schema_json: dict, portal: Optional[Portal] = None) -> None:
         super().__init__(schema_json)
-#       self._data = schema_json if isinstance(schema_json, dict) else {}
-#       self._type = Schema.type_name(schema_json.get("title", ""))
         self._portal = portal  # Needed only to resolve linkTo references.
         self._map_value_functions = {
             "boolean": self._map_function_boolean,
             "enum": self._map_function_enum,
             "integer": self._map_function_integer,
             "number": self._map_function_number,
-            "string": self._map_function_string
+            "string": self._map_function_string,
+            "date": self._map_function_date,
+            "datetime": self._map_function_datetime
         }
         self._resolved_refs = set()
         self._unresolved_refs = []
         self._typeinfo = self._create_typeinfo(schema_json)
-
-#   @property
-#   def data(self) -> dict:
-#       return self._data
-
-#   @property
-#   def type(self) -> str:
-#       return self._type
 
     @staticmethod
     def load_by_name(name: str, portal: Portal) -> Optional[dict]:
@@ -424,6 +417,10 @@ class Schema(SchemaBase):
                 map_function = self._map_function_enum
             elif isinstance(typeinfo.get("linkTo"), str):
                 map_function = self._map_function_ref
+            elif (type_format := typeinfo.get("format")) == "date":
+                map_function = self._map_function_date
+            elif type_format == "date-time":
+                map_function = self._map_function_datetime
             else:
                 map_function = self._map_value_functions.get(typeinfo_type)
             return map_function(typeinfo) if map_function else None
@@ -453,6 +450,20 @@ class Schema(SchemaBase):
         def map_string(value: str, src: Optional[str]) -> str:
             return value if value is not None else ""
         return map_string
+
+    def _map_function_date(self, typeinfo: dict) -> Callable:
+        def map_date(value: str, src: Optional[str]) -> str:
+            value = normalize_date_string(value)
+#           if value and value.endswith(" 00:00:00"):
+#               value = value[:-9]
+            return value if value is not None else ""
+        return map_date
+
+    def _map_function_datetime(self, typeinfo: dict) -> Callable:
+        def map_datetime(value: str, src: Optional[str]) -> str:
+            value = normalize_datetime_string(value)
+            return value if value is not None else ""
+        return map_datetime
 
     def _map_function_ref(self, typeinfo: dict) -> Callable:
         def map_ref(value: str, link_to: str, portal: Optional[Portal], src: Optional[str]) -> Any:

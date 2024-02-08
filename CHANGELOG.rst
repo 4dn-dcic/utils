@@ -7,6 +7,13 @@ Change Log
 ----------
 
 
+8.8.0
+=====
+* New datetime_utils module and tests; first created for date/time support in structured_data.
+* Changes to structured_data support date/time types.
+* Changes to structured_data support internal references in any order.
+
+
 8.7.2
 =====
 
