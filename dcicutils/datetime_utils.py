@@ -14,7 +14,7 @@ def parse_datetime_string(value: str) -> Optional[datetime]:
         return None
     tz_hours = -1
     tz_minutes = -1
-    if (t := value.rfind("T")) > 0:
+    if value.rfind("T") > 0:
         value = value.replace("T", " ")
     if (space := value.find(" ")) > 0 and (value_suffix := value[space + 1:]):
         if (plus := value_suffix.rfind("+")) > 0 or (minus := value_suffix.rfind("-")) > 0:

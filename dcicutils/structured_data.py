@@ -209,7 +209,7 @@ class StructuredDataSet:
         if ref_errors := self.ref_errors:
             ref_errors_actual = []
             for ref_error in ref_errors:
-                if not (ref := self.portal.ref_exists(ref_error["error"])):
+                if not self.portal.ref_exists(ref_error["error"]):
                     ref_errors_actual.append(ref_error)
             if ref_errors_actual:
                 self._errors["ref"] = ref_errors_actual
