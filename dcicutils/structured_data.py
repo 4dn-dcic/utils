@@ -12,7 +12,7 @@ from dcicutils.common import OrchestratedApp
 from dcicutils.data_readers import CsvReader, Excel, RowReader
 from dcicutils.datetime_utils import normalize_date_string, normalize_datetime_string
 from dcicutils.file_utils import search_for_file
-from dcicutils.misc_utils import (create_dict, create_readonly_object, load_json_if,
+from dcicutils.misc_utils import (create_dict, create_readonly_object, is_uuid, load_json_if,
                                   merge_objects, remove_empty_properties, right_trim,
                                   split_string, to_boolean, to_enum, to_float, to_integer, VirtualApp)
 from dcicutils.portal_object_utils import PortalObject
@@ -204,6 +204,17 @@ class StructuredDataSet:
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
             self._load_reader(excel.sheet_reader(sheet_name), type_name=Schema.type_name(sheet_name))
+        # Check for unresolved reference errors which really are not because of ordering.
+        # Yes such internal references will be handled correctly on actual database update via snovault.loadxl.
+        if ref_errors := self.ref_errors:
+            ref_errors_actual = []
+            for ref_error in ref_errors:
+                if not (ref := self.portal.ref_exists(ref_error["error"])):
+                    ref_errors_actual.append(ref_error)
+            if ref_errors_actual:
+                self._errors["ref"] = ref_errors_actual
+            else:
+                del self._errors["ref"]
 
     def _load_json_file(self, file: str) -> None:
         with open(file) as f:
@@ -670,7 +681,13 @@ class Portal(PortalBase):
         """
         return self.is_schema_type(schema_name, FILE_SCHEMA_NAME)
 
-    def ref_exists(self, type_name: str, value: str) -> List[str]:
+    def ref_exists(self, type_name: str, value: Optional[str] = None) -> List[str]:
+        if not value:
+            if type_name.startswith("/") and len(parts := type_name[1:].split("/")) == 2:
+                type_name = parts[0]
+                value = parts[1]
+            else:
+                return []
         resolved = []
         is_resolved, resolved_uuid = self._ref_exists_single(type_name, value)
         if is_resolved:
@@ -700,7 +717,7 @@ class Portal(PortalBase):
             for item in items:
                 if (ivalue := next((item[iproperty] for iproperty in iproperties if iproperty in item), None)):
                     if isinstance(ivalue, list) and value in ivalue or ivalue == value:
-                        return True, None
+                        return True, ivalue if is_uuid(ivalue) else None
         if (value := self.get_metadata(f"/{type_name}/{value}")) is None:
             return False, None
         return True, value.get("uuid")
