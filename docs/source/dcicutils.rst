@@ -93,6 +93,13 @@ data_utils
    :members:
 
 
+datetime_utils
+^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.datetime_utils
+   :members:
+
+
 deployment_utils
 ^^^^^^^^^^^^^^^^
 
