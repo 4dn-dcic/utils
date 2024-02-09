@@ -65,7 +65,7 @@ def normalize_datetime_string(value: str) -> Optional[str]:
     or if ill-formated then returns None. The given string is assumed to be in the format "YYYY-MM-DD hh:mm:ss"
     and with an optional timezone suffix in format "+hh:mm" or "+hh". Also allowed is just a date of the
     format "YYYY-MM-DD" in which case a time of "00:00:00" is assumed. If no timezone is specified then
-    the local timezone is assumed.  The returned format looks like this: "2024-02-08T10:37:51-05:00"
+    the local timezone is assumed. The returned format looks like this: "2024-02-08T10:37:51-05:00"
     """
     dt = parse_datetime_string(value)
     return dt.isoformat() if dt else None
