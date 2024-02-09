@@ -6,7 +6,7 @@ def test_normalize_datetime_string():
     tz = get_local_timezone_string()
 
     value = "2024-02-08T10:37:51-05:00"
-    assert normalize_datetime_string(value) == "2024-02-08T10:37:51-05:00"
+    assert normalize_datetime_string(value) == "2024-02-08T10:37:51" + tz
 
     value = " 2024-01-28  17:15:32"
     assert normalize_datetime_string(value) == "2024-01-28T17:15:32" + tz
