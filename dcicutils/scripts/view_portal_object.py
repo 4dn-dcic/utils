@@ -109,7 +109,17 @@ def _create_portal(ini: str, env: Optional[str] = None,
 def _get_portal_object(portal: Portal, uuid: str,
                        raw: bool = False, database: bool = False, verbose: bool = False) -> dict:
     if verbose:
-        _print(f"Getting object ({uuid}) from portal ... ", end="")
+        _print(f"Getting object from Portal: {uuid}")
+        if portal.env:
+            _print(f"Portal environment: {portal.env}")
+        if portal.keys_file:
+            _print(f"Portal keys file: {portal.keys_file}")
+        if portal.key_id:
+            _print(f"Portal key prefix: {portal.key_id[0:2]}******")
+        if portal.ini_file:
+            _print(f"Portal ini file: {portal.ini_file}")
+        if portal.server:
+            _print(f"Portal server: {portal.server}")
     response = None
     try:
         if not uuid.startswith("/"):
@@ -119,19 +129,16 @@ def _get_portal_object(portal: Portal, uuid: str,
         response = portal.get(path, raw=raw, database=database)
     except Exception as e:
         if "404" in str(e) and "not found" in str(e).lower():
-            if verbose:
-                _print("Not found!")
-            else:
-                _print(f"Object ({uuid}) not found!")
+            _print("Portal object not found: {uuid}")
             _exit_without_action()
-        _exit_without_action(f"Exception getting object ({uuid}) -> {get_error_message(e)}", newline=verbose)
+        _exit_without_action(f"Exception getting Portal object: {uuid}\n{get_error_message(e)}")
     if not response:
-        _exit_without_action(f"Null response getting object {uuid}).")
+        _exit_without_action(f"Null response getting Portal object: {uuid}")
     if response.status_code not in [200, 307]:
         # TODO: Understand why the /me endpoint returns HTTP status code 307, which is only why we mention it above.
-        _exit_without_action(f"Invalid status code ({response.status_code}) getting object: {uuid}")
+        _exit_without_action(f"Invalid status code ({response.status_code}) getting Portal object: {uuid}")
     if not response.json:
-        _exit_without_action(f"Invalid JSON getting object {uuid}).")
+        _exit_without_action(f"Invalid JSON getting Portal object: {uuid}")
     if verbose:
         _print("OK")
     return response.json()
@@ -143,10 +150,8 @@ def _print(*args, **kwargs):
     sys.stdout.flush()
 
 
-def _exit_without_action(message: Optional[str] = None, newline: bool = True) -> None:
+def _exit_without_action(message: Optional[str] = None) -> None:
     if message:
-        if newline:
-            _print()
         _print(f"ERROR: {message}")
     exit(1)
 
