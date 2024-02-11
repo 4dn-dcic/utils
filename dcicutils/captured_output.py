@@ -1,4 +1,3 @@
-# TODO: Move to dcicutils.
 from collections import namedtuple
 from contextlib import contextmanager
 import io
