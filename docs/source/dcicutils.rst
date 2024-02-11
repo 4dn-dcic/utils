@@ -30,6 +30,13 @@ bundle_utils
    :members:
 
 
+captured_output
+^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.captured_output
+   :members:
+
+
 codebuild_utils
 ^^^^^^^^^^^^^^^
 
