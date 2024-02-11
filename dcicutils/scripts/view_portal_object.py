@@ -61,9 +61,10 @@ import pyperclip
 import sys
 from typing import Optional
 import yaml
+from dcicutils.captured_output import captured_output, uncaptured_output
 from dcicutils.misc_utils import get_error_message
 from dcicutils.portal_utils import Portal
-from dcicutils.captured_output import captured_output, uncaptured_output
+from dcicutils.structured_data import Schema
 
 
 def main():
@@ -79,6 +80,8 @@ def main():
                         help=f"Environment server name (server from key in ~/.smaht-keys.json).")
     parser.add_argument("--app", type=str, required=False, default=None,
                         help=f"Application name (one of: smaht, cgap, fourfront).")
+    parser.add_argument("--schema", action="store_true", required=False, default=False,
+                        help="View named schema rather than object.")
     parser.add_argument("--raw", action="store_true", required=False, default=False, help="Raw output.")
     parser.add_argument("--database", action="store_true", required=False, default=False,
                         help="Read from database output.")
@@ -90,7 +93,14 @@ def main():
     args = parser.parse_args()
 
     portal = _create_portal(ini=args.ini, env=args.env, server=args.server, app=args.app, debug=args.debug)
-    data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw, database=args.database, verbose=args.verbose)
+    if args.uuid == "schemas":
+        _print_all_schema_names(portal=portal, verbose=args.verbose)
+        return
+    elif args.schema:
+        data = _get_schema(portal=portal, schema_name=args.uuid)
+    else:
+        data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw,
+                                  database=args.database, verbose=args.verbose)
 
     if args.copy:
         pyperclip.copy(json.dumps(data, indent=4))
@@ -142,6 +152,34 @@ def _get_portal_object(portal: Portal, uuid: str,
     if verbose:
         _print("OK")
     return response.json()
+
+
+def _get_schema(portal: Portal, schema_name: str) -> Optional[dict]:
+    def rummage_for_schema_name(portal: Portal, schema_name: str) -> Optional[str]:  # noqa
+        if schemas := portal.get_schemas():
+            for schema in schemas:
+                if schema.lower() == schema_name.lower():
+                    return schema
+    schema = Schema.load_by_name(schema_name, portal)
+    if not schema:
+        if schema_name := rummage_for_schema_name(portal, schema_name):
+            schema = Schema.load_by_name(schema_name, portal)
+    return schema.data if schema else None
+
+
+def _print_all_schema_names(portal: Portal, verbose: bool = False) -> None:
+    if schemas := portal.get_schemas():
+        for schema in sorted(schemas.keys()):
+            _print(schema)
+            if verbose:
+                if identifying_properties := schemas[schema].get("identifyingProperties"):
+                    _print("- identifying properties:")
+                    for identifying_property in sorted(identifying_properties):
+                        _print(f"  - {identifying_property}")
+                if required_properties := schemas[schema].get("required"):
+                    _print("- required properties:")
+                    for required_property in sorted(required_properties):
+                        _print(f"  - {required_property}")
 
 
 def _print(*args, **kwargs):
