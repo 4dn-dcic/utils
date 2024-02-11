@@ -1334,6 +1334,16 @@ docs = ["sphinx (!=5.2.0,!=5.2.0.post0)", "sphinx-rtd-theme"]
 test = ["flaky", "pretend", "pytest (>=3.0.1)"]
 
 [[package]]
+name = "pyperclip"
+version = "1.8.2"
+description = "A cross-platform clipboard module for Python. (Only handles plain text for now.)"
+optional = false
+python-versions = "*"
+files = [
+    {file = "pyperclip-1.8.2.tar.gz", hash = "sha256:105254a8b04934f0bc84e9c24eb360a591aaf6535c9def5f29d92af107a9bf57"},
+]
+
+[[package]]
 name = "pyramid"
 version = "1.10.4"
 description = "The Pyramid Web Framework, a Pylons project"
@@ -2092,4 +2102,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<3.12"
-content-hash = "f809dee9b269816495aebe98b7299657df63d20446e140df3635955ca358c861"
+content-hash = "e921aaa6ed6c8f604a55b2fdff146f4a01429e9ac7653a36be3078c38b654094"

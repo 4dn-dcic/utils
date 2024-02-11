@@ -12,6 +12,7 @@ Change Log
 * Changes to structured_data support date/time types.
 * Changes to structured_data support internal references in any order.
 * New datetime_utils module and tests; first created for date/time support in structured_data.
+* Added view-portal-object script for general troubleshooting.
 
 
 8.7.2

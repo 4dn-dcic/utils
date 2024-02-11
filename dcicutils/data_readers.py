@@ -152,9 +152,10 @@ class ExcelSheetReader(RowReader):
 
 class Excel:
 
-    def __init__(self, file: str, reader_class: Optional[Type] = None) -> None:
+    def __init__(self, file: str, reader_class: Optional[Type] = None, include_hidden_sheets: bool = False) -> None:
         self._file = file
         self._workbook = None
+        self._include_hidden_sheets = include_hidden_sheets
         self.sheet_names = None
         if isinstance(reader_class, Type) and issubclass(reader_class, ExcelSheetReader):
             self._reader_class = reader_class
@@ -169,7 +170,7 @@ class Excel:
         if self._workbook is None:
             self._workbook = openpyxl.load_workbook(self._file, data_only=True)
             self.sheet_names = [sheet_name for sheet_name in self._workbook.sheetnames
-                                if self._workbook[sheet_name].sheet_state != "hidden"]
+                                if self._include_hidden_sheets or (self._workbook[sheet_name].sheet_state != "hidden")]
 
     def __del__(self) -> None:
         if (workbook := self._workbook) is not None:
