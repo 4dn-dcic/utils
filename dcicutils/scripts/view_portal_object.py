@@ -139,7 +139,7 @@ def _get_portal_object(portal: Portal, uuid: str,
         response = portal.get(path, raw=raw, database=database)
     except Exception as e:
         if "404" in str(e) and "not found" in str(e).lower():
-            _print("Portal object not found: {uuid}")
+            _print(f"Portal object not found: {uuid}")
             _exit_without_action()
         _exit_without_action(f"Exception getting Portal object: {uuid}\n{get_error_message(e)}")
     if not response:

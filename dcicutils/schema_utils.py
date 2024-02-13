@@ -191,7 +191,9 @@ class Schema:
 
     def __init__(self, schema: dict, type: Optional[str] = None) -> None:
         self._data = schema if isinstance(schema, dict) else (schema.data if isinstance(schema, Schema) else {})
-        self._type = (type if isinstance(type, str) else "") or Schema.type_name(self._data.get("title", ""))
+        self._type = ((type if isinstance(type, str) else "") or
+                      Schema.type_name(self._data.get("title", "")) or
+                      Schema.type_name(self._data.get("$id", "")))
 
     @property
     def data(self) -> dict:
