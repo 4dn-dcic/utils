@@ -7,6 +7,11 @@ Change Log
 ----------
 
 
+8.7.3
+=====
+
+* add add_on parameter to delete_metadata
+
 8.7.2
 =====
 

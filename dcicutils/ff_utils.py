@@ -762,12 +762,12 @@ def get_metadata_links(obj_id, key=None, ff_env=None):
     return get_response_json(response)
 
 
-def delete_metadata(obj_id, key=None, ff_env=None):
+def delete_metadata(obj_id, key=None, ff_env=None, add_on=''):
     """
     Given standard key/ff_env authentication, simply set the status of the
     given object to 'deleted'
     """
-    return patch_metadata({'status': 'deleted'}, obj_id, key, ff_env)
+    return patch_metadata({'status': 'deleted'}, obj_id, key, ff_env, add_on=add_on)
 
 
 def purge_metadata(obj_id, key=None, ff_env=None):
