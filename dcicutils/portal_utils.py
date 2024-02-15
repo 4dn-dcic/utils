@@ -88,9 +88,9 @@ class Portal:
                 isinstance(secret := key.get("secret"), str) and secret):  # noqa
                 self._key = {"key": key_id, "secret": secret}
                 if (isinstance(server, str) and server) or (isinstance(server := key.get("server"), str) and server):
-                    if server := normalize_server(server):
+                    if server := Portal._normalize_server(server):
                         if isinstance(key_server := key.get("server"), str) and key_server:
-                            if normalize_server(key_server) != server:
+                            if Portal._normalize_server(key_server) != server:
                                 raise Exception(f"Portal server inconsistency: {server} vs {key_server}")
                         self._key["server"] = self._server = server
             if not self._key:
@@ -104,48 +104,20 @@ class Portal:
 
         def init_from_keys_file(keys_file: str, env: Optional[str], server: Optional[str],
                                 unspecified: Optional[list] = []) -> None:
-            try:
-                with io.open(keys_file := os.path.expanduser(keys_file)) as f:
-                    keys = json.load(f)
-            except Exception:
-                raise Exception(f"Portal initialization error; cannot open keys-file: {keys_file}")
-            if isinstance(env, str) and env and isinstance(key := keys.get(env), dict):
+            key, env = Portal._lookup_in_keys_file(keys_file, env, server, raise_exception=True)
+            if key:
                 init_from_key(key, server)
                 self._keys_file = keys_file
                 self._env = env
-            elif (isinstance(server, str) and (server := normalize_server(server)) and
-                  (key := [keys[k] for k in keys if normalize_server(keys[k].get("server")) == server])):
-                init_from_key(key[0], server)
-                self._keys_file = keys_file
-            elif not env and len(keys) == 1 and (env := next(iter(keys))) and isinstance(key := keys[env], dict):
-                init_from_key(key, server)
-                self._keys_file = keys_file
-                self._env = env
-            else:
-                raise Exception(f"Portal initialization error;"
-                                f" {env or server or None} not found in keys-file: {keys_file}")
 
         def init_from_env_server_app(env: str, server: str, app: Optional[str],
                                      unspecified: Optional[list] = None) -> None:
-            if keys_file := self._default_keys_file(app, env):
+            if keys_file := Portal._default_keys_file(app, env, server):
                 init_from_keys_file(keys_file, env, server, unspecified=unspecified)
             else:
                 init(unspecified=unspecified)
                 self._env = env
                 self._server = server
-
-        def normalize_server(server: str) -> Optional[str]:
-            prefix = ""
-            if (lowercase_server := server.lower()).startswith("http://"):
-                prefix = "http://"
-            elif lowercase_server.startswith("https://"):
-                prefix = "https://"
-            if prefix:
-                if (server := re.sub(r"/+", "/", server[len(prefix):])).startswith("/"):
-                    server = server[1:]
-                if len(server) > 1 and server.endswith("/"):
-                    server = server[:-1]
-                return prefix + server if server else None
 
         if (valid_app := app) and not (valid_app := Portal._valid_app(app)):
             raise Exception(f"Portal initialization error; invalid app: {app}")
@@ -166,7 +138,7 @@ class Portal:
             init_from_env_server_app(arg, server, app, unspecified=[env])
         elif (isinstance(env, str) and env) or (isinstance(server, str) and server):
             init_from_env_server_app(env, server, app, unspecified=[arg])
-        elif not arg and (keys_file := self._default_keys_file(app=self._app or Portal.DEFAULT_APP, env=env)):
+        elif not arg and (keys_file := Portal._default_keys_file(self._app or Portal.DEFAULT_APP, env, server)):
             # If no initial arg then look for default app keys file.
             init_from_keys_file(keys_file, env, server)
         elif raise_exception:
@@ -411,14 +383,57 @@ class Portal:
             result_kwargs["timeout"] = timeout
         return result_kwargs
 
-    def _default_keys_file(self, app: Optional[str], env: Optional[str] = None) -> Optional[str]:
+    @staticmethod
+    def _default_keys_file(app: Optional[str], env: Optional[str], server: Optional[str]) -> Optional[str]:
         def infer_app_from_env(env: str) -> Optional[str]:  # noqa
             if isinstance(env, str) and (lowercase_env := env.lower()):
                 if app := [app for app in ORCHESTRATED_APPS if lowercase_env.startswith(app.lower())]:
-                    return self._valid_app(app[0])
+                    return Portal._valid_app(app[0])
         if (app := Portal._valid_app(app)) or (app := infer_app_from_env(env)):
             keys_file = os.path.expanduser(os.path.join(Portal.KEYS_FILE_DIRECTORY, f".{app.lower()}-keys.json"))
             return keys_file if os.path.exists(keys_file) else None
+        if not app:
+            for app in ORCHESTRATED_APPS:
+                if keys_file := Portal._default_keys_file(app, env, server):
+                    if Portal._lookup_in_keys_file(keys_file, env, server)[0]:
+                        return keys_file
+
+    @staticmethod
+    def _lookup_in_keys_file(keys_file: str, env: Optional[str], server: Optional[str],
+                             raise_exception: bool = False) -> Tuple[Optional[dict], Optional[str]]:
+        try:
+            with io.open(keys_file := os.path.expanduser(keys_file)) as f:
+                keys = json.load(f)
+        except Exception:
+            if raise_exception:
+                raise Exception(f"Portal initialization error; cannot open keys-file: {keys_file}")
+            return None, None
+        if isinstance(env, str) and env and isinstance(key := keys.get(env), dict):
+            return key, env
+        elif (isinstance(server, str) and (server := Portal._normalize_server(server)) and
+              (key := [keys[k] for k in keys if Portal._normalize_server(keys[k].get("server")) == server])):
+            return key[0], env
+        elif not env and len(keys) == 1 and (env := next(iter(keys))) and isinstance(key := keys[env], dict):
+            return key, env
+        else:
+            if raise_exception:
+                raise Exception(f"Portal initialization error;"
+                                f" {env or server or None} not found in keys-file: {keys_file}")
+            return None, None
+
+    @staticmethod
+    def _normalize_server(server: str) -> Optional[str]:
+        prefix = ""
+        if (lowercase_server := server.lower()).startswith("http://"):
+            prefix = "http://"
+        elif lowercase_server.startswith("https://"):
+            prefix = "https://"
+        if prefix:
+            if (server := re.sub(r"/+", "/", server[len(prefix):])).startswith("/"):
+                server = server[1:]
+            if len(server) > 1 and server.endswith("/"):
+                server = server[:-1]
+            return prefix + server if server else None
 
     @staticmethod
     def _valid_app(app: Optional[str]) -> Optional[str]:

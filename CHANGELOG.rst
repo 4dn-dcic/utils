@@ -7,6 +7,15 @@ Change Log
 ----------
 
 
+8.8.0
+=====
+* Changes to structured_data support date/time types.
+* Changes to structured_data support internal references in any order.
+* New datetime_utils module and tests; first created for date/time support in structured_data.
+* Added view-portal-object script for general troubleshooting.
+* Change to data_reader to ignore sheet names enclosed in parenthesis.
+
+
 8.7.2
 =====
 

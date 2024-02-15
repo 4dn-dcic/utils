@@ -30,6 +30,13 @@ bundle_utils
    :members:
 
 
+captured_output
+^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.captured_output
+   :members:
+
+
 codebuild_utils
 ^^^^^^^^^^^^^^^
 
@@ -90,6 +97,13 @@ data_utils
 ^^^^^^^^^^
 
 .. automodule:: dcicutils.data_utils
+   :members:
+
+
+datetime_utils
+^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.datetime_utils
    :members:
 
 

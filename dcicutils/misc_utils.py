@@ -2540,6 +2540,14 @@ def pad_to(target_size: int, data: list, *, padding=None):
     return data
 
 
+def normalize_spaces(value: str) -> str:
+    """
+    Returns the given string with multiple consecutive occurrences of whitespace
+    converted to a single space, and left and right trimmed of spaces.
+    """
+    return re.sub(r"\s+", " ", value).strip()
+
+
 class JsonLinesReader:
 
     def __init__(self, fp, padded=False, padding=None):

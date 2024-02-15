@@ -10,8 +10,9 @@ from typing import Any, Callable, List, Optional, Tuple, Type, Union
 from webtest.app import TestApp
 from dcicutils.common import OrchestratedApp
 from dcicutils.data_readers import CsvReader, Excel, RowReader
+from dcicutils.datetime_utils import normalize_date_string, normalize_datetime_string
 from dcicutils.file_utils import search_for_file
-from dcicutils.misc_utils import (create_dict, create_readonly_object, load_json_if,
+from dcicutils.misc_utils import (create_dict, create_readonly_object, is_uuid, load_json_if,
                                   merge_objects, remove_empty_properties, right_trim,
                                   split_string, to_boolean, to_enum, to_float, to_integer, VirtualApp)
 from dcicutils.portal_object_utils import PortalObject
@@ -203,6 +204,17 @@ class StructuredDataSet:
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
             self._load_reader(excel.sheet_reader(sheet_name), type_name=Schema.type_name(sheet_name))
+        # Check for unresolved reference errors which really are not because of ordering.
+        # Yes such internal references will be handled correctly on actual database update via snovault.loadxl.
+        if ref_errors := self.ref_errors:
+            ref_errors_actual = []
+            for ref_error in ref_errors:
+                if not self.portal.ref_exists(ref_error["error"]):
+                    ref_errors_actual.append(ref_error)
+            if ref_errors_actual:
+                self._errors["ref"] = ref_errors_actual
+            else:
+                del self._errors["ref"]
 
     def _load_json_file(self, file: str) -> None:
         with open(file) as f:
@@ -368,27 +380,19 @@ class Schema(SchemaBase):
 
     def __init__(self, schema_json: dict, portal: Optional[Portal] = None) -> None:
         super().__init__(schema_json)
-#       self._data = schema_json if isinstance(schema_json, dict) else {}
-#       self._type = Schema.type_name(schema_json.get("title", ""))
         self._portal = portal  # Needed only to resolve linkTo references.
         self._map_value_functions = {
             "boolean": self._map_function_boolean,
             "enum": self._map_function_enum,
             "integer": self._map_function_integer,
             "number": self._map_function_number,
-            "string": self._map_function_string
+            "string": self._map_function_string,
+            "date": self._map_function_date,
+            "datetime": self._map_function_datetime
         }
         self._resolved_refs = set()
         self._unresolved_refs = []
         self._typeinfo = self._create_typeinfo(schema_json)
-
-#   @property
-#   def data(self) -> dict:
-#       return self._data
-
-#   @property
-#   def type(self) -> str:
-#       return self._type
 
     @staticmethod
     def load_by_name(name: str, portal: Portal) -> Optional[dict]:
@@ -424,6 +428,10 @@ class Schema(SchemaBase):
                 map_function = self._map_function_enum
             elif isinstance(typeinfo.get("linkTo"), str):
                 map_function = self._map_function_ref
+            elif (type_format := typeinfo.get("format")) == "date":
+                map_function = self._map_function_date
+            elif type_format == "date-time":
+                map_function = self._map_function_datetime
             else:
                 map_function = self._map_value_functions.get(typeinfo_type)
             return map_function(typeinfo) if map_function else None
@@ -453,6 +461,18 @@ class Schema(SchemaBase):
         def map_string(value: str, src: Optional[str]) -> str:
             return value if value is not None else ""
         return map_string
+
+    def _map_function_date(self, typeinfo: dict) -> Callable:
+        def map_date(value: str, src: Optional[str]) -> str:
+            value = normalize_date_string(value)
+            return value if value is not None else ""
+        return map_date
+
+    def _map_function_datetime(self, typeinfo: dict) -> Callable:
+        def map_datetime(value: str, src: Optional[str]) -> str:
+            value = normalize_datetime_string(value)
+            return value if value is not None else ""
+        return map_datetime
 
     def _map_function_ref(self, typeinfo: dict) -> Callable:
         def map_ref(value: str, link_to: str, portal: Optional[Portal], src: Optional[str]) -> Any:
@@ -661,7 +681,13 @@ class Portal(PortalBase):
         """
         return self.is_schema_type(schema_name, FILE_SCHEMA_NAME)
 
-    def ref_exists(self, type_name: str, value: str) -> List[str]:
+    def ref_exists(self, type_name: str, value: Optional[str] = None) -> List[str]:
+        if not value:
+            if type_name.startswith("/") and len(parts := type_name[1:].split("/")) == 2:
+                type_name = parts[0]
+                value = parts[1]
+            else:
+                return []
         resolved = []
         is_resolved, resolved_uuid = self._ref_exists_single(type_name, value)
         if is_resolved:
@@ -691,7 +717,7 @@ class Portal(PortalBase):
             for item in items:
                 if (ivalue := next((item[iproperty] for iproperty in iproperties if iproperty in item), None)):
                     if isinstance(ivalue, list) and value in ivalue or ivalue == value:
-                        return True, None
+                        return True, (ivalue if isinstance(ivalue, str) and is_uuid(ivalue) else None)
         if (value := self.get_metadata(f"/{type_name}/{value}")) is None:
             return False, None
         return True, value.get("uuid")
