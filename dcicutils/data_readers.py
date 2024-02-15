@@ -170,7 +170,15 @@ class Excel:
         if self._workbook is None:
             self._workbook = openpyxl.load_workbook(self._file, data_only=True)
             self.sheet_names = [sheet_name for sheet_name in self._workbook.sheetnames
-                                if self._include_hidden_sheets or (self._workbook[sheet_name].sheet_state != "hidden")]
+                                if not self.is_hidden_sheet(self._workbook[sheet_name])]
+
+    def is_hidden_sheet(self, sheet: openpyxl.worksheet.worksheet.Worksheet) -> bool:
+        if not self._include_hidden_sheets:
+            if sheet.sheet_state == "hidden":
+                return True
+            if sheet.title.startswith("(") and sheet.title.endswith(")"):
+                return True
+        return False
 
     def __del__(self) -> None:
         if (workbook := self._workbook) is not None:
