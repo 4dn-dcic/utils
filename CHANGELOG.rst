@@ -7,6 +7,11 @@ Change Log
 ----------
 
 
+8.8.1
+=====
+* Changes to troubleshooting utility script view-portal-object.
+
+
 8.8.0
 =====
 * Changes to structured_data support date/time types.
