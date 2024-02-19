@@ -63,7 +63,7 @@ import sys
 from typing import List, Optional, Tuple
 import yaml
 from dcicutils.captured_output import captured_output, uncaptured_output
-from dcicutils.misc_utils import get_error_message, is_uuid
+from dcicutils.misc_utils import get_error_message, is_uuid, PRINT
 from dcicutils.portal_utils import Portal
 
 
@@ -116,7 +116,7 @@ def main():
             if not args.raw:
                 _print(schema_name)
             _print_schema(schema, details=args.details, more_details=args.details, raw=args.raw)
-        return
+            return
 
     data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw, database=args.database, verbose=args.verbose)
     if args.copy:
@@ -215,6 +215,7 @@ def _print_schema_info(schema: dict, level: int = 0,
                         _print(f"  - {required_property}: {property_type}")
                 else:
                     _print(f"  - {required_property}")
+            required = required_properties
         if identifying_properties := schema.get("identifyingProperties"):
             _print("- identifying properties:")
             for identifying_property in sorted(list(set(identifying_properties))):
@@ -225,6 +226,16 @@ def _print_schema_info(schema: dict, level: int = 0,
                         _print(f"  - {identifying_property}: {property_type}")
                 else:
                     _print(f"  - {identifying_property}")
+        if properties := schema.get("properties"):
+            reference_properties = []
+            for property_name in properties:
+                property = properties[property_name]
+                if link_to := property.get("linkTo"):
+                    reference_properties.append({"name": property_name, "ref": link_to})
+            if reference_properties:
+                _print("- reference properties:")
+                for reference_property in sorted(reference_properties, key=lambda key: key["name"]):
+                    _print(f"  - {reference_property['name']}: {reference_property['ref']}")
         if schema.get("additionalProperties") is True:
             _print(f"  - additional properties are allowed")
             pass
@@ -277,13 +288,34 @@ def _print_schema_info(schema: dict, level: int = 0,
                     if isinstance(property_type, list):
                         property_type = " | ".join(property_type)
                     suffix = ""
+                    if (enumeration := property.get("enum")) is not None:
+                        suffix += f" | enum"
                     if property_required:
                         suffix += f" | required"
                     if pattern := property.get("pattern"):
                         suffix += f" | pattern: {pattern}"
                     if link_to := property.get("linkTo"):
                         suffix += f" | reference: {link_to}"
+                    if property.get("calculatedProperty"):
+                        suffix += f" | calculated"
+                    if default := property.get("default"):
+                        suffix += f" | default:"
+                        if isinstance(default, dict):
+                            suffix += f" object"
+                        elif isinstance(default, list):
+                            suffix += f" array"
+                        else:
+                            suffix += f" {default}"
                     _print(f"{spaces}- {property_name}: {property_type}{suffix}")
+                    if enumeration:
+                        nenums = 0
+                        maxenums = 15
+                        for enum in enumeration:
+                            if (nenums := nenums + 1) >= maxenums:
+                                if (remaining := len(enumeration) - nenums) > 0:
+                                    _print(f"{spaces}  - [{remaining} more ...]")
+                                break
+                            _print(f"{spaces}  - {enum}")
             else:
                 _print(f"{spaces}- {property_name}")
 
@@ -303,7 +335,7 @@ def _print_all_schema_names(portal: Portal,
 
 def _print(*args, **kwargs):
     with uncaptured_output():
-        print(*args, **kwargs)
+        PRINT(*args, **kwargs)
     sys.stdout.flush()
 
 
