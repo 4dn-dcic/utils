@@ -103,7 +103,8 @@ def main():
                             app=args.app, verbose=args.verbose, debug=args.debug)
 
     if args.uuid.lower() == "schemas" or args.uuid.lower() == "schema":
-        _print_all_schema_names(portal=portal, details=args.details, more_details=args.more_details, raw=args.raw)
+        _print_all_schema_names(portal=portal, details=args.details,
+                                more_details=args.more_details, raw=args.raw, raw_yaml=args.yaml)
         return
 
     if _is_maybe_schema_name(args.uuid):
@@ -119,7 +120,7 @@ def main():
                     _print(f"{schema_name} | parent: {parent_schema_name}")
                 else:
                     _print(schema_name)
-            _print_schema(schema, details=args.details, more_details=args.details, raw=args.raw)
+            _print_schema(schema, details=args.details, more_details=args.details, raw=args.raw, raw_yaml=args.yaml)
             return
 
     data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw, database=args.database, verbose=args.verbose)
@@ -196,9 +197,13 @@ def _is_maybe_schema_name(value: str) -> bool:
     return False
 
 
-def _print_schema(schema: dict, details: bool = False, more_details: bool = False, raw: bool = False) -> None:
+def _print_schema(schema: dict, details: bool = False, more_details: bool = False,
+                  raw: bool = False, raw_yaml: bool = False) -> None:
     if raw:
-        _print(json.dumps(schema, indent=4))
+        if raw_yaml:
+            _print(yaml.dump(schema))
+        else:
+            _print(json.dumps(schema, indent=4))
         return
     _print_schema_info(schema, details=details, more_details=more_details)
 
@@ -219,6 +224,13 @@ def _print_schema_info(schema: dict, level: int = 0,
                         _print(f"  - {required_property}: {property_type}")
                 else:
                     _print(f"  - {required_property}")
+            if isinstance(any_of := schema.get("anyOf"), list):
+                if ((any_of == [{"required": ["submission_centers"]}, {"required": ["consortia"]}]) or
+                    (any_of == [{"required": ["consortia"]}, {"required": ["submission_centers"]}])):  # noqa
+                    # Very very special case.
+                    _print(f"  - at least one of:")
+                    _print(f"    - consortia: array of string | unique")
+                    _print(f"    - submission_centers: array of string | unique")
             required = required_properties
         if identifying_properties := schema.get("identifyingProperties"):
             _print("- identifying properties:")
@@ -264,6 +276,8 @@ def _print_schema_info(schema: dict, level: int = 0,
                             property_type = "undefined object"
                     elif property.get("additionalProperties") is True:
                         property_type = "open ended object"
+                    if property.get("calculatedProperty"):
+                        suffix += f" | calculated"
                     _print(f"{spaces}- {property_name}: {property_type}{suffix}")
                     _print_schema_info(object_properties, level=level + 1,
                                        details=details, more_details=more_details,
@@ -272,13 +286,18 @@ def _print_schema_info(schema: dict, level: int = 0,
                     suffix = ""
                     if property_required:
                         suffix += f" | required"
+                    if property.get("uniqueItems"):
+                        suffix += f" | unique"
+                    if property.get("calculatedProperty"):
+                        suffix += f" | calculated"
                     if property_items := property.get("items"):
                         if property_type := property_items.get("type"):
                             if property_type == "object":
                                 suffix = ""
                                 _print(f"{spaces}- {property_name}: array of object{suffix}")
-                                _print_schema_info(property_items.get("properties"),
-                                                   details=details, more_details=more_details, level=level + 1)
+                                _print_schema_info(property_items.get("properties"), level=level + 1,
+                                                   details=details, more_details=more_details,
+                                                   required=property_items.get("required"))
                             elif property_type == "array":
                                 # This (array-of-array) never happens to occur at this time (February 2024).
                                 _print(f"{spaces}- {property_name}: array of array{suffix}")
@@ -290,18 +309,21 @@ def _print_schema_info(schema: dict, level: int = 0,
                         _print(f"{spaces}- {property_name}: array{suffix}")
                 else:
                     if isinstance(property_type, list):
-                        property_type = " | ".join(property_type)
+                        property_type = " or ".join(sorted(property_type))
                     suffix = ""
                     if (enumeration := property.get("enum")) is not None:
                         suffix += f" | enum"
                     if property_required:
                         suffix += f" | required"
+                    if property.get("uniqueKey"):
+                        suffix += f" | unique"
                     if pattern := property.get("pattern"):
                         suffix += f" | pattern: {pattern}"
                     if (format := property.get("format")) and (format != "uuid"):
                         suffix += f" | format: {format}"
                     if property.get("anyOf") == [{"format": "date"}, {"format": "date-time"}]:
-                        suffix += f" | format: date | date-time"
+                        # Very special case.
+                        suffix += f" | format: date/date-time"
                     if link_to := property.get("linkTo"):
                         suffix += f" | reference: {link_to}"
                     if property.get("calculatedProperty"):
@@ -330,10 +352,13 @@ def _print_schema_info(schema: dict, level: int = 0,
 
 def _print_all_schema_names(portal: Portal,
                             details: bool = False, more_details: bool = False,
-                            raw: bool = False) -> None:
+                            raw: bool = False, raw_yaml: bool = False) -> None:
     if schemas := _get_schemas(portal):
         if raw:
-            _print(json.dumps(schemas, indent=4))
+            if raw_yaml:
+                _print(yaml.dump(schemas))
+            else:
+                _print(json.dumps(schemas, indent=4))
             return
         for schema_name in sorted(schemas.keys()):
             if parent_schema_name := _get_parent_schema_name(schemas[schema_name]):
