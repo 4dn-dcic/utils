@@ -68,6 +68,16 @@ from dcicutils.misc_utils import get_error_message, is_uuid, PRINT
 from dcicutils.portal_utils import Portal
 
 
+# Schema properties to ignore (by default) for the view schema usage.
+_SCHEMAS_IGNORE_PROPERTIES = [
+    "date_created",
+    "last_modified",
+    "principals_allowed",
+    "submitted_by",
+    "schema_version"
+]
+
+
 def main():
 
     parser = argparse.ArgumentParser(description="View Portal object.")
@@ -83,6 +93,8 @@ def main():
                         help=f"Application name (one of: smaht, cgap, fourfront).")
     parser.add_argument("--schema", action="store_true", required=False, default=False,
                         help="View named schema rather than object.")
+    parser.add_argument("--all", action="store_true", required=False, default=False,
+                        help="Include all properties for schema usage.")
     parser.add_argument("--raw", action="store_true", required=False, default=False, help="Raw output.")
     parser.add_argument("--database", action="store_true", required=False, default=False,
                         help="Read from database output.")
@@ -104,7 +116,7 @@ def main():
 
     if args.uuid.lower() == "schemas" or args.uuid.lower() == "schema":
         _print_all_schema_names(portal=portal, details=args.details,
-                                more_details=args.more_details, raw=args.raw, raw_yaml=args.yaml)
+                                more_details=args.more_details, all=args.all, raw=args.raw, raw_yaml=args.yaml)
         return
 
     if _is_maybe_schema_name(args.uuid):
@@ -120,7 +132,8 @@ def main():
                     _print(f"{schema_name} | parent: {parent_schema_name}")
                 else:
                     _print(schema_name)
-            _print_schema(schema, details=args.details, more_details=args.details, raw=args.raw, raw_yaml=args.yaml)
+            _print_schema(schema, details=args.details, more_details=args.details,
+                          all=args.all, raw=args.raw, raw_yaml=args.yaml)
             return
 
     data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw, database=args.database, verbose=args.verbose)
@@ -197,7 +210,7 @@ def _is_maybe_schema_name(value: str) -> bool:
     return False
 
 
-def _print_schema(schema: dict, details: bool = False, more_details: bool = False,
+def _print_schema(schema: dict, details: bool = False, more_details: bool = False, all: bool = False,
                   raw: bool = False, raw_yaml: bool = False) -> None:
     if raw:
         if raw_yaml:
@@ -205,11 +218,11 @@ def _print_schema(schema: dict, details: bool = False, more_details: bool = Fals
         else:
             _print(json.dumps(schema, indent=4))
         return
-    _print_schema_info(schema, details=details, more_details=more_details)
+    _print_schema_info(schema, details=details, more_details=more_details, all=all)
 
 
 def _print_schema_info(schema: dict, level: int = 0,
-                       details: bool = False, more_details: bool = False,
+                       details: bool = False, more_details: bool = False, all: bool = False,
                        required: Optional[List[str]] = None) -> None:
     if not schema or not isinstance(schema, dict):
         return
@@ -217,6 +230,8 @@ def _print_schema_info(schema: dict, level: int = 0,
         if required_properties := schema.get("required"):
             _print("- required properties:")
             for required_property in sorted(list(set(required_properties))):
+                if not all and required_property in _SCHEMAS_IGNORE_PROPERTIES:
+                    continue
                 if property_type := (info := schema.get("properties", {}).get(required_property, {})).get("type"):
                     if property_type == "array" and (array_type := info.get("items", {}).get("type")):
                         _print(f"  - {required_property}: {property_type} of {array_type}")
@@ -229,12 +244,14 @@ def _print_schema_info(schema: dict, level: int = 0,
                     (any_of == [{"required": ["consortia"]}, {"required": ["submission_centers"]}])):  # noqa
                     # Very very special case.
                     _print(f"  - at least one of:")
-                    _print(f"    - consortia: array of string | unique")
-                    _print(f"    - submission_centers: array of string | unique")
+                    _print(f"    - consortia: array of string")
+                    _print(f"    - submission_centers: array of string")
             required = required_properties
         if identifying_properties := schema.get("identifyingProperties"):
             _print("- identifying properties:")
             for identifying_property in sorted(list(set(identifying_properties))):
+                if not all and identifying_property in _SCHEMAS_IGNORE_PROPERTIES:
+                    continue
                 if property_type := (info := schema.get("properties", {}).get(identifying_property, {})).get("type"):
                     if property_type == "array" and (array_type := info.get("items", {}).get("type")):
                         _print(f"  - {identifying_property}: {property_type} of {array_type}")
@@ -245,6 +262,8 @@ def _print_schema_info(schema: dict, level: int = 0,
         if properties := schema.get("properties"):
             reference_properties = []
             for property_name in properties:
+                if not all and property_name in _SCHEMAS_IGNORE_PROPERTIES:
+                    continue
                 property = properties[property_name]
                 if link_to := property.get("linkTo"):
                     reference_properties.append({"name": property_name, "ref": link_to})
@@ -261,6 +280,8 @@ def _print_schema_info(schema: dict, level: int = 0,
         if level == 0:
             _print("- properties:")
         for property_name in sorted(properties):
+            if not all and property_name in _SCHEMAS_IGNORE_PROPERTIES:
+                continue
             if property_name.startswith("@"):
                 continue
             spaces = f"{' ' * (level + 1) * 2}"
@@ -280,7 +301,7 @@ def _print_schema_info(schema: dict, level: int = 0,
                         suffix += f" | calculated"
                     _print(f"{spaces}- {property_name}: {property_type}{suffix}")
                     _print_schema_info(object_properties, level=level + 1,
-                                       details=details, more_details=more_details,
+                                       details=details, more_details=more_details, all=all,
                                        required=property.get("required"))
                 elif property_type == "array":
                     suffix = ""
@@ -296,7 +317,7 @@ def _print_schema_info(schema: dict, level: int = 0,
                                 suffix = ""
                                 _print(f"{spaces}- {property_name}: array of object{suffix}")
                                 _print_schema_info(property_items.get("properties"), level=level + 1,
-                                                   details=details, more_details=more_details,
+                                                   details=details, more_details=more_details, all=all,
                                                    required=property_items.get("required"))
                             elif property_type == "array":
                                 # This (array-of-array) never happens to occur at this time (February 2024).
@@ -321,9 +342,11 @@ def _print_schema_info(schema: dict, level: int = 0,
                         suffix += f" | pattern: {pattern}"
                     if (format := property.get("format")) and (format != "uuid"):
                         suffix += f" | format: {format}"
-                    if property.get("anyOf") == [{"format": "date"}, {"format": "date-time"}]:
-                        # Very special case.
-                        suffix += f" | format: date/date-time"
+                    if isinstance(any_of := property.get("anyOf"), list):
+                        if ((any_of == [{"format": "date"}, {"format": "date-time"}]) or
+                            (any_of == [{"format": "date-time"}, {"format": "date"}])):  # noqa
+                            # Very special case.
+                            suffix += f" | format: date or date-time"
                     if link_to := property.get("linkTo"):
                         suffix += f" | reference: {link_to}"
                     if property.get("calculatedProperty"):
@@ -351,7 +374,7 @@ def _print_schema_info(schema: dict, level: int = 0,
 
 
 def _print_all_schema_names(portal: Portal,
-                            details: bool = False, more_details: bool = False,
+                            details: bool = False, more_details: bool = False, all: bool = False,
                             raw: bool = False, raw_yaml: bool = False) -> None:
     if schemas := _get_schemas(portal):
         if raw:
@@ -366,7 +389,7 @@ def _print_all_schema_names(portal: Portal,
             else:
                 _print(schema_name)
             if details:
-                _print_schema(schemas[schema_name], details=details, more_details=more_details)
+                _print_schema(schemas[schema_name], details=details, more_details=more_details, all=all)
 
 
 def _get_parent_schema_name(schema: dict) -> Optional[str]:
