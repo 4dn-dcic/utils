@@ -111,8 +111,8 @@ def main():
     if args.more_details:
         args.details = True
 
-    portal = _create_portal(ini=args.ini, env=args.env, server=args.server,
-                            app=args.app, verbose=args.verbose, debug=args.debug)
+    portal = _create_portal(ini=args.ini, env=args.env or os.environ.get("SMAHT_ENV"),
+                            server=args.server, app=args.app, verbose=args.verbose, debug=args.debug)
 
     if args.uuid.lower() == "schemas" or args.uuid.lower() == "schema":
         _print_all_schema_names(portal=portal, details=args.details,
@@ -273,7 +273,6 @@ def _print_schema_info(schema: dict, level: int = 0,
                     _print(f"  - {reference_property['name']}: {reference_property['ref']}")
         if schema.get("additionalProperties") is True:
             _print(f"  - additional properties are allowed")
-            pass
     if not more_details:
         return
     if properties := (schema.get("properties") if level == 0 else schema):
@@ -312,11 +311,13 @@ def _print_schema_info(schema: dict, level: int = 0,
                     if property.get("calculatedProperty"):
                         suffix += f" | calculated"
                     if property_items := property.get("items"):
+                        if (enumeration := property_items.get("enum")) is not None:
+                            suffix = f" | enum" + suffix
                         if pattern := property_items.get("pattern"):
                             suffix += f" | pattern: {pattern}"
                         if (format := property_items.get("format")) and (format != "uuid"):
                             suffix += f" | format: {format}"
-                        if max_length := property_items.get("maxLength"):
+                        if (max_length := property_items.get("maxLength")) is not None:
                             suffix += f" | max items: {max_length}"
                         if property_type := property_items.get("type"):
                             if property_type == "object":
@@ -334,6 +335,15 @@ def _print_schema_info(schema: dict, level: int = 0,
                             _print(f"{spaces}- {property_name}: array{suffix}")
                     else:
                         _print(f"{spaces}- {property_name}: array{suffix}")
+                    if enumeration:
+                        nenums = 0
+                        maxenums = 15
+                        for enum in sorted(enumeration):
+                            if (nenums := nenums + 1) >= maxenums:
+                                if (remaining := len(enumeration) - nenums) > 0:
+                                    _print(f"{spaces}  - [{remaining} more ...]")
+                                break
+                            _print(f"{spaces}  - {enum}")
                 else:
                     if isinstance(property_type, list):
                         property_type = " or ".join(sorted(property_type))
@@ -357,7 +367,7 @@ def _print_schema_info(schema: dict, level: int = 0,
                         suffix += f" | reference: {link_to}"
                     if property.get("calculatedProperty"):
                         suffix += f" | calculated"
-                    if default := property.get("default"):
+                    if (default := property.get("default")) is not None:
                         suffix += f" | default:"
                         if isinstance(default, dict):
                             suffix += f" object"
@@ -365,13 +375,13 @@ def _print_schema_info(schema: dict, level: int = 0,
                             suffix += f" array"
                         else:
                             suffix += f" {default}"
-                    if minimum := property.get("minimum"):
+                    if (minimum := property.get("minimum")) is not None:
                         suffix += f" | min: {minimum}"
-                    if maximum := property.get("maximum"):
+                    if (maximum := property.get("maximum")) is not None:
                         suffix += f" | max: {maximum}"
-                    if max_length := property.get("maxLength"):
+                    if (max_length := property.get("maxLength")) is not None:
                         suffix += f" | max length: {max_length}"
-                    if min_length := property.get("minLength"):
+                    if (min_length := property.get("minLength")) is not None:
                         suffix += f" | min length: {min_length}"
                     _print(f"{spaces}- {property_name}: {property_type}{suffix}")
                     if enumeration:
