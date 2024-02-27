@@ -118,6 +118,32 @@ def main():
         _print_all_schema_names(portal=portal, details=args.details,
                                 more_details=args.more_details, all=args.all, raw=args.raw, raw_yaml=args.yaml)
         return
+    elif args.uuid.lower() == "info":  # TODO: need word for what consortiums and submission centers are collectively
+        if consortia := portal.get_metadata("/consortia?limit=1000"):
+            _print("Known Consortia:")
+            consortia = sorted(consortia.get("@graph", []), key=lambda key: key.get("identifier"))
+            for consortium in consortia:
+                if ((consortium_name := consortium.get("identifier")) and
+                    (consortium_uuid := consortium.get("uuid"))):  # noqa
+                    _print(f"- {consortium_name}: {consortium_uuid}")
+        if submission_centers := portal.get_metadata("/submission-centers?limit=1000"):
+            _print("Known Submission Centers:")
+            submission_centers = sorted(submission_centers.get("@graph", []), key=lambda key: key.get("identifier"))
+            for submission_center in submission_centers:
+                if ((submission_center_name := submission_center.get("identifier")) and
+                    (submission_center_uuid := submission_center.get("uuid"))):  # noqa
+                    _print(f"- {submission_center_name}: {submission_center_uuid}")
+        try:
+            if file_formats := portal.get_metadata("/file-formats?limit=1000"):
+                _print("Known File Formats:")
+                file_formats = sorted(file_formats.get("@graph", []), key=lambda key: key.get("identifier"))
+                for file_format in file_formats:
+                    if ((file_format_name := file_format.get("identifier")) and
+                        (file_format_uuid := file_format.get("uuid"))):  # noqa
+                        _print(f"- {file_format_name}: {file_format_uuid}")
+        except Exception:
+            _print("Known File Formats: None")
+        return
 
     if _is_maybe_schema_name(args.uuid):
         args.schema = True
