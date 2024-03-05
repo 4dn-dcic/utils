@@ -681,7 +681,7 @@ class Portal(PortalBase):
         """
         return self.is_schema_type(schema_name, FILE_SCHEMA_NAME)
 
-    def ref_exists(self, type_name: str, value: Optional[str] = None) -> List[str]:
+    def ref_exists(self, type_name: str, value: Optional[str] = None) -> List[dict]:
         if not value:
             if type_name.startswith("/") and len(parts := type_name[1:].split("/")) == 2:
                 type_name = parts[0]
