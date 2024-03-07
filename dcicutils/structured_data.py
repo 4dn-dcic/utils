@@ -291,6 +291,18 @@ class StructuredDataSet:
     def ref_lookup_count(self) -> int:
         return self.portal.ref_lookup_count if self.portal else -1
 
+    @property
+    def ref_lookup_found_count(self) -> int:
+        return self.portal.ref_lookup_found_count if self.portal else -1
+
+    @property
+    def ref_lookup_notfound_count(self) -> int:
+        return self.portal.ref_lookup_notfound_count if self.portal else -1
+
+    @property
+    def ref_lookup_error_count(self) -> int:
+        return self.portal.ref_lookup_error_count if self.portal else -1
+
     def _note_warning(self, item: Optional[Union[dict, List[dict]]], group: str) -> None:
         self._note_issue(self._warnings, item, group)
 
@@ -695,6 +707,9 @@ class Portal(PortalBase):
             self._ref_cache = {}
         self._ref_cache_hit_count = 0
         self._ref_lookup_count = 0
+        self._ref_lookup_found_count = 0
+        self._ref_lookup_notfound_count = 0
+        self._ref_lookup_error_count = 0
 
     @lru_cache(maxsize=8092)
     def get_metadata_cache(self, object_name: str) -> Optional[dict]:
@@ -703,8 +718,14 @@ class Portal(PortalBase):
     def get_metadata_nocache(self, object_name: str) -> Optional[dict]:
         try:
             self._ref_lookup_count += 1
-            return super().get_metadata(object_name)
-        except Exception:
+            result = super().get_metadata(object_name)
+            self._ref_lookup_found_count += 1
+            return result
+        except Exception as e:
+            if "HTTPNotFound" in str(e):
+                self._ref_lookup_notfound_count += 1
+            else:
+                self._ref_lookup_error_count += 1
             return None
 
     @lru_cache(maxsize=256)
@@ -812,6 +833,18 @@ class Portal(PortalBase):
     @property
     def ref_lookup_count(self) -> int:
         return self._ref_lookup_count
+
+    @property
+    def ref_lookup_found_count(self) -> int:
+        return self._ref_lookup_found_count
+
+    @property
+    def ref_lookup_notfound_count(self) -> int:
+        return self._ref_lookup_notfound_count
+
+    @property
+    def ref_lookup_error_count(self) -> int:
+        return self._ref_lookup_error_count
 
     @staticmethod
     def create_for_testing(arg: Optional[Union[str, bool, List[dict], dict, Callable]] = None,
