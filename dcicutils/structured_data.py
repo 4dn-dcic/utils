@@ -292,6 +292,10 @@ class StructuredDataSet:
         return self.portal.ref_lookup_cache_miss_count if self.portal else -1
 
     @property
+    def ref_lookup_count(self) -> int:
+        return self.portal.ref_lookup_count if self.portal else -1
+
+    @property
     def ref_lookup_found_count(self) -> int:
         return self.portal.ref_lookup_found_count if self.portal else -1
 
@@ -842,6 +846,8 @@ class Portal(PortalBase):
 
     @property
     def ref_lookup_cache_hit_count(self) -> int:
+        if self._ref_cache is None:
+            return 0
         try:
             return self.get_metadata_cache.cache_info().hits
         except Exception:
@@ -849,10 +855,16 @@ class Portal(PortalBase):
 
     @property
     def ref_lookup_cache_miss_count(self) -> int:
+        if self._ref_cache is None:
+            return self.ref_lookup_count
         try:
             return self.get_metadata_cache.cache_info().misses
         except Exception:
             return -1
+
+    @property
+    def ref_lookup_count(self) -> int:
+        return self._ref_lookup_found_count + self._ref_lookup_notfound_count + self._ref_lookup_error_count
 
     @property
     def ref_lookup_found_count(self) -> int:
