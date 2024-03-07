@@ -284,12 +284,12 @@ class StructuredDataSet:
         return (ref_lookup_flags & StructuredDataSet.REF_LOOKUP_SUBTYPES) == StructuredDataSet.REF_LOOKUP_SUBTYPES
 
     @property
-    def ref_cache_hit_count(self) -> int:
-        return self.portal.ref_cache_hit_count if self.portal else -1
+    def ref_lookup_cache_hit_count(self) -> int:
+        return self.portal.ref_lookup_cache_hit_count if self.portal else -1
 
     @property
-    def ref_lookup_count(self) -> int:
-        return self.portal.ref_lookup_count if self.portal else -1
+    def ref_lookup_cache_miss_count(self) -> int:
+        return self.portal.ref_lookup_cache_miss_count if self.portal else -1
 
     @property
     def ref_lookup_found_count(self) -> int:
@@ -302,6 +302,14 @@ class StructuredDataSet:
     @property
     def ref_lookup_error_count(self) -> int:
         return self.portal.ref_lookup_error_count if self.portal else -1
+
+    @property
+    def ref_exists_cache_hit_count(self) -> int:
+        return self.portal.ref_exists_cache_hit_count if self.portal else -1
+
+    @property
+    def ref_exists_cache_miss_count(self) -> int:
+        return self.portal.ref_exists_cache_miss_count if self.portal else -1
 
     def _note_warning(self, item: Optional[Union[dict, List[dict]]], group: str) -> None:
         self._note_issue(self._warnings, item, group)
@@ -705,11 +713,11 @@ class Portal(PortalBase):
         else:
             self.get_metadata = self.get_metadata_cache
             self._ref_cache = {}
-        self._ref_cache_hit_count = 0
-        self._ref_lookup_count = 0
         self._ref_lookup_found_count = 0
         self._ref_lookup_notfound_count = 0
         self._ref_lookup_error_count = 0
+        self._ref_exists_cache_hit_count = 0
+        self._ref_exists_cache_miss_count = 0
 
     @lru_cache(maxsize=8092)
     def get_metadata_cache(self, object_name: str) -> Optional[dict]:
@@ -717,7 +725,6 @@ class Portal(PortalBase):
 
     def get_metadata_nocache(self, object_name: str) -> Optional[dict]:
         try:
-            self._ref_lookup_count += 1
             result = super().get_metadata(object_name)
             self._ref_lookup_found_count += 1
             return result
@@ -783,9 +790,10 @@ class Portal(PortalBase):
             else:
                 return []  # Should not happen.
         if (resolved := self._ref_exists_from_cache(type_name, value)) is not None:
-            self._ref_cache_hit_count += 1
+            self._ref_exists_cache_hit_count += 1
             return resolved
         # Not cached here.
+        self._ref_exists_cache_miss_count += 1
         resolved = []
         ref_lookup_strategy = self._ref_lookup_strategy(type_name, value)
         is_ref_lookup_root = StructuredDataSet._is_ref_lookup_root(ref_lookup_strategy)
@@ -827,12 +835,18 @@ class Portal(PortalBase):
         return True, value.get("uuid")
 
     @property
-    def ref_cache_hit_count(self) -> int:
-        return self._ref_cache_hit_count
+    def ref_lookup_cache_hit_count(self) -> int:
+        try:
+            return self.get_metadata_cache.cache_info().hits
+        except Exception:
+            return -1
 
     @property
-    def ref_lookup_count(self) -> int:
-        return self._ref_lookup_count
+    def ref_lookup_cache_miss_count(self) -> int:
+        try:
+            return self.get_metadata_cache.cache_info().misses
+        except Exception:
+            return -1
 
     @property
     def ref_lookup_found_count(self) -> int:
@@ -845,6 +859,14 @@ class Portal(PortalBase):
     @property
     def ref_lookup_error_count(self) -> int:
         return self._ref_lookup_error_count
+
+    @property
+    def ref_exists_cache_hit_count(self) -> int:
+        return self._ref_exists_cache_hit_count
+
+    @property
+    def ref_exists_cache_miss_count(self) -> int:
+        return self._ref_exists_cache_miss_count
 
     @staticmethod
     def create_for_testing(arg: Optional[Union[str, bool, List[dict], dict, Callable]] = None,
