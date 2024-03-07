@@ -304,6 +304,10 @@ class StructuredDataSet:
         return self.portal.ref_lookup_error_count if self.portal else -1
 
     @property
+    def ref_exists_internal_count(self) -> int:
+        return self.portal.ref_exists_internal_count if self.portal else -1
+
+    @property
     def ref_exists_cache_hit_count(self) -> int:
         return self.portal.ref_exists_cache_hit_count if self.portal else -1
 
@@ -716,6 +720,7 @@ class Portal(PortalBase):
         self._ref_lookup_found_count = 0
         self._ref_lookup_notfound_count = 0
         self._ref_lookup_error_count = 0
+        self._ref_exists_internal_count = 0
         self._ref_exists_cache_hit_count = 0
         self._ref_exists_cache_miss_count = 0
 
@@ -829,6 +834,7 @@ class Portal(PortalBase):
             for item in items:
                 if (ivalue := next((item[iproperty] for iproperty in iproperties if iproperty in item), None)):
                     if isinstance(ivalue, list) and value in ivalue or ivalue == value:
+                        self._ref_exists_internal_count += 1
                         return True, (ivalue if isinstance(ivalue, str) and is_uuid(ivalue) else None)
         if (value := self.get_metadata(f"/{type_name}/{value}" if not root else f"/{value}")) is None:
             return False, None
@@ -859,6 +865,10 @@ class Portal(PortalBase):
     @property
     def ref_lookup_error_count(self) -> int:
         return self._ref_lookup_error_count
+
+    @property
+    def ref_exists_internal_count(self) -> int:
+        return self._ref_exists_internal_count
 
     @property
     def ref_exists_cache_hit_count(self) -> int:
