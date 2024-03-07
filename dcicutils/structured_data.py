@@ -687,7 +687,12 @@ class Portal(PortalBase):
             self._ref_lookup_strategy = ref_lookup_strategy
         else:
             self._ref_lookup_strategy = lambda type_name, value: StructuredDataSet.REF_LOOKUP_DEFAULT
-        self._ref_cache = {} if not ref_lookup_nocache else None
+        if ref_lookup_nocache is True:
+            self.get_metadata = self.get_metadata_nocache
+            self._ref_cache = None
+        else:
+            self.get_metadata = self.get_metadata_cache
+            self._ref_cache = {}
         self._ref_cache_hit_count = 0
         self._ref_lookup_count = 0
 
