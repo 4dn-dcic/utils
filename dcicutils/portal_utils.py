@@ -331,15 +331,15 @@ class Portal:
         Returns the "super type map" for all of the known schemas (via /profiles).
         This is a dictionary with property names which are all known schema type names which
         have (one or more) sub-types, and the value of each such property name is an array
-        of all of those sub-types (direct and all descendents), in breadth first order.
+        of all of those sub-type names (direct and all descendents), in breadth first order.
         """
         def list_breadth_first(super_type_map: dict, super_type_name: str) -> dict:
             result = []
             queue = deque(super_type_map.get(super_type_name, []))
             while queue:
-                result.append(sub_type_name := queue.popleft())
-                if sub_type_name in super_type_map:
-                    queue.extend(super_type_map[sub_type_name])
+                result.append(subtype_name := queue.popleft())
+                if subtype_name in super_type_map:
+                    queue.extend(super_type_map[subtype_name])
             return result
         if not (schemas := self.get_schemas()):
             return {}

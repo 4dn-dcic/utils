@@ -47,11 +47,27 @@ StructuredDataSet = Type["StructuredDataSet"]
 
 class StructuredDataSet:
 
+    # Reference (linkTo) lookup strategies; on a per-reference (type/value) basis;
+    # controlled by optional ref_lookup_strategy callable; default is lookup at root path
+    # but after the named reference (linkTo) type path lookup, and then lookup all subtypes;
+    # can choose to lookup root path first, or not lookup root path at all, or not lookup
+    # subtypes at all; the ref_lookup_strategy callable if specified should take a type_name
+    # and value (string) arguements and return an integer of any of the below ORed together.
+    REF_LOOKUP_ROOT = 0x0001
+    REF_LOOKUP_ROOT_FIRST = 0x0002 | REF_LOOKUP_ROOT
+    REF_LOOKUP_SUBTYPES = 0x0004
+    REF_LOOKUP_MINIMAL = 0
+    REF_LOOKUP_DEFAULT = REF_LOOKUP_ROOT | REF_LOOKUP_SUBTYPES
+
     def __init__(self, file: Optional[str] = None, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
                  schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
-                 order: Optional[List[str]] = None, prune: bool = True) -> None:
+                 order: Optional[List[str]] = None, prune: bool = True,
+                 ref_lookup_strategy: Optional[Callable] = None,
+                 ref_lookup_nocache: bool = False) -> None:
         self._data = {}
-        self._portal = Portal(portal, data=self._data, schemas=schemas) if portal else None
+        self._portal = Portal(portal, data=self._data, schemas=schemas,
+                              ref_lookup_strategy=ref_lookup_strategy,
+                              ref_lookup_nocache=ref_lookup_nocache) if portal else None
         self._order = order
         self._prune = prune
         self._warnings = {}
@@ -72,8 +88,11 @@ class StructuredDataSet:
     @staticmethod
     def load(file: str, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
              schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
-             order: Optional[List[str]] = None, prune: bool = True) -> StructuredDataSet:
-        return StructuredDataSet(file=file, portal=portal, schemas=schemas, autoadd=autoadd, order=order, prune=prune)
+             order: Optional[List[str]] = None, prune: bool = True,
+             ref_lookup_strategy: Optional[Callable] = None,
+             ref_lookup_nocache: bool = False) -> StructuredDataSet:
+        return StructuredDataSet(file=file, portal=portal, schemas=schemas, autoadd=autoadd, order=order, prune=prune,
+                                 ref_lookup_strategy=ref_lookup_strategy, ref_lookup_nocache=ref_lookup_nocache)
 
     def validate(self, force: bool = False) -> None:
         def data_without_deleted_properties(data: dict) -> dict:
@@ -254,6 +273,23 @@ class StructuredDataSet:
         for name in properties:
             if name not in structured_row and (not schema or schema.data.get("properties", {}).get(name)):
                 structured_row[name] = properties[name]
+
+    def _is_ref_lookup_root(ref_lookup_flags: int) -> bool:
+        return (ref_lookup_flags & StructuredDataSet.REF_LOOKUP_ROOT) == StructuredDataSet.REF_LOOKUP_ROOT
+
+    def _is_ref_lookup_root_first(ref_lookup_flags: int) -> bool:
+        return (ref_lookup_flags & StructuredDataSet.REF_LOOKUP_ROOT_FIRST) == StructuredDataSet.REF_LOOKUP_ROOT_FIRST
+
+    def _is_ref_lookup_subtypes(ref_lookup_flags: int) -> bool:
+        return (ref_lookup_flags & StructuredDataSet.REF_LOOKUP_SUBTYPES) == StructuredDataSet.REF_LOOKUP_SUBTYPES
+
+    @property
+    def ref_cache_hit_count(self) -> int:
+        return self.portal.ref_cache_hit_count if self.portal else -1
+
+    @property
+    def ref_lookup_count(self) -> int:
+        return self.portal.ref_lookup_count if self.portal else -1
 
     def _note_warning(self, item: Optional[Union[dict, List[dict]]], group: str) -> None:
         self._note_issue(self._warnings, item, group)
@@ -637,6 +673,8 @@ class Portal(PortalBase):
                  env: Optional[str] = None, server: Optional[str] = None,
                  app: Optional[OrchestratedApp] = None,
                  data: Optional[dict] = None, schemas: Optional[List[dict]] = None,
+                 ref_lookup_strategy: Optional[Callable] = None,
+                 ref_lookup_nocache: bool = False,
                  raise_exception: bool = True) -> None:
         super().__init__(arg, env=env, server=server, app=app, raise_exception=raise_exception)
         if isinstance(arg, Portal):
@@ -645,10 +683,21 @@ class Portal(PortalBase):
         else:
             self._schemas = schemas
             self._data = data
+        if callable(ref_lookup_strategy):
+            self._ref_lookup_strategy = ref_lookup_strategy
+        else:
+            self._ref_lookup_strategy = lambda type_name, value: StructuredDataSet.REF_LOOKUP_DEFAULT
+        self._ref_cache = {} if not ref_lookup_nocache else None
+        self._ref_cache_hit_count = 0
+        self._ref_lookup_count = 0
 
-    @lru_cache(maxsize=256)
-    def get_metadata(self, object_name: str) -> Optional[dict]:
+    @lru_cache(maxsize=8092)
+    def get_metadata_cache(self, object_name: str) -> Optional[dict]:
+        return self.get_metadata_nocache(object_name)
+
+    def get_metadata_nocache(self, object_name: str) -> Optional[dict]:
         try:
+            self._ref_lookup_count += 1
             return super().get_metadata(object_name)
         except Exception:
             return None
@@ -675,11 +724,30 @@ class Portal(PortalBase):
                     schemas[user_specified_schema["title"]] = user_specified_schema
         return schemas
 
+    @lru_cache(maxsize=64)
+    def _get_schema_subtypes(self, type_name: str) -> Optional[List[str]]:
+        if not (schemas_super_type_map := self.get_schemas_super_type_map()):
+            return []
+        return schemas_super_type_map.get(type_name)
+
     def is_file_schema(self, schema_name: str) -> bool:
         """
         Returns True iff the given schema name isa File type, i.e. has an ancestor which is of type File.
         """
         return self.is_schema_type(schema_name, FILE_SCHEMA_NAME)
+
+    def _ref_exists_from_cache(self, type_name: str, value: str) -> Optional[List[dict]]:
+        if self._ref_cache is not None:
+            return self._ref_cache.get(f"/{type_name}/{value}", None)
+        return None
+
+    def _cache_ref(self, type_name: str, value: str, resolved: List[str],
+                   subtype_names: Optional[List[str]]) -> None:
+        if self._ref_cache is not None:
+            for type_name in [type_name] + (subtype_names or []):
+                object_path = f"/{type_name}/{value}"
+                if self._ref_cache.get(object_path, None) is None:
+                    self._ref_cache[object_path] = resolved
 
     def ref_exists(self, type_name: str, value: Optional[str] = None) -> List[dict]:
         if not value:
@@ -687,40 +755,58 @@ class Portal(PortalBase):
                 type_name = parts[0]
                 value = parts[1]
             else:
-                return []
+                return []  # Should not happen.
+        if (resolved := self._ref_exists_from_cache(type_name, value)) is not None:
+            self._ref_cache_hit_count += 1
+            return resolved
+        # Not cached here.
         resolved = []
-        is_resolved, resolved_uuid = self._ref_exists_single(type_name, value)
+        ref_lookup_strategy = self._ref_lookup_strategy(type_name, value)
+        is_ref_lookup_root = StructuredDataSet._is_ref_lookup_root(ref_lookup_strategy)
+        is_ref_lookup_root_first = StructuredDataSet._is_ref_lookup_root_first(ref_lookup_strategy)
+        is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
+        is_resolved = False
+        subtype_names = self._get_schema_subtypes(type_name)
+        if is_ref_lookup_root_first:
+            is_resolved, resolved_uuid = self._ref_exists_single(type_name, value, root=True)
+        if not is_resolved:
+            is_resolved, resolved_uuid = self._ref_exists_single(type_name, value)
+        if not is_resolved and is_ref_lookup_root and not is_ref_lookup_root_first:
+            is_resolved, resolved_uuid = self._ref_exists_single(type_name, value, root=True)
         if is_resolved:
             resolved.append({"type": type_name, "uuid": resolved_uuid})
-            # TODO: Added this return on 2024-01-14 (dmichaels).
-            # Why did I orginally check for multiple existing values?
-            # Why not just return right away if I find that the ref exists?
-            # Getting multiple values because, for example, we find
-            # both this /Sample/UW_CELL-CULTURE-SAMPLE_COLO-829BL_HI-C_1
-            # and /CellSample/UW_CELL-CULTURE-SAMPLE_COLO-829BL_HI-C_1
-            # Why does that matter at all? Same thing.
-            return resolved
-        # Check for the given ref in all sub-types of the given type.
-        if (schemas_super_type_map := self.get_schemas_super_type_map()):
-            if (sub_type_names := schemas_super_type_map.get(type_name)):
-                for sub_type_name in sub_type_names:
-                    is_resolved, resolved_uuid = self._ref_exists_single(sub_type_name, value)
-                    if is_resolved:
-                        resolved.append({"type": type_name, "uuid": resolved_uuid})
-                        # TODO: Added this return on 2024-01-14 (dmichaels). See above TODO.
-                        return resolved
+        # Check for the given ref in all subtypes of the given type.
+        elif subtype_names and is_ref_lookup_subtypes:
+            for subtype_name in subtype_names:
+                is_resolved, resolved_uuid = self._ref_exists_single(subtype_name, value)
+                if is_resolved:
+                    resolved.append({"type": type_name, "uuid": resolved_uuid})
+                    break
+        # Cache this ref (and all subtype versions of it); whether or not found;
+        # if not found it will be an empty array (array because caching all matches;
+        # but TODO - do not think we should do this anymore - maybe test changes needed).
+        self._cache_ref(type_name, value, resolved, subtype_names)
         return resolved
 
-    def _ref_exists_single(self, type_name: str, value: str) -> Tuple[bool, Optional[str]]:
+    def _ref_exists_single(self, type_name: str, value: str, root: bool = False) -> Tuple[bool, Optional[str]]:
+        # Check first in our own data (i.e. e.g. within the given spreadsheet).
         if self._data and (items := self._data.get(type_name)) and (schema := self.get_schema(type_name)):
             iproperties = set(schema.get("identifyingProperties", [])) | {"identifier", "uuid"}
             for item in items:
                 if (ivalue := next((item[iproperty] for iproperty in iproperties if iproperty in item), None)):
                     if isinstance(ivalue, list) and value in ivalue or ivalue == value:
                         return True, (ivalue if isinstance(ivalue, str) and is_uuid(ivalue) else None)
-        if (value := self.get_metadata(f"/{type_name}/{value}")) is None:
+        if (value := self.get_metadata(f"/{type_name}/{value}" if not root else f"/{value}")) is None:
             return False, None
         return True, value.get("uuid")
+
+    @property
+    def ref_cache_hit_count(self) -> int:
+        return self._ref_cache_hit_count
+
+    @property
+    def ref_lookup_count(self) -> int:
+        return self._ref_lookup_count
 
     @staticmethod
     def create_for_testing(arg: Optional[Union[str, bool, List[dict], dict, Callable]] = None,

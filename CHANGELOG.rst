@@ -10,6 +10,7 @@ Change Log
 8.8.1
 =====
 * Changes to troubleshooting utility script view-portal-object.
+* Support ref caching in structured_data etc.
 
 
 8.8.0

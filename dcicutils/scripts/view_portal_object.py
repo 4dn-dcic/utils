@@ -61,7 +61,7 @@ import json
 import pyperclip
 import os
 import sys
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 import yaml
 from dcicutils.captured_output import captured_output, uncaptured_output
 from dcicutils.misc_utils import get_error_message, is_uuid, PRINT
@@ -96,6 +96,7 @@ def main():
     parser.add_argument("--all", action="store_true", required=False, default=False,
                         help="Include all properties for schema usage.")
     parser.add_argument("--raw", action="store_true", required=False, default=False, help="Raw output.")
+    parser.add_argument("--tree", action="store_true", required=False, default=False, help="Tree output for schemas.")
     parser.add_argument("--database", action="store_true", required=False, default=False,
                         help="Read from database output.")
     parser.add_argument("--yaml", action="store_true", required=False, default=False, help="YAML output.")
@@ -116,7 +117,8 @@ def main():
 
     if args.uuid.lower() == "schemas" or args.uuid.lower() == "schema":
         _print_all_schema_names(portal=portal, details=args.details,
-                                more_details=args.more_details, all=args.all, raw=args.raw, raw_yaml=args.yaml)
+                                more_details=args.more_details, all=args.all,
+                                tree=args.tree, raw=args.raw, raw_yaml=args.yaml)
         return
     elif args.uuid.lower() == "info":  # TODO: need word for what consortiums and submission centers are collectively
         if consortia := portal.get_metadata("/consortia?limit=1000"):
@@ -155,7 +157,10 @@ def main():
                 pyperclip.copy(json.dumps(schema, indent=4))
             if not args.raw:
                 if parent_schema_name := _get_parent_schema_name(schema):
-                    _print(f"{schema_name} | parent: {parent_schema_name}")
+                    if schema.get("isAbstract") is True:
+                        _print(f"{schema_name} | parent: {parent_schema_name} | abstract")
+                    else:
+                        _print(f"{schema_name} | parent: {parent_schema_name}")
                 else:
                     _print(schema_name)
             _print_schema(schema, details=args.details, more_details=args.details,
@@ -425,27 +430,103 @@ def _print_schema_info(schema: dict, level: int = 0,
 
 def _print_all_schema_names(portal: Portal,
                             details: bool = False, more_details: bool = False, all: bool = False,
-                            raw: bool = False, raw_yaml: bool = False) -> None:
-    if schemas := _get_schemas(portal):
-        if raw:
-            if raw_yaml:
-                _print(yaml.dump(schemas))
+                            tree: bool = False, raw: bool = False, raw_yaml: bool = False) -> None:
+    if not (schemas := _get_schemas(portal)):
+        return
+
+    if raw:
+        if raw_yaml:
+            _print(yaml.dump(schemas))
+        else:
+            _print(json.dumps(schemas, indent=4))
+        return
+
+    if tree:
+        _print_schemas_tree(schemas)
+        return
+
+    for schema_name in sorted(schemas.keys()):
+        if parent_schema_name := _get_parent_schema_name(schemas[schema_name]):
+            if schemas[schema_name].get("isAbstract") is True:
+                _print(f"{schema_name} | parent: {parent_schema_name} | abstract")
             else:
-                _print(json.dumps(schemas, indent=4))
-            return
-        for schema_name in sorted(schemas.keys()):
-            if parent_schema_name := _get_parent_schema_name(schemas[schema_name]):
                 _print(f"{schema_name} | parent: {parent_schema_name}")
+        else:
+            if schemas[schema_name].get("isAbstract") is True:
+                _print(f"{schema_name} | abstract")
             else:
                 _print(schema_name)
-            if details:
-                _print_schema(schemas[schema_name], details=details, more_details=more_details, all=all)
+        if details:
+            _print_schema(schemas[schema_name], details=details, more_details=more_details, all=all)
 
 
 def _get_parent_schema_name(schema: dict) -> Optional[str]:
-    if sub_class_of := schema.get("rdfs:subClassOf"):
-        if (parent_schema_name := os.path.basename(sub_class_of).replace(".json", "")) != "Item":
-            return parent_schema_name
+    if (isinstance(schema, dict) and
+        (parent_schema_name := schema.get("rdfs:subClassOf")) and
+        (parent_schema_name := parent_schema_name.replace("/profiles/", "").replace(".json", "")) and
+        (parent_schema_name != "Item")):  # noqa
+        return parent_schema_name
+    return None
+
+
+def _print_schemas_tree(schemas: dict) -> None:
+    def children_of(name: str) -> List[str]:
+        nonlocal schemas
+        children = []
+        if not (name is None or isinstance(name, str)):
+            return children
+        if name and name.lower() == "schemas":
+            name = None
+        for schema_name in (schemas if isinstance(schemas, dict) else {}):
+            if _get_parent_schema_name(schemas[schema_name]) == name:
+                children.append(schema_name)
+        return sorted(children)
+    def name_of(name: str) -> str:  # noqa
+        nonlocal schemas
+        if not (name is None or isinstance(name, str)):
+            return name
+        if (schema := schemas.get(name)) and schema.get("isAbstract") is True:
+            return f"{name} (abstact)"
+        return name
+    _print_tree(root_name="Schemas", children_of=children_of, name_of=name_of)
+
+
+def _print_tree(root_name: Optional[str],
+                children_of: Callable,
+                has_children: Optional[Callable] = None,
+                name_of: Optional[Callable] = None,
+                print: Callable = print) -> None:
+    """
+    Recursively prints as a tree structure the given root name and any of its
+    children (again, recursively) as specified by the given children_of callable;
+    the has_children may be specified, for efficiency, though if not specified
+    it will use the children_of function to determine this; the name_of callable
+    may be specified to modify the name before printing.
+    """
+    first = "└─ "
+    space = "    "
+    branch = "│   "
+    tee = "├── "
+    last = "└── "
+
+    if not callable(children_of):
+        return
+    if not callable(has_children):
+        has_children = lambda name: children_of(name) is not None  # noqa
+
+    # This function adapted from stackoverflow.
+    # Ref: https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python
+    def tree_generator(name: str, prefix: str = ""):
+        contents = children_of(name)
+        pointers = [tee] * (len(contents) - 1) + [last]
+        for pointer, path in zip(pointers, contents):
+            yield prefix + pointer + (name_of(path) if callable(name_of) else path)
+            if has_children(path):
+                extension = branch if pointer == tee else space
+                yield from tree_generator(path, prefix=prefix+extension)
+    print(first + ((name_of(root_name) if callable(name_of) else root_name) or "root"))
+    for line in tree_generator(root_name, prefix="   "):
+        print(line)
 
 
 def _print(*args, **kwargs):
