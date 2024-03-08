@@ -1,0 +1,170 @@
+{
+  "schema_version": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "accession": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "status": {
+    "type": "string",
+    "map": "<map_enum>"
+  },
+  "file_format": {
+    "type": "string",
+    "map": "<map_ref>"
+  },
+  "filename": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "file_size": {
+    "type": "integer",
+    "map": "<map_integer>"
+  },
+  "md5sum": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "content_md5sum": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "quality_metrics#": {
+    "type": "string",
+    "map": "<map_ref>"
+  },
+  "quality_metrics": "quality_metrics#",
+  "data_category#": {
+    "type": "string",
+    "map": "<map_enum>"
+  },
+  "data_category": "data_category#",
+  "data_type#": {
+    "type": "string",
+    "map": "<map_enum>"
+  },
+  "data_type": "data_type#",
+  "o2_path": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "variant_type#": {
+    "type": "string",
+    "map": "<map_enum>"
+  },
+  "variant_type": "variant_type#",
+  "uuid": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "tags#": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "tags": "tags#",
+  "date_created": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "submitted_by": {
+    "type": "string",
+    "map": "<map_ref>"
+  },
+  "last_modified.date_modified": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "last_modified.modified_by": {
+    "type": "string",
+    "map": "<map_ref>"
+  },
+  "description": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "submission_centers#": {
+    "type": "string",
+    "map": "<map_ref>"
+  },
+  "submission_centers": "submission_centers#",
+  "consortia#": {
+    "type": "string",
+    "map": "<map_ref>"
+  },
+  "consortia": "consortia#",
+  "aliases#": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "aliases": "aliases#",
+  "alternate_accessions#": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "alternate_accessions": "alternate_accessions#",
+  "extra_files#.file_format": {
+    "type": "string",
+    "map": "<map_ref>"
+  },
+  "extra_files.file_format": "extra_files#.file_format",
+  "extra_files#.file_size": {
+    "type": "integer",
+    "map": "<map_integer>"
+  },
+  "extra_files.file_size": "extra_files#.file_size",
+  "extra_files#.filename": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "extra_files.filename": "extra_files#.filename",
+  "extra_files#.href": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "extra_files.href": "extra_files#.href",
+  "extra_files#.md5sum": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "extra_files.md5sum": "extra_files#.md5sum",
+  "extra_files#.status": {
+    "type": "string",
+    "map": "<map_enum>"
+  },
+  "extra_files.status": "extra_files#.status",
+  "@id": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "@type#": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "@type": "@type#",
+  "principals_allowed.view": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "principals_allowed.edit": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "display_title": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "href": {
+    "type": "string",
+    "map": "<map_string>"
+  },
+  "upload_credentials": {
+    "type": "object",
+    "map": null
+  },
+  "upload_key": {
+    "type": "string",
+    "map": "<map_string>"
+  }
+}

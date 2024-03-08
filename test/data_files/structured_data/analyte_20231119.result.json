@@ -1,0 +1,35 @@
+{
+    "Analyte": [
+        {
+            "a260_a280_ratio": 2.3,
+            "components": [
+                "Total RNA"
+            ],
+            "concentration": 1.5,
+            "molecule": [
+                "RNA"
+            ],
+            "protocols": [
+                "Protocol9"
+            ],
+            "ribosomal_rna_ratio": 1.4,
+            "rna_integrity_number": 8.5,
+            "rna_integrity_number_instrument": "Agilent Bioanalyzer",
+            "sample_quantity": 2.0,
+            "samples": [
+                "Sample9"
+            ],
+            "submitted_id": "analyte-9",
+            "uuid": "uuid9",
+            "volume": 0.9,
+            "weight": 13.0,
+            "consortia": [
+                "smaht",
+                "another-consortia"
+            ],
+            "submission_centers": [
+                "somesubctr"
+            ]
+        }
+    ]
+}

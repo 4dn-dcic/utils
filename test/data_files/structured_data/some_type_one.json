@@ -1,0 +1,63 @@
+{
+    "title": "SomeTypeOne",
+    "properties": {
+        "abc": {
+            "type": "object",
+            "properties": {
+                "def": {"type": "string"},
+                "ghi": {
+                    "type": "object",
+                    "properties": {
+                        "jkl": {"type": "string"},
+                        "mno": {"type": "number"}
+                      }
+                  }
+              }
+        },
+        "pqr": {"type": "integer"},
+        "stu": {
+            "type": "array",
+            "items": {"type": "string"}
+        },
+        "vw": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "xy": {"type": "integer"},
+                    "z": {"type": "boolean"},
+                    "foo": {"type": "string"}
+                }
+            }
+        },
+        "simple_string": {
+            "type": "string"
+        },
+        "simple_string_array": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "simple_integer_array": {
+            "type": "array",
+            "items": {
+                "type": "integer"
+            }
+        },
+        "simple_number_array": {
+            "type": "array",
+            "items": {
+                "type": "number"
+            }
+        },
+        "simple_boolean_array": {
+            "type": "array",
+            "items": {
+                "type": "boolean"
+            }
+        },
+        "ignore_empty_object": {},
+        "ignore_no_object": null
+    }
+}

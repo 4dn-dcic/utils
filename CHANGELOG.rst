@@ -12,6 +12,7 @@ Change Log
 * Changes to troubleshooting utility script view-portal-object.
 * Some reworking of ref lookup in structured_data.
 * Support ref caching in structured_data.
+* Moved/adapted test_structured_data.py from smaht-portal to here.
 
 
 8.8.0

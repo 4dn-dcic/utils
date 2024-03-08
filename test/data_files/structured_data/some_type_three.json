@@ -1,0 +1,47 @@
+{
+    "title": "Test",
+    "properties": {
+        "abc": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                 },
+                "id": {
+                    "type": "integer"
+                 }
+            }
+        },
+        "someobj": {
+            "type": "object",
+            "properties": {
+                "ghi": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "jkl": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+             }
+        },
+        "simplearray": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "arrayofarray": {
+            "type": "array",
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "string"
+                 }
+            }
+        }
+     }
+}

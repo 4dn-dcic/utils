@@ -1,0 +1,98 @@
+{
+    "Sequencing": [
+        {
+            "accession": "SQ000001",
+            "alternate_accessions": [
+                "ALT00001",
+                "ALT00002"
+            ],
+            "date_created": "2023-01-01T12:00:00Z",
+            "display_title": "Sequencing Sample 1",
+            "instrument_model": "NovaSeq",
+            "last_modified": {
+                "date_modified": "2023-01-02T10:30:00Z",
+                "modified_by": "User2"
+            },
+            "platform": "Illumina",
+            "protocols": ["Protocol1"],
+            "read_type": "Paired-end",
+            "schema_version": "1.2",
+            "status": "in review",
+            "submission_centers": [
+                "Center1"
+            ],
+            "submitted_by": "User1",
+            "submitted_id": "XY_SEQUENCING_ABC1",
+            "tags": [
+                "tag1",
+                "tag2"
+            ],
+            "target_coverage": 30.5,
+            "target_read_count": 1000000,
+            "target_read_length": 150,
+            "uuid": "f50a6b9b-8600-4a8c-b693-47c0b2cf8123"
+        },
+        {
+            "accession": "SQ000002",
+            "consortia": [
+                "Consortium1"
+            ],
+            "date_created": "2023-02-01T15:45:00Z",
+            "display_title": "Sequencing Sample 2",
+            "instrument_model": "Revio",
+            "last_modified": {
+                "date_modified": "2023-02-02T08:20:00Z",
+                "modified_by": "User4"
+            },
+            "platform": "PacBio",
+            "protocols": ["Protocol2"],
+            "read_type": "Single-end",
+            "schema_version": "1.1",
+            "status": "in review",
+            "submission_centers": [
+                "somesubctr"
+            ],
+            "submitted_by": "User3",
+            "submitted_id": "XY_SEQUENCING_ABC2",
+            "tags": [
+                "tag3",
+                "tag4"
+            ],
+            "target_coverage": 20.8,
+            "target_read_count": 800000,
+            "target_read_length": 4000,
+            "uuid": "c6e0f8a4-7e76-40c1-8a85-2a28e6b4d1e1"
+        },
+        {
+            "accession": "SQ000003",
+            "consortia": [
+                "Consortium2"
+            ],
+            "date_created": "2023-03-01T09:15:00Z",
+            "display_title": "Sequencing Sample 3",
+            "instrument_model": "PromethION",
+            "last_modified": {
+                "date_modified": "2023-03-02T14:10:00Z",
+                "modified_by": "User6"
+            },
+            "platform": "ONT",
+            "protocols": ["Protocol3"],
+            "read_type": "Not Applicable",
+            "schema_version": "1.0",
+            "status": "in review",
+            "submission_centers": [
+                "Center2"
+            ],
+            "submitted_by": "User5",
+            "submitted_id": "XY_SEQUENCING_ABC3",
+            "tags": [
+                "tag5",
+                "tag6"
+            ],
+            "target_coverage": 50.2,
+            "target_read_count": 500000,
+            "target_read_length": 200,
+            "uuid": "9d3b4c5f-4e3b-4781-b95a-10f56d8a3762"
+        }
+    ]
+}

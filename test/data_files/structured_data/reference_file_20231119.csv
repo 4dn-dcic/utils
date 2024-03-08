@@ -1,0 +1,2 @@
+aliases,data_category,data_type,extra_files#.file_format,extra_files#.file_size,extra_files#.file_format,extra_files#.file_size,file_format,submission_centers#,uuid
+some:alias,Variant Calls,Aligned Reads,BAM,1024,VCF,512,FASTA,Center1,1874B4CE-CC2B-4092-A249-4F3BFFD724C0

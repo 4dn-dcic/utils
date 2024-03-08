@@ -1,0 +1,26 @@
+{
+    "ReferenceFile": [
+        {
+            "aliases": [
+                "some:alias"
+            ],
+            "data_category": [
+                "Variant Calls"
+            ],
+            "data_type": [
+                "Aligned Reads"
+            ],
+            "extra_files": [
+                {
+                    "file_format": "VCF",
+                    "file_size": 512
+                }
+            ],
+            "file_format": "FASTA",
+            "submission_centers": [
+                "Center1"
+            ],
+            "uuid": "1874B4CE-CC2B-4092-A249-4F3BFFD724C0"
+        }
+    ]
+}

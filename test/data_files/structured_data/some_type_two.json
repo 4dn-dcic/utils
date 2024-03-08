@@ -1,0 +1,140 @@
+{
+    "title": "SomeTypeTwo",
+    "properties": {
+        "uuid": {
+            "title": "UUID",
+            "type": "string"
+        },
+        "tags": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "date_created": {
+            "type": "string"
+        },
+        "submitted_by": {
+            "type": "string",
+            "linkTo": "User"
+        },
+        "status": {
+            "type": "string",
+            "enum": [
+                "Public",
+                "Current",
+                "Deleted",
+                "Inactive",
+                "In Review",
+                "Obsolete",
+                "Shared"
+            ]
+        },
+        "schema_version": {
+            "type": "string"
+        },
+        "last_modified": {
+            "type": "object",
+            "properties": {
+                "date_modified": {
+                    "type": "string"
+                },
+                "modified_by": {
+                    "type": "string"
+                }
+            }
+        },
+        "identifier": {
+            "type": "string"
+        },
+        "description": {
+            "type": "string"
+        },
+        "submission_centers": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "xyzzy": {
+            "type": "array",
+            "items": {
+                 "type": "object",
+                 "properties": {
+                     "foo": {"type": "integer"},
+                     "goo": {"type": "string"},
+                     "hoo": {"type": "integer"}
+                 }
+            }
+        },
+        "some_integer_property": {
+            "type": "integer"
+        },
+        "some_boolean_property": {
+            "type": "boolean"
+        },
+        "consortia": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "aliases": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "accession": {
+            "type": "string"
+        },
+        "alternate_accessions": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "standard_file_extension": {
+            "type": "string"
+        },
+        "other_allowed_extensions": {
+            "items": {
+                "title": "OK Extension",
+                "type": "string"
+            },
+            "type": "array"
+        },
+        "extra_file_formats": {
+            "items": {
+                "description": "A file format for an extra file",
+                "linkTo": "FileFormat",
+                "title": "Format",
+                "type": "string"
+            },
+            "type": "array"
+        },
+        "@id": {
+            "type": "string"
+        },
+        "@type": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "principals_allowed": {
+            "type": "object",
+            "properties": {
+                "view": {
+                    "type": "string"
+                },
+                "edit": {
+                    "type": "string"
+                }
+            }
+        },
+        "display_title": {
+            "type": "string"
+        }
+    }
+}
