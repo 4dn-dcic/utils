@@ -808,6 +808,7 @@ class Portal(PortalBase):
                 # It might NOW be found internally, since the portal self._data can change.
                 # TODO
                 ref_lookup_strategy = self._ref_lookup_strategy(type_name, value)
+                is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
                 subtype_names = self._get_schema_subtypes(type_name) if is_ref_lookup_subtypes else None
                 is_resolved, resolved_uuid = self._ref_exists_internally(type_name, value, subtype_names)
                 if is_resolved:
