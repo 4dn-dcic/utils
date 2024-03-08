@@ -827,13 +827,13 @@ class Portal(PortalBase):
         is_ref_lookup_root_first = StructuredDataSet._is_ref_lookup_root_first(ref_lookup_strategy)
         is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
         subtype_names = self._get_schema_subtypes(type_name) if is_ref_lookup_subtypes else None
-        # Lookup internally first (including at subtypes if desired).
+        # Lookup internally first (including at subtypes if desired; root lookup not applicable here).
         is_resolved, resolved_uuid = self._ref_exists_internally(type_name, value, subtype_names)
         if is_resolved:
             resolved = [{"type": type_name, "uuid": resolved_uuid}]
             self._cache_ref(type_name, value, resolved, subtype_names)
             return resolved
-        # Not found internally; perform actual portal lookup (included at root and subtypes if desired).
+        # Not found internally; perform actual portal lookup (including at root and subtypes if desired).
         # First construct the list of lookup paths at which to look for the referenced item.
         lookup_paths = []
         if is_ref_lookup_root_first:
