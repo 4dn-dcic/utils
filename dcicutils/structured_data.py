@@ -12,7 +12,7 @@ from dcicutils.common import OrchestratedApp
 from dcicutils.data_readers import CsvReader, Excel, RowReader
 from dcicutils.datetime_utils import normalize_date_string, normalize_datetime_string
 from dcicutils.file_utils import search_for_file
-from dcicutils.misc_utils import (create_dict, create_readonly_object, is_uuid, load_json_if,
+from dcicutils.misc_utils import (create_dict, create_readonly_object, load_json_if,
                                   merge_objects, remove_empty_properties, right_trim,
                                   split_string, to_boolean, to_enum, to_float, to_integer, VirtualApp)
 from dcicutils.portal_object_utils import PortalObject
@@ -53,6 +53,10 @@ class StructuredDataSet:
     # can choose to lookup root path first, or not lookup root path at all, or not lookup
     # subtypes at all; the ref_lookup_strategy callable if specified should take a type_name
     # and value (string) arguements and return an integer of any of the below ORed together.
+    # The main purpose of this is optimization; to minimum portal lookups; since for example,
+    # currently at least, /{type}/{accession} does not work but /{accession} does; so we
+    # currently (smaht-portal/.../ingestion_processors) use REF_LOOKUP_ROOT_FIRST for this.
+    # And current usage NEVER has REF_LOOKUP_SUBTYPES turned OFF; but support just in case.
     REF_LOOKUP_ROOT = 0x0001
     REF_LOOKUP_ROOT_FIRST = 0x0002 | REF_LOOKUP_ROOT
     REF_LOOKUP_SUBTYPES = 0x0004
@@ -228,8 +232,10 @@ class StructuredDataSet:
         if ref_errors := self.ref_errors:
             ref_errors_actual = []
             for ref_error in ref_errors:
-                if not self.portal.ref_exists(ref_error["error"]):
+                if not (resolved := self.portal.ref_exists(ref := ref_error["error"])):
                     ref_errors_actual.append(ref_error)
+                else:
+                    self._resolved_refs.add((ref, resolved[0].get("uuid")))
             if ref_errors_actual:
                 self._errors["ref"] = ref_errors_actual
             else:
@@ -565,7 +571,7 @@ class Schema(SchemaBase):
         the names of any nested properties (i.e objects within objects) flattened into a single
         property name in dot notation; and set the value of each of these flat property names
         to the type of the terminal/leaf value of the (either) top-level or nested type. N.B. We
-        do NOT currently support array-of-arry or array-of-multiple-types. E.g. for this schema:
+        do NOT currently support array-of-array or array-of-multiple-types. E.g. for this schema:
 
           { "properties": {
               "abc": {
@@ -783,66 +789,89 @@ class Portal(PortalBase):
             return self._ref_cache.get(f"/{type_name}/{value}", None)
         return None
 
-    def _cache_ref(self, type_name: str, value: str, resolved: List[str],
-                   subtype_names: Optional[List[str]]) -> None:
+    def _cache_ref(self, type_name: str, value: str, resolved: List[str], subtype_names: Optional[List[str]]) -> None:
         if self._ref_cache is not None:
-            for type_name in [type_name] + (subtype_names or []):
-                object_path = f"/{type_name}/{value}"
-                if self._ref_cache.get(object_path, None) is None:
-                    self._ref_cache[object_path] = resolved
+            for type_name in [type_name] + (subtype_names if subtype_names else []):
+                self._ref_cache[f"/{type_name}/{value}"] = resolved
 
     def ref_exists(self, type_name: str, value: Optional[str] = None) -> List[dict]:
         if not value:
             if type_name.startswith("/") and len(parts := type_name[1:].split("/")) == 2:
-                type_name = parts[0]
-                value = parts[1]
+                if not (type_name := parts[0]) or not (value := parts[1]):
+                    return []
             else:
-                return []  # Should not happen.
+                return []
         if (resolved := self._ref_exists_from_cache(type_name, value)) is not None:
+            # Found cached resolved reference.
+            if not resolved:
+                # Cached resolved reference is empty ([]).
+                # It might NOW be found internally, since the portal self._data can change.
+                # TODO
+                ref_lookup_strategy = self._ref_lookup_strategy(type_name, value)
+                subtype_names = self._get_schema_subtypes(type_name) if is_ref_lookup_subtypes else None
+                is_resolved, resolved_uuid = self._ref_exists_internally(type_name, value, subtype_names)
+                if is_resolved:
+                    resolved = [{"type": type_name, "uuid": resolved_uuid}]
+                    self._cache_ref(type_name, value, resolved, subtype_names)
+                    return resolved
             self._ref_exists_cache_hit_count += 1
             return resolved
         # Not cached here.
         self._ref_exists_cache_miss_count += 1
-        resolved = []
+        # Get the lookup strategy.
         ref_lookup_strategy = self._ref_lookup_strategy(type_name, value)
         is_ref_lookup_root = StructuredDataSet._is_ref_lookup_root(ref_lookup_strategy)
         is_ref_lookup_root_first = StructuredDataSet._is_ref_lookup_root_first(ref_lookup_strategy)
         is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
-        is_resolved = False
-        subtype_names = self._get_schema_subtypes(type_name)
-        if is_ref_lookup_root_first:
-            is_resolved, resolved_uuid = self._ref_exists_single(type_name, value, root=True)
-        if not is_resolved:
-            is_resolved, resolved_uuid = self._ref_exists_single(type_name, value)
-        if not is_resolved and is_ref_lookup_root and not is_ref_lookup_root_first:
-            is_resolved, resolved_uuid = self._ref_exists_single(type_name, value, root=True)
+        subtype_names = self._get_schema_subtypes(type_name) if is_ref_lookup_subtypes else None
+        # Lookup internally first (including at subtypes if desired).
+        is_resolved, resolved_uuid = self._ref_exists_internally(type_name, value, subtype_names)
         if is_resolved:
-            resolved.append({"type": type_name, "uuid": resolved_uuid})
-        # Check for the given ref in all subtypes of the given type.
-        elif subtype_names and is_ref_lookup_subtypes:
+            resolved = [{"type": type_name, "uuid": resolved_uuid}]
+            self._cache_ref(type_name, value, resolved, subtype_names)
+            return resolved
+        # Not found internally; perform actual portal lookup (included at root and subtypes if desired).
+        # First construct the list of lookup paths at which to look for the referenced item.
+        lookup_paths = []
+        if is_ref_lookup_root_first:
+            lookup_paths.append(f"/{value}")
+        lookup_paths.append(f"/{type_name}/{value}")
+        if is_ref_lookup_root and not is_ref_lookup_root_first:
+            lookup_paths.append(f"/{value}")
+        if subtype_names:
             for subtype_name in subtype_names:
-                is_resolved, resolved_uuid = self._ref_exists_single(subtype_name, value)
-                if is_resolved:
-                    resolved.append({"type": type_name, "uuid": resolved_uuid})
-                    break
-        # Cache this ref (and all subtype versions of it); whether or not found;
-        # if not found it will be an empty array (array because caching all matches;
-        # but TODO - do not think we should do this anymore - maybe test changes needed).
-        self._cache_ref(type_name, value, resolved, subtype_names)
-        return resolved
+                lookup_paths.append(f"/{subtype_name}/{value}")
+        # Do the actual lookup in the portal for each of the desired lookup paths.
+        for lookup_path in lookup_paths:
+            if isinstance(item := self.get_metadata(lookup_path), dict):
+                resolved = [{"type": type_name, "uuid": item.get("uuid", None)}]
+                self._cache_ref(type_name, value, resolved, subtype_names)
+                return resolved
+        return []
 
-    def _ref_exists_single(self, type_name: str, value: str, root: bool = False) -> Tuple[bool, Optional[str]]:
-        # Check first in our own data (i.e. e.g. within the given spreadsheet).
+    def _ref_exists_internally(self, type_name: str, value: str,
+                               subtype_names: Optional[List[str]] = None) -> Tuple[bool, Optional[str]]:
+        is_resolved, resolved_uuid = self._ref_exists_single_internally(type_name, value)
+        if is_resolved:
+            return True, resolved_uuid
+        if subtype_names:
+            for subtype_name in subtype_names:
+                is_resolved, resolved_uuid = self._ref_exists_single_internally(subtype_name, value)
+                if is_resolved:
+                    return True, resolved_uuid
+        return False, None
+
+    def _ref_exists_single_internally(self, type_name: str, value: str) -> Tuple[bool, Optional[str]]:
         if self._data and (items := self._data.get(type_name)) and (schema := self.get_schema(type_name)):
-            iproperties = set(schema.get("identifyingProperties", [])) | {"identifier", "uuid"}
+            identifying_properties = set(schema.get("identifyingProperties", [])) | {"identifier", "uuid"}
             for item in items:
-                if (ivalue := next((item[iproperty] for iproperty in iproperties if iproperty in item), None)):
-                    if isinstance(ivalue, list) and value in ivalue or ivalue == value:
-                        self._ref_exists_internal_count += 1
-                        return True, (ivalue if isinstance(ivalue, str) and is_uuid(ivalue) else None)
-        if (value := self.get_metadata(f"/{type_name}/{value}" if not root else f"/{value}")) is None:
-            return False, None
-        return True, value.get("uuid")
+                for identifying_property in identifying_properties:
+                    if (identifying_value := item.get(identifying_property, None)) is not None:
+                        if ((identifying_value == value) or
+                            (isinstance(identifying_value, list) and (value in identifying_value))):  # noqa
+                            self._ref_exists_internal_count += 1
+                            return True, item.get("uuid", None)
+        return False, None
 
     @property
     def ref_lookup_cache_hit_count(self) -> int:
