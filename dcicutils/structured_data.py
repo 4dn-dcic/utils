@@ -53,7 +53,7 @@ class StructuredDataSet:
     # can choose to lookup root path first, or not lookup root path at all, or not lookup
     # subtypes at all; the ref_lookup_strategy callable if specified should take a type_name
     # and value (string) arguements and return an integer of any of the below ORed together.
-    # The main purpose of this is optimization; to minimum portal lookups; since for example,
+    # The main purpose of this is optimization; to minimize portal lookups; since for example,
     # currently at least, /{type}/{accession} does not work but /{accession} does; so we
     # currently (smaht-portal/.../ingestion_processors) use REF_LOOKUP_ROOT_FIRST for this.
     # And current usage NEVER has REF_LOOKUP_SUBTYPES turned OFF; but support just in case.
@@ -805,7 +805,8 @@ class Portal(PortalBase):
             # Found cached resolved reference.
             if not resolved:
                 # Cached resolved reference is empty ([]).
-                # It might NOW be found internally, since the portal self._data can change.
+                # It might NOW be found internally, since the portal self._data
+                # can change, as the data (e.g. spreadsheet sheets) are parsed.
                 ref_lookup_strategy = self._ref_lookup_strategy(type_name, value)
                 is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
                 subtype_names = self._get_schema_subtypes(type_name) if is_ref_lookup_subtypes else None
@@ -818,7 +819,9 @@ class Portal(PortalBase):
             return resolved
         # Not cached here.
         self._ref_exists_cache_miss_count += 1
-        # Get the lookup strategy.
+        # Get the lookup strategy; i.e. should do we lookup by root path, and if so, should
+        # we do this first, and do we lookup by subtypes; by default we lookup by root path
+        # but not first, and we do lookup by subtypes.
         ref_lookup_strategy = self._ref_lookup_strategy(type_name, value)
         is_ref_lookup_root = StructuredDataSet._is_ref_lookup_root(ref_lookup_strategy)
         is_ref_lookup_root_first = StructuredDataSet._is_ref_lookup_root_first(ref_lookup_strategy)
