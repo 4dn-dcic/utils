@@ -722,10 +722,10 @@ class Portal(PortalBase):
         else:
             self._ref_lookup_strategy = lambda type_name, value: StructuredDataSet.REF_LOOKUP_DEFAULT
         if ref_lookup_nocache is True:
-            self.get_metadata = self.get_metadata_nocache
+            self.ref_lookup = self.ref_lookup_nocache
             self._ref_cache = None
         else:
-            self.get_metadata = self.get_metadata_cache
+            self.ref_lookup = self.ref_lookup_cache
             self._ref_cache = {}
         self._ref_lookup_found_count = 0
         self._ref_lookup_notfound_count = 0
@@ -735,10 +735,10 @@ class Portal(PortalBase):
         self._ref_exists_cache_miss_count = 0
 
     @lru_cache(maxsize=8092)
-    def get_metadata_cache(self, object_name: str) -> Optional[dict]:
-        return self.get_metadata_nocache(object_name)
+    def ref_lookup_cache(self, object_name: str) -> Optional[dict]:
+        return self.ref_lookup_nocache(object_name)
 
-    def get_metadata_nocache(self, object_name: str) -> Optional[dict]:
+    def ref_lookup_nocache(self, object_name: str) -> Optional[dict]:
         try:
             result = super().get_metadata(object_name)
             self._ref_lookup_found_count += 1
@@ -844,7 +844,7 @@ class Portal(PortalBase):
                 lookup_paths.append(f"/{subtype_name}/{value}")
         # Do the actual lookup in the portal for each of the desired lookup paths.
         for lookup_path in lookup_paths:
-            if isinstance(item := self.get_metadata(lookup_path), dict):
+            if isinstance(item := self.ref_lookup(lookup_path), dict):
                 resolved = [{"type": type_name, "uuid": item.get("uuid", None)}]
                 self._cache_ref(type_name, value, resolved, subtype_names)
                 return resolved
@@ -852,14 +852,10 @@ class Portal(PortalBase):
 
     def _ref_exists_internally(self, type_name: str, value: str,
                                subtype_names: Optional[List[str]] = None) -> Tuple[bool, Optional[str]]:
-        is_resolved, resolved_uuid = self._ref_exists_single_internally(type_name, value)
-        if is_resolved:
-            return True, resolved_uuid
-        if subtype_names:
-            for subtype_name in subtype_names:
-                is_resolved, resolved_uuid = self._ref_exists_single_internally(subtype_name, value)
-                if is_resolved:
-                    return True, resolved_uuid
+        for type_name in [type_name] + (subtype_names or []):
+            is_resolved, resolved_uuid = self._ref_exists_single_internally(type_name, value)
+            if is_resolved:
+                return True, resolved_uuid
         return False, None
 
     def _ref_exists_single_internally(self, type_name: str, value: str) -> Tuple[bool, Optional[str]]:
@@ -879,7 +875,7 @@ class Portal(PortalBase):
         if self._ref_cache is None:
             return 0
         try:
-            return self.get_metadata_cache.cache_info().hits
+            return self.ref_lookup_cache.cache_info().hits
         except Exception:
             return -1
 
@@ -888,7 +884,7 @@ class Portal(PortalBase):
         if self._ref_cache is None:
             return self.ref_lookup_count
         try:
-            return self.get_metadata_cache.cache_info().misses
+            return self.ref_lookup_cache.cache_info().misses
         except Exception:
             return -1
 
