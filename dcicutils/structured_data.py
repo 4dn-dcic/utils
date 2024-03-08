@@ -806,7 +806,6 @@ class Portal(PortalBase):
             if not resolved:
                 # Cached resolved reference is empty ([]).
                 # It might NOW be found internally, since the portal self._data can change.
-                # TODO
                 ref_lookup_strategy = self._ref_lookup_strategy(type_name, value)
                 is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
                 subtype_names = self._get_schema_subtypes(type_name) if is_ref_lookup_subtypes else None
@@ -848,6 +847,8 @@ class Portal(PortalBase):
                 resolved = [{"type": type_name, "uuid": item.get("uuid", None)}]
                 self._cache_ref(type_name, value, resolved, subtype_names)
                 return resolved
+        # Not found at all; note that we cache this ([]) too; indicates lookup has been done.
+        self._cache_ref(type_name, value, [], subtype_names)
         return []
 
     def _ref_exists_internally(self, type_name: str, value: str,
