@@ -168,7 +168,12 @@ class Excel:
 
     def open(self) -> None:
         if self._workbook is None:
-            self._workbook = openpyxl.load_workbook(self._file, data_only=True)
+            import warnings
+            with warnings.catch_warnings():
+                # Without this warning suppression thing, for some spreadsheets we get this stdout warning:
+                # UserWarning: data validation extension is not supported and will be removed
+                warnings.filterwarnings("ignore", category=UserWarning)
+                self._workbook = openpyxl.load_workbook(self._file, data_only=True)
             self.sheet_names = [sheet_name for sheet_name in self._workbook.sheetnames
                                 if not self.is_hidden_sheet(self._workbook[sheet_name])]
 
