@@ -847,12 +847,20 @@ class Portal(PortalBase):
                 # Cached resolved reference is empty ([]).
                 # It might NOW be found internally, since the portal self._data
                 # can change, as the data (e.g. spreadsheet sheets) are parsed.
-                ref_lookup_strategy, _ = self._ref_lookup_strategy(type_name, self.get_schema(type_name), value)
+                # TODO: Consolidate this with the below similar usage.
+                ref_lookup_strategy, incorrect_identifying_property = (
+                    self._ref_lookup_strategy(type_name, self.get_schema(type_name), value))
                 is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
                 subtype_names = self._get_schema_subtypes(type_name) if is_ref_lookup_subtypes else None
                 is_resolved, identifying_property, resolved_uuid = (
-                    self._ref_exists_internally(type_name, value, subtype_names))
+                    self._ref_exists_internally(type_name, value, subtype_names,
+                                                incorrect_identifying_property=incorrect_identifying_property))
                 if is_resolved:
+                    if identifying_property == incorrect_identifying_property:
+                        # Not REALLY resolved as it resolved to a property which is NOT an identifying
+                        # property, but may be commonly mistaken for one (e.g. UnalignedReads.filename).
+                        self._ref_incorrect_identifying_property_count += 1
+                        return []
                     resolved = [{"type": type_name, "uuid": resolved_uuid}]
                     self._cache_ref(type_name, value, resolved, subtype_names)
                     return resolved
