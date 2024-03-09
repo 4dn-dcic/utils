@@ -6,6 +6,7 @@ import os
 from pyramid.router import Router
 import re
 import sys
+from tqdm import tqdm
 from typing import Any, Callable, List, Optional, Tuple, Type, Union
 from webtest.app import TestApp
 from dcicutils.common import OrchestratedApp
@@ -57,17 +58,20 @@ class StructuredDataSet:
     # currently at least, /{type}/{accession} does not work but /{accession} does; so we
     # currently (smaht-portal/.../ingestion_processors) use REF_LOOKUP_ROOT_FIRST for this.
     # And current usage NEVER has REF_LOOKUP_SUBTYPES turned OFF; but support just in case.
-    REF_LOOKUP_ROOT = 0x0001
-    REF_LOOKUP_ROOT_FIRST = 0x0002 | REF_LOOKUP_ROOT
-    REF_LOOKUP_SUBTYPES = 0x0004
-    REF_LOOKUP_MINIMAL = 0
-    REF_LOOKUP_DEFAULT = REF_LOOKUP_ROOT | REF_LOOKUP_SUBTYPES
+    REF_LOOKUP_SPECIFIED_TYPE = 0x0001
+    REF_LOOKUP_ROOT = 0x0002
+    REF_LOOKUP_ROOT_FIRST = 0x0004 | REF_LOOKUP_ROOT
+    REF_LOOKUP_SUBTYPES = 0x0008
+    REF_LOOKUP_DEFAULT = REF_LOOKUP_SPECIFIED_TYPE | REF_LOOKUP_ROOT | REF_LOOKUP_SUBTYPES
 
     def __init__(self, file: Optional[str] = None, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
                  schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
                  order: Optional[List[str]] = None, prune: bool = True,
                  ref_lookup_strategy: Optional[Callable] = None,
-                 ref_lookup_nocache: bool = False) -> None:
+                 ref_lookup_nocache: bool = False,
+                 progress: bool = False) -> None:
+        progress = False
+        self._progress = progress
         self._data = {}
         self._portal = Portal(portal, data=self._data, schemas=schemas,
                               ref_lookup_strategy=ref_lookup_strategy,
@@ -80,6 +84,21 @@ class StructuredDataSet:
         self._validated = False
         self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
         self._load_file(file) if file else None
+
+    def _progress_add(self, amount: Union[int, Callable]) -> None:
+        if self._progress is not False and self._progress is not None:
+            if callable(amount):
+                amount = amount()
+            if not isinstance(amount, int):
+                return
+            if self._progress is True:
+                if amount > 0:
+                    self._progress = tqdm(total=amount)
+            elif isinstance(self._progress, tqdm):
+                if amount > 0:
+                    self._progress.total += amount
+                elif amount < 0:
+                    self._progress.update(-amount)
 
     @property
     def data(self) -> dict:
@@ -223,6 +242,15 @@ class StructuredDataSet:
         self._load_reader(CsvReader(file), type_name=Schema.type_name(file))
 
     def _load_excel_file(self, file: str) -> None:
+        def calculate_total_rows_to_process():
+            nonlocal file
+            excel = Excel(file)
+            nrows = 0
+            for sheet_name in excel.sheet_names:
+                for row in excel.sheet_reader(sheet_name):
+                    nrows += 1
+            return nrows
+        self._progress_add(calculate_total_rows_to_process)
         excel = Excel(file)  # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
@@ -262,6 +290,7 @@ class StructuredDataSet:
                 if self._autoadd_properties:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
             self._add(type_name, structured_row)
+            self._progress_add(-1)
         self._note_warning(reader.warnings, "reader")
         if schema:
             self._note_error(schema._unresolved_refs, "ref")
@@ -279,6 +308,10 @@ class StructuredDataSet:
         for name in properties:
             if name not in structured_row and (not schema or schema.data.get("properties", {}).get(name)):
                 structured_row[name] = properties[name]
+
+    def _is_ref_lookup_specified_type(ref_lookup_flags: int) -> bool:
+        return (ref_lookup_flags &
+                StructuredDataSet.REF_LOOKUP_SPECIFIED_TYPE) == StructuredDataSet.REF_LOOKUP_SPECIFIED_TYPE
 
     def _is_ref_lookup_root(ref_lookup_flags: int) -> bool:
         return (ref_lookup_flags & StructuredDataSet.REF_LOOKUP_ROOT) == StructuredDataSet.REF_LOOKUP_ROOT
@@ -324,6 +357,10 @@ class StructuredDataSet:
     @property
     def ref_exists_cache_miss_count(self) -> int:
         return self.portal.ref_exists_cache_miss_count if self.portal else -1
+
+    @property
+    def ref_incorrect_identifying_property_count(self) -> int:
+        return self.portal.ref_incorrect_identifying_property_count if self.portal else -1
 
     def _note_warning(self, item: Optional[Union[dict, List[dict]]], group: str) -> None:
         self._note_issue(self._warnings, item, group)
@@ -549,6 +586,7 @@ class Schema(SchemaBase):
             nonlocal self, typeinfo
             if not value:
                 if (column := typeinfo.get("column")) and column in self.data.get("required", []):
+                    # TODO: If think we do have the column (and type?) name(s) originating the ref yes?
                     self._unresolved_refs.append({"src": src, "error": f"/{link_to}/<null>"})
             elif portal:
                 if not (resolved := portal.ref_exists(link_to, value)):
@@ -562,6 +600,7 @@ class Schema(SchemaBase):
                 else:
                     # A resolved-ref set value is a tuple of the reference path and its uuid.
                     self._resolved_refs.add((f"/{link_to}/{value}", resolved[0].get("uuid")))
+#                   self._resolved_refs.add((f"/{link_to}/{value}", resolved[0].get("uuid"), resolved[0].get("data")))
             return value
         return lambda value, src: map_ref(value, typeinfo.get("linkTo"), self._portal, src)
 
@@ -720,7 +759,7 @@ class Portal(PortalBase):
         if callable(ref_lookup_strategy):
             self._ref_lookup_strategy = ref_lookup_strategy
         else:
-            self._ref_lookup_strategy = lambda type_name, value: StructuredDataSet.REF_LOOKUP_DEFAULT
+            self._ref_lookup_strategy = lambda type_name, schema, value: (StructuredDataSet.REF_LOOKUP_DEFAULT, None)
         if ref_lookup_nocache is True:
             self.ref_lookup = self.ref_lookup_nocache
             self._ref_cache = None
@@ -733,6 +772,7 @@ class Portal(PortalBase):
         self._ref_exists_internal_count = 0
         self._ref_exists_cache_hit_count = 0
         self._ref_exists_cache_miss_count = 0
+        self._ref_incorrect_identifying_property_count = 0
 
     @lru_cache(maxsize=8092)
     def ref_lookup_cache(self, object_name: str) -> Optional[dict]:
@@ -740,7 +780,7 @@ class Portal(PortalBase):
 
     def ref_lookup_nocache(self, object_name: str) -> Optional[dict]:
         try:
-            result = super().get_metadata(object_name)
+            result = super().get_metadata(object_name, raw=True)
             self._ref_lookup_found_count += 1
             return result
         except Exception as e:
@@ -807,10 +847,11 @@ class Portal(PortalBase):
                 # Cached resolved reference is empty ([]).
                 # It might NOW be found internally, since the portal self._data
                 # can change, as the data (e.g. spreadsheet sheets) are parsed.
-                ref_lookup_strategy = self._ref_lookup_strategy(type_name, value)
+                ref_lookup_strategy, _ = self._ref_lookup_strategy(type_name, self.get_schema(type_name), value)
                 is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
                 subtype_names = self._get_schema_subtypes(type_name) if is_ref_lookup_subtypes else None
-                is_resolved, resolved_uuid = self._ref_exists_internally(type_name, value, subtype_names)
+                is_resolved, identifying_property, resolved_uuid = (
+                    self._ref_exists_internally(type_name, value, subtype_names))
                 if is_resolved:
                     resolved = [{"type": type_name, "uuid": resolved_uuid}]
                     self._cache_ref(type_name, value, resolved, subtype_names)
@@ -822,14 +863,23 @@ class Portal(PortalBase):
         # Get the lookup strategy; i.e. should do we lookup by root path, and if so, should
         # we do this first, and do we lookup by subtypes; by default we lookup by root path
         # but not first, and we do lookup by subtypes.
-        ref_lookup_strategy = self._ref_lookup_strategy(type_name, value)
+        ref_lookup_strategy, incorrect_identifying_property = (
+            self._ref_lookup_strategy(type_name, self.get_schema(type_name), value))
+        is_ref_lookup_specified_type = StructuredDataSet._is_ref_lookup_specified_type(ref_lookup_strategy)
         is_ref_lookup_root = StructuredDataSet._is_ref_lookup_root(ref_lookup_strategy)
         is_ref_lookup_root_first = StructuredDataSet._is_ref_lookup_root_first(ref_lookup_strategy)
         is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
         subtype_names = self._get_schema_subtypes(type_name) if is_ref_lookup_subtypes else None
         # Lookup internally first (including at subtypes if desired; root lookup not applicable here).
-        is_resolved, resolved_uuid = self._ref_exists_internally(type_name, value, subtype_names)
+        is_resolved, identifying_property, resolved_uuid = (
+            self._ref_exists_internally(type_name, value, subtype_names,
+                                        incorrect_identifying_property=incorrect_identifying_property))
         if is_resolved:
+            if identifying_property == incorrect_identifying_property:
+                # Not REALLY resolved as it resolved to a property which is NOT an identifying
+                # property, but may be commonly mistaken for one (e.g. UnalignedReads.filename).
+                self._ref_incorrect_identifying_property_count += 1
+                return []
             resolved = [{"type": type_name, "uuid": resolved_uuid}]
             self._cache_ref(type_name, value, resolved, subtype_names)
             return resolved
@@ -838,12 +888,16 @@ class Portal(PortalBase):
         lookup_paths = []
         if is_ref_lookup_root_first:
             lookup_paths.append(f"/{value}")
-        lookup_paths.append(f"/{type_name}/{value}")
+        if is_ref_lookup_specified_type:
+            lookup_paths.append(f"/{type_name}/{value}")
         if is_ref_lookup_root and not is_ref_lookup_root_first:
             lookup_paths.append(f"/{value}")
         if subtype_names:
             for subtype_name in subtype_names:
                 lookup_paths.append(f"/{subtype_name}/{value}")
+        if not lookup_paths:
+            # No (i.e. zero) lookup strategy means no ref lookup at all.
+            return []
         # Do the actual lookup in the portal for each of the desired lookup paths.
         for lookup_path in lookup_paths:
             if isinstance(item := self.ref_lookup(lookup_path), dict):
@@ -854,15 +908,21 @@ class Portal(PortalBase):
         self._cache_ref(type_name, value, [], subtype_names)
         return []
 
-    def _ref_exists_internally(self, type_name: str, value: str,
-                               subtype_names: Optional[List[str]] = None) -> Tuple[bool, Optional[str]]:
+    def _ref_exists_internally(
+            self, type_name: str, value: str,
+            subtype_names: Optional[List[str]] = None,
+            incorrect_identifying_property: Optional[str] = None) -> Tuple[bool, Optional[str], Optional[str]]:
         for type_name in [type_name] + (subtype_names or []):
-            is_resolved, resolved_uuid = self._ref_exists_single_internally(type_name, value)
+            is_resolved, identifying_property, resolved_uuid = self._ref_exists_single_internally(
+                type_name, value, incorrect_identifying_property=incorrect_identifying_property)
             if is_resolved:
-                return True, resolved_uuid
-        return False, None
+                return True, identifying_property, resolved_uuid
+        return False, None, None
 
-    def _ref_exists_single_internally(self, type_name: str, value: str) -> Tuple[bool, Optional[str]]:
+    def _ref_exists_single_internally(
+            self, type_name: str, value: str,
+            incorrect_identifying_property:
+            Optional[str] = None) -> Tuple[bool, Optional[str], Optional[str]]:
         if self._data and (items := self._data.get(type_name)) and (schema := self.get_schema(type_name)):
             identifying_properties = set(schema.get("identifyingProperties", [])) | {"identifier", "uuid"}
             for item in items:
@@ -871,8 +931,13 @@ class Portal(PortalBase):
                         if ((identifying_value == value) or
                             (isinstance(identifying_value, list) and (value in identifying_value))):  # noqa
                             self._ref_exists_internal_count += 1
-                            return True, item.get("uuid", None)
-        return False, None
+                            return True, identifying_property, item.get("uuid", None)
+                if incorrect_identifying_property:
+                    if (identifying_value := item.get(incorrect_identifying_property, None)) is not None:
+                        if ((identifying_value == value) or
+                            (isinstance(identifying_value, list) and (value in identifying_value))):  # noqa
+                            return True, incorrect_identifying_property, item.get("uuid", None)
+        return False, None, None
 
     @property
     def ref_lookup_cache_hit_count(self) -> int:
@@ -919,6 +984,10 @@ class Portal(PortalBase):
     @property
     def ref_exists_cache_miss_count(self) -> int:
         return self._ref_exists_cache_miss_count
+
+    @property
+    def ref_incorrect_identifying_property_count(self) -> int:
+        return self._ref_incorrect_identifying_property_count
 
     @staticmethod
     def create_for_testing(arg: Optional[Union[str, bool, List[dict], dict, Callable]] = None,

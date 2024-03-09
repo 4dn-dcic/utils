@@ -1,5 +1,6 @@
 from copy import deepcopy
 from functools import lru_cache
+import re
 from typing import Any, List, Optional, Tuple, Type, Union
 from dcicutils.data_readers import RowReader
 from dcicutils.misc_utils import create_readonly_object
@@ -105,6 +106,13 @@ class PortalObject:
                             identifying_paths.append(f"/{self.type}/{identifying_value_item}")
                         identifying_paths.append(f"/{identifying_value_item}")
                 else:
+                    if (schema := self.schema):
+                        if pattern := schema.get("properties", {}).get(identifying_property, {}).get("pattern"):
+                            if not re.match(pattern, identifying_value):
+                                # If this identifying value is for a (identifying) property which has a
+                                # pattern, and the value does NOT match the pattern, then do NOT include
+                                # this value as an identifying path, since it cannot possibly be found.
+                                continue
                     if self.type:
                         identifying_paths.append(f"/{self.type}/{identifying_value}")
                     identifying_paths.append(f"/{identifying_value}")

@@ -4,7 +4,7 @@ import json
 import os
 import pytest
 import re
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Tuple, Union
 from unittest import mock
 from webtest import TestApp
 from dcicutils.misc_utils import VirtualApp
@@ -1513,11 +1513,18 @@ def parse_structured_data(file: str, portal: Optional[Union[VirtualApp, TestApp,
                           autoadd: Optional[dict] = None, prune: bool = True,
                           ref_nocache: bool = False) -> StructuredDataSet:
 
-    def ref_lookup_strategy(type_name: str, value: str) -> int:
-        if is_accession(value):
-            return StructuredDataSet.REF_LOOKUP_DEFAULT | StructuredDataSet.REF_LOOKUP_ROOT_FIRST
-        else:
-            return StructuredDataSet.REF_LOOKUP_DEFAULT
+    def ref_lookup_strategy(type_name: str, schema: dict, value: str) -> (int, Optional[str]):
+        not_an_identifying_property = "filename"
+        if schema_properties := schema.get("properties"):
+            if schema_properties.get("accession") and is_accession(value):
+                # Case: lookup by accession (only by root).
+                return StructuredDataSet.REF_LOOKUP_ROOT, not_an_identifying_property
+            elif schema_property_info_submitted_id := schema_properties.get("submitted_id"):
+                if schema_property_pattern_submitted_id := schema_property_info_submitted_id.get("pattern"):
+                    if re.match(schema_property_pattern_submitted_id, value):
+                        # Case: lookup by submitted_id (only by specified type).
+                        return StructuredDataSet.REF_LOOKUP_SPECIFIED_TYPE, not_an_identifying_property
+        return StructuredDataSet.REF_LOOKUP_DEFAULT, not_an_identifying_property
 
     structured_data = StructuredDataSet.load(file=file, portal=portal,
                                              autoadd=autoadd, order=ITEM_INDEX_ORDER, prune=prune,
