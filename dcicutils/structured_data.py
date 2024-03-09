@@ -205,7 +205,7 @@ class StructuredDataSet:
                         diffs[object_type].append(create_readonly_object(path=identifying_path,
                                                                          uuid=existing_object.uuid,
                                                                          diffs=object_diffs or None))
-                    else:
+                    elif identifying_path:
                         # If there is no existing object we still create a record for this object
                         # but with no uuid which will be the indication that it does not exist.
                         diffs[object_type].append(create_readonly_object(path=identifying_path, uuid=None, diffs=None))
