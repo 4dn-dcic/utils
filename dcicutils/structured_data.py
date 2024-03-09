@@ -6,6 +6,7 @@ import os
 from pyramid.router import Router
 import re
 import sys
+import time
 from tqdm import tqdm
 from typing import Any, Callable, List, Optional, Tuple, Type, Union
 from webtest.app import TestApp
@@ -69,7 +70,8 @@ class StructuredDataSet:
                  order: Optional[List[str]] = None, prune: bool = True,
                  ref_lookup_strategy: Optional[Callable] = None,
                  ref_lookup_nocache: bool = False,
-                 progress: bool = False) -> None:
+                 progress: bool = False,
+                 debug_sleep: Optional[str] = None) -> None:
         progress = False
         self._progress = progress
         self._data = {}
@@ -83,6 +85,12 @@ class StructuredDataSet:
         self._resolved_refs = set()
         self._validated = False
         self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
+        self._debug_sleep = None
+        if debug_sleep:
+            try:
+                self._debug_sleep = float(debug_sleep)
+            except Exception:
+                self._debug_sleep = None
         self._load_file(file) if file else None
 
     def _progress_add(self, amount: Union[int, Callable]) -> None:
@@ -113,9 +121,10 @@ class StructuredDataSet:
              schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
              order: Optional[List[str]] = None, prune: bool = True,
              ref_lookup_strategy: Optional[Callable] = None,
-             ref_lookup_nocache: bool = False) -> StructuredDataSet:
+             ref_lookup_nocache: bool = False, debug_sleep: Optional[str] = None) -> StructuredDataSet:
         return StructuredDataSet(file=file, portal=portal, schemas=schemas, autoadd=autoadd, order=order, prune=prune,
-                                 ref_lookup_strategy=ref_lookup_strategy, ref_lookup_nocache=ref_lookup_nocache)
+                                 ref_lookup_strategy=ref_lookup_strategy, ref_lookup_nocache=ref_lookup_nocache,
+                                 debug_sleep=debug_sleep)
 
     def validate(self, force: bool = False) -> None:
         def data_without_deleted_properties(data: dict) -> dict:
@@ -278,6 +287,8 @@ class StructuredDataSet:
         noschema = False
         structured_row_template = None
         for row in reader:
+            if self._debug_sleep:
+                time.sleep(float(self._debug_sleep))
             if not structured_row_template:  # Delay creation just so we don't reference schema if there are no rows.
                 if not schema and not noschema and not (schema := Schema.load_by_name(type_name, portal=self._portal)):
                     noschema = True
