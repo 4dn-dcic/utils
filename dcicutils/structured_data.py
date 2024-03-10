@@ -297,7 +297,7 @@ class StructuredDataSet:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
             self._add(type_name, structured_row)
             if self._progress:
-                self._progress_update(-1, len(self._resolved_refs), len(self.ref_errors), self.ref_lookup_count)
+                self._progress_update(-1, self.ref_total_count, self.ref_total_notfound_count, self.ref_lookup_count)
         self._note_warning(reader.warnings, "reader")
         if schema:
             self._note_error(schema._unresolved_refs, "ref")
@@ -868,9 +868,13 @@ class Portal(PortalBase):
         # Reference is NOT cached here; lookup INTERNALLY first.
         if (resolved := self.ref_exists_internally(type_name, value, update_counts=called_from_map_ref)) is None:
             # Reference was resolved (internally) INCORRECTLY.
+            if called_from_map_ref:
+                self._ref_total_notfound_count += 1
             return None
         if resolved:
             # Reference was resolved internally.
+            if called_from_map_ref:
+                self._ref_total_found_count += 1
             return resolved
         # Reference is NOT cached and was NOT resolved internally; lookup in PORTAL.
         # Get the lookup strategy; i.e. should do we lookup by root path, and if so, should
@@ -996,24 +1000,6 @@ class Portal(PortalBase):
                 self._ref_cache[f"/{type_name}/{value}"] = resolved
 
     @property
-    def ref_lookup_cache_hit_count(self) -> int:
-        if self._ref_cache is None:
-            return -1
-        try:
-            return self.ref_lookup_cached.cache_info().hits
-        except Exception:
-            return -1
-
-    @property
-    def ref_lookup_cache_miss_count(self) -> int:
-        if self._ref_cache is None:
-            return -1
-        try:
-            return self.ref_lookup_cached.cache_info().misses
-        except Exception:
-            return -1
-
-    @property
     def ref_total_count(self) -> int:
         return self._ref_total_count
 
@@ -1040,6 +1026,24 @@ class Portal(PortalBase):
     @property
     def ref_lookup_error_count(self) -> int:
         return self._ref_lookup_error_count
+
+    @property
+    def ref_lookup_cache_hit_count(self) -> int:
+        if self._ref_cache is None:
+            return -1
+        try:
+            return self.ref_lookup_cached.cache_info().hits
+        except Exception:
+            return -1
+
+    @property
+    def ref_lookup_cache_miss_count(self) -> int:
+        if self._ref_cache is None:
+            return -1
+        try:
+            return self.ref_lookup_cached.cache_info().misses
+        except Exception:
+            return -1
 
     @property
     def ref_exists_internal_count(self) -> int:
