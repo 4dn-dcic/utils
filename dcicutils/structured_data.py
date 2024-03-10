@@ -264,7 +264,7 @@ class StructuredDataSet:
             ref_errors_actual = []
             for ref_error in ref_errors:
                 if not (resolved := self.portal.ref_exists(ref := ref_error["error"])):
-#               if not (resolved := self.portal.ref_exists_internally(ref := ref_error["error"])):
+                    # if not (resolved := self.portal.ref_exists_internally(ref := ref_error["error"])):
                     ref_errors_actual.append(ref_error)
                 else:
                     self._resolved_refs.add((ref, resolved.get("uuid")))
@@ -844,7 +844,8 @@ class Portal(PortalBase):
         """
         return self.is_schema_type(schema_name, FILE_SCHEMA_NAME)
 
-    def ref_exists(self, type_name: str, value: Optional[str] = None, called_from_map_ref: bool = False) -> Optional[dict]:
+    def ref_exists(self, type_name: str, value: Optional[str] = None,
+                   called_from_map_ref: bool = False) -> Optional[dict]:
         # print(f"\033[Kxyzzy:ref_exists({type_name}/{value})")
         if not value:
             type_name, value = Portal._get_type_name_and_value_from_path(type_name)
