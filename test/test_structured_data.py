@@ -1426,7 +1426,8 @@ def _test_parse_structured_data(testapp,
             nonlocal norefs, expected_refs, refs_actual
             refs_actual.add(ref := f"/{type_name}/{value}")
             if norefs is True or (isinstance(norefs, list) and ref in norefs):
-                return [{"type": "dummy", "uuid": "dummy"}]
+#               return [{"type": "dummy", "uuid": "dummy"}]
+                return {"type": "dummy", "uuid": "dummy"}
             return real_ref_exists(self, type_name, value)
         with mock.patch("dcicutils.structured_data.Portal.ref_exists",
                         side_effect=mocked_ref_exists, autospec=True):

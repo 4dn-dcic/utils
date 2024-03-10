@@ -264,9 +264,10 @@ class StructuredDataSet:
             ref_errors_actual = []
             for ref_error in ref_errors:
                 if not (resolved := self.portal.ref_exists(ref := ref_error["error"])):
+#               if not (resolved := self.portal.ref_exists_internally(ref := ref_error["error"])):
                     ref_errors_actual.append(ref_error)
                 else:
-                    self._resolved_refs.add((ref, resolved[0].get("uuid")))
+                    self._resolved_refs.add((ref, resolved.get("uuid")))
             if ref_errors_actual:
                 self._errors["ref"] = ref_errors_actual
             else:
@@ -613,16 +614,9 @@ class Schema(SchemaBase):
             elif portal:
                 if not (resolved := portal.ref_exists(link_to, value, True)):
                     self._unresolved_refs.append({"src": src, "error": f"/{link_to}/{value}"})
-                elif len(resolved) > 1:
-                    # TODO: Don't think we need this anymore; see TODO on Portal.ref_exists.
-                    self._unresolved_refs.append({
-                        "src": src,
-                        "error": f"/{link_to}/{value}",
-                        "types": [resolved_ref["type"] for resolved_ref in resolved]})
                 else:
                     # A resolved-ref set value is a tuple of the reference path and its uuid.
-                    self._resolved_refs.add((f"/{link_to}/{value}", resolved[0].get("uuid")))
-#                   self._resolved_refs.add((f"/{link_to}/{value}", resolved[0].get("uuid"), resolved[0].get("data")))
+                    self._resolved_refs.add((f"/{link_to}/{value}", resolved.get("uuid")))
             return value
         return lambda value, src: map_ref(value, typeinfo.get("linkTo"), self._portal, src)
 
@@ -850,45 +844,30 @@ class Portal(PortalBase):
         """
         return self.is_schema_type(schema_name, FILE_SCHEMA_NAME)
 
-    def _ref_exists_from_cache(self, type_name: str, value: str) -> Optional[List[dict]]:
-        if self._ref_cache is not None:
-            self._ref_exists_cache_hit_count += 1
-            return self._ref_cache.get(f"/{type_name}/{value}", None)
-        self._ref_exists_cache_miss_count += 1
-        return None
-
-    def _cache_ref(self, type_name: str, value: str, resolved: List[str]) -> None:
-        subtype_names = self._get_schema_subtypes_names(type_name)
-        if self._ref_cache is not None:
-            for type_name in [type_name] + subtype_names:
-                self._ref_cache[f"/{type_name}/{value}"] = resolved
-
-    def ref_exists(self, type_name: str, value: Optional[str] = None, called_from_map_ref: bool = False) -> List[dict]:
-        print(f"\033[Kxyzzy:ref_exists({type_name}/{value})")
+    def ref_exists(self, type_name: str, value: Optional[str] = None, called_from_map_ref: bool = False) -> Optional[dict]:
+        # print(f"\033[Kxyzzy:ref_exists({type_name}/{value})")
         if not value:
-            if type_name.startswith("/") and len(parts := type_name[1:].split("/")) == 2:
-                if not (type_name := parts[0]) or not (value := parts[1]):
-                    return []
-            else:
-                return []
+            type_name, value = Portal._get_type_name_and_value_from_path(type_name)
+            if not type_name or not value:
+                return None
         if called_from_map_ref:
             self._ref_total_count += 1
         # First check our reference cache.
         if (resolved := self._ref_exists_from_cache(type_name, value)) is not None:
             # Found CACHED reference.
             if resolved:
-                # Found cached RESOLVED reference (non-empty array).
+                # Found cached RESOLVED reference (non-empty object).
                 if called_from_map_ref:
                     self._ref_total_found_count += 1
                 return resolved
-            # Found cached UNRESOLVED reference (empty array); meaning it was looked
+            # Found cached UNRESOLVED reference (empty object); meaning it was looked
             # up but not found. It might NOW be found INTERNALLY, since the portal
             # self._data can change, i.e. as data (e.g. spreadsheet sheets) are parsed.
-            return self._ref_exists_internally(type_name, value, update_counts=called_from_map_ref) or []
+            return self.ref_exists_internally(type_name, value, update_counts=called_from_map_ref) or {}
         # Reference is NOT cached here; lookup INTERNALLY first.
-        if (resolved := self._ref_exists_internally(type_name, value, update_counts=called_from_map_ref)) is None:
+        if (resolved := self.ref_exists_internally(type_name, value, update_counts=called_from_map_ref)) is None:
             # Reference was resolved (internally) INCORRECTLY.
-            return []
+            return None
         if resolved:
             # Reference was resolved internally.
             return resolved
@@ -916,29 +895,35 @@ class Portal(PortalBase):
             # No (i.e. zero) lookup strategy means no ref lookup at all.
             if called_from_map_ref:
                 self._ref_total_notfound_count += 1
-            return []
+            return None
         # Do the actual lookup in portal for each of the desired lookup paths.
         for lookup_path in lookup_paths:
             if isinstance(resolved_item := self.ref_lookup(lookup_path), dict):
-                resolved = [{"type": type_name, "uuid": resolved_item.get("uuid", None)}]
+                resolved = {"type": type_name, "uuid": resolved_item.get("uuid", None)}
                 self._cache_ref(type_name, value, resolved)
                 self._ref_exists_external_count += 1
                 if called_from_map_ref:
                     self._ref_total_found_count += 1
                 return resolved
-        # Not found at all; note that we cache this ([]) too; indicates lookup has been done.
-        self._cache_ref(type_name, value, [])
+        # Not found at all; note that we cache this ({}) too; indicates lookup has been done.
+        self._cache_ref(type_name, value, {})
         if called_from_map_ref:
             self._ref_total_notfound_count += 1
-        return []
+        return None
 
-    def _ref_exists_internally(self, type_name: str, value: str, update_counts: bool = False) -> Optional[List[dict]]:
+    def ref_exists_internally(self, type_name: str, value: Optional[str] = None,
+                              update_counts: bool = False) -> Optional[dict]:
         """
         Looks up the given reference (type/value) internally (i.e. with this data parsed thus far).
         If found then returns a list of a single dictionary containing the (given) type name and
         the uuid (if any) of the resolved item. If not found then returns an empty list; however,
         if not found, but found using an "incorrect" identifying property, then returns None.
         """
+        # print(f"\033[Kxyzzy:ref_exists_internally({type_name}/{value})")
+        if not value:
+            type_name, value = Portal._get_type_name_and_value_from_path(type_name)
+            if not type_name or not value:
+                return None
         # Note that root lookup not applicable here.
         ref_lookup_strategy, incorrect_identifying_property = (
             self._ref_lookup_strategy(type_name, self.get_schema(type_name), value))
@@ -950,7 +935,7 @@ class Portal(PortalBase):
                 if update_counts:
                     self._ref_exists_internal_count += 1
                     self._ref_total_found_count += 1
-                resolved = [{"type": type_name, "uuid": resolved_item.get("uuid")}]  # xyzzy
+                resolved = {"type": type_name, "uuid": resolved_item.get("uuid")}
                 self._cache_ref(type_name, value, resolved)
                 return resolved
         # Here this reference is not resolved internally; but let us check any specified incorrect
@@ -974,7 +959,7 @@ class Portal(PortalBase):
                             return None  # None return means resolved internally incorrectly.
         if update_counts:
             self._ref_total_notfound_count += 1
-        return []  # Empty return means not resolved internally.
+        return {}  # Empty return means not resolved internally.
 
     def _ref_exists_single_internally(self, type_name: str, value: str) -> Tuple[bool, Optional[dict]]:
         if self._data and (items := self._data.get(type_name)) and (schema := self.get_schema(type_name)):
@@ -987,16 +972,26 @@ class Portal(PortalBase):
                             return True, item
         return False, None
 
-    def _old___ref_exists_internally(
-            self, type_name: str, value: str,
-            subtype_names: Optional[List[str]] = None,
-            incorrect_identifying_property: Optional[str] = None) -> Tuple[bool, Optional[str], Optional[str]]:
-        for type_name in [type_name] + (subtype_names or []):
-            is_resolved, identifying_property, resolved_uuid = self._ref_exists_single_internally(
-                type_name, value, incorrect_identifying_property=incorrect_identifying_property)
-            if is_resolved:
-                return True, identifying_property, resolved_uuid
-        return False, None, None
+    @staticmethod
+    def _get_type_name_and_value_from_path(path: str) -> Tuple[Optional[str], Optional[str]]:
+        if path.startswith("/") and len(parts := path[1:].split("/")) == 2:
+            if not (type_name := parts[0]) or not (value := parts[1]):
+                return None
+            return type_name, value
+        return None, None
+
+    def _ref_exists_from_cache(self, type_name: str, value: str) -> Optional[List[dict]]:
+        if self._ref_cache is not None:
+            self._ref_exists_cache_hit_count += 1
+            return self._ref_cache.get(f"/{type_name}/{value}", None)
+        self._ref_exists_cache_miss_count += 1
+        return None
+
+    def _cache_ref(self, type_name: str, value: str, resolved: List[str]) -> None:
+        subtype_names = self._get_schema_subtypes_names(type_name)
+        if self._ref_cache is not None:
+            for type_name in [type_name] + subtype_names:
+                self._ref_cache[f"/{type_name}/{value}"] = resolved
 
     @property
     def ref_lookup_cache_hit_count(self) -> int:
