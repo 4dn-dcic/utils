@@ -7,7 +7,6 @@ from pyramid.router import Router
 import re
 import sys
 import time
-from tqdm import tqdm
 from typing import Any, Callable, List, Optional, Tuple, Type, Union
 from webtest.app import TestApp
 from dcicutils.common import OrchestratedApp
@@ -70,10 +69,9 @@ class StructuredDataSet:
                  order: Optional[List[str]] = None, prune: bool = True,
                  ref_lookup_strategy: Optional[Callable] = None,
                  ref_lookup_nocache: bool = False,
-                 progress: bool = False,
+                 progress: Optional[Callable] = None,
                  debug_sleep: Optional[str] = None) -> None:
-        progress = False
-        self._progress = progress
+        self._progress = progress if callable(progress) else None
         self._data = {}
         self._portal = Portal(portal, data=self._data, schemas=schemas,
                               ref_lookup_strategy=ref_lookup_strategy,
@@ -93,20 +91,15 @@ class StructuredDataSet:
                 self._debug_sleep = None
         self._load_file(file) if file else None
 
-    def _progress_add(self, amount: Union[int, Callable]) -> None:
-        if self._progress is not False and self._progress is not None:
-            if callable(amount):
-                amount = amount()
-            if not isinstance(amount, int):
-                return
-            if self._progress is True:
-                if amount > 0:
-                    self._progress = tqdm(total=amount)
-            elif isinstance(self._progress, tqdm):
-                if amount > 0:
-                    self._progress.total += amount
-                elif amount < 0:
-                    self._progress.update(-amount)
+    def _progress_update(self, nrows: Union[int, Callable],
+                         nrefs_resolved: Optional[int] = None,
+                         nrefs_unresolved: Optional[int] = None,
+                         nlookups: Optional[int] = None) -> None:
+        if self._progress:
+            if callable(nrows):
+                nrows = nrows()
+            if isinstance(nrows, int) and nrows != 0:
+                self._progress(nrows, nrefs_resolved, nrefs_unresolved, nlookups)
 
     @property
     def data(self) -> dict:
@@ -259,7 +252,8 @@ class StructuredDataSet:
                 for row in excel.sheet_reader(sheet_name):
                     nrows += 1
             return nrows
-        self._progress_add(calculate_total_rows_to_process)
+        if self._progress:
+            self._progress_update(calculate_total_rows_to_process)
         excel = Excel(file)  # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
@@ -301,7 +295,8 @@ class StructuredDataSet:
                 if self._autoadd_properties:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
             self._add(type_name, structured_row)
-            self._progress_add(-1)
+            if self._progress:
+                self._progress_update(-1, len(self._resolved_refs), len(self.ref_errors), self.ref_lookup_count)
         self._note_warning(reader.warnings, "reader")
         if schema:
             self._note_error(schema._unresolved_refs, "ref")
