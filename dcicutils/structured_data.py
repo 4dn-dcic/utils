@@ -266,7 +266,7 @@ class StructuredDataSet:
             ref_errors_actual = []
             for ref_error in ref_errors:
                 if not (resolved := self.portal.ref_exists(ref := ref_error["error"])):
-                    # if not (resolved := self.portal.ref_exists_internally(ref := ref_error["error"])):
+                    # if not (resolved := self.portal.ref_exists_internally(ref := ref_error["error"])):  # TODO
                     ref_errors_actual.append(ref_error)
                 else:
                     self._resolved_refs.add((ref, resolved.get("uuid")))
@@ -552,7 +552,6 @@ class Schema(SchemaBase):
                 # The type specifier can actually be a list of acceptable types; for
                 # example smaht-portal/schemas/mixins.json/meta_workflow_input#.value;
                 # we will take the first one for which we have a mapping function.
-                # TODO: Maybe more correct to get all map function and map to any for values.
                 for acceptable_type in typeinfo_type:
                     if (map_function := self._map_value_functions.get(acceptable_type)) is not None:
                         break
@@ -613,7 +612,6 @@ class Schema(SchemaBase):
             nonlocal self, typeinfo
             if not value:
                 if (column := typeinfo.get("column")) and column in self.data.get("required", []):
-                    # TODO: If think we do have the column (and type?) name(s) originating the ref yes?
                     self._unresolved_refs.append({"src": src, "error": f"/{link_to}/<null>"})
             elif portal:
                 if not (resolved := portal.ref_exists(link_to, value, True)):
@@ -857,7 +855,13 @@ class Portal(PortalBase):
                 return None
         if called_from_map_ref:
             self._ref_total_count += 1
-        # First check our reference cache.
+        # First make sure the given value can possibly be a reference to the given type.
+        if not self._is_valid_ref(type_name, value):
+            if called_from_map_ref:
+                self._ref_incorrect_identifying_property_count += 1
+                self._ref_total_notfound_count += 1
+            return None
+        # Check our reference cache.
         if (resolved := self._ref_exists_from_cache(type_name, value)) is not None:
             # Found CACHED reference.
             if resolved:
@@ -876,7 +880,7 @@ class Portal(PortalBase):
                 self._ref_total_notfound_count += 1
             return None
         if resolved:
-            # Reference was resolved internally.
+            # Reference was resolved internally (note: here only if resolved is not an empty dictionary).
             if called_from_map_ref:
                 self._ref_total_found_count += 1
             return resolved
@@ -981,6 +985,35 @@ class Portal(PortalBase):
                             (isinstance(identifying_value, list) and (value in identifying_value))):  # noqa
                             return True, item
         return False, None
+
+    # TODO: Move this to smaht-submitr and smaht-portal and pass in.
+    def _is_valid_ref(self, type_name: str, value: str) -> bool:
+        """
+        Returns True iff the given value can possibly be a valid reference
+        to type specified by the given type name, otherwise returns False.
+        """
+        from dcicutils.misc_utils import is_uuid
+        def is_possibly_valid(schema: dict, name: str, value: str) -> Optional[Callable]:   # noqa
+            if properties := schema.get("properties"):
+                if pattern := properties.get(name, {}).get("pattern"):
+                    if not re.match(pattern, value):
+                        return False
+                if format := properties.get(name, {}).get("format"):
+                    if (format == "accession") and (name == "accession"):
+                        pattern = "^SMA[1-9A-Z]{9}$"
+                        if not re.match(pattern, value):
+                            return False
+                    if (format == "uuid") and (name == "uuid"):
+                        if not is_uuid(value):
+                            return False
+            return True
+        for schema_name in [type_name] + self._get_schema_subtypes_names(type_name):
+            if schema := self.get_schema(schema_name):
+                if identifying_properties := schema.get("identifyingProperties"):
+                    for identifying_property in identifying_properties:
+                        if is_possibly_valid(schema, identifying_property, value):
+                            return True
+        return False
 
     @staticmethod
     def _get_type_name_and_value_from_path(path: str) -> Tuple[Optional[str], Optional[str]]:
