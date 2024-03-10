@@ -1422,7 +1422,7 @@ def _test_parse_structured_data(testapp,
                         return value
                 return map_ref(value, src)
             return lambda value, src: mocked_map_ref(value, typeinfo.get("linkTo"), self._portal, src)
-        def mocked_ref_exists(self, type_name, value):  # noqa
+        def mocked_ref_exists(self, type_name, value, called_from_map_ref = False):  # noqa
             nonlocal norefs, expected_refs, refs_actual
             refs_actual.add(ref := f"/{type_name}/{value}")
             if norefs is True or (isinstance(norefs, list) and ref in norefs):
