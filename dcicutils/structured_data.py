@@ -92,15 +92,16 @@ class StructuredDataSet:
         self._load_file(file) if file else None
 
     def _progress_update(self, nrows: Union[int, Callable],
-                         nrefs_resolved: Optional[int] = None,
-                         nrefs_unresolved: Optional[int] = None,
-                         nlookups: Optional[int] = None,
-                         ncachehits: Optional[int] = None) -> None:
+                         ref_resolved: Optional[int] = None,
+                         ref_unresolved: Optional[int] = None,
+                         ref_lookups: Optional[int] = None,
+                         ref_cache_hits: Optional[int] = None,
+                         ref_incorrect: Optional[int] = None) -> None:
         if self._progress:
             if callable(nrows):
                 nrows = nrows()
             if isinstance(nrows, int) and nrows != 0:
-                self._progress(nrows, nrefs_resolved, nrefs_unresolved, nlookups, ncachehits)
+                self._progress(nrows, ref_resolved, ref_unresolved, ref_lookups, ref_cache_hits, ref_incorrect)
 
     @property
     def data(self) -> dict:
@@ -299,7 +300,8 @@ class StructuredDataSet:
             self._add(type_name, structured_row)
             if self._progress:
                 self._progress_update(-1, self.ref_total_count, self.ref_total_notfound_count,
-                                      self.ref_lookup_count, self.ref_lookup_cache_hit_count)
+                                      self.ref_lookup_count, self.ref_lookup_cache_hit_count,
+                                      self.ref_incorrect_identifying_property_count)
         self._note_warning(reader.warnings, "reader")
         if schema:
             self._note_error(schema._unresolved_refs, "ref")
