@@ -945,19 +945,20 @@ class Portal(PortalBase):
         # reference, which would otherwise be unresolved, would be resolved; in which case we have an
         # incorrect reference; doing this can cut down considerably on useless lookups (at least for
         # a case from He Li, early March 2024).
-        if incorrect_identifying_property:
-            if self._data and (items := self._data.get(type_name)):
-                for item in items:
-                    if (identifying_value := item.get(incorrect_identifying_property, None)) is not None:
-                        if ((identifying_value == value) or
-                            (isinstance(identifying_value, list) and (value in identifying_value))):  # noqa
-                            # Not REALLY resolved as it resolved to a property which is NOT an identifying
-                            # property, but may be commonly mistaken for one (e.g. UnalignedReads.filename).
-                            # Return value to prevent actual portal lookup from happening.
-                            if update_counts:
-                                self._ref_incorrect_identifying_property_count += 1
-                                self._ref_total_notfound_count += 1
-                            return None  # None return means resolved internally incorrectly.
+        for type_name in [type_name] + subtype_names:
+            if incorrect_identifying_property:
+                if self._data and (items := self._data.get(type_name)):
+                    for item in items:
+                        if (identifying_value := item.get(incorrect_identifying_property, None)) is not None:
+                            if ((identifying_value == value) or
+                                (isinstance(identifying_value, list) and (value in identifying_value))):  # noqa
+                                # Not REALLY resolved as it resolved to a property which is NOT an identifying
+                                # property, but may be commonly mistaken for one (e.g. UnalignedReads.filename).
+                                # Return value to prevent actual portal lookup from happening.
+                                if update_counts:
+                                    self._ref_incorrect_identifying_property_count += 1
+                                    self._ref_total_notfound_count += 1
+                                return None  # None return means resolved internally incorrectly.
         if update_counts:
             self._ref_total_notfound_count += 1
         return {}  # Empty return means not resolved internally.
