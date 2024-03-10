@@ -94,12 +94,13 @@ class StructuredDataSet:
     def _progress_update(self, nrows: Union[int, Callable],
                          nrefs_resolved: Optional[int] = None,
                          nrefs_unresolved: Optional[int] = None,
-                         nlookups: Optional[int] = None) -> None:
+                         nlookups: Optional[int] = None,
+                         ncachehits: Optional[int] = None) -> None:
         if self._progress:
             if callable(nrows):
                 nrows = nrows()
             if isinstance(nrows, int) and nrows != 0:
-                self._progress(nrows, nrefs_resolved, nrefs_unresolved, nlookups)
+                self._progress(nrows, nrefs_resolved, nrefs_unresolved, nlookups, ncachehits)
 
     @property
     def data(self) -> dict:
@@ -297,7 +298,8 @@ class StructuredDataSet:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
             self._add(type_name, structured_row)
             if self._progress:
-                self._progress_update(-1, self.ref_total_count, self.ref_total_notfound_count, self.ref_lookup_count)
+                self._progress_update(-1, self.ref_total_count, self.ref_total_notfound_count,
+                                      self.ref_lookup_count, self.ref_lookup_cache_hit_count)
         self._note_warning(reader.warnings, "reader")
         if schema:
             self._note_error(schema._unresolved_refs, "ref")
