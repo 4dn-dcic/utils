@@ -96,12 +96,12 @@ class StructuredDataSet:
                          ref_unresolved: Optional[int] = None,
                          ref_lookups: Optional[int] = None,
                          ref_cache_hits: Optional[int] = None,
-                         ref_incorrect: Optional[int] = None) -> None:
+                         ref_invalid: Optional[int] = None) -> None:
         if self._progress:
             if callable(nrows):
                 nrows = nrows()
             if isinstance(nrows, int) and nrows != 0:
-                self._progress(nrows, ref_resolved, ref_unresolved, ref_lookups, ref_cache_hits, ref_incorrect)
+                self._progress(nrows, ref_resolved, ref_unresolved, ref_lookups, ref_cache_hits, ref_invalid)
 
     @property
     def data(self) -> dict:
@@ -301,7 +301,7 @@ class StructuredDataSet:
             if self._progress:
                 self._progress_update(-1, self.ref_total_count, self.ref_total_notfound_count,
                                       self.ref_lookup_count, self.ref_lookup_cache_hit_count,
-                                      self.ref_incorrect_identifying_property_count)
+                                      self.ref_invalid_identifying_property_count)
         self._note_warning(reader.warnings, "reader")
         if schema:
             self._note_error(schema._unresolved_refs, "ref")
@@ -386,8 +386,8 @@ class StructuredDataSet:
         return self.portal.ref_exists_cache_miss_count if self.portal else -1
 
     @property
-    def ref_incorrect_identifying_property_count(self) -> int:
-        return self.portal.ref_incorrect_identifying_property_count if self.portal else -1
+    def ref_invalid_identifying_property_count(self) -> int:
+        return self.portal.ref_invalid_identifying_property_count if self.portal else -1
 
     def _note_warning(self, item: Optional[Union[dict, List[dict]]], group: str) -> None:
         self._note_issue(self._warnings, item, group)
@@ -791,7 +791,7 @@ class Portal(PortalBase):
         self._ref_exists_external_count = 0
         self._ref_exists_cache_hit_count = 0
         self._ref_exists_cache_miss_count = 0
-        self._ref_incorrect_identifying_property_count = 0
+        self._ref_invalid_identifying_property_count = 0
         self._ref_total_count = 0
         self._ref_total_found_count = 0
         self._ref_total_notfound_count = 0
@@ -860,7 +860,7 @@ class Portal(PortalBase):
         ref_lookup_strategy, ref_validator = self._ref_lookup_strategy(type_name, schema, value)
         if not self._is_valid_ref(type_name, value, ref_validator):
             if called_from_map_ref:
-                self._ref_incorrect_identifying_property_count += 1
+                self._ref_invalid_identifying_property_count += 1
                 self._ref_total_notfound_count += 1
             return None
         # Check our reference cache.
@@ -932,7 +932,7 @@ class Portal(PortalBase):
         Looks up the given reference (type/value) internally (i.e. with this data parsed thus far).
         If found then returns a list of a single dictionary containing the (given) type name and
         the uuid (if any) of the resolved item. If not found then returns an empty list; however,
-        if not found, but found using an "incorrect" identifying property, then returns None.
+        if not found, but found using an invalid identifying property, then returns None.
         """
         # print(f"\033[Kxyzzy:ref_exists_internally({type_name}/{value})")
         if not value:
@@ -968,15 +968,6 @@ class Portal(PortalBase):
                             return True, item
         return False, None
 
-    # For smaht-submitr/smaht-portal ...
-    def ref_validator(schema: dict, property_name: str, property_value: str) -> Optional[bool]:
-        if property_format := schema.get("properties", {}).get(property_name, {}).get("format"):
-            if (property_format == "accession") and (property_name == "accession"):
-                accession_pattern = "^SMA[1-9A-Z]{9}$"
-                if not re.match(accession_pattern, property_value):
-                    return False
-        return None
-
     def _is_valid_ref(self, type_name: str, value: str, ref_validator: Optional[Callable]) -> bool:
         """
         Returns True iff the given value can possibly be a valid reference to the type specified by
@@ -995,7 +986,8 @@ class Portal(PortalBase):
         to the required pattern/format for any of the identifying properties for the type.
 
         At least at first, the only reason we support the ref_validator callable is at all is because
-        the "accession" identifying property in our portal schemas do not have an associated pattern.
+        the "accession" identifying property in our portal schemas do not have an associated pattern;
+        otherwise we could handle it generically here.
         """
         def is_possibly_valid(schema: dict, property_name: str, property_value: str) -> Optional[Callable]:  # noqa
             nonlocal ref_validator
@@ -1105,8 +1097,8 @@ class Portal(PortalBase):
         return self._ref_exists_cache_miss_count
 
     @property
-    def ref_incorrect_identifying_property_count(self) -> int:
-        return self._ref_incorrect_identifying_property_count
+    def ref_invalid_identifying_property_count(self) -> int:
+        return self._ref_invalid_identifying_property_count
 
     @staticmethod
     def create_for_testing(arg: Optional[Union[str, bool, List[dict], dict, Callable]] = None,
