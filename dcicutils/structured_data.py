@@ -13,9 +13,9 @@ from dcicutils.common import OrchestratedApp
 from dcicutils.data_readers import CsvReader, Excel, RowReader
 from dcicutils.datetime_utils import normalize_date_string, normalize_datetime_string
 from dcicutils.file_utils import search_for_file
-from dcicutils.misc_utils import (create_dict, create_readonly_object, load_json_if,
-                                  merge_objects, remove_empty_properties, right_trim,
-                                  split_string, to_boolean, to_enum, to_float, to_integer, VirtualApp)
+from dcicutils.misc_utils import (create_dict, create_readonly_object, is_uuid, load_json_if,
+                                  merge_objects, remove_empty_properties, right_trim, split_string,
+                                  to_boolean, to_enum, to_float, to_integer, VirtualApp)
 from dcicutils.portal_object_utils import PortalObject
 from dcicutils.portal_utils import Portal as PortalBase
 from dcicutils.schema_utils import Schema as SchemaBase
@@ -856,7 +856,9 @@ class Portal(PortalBase):
         if called_from_map_ref:
             self._ref_total_count += 1
         # First make sure the given value can possibly be a reference to the given type.
-        if not self._is_valid_ref(type_name, value):
+        schema = self.get_schema(type_name)
+        ref_lookup_strategy, ref_validator = self._ref_lookup_strategy(type_name, schema, value)
+        if not self._is_valid_ref(type_name, value, ref_validator):
             if called_from_map_ref:
                 self._ref_incorrect_identifying_property_count += 1
                 self._ref_total_notfound_count += 1
@@ -938,7 +940,7 @@ class Portal(PortalBase):
             if not type_name or not value:
                 return None
         # Note that root lookup not applicable here.
-        ref_lookup_strategy, incorrect_identifying_property = (
+        ref_lookup_strategy, ref_validator = (
             self._ref_lookup_strategy(type_name, self.get_schema(type_name), value))
         is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
         subtype_names = self._get_schema_subtypes_names(type_name) if is_ref_lookup_subtypes else []
@@ -951,26 +953,6 @@ class Portal(PortalBase):
                 resolved = {"type": type_name, "uuid": resolved_item.get("uuid")}
                 self._cache_ref(type_name, value, resolved)
                 return resolved
-        # Here this reference is not resolved internally; but let us check any specified incorrect
-        # property to see if it would have been resolved using that; for example, if we pretend that
-        # UnalignedReads.filename were an identifying property (which it is not), then we see if this
-        # reference, which would otherwise be unresolved, would be resolved; in which case we have an
-        # incorrect reference; doing this can cut down considerably on useless lookups (at least for
-        # a case from He Li, early March 2024).
-        for type_name in [type_name] + subtype_names:
-            if incorrect_identifying_property:
-                if self._data and (items := self._data.get(type_name)):
-                    for item in items:
-                        if (identifying_value := item.get(incorrect_identifying_property, None)) is not None:
-                            if ((identifying_value == value) or
-                                (isinstance(identifying_value, list) and (value in identifying_value))):  # noqa
-                                # Not REALLY resolved as it resolved to a property which is NOT an identifying
-                                # property, but may be commonly mistaken for one (e.g. UnalignedReads.filename).
-                                # Return value to prevent actual portal lookup from happening.
-                                if update_counts:
-                                    self._ref_incorrect_identifying_property_count += 1
-                                    self._ref_total_notfound_count += 1
-                                return None  # None return means resolved internally incorrectly.
         if update_counts:
             self._ref_total_notfound_count += 1
         return {}  # Empty return means not resolved internally.
@@ -986,25 +968,36 @@ class Portal(PortalBase):
                             return True, item
         return False, None
 
-    # TODO: Move this to smaht-submitr and smaht-portal and pass in.
-    def _is_valid_ref(self, type_name: str, value: str) -> bool:
+    # For smaht-submitr/smaht-portal ...
+    def ref_validator(schema: dict, property_name: str, property_value: str) -> Optional[bool]:
+        if property_format := schema.get("properties", {}).get(property_name, {}).get("format"):
+            if (property_format == "accession") and (property_name == "accession"):
+                accession_pattern = "^SMA[1-9A-Z]{9}$"
+                if not re.match(accession_pattern, property_value):
+                    return False
+        return None
+
+    def _is_valid_ref(self, type_name: str, value: str, ref_validator: Optional[Callable]) -> bool:
         """
         Returns True iff the given value can possibly be a valid reference
         to type specified by the given type name, otherwise returns False.
+        The given ref_validator callable if specified will be called with
+        the schema (dictionary) for the given type
         """
-        from dcicutils.misc_utils import is_uuid
-        def is_possibly_valid(schema: dict, name: str, value: str) -> Optional[Callable]:   # noqa
-            if properties := schema.get("properties"):
-                if pattern := properties.get(name, {}).get("pattern"):
-                    if not re.match(pattern, value):
+        def is_possibly_valid(schema: dict, property_name: str, property_value: str) -> Optional[Callable]:  # noqa
+            nonlocal ref_validator
+            if callable(ref_validator):
+                if (ref_validator_result := ref_validator(schema, property_name, property_value)) is False:
+                    return False
+                elif ref_validator_result is True:
+                    return True
+            if property_info := schema.get("properties", {}).get(property_name):
+                if property_pattern := property_info.get("pattern"):
+                    if not re.match(property_pattern, property_value):
                         return False
-                if format := properties.get(name, {}).get("format"):
-                    if (format == "accession") and (name == "accession"):
-                        pattern = "^SMA[1-9A-Z]{9}$"
-                        if not re.match(pattern, value):
-                            return False
-                    if (format == "uuid") and (name == "uuid"):
-                        if not is_uuid(value):
+                if property_format := property_info.get("format"):
+                    if (property_format == "uuid") and (property_name == "uuid"):
+                        if not is_uuid(property_value):
                             return False
             return True
         for schema_name in [type_name] + self._get_schema_subtypes_names(type_name):
