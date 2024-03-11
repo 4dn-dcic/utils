@@ -91,7 +91,9 @@ class StructuredDataSet:
                 self._debug_sleep = None
         self._load_file(file) if file else None
 
-    def _progress_update(self, nrows: Union[int, Callable],
+    def _progress_update(self,
+                         nrows: Union[int, Callable],
+                         ref_total: Optional[int] = None,
                          ref_resolved: Optional[int] = None,
                          ref_unresolved: Optional[int] = None,
                          ref_lookups: Optional[int] = None,
@@ -99,9 +101,12 @@ class StructuredDataSet:
                          ref_invalid: Optional[int] = None) -> None:
         if self._progress:
             if callable(nrows):
-                nrows = nrows()
+                nrows, nsheets = nrows()
+            else:
+                nsheets = None
             if isinstance(nrows, int) and nrows != 0:
-                self._progress(nrows, ref_resolved, ref_unresolved, ref_lookups, ref_cache_hits, ref_invalid)
+                self._progress(nrows, nsheets, ref_total, ref_resolved, ref_unresolved,
+                               ref_lookups, ref_cache_hits, ref_invalid)
 
     @property
     def data(self) -> dict:
@@ -246,14 +251,14 @@ class StructuredDataSet:
         self._load_reader(CsvReader(file), type_name=Schema.type_name(file))
 
     def _load_excel_file(self, file: str) -> None:
-        def calculate_total_rows_to_process():
+        def calculate_total_rows_to_process() -> Tuple[int, int]:
             nonlocal file
             excel = Excel(file)
             nrows = 0
             for sheet_name in excel.sheet_names:
                 for row in excel.sheet_reader(sheet_name):
                     nrows += 1
-            return nrows
+            return nrows, len(excel.sheet_names)
         if self._progress:
             self._progress_update(calculate_total_rows_to_process)
         excel = Excel(file)  # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
@@ -299,8 +304,12 @@ class StructuredDataSet:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
             self._add(type_name, structured_row)
             if self._progress:
-                self._progress_update(-1, self.ref_total_count, self.ref_total_notfound_count,
-                                      self.ref_lookup_count, self.ref_lookup_cache_hit_count,
+                self._progress_update(-1,
+                                      self.ref_total_count,
+                                      self.ref_total_found_count,
+                                      self.ref_total_notfound_count,
+                                      self.ref_lookup_count,
+                                      self.ref_lookup_cache_hit_count,
                                       self.ref_invalid_identifying_property_count)
         self._note_warning(reader.warnings, "reader")
         if schema:
