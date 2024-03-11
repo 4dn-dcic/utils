@@ -885,12 +885,7 @@ class Portal(PortalBase):
             # self._data can change, i.e. as data (e.g. spreadsheet sheets) are parsed.
             return self.ref_exists_internally(type_name, value, update_counts=called_from_map_ref) or {}
         # Reference is NOT cached here; lookup INTERNALLY first.
-        if (resolved := self.ref_exists_internally(type_name, value, update_counts=called_from_map_ref)) is None:
-            # Reference was resolved (internally) INCORRECTLY.
-            if called_from_map_ref:
-                self._ref_total_notfound_count += 1
-            return None
-        if resolved:
+        if resolved := self.ref_exists_internally(type_name, value, update_counts=called_from_map_ref):
             # Reference was resolved internally (note: here only if resolved is not an empty dictionary).
             if called_from_map_ref:
                 self._ref_total_found_count += 1
@@ -939,15 +934,14 @@ class Portal(PortalBase):
                               update_counts: bool = False) -> Optional[dict]:
         """
         Looks up the given reference (type/value) internally (i.e. with this data parsed thus far).
-        If found then returns a list of a single dictionary containing the (given) type name and
-        the uuid (if any) of the resolved item. If not found then returns an empty list; however,
-        if not found, but found using an invalid identifying property, then returns None.
+        If found then returns a dictionary containing the (given) type name and the uuid (if any)
+        of the resolved item.
         """
         # print(f"\033[Kxyzzy:ref_exists_internally({type_name}/{value})")
         if not value:
             type_name, value = Portal._get_type_name_and_value_from_path(type_name)
             if not type_name or not value:
-                return None
+                return None  # Should not happen.
         # Note that root lookup not applicable here.
         ref_lookup_strategy, ref_validator = (
             self._ref_lookup_strategy(type_name, self.get_schema(type_name), value))
@@ -1038,8 +1032,8 @@ class Portal(PortalBase):
         return None
 
     def _cache_ref(self, type_name: str, value: str, resolved: List[str]) -> None:
-        subtype_names = self._get_schema_subtypes_names(type_name)
         if self._ref_cache is not None:
+            subtype_names = self._get_schema_subtypes_names(type_name)
             for type_name in [type_name] + subtype_names:
                 self._ref_cache[f"/{type_name}/{value}"] = resolved
 
