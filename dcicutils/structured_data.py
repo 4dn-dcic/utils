@@ -979,10 +979,23 @@ class Portal(PortalBase):
 
     def _is_valid_ref(self, type_name: str, value: str, ref_validator: Optional[Callable]) -> bool:
         """
-        Returns True iff the given value can possibly be a valid reference
-        to type specified by the given type name, otherwise returns False.
-        The given ref_validator callable if specified will be called with
-        the schema (dictionary) for the given type
+        Returns True iff the given value can possibly be a valid reference to the type specified by
+        the given type name, otherwise returns False.
+
+        The given ref_validator callable, if specified, will be called with the schema (dictionary)
+        for the given type a property name (which is will be an identifying property for the type),
+        and the property value. The ref_validator callable should be False iff the given value is
+        NOT valid for the given type (schema) and property (name), otherwise (if it is valid) can
+        return either None or True, where None means to continue checking the format according to
+        other property requirements (i.e. e.g. checking any pattern is adhered to), and where
+        True means to not continue checking any property requirements.
+
+        This primary purpose of this to prevent unnecessary portal lookups, i.e for reference
+        paths which cannot possibly be valid, e.g. because the property value does not adhere
+        to the required pattern/format for any of the identifying properties for the type.
+
+        At least at first, the only reason we support the ref_validator callable is at all is because
+        the "accession" identifying property in our portal schemas do not have an associated pattern.
         """
         def is_possibly_valid(schema: dict, property_name: str, property_value: str) -> Optional[Callable]:  # noqa
             nonlocal ref_validator
