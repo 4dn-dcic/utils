@@ -265,6 +265,10 @@ class StructuredDataSet:
                 for row in excel.sheet_reader(sheet_name):
                     nrows += 1
             return nrows, len(excel.sheet_names)
+        if False:  # TODO
+            if self._progress:
+                nrows, nsheets = calculate_total_rows_to_process()
+                self._progress({"start": True, "sheets": nsheets, "rows": nrows})
         if self._progress:
             self._progress_update(calculate_total_rows_to_process)
         excel = Excel(file)  # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
@@ -309,6 +313,14 @@ class StructuredDataSet:
                 if self._autoadd_properties:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
             self._add(type_name, structured_row)
+            if False:
+                if self._progress:
+                    self._progress({
+                        "parse": True,
+                        "refs": 0,
+                        "refs_found": 0
+                        "refs_not_found": 0
+                    })
             if self._progress:
                 self._progress_update(-1,
                                       self.ref_total_count,

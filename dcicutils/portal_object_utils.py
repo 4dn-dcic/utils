@@ -99,7 +99,8 @@ class PortalObject:
     def compare(self, value: Union[dict, PortalObject],
                 consider_refs: bool = False, resolved_refs: List[dict] = None) -> Tuple[dict, int]:
         if consider_refs and isinstance(resolved_refs, list):
-            this_data, nlookups = self._normalized_refs(refs=resolved_refs).data
+            normlized_portal_object, nlookups = self._normalized_refs(refs=resolved_refs)
+            this_data = normlized_portal_object.data
         else:
             this_data = self.data
             nlookups = 0
@@ -249,13 +250,13 @@ class PortalObject:
         if isinstance(value, dict):
             for key in value:
                 path = f"{_path}.{key}" if _path else key
-                value[key] = PortalObject._normalize_data_refs(value[key], refs=refs,
-                                                               schema=schema, portal=portal, _path=path)
+                value[key], nlookups = PortalObject._normalize_data_refs(value[key], refs=refs,
+                                                                         schema=schema, portal=portal, _path=path)
         elif isinstance(value, list):
             for index in range(len(value)):
                 path = f"{_path or ''}#{index}"
-                value[index] = PortalObject._normalize_data_refs(value[index], refs=refs,
-                                                                 schema=schema, portal=portal, _path=path)
+                value[index],nlookups = PortalObject._normalize_data_refs(value[index], refs=refs,
+                                                                          schema=schema, portal=portal, _path=path)
         elif value_type := Schema.get_property_by_path(schema, _path):
             if link_to := value_type.get("linkTo"):
                 ref_path = f"/{link_to}/{value}"
