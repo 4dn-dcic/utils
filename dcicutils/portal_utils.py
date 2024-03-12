@@ -398,7 +398,7 @@ class Portal:
         return super_type_map_flattened
 
     @lru_cache(maxsize=64)
-    def get_schemas_subtype_names(self, type_name: str) -> List[str]:
+    def get_schema_subtype_names(self, type_name: str) -> List[str]:
         if not (schemas_super_type_map := self.get_schemas_super_type_map()):
             return []
         return schemas_super_type_map.get(type_name, [])

@@ -222,6 +222,9 @@ class StructuredDataSet:
                         diffs[type_name].append(create_readonly_object(path=identifying_path, uuid=None, diffs=None))
                         if callable(progress):
                             progress({"create": True, "lookups": nlookups})
+                    else:
+                        if callable(progress):
+                            progress({"lookups": nlookups})
         if callable(progress):
             progress({"finish": True})
         return diffs
@@ -318,7 +321,7 @@ class StructuredDataSet:
                     self._progress({
                         "parse": True,
                         "refs": 0,
-                        "refs_found": 0
+                        "refs_found": 0,
                         "refs_not_found": 0
                     })
             if self._progress:
@@ -862,7 +865,7 @@ class Portal(PortalBase):
         return schemas
 
     @lru_cache(maxsize=64)
-    def _get_schema_subtypes_names(self, type_name: str) -> List[str]:
+    def _get_schema_subtype_names(self, type_name: str) -> List[str]:
         if not (schemas_super_type_map := self.get_schemas_super_type_map()):
             return []
         return schemas_super_type_map.get(type_name, [])
@@ -925,7 +928,7 @@ class Portal(PortalBase):
             lookup_paths.append(f"/{type_name}/{value}")
         if is_ref_lookup_root and not is_ref_lookup_root_first:
             lookup_paths.append(f"/{value}")
-        subtype_names = self._get_schema_subtypes_names(type_name) if is_ref_lookup_subtypes else []
+        subtype_names = self._get_schema_subtype_names(type_name) if is_ref_lookup_subtypes else []
         for subtype_name in subtype_names:
             lookup_paths.append(f"/{subtype_name}/{value}")
         if not lookup_paths:
@@ -964,7 +967,7 @@ class Portal(PortalBase):
         ref_lookup_strategy, ref_validator = (
             self._ref_lookup_strategy(type_name, self.get_schema(type_name), value))
         is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
-        subtype_names = self._get_schema_subtypes_names(type_name) if is_ref_lookup_subtypes else []
+        subtype_names = self._get_schema_subtype_names(type_name) if is_ref_lookup_subtypes else []
         for type_name in [type_name] + subtype_names:
             is_resolved, resolved_item = self._ref_exists_single_internally(type_name, value)
             if is_resolved:
@@ -1026,7 +1029,7 @@ class Portal(PortalBase):
                         if not is_uuid(property_value):
                             return False
             return True
-        for schema_name in [type_name] + self._get_schema_subtypes_names(type_name):
+        for schema_name in [type_name] + self._get_schema_subtype_names(type_name):
             if schema := self.get_schema(schema_name):
                 if identifying_properties := schema.get("identifyingProperties"):
                     for identifying_property in identifying_properties:
@@ -1051,7 +1054,7 @@ class Portal(PortalBase):
 
     def _cache_ref(self, type_name: str, value: str, resolved: List[str]) -> None:
         if self._ref_cache is not None:
-            subtype_names = self._get_schema_subtypes_names(type_name)
+            subtype_names = self._get_schema_subtype_names(type_name)
             for type_name in [type_name] + subtype_names:
                 self._ref_cache[f"/{type_name}/{value}"] = resolved
 

@@ -214,7 +214,7 @@ class PortalObject:
                     if Portal.is_lookup_root(lookup_options) and not Portal.is_lookup_root_first(lookup_options):
                         identifying_paths.append(f"/{identifying_value}")
                     if Portal.is_lookup_subtypes(lookup_options):
-                        for subtype_name in self._portal.get_schemas_subtype_names():
+                        for subtype_name in self._portal.get_schema_subtype_names(self.type):
                             identifying_paths.append(f"/{subtype_name}/{identifying_value}")
         return identifying_paths or None
 
@@ -255,8 +255,8 @@ class PortalObject:
         elif isinstance(value, list):
             for index in range(len(value)):
                 path = f"{_path or ''}#{index}"
-                value[index],nlookups = PortalObject._normalize_data_refs(value[index], refs=refs,
-                                                                          schema=schema, portal=portal, _path=path)
+                value[index], nlookups = PortalObject._normalize_data_refs(value[index], refs=refs,
+                                                                           schema=schema, portal=portal, _path=path)
         elif value_type := Schema.get_property_by_path(schema, _path):
             if link_to := value_type.get("linkTo"):
                 ref_path = f"/{link_to}/{value}"
