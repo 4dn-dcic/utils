@@ -627,8 +627,6 @@ def test_compare():
         assert portal_object_found.types == ["IngestionSubmission", "Item"]
         assert portal_object_found.schema == TEST_OBJECT_SCHEMA_JSON
         assert portal_object_found.identifying_properties == ["uuid", "aliases"]
-        import pdb ; pdb.set_trace()
-        xx = portal_object_found._get_identifying_paths()
         assert portal_object_found._get_identifying_paths() == (
             [f"/{TEST_OBJECT_DATABASE_JSON['@type'][0]}/{TEST_OBJECT_UUID}",
              f"/{TEST_OBJECT_UUID}",
