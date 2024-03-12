@@ -46,6 +46,22 @@ class Portal:
     KEYS_FILE_DIRECTORY = "~"
     MIME_TYPE_JSON = "application/json"
 
+    # Object lookup strategies; on a per-reference (type/value) basis, used currently ONLY by
+    # structured_data.py; controlled by an optional ref_lookup_strategy callable; default is
+    # lookup at root path but after the specified type path lookup, and then lookup all subtypes;
+    # can choose to lookup root path first, or not lookup root path at all, or not lookup
+    # subtypes at all; the ref_lookup_strategy callable if specified should take a type_name
+    # and value (string) arguements and return an integer of any of the below ORed together.
+    # The main purpose of this is optimization; to minimize portal lookups; since for example,
+    # currently at least, /{type}/{accession} does not work but /{accession} does; so we
+    # currently (smaht-portal/.../ingestion_processors) use LOOKUP_ROOT_FIRST for this.
+    # And current usage NEVER has LOOKUP_SUBTYPES turned OFF; but support just in case.
+    LOOKUP_SPECIFIED_TYPE = 0x0001
+    LOOKUP_ROOT = 0x0002
+    LOOKUP_ROOT_FIRST = 0x0004 | LOOKUP_ROOT
+    LOOKUP_SUBTYPES = 0x0008
+    LOOKUP_DEFAULT = LOOKUP_SPECIFIED_TYPE | LOOKUP_ROOT | LOOKUP_SUBTYPES
+
     def __init__(self,
                  arg: Optional[Union[Portal, TestApp, VirtualApp, PyramidRouter, dict, tuple, str]] = None,
                  env: Optional[str] = None, server: Optional[str] = None,
@@ -188,9 +204,27 @@ class Portal:
     def vapp(self) -> Optional[TestApp]:
         return self._vapp
 
+    @staticmethod
+    def is_lookup_specified_type(lookup_options: int) -> bool:
+        return (lookup_options &
+                Portal.LOOKUP_SPECIFIED_TYPE) == Portal.LOOKUP_SPECIFIED_TYPE
+
+    @staticmethod
+    def is_lookup_root(lookup_options: int) -> bool:
+        return (lookup_options & Portal.LOOKUP_ROOT) == Portal.LOOKUP_ROOT
+
+    @staticmethod
+    def is_lookup_root_first(lookup_options: int) -> bool:
+        return (lookup_options & Portal.LOOKUP_ROOT_FIRST) == Portal.LOOKUP_ROOT_FIRST
+
+    @staticmethod
+    def is_lookup_subtypes(lookup_options: int) -> bool:
+        return (lookup_options & Portal.LOOKUP_SUBTYPES) == Portal.LOOKUP_SUBTYPES
+
     def get(self, url: str, follow: bool = True,
             raw: bool = False, database: bool = False, raise_for_status: bool = False, **kwargs) -> OptionalResponse:
         url = self.url(url, raw, database)
+        # print(f'xyzzy.portal.get({url})')
         if not self.vapp:
             response = requests.get(url, allow_redirects=follow, **self._kwargs(**kwargs))
         else:
@@ -205,6 +239,7 @@ class Portal:
     def patch(self, url: str, data: Optional[dict] = None, json: Optional[dict] = None,
               raise_for_status: bool = False, **kwargs) -> OptionalResponse:
         url = self.url(url)
+        # print(f'xyzzy.portal.patch({url})')
         if not self.vapp:
             response = requests.patch(url, data=data, json=json, **self._kwargs(**kwargs))
         else:
@@ -217,6 +252,7 @@ class Portal:
     def post(self, url: str, data: Optional[dict] = None, json: Optional[dict] = None, files: Optional[dict] = None,
              raise_for_status: bool = False, **kwargs) -> OptionalResponse:
         url = self.url(url)
+        # print(f'xyzzy.portal.post({url})')
         if files and not ("headers" in kwargs):
             # Setting headers to None when using files implies content-type multipart/form-data.
             kwargs["headers"] = None
@@ -233,6 +269,7 @@ class Portal:
         return response
 
     def get_metadata(self, object_id: str, raw: bool = False, database: bool = False) -> Optional[dict]:
+        # print(f'xyzzy.portal.get_metadata({object_id})')
         if isinstance(raw, bool) and raw:
             add_on = "frame=raw" + ("&datastore=database" if isinstance(database, bool) and database else "")
         elif database:
@@ -242,11 +279,13 @@ class Portal:
         return get_metadata(obj_id=object_id, vapp=self.vapp, key=self.key, add_on=add_on)
 
     def patch_metadata(self, object_id: str, data: dict) -> Optional[dict]:
+        # print(f'xyzzy.portal.patch_metadata({object_id})')
         if self.key:
             return patch_metadata(obj_id=object_id, patch_item=data, key=self.key)
         return self.patch(f"/{object_id}", data).json()
 
     def post_metadata(self, object_type: str, data: dict) -> Optional[dict]:
+        # print(f'xyzzy.portal.post_metadata({object_id})')
         if self.key:
             return post_metadata(schema_name=object_type, post_item=data, key=self.key)
         return self.post(f"/{object_type}", data).json()
@@ -357,6 +396,12 @@ class Portal:
         for super_type_name in super_type_map:
             super_type_map_flattened[super_type_name] = list_breadth_first(super_type_map, super_type_name)
         return super_type_map_flattened
+
+    @lru_cache(maxsize=64)
+    def get_schemas_subtype_names(self, type_name: str) -> List[str]:
+        if not (schemas_super_type_map := self.get_schemas_super_type_map()):
+            return []
+        return schemas_super_type_map.get(type_name, [])
 
     def url(self, url: str, raw: bool = False, database: bool = False) -> str:
         if not isinstance(url, str) or not url:

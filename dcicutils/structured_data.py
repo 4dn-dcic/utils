@@ -48,22 +48,6 @@ StructuredDataSet = Type["StructuredDataSet"]
 
 class StructuredDataSet:
 
-    # Reference (linkTo) lookup strategies; on a per-reference (type/value) basis;
-    # controlled by optional ref_lookup_strategy callable; default is lookup at root path
-    # but after the named reference (linkTo) type path lookup, and then lookup all subtypes;
-    # can choose to lookup root path first, or not lookup root path at all, or not lookup
-    # subtypes at all; the ref_lookup_strategy callable if specified should take a type_name
-    # and value (string) arguements and return an integer of any of the below ORed together.
-    # The main purpose of this is optimization; to minimize portal lookups; since for example,
-    # currently at least, /{type}/{accession} does not work but /{accession} does; so we
-    # currently (smaht-portal/.../ingestion_processors) use REF_LOOKUP_ROOT_FIRST for this.
-    # And current usage NEVER has REF_LOOKUP_SUBTYPES turned OFF; but support just in case.
-    REF_LOOKUP_SPECIFIED_TYPE = 0x0001
-    REF_LOOKUP_ROOT = 0x0002
-    REF_LOOKUP_ROOT_FIRST = 0x0004 | REF_LOOKUP_ROOT
-    REF_LOOKUP_SUBTYPES = 0x0008
-    REF_LOOKUP_DEFAULT = REF_LOOKUP_SPECIFIED_TYPE | REF_LOOKUP_ROOT | REF_LOOKUP_SUBTYPES
-
     def __init__(self, file: Optional[str] = None, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
                  schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
                  order: Optional[List[str]] = None, prune: bool = True,
@@ -76,6 +60,7 @@ class StructuredDataSet:
         self._portal = Portal(portal, data=self._data, schemas=schemas,
                               ref_lookup_strategy=ref_lookup_strategy,
                               ref_lookup_nocache=ref_lookup_nocache) if portal else None
+        self._ref_lookup_strategy = ref_lookup_strategy
         self._order = order
         self._prune = prune
         self._warnings = {}
@@ -199,25 +184,46 @@ class StructuredDataSet:
                 upload_file["path"] = file_path
         return upload_files
 
-    def compare(self) -> dict:
+    def compare(self, progress: Optional[Callable] = None) -> dict:
+        def get_counts() -> int:
+            ntypes = 0
+            nobjects = 0
+            if self.data:
+                ntypes = len(self.data)
+                for type_name in self.data:
+                    nobjects += len(self.data[type_name])
+            return ntypes, nobjects
         diffs = {}
-        if self.data or self.portal:
+        if callable(progress):
+            ntypes, nobjects = get_counts()
+            progress({"start": True, "types": ntypes, "objects": nobjects})
+        if self.data or self.portal:  # TODO: what is this OR biz?
             refs = self.resolved_refs_with_uuids
-            for object_type in self.data:
-                if not diffs.get(object_type):
-                    diffs[object_type] = []
-                for portal_object in self.data[object_type]:
-                    portal_object = PortalObject(portal_object, portal=self.portal, type=object_type)
-                    existing_object, identifying_path = portal_object.lookup(include_identifying_path=True, raw=True)
+            # TODO: Need feedback/progress tracking mechanism here.
+            # TODO: Check validity of reference; actually check that earlier on even maybe.
+            for type_name in self.data:
+                if not diffs.get(type_name):
+                    diffs[type_name] = []
+                for portal_object in self.data[type_name]:
+                    portal_object = PortalObject(portal_object, portal=self.portal, type=type_name)
+                    existing_object, identifying_path, nlookups = (
+                        portal_object.lookup(raw=True, ref_lookup_strategy=self._ref_lookup_strategy))
                     if existing_object:
-                        object_diffs = portal_object.compare(existing_object, consider_refs=True, resolved_refs=refs)
-                        diffs[object_type].append(create_readonly_object(path=identifying_path,
-                                                                         uuid=existing_object.uuid,
-                                                                         diffs=object_diffs or None))
+                        object_diffs, nlookups_compare = portal_object.compare(
+                            existing_object, consider_refs=True, resolved_refs=refs)
+                        diffs[type_name].append(create_readonly_object(path=identifying_path,
+                                                                       uuid=existing_object.uuid,
+                                                                       diffs=object_diffs or None))
+                        if callable(progress):
+                            progress({"update": True, "lookups": nlookups + nlookups_compare})
                     elif identifying_path:
                         # If there is no existing object we still create a record for this object
                         # but with no uuid which will be the indication that it does not exist.
-                        diffs[object_type].append(create_readonly_object(path=identifying_path, uuid=None, diffs=None))
+                        diffs[type_name].append(create_readonly_object(path=identifying_path, uuid=None, diffs=None))
+                        if callable(progress):
+                            progress({"create": True, "lookups": nlookups})
+        if callable(progress):
+            progress({"finish": True})
         return diffs
 
     def _load_file(self, file: str) -> None:
@@ -331,16 +337,16 @@ class StructuredDataSet:
 
     def _is_ref_lookup_specified_type(ref_lookup_flags: int) -> bool:
         return (ref_lookup_flags &
-                StructuredDataSet.REF_LOOKUP_SPECIFIED_TYPE) == StructuredDataSet.REF_LOOKUP_SPECIFIED_TYPE
+                Portal.LOOKUP_SPECIFIED_TYPE) == Portal.LOOKUP_SPECIFIED_TYPE
 
     def _is_ref_lookup_root(ref_lookup_flags: int) -> bool:
-        return (ref_lookup_flags & StructuredDataSet.REF_LOOKUP_ROOT) == StructuredDataSet.REF_LOOKUP_ROOT
+        return (ref_lookup_flags & Portal.LOOKUP_ROOT) == Portal.LOOKUP_ROOT
 
     def _is_ref_lookup_root_first(ref_lookup_flags: int) -> bool:
-        return (ref_lookup_flags & StructuredDataSet.REF_LOOKUP_ROOT_FIRST) == StructuredDataSet.REF_LOOKUP_ROOT_FIRST
+        return (ref_lookup_flags & Portal.LOOKUP_ROOT_FIRST) == Portal.LOOKUP_ROOT_FIRST
 
     def _is_ref_lookup_subtypes(ref_lookup_flags: int) -> bool:
-        return (ref_lookup_flags & StructuredDataSet.REF_LOOKUP_SUBTYPES) == StructuredDataSet.REF_LOOKUP_SUBTYPES
+        return (ref_lookup_flags & Portal.LOOKUP_SUBTYPES) == Portal.LOOKUP_SUBTYPES
 
     @property
     def ref_total_count(self) -> int:
@@ -786,7 +792,7 @@ class Portal(PortalBase):
         if callable(ref_lookup_strategy):
             self._ref_lookup_strategy = ref_lookup_strategy
         else:
-            self._ref_lookup_strategy = lambda type_name, schema, value: (StructuredDataSet.REF_LOOKUP_DEFAULT, None)
+            self._ref_lookup_strategy = lambda type_name, schema, value: (Portal.LOOKUP_DEFAULT, None)
         if ref_lookup_nocache is True:
             self.ref_lookup = self.ref_lookup_uncached
             self._ref_cache = None
