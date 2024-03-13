@@ -76,23 +76,6 @@ class StructuredDataSet:
                 self._debug_sleep = None
         self._load_file(file) if file else None
 
-    def _progress_update(self,
-                         nrows: Union[int, Callable],
-                         ref_total: Optional[int] = None,
-                         ref_resolved: Optional[int] = None,
-                         ref_unresolved: Optional[int] = None,
-                         ref_lookups: Optional[int] = None,
-                         ref_cache_hits: Optional[int] = None,
-                         ref_invalid: Optional[int] = None) -> None:
-        if self._progress:
-            if callable(nrows):
-                nrows, nsheets = nrows()
-            else:
-                nsheets = None
-            if isinstance(nrows, int) and nrows != 0:
-                self._progress(nrows, nsheets, ref_total, ref_resolved, ref_unresolved,
-                               ref_lookups, ref_cache_hits, ref_invalid)
-
     @property
     def data(self) -> dict:
         return self._data
@@ -271,10 +254,6 @@ class StructuredDataSet:
         if self._progress:
             nrows, nsheets = get_counts()
             self._progress({"start": True, "sheets": nsheets, "rows": nrows})
-        """
-        if self._progress:
-            self._progress_update(get_counts)
-        """
         excel = Excel(file)  # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
