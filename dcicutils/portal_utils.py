@@ -224,7 +224,6 @@ class Portal:
     def get(self, url: str, follow: bool = True,
             raw: bool = False, database: bool = False, raise_for_status: bool = False, **kwargs) -> OptionalResponse:
         url = self.url(url, raw, database)
-        # print(f'xyzzy.portal.get({url})')
         if not self.vapp:
             response = requests.get(url, allow_redirects=follow, **self._kwargs(**kwargs))
         else:
@@ -239,7 +238,6 @@ class Portal:
     def patch(self, url: str, data: Optional[dict] = None, json: Optional[dict] = None,
               raise_for_status: bool = False, **kwargs) -> OptionalResponse:
         url = self.url(url)
-        # print(f'xyzzy.portal.patch({url})')
         if not self.vapp:
             response = requests.patch(url, data=data, json=json, **self._kwargs(**kwargs))
         else:
@@ -252,7 +250,6 @@ class Portal:
     def post(self, url: str, data: Optional[dict] = None, json: Optional[dict] = None, files: Optional[dict] = None,
              raise_for_status: bool = False, **kwargs) -> OptionalResponse:
         url = self.url(url)
-        # print(f'xyzzy.portal.post({url})')
         if files and not ("headers" in kwargs):
             # Setting headers to None when using files implies content-type multipart/form-data.
             kwargs["headers"] = None
@@ -268,24 +265,28 @@ class Portal:
             response.raise_for_status()
         return response
 
-    def get_metadata(self, object_id: str, raw: bool = False, database: bool = False) -> Optional[dict]:
-        # print(f'xyzzy.portal.get_metadata({object_id})')
+    def get_metadata(self, object_id: str, raw: bool = False,
+                     database: bool = False, raise_exception: bool = True) -> Optional[dict]:
         if isinstance(raw, bool) and raw:
             add_on = "frame=raw" + ("&datastore=database" if isinstance(database, bool) and database else "")
         elif database:
             add_on = "datastore=database"
         else:
             add_on = ""
-        return get_metadata(obj_id=object_id, vapp=self.vapp, key=self.key, add_on=add_on)
+        if raise_exception:
+            return get_metadata(obj_id=object_id, vapp=self.vapp, key=self.key, add_on=add_on)
+        else:
+            try:
+                return get_metadata(obj_id=object_id, vapp=self.vapp, key=self.key, add_on=add_on)
+            except Exception:
+                return None
 
     def patch_metadata(self, object_id: str, data: dict) -> Optional[dict]:
-        # print(f'xyzzy.portal.patch_metadata({object_id})')
         if self.key:
             return patch_metadata(obj_id=object_id, patch_item=data, key=self.key)
         return self.patch(f"/{object_id}", data).json()
 
     def post_metadata(self, object_type: str, data: dict) -> Optional[dict]:
-        # print(f'xyzzy.portal.post_metadata({object_id})')
         if self.key:
             return post_metadata(schema_name=object_type, post_item=data, key=self.key)
         return self.post(f"/{object_type}", data).json()
