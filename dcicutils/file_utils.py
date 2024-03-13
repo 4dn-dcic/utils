@@ -29,6 +29,8 @@ def search_for_file(file: str,
         elif not isinstance(location, list):
             location = []
         for directory in location:
+            if not directory:
+                continue
             if isinstance(directory, (str, pathlib.PosixPath)) and os.path.exists(os.path.join(directory, file)):
                 file_found = os.path.abspath(os.path.normpath(os.path.join(directory, file)))
                 if single:
@@ -37,6 +39,8 @@ def search_for_file(file: str,
                     files_found.append(file_found)
         if recursive:
             for directory in location:
+                if not directory:
+                    continue
                 if not directory.endswith("/**") and not file.startswith("**/"):
                     path = f"{directory}/**/{file}"
                 else:
