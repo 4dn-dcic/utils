@@ -277,6 +277,6 @@ class PortalObject:
                 if isinstance(portal, Portal):
                     nlookups += 1
                     if ((ref_object := portal.get_metadata(ref_path, raise_exception=False)) and
-                        (ref_uuid := ref_object.get("uuid"))):
+                        (ref_uuid := ref_object.get("uuid"))):  # noqa
                         return ref_uuid, nlookups
         return value, nlookups
