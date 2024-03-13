@@ -260,7 +260,7 @@ class StructuredDataSet:
         self._load_reader(CsvReader(file), type_name=Schema.type_name(file))
 
     def _load_excel_file(self, file: str) -> None:
-        def calculate_total_rows_to_process() -> Tuple[int, int]:
+        def get_counts() -> Tuple[int, int]:
             nonlocal file
             excel = Excel(file)
             nrows = 0
@@ -268,23 +268,28 @@ class StructuredDataSet:
                 for row in excel.sheet_reader(sheet_name):
                     nrows += 1
             return nrows, len(excel.sheet_names)
-        if False:  # TODO
-            if self._progress:
-                nrows, nsheets = calculate_total_rows_to_process()
-                self._progress({"start": True, "sheets": nsheets, "rows": nrows})
         if self._progress:
-            self._progress_update(calculate_total_rows_to_process)
+            nrows, nsheets = get_counts()
+            self._progress({"start": True, "sheets": nsheets, "rows": nrows})
+        """
+        if self._progress:
+            self._progress_update(get_counts)
+        """
         excel = Excel(file)  # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
             self._load_reader(excel.sheet_reader(sheet_name), type_name=Schema.type_name(sheet_name))
+        if self._progress:
+            self._progress({"finish": True})
+        # TODO: Do we really need progress reporting for the below?
         # Check for unresolved reference errors which really are not because of ordering.
         # Yes such internal references will be handled correctly on actual database update via snovault.loadxl.
         if ref_errors := self.ref_errors:
             ref_errors_actual = []
             for ref_error in ref_errors:
                 if not (resolved := self.portal.ref_exists(ref := ref_error["error"])):
-                    # if not (resolved := self.portal.ref_exists_internally(ref := ref_error["error"])):  # TODO
+                    # TODO: Probably do this instead; and if so then no progress needed (per question above).
+                    # if not (resolved := self.portal.ref_exists_internally(ref := ref_error["error"])):
                     ref_errors_actual.append(ref_error)
                 else:
                     self._resolved_refs.add((ref, resolved.get("uuid")))
@@ -316,22 +321,16 @@ class StructuredDataSet:
                 if self._autoadd_properties:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
             self._add(type_name, structured_row)
-            if False:
-                if self._progress:
-                    self._progress({
-                        "parse": True,
-                        "refs": 0,
-                        "refs_found": 0,
-                        "refs_not_found": 0
-                    })
             if self._progress:
-                self._progress_update(-1,
-                                      self.ref_total_count,
-                                      self.ref_total_found_count,
-                                      self.ref_total_notfound_count,
-                                      self.ref_lookup_count,
-                                      self.ref_lookup_cache_hit_count,
-                                      self.ref_invalid_identifying_property_count)
+                self._progress({
+                    "parse": True,
+                    "refs": self.ref_total_count,
+                    "refs_found": self.ref_total_found_count,
+                    "refs_not_found": self.ref_total_notfound_count,
+                    "refs_lookup": self.ref_lookup_count,
+                    "refs_cache_hit": self.ref_lookup_cache_hit_count,
+                    "refs_invalid": self.ref_invalid_identifying_property_count
+                })
         self._note_warning(reader.warnings, "reader")
         if schema:
             self._note_error(schema._unresolved_refs, "ref")
