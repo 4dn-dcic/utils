@@ -1,0 +1,78 @@
+{
+    "Workflow": [
+        {
+            "accession": "WF123456",
+            "aliases": [
+                "alias1:123",
+                "alias2:456"
+            ],
+            "category": [
+                "Alignment",
+                "Annotation"
+            ],
+            "date_created": "2023-11-01T12:00:00Z",
+            "description": "This is a sample workflow for testing purposes.",
+            "language": "CWL",
+            "main_file_name": "main.cwl",
+            "name": "sample-workflow-1",
+            "schema_version": "1",
+            "status": "public",
+            "submission_centers": [
+                "SubmissionCenter1",
+                "SubmissionCenter2"
+            ],
+            "submitted_by": "user-id-1",
+            "tags": [
+                "tag1",
+                "tag2"
+            ],
+            "tibanna_config": {
+                "instance_type": [
+                    "c5.4xlarge",
+                    "m5a.2xlarge"
+                ],
+                "run_name": "sample-run"
+            },
+            "title": "Sample Workflow 1",
+            "uuid": "7c01e109-7817-4a53-8b33-0d8c6e2c4f20",
+            "version": "1.0.0"
+        },
+        {
+            "accession": "WF789012",
+            "aliases": [
+                "alias3:789",
+                "alias4:1011"
+            ],
+            "category": [
+                "Quality Control",
+                "Testing"
+            ],
+            "consortia": [
+                "Consortium1",
+                "Consortium2"
+            ],
+            "date_created": "2023-11-05T14:30:00Z",
+            "description": "Another sample workflow for testing.",
+            "language": "WDL",
+            "main_file_name": "workflow.wdl",
+            "name": "sample-workflow-2",
+            "schema_version": "1",
+            "status": "current",
+            "submitted_by": "user-id-2",
+            "tags": [
+                "tag3",
+                "tag4"
+            ],
+            "tibanna_config": {
+                "instance_type": [
+                    "r4.4xlarge",
+                    "r5.4xlarge"
+                ],
+                "run_name": "another-run"
+            },
+            "title": "Sample Workflow 2",
+            "uuid": "c6a4b30e-6e46-471d-8e50-61f3d016d50a",
+            "version": "1.1.0"
+        }
+    ]
+}

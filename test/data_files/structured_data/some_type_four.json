@@ -1,0 +1,54 @@
+{
+    "title": "SomeTypeFour",
+    "properties": {
+        "alfa": {
+            "type": "object",
+            "properties": {
+                "bravo": { "type": "string" },
+                "charlie": {
+                    "type": "object",
+                    "properties": {
+                        "delta": { "type": "string" },
+                        "echo": {
+                            "type": "object",
+                            "properties": {
+                                "foxtrot": { "type": "integer" }
+                            }
+                        },
+                        "golf": {
+                            "type": "array",
+                            "items": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "indigo": {
+            "type": "array",
+            "items": { "type": "string" }
+        },
+        "juliet": {
+            "type": "array",
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": { "type": "number" }
+                }
+            }
+        },
+        "kilo": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "lima": { "type": "integer" },
+                    "mike": { "type": "string" },
+                    "november": { "type": "boolean" }
+                }
+            }
+        }
+    }
+}

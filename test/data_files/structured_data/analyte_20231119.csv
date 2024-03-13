@@ -1,0 +1,2 @@
+a260_a280_ratio,components#,concentration,molecule#,protocols#,ribosomal_rna_ratio,rna_integrity_number,rna_integrity_number_instrument,sample_quantity,samples#,submitted_id,uuid,volume,weight,consortia,submission_centers
+2.3,Total RNA,1.5,RNA,Protocol9,1.4,8.5,Agilent Bioanalyzer,2.0,Sample9,analyte-9,uuid9,0.9,13.0,smaht|another-consortia,somesubctr

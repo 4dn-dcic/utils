@@ -1,0 +1,66 @@
+{
+    "Software": [
+        {
+            "accession": "SW123456",
+            "aliases": [
+                "somealias:abc",
+                "somealias:def"
+            ],
+            "binary_url": "https://example.com/sample-software-1.zip",
+            "category": [
+                "Alignment",
+                "Quality Control"
+            ],
+            "commit": "abc123",
+            "date_created": "2023-11-01T12:00:00Z",
+            "description": "This is a sample software for testing purposes.",
+            "name": "public",
+            "schema_version": "1",
+            "source_url": "https://github.com/sample-software-1",
+            "status": "public",
+            "submission_centers": [
+                "SubmissionCenter1",
+                "SubmissionCenter2"
+            ],
+            "submitted_by": "user-id-1",
+            "tags": [
+                "tag1",
+                "tag2"
+            ],
+            "title": "Sample Software 1",
+            "uuid": "a8e3168b-1b90-45e2-9f91-c8740d74a860",
+            "version": "1.0.0"
+        },
+        {
+            "accession": "SW789012",
+            "aliases": [
+                "alias3:789",
+                "alias4:1011"
+            ],
+            "binary_url": "https://example.com/sample-software-2.tar.gz",
+            "category": [
+                "Alignment Manipulation",
+                "Variant Calling"
+            ],
+            "commit": "def456",
+            "consortia": [
+                "Consortium1",
+                "Consortium2"
+            ],
+            "date_created": "2023-11-05T14:30:00Z",
+            "description": "Another sample software for testing.",
+            "name": "current",
+            "schema_version": "1",
+            "source_url": "https://github.com/sample-software-2",
+            "status": "current",
+            "submitted_by": "user-id-2",
+            "tags": [
+                "tag3",
+                "tag4"
+            ],
+            "title": "Sample Software 2",
+            "uuid": "d0be5d3c-18bb-47bb-b9b1-255779a5ac07",
+            "version": "2.1.0"
+        }
+    ]
+}

@@ -1,0 +1,92 @@
+{
+    "Library": [
+        {
+            "a260_a280_ratio": 1.8,
+            "adapter_name": "Adapter1",
+            "adapter_sequence": "ATCGATCG",
+            "amplification_cycles": 10,
+            "amplification_end_mass": 100.0,
+            "amplification_start_mass": 50.0,
+            "analyte": "sample-analyte-1",
+            "analyte_weight": 5.0,
+            "barcode_sequences": "BC001|BC002",
+            "consortia": [
+                "Consortium1"
+            ],
+            "fragment_maximum_length": 500,
+            "fragment_mean_length": 300.0,
+            "fragment_minimum_length": 100,
+            "fragment_standard_deviation_length": 50.0,
+            "insert_maximum_length": 450,
+            "insert_mean_length": 250.0,
+            "insert_minimum_length": 80,
+            "insert_standard_deviation_length": 40.0,
+            "preparation_date": "2023-01-01",
+            "submission_centers": [
+                "somesubctr"
+            ],
+            "protocols": [
+                "protocol1"
+            ],
+            "submitted_id": "XY_LIBRARY_ABC1",
+            "uuid": "uuid1"
+        },
+        {
+            "a260_a280_ratio": 1.9,
+            "adapter_name": "Adapter2",
+            "adapter_sequence": "GCTAGCTA",
+            "amplification_cycles": 12,
+            "amplification_end_mass": 120.0,
+            "amplification_start_mass": 60.0,
+            "analyte": "sample-analyte-2",
+            "analyte_weight": 6.0,
+            "barcode_sequences": "BC003|BC004",
+            "fragment_maximum_length": 550,
+            "fragment_mean_length": 320.0,
+            "fragment_minimum_length": 110,
+            "fragment_standard_deviation_length": 55.0,
+            "insert_maximum_length": 500,
+            "insert_mean_length": 280.0,
+            "insert_minimum_length": 90,
+            "insert_standard_deviation_length": 45.0,
+            "library_preparation": "prep2",
+            "preparation_date": "2023-02-01",
+            "submission_centers": [
+                "Center1"
+            ],
+            "submitted_id": "XY_LIBRARY_ABC2",
+            "uuid": "uuid2"
+        },
+        {
+            "a260_a280_ratio": 2.0,
+            "adapter_name": "Adapter3",
+            "adapter_sequence": "TGCATGCA",
+            "amplification_cycles": 15,
+            "amplification_end_mass": 150.0,
+            "amplification_start_mass": 70.0,
+            "analyte": "sample-analyte-3",
+            "analyte_weight": 7.0,
+            "barcode_sequences": "BC005|BC006",
+            "consortia": [
+                "Consortium2"
+            ],
+            "fragment_maximum_length": 600,
+            "fragment_mean_length": 350.0,
+            "fragment_minimum_length": 120,
+            "fragment_standard_deviation_length": 60.0,
+            "insert_maximum_length": 550,
+            "insert_mean_length": 320.0,
+            "insert_minimum_length": 100,
+            "insert_standard_deviation_length": 50.0,
+            "preparation_date": "2023-03-01",
+            "submission_centers": [
+                "anothersubctr"
+            ],
+            "protocols": [
+                "protocol3"
+            ],
+            "submitted_id": "XY_LIBRARY_ABC3",
+            "uuid": "uuid3"
+        }
+    ]
+}

@@ -589,9 +589,8 @@ def test_compare():
     assert not portal_object.types
     assert not portal_object.schema
     assert not portal_object.identifying_properties
-    assert portal_object.identifying_path == f"/{TEST_OBJECT_UUID}"
-    assert portal_object.identifying_paths == [f"/{TEST_OBJECT_UUID}"]
-    assert portal_object.compare(TEST_OBJECT_RAW_JSON) == {}
+    assert portal_object._get_identifying_paths() == [f"/{TEST_OBJECT_UUID}"]
+    assert portal_object.compare(TEST_OBJECT_RAW_JSON) == ({}, 0)
 
     portal_object = PortalObject(TEST_OBJECT_DATABASE_JSON)
     assert portal_object.data == TEST_OBJECT_DATABASE_JSON
@@ -601,10 +600,9 @@ def test_compare():
     assert portal_object.types == ["IngestionSubmission", "Item"]
     assert not portal_object.schema
     assert not portal_object.identifying_properties
-    assert portal_object.identifying_path == f"/{TEST_OBJECT_DATABASE_JSON['@type'][0]}/{TEST_OBJECT_UUID}"
-    assert portal_object.identifying_paths == [f"/{TEST_OBJECT_DATABASE_JSON['@type'][0]}/{TEST_OBJECT_UUID}",
-                                               f"/{TEST_OBJECT_UUID}"]
-    assert portal_object.compare(TEST_OBJECT_DATABASE_JSON) == {}
+    assert portal_object._get_identifying_paths() == [f"/{TEST_OBJECT_DATABASE_JSON['@type'][0]}/{TEST_OBJECT_UUID}",
+                                                      f"/{TEST_OBJECT_UUID}"]
+    assert portal_object.compare(TEST_OBJECT_DATABASE_JSON) == ({}, 0)
 
     portal_object_copy = portal_object.copy()
     assert portal_object.data == portal_object_copy.data
@@ -620,38 +618,37 @@ def test_compare():
         assert not portal_object.types
         assert portal_object.schema == TEST_OBJECT_SCHEMA_JSON
         assert portal_object.identifying_properties == ["uuid"]
-        assert not portal_object.identifying_path == [f"/{TEST_OBJECT_UUID}"]
-        assert not portal_object.identifying_paths == f"/{TEST_OBJECT_UUID}"
+        assert not portal_object._get_identifying_paths() == f"/{TEST_OBJECT_UUID}"
 
-        portal_object_found = portal_object.lookup()
+        portal_object_found, _, _ = portal_object.lookup()
         assert portal_object_found.uuid == portal_object.uuid
         assert portal_object_found.portal == portal_object.portal
         assert portal_object_found.type == "IngestionSubmission"
         assert portal_object_found.types == ["IngestionSubmission", "Item"]
         assert portal_object_found.schema == TEST_OBJECT_SCHEMA_JSON
         assert portal_object_found.identifying_properties == ["uuid", "aliases"]
-        assert portal_object_found.identifying_path == f"/{TEST_OBJECT_DATABASE_JSON['@type'][0]}/{TEST_OBJECT_UUID}"
-        assert portal_object_found.identifying_paths == [f"/{TEST_OBJECT_DATABASE_JSON['@type'][0]}/{TEST_OBJECT_UUID}",
-                                                         f"/{TEST_OBJECT_UUID}",
-                                                         "/IngestionSubmission/foo", "/foo",
-                                                         "/IngestionSubmission/bar", "/bar"]
+        assert portal_object_found._get_identifying_paths() == (
+            [f"/{TEST_OBJECT_DATABASE_JSON['@type'][0]}/{TEST_OBJECT_UUID}",
+             f"/{TEST_OBJECT_UUID}",
+             "/IngestionSubmission/foo", "/foo",
+             "/IngestionSubmission/bar", "/bar"])
 
         portal_object_copy = portal_object.copy()
         portal_object_copy.data["xyzzy"] = 123
-        assert portal_object.compare(portal_object_copy) == {}
+        assert portal_object.compare(portal_object_copy) == ({}, 0)
 
         portal_object.data["xyzzy"] = 123
-        assert portal_object.compare(portal_object_copy) == {}
+        assert portal_object.compare(portal_object_copy) == ({}, 0)
 
         portal_object.data["xyzzy"] = 456
-        diffs = portal_object.compare(portal_object_copy)
+        diffs, _ = portal_object.compare(portal_object_copy)
         assert diffs["xyzzy"].value == 456
         assert diffs["xyzzy"].creating_value is False
         assert diffs["xyzzy"].updating_value == 123
         assert diffs["xyzzy"].deleting_value is False
 
         portal_object.data["xyzzy"] = PortalObject._PROPERTY_DELETION_SENTINEL
-        diffs = portal_object.compare(portal_object_copy)
+        diffs, _ = portal_object.compare(portal_object_copy)
         assert diffs["xyzzy"].value == 123
         assert diffs["xyzzy"].creating_value is False
         assert diffs["xyzzy"].updating_value is None
@@ -659,14 +656,14 @@ def test_compare():
 
         portal_object.data["xyzzy"] = 456
         del portal_object_copy.data["xyzzy"]
-        diffs = portal_object.compare(portal_object_copy)
+        diffs, _ = portal_object.compare(portal_object_copy)
         assert diffs["xyzzy"].value == 456
         assert diffs["xyzzy"].creating_value is True
         assert diffs["xyzzy"].updating_value is None
         assert diffs["xyzzy"].deleting_value is False
 
         portal_object.data["additional_data"]["upload_info"][1]["uuid"] = "foobar"
-        diffs = portal_object.compare(portal_object_copy)
+        diffs, _ = portal_object.compare(portal_object_copy)
         assert diffs["additional_data.upload_info#1.uuid"].value == "foobar"
         assert diffs["additional_data.upload_info#1.uuid"].creating_value is False
         assert diffs["additional_data.upload_info#1.uuid"].updating_value == "f5ac5d98-1f85-44f4-8bad-b4488fbdda7e"
@@ -679,7 +676,7 @@ def test_compare():
         portal_object = PortalObject(TEST_OBJECT_DATABASE_JSON)
         portal_object_copy = portal_object.copy()
         portal_object_copy.data["submitted_by"]["display_title"] = "J. Alfred Prufrock"
-        diffs = portal_object.compare(portal_object_copy)
+        diffs, _ = portal_object.compare(portal_object_copy)
         assert diffs["submitted_by.display_title"].value == "David Michaels"
         assert diffs["submitted_by.display_title"].creating_value is False
         assert diffs["submitted_by.display_title"].updating_value == "J. Alfred Prufrock"

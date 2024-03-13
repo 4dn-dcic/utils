@@ -1,0 +1,43 @@
+{
+    "FileFormat": [
+        {
+            "identifier": "vcf_gz_tbi",
+            "status": "public",
+            "description": "Tabix index file of vcf compressed",
+            "consortia": [
+                "358aed10-9b9d-4e26-ab84-4bd162da182b"
+            ],
+            "submission_centers": [
+                "9626d82e-8110-4213-ac75-0a50adf890ff"
+            ],
+            "standard_file_extension": "vcf.gz.tbi"
+        },
+        {
+            "identifier": "txt",
+            "status": "public",
+            "description": "This format is used for aligned reads",
+            "consortia": [
+                "358aed10-9b9d-4e26-ab84-4bd162da182b"
+            ],
+            "submission_centers": [
+                "9626d82e-8110-4213-ac75-0a50adf890ff"
+            ],
+            "standard_file_extension": "txt"
+        },
+        {
+            "identifier": "vcf",
+            "status": "public",
+            "description": "vcf compressed",
+            "consortia": [
+                "358aed10-9b9d-4e26-ab84-4bd162da182b"
+            ],
+            "submission_centers": [
+                "9626d82e-8110-4213-ac75-0a50adf890ff"
+            ],
+            "standard_file_extension": "vcf",
+            "other_allowed_extensions": [
+                "foobar"
+            ]
+        }
+    ]
+}

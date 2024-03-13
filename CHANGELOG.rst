@@ -7,6 +7,16 @@ Change Log
 ----------
 
 
+8.8.1
+=====
+* Changes to troubleshooting utility script view-portal-object.
+* Some reworking of ref lookup in structured_data.
+* Support ref caching in structured_data.
+* Added hook to turn off ref lookup by subtypes in case we need this later.
+* Added hook do ref lookup at root path first; set to true by smaht-portal for accession IDs.
+* Moved/adapted test_structured_data.py from smaht-portal to here.
+
+
 8.8.0
 =====
 * Changes to structured_data support date/time types.

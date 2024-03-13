@@ -1,0 +1,4 @@
+accession,description,source,submitted_id,tags,title,url,submission_centers
+CL000001,Description for Sample Cell Line 1,Vendor A,XY_CELL-LINE_ABC1,tag1|tag2,Sample Cell Line 1,https://vendorA.com/cellline/XY_CELL-LINE_ABC1,some-submission-center-a
+CL000002,Description for Sample Cell Line 2,Institution B,XY_CELL-LINE_ABC2,tag3|tag4,Sample Cell Line 2,https://institutionB.com/cellline/XY_CELL-LINE_ABC2,some-submission-center-a|some-submission-center-b
+CL000003,Description for Sample Cell Line 3,Vendor C,XY_CELL-LINE_ABC3,tag5|tag6,Sample Cell Line 3,https://vendorC.com/cellline/XY_CELL-LINE_ABC3,some-submission-center-b|some-submission-center-a

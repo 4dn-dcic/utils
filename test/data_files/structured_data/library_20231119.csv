@@ -1,0 +1,4 @@
+a260_a280_ratio,adapter_name,adapter_sequence,amplification_cycles,amplification_end_mass,amplification_start_mass,analyte,analyte_weight,barcode_sequences,consortia#,fragment_maximum_length,fragment_mean_length,fragment_minimum_length,fragment_standard_deviation_length,insert_maximum_length,insert_mean_length,insert_minimum_length,insert_standard_deviation_length,library_preparation,preparation_date,protocols,submission_centers#,submitted_id,uuid,
+1.8,Adapter1,ATCGATCG,10,100,50,sample-analyte-1,5,BC001|BC002,Consortium1,500,300,100,50,450,250,80,40,,2023-01-01,protocol1,somesubctr,XY_LIBRARY_ABC1,uuid1,
+1.9,Adapter2,GCTAGCTA,12,120,60,sample-analyte-2,6,BC003|BC004,,550,320,110,55,500,280,90,45,prep2,2023-02-01,,Center1,XY_LIBRARY_ABC2,uuid2,
+2.0,Adapter3,TGCATGCA,15,150,70,sample-analyte-3,7,BC005|BC006,Consortium2,600,350,120,60,550,320,100,50,,2023-03-01,protocol3,anothersubctr,XY_LIBRARY_ABC3,uuid3,
