@@ -307,7 +307,7 @@ class StructuredDataSet:
                     "refs_found": self.ref_total_found_count,
                     "refs_not_found": self.ref_total_notfound_count,
                     "refs_lookup": self.ref_lookup_count,
-                    "refs_cache_hit": self.ref_lookup_cache_hit_count,
+                    "refs_cache_hit": self.ref_exists_cache_hit_count,
                     "refs_invalid": self.ref_invalid_identifying_property_count
                 })
         self._note_warning(reader.warnings, "reader")
@@ -1027,8 +1027,9 @@ class Portal(PortalBase):
 
     def _ref_exists_from_cache(self, type_name: str, value: str) -> Optional[List[dict]]:
         if self._ref_cache is not None:
-            self._ref_exists_cache_hit_count += 1
-            return self._ref_cache.get(f"/{type_name}/{value}", None)
+            if ref := self._ref_cache.get(f"/{type_name}/{value}", None):
+                self._ref_exists_cache_hit_count += 1
+            return ref
         self._ref_exists_cache_miss_count += 1
         return None
 
