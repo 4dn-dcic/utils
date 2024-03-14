@@ -955,10 +955,6 @@ class Portal(PortalBase):
                 resolved = {"type": type_name, "uuid": resolved_item.get("uuid")}
                 self._cache_ref(type_name, value, resolved)
                 return resolved
-        if update_counts:
-            # No do not update the not-found count if not found internally (2024-03-14).
-            # self._ref_total_notfound_count += 1
-            pass
         return {}  # Empty return means not resolved internally.
 
     def _ref_exists_single_internally(self, type_name: str, value: str) -> Tuple[bool, Optional[dict]]:
