@@ -9,6 +9,7 @@ Change Log
 
 8.8.2
 =====
+* Support for ExtraFiles pseudo-type, to handle extra_files in smaht-submitr..
 * Minor structured_data fix related to counting unresolved references;
   not functionally consequential; only incorrect user feedback in smaht-submitr.
 
