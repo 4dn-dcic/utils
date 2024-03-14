@@ -7,6 +7,12 @@ Change Log
 ----------
 
 
+8.8.2
+=====
+* Minor structured_data fix related to counting unresolved references;
+  not functionally consequential; only incorrect user feedback in smaht-submitr.
+
+
 8.8.1
 =====
 * Changes to troubleshooting utility script view-portal-object.
