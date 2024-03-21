@@ -2,7 +2,6 @@ import copy
 from functools import lru_cache
 import json
 from jsonschema import Draft7Validator as SchemaValidator
-import os
 from pyramid.router import Router
 import re
 import sys
@@ -37,8 +36,32 @@ ARRAY_VALUE_DELIMITER_ESCAPE_CHAR = "\\"
 ARRAY_NAME_SUFFIX_CHAR = "#"
 ARRAY_NAME_SUFFIX_REGEX = re.compile(rf"{ARRAY_NAME_SUFFIX_CHAR}\d+")
 DOTTED_NAME_DELIMITER_CHAR = "."
-FILE_SCHEMA_NAME = "File"
-FILE_SCHEMA_NAME_PROPERTY = "filename"
+
+# TODO: Should probably pass this knowledge in from callers.
+FILE_TYPE_NAME = "File"
+FILE_TYPE_PROPERTY_NAME = "filename"
+# This ExtraFile is a pseudo-type to handle extra_files in smaht-submitr.
+EXTRA_FILE_TYPE_NAME = "ExtraFile"
+EXTRA_FILE_TYPE_PROPERTY_NAME = "extra_files"
+
+ENABLE_ARRAY_SHEET_REFS = True
+
+# The ExtraFile pseudo-type schema.
+EXTRA_FILE_SCHEMA = {
+    "title": "ExtraFile",
+    "type": "object",
+    "required": [
+        "filename"
+    ],
+    "identifyingProperties": [
+        "filename"
+    ],
+    "properties": {
+        "filename": {
+            "type": "string"
+        }
+    }
+}
 
 # Forward type references for type hints.
 Portal = Type["Portal"]
@@ -53,6 +76,7 @@ class StructuredDataSet:
                  order: Optional[List[str]] = None, prune: bool = True,
                  ref_lookup_strategy: Optional[Callable] = None,
                  ref_lookup_nocache: bool = False,
+                 norefs: bool = False,
                  progress: Optional[Callable] = None,
                  debug_sleep: Optional[str] = None) -> None:
         self._progress = progress if callable(progress) else None
@@ -68,6 +92,7 @@ class StructuredDataSet:
         self._resolved_refs = set()
         self._validated = False
         self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
+        self._norefs = True if norefs is True else False
         self._debug_sleep = None
         if debug_sleep:
             try:
@@ -89,10 +114,12 @@ class StructuredDataSet:
              schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
              order: Optional[List[str]] = None, prune: bool = True,
              ref_lookup_strategy: Optional[Callable] = None,
-             ref_lookup_nocache: bool = False, debug_sleep: Optional[str] = None) -> StructuredDataSet:
+             ref_lookup_nocache: bool = False,
+             norefs: bool = False,
+             debug_sleep: Optional[str] = None) -> StructuredDataSet:
         return StructuredDataSet(file=file, portal=portal, schemas=schemas, autoadd=autoadd, order=order, prune=prune,
                                  ref_lookup_strategy=ref_lookup_strategy, ref_lookup_nocache=ref_lookup_nocache,
-                                 debug_sleep=debug_sleep)
+                                 norefs=norefs, debug_sleep=debug_sleep)
 
     def validate(self, force: bool = False) -> None:
         def data_without_deleted_properties(data: dict) -> dict:
@@ -110,7 +137,7 @@ class StructuredDataSet:
             return
         self._validated = True
         for type_name in self.data:
-            if (schema := Schema.load_by_name(type_name, portal=self._portal)):
+            if (schema := Schema.load_by_name(type_name, portal=self._portal, norefs=self._norefs)):
                 row_number = 0
                 for data in self.data[type_name]:
                     data = data_without_deleted_properties(data)
@@ -155,7 +182,7 @@ class StructuredDataSet:
             for type_name in self.data:
                 if self._portal.is_file_schema(type_name):
                     for item in self.data[type_name]:
-                        if (file_name := item.get(FILE_SCHEMA_NAME_PROPERTY)):
+                        if (file_name := item.get(FILE_TYPE_PROPERTY_NAME)):
                             result.append({"type": type_name, "file": file_name})
         return result
 
@@ -289,7 +316,8 @@ class StructuredDataSet:
             if self._debug_sleep:
                 time.sleep(float(self._debug_sleep))
             if not structured_row_template:  # Delay creation just so we don't reference schema if there are no rows.
-                if not schema and not noschema and not (schema := Schema.load_by_name(type_name, portal=self._portal)):
+                if not schema and not noschema and not (schema := Schema.load_by_name(type_name, portal=self._portal,
+                                                                                      norefs=self._norefs)):
                     noschema = True
                 elif schema and (schema_name := schema.type):
                     type_name = schema_name
@@ -414,10 +442,12 @@ class StructuredDataSet:
 
 class _StructuredRowTemplate:
 
-    def __init__(self, column_names: List[str], schema: Optional[Schema] = None) -> None:
+    def __init__(self, column_names: List[str], schema: Optional[Schema] = None,
+                 obtain_array_values: Optional[Callable] = None) -> None:
         self._schema = schema
         self._set_value_functions = {}
         self._template = self._create_row_template(column_names)
+        self._obtain_array_values = obtain_array_values if callable(obtain_array_values) else None
 
     def create_row(self) -> dict:
         return copy.deepcopy(self._template)
@@ -477,6 +507,15 @@ class _StructuredRowTemplate:
                     set_value_backtrack_object(i, p)
                 data = data[p]
             if (p := path[-1]) == -1 and isinstance(value, str):
+                if ENABLE_ARRAY_SHEET_REFS and value.lower().value.startswith("[ref:") and value.endswith("]"):
+                    if self._obtain_array_values:
+                        values = self._obtain_array_values(value)
+                    if sheet_name_containing_array := value[5:].strip():
+                        if dot := sheet_name_containing_array.find(".") > 0:
+                            if sheet_name_containing_array := sheet_name_containing_array[0:dot].strip():
+                                pass
+                                # sheet_column_containing_array = sheet_name_containing_array[dot + 1:].strip()
+                    pass
                 values = _split_array_string(value, unique=typeinfo.get("unique") if typeinfo else False)
                 if mapv:
                     values = [mapv(value, src) for value in values]
@@ -520,7 +559,7 @@ class _StructuredRowTemplate:
 
 class Schema(SchemaBase):
 
-    def __init__(self, schema_json: dict, portal: Optional[Portal] = None) -> None:
+    def __init__(self, schema_json: dict, portal: Optional[Portal] = None, norefs: bool = False) -> None:
         super().__init__(schema_json)
         self._portal = portal  # Needed only to resolve linkTo references.
         self._map_value_functions = {
@@ -535,11 +574,12 @@ class Schema(SchemaBase):
         self._resolved_refs = set()
         self._unresolved_refs = []
         self._typeinfo = self._create_typeinfo(schema_json)
+        self._norefs = True if norefs is True else False
 
     @staticmethod
-    def load_by_name(name: str, portal: Portal) -> Optional[dict]:
+    def load_by_name(name: str, portal: Portal, norefs: bool = False) -> Optional[dict]:
         schema_json = portal.get_schema(Schema.type_name(name)) if portal else None
-        return Schema(schema_json, portal) if schema_json else None
+        return Schema(schema_json, portal, norefs=norefs) if schema_json else None
 
     def validate(self, data: dict) -> List[str]:
         errors = []
@@ -618,6 +658,8 @@ class Schema(SchemaBase):
     def _map_function_ref(self, typeinfo: dict) -> Callable:
         def map_ref(value: str, link_to: str, portal: Optional[Portal], src: Optional[str]) -> Any:
             nonlocal self, typeinfo
+            if self._norefs:
+                return value
             if not value:
                 if (column := typeinfo.get("column")) and column in self.data.get("required", []):
                     self._unresolved_refs.append({"src": src, "error": f"/{link_to}/<null>"})
@@ -750,8 +792,7 @@ class Schema(SchemaBase):
 
     @staticmethod
     def type_name(value: str) -> str:  # File or other name.
-        name = os.path.basename(value).replace(" ", "") if isinstance(value, str) else ""
-        return PortalBase.schema_name(name[0:dot] if (dot := name.rfind(".")) > 0 else name)
+        return PortalBase.schema_name(value)
 
     @staticmethod
     def array_indices(name: str) -> Tuple[Optional[str], Optional[List[int]]]:
@@ -804,7 +845,7 @@ class Portal(PortalBase):
         self._ref_total_found_count = 0
         self._ref_total_notfound_count = 0
 
-    @lru_cache(maxsize=8092)
+    @lru_cache(maxsize=10000)
     def ref_lookup_cached(self, object_name: str) -> Optional[dict]:
         return self.ref_lookup_uncached(object_name)
 
@@ -820,16 +861,13 @@ class Portal(PortalBase):
                 self._ref_lookup_error_count += 1
             return None
 
-    @lru_cache(maxsize=256)
+    @lru_cache(maxsize=100)
     def get_schema(self, schema_name: str) -> Optional[dict]:
-        if not (schemas := self.get_schemas()):
-            return None
-        if schema := schemas.get(schema_name := Schema.type_name(schema_name)):
-            return schema
-        if schema_name == schema_name.upper() and (schema := schemas.get(schema_name.lower().title())):
-            return schema
-        if schema_name == schema_name.lower() and (schema := schemas.get(schema_name.title())):
-            return schema
+        return schemas.get(Schema.type_name(schema_name), None) if (schemas := self.get_schemas()) else None
+#       if schema_name == schema_name.upper() and (schema := schemas.get(schema_name.lower().title())):
+#           return schema
+#       if schema_name == schema_name.lower() and (schema := schemas.get(schema_name.title())):
+#           return schema
 
     @lru_cache(maxsize=1)
     def get_schemas(self) -> Optional[dict]:
@@ -842,17 +880,11 @@ class Portal(PortalBase):
                     schemas[user_specified_schema["title"]] = user_specified_schema
         return schemas
 
-    @lru_cache(maxsize=64)
-    def _get_schema_subtype_names(self, type_name: str) -> List[str]:
-        if not (schemas_super_type_map := self.get_schemas_super_type_map()):
-            return []
-        return schemas_super_type_map.get(type_name, [])
-
     def is_file_schema(self, schema_name: str) -> bool:
         """
         Returns True iff the given schema name isa File type, i.e. has an ancestor which is of type File.
         """
-        return self.is_schema_type(schema_name, FILE_SCHEMA_NAME)
+        return self.is_schema_type(schema_name, FILE_TYPE_NAME)
 
     def ref_exists(self, type_name: str, value: Optional[str] = None,
                    called_from_map_ref: bool = False) -> Optional[dict]:
@@ -906,7 +938,7 @@ class Portal(PortalBase):
             lookup_paths.append(f"/{type_name}/{value}")
         if is_ref_lookup_root and not is_ref_lookup_root_first:
             lookup_paths.append(f"/{value}")
-        subtype_names = self._get_schema_subtype_names(type_name) if is_ref_lookup_subtypes else []
+        subtype_names = self.get_schema_subtype_names(type_name) if is_ref_lookup_subtypes else []
         for subtype_name in subtype_names:
             lookup_paths.append(f"/{subtype_name}/{value}")
         if not lookup_paths:
@@ -945,7 +977,7 @@ class Portal(PortalBase):
         ref_lookup_strategy, ref_validator = (
             self._ref_lookup_strategy(type_name, self.get_schema(type_name), value))
         is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
-        subtype_names = self._get_schema_subtype_names(type_name) if is_ref_lookup_subtypes else []
+        subtype_names = self.get_schema_subtype_names(type_name) if is_ref_lookup_subtypes else []
         for type_name in [type_name] + subtype_names:
             is_resolved, resolved_item = self._ref_exists_single_internally(type_name, value)
             if is_resolved:
@@ -1005,7 +1037,7 @@ class Portal(PortalBase):
                         if not is_uuid(property_value):
                             return False
             return True
-        for schema_name in [type_name] + self._get_schema_subtype_names(type_name):
+        for schema_name in [type_name] + self.get_schema_subtype_names(type_name):
             if schema := self.get_schema(schema_name):
                 if identifying_properties := schema.get("identifyingProperties"):
                     for identifying_property in identifying_properties:
@@ -1031,7 +1063,7 @@ class Portal(PortalBase):
 
     def _cache_ref(self, type_name: str, value: str, resolved: List[str]) -> None:
         if self._ref_cache is not None:
-            subtype_names = self._get_schema_subtype_names(type_name)
+            subtype_names = self.get_schema_subtype_names(type_name)
             for type_name in [type_name] + subtype_names:
                 self._ref_cache[f"/{type_name}/{value}"] = resolved
 

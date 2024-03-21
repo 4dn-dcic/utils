@@ -181,7 +181,10 @@ class Excel:
         if not self._include_hidden_sheets:
             if sheet.sheet_state == "hidden":
                 return True
-            if sheet.title.startswith("(") and sheet.title.endswith(")"):
+            if ((sheet.title.startswith("(") and sheet.title.endswith(")")) or
+                (sheet.title.startswith("[") and sheet.title.endswith("]")) or
+                (sheet.title.startswith("{") and sheet.title.endswith("}")) or
+                (sheet.title.startswith("<") and sheet.title.endswith(">"))):  # noqa
                 return True
         return False
 
