@@ -252,6 +252,9 @@ class StructuredDataSet:
                 return self._load_normal_file(file)
         return self._load_normal_file(file)
 
+    def _load_file(self, file: str) -> None:
+        return self.load_file(file)
+
     def _load_normal_file(self, file: str) -> None:
         if file.endswith(".csv") or file.endswith(".tsv"):
             self._load_csv_file(file)
