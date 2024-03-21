@@ -99,7 +99,7 @@ class StructuredDataSet:
                 self._debug_sleep = float(debug_sleep)
             except Exception:
                 self._debug_sleep = None
-        self._load_file(file) if file else None
+        self.load_file(file) if file else None
 
     @property
     def data(self) -> dict:
@@ -239,7 +239,7 @@ class StructuredDataSet:
             progress({"finish": True})
         return diffs
 
-    def _load_file(self, file: str) -> None:
+    def load_file(self, file: str) -> None:
         # Returns a dictionary where each property is the name (i.e. the type) of the data,
         # and the value is array of dictionaries for the data itself. Handle these kinds of files:
         # 1.  Single CSV, TSV, or JSON file, where the (base) name of the file is the data type name.
@@ -264,7 +264,7 @@ class StructuredDataSet:
 
     def _load_packed_file(self, file: str) -> None:
         for file in unpack_files(file, suffixes=ACCEPTABLE_FILE_SUFFIXES):
-            self._load_file(file)
+            self.load_file(file)
 
     def _load_csv_file(self, file: str) -> None:
         self._load_reader(CsvReader(file), type_name=Schema.type_name(file))
