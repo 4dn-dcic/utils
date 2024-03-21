@@ -507,7 +507,7 @@ class _StructuredRowTemplate:
                     set_value_backtrack_object(i, p)
                 data = data[p]
             if (p := path[-1]) == -1 and isinstance(value, str):
-                if ENABLE_ARRAY_SHEET_REFS and value.lower().value.startswith("[ref:") and value.endswith("]"):
+                if ENABLE_ARRAY_SHEET_REFS and value.lower().startswith("[ref:") and value.endswith("]"):
                     if self._obtain_array_values:
                         values = self._obtain_array_values(value)
                     if sheet_name_containing_array := value[5:].strip():
