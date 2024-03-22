@@ -77,7 +77,11 @@ class RowReader(abc.ABC):
     def warnings(self) -> List[str]:
         warnings = []
         if self._warning_empty_headers:
-            warnings.append({"src": create_dict(file=self.file),
+            if hasattr(self, "sheet_name") and self.sheet_name:
+                src = {"sheet": self.sheet_name}
+            else:
+                src = {"file": self.file}
+            warnings.append({"src": src,
                              "warning": "Empty header column encountered; ignoring it and all subsequent columns."})
         if self._warning_extra_values:
             for row_number in self._warning_extra_values:
