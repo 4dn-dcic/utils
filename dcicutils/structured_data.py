@@ -891,7 +891,6 @@ class Portal(PortalBase):
 
     def ref_exists(self, type_name: str, value: Optional[str] = None,
                    called_from_map_ref: bool = False) -> Optional[dict]:
-        # print(f"\033[Kxyzzy:ref_exists({type_name}/{value})")
         if not value:
             type_name, value = Portal._get_type_name_and_value_from_path(type_name)
             if not type_name or not value:
@@ -971,7 +970,6 @@ class Portal(PortalBase):
         If found then returns a dictionary containing the (given) type name and the uuid (if any)
         of the resolved item.
         """
-        # print(f"\033[Kxyzzy:ref_exists_internally({type_name}/{value})")
         if not value:
             type_name, value = Portal._get_type_name_and_value_from_path(type_name)
             if not type_name or not value:
