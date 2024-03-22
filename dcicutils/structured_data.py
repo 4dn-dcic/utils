@@ -288,8 +288,6 @@ class StructuredDataSet:
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
             self._load_reader(excel.sheet_reader(sheet_name), type_name=Schema.type_name(sheet_name))
-        if self._progress:
-            self._progress({"finish": True})
         # TODO: Do we really need progress reporting for the below?
         # Check for unresolved reference errors which really are not because of ordering.
         # Yes such internal references will be handled correctly on actual database update via snovault.loadxl.
@@ -301,11 +299,25 @@ class StructuredDataSet:
                     # if not (resolved := self.portal.ref_exists_internally(ref := ref_error["error"])):
                     ref_errors_actual.append(ref_error)
                 else:
+                    # Now found so subtract off from ref_total_notfound_count.
+                    self.portal._ref_total_notfound_count -= 1
                     self._resolved_refs.add((ref, resolved.get("uuid")))
             if ref_errors_actual:
                 self._errors["ref"] = ref_errors_actual
             else:
                 del self._errors["ref"]
+        if self._progress:
+            # TODO: Refactor with same thing below in _load_reader.
+            self._progress({
+                "finish": True,
+                "refs": self.ref_total_count,
+                "refs_found": self.ref_total_found_count,
+                "refs_not_found": self.ref_total_notfound_count,
+                "refs_lookup": self.ref_lookup_count,
+                "refs_lookup_cache_hit": self.ref_lookup_cache_hit_count,
+                "refs_exists_cache_hit": self.ref_exists_cache_hit_count,
+                "refs_invalid": self.ref_invalid_identifying_property_count
+            })
 
     def _load_json_file(self, file: str) -> None:
         with open(file) as f:
@@ -338,7 +350,8 @@ class StructuredDataSet:
                     "refs_found": self.ref_total_found_count,
                     "refs_not_found": self.ref_total_notfound_count,
                     "refs_lookup": self.ref_lookup_count,
-                    "refs_cache_hit": self.ref_exists_cache_hit_count,
+                    "refs_lookup_cache_hit": self.ref_lookup_cache_hit_count,
+                    "refs_exists_cache_hit": self.ref_exists_cache_hit_count,
                     "refs_invalid": self.ref_invalid_identifying_property_count
                 })
         self._note_warning(reader.warnings, "reader")
@@ -918,7 +931,9 @@ class Portal(PortalBase):
             # self._data can change, i.e. as data (e.g. spreadsheet sheets) are parsed.
             return self.ref_exists_internally(type_name, value, update_counts=called_from_map_ref) or {}
         # Reference is NOT cached here; lookup INTERNALLY first.
-        if resolved := self.ref_exists_internally(type_name, value, update_counts=called_from_map_ref):
+        # Skip updating _ref_total_notfound_count here as if not found we look in portal below.
+        if resolved := self.ref_exists_internally(type_name, value, update_counts=called_from_map_ref,
+                                                  skip_total_notfound_count=True):
             # Reference was resolved internally (note: here only if resolved is not an empty dictionary).
             if called_from_map_ref:
                 self._ref_total_found_count += 1
@@ -964,7 +979,8 @@ class Portal(PortalBase):
         return None
 
     def ref_exists_internally(self, type_name: str, value: Optional[str] = None,
-                              update_counts: bool = False) -> Optional[dict]:
+                              update_counts: bool = False,
+                              skip_total_notfound_count: bool = False) -> Optional[dict]:
         """
         Looks up the given reference (type/value) internally (i.e. with this data parsed thus far).
         If found then returns a dictionary containing the (given) type name and the uuid (if any)
@@ -988,6 +1004,9 @@ class Portal(PortalBase):
                 resolved = {"type": type_name, "uuid": resolved_item.get("uuid")}
                 self._cache_ref(type_name, value, resolved)
                 return resolved
+        if update_counts:
+            if not skip_total_notfound_count:
+                self._ref_total_notfound_count += 1
         return {}  # Empty return means not resolved internally.
 
     def _ref_exists_single_internally(self, type_name: str, value: str) -> Tuple[bool, Optional[dict]]:
