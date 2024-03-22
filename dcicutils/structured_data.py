@@ -44,7 +44,7 @@ FILE_TYPE_PROPERTY_NAME = "filename"
 EXTRA_FILE_TYPE_NAME = "ExtraFile"
 EXTRA_FILE_TYPE_PROPERTY_NAME = "extra_files"
 
-ENABLE_ARRAY_SHEET_REFS = True
+ENABLE_ARRAY_SHEET_REFS = False
 
 # The ExtraFile pseudo-type schema.
 EXTRA_FILE_SCHEMA = {
@@ -523,15 +523,16 @@ class _StructuredRowTemplate:
                     set_value_backtrack_object(i, p)
                 data = data[p]
             if (p := path[-1]) == -1 and isinstance(value, str):
-                if ENABLE_ARRAY_SHEET_REFS and value.lower().startswith("[ref:") and value.endswith("]"):
-                    if self._obtain_array_values:
-                        values = self._obtain_array_values(value)
-                    if sheet_name_containing_array := value[5:].strip():
-                        if dot := sheet_name_containing_array.find(".") > 0:
-                            if sheet_name_containing_array := sheet_name_containing_array[0:dot].strip():
-                                pass
-                                # sheet_column_containing_array = sheet_name_containing_array[dot + 1:].strip()
-                    pass
+                if ENABLE_ARRAY_SHEET_REFS and False:
+                    # TODO: IN PROGRESS. DISABLED FOR NOW.
+                    if isinstance(value, str) and value.lower().startswith("[ref:") and value.endswith("]"):
+                        if self._obtain_array_values:
+                            values = self._obtain_array_values(value)
+                        if sheet_name_containing_array := value[5:].strip():
+                            if dot := sheet_name_containing_array.find(".") > 0:
+                                if sheet_name_containing_array := sheet_name_containing_array[0:dot].strip():
+                                    pass
+                                    # sheet_column_containing_array = sheet_name_containing_array[dot + 1:].strip()
                 values = _split_array_string(value, unique=typeinfo.get("unique") if typeinfo else False)
                 if mapv:
                     values = [mapv(value, src) for value in values]
