@@ -139,17 +139,17 @@ class PortalObject:
                 if not isinstance(a[index], dict) and not isinstance(a[index], list):
                     if a[index] not in b:
                         if a[index] != PortalObject._PROPERTY_DELETION_SENTINEL:
-                            if index < len(b):
-                                diffs[path] = diff_updating(a[index], b[index])
-                            else:
-                                diffs[path] = diff_creating(a[index])
+                            diffs[path] = diff_creating(a[index])
                         else:
-                            if index < len(b):
-                                diffs[path] = diff_deleting(b[index])
+                            diffs[path] = diff_deleting(b[index])
                 elif index < len(b):
                     diffs.update(PortalObject._compare(a[index], b[index], _path=path))
                 else:
                     diffs[path] = diff_creating(a[index])
+            for index in range(len(b)):
+                path = f"{_path or ''}#{index}.deleting"
+                if b[index] not in a:
+                    diffs[path] = diff_deleting(b[index])
         elif a != b:
             if a == PortalObject._PROPERTY_DELETION_SENTINEL:
                 diffs[_path] = diff_deleting(b)
