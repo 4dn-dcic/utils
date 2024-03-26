@@ -12,8 +12,9 @@ Change Log
 * Support for ExtraFiles pseudo-type, to handle extra_files in smaht-submitr..
 * Minor structured_data fix related to counting unresolved references;
   not functionally consequential; only incorrect user feedback in smaht-submitr.
+* Support in structured_data for norefs (completely ignore references).
 * Minor fix in portal_object_utils.PortalObject._compare for lists.
-* Support in structured_data for norefs (complete ignore references).
+* Minor structured_data code cleanup.
 
 
 8.8.1

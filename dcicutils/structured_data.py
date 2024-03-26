@@ -91,6 +91,7 @@ class StructuredDataSet:
         self._errors = {}
         self._resolved_refs = set()
         self._validated = False
+        self._nrows = 0
         self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
         self._norefs = True if norefs is True else False
         self._debug_sleep = None
@@ -193,6 +194,10 @@ class StructuredDataSet:
             if file_path := search_for_file(upload_file["file"], location, recursive=recursive, single=True):
                 upload_file["path"] = file_path
         return upload_files
+
+    @property
+    def nrows(self) -> int:
+        return self._nrows
 
     def compare(self, progress: Optional[Callable] = None) -> dict:
         def get_counts() -> int:
@@ -328,6 +333,7 @@ class StructuredDataSet:
         noschema = False
         structured_row_template = None
         for row in reader:
+            self._nrows += 1
             if self._debug_sleep:
                 time.sleep(float(self._debug_sleep))
             if not structured_row_template:  # Delay creation just so we don't reference schema if there are no rows.
