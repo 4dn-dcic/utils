@@ -192,8 +192,8 @@ class StructuredDataSet:
         diffs = {}
         if callable(progress):
             ntypes, nobjects = get_counts()
-            progress({PROGRESS.ANALYZE_START: True,
-                      PROGRESS.ANALYZE_COUNT_TYPES: ntypes, PROGRESS.ANALYZE_COUNT_ITEMS: nobjects})
+            progress({PROGRESS.ANALYZE_START.value: True,
+                      PROGRESS.ANALYZE_COUNT_TYPES.value: ntypes, PROGRESS.ANALYZE_COUNT_ITEMS.value: nobjects})
         if self.data or self.portal:  # TODO: what is this OR biz?
             refs = self.resolved_refs_with_uuids
             # TODO: Need feedback/progress tracking mechanism here.
@@ -212,19 +212,19 @@ class StructuredDataSet:
                                                                        uuid=existing_object.uuid,
                                                                        diffs=object_diffs or None))
                         if callable(progress):
-                            progress({PROGRESS.ANALYZE_UPDATE: True,
-                                      PROGRESS.ANALYZE_COUNT_LOOKUP: nlookups + nlookups_compare})
+                            progress({PROGRESS.ANALYZE_UPDATE.value: True,
+                                      PROGRESS.ANALYZE_COUNT_LOOKUP.value: nlookups + nlookups_compare})
                     elif identifying_path:
                         # If there is no existing object we still create a record for this object
                         # but with no uuid which will be the indication that it does not exist.
                         diffs[type_name].append(create_readonly_object(path=identifying_path, uuid=None, diffs=None))
                         if callable(progress):
-                            progress({PROGRESS.ANALYZE_CREATE: True, PROGRESS.ANALYZE_COUNT_LOOKUP: nlookups})
+                            progress({PROGRESS.ANALYZE_CREATE.value: True, PROGRESS.ANALYZE_COUNT_LOOKUP.value: nlookups})
                     else:
                         if callable(progress):
-                            progress({PROGRESS.ANALYZE_COUNT_LOOKUP: nlookups})
+                            progress({PROGRESS.ANALYZE_COUNT_LOOKUP.value: nlookups})
         if callable(progress):
-            progress({PROGRESS.ANALYZE_DONE: True})
+            progress({PROGRESS.ANALYZE_DONE.value: True})
         return diffs
 
     def load_file(self, file: str) -> None:
@@ -271,8 +271,8 @@ class StructuredDataSet:
             return nrows, len(excel.sheet_names)
         if self._progress:  # TODO: Move to _load_reader
             nrows, nsheets = get_counts()
-            self._progress({PROGRESS.LOAD_START: True,
-                            PROGRESS.LOAD_COUNT_SHEETS: nsheets, PROGRESS.LOAD_COUNT_ROWS: nrows})
+            self._progress({PROGRESS.LOAD_START.value: True,
+                            PROGRESS.LOAD_COUNT_SHEETS.value: nsheets, PROGRESS.LOAD_COUNT_ROWS.value: nrows})
         excel = Excel(file)  # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
@@ -297,14 +297,14 @@ class StructuredDataSet:
                 del self._errors["ref"]
         if self._progress:
             self._progress({   # TODO: Refactor with same thing below in _load_reader.
-                PROGRESS.LOAD_DONE: True,
-                PROGRESS.LOAD_COUNT_REFS: self.ref_total_count,
-                PROGRESS.LOAD_COUNT_REFS_FOUND: self.ref_total_found_count,
-                PROGRESS.LOAD_COUNT_REFS_NOT_FOUND: self.ref_total_notfound_count,
-                PROGRESS.LOAD_COUNT_REFS_LOOKUP: self.ref_lookup_count,
-                PROGRESS.LOAD_COUNT_REFS_LOOKUP_CACHE_HIT: self.ref_lookup_cache_hit_count,
-                PROGRESS.LOAD_COUNT_REFS_EXISTS_CACHE_HIT: self.ref_exists_cache_hit_count,
-                PROGRESS.LOAD_COUNT_REFS_INVALID: self.ref_invalid_identifying_property_count
+                PROGRESS.LOAD_DONE.value: True,
+                PROGRESS.LOAD_COUNT_REFS.value: self.ref_total_count,
+                PROGRESS.LOAD_COUNT_REFS_FOUND.value: self.ref_total_found_count,
+                PROGRESS.LOAD_COUNT_REFS_NOT_FOUND.value: self.ref_total_notfound_count,
+                PROGRESS.LOAD_COUNT_REFS_LOOKUP.value: self.ref_lookup_count,
+                PROGRESS.LOAD_COUNT_REFS_LOOKUP_CACHE_HIT.value: self.ref_lookup_cache_hit_count,
+                PROGRESS.LOAD_COUNT_REFS_EXISTS_CACHE_HIT.value: self.ref_exists_cache_hit_count,
+                PROGRESS.LOAD_COUNT_REFS_INVALID.value: self.ref_invalid_identifying_property_count
             })
 
     def _load_json_file(self, file: str) -> None:
@@ -334,14 +334,14 @@ class StructuredDataSet:
             self._add(type_name, structured_row)
             if self._progress:
                 self._progress({
-                    PROGRESS.LOAD_ITEM: True,
-                    PROGRESS.LOAD_COUNT_REFS: self.ref_total_count,
-                    PROGRESS.LOAD_COUNT_REFS_FOUND: self.ref_total_found_count,
-                    PROGRESS.LOAD_COUNT_REFS_NOT_FOUND: self.ref_total_notfound_count,
-                    PROGRESS.LOAD_COUNT_REFS_LOOKUP: self.ref_lookup_count,
-                    PROGRESS.LOAD_COUNT_REFS_LOOKUP_CACHE_HIT: self.ref_lookup_cache_hit_count,
-                    PROGRESS.LOAD_COUNT_REFS_EXISTS_CACHE_HIT: self.ref_exists_cache_hit_count,
-                    PROGRESS.LOAD_COUNT_REFS_INVALID: self.ref_invalid_identifying_property_count
+                    PROGRESS.LOAD_ITEM.value: True,
+                    PROGRESS.LOAD_COUNT_REFS.value: self.ref_total_count,
+                    PROGRESS.LOAD_COUNT_REFS_FOUND.value: self.ref_total_found_count,
+                    PROGRESS.LOAD_COUNT_REFS_NOT_FOUND.value: self.ref_total_notfound_count,
+                    PROGRESS.LOAD_COUNT_REFS_LOOKUP.value: self.ref_lookup_count,
+                    PROGRESS.LOAD_COUNT_REFS_LOOKUP_CACHE_HIT.value: self.ref_lookup_cache_hit_count,
+                    PROGRESS.LOAD_COUNT_REFS_EXISTS_CACHE_HIT.value: self.ref_exists_cache_hit_count,
+                    PROGRESS.LOAD_COUNT_REFS_INVALID.value: self.ref_invalid_identifying_property_count
                 })
         self._note_warning(reader.warnings, "reader")
         if schema:
