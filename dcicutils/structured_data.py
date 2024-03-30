@@ -37,31 +37,31 @@ ARRAY_NAME_SUFFIX_CHAR = "#"
 ARRAY_NAME_SUFFIX_REGEX = re.compile(rf"{ARRAY_NAME_SUFFIX_CHAR}\d+")
 DOTTED_NAME_DELIMITER_CHAR = "."
 
+
+class PROGRESS:
+    PARSE_START = "start"
+    PARSE_ITEM = "parse"
+    PARSE_DONE = "finish"
+    PARSE_COUNT_SHEETS = "sheets"
+    PARSE_COUNT_ROWS = "rows"
+    PARSE_COUNT_REFS = "refs"
+    PARSE_COUNT_REFS_FOUND = "refs_found"
+    PARSE_COUNT_REFS_NOT_FOUND = "refs_not_found"
+    PARSE_COUNT_REFS_LOOKUP = "refs_lookup"
+    PARSE_COUNT_REFS_LOOKUP_CACHE_HIT = "refs_lookup_cache_hit"
+    PARSE_COUNT_REFS_EXISTS_CACHE_HIT = "refs_exists_cache_hit"
+    PARSE_COUNT_REFS_INVALID = "refs_invalid"
+    PARSE_ANALYZE_START = "start"
+    PARSE_ANALYZE_COUNT_TYPES = "types"
+    PARSE_ANALYZE_COUNT_ITEMS = "objects"
+    PARSE_ANALYZE_CREATE = "create"
+    PARSE_ANALYZE_UPDATE = "update"
+    PARSE_ANALYZE_DONE = "finish"
+
+
 # TODO: Should probably pass this knowledge in from callers.
 FILE_TYPE_NAME = "File"
 FILE_TYPE_PROPERTY_NAME = "filename"
-# This ExtraFile is a pseudo-type to handle extra_files in smaht-submitr.
-EXTRA_FILE_TYPE_NAME = "ExtraFile"
-EXTRA_FILE_TYPE_PROPERTY_NAME = "extra_files"
-
-ENABLE_ARRAY_SHEET_REFS = False
-
-# The ExtraFile pseudo-type schema.
-EXTRA_FILE_SCHEMA = {
-    "title": "ExtraFile",
-    "type": "object",
-    "required": [
-        "filename"
-    ],
-    "identifyingProperties": [
-        "filename"
-    ],
-    "properties": {
-        "filename": {
-            "type": "string"
-        }
-    }
-}
 
 # Forward type references for type hints.
 Portal = Type["Portal"]
@@ -212,7 +212,8 @@ class StructuredDataSet:
         diffs = {}
         if callable(progress):
             ntypes, nobjects = get_counts()
-            progress({"start": True, "types": ntypes, "objects": nobjects})
+            progress({PROGRESS.PARSE_ANALYZE_START: True,
+                      PROGRESS.PARSE_ANALYZE_COUNT_TYPES: ntypes, PROGRESS.PARSE_ANALYZE_COUNT_ITEMS: nobjects})
         if self.data or self.portal:  # TODO: what is this OR biz?
             refs = self.resolved_refs_with_uuids
             # TODO: Need feedback/progress tracking mechanism here.
@@ -231,18 +232,18 @@ class StructuredDataSet:
                                                                        uuid=existing_object.uuid,
                                                                        diffs=object_diffs or None))
                         if callable(progress):
-                            progress({"update": True, "lookups": nlookups + nlookups_compare})
+                            progress({PROGRESS.PARSE_ANALYZE_UPDATE: True, "lookups": nlookups + nlookups_compare})
                     elif identifying_path:
                         # If there is no existing object we still create a record for this object
                         # but with no uuid which will be the indication that it does not exist.
                         diffs[type_name].append(create_readonly_object(path=identifying_path, uuid=None, diffs=None))
                         if callable(progress):
-                            progress({"create": True, "lookups": nlookups})
+                            progress({PROGRESS.PARSE_ANALYZE_CREATE: True, "lookups": nlookups})
                     else:
                         if callable(progress):
                             progress({"lookups": nlookups})
         if callable(progress):
-            progress({"finish": True})
+            progress({PROGRESS.PARSE_ANALYZE_DONE: True})
         return diffs
 
     def load_file(self, file: str) -> None:
@@ -289,7 +290,8 @@ class StructuredDataSet:
             return nrows, len(excel.sheet_names)
         if self._progress:
             nrows, nsheets = get_counts()
-            self._progress({"start": True, "sheets": nsheets, "rows": nrows})
+            self._progress({PROGRESS.PARSE_START: True,
+                            PROGRESS.PARSE_COUNT_SHEETS: nsheets, PROGRESS.PARSE_COUNT_ROWS: nrows})
         excel = Excel(file)  # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
@@ -315,14 +317,14 @@ class StructuredDataSet:
         if self._progress:
             # TODO: Refactor with same thing below in _load_reader.
             self._progress({
-                "finish": True,
-                "refs": self.ref_total_count,
-                "refs_found": self.ref_total_found_count,
-                "refs_not_found": self.ref_total_notfound_count,
-                "refs_lookup": self.ref_lookup_count,
-                "refs_lookup_cache_hit": self.ref_lookup_cache_hit_count,
-                "refs_exists_cache_hit": self.ref_exists_cache_hit_count,
-                "refs_invalid": self.ref_invalid_identifying_property_count
+                PROGRESS.PARSE_DONE: True,
+                PROGRESS.PARSE_COUNT_REFS: self.ref_total_count,
+                PROGRESS.PARSE_COUNT_REFS_FOUND: self.ref_total_found_count,
+                PROGRESS.PARSE_COUNT_REFS_NOT_FOUND: self.ref_total_notfound_count,
+                PROGRESS.PARSE_COUNT_REFS_LOOKUP: self.ref_lookup_count,
+                PROGRESS.PARSE_COUNT_REFS_LOOKUP_CACHE_HIT: self.ref_lookup_cache_hit_count,
+                PROGRESS.PARSE_COUNT_REFS_EXISTS_CACHE_HIT: self.ref_exists_cache_hit_count,
+                PROGRESS.PARSE_COUNT_REFS_INVALID: self.ref_invalid_identifying_property_count
             })
 
     def _load_json_file(self, file: str) -> None:
@@ -352,14 +354,14 @@ class StructuredDataSet:
             self._add(type_name, structured_row)
             if self._progress:
                 self._progress({
-                    "parse": True,
-                    "refs": self.ref_total_count,
-                    "refs_found": self.ref_total_found_count,
-                    "refs_not_found": self.ref_total_notfound_count,
-                    "refs_lookup": self.ref_lookup_count,
-                    "refs_lookup_cache_hit": self.ref_lookup_cache_hit_count,
-                    "refs_exists_cache_hit": self.ref_exists_cache_hit_count,
-                    "refs_invalid": self.ref_invalid_identifying_property_count
+                    PROGRESS.PARSE_ITEM: True,
+                    PROGRESS.PARSE_COUNT_REFS: self.ref_total_count,
+                    PROGRESS.PARSE_COUNT_REFS_FOUND: self.ref_total_found_count,
+                    PROGRESS.PARSE_COUNT_REFS_NOT_FOUND: self.ref_total_notfound_count,
+                    PROGRESS.PARSE_COUNT_REFS_LOOKUP: self.ref_lookup_count,
+                    PROGRESS.PARSE_COUNT_REFS_LOOKUP_CACHE_HIT: self.ref_lookup_cache_hit_count,
+                    PROGRESS.PARSE_COUNT_REFS_EXISTS_CACHE_HIT: self.ref_exists_cache_hit_count,
+                    PROGRESS.PARSE_COUNT_REFS_INVALID: self.ref_invalid_identifying_property_count
                 })
         self._note_warning(reader.warnings, "reader")
         if schema:
@@ -465,12 +467,10 @@ class StructuredDataSet:
 
 class _StructuredRowTemplate:
 
-    def __init__(self, column_names: List[str], schema: Optional[Schema] = None,
-                 obtain_array_values: Optional[Callable] = None) -> None:
+    def __init__(self, column_names: List[str], schema: Optional[Schema] = None) -> None:
         self._schema = schema
         self._set_value_functions = {}
         self._template = self._create_row_template(column_names)
-        self._obtain_array_values = obtain_array_values if callable(obtain_array_values) else None
 
     def create_row(self) -> dict:
         return copy.deepcopy(self._template)
@@ -530,16 +530,6 @@ class _StructuredRowTemplate:
                     set_value_backtrack_object(i, p)
                 data = data[p]
             if (p := path[-1]) == -1 and isinstance(value, str):
-                if ENABLE_ARRAY_SHEET_REFS and False:
-                    # TODO: IN PROGRESS. DISABLED FOR NOW.
-                    if isinstance(value, str) and value.lower().startswith("[ref:") and value.endswith("]"):
-                        if self._obtain_array_values:
-                            values = self._obtain_array_values(value)
-                        if sheet_name_containing_array := value[5:].strip():
-                            if dot := sheet_name_containing_array.find(".") > 0:
-                                if sheet_name_containing_array := sheet_name_containing_array[0:dot].strip():
-                                    pass
-                                    # sheet_column_containing_array = sheet_name_containing_array[dot + 1:].strip()
                 values = _split_array_string(value, unique=typeinfo.get("unique") if typeinfo else False)
                 if mapv:
                     values = [mapv(value, src) for value in values]
