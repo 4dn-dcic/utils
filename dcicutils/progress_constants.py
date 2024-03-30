@@ -1,11 +1,17 @@
 from datetime import datetime
 from enum import Enum
 
-
 # Constants for progress tracking for smaht-submitr.
 # Here only to share between smaht-portal, snovault, and smaht-submitr.
 
-class PROGRESS_INGESTER(Enum):
+
+class _Enum(Enum):
+    # Automatically make enumerators within the enumeration resolve to its value property.
+    def __get__(self, instance, owner):
+        return self.value
+
+
+class PROGRESS_INGESTER(_Enum):
     VALIDATION = "ingester_validation"
     INITIATE = "ingester_initiate"
     PARSE_LOAD_INITIATE = "ingester_parse_initiate"
@@ -20,7 +26,7 @@ class PROGRESS_INGESTER(Enum):
     NOW = lambda: str(datetime.utcnow())  # noqa
 
 
-class PROGRESS_PARSE(Enum):
+class PROGRESS_PARSE(_Enum):
     LOAD_START = "parse_start"
     LOAD_ITEM = "parse_item"
     LOAD_DONE = "parse_done"
@@ -46,7 +52,7 @@ class PROGRESS_PARSE(Enum):
     NOW = lambda: str(datetime.utcnow())  # noqa
 
 
-class PROGRESS_LOADXL(Enum):
+class PROGRESS_LOADXL(_Enum):
     START = "loadxl_start"
     START_SECOND_ROUND = "loadxl_start_second_round"
     ITEM = "loadxl_item"
