@@ -117,10 +117,11 @@ class StructuredDataSet:
              ref_lookup_strategy: Optional[Callable] = None,
              ref_lookup_nocache: bool = False,
              norefs: bool = False,
+             progress: Optional[Callable] = None,
              debug_sleep: Optional[str] = None) -> StructuredDataSet:
         return StructuredDataSet(file=file, portal=portal, schemas=schemas, autoadd=autoadd, order=order, prune=prune,
                                  ref_lookup_strategy=ref_lookup_strategy, ref_lookup_nocache=ref_lookup_nocache,
-                                 norefs=norefs, debug_sleep=debug_sleep)
+                                 norefs=norefs, progress=progress, debug_sleep=debug_sleep)
 
     def validate(self, force: bool = False) -> None:
         def data_without_deleted_properties(data: dict) -> dict:
