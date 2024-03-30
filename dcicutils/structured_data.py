@@ -219,7 +219,8 @@ class StructuredDataSet:
                         # but with no uuid which will be the indication that it does not exist.
                         diffs[type_name].append(create_readonly_object(path=identifying_path, uuid=None, diffs=None))
                         if callable(progress):
-                            progress({PROGRESS.ANALYZE_CREATE.value: True, PROGRESS.ANALYZE_COUNT_LOOKUP.value: nlookups})
+                            progress({PROGRESS.ANALYZE_CREATE.value: True,
+                                      PROGRESS.ANALYZE_COUNT_LOOKUP.value: nlookups})
                     else:
                         if callable(progress):
                             progress({PROGRESS.ANALYZE_COUNT_LOOKUP.value: nlookups})
