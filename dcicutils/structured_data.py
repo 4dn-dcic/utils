@@ -298,7 +298,7 @@ class StructuredDataSet:
                 del self._errors["ref"]
         if self._progress:
             self._progress({   # TODO: Refactor with same thing below in _load_reader.
-                PROGRESS.LOAD_DONE.value: True,
+                PROGRESS.LOAD_DONE.value: PROGRESS.NOW(),
                 PROGRESS.LOAD_COUNT_REFS.value: self.ref_total_count,
                 PROGRESS.LOAD_COUNT_REFS_FOUND.value: self.ref_total_found_count,
                 PROGRESS.LOAD_COUNT_REFS_NOT_FOUND.value: self.ref_total_notfound_count,

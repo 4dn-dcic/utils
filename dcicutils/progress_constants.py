@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 
 
@@ -16,6 +17,7 @@ class PROGRESS_INGESTER(Enum):
     MESSAGE = "ingester_message"
     MESSAGE_VERBOSE = "ingester_message_verbose"
     MESSAGE_DEBUG = "ingester_message_debug"
+    NOW = lambda: str(datetime.utcnow())  # noqa
 
 
 class PROGRESS_PARSE(Enum):
@@ -41,6 +43,7 @@ class PROGRESS_PARSE(Enum):
     MESSAGE = "parse_message"
     MESSAGE_VERBOSE = "parse_message_verbose"
     MESSAGE_DEBUG = "parse_message_debug"
+    NOW = lambda: str(datetime.utcnow())  # noqa
 
 
 class PROGRESS_LOADXL(Enum):
@@ -57,3 +60,4 @@ class PROGRESS_LOADXL(Enum):
     MESSAGE = "loadxl_message"
     MESSAGE_VERBOSE = "loadxl_message_verbose"
     MESSAGE_DEBUG = "loadxl_message_debug"
+    NOW = lambda: str(datetime.utcnow())  # noqa
