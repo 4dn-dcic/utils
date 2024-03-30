@@ -9,6 +9,10 @@ class _Enum(Enum):
     # Automatically make enumerators within the enumeration resolve to its value property.
     def __get__(self, instance, owner):
         return self.value
+    # But doing the above does not take when iterating; so make provide a values method.
+    @classmethod  # noqa
+    def values(cls):
+        return [enumerator.value for enumerator in cls]
 
 
 class PROGRESS_INGESTER(_Enum):
