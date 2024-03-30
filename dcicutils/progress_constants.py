@@ -13,6 +13,9 @@ class PROGRESS_INGESTER(Enum):
     VALIDATE_LOAD_DONE = "ingester_validate_done"
     LOADXL_INITIATE = "ingester_loadxl_initiate"
     LOADXL_DONE = "ingester_loadxl_done"
+    MESSAGE = "ingester_message"
+    MESSAGE_VERBOSE = "ingester_message_verbose"
+    MESSAGE_DEBUG = "ingester_message_debug"
 
 
 class PROGRESS_PARSE(Enum):
@@ -35,6 +38,9 @@ class PROGRESS_PARSE(Enum):
     ANALYZE_COUNT_LOOKUP = "lookups"
     ANALYZE_UPDATE = "update"
     ANALYZE_DONE = "finish"
+    MESSAGE = "parse_message"
+    MESSAGE_VERBOSE = "parse_message_verbose"
+    MESSAGE_DEBUG = "parse_message_debug"
 
 
 class PROGRESS_LOADXL(Enum):
