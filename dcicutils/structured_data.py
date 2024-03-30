@@ -1,5 +1,4 @@
 import copy
-from enum import Enum
 from functools import lru_cache
 import json
 from jsonschema import Draft7Validator as SchemaValidator
@@ -18,6 +17,7 @@ from dcicutils.misc_utils import (create_dict, create_readonly_object, is_uuid, 
                                   to_boolean, to_enum, to_float, to_integer, VirtualApp)
 from dcicutils.portal_object_utils import PortalObject
 from dcicutils.portal_utils import Portal as PortalBase
+from dcicutils.progress_constants import PROGRESS_PARSE as PROGRESS
 from dcicutils.schema_utils import Schema as SchemaBase
 from dcicutils.zip_utils import unpack_gz_file_to_temporary_file, unpack_files
 
@@ -37,28 +37,6 @@ ARRAY_VALUE_DELIMITER_ESCAPE_CHAR = "\\"
 ARRAY_NAME_SUFFIX_CHAR = "#"
 ARRAY_NAME_SUFFIX_REGEX = re.compile(rf"{ARRAY_NAME_SUFFIX_CHAR}\d+")
 DOTTED_NAME_DELIMITER_CHAR = "."
-
-
-class PROGRESS(Enum):
-    LOAD_START = "start"
-    LOAD_ITEM = "parse"
-    LOAD_DONE = "finish"
-    LOAD_COUNT_SHEETS = "sheets"
-    LOAD_COUNT_ROWS = "rows"
-    LOAD_COUNT_REFS = "refs"
-    LOAD_COUNT_REFS_FOUND = "refs_found"
-    LOAD_COUNT_REFS_NOT_FOUND = "refs_not_found"
-    LOAD_COUNT_REFS_LOOKUP = "refs_lookup"
-    LOAD_COUNT_REFS_LOOKUP_CACHE_HIT = "refs_lookup_cache_hit"
-    LOAD_COUNT_REFS_EXISTS_CACHE_HIT = "refs_exists_cache_hit"
-    LOAD_COUNT_REFS_INVALID = "refs_invalid"
-    ANALYZE_START = "start"
-    ANALYZE_COUNT_TYPES = "types"
-    ANALYZE_COUNT_ITEMS = "objects"
-    ANALYZE_CREATE = "create"
-    ANALYZE_COUNT_LOOKUP = "lookups"
-    ANALYZE_UPDATE = "update"
-    ANALYZE_DONE = "finish"
 
 
 # TODO: Should probably pass this knowledge in from callers.
