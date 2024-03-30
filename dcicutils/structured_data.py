@@ -192,7 +192,7 @@ class StructuredDataSet:
         diffs = {}
         if callable(progress):
             ntypes, nobjects = get_counts()
-            progress({PROGRESS.ANALYZE_START.value: True,
+            progress({PROGRESS.ANALYZE_START.value: PROGRESS.NOW(),
                       PROGRESS.ANALYZE_COUNT_TYPES.value: ntypes, PROGRESS.ANALYZE_COUNT_ITEMS.value: nobjects})
         if self.data or self.portal:  # TODO: what is this OR biz?
             refs = self.resolved_refs_with_uuids
@@ -225,7 +225,7 @@ class StructuredDataSet:
                         if callable(progress):
                             progress({PROGRESS.ANALYZE_COUNT_LOOKUP.value: nlookups})
         if callable(progress):
-            progress({PROGRESS.ANALYZE_DONE.value: True})
+            progress({PROGRESS.ANALYZE_DONE.value: PROGRESS.NOW()})
         return diffs
 
     def load_file(self, file: str) -> None:
@@ -272,7 +272,7 @@ class StructuredDataSet:
             return nrows, len(excel.sheet_names)
         if self._progress:  # TODO: Move to _load_reader
             nrows, nsheets = get_counts()
-            self._progress({PROGRESS.LOAD_START.value: True,
+            self._progress({PROGRESS.LOAD_START.value: PROGRESS.NOW(),
                             PROGRESS.LOAD_COUNT_SHEETS.value: nsheets, PROGRESS.LOAD_COUNT_ROWS.value: nrows})
         excel = Excel(file)  # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
