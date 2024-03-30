@@ -7,6 +7,12 @@ from enum import Enum
 class PROGRESS_INGESTER(Enum):
     VALIDATION = "ingester_validation"
     INITIATE = "ingester_initiate"
+    PARSE_LOAD_INITIATE = "ingester_parse_initiate"
+    PARSE_LOAD_DONE = "ingester_parse_done"
+    VALIDATE_LOAD_INITIATE = "ingester_validate_initiate"
+    VALIDATE_LOAD_DONE = "ingester_validate_done"
+    LOADXL_INITIATE = "ingester_loadxl_initiate"
+    LOADXL_DONE = "ingester_loadxl_done"
 
 
 class PROGRESS_PARSE(Enum):
@@ -32,7 +38,6 @@ class PROGRESS_PARSE(Enum):
 
 
 class PROGRESS_LOADXL(Enum):
-    INITIATE = "loadxl_initiate"
     START = "loadxl_start"
     START_SECOND_ROUND = "loadxl_start_second_round"
     ITEM = "loadxl_item"
