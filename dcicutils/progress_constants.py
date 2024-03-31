@@ -18,6 +18,7 @@ class _Enum(Enum):
 class PROGRESS_INGESTER(_Enum):
     VALIDATION = "ingester_validation"
     QUEUED = "ingester_queued"
+    QUEUE_CLEANUP = "ingester_queue_cleanup"
     INITIATE = "ingester_initiate"
     CLEANUP = "ingester_cleanup"
     DONE = "ingester_done"
