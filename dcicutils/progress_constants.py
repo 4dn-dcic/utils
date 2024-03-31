@@ -19,6 +19,7 @@ class PROGRESS_INGESTER(_Enum):
     VALIDATION = "ingester_validation"
     QUEUED = "ingester_queued"
     INITIATE = "ingester_initiate"
+    DONE = "ingester_done"
     PARSE_LOAD_INITIATE = "ingester_parse_initiate"
     PARSE_LOAD_DONE = "ingester_parse_done"
     VALIDATE_LOAD_INITIATE = "ingester_validate_initiate"
@@ -28,7 +29,7 @@ class PROGRESS_INGESTER(_Enum):
     MESSAGE = "ingester_message"
     MESSAGE_VERBOSE = "ingester_message_verbose"
     MESSAGE_DEBUG = "ingester_message_debug"
-    NOW = lambda: str(datetime.utcnow())  # noqa
+    NOW = lambda: _NOW()  # noqa
 
 
 class PROGRESS_PARSE(_Enum):
@@ -54,7 +55,7 @@ class PROGRESS_PARSE(_Enum):
     MESSAGE = "parse_message"
     MESSAGE_VERBOSE = "parse_message_verbose"
     MESSAGE_DEBUG = "parse_message_debug"
-    NOW = lambda: str(datetime.utcnow())  # noqa
+    NOW = lambda: _NOW()  # noqa
 
 
 class PROGRESS_LOADXL(_Enum):
@@ -71,4 +72,8 @@ class PROGRESS_LOADXL(_Enum):
     MESSAGE = "loadxl_message"
     MESSAGE_VERBOSE = "loadxl_message_verbose"
     MESSAGE_DEBUG = "loadxl_message_debug"
-    NOW = lambda: str(datetime.utcnow())  # noqa
+    NOW = lambda: _NOW()  # noqa
+
+
+def _NOW() -> str:
+    return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
