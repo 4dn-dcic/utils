@@ -17,7 +17,7 @@ from dcicutils.misc_utils import (create_dict, create_readonly_object, is_uuid, 
                                   to_boolean, to_enum, to_float, to_integer, VirtualApp)
 from dcicutils.portal_object_utils import PortalObject
 from dcicutils.portal_utils import Portal as PortalBase
-from dcicutils.progress_constants import PROGRESS_PARSE as PROGRESS
+from dcicutils.submitr.progress_constants import PROGRESS_PARSE as PROGRESS
 from dcicutils.schema_utils import Schema as SchemaBase
 from dcicutils.zip_utils import unpack_gz_file_to_temporary_file, unpack_files
 
