@@ -16,8 +16,10 @@ Change Log
 * Minor fix in portal_object_utils.PortalObject._compare for lists.
 * Minor structured_data changes for smaht-submitr validation/submission progress tracking.
 * Minor structured_data code cleanup.
-* Added progress_constants for sharing between smaht-submitr, snovault, smaht-portal;
-  not ideal living here but driving us nuts maintaining in separate locations.
+* Added submitr.progress_constants for sharing between smaht-submitr, snovault, smaht-portal;
+  not ideal living here but driving us nuts maintaining in separate locations;
+  and since we have this submitr sub-directory now, unified the common
+  ref_lookup_strategy function from smaht-submitr and smaht-portal.
 
 
 8.8.1
