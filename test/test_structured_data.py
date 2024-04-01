@@ -1513,7 +1513,7 @@ def parse_structured_data(file: str, portal: Optional[Union[VirtualApp, TestApp,
                           autoadd: Optional[dict] = None, prune: bool = True,
                           ref_nocache: bool = False) -> StructuredDataSet:
 
-    def ref_lookup_strategy(type_name: str, schema: dict, value: str) -> Tuple[int, Optional[str]]:
+    def ref_lookup_strategy(portal: Portal, type_name: str, schema: dict, value: str) -> Tuple[int, Optional[str]]:
         not_an_identifying_property = "filename"
         if schema_properties := schema.get("properties"):
             if schema_properties.get("accession") and is_accession(value):
