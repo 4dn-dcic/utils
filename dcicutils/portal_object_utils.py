@@ -195,7 +195,7 @@ class PortalObject:
                         # sure we check accession format (since it does not have a pattern).
                         if callable(ref_lookup_strategy):
                             lookup_options, ref_validator = ref_lookup_strategy(
-                                self.type, schema, identifying_value)
+                                self._portal, self.type, schema, identifying_value)
                             if callable(ref_validator):
                                 if ref_validator(schema, identifying_property, identifying_value) is False:
                                     continue

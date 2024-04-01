@@ -822,7 +822,7 @@ class Portal(PortalBase):
         if callable(ref_lookup_strategy):
             self._ref_lookup_strategy = ref_lookup_strategy
         else:
-            self._ref_lookup_strategy = lambda type_name, schema, value: (Portal.LOOKUP_DEFAULT, None)
+            self._ref_lookup_strategy = lambda portal, type_name, schema, value: (Portal.LOOKUP_DEFAULT, None)
         if ref_lookup_nocache is True:
             self.ref_lookup = self.ref_lookup_uncached
             self._ref_cache = None
@@ -860,10 +860,6 @@ class Portal(PortalBase):
     @lru_cache(maxsize=100)
     def get_schema(self, schema_name: str) -> Optional[dict]:
         return schemas.get(Schema.type_name(schema_name), None) if (schemas := self.get_schemas()) else None
-#       if schema_name == schema_name.upper() and (schema := schemas.get(schema_name.lower().title())):
-#           return schema
-#       if schema_name == schema_name.lower() and (schema := schemas.get(schema_name.title())):
-#           return schema
 
     @lru_cache(maxsize=1)
     def get_schemas(self) -> Optional[dict]:
@@ -892,7 +888,7 @@ class Portal(PortalBase):
             self._ref_total_count += 1
         # First make sure the given value can possibly be a reference to the given type.
         schema = self.get_schema(type_name)
-        ref_lookup_strategy, ref_validator = self._ref_lookup_strategy(type_name, schema, value)
+        ref_lookup_flags, ref_validator = self._ref_lookup_strategy(self, type_name, schema, value)
         if not self._is_valid_ref(type_name, value, ref_validator):
             if called_from_map_ref:
                 self._ref_invalid_identifying_property_count += 1
@@ -922,11 +918,11 @@ class Portal(PortalBase):
         # Get the lookup strategy; i.e. should do we lookup by root path, and if so, should
         # we do this first, and do we lookup by subtypes; by default we lookup by root path
         # but not first, and we also lookup by subtypes by default.
-        ref_lookup_strategy, _ = self._ref_lookup_strategy(type_name, self.get_schema(type_name), value)
-        is_ref_lookup_specified_type = StructuredDataSet._is_ref_lookup_specified_type(ref_lookup_strategy)
-        is_ref_lookup_root = StructuredDataSet._is_ref_lookup_root(ref_lookup_strategy)
-        is_ref_lookup_root_first = StructuredDataSet._is_ref_lookup_root_first(ref_lookup_strategy)
-        is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
+        ref_lookup_flags, _ = self._ref_lookup_strategy(self, type_name, self.get_schema(type_name), value)
+        is_ref_lookup_specified_type = StructuredDataSet._is_ref_lookup_specified_type(ref_lookup_flags)
+        is_ref_lookup_root = StructuredDataSet._is_ref_lookup_root(ref_lookup_flags)
+        is_ref_lookup_root_first = StructuredDataSet._is_ref_lookup_root_first(ref_lookup_flags)
+        is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_flags)
         # First construct the list of lookup paths at which to look for the referenced item.
         lookup_paths = []
         if is_ref_lookup_root_first:
@@ -971,9 +967,9 @@ class Portal(PortalBase):
             if not type_name or not value:
                 return None  # Should not happen.
         # Note that root lookup not applicable here.
-        ref_lookup_strategy, ref_validator = (
-            self._ref_lookup_strategy(type_name, self.get_schema(type_name), value))
-        is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
+        ref_lookup_flags, ref_validator = (
+            self._ref_lookup_strategy(self, type_name, self.get_schema(type_name), value))
+        is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_flags)
         subtype_names = self.get_schema_subtype_names(type_name) if is_ref_lookup_subtypes else []
         for type_name in [type_name] + subtype_names:
             is_resolved, resolved_item = self._ref_exists_single_internally(type_name, value)
