@@ -300,6 +300,7 @@ class Portal:
         except Exception:
             return False
 
+    @lru_cache(maxsize=100)
     def get_schema(self, schema_name: str) -> Optional[dict]:
         return get_schema(self.schema_name(schema_name), portal_vapp=self.vapp, key=self.key)
 
@@ -308,8 +309,13 @@ class Portal:
         return self.get("/profiles/").json()
 
     @staticmethod
+    @lru_cache(maxsize=100)
     def schema_name(name: str) -> str:
-        return to_camel_case(name.replace(" ", "") if not name.endswith(".json") else name[:-5])
+        name = os.path.basename(name).replace(" ", "") if isinstance(name, str) else ""
+        if (dot := name.rfind(".")) > 0:
+            name = name[0:dot]
+        return to_camel_case(name)
+        # return to_camel_case(name.replace(" ", "") if not name.endswith(".json") else name[:-5])
 
     def is_schema_type(self, schema_name_or_portal_object: Union[str, dict], target_schema_name: str,
                        _schemas_super_type_map: Optional[list] = None) -> bool:
@@ -398,7 +404,7 @@ class Portal:
             super_type_map_flattened[super_type_name] = list_breadth_first(super_type_map, super_type_name)
         return super_type_map_flattened
 
-    @lru_cache(maxsize=64)
+    @lru_cache(maxsize=100)
     def get_schema_subtype_names(self, type_name: str) -> List[str]:
         if not (schemas_super_type_map := self.get_schemas_super_type_map()):
             return []

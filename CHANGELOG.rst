@@ -7,6 +7,21 @@ Change Log
 ----------
 
 
+8.8.2
+=====
+* Support for ExtraFiles pseudo-type, to handle extra_files in smaht-submitr..
+* Minor structured_data fix related to counting unresolved references;
+  not functionally consequential; only incorrect user feedback in smaht-submitr.
+* Support in structured_data for norefs (completely ignore references).
+* Minor fix in portal_object_utils.PortalObject._compare for lists.
+* Minor structured_data changes for smaht-submitr validation/submission progress tracking.
+* Minor structured_data code cleanup.
+* Added submitr.progress_constants for sharing between smaht-submitr, snovault, smaht-portal;
+  not ideal living here but driving us nuts maintaining in separate locations;
+  and since we have this submitr sub-directory now, unified the common
+  ref_lookup_strategy function from smaht-submitr and smaht-portal.
+
+
 8.8.1
 =====
 * Changes to troubleshooting utility script view-portal-object.

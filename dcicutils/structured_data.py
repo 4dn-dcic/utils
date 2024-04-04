@@ -2,7 +2,6 @@ import copy
 from functools import lru_cache
 import json
 from jsonschema import Draft7Validator as SchemaValidator
-import os
 from pyramid.router import Router
 import re
 import sys
@@ -18,6 +17,7 @@ from dcicutils.misc_utils import (create_dict, create_readonly_object, is_uuid, 
                                   to_boolean, to_enum, to_float, to_integer, VirtualApp)
 from dcicutils.portal_object_utils import PortalObject
 from dcicutils.portal_utils import Portal as PortalBase
+from dcicutils.submitr.progress_constants import PROGRESS_PARSE as PROGRESS
 from dcicutils.schema_utils import Schema as SchemaBase
 from dcicutils.zip_utils import unpack_gz_file_to_temporary_file, unpack_files
 
@@ -37,8 +37,11 @@ ARRAY_VALUE_DELIMITER_ESCAPE_CHAR = "\\"
 ARRAY_NAME_SUFFIX_CHAR = "#"
 ARRAY_NAME_SUFFIX_REGEX = re.compile(rf"{ARRAY_NAME_SUFFIX_CHAR}\d+")
 DOTTED_NAME_DELIMITER_CHAR = "."
-FILE_SCHEMA_NAME = "File"
-FILE_SCHEMA_NAME_PROPERTY = "filename"
+
+
+# TODO: Should probably pass this knowledge in from callers.
+FILE_TYPE_NAME = "File"
+FILE_TYPE_PROPERTY_NAME = "filename"
 
 # Forward type references for type hints.
 Portal = Type["Portal"]
@@ -53,6 +56,7 @@ class StructuredDataSet:
                  order: Optional[List[str]] = None, prune: bool = True,
                  ref_lookup_strategy: Optional[Callable] = None,
                  ref_lookup_nocache: bool = False,
+                 norefs: bool = False,
                  progress: Optional[Callable] = None,
                  debug_sleep: Optional[str] = None) -> None:
         self._progress = progress if callable(progress) else None
@@ -67,14 +71,16 @@ class StructuredDataSet:
         self._errors = {}
         self._resolved_refs = set()
         self._validated = False
+        self._nrows = 0
         self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
+        self._norefs = True if norefs is True else False
         self._debug_sleep = None
         if debug_sleep:
             try:
                 self._debug_sleep = float(debug_sleep)
             except Exception:
                 self._debug_sleep = None
-        self._load_file(file) if file else None
+        self.load_file(file) if file else None
 
     @property
     def data(self) -> dict:
@@ -89,10 +95,13 @@ class StructuredDataSet:
              schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
              order: Optional[List[str]] = None, prune: bool = True,
              ref_lookup_strategy: Optional[Callable] = None,
-             ref_lookup_nocache: bool = False, debug_sleep: Optional[str] = None) -> StructuredDataSet:
+             ref_lookup_nocache: bool = False,
+             norefs: bool = False,
+             progress: Optional[Callable] = None,
+             debug_sleep: Optional[str] = None) -> StructuredDataSet:
         return StructuredDataSet(file=file, portal=portal, schemas=schemas, autoadd=autoadd, order=order, prune=prune,
                                  ref_lookup_strategy=ref_lookup_strategy, ref_lookup_nocache=ref_lookup_nocache,
-                                 debug_sleep=debug_sleep)
+                                 norefs=norefs, progress=progress, debug_sleep=debug_sleep)
 
     def validate(self, force: bool = False) -> None:
         def data_without_deleted_properties(data: dict) -> dict:
@@ -110,7 +119,7 @@ class StructuredDataSet:
             return
         self._validated = True
         for type_name in self.data:
-            if (schema := Schema.load_by_name(type_name, portal=self._portal)):
+            if (schema := Schema.load_by_name(type_name, portal=self._portal, norefs=self._norefs)):
                 row_number = 0
                 for data in self.data[type_name]:
                     data = data_without_deleted_properties(data)
@@ -155,7 +164,7 @@ class StructuredDataSet:
             for type_name in self.data:
                 if self._portal.is_file_schema(type_name):
                     for item in self.data[type_name]:
-                        if (file_name := item.get(FILE_SCHEMA_NAME_PROPERTY)):
+                        if (file_name := item.get(FILE_TYPE_PROPERTY_NAME)):
                             result.append({"type": type_name, "file": file_name})
         return result
 
@@ -166,6 +175,10 @@ class StructuredDataSet:
             if file_path := search_for_file(upload_file["file"], location, recursive=recursive, single=True):
                 upload_file["path"] = file_path
         return upload_files
+
+    @property
+    def nrows(self) -> int:
+        return self._nrows
 
     def compare(self, progress: Optional[Callable] = None) -> dict:
         def get_counts() -> int:
@@ -179,7 +192,8 @@ class StructuredDataSet:
         diffs = {}
         if callable(progress):
             ntypes, nobjects = get_counts()
-            progress({"start": True, "types": ntypes, "objects": nobjects})
+            progress({PROGRESS.ANALYZE_START: PROGRESS.NOW(),
+                      PROGRESS.ANALYZE_COUNT_TYPES: ntypes, PROGRESS.ANALYZE_COUNT_ITEMS: nobjects})
         if self.data or self.portal:  # TODO: what is this OR biz?
             refs = self.resolved_refs_with_uuids
             # TODO: Need feedback/progress tracking mechanism here.
@@ -198,21 +212,23 @@ class StructuredDataSet:
                                                                        uuid=existing_object.uuid,
                                                                        diffs=object_diffs or None))
                         if callable(progress):
-                            progress({"update": True, "lookups": nlookups + nlookups_compare})
+                            progress({PROGRESS.ANALYZE_UPDATE: True,
+                                      PROGRESS.ANALYZE_LOOKUPS: nlookups + nlookups_compare})
                     elif identifying_path:
                         # If there is no existing object we still create a record for this object
                         # but with no uuid which will be the indication that it does not exist.
                         diffs[type_name].append(create_readonly_object(path=identifying_path, uuid=None, diffs=None))
                         if callable(progress):
-                            progress({"create": True, "lookups": nlookups})
+                            progress({PROGRESS.ANALYZE_CREATE: True,
+                                      PROGRESS.ANALYZE_LOOKUPS: nlookups})
                     else:
                         if callable(progress):
-                            progress({"lookups": nlookups})
+                            progress({PROGRESS.ANALYZE_LOOKUPS: nlookups})
         if callable(progress):
-            progress({"finish": True})
+            progress({PROGRESS.ANALYZE_DONE: PROGRESS.NOW()})
         return diffs
 
-    def _load_file(self, file: str) -> None:
+    def load_file(self, file: str) -> None:
         # Returns a dictionary where each property is the name (i.e. the type) of the data,
         # and the value is array of dictionaries for the data itself. Handle these kinds of files:
         # 1.  Single CSV, TSV, or JSON file, where the (base) name of the file is the data type name.
@@ -224,6 +240,9 @@ class StructuredDataSet:
             with unpack_gz_file_to_temporary_file(file) as file:
                 return self._load_normal_file(file)
         return self._load_normal_file(file)
+
+    def _load_file(self, file: str) -> None:
+        return self.load_file(file)
 
     def _load_normal_file(self, file: str) -> None:
         if file.endswith(".csv") or file.endswith(".tsv"):
@@ -237,7 +256,7 @@ class StructuredDataSet:
 
     def _load_packed_file(self, file: str) -> None:
         for file in unpack_files(file, suffixes=ACCEPTABLE_FILE_SUFFIXES):
-            self._load_file(file)
+            self.load_file(file)
 
     def _load_csv_file(self, file: str) -> None:
         self._load_reader(CsvReader(file), type_name=Schema.type_name(file))
@@ -251,15 +270,14 @@ class StructuredDataSet:
                 for row in excel.sheet_reader(sheet_name):
                     nrows += 1
             return nrows, len(excel.sheet_names)
-        if self._progress:
+        if self._progress:  # TODO: Move to _load_reader
             nrows, nsheets = get_counts()
-            self._progress({"start": True, "sheets": nsheets, "rows": nrows})
+            self._progress({PROGRESS.LOAD_START: PROGRESS.NOW(),
+                            PROGRESS.LOAD_COUNT_SHEETS: nsheets, PROGRESS.LOAD_COUNT_ROWS: nrows})
         excel = Excel(file)  # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
             self._load_reader(excel.sheet_reader(sheet_name), type_name=Schema.type_name(sheet_name))
-        if self._progress:
-            self._progress({"finish": True})
         # TODO: Do we really need progress reporting for the below?
         # Check for unresolved reference errors which really are not because of ordering.
         # Yes such internal references will be handled correctly on actual database update via snovault.loadxl.
@@ -271,11 +289,24 @@ class StructuredDataSet:
                     # if not (resolved := self.portal.ref_exists_internally(ref := ref_error["error"])):
                     ref_errors_actual.append(ref_error)
                 else:
+                    # Now found so subtract off from ref_total_notfound_count.
+                    self.portal._ref_total_notfound_count -= 1
                     self._resolved_refs.add((ref, resolved.get("uuid")))
             if ref_errors_actual:
                 self._errors["ref"] = ref_errors_actual
             else:
                 del self._errors["ref"]
+        if self._progress:
+            self._progress({   # TODO: Refactor with same thing below in _load_reader.
+                PROGRESS.LOAD_DONE: PROGRESS.NOW(),
+                PROGRESS.LOAD_COUNT_REFS: self.ref_total_count,
+                PROGRESS.LOAD_COUNT_REFS_FOUND: self.ref_total_found_count,
+                PROGRESS.LOAD_COUNT_REFS_NOT_FOUND: self.ref_total_notfound_count,
+                PROGRESS.LOAD_COUNT_REFS_LOOKUP: self.ref_lookup_count,
+                PROGRESS.LOAD_COUNT_REFS_LOOKUP_CACHE_HIT: self.ref_lookup_cache_hit_count,
+                PROGRESS.LOAD_COUNT_REFS_EXISTS_CACHE_HIT: self.ref_exists_cache_hit_count,
+                PROGRESS.LOAD_COUNT_REFS_INVALID: self.ref_invalid_identifying_property_count
+            })
 
     def _load_json_file(self, file: str) -> None:
         with open(file) as f:
@@ -286,10 +317,12 @@ class StructuredDataSet:
         noschema = False
         structured_row_template = None
         for row in reader:
+            self._nrows += 1
             if self._debug_sleep:
                 time.sleep(float(self._debug_sleep))
             if not structured_row_template:  # Delay creation just so we don't reference schema if there are no rows.
-                if not schema and not noschema and not (schema := Schema.load_by_name(type_name, portal=self._portal)):
+                if not schema and not noschema and not (schema := Schema.load_by_name(type_name, portal=self._portal,
+                                                                                      norefs=self._norefs)):
                     noschema = True
                 elif schema and (schema_name := schema.type):
                     type_name = schema_name
@@ -302,13 +335,14 @@ class StructuredDataSet:
             self._add(type_name, structured_row)
             if self._progress:
                 self._progress({
-                    "parse": True,
-                    "refs": self.ref_total_count,
-                    "refs_found": self.ref_total_found_count,
-                    "refs_not_found": self.ref_total_notfound_count,
-                    "refs_lookup": self.ref_lookup_count,
-                    "refs_cache_hit": self.ref_lookup_cache_hit_count,
-                    "refs_invalid": self.ref_invalid_identifying_property_count
+                    PROGRESS.LOAD_ITEM: True,
+                    PROGRESS.LOAD_COUNT_REFS: self.ref_total_count,
+                    PROGRESS.LOAD_COUNT_REFS_FOUND: self.ref_total_found_count,
+                    PROGRESS.LOAD_COUNT_REFS_NOT_FOUND: self.ref_total_notfound_count,
+                    PROGRESS.LOAD_COUNT_REFS_LOOKUP: self.ref_lookup_count,
+                    PROGRESS.LOAD_COUNT_REFS_LOOKUP_CACHE_HIT: self.ref_lookup_cache_hit_count,
+                    PROGRESS.LOAD_COUNT_REFS_EXISTS_CACHE_HIT: self.ref_exists_cache_hit_count,
+                    PROGRESS.LOAD_COUNT_REFS_INVALID: self.ref_invalid_identifying_property_count
                 })
         self._note_warning(reader.warnings, "reader")
         if schema:
@@ -520,7 +554,7 @@ class _StructuredRowTemplate:
 
 class Schema(SchemaBase):
 
-    def __init__(self, schema_json: dict, portal: Optional[Portal] = None) -> None:
+    def __init__(self, schema_json: dict, portal: Optional[Portal] = None, norefs: bool = False) -> None:
         super().__init__(schema_json)
         self._portal = portal  # Needed only to resolve linkTo references.
         self._map_value_functions = {
@@ -535,11 +569,12 @@ class Schema(SchemaBase):
         self._resolved_refs = set()
         self._unresolved_refs = []
         self._typeinfo = self._create_typeinfo(schema_json)
+        self._norefs = True if norefs is True else False
 
     @staticmethod
-    def load_by_name(name: str, portal: Portal) -> Optional[dict]:
+    def load_by_name(name: str, portal: Portal, norefs: bool = False) -> Optional[dict]:
         schema_json = portal.get_schema(Schema.type_name(name)) if portal else None
-        return Schema(schema_json, portal) if schema_json else None
+        return Schema(schema_json, portal, norefs=norefs) if schema_json else None
 
     def validate(self, data: dict) -> List[str]:
         errors = []
@@ -618,6 +653,9 @@ class Schema(SchemaBase):
     def _map_function_ref(self, typeinfo: dict) -> Callable:
         def map_ref(value: str, link_to: str, portal: Optional[Portal], src: Optional[str]) -> Any:
             nonlocal self, typeinfo
+            if self._norefs:
+                self._resolved_refs.add((f"/{link_to}/{value}", None))
+                return value
             if not value:
                 if (column := typeinfo.get("column")) and column in self.data.get("required", []):
                     self._unresolved_refs.append({"src": src, "error": f"/{link_to}/<null>"})
@@ -750,8 +788,7 @@ class Schema(SchemaBase):
 
     @staticmethod
     def type_name(value: str) -> str:  # File or other name.
-        name = os.path.basename(value).replace(" ", "") if isinstance(value, str) else ""
-        return PortalBase.schema_name(name[0:dot] if (dot := name.rfind(".")) > 0 else name)
+        return PortalBase.schema_name(value)
 
     @staticmethod
     def array_indices(name: str) -> Tuple[Optional[str], Optional[List[int]]]:
@@ -785,7 +822,7 @@ class Portal(PortalBase):
         if callable(ref_lookup_strategy):
             self._ref_lookup_strategy = ref_lookup_strategy
         else:
-            self._ref_lookup_strategy = lambda type_name, schema, value: (Portal.LOOKUP_DEFAULT, None)
+            self._ref_lookup_strategy = lambda portal, type_name, schema, value: (Portal.LOOKUP_DEFAULT, None)
         if ref_lookup_nocache is True:
             self.ref_lookup = self.ref_lookup_uncached
             self._ref_cache = None
@@ -804,7 +841,7 @@ class Portal(PortalBase):
         self._ref_total_found_count = 0
         self._ref_total_notfound_count = 0
 
-    @lru_cache(maxsize=8092)
+    @lru_cache(maxsize=10000)
     def ref_lookup_cached(self, object_name: str) -> Optional[dict]:
         return self.ref_lookup_uncached(object_name)
 
@@ -820,16 +857,9 @@ class Portal(PortalBase):
                 self._ref_lookup_error_count += 1
             return None
 
-    @lru_cache(maxsize=256)
+    @lru_cache(maxsize=100)
     def get_schema(self, schema_name: str) -> Optional[dict]:
-        if not (schemas := self.get_schemas()):
-            return None
-        if schema := schemas.get(schema_name := Schema.type_name(schema_name)):
-            return schema
-        if schema_name == schema_name.upper() and (schema := schemas.get(schema_name.lower().title())):
-            return schema
-        if schema_name == schema_name.lower() and (schema := schemas.get(schema_name.title())):
-            return schema
+        return schemas.get(Schema.type_name(schema_name), None) if (schemas := self.get_schemas()) else None
 
     @lru_cache(maxsize=1)
     def get_schemas(self) -> Optional[dict]:
@@ -842,21 +872,14 @@ class Portal(PortalBase):
                     schemas[user_specified_schema["title"]] = user_specified_schema
         return schemas
 
-    @lru_cache(maxsize=64)
-    def _get_schema_subtype_names(self, type_name: str) -> List[str]:
-        if not (schemas_super_type_map := self.get_schemas_super_type_map()):
-            return []
-        return schemas_super_type_map.get(type_name, [])
-
     def is_file_schema(self, schema_name: str) -> bool:
         """
         Returns True iff the given schema name isa File type, i.e. has an ancestor which is of type File.
         """
-        return self.is_schema_type(schema_name, FILE_SCHEMA_NAME)
+        return self.is_schema_type(schema_name, FILE_TYPE_NAME)
 
     def ref_exists(self, type_name: str, value: Optional[str] = None,
                    called_from_map_ref: bool = False) -> Optional[dict]:
-        # print(f"\033[Kxyzzy:ref_exists({type_name}/{value})")
         if not value:
             type_name, value = Portal._get_type_name_and_value_from_path(type_name)
             if not type_name or not value:
@@ -865,7 +888,7 @@ class Portal(PortalBase):
             self._ref_total_count += 1
         # First make sure the given value can possibly be a reference to the given type.
         schema = self.get_schema(type_name)
-        ref_lookup_strategy, ref_validator = self._ref_lookup_strategy(type_name, schema, value)
+        ref_lookup_flags, ref_validator = self._ref_lookup_strategy(self, type_name, schema, value)
         if not self._is_valid_ref(type_name, value, ref_validator):
             if called_from_map_ref:
                 self._ref_invalid_identifying_property_count += 1
@@ -884,7 +907,9 @@ class Portal(PortalBase):
             # self._data can change, i.e. as data (e.g. spreadsheet sheets) are parsed.
             return self.ref_exists_internally(type_name, value, update_counts=called_from_map_ref) or {}
         # Reference is NOT cached here; lookup INTERNALLY first.
-        if resolved := self.ref_exists_internally(type_name, value, update_counts=called_from_map_ref):
+        # Skip updating _ref_total_notfound_count here as if not found we look in portal below.
+        if resolved := self.ref_exists_internally(type_name, value, update_counts=called_from_map_ref,
+                                                  skip_total_notfound_count=True):
             # Reference was resolved internally (note: here only if resolved is not an empty dictionary).
             if called_from_map_ref:
                 self._ref_total_found_count += 1
@@ -893,11 +918,11 @@ class Portal(PortalBase):
         # Get the lookup strategy; i.e. should do we lookup by root path, and if so, should
         # we do this first, and do we lookup by subtypes; by default we lookup by root path
         # but not first, and we also lookup by subtypes by default.
-        ref_lookup_strategy, _ = self._ref_lookup_strategy(type_name, self.get_schema(type_name), value)
-        is_ref_lookup_specified_type = StructuredDataSet._is_ref_lookup_specified_type(ref_lookup_strategy)
-        is_ref_lookup_root = StructuredDataSet._is_ref_lookup_root(ref_lookup_strategy)
-        is_ref_lookup_root_first = StructuredDataSet._is_ref_lookup_root_first(ref_lookup_strategy)
-        is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
+        ref_lookup_flags, _ = self._ref_lookup_strategy(self, type_name, self.get_schema(type_name), value)
+        is_ref_lookup_specified_type = StructuredDataSet._is_ref_lookup_specified_type(ref_lookup_flags)
+        is_ref_lookup_root = StructuredDataSet._is_ref_lookup_root(ref_lookup_flags)
+        is_ref_lookup_root_first = StructuredDataSet._is_ref_lookup_root_first(ref_lookup_flags)
+        is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_flags)
         # First construct the list of lookup paths at which to look for the referenced item.
         lookup_paths = []
         if is_ref_lookup_root_first:
@@ -906,7 +931,7 @@ class Portal(PortalBase):
             lookup_paths.append(f"/{type_name}/{value}")
         if is_ref_lookup_root and not is_ref_lookup_root_first:
             lookup_paths.append(f"/{value}")
-        subtype_names = self._get_schema_subtype_names(type_name) if is_ref_lookup_subtypes else []
+        subtype_names = self.get_schema_subtype_names(type_name) if is_ref_lookup_subtypes else []
         for subtype_name in subtype_names:
             lookup_paths.append(f"/{subtype_name}/{value}")
         if not lookup_paths:
@@ -930,22 +955,22 @@ class Portal(PortalBase):
         return None
 
     def ref_exists_internally(self, type_name: str, value: Optional[str] = None,
-                              update_counts: bool = False) -> Optional[dict]:
+                              update_counts: bool = False,
+                              skip_total_notfound_count: bool = False) -> Optional[dict]:
         """
         Looks up the given reference (type/value) internally (i.e. with this data parsed thus far).
         If found then returns a dictionary containing the (given) type name and the uuid (if any)
         of the resolved item.
         """
-        # print(f"\033[Kxyzzy:ref_exists_internally({type_name}/{value})")
         if not value:
             type_name, value = Portal._get_type_name_and_value_from_path(type_name)
             if not type_name or not value:
                 return None  # Should not happen.
         # Note that root lookup not applicable here.
-        ref_lookup_strategy, ref_validator = (
-            self._ref_lookup_strategy(type_name, self.get_schema(type_name), value))
-        is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_strategy)
-        subtype_names = self._get_schema_subtype_names(type_name) if is_ref_lookup_subtypes else []
+        ref_lookup_flags, ref_validator = (
+            self._ref_lookup_strategy(self, type_name, self.get_schema(type_name), value))
+        is_ref_lookup_subtypes = StructuredDataSet._is_ref_lookup_subtypes(ref_lookup_flags)
+        subtype_names = self.get_schema_subtype_names(type_name) if is_ref_lookup_subtypes else []
         for type_name in [type_name] + subtype_names:
             is_resolved, resolved_item = self._ref_exists_single_internally(type_name, value)
             if is_resolved:
@@ -956,7 +981,8 @@ class Portal(PortalBase):
                 self._cache_ref(type_name, value, resolved)
                 return resolved
         if update_counts:
-            self._ref_total_notfound_count += 1
+            if not skip_total_notfound_count:
+                self._ref_total_notfound_count += 1
         return {}  # Empty return means not resolved internally.
 
     def _ref_exists_single_internally(self, type_name: str, value: str) -> Tuple[bool, Optional[dict]]:
@@ -1007,7 +1033,7 @@ class Portal(PortalBase):
                         if not is_uuid(property_value):
                             return False
             return True
-        for schema_name in [type_name] + self._get_schema_subtype_names(type_name):
+        for schema_name in [type_name] + self.get_schema_subtype_names(type_name):
             if schema := self.get_schema(schema_name):
                 if identifying_properties := schema.get("identifyingProperties"):
                     for identifying_property in identifying_properties:
@@ -1025,14 +1051,15 @@ class Portal(PortalBase):
 
     def _ref_exists_from_cache(self, type_name: str, value: str) -> Optional[List[dict]]:
         if self._ref_cache is not None:
-            self._ref_exists_cache_hit_count += 1
-            return self._ref_cache.get(f"/{type_name}/{value}", None)
+            if ref := self._ref_cache.get(f"/{type_name}/{value}", None):
+                self._ref_exists_cache_hit_count += 1
+            return ref
         self._ref_exists_cache_miss_count += 1
         return None
 
     def _cache_ref(self, type_name: str, value: str, resolved: List[str]) -> None:
         if self._ref_cache is not None:
-            subtype_names = self._get_schema_subtype_names(type_name)
+            subtype_names = self.get_schema_subtype_names(type_name)
             for type_name in [type_name] + subtype_names:
                 self._ref_cache[f"/{type_name}/{value}"] = resolved
 
