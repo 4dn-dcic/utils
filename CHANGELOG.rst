@@ -7,6 +7,11 @@ Change Log
 ----------
 
 
+8.8.3
+=====
+* Minor fix in structured_data related to smaht-submitr progress monitoring.
+
+
 8.8.2
 =====
 * Support for ExtraFiles pseudo-type, to handle extra_files in smaht-submitr..

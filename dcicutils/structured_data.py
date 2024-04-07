@@ -335,7 +335,7 @@ class StructuredDataSet:
             self._add(type_name, structured_row)
             if self._progress:
                 self._progress({
-                    PROGRESS.LOAD_ITEM: True,
+                    PROGRESS.LOAD_ITEM: self._nrows,
                     PROGRESS.LOAD_COUNT_REFS: self.ref_total_count,
                     PROGRESS.LOAD_COUNT_REFS_FOUND: self.ref_total_found_count,
                     PROGRESS.LOAD_COUNT_REFS_NOT_FOUND: self.ref_total_notfound_count,
