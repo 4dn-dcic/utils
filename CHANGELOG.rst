@@ -10,6 +10,7 @@ Change Log
 8.8.3
 =====
 * Minor fix in structured_data related to smaht-submitr progress monitoring.
+* Added progress_bar module (orginally lived in smaht-submitr).
 
 
 8.8.2

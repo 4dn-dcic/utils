@@ -281,6 +281,13 @@ portal_object_utils
    :members:
 
 
+progress_bar
+^^^^^^^^^^^^
+
+.. automodule:: dcicutils.progress_bar
+   :members:
+
+
 progress_constants
 ^^^^^^^^^^^^^^^^^^
 
