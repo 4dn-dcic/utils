@@ -103,9 +103,11 @@ class ProgressBar:
             return True
         return False
 
-    def set_total(self, value: int) -> None:
+    def set_total(self, value: int, reset_eta: bool = False) -> None:
         if value == self._total:
             # If the total has not changed since last set then do nothing.
+            if reset_eta and self._bar is not None:
+                self._bar.reset()
             return
         if isinstance(value, int) and value > 0:
             self._total = value
@@ -114,6 +116,12 @@ class ProgressBar:
                 # the total during the course of a single ProgressBar instance.
                 self._bar.reset()
                 self._bar.total = value
+
+    def reset_eta(self) -> None:
+        # Since set_total does nothing if total is the same, provide
+        # a way to reset the ETA if starting over with the same total.
+        if self._bar is not None:
+            self._bar.reset()
 
     def set_progress(self, value: int) -> None:
         if isinstance(value, int) and value >= 0:
@@ -137,6 +145,7 @@ class ProgressBar:
             return
         self._ended = time.time()
         self._done = True
+        self.set_progress(self.total)  # xyzzy
         self._bar.set_description(self._description)
         self._bar.refresh()
         # FYI: Do NOT do a bar.disable = True before a bar.close() or it messes up output
