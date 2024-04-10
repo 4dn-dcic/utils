@@ -45,6 +45,7 @@ class Portal:
     DEFAULT_APP = APP_SMAHT
     KEYS_FILE_DIRECTORY = "~"
     MIME_TYPE_JSON = "application/json"
+    FILE_TYPE_SCHEMA_NAME = "File"
 
     # Object lookup strategies; on a per-reference (type/value) basis, used currently ONLY by
     # structured_data.py; controlled by an optional ref_lookup_strategy callable; default is
@@ -341,6 +342,9 @@ class Portal:
                         if value.lower() == schema_name:
                             return True
         return False
+
+    def is_schema_file_type(self, schema_name_or_portal_object: Union[str, dict]) -> bool:
+        return self.is_schema_type(schema_name_or_portal_object, self.FILE_TYPE_SCHEMA_NAME)
 
     def isinstance_schema(self, portal_object: dict, target_schema_name: str) -> bool:
         """

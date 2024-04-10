@@ -11,6 +11,7 @@ Change Log
 =====
 * Minor fix in structured_data related to smaht-submitr progress monitoring.
 * Added progress_bar module (orginally lived in smaht-submitr).
+* Added Portal.is_schema_type_file to portal_utils.
 
 
 8.8.2
