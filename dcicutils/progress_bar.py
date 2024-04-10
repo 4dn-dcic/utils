@@ -149,8 +149,7 @@ class ProgressBar:
         if self._done or self._bar is None:
             return
         self._ended = time.time()
-        self._done = True
-        self.set_progress(self.total)  # xyzzy
+        self.set_progress(self.total)
         self._bar.set_description(self._description)
         self._bar.refresh()
         # FYI: Do NOT do a bar.disable = True before a bar.close() or it messes up output
@@ -160,6 +159,7 @@ class ProgressBar:
             self._tidy_output_hack.restore()
         if self._interrupt_handler:
             self._interrupt_handler.restore()
+        self._done = True
 
     def disable(self, value: bool = True) -> None:
         self._disabled = (value is True)
