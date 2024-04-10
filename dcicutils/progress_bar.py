@@ -116,12 +116,17 @@ class ProgressBar:
                 # the total during the course of a single ProgressBar instance.
                 self._bar.reset()
                 self._bar.total = value
+                self._bar.refresh()
 
     def reset_eta(self) -> None:
         # Since set_total does nothing if total is the same, provide
         # a way to reset the ETA if starting over with the same total.
         if self._bar is not None:
+            progress = self._bar.n
             self._bar.reset()
+            self._bar.total = self._total
+            self._bar.n = progress
+            self._bar.refresh()
 
     def set_progress(self, value: int) -> None:
         if isinstance(value, int) and value >= 0:
