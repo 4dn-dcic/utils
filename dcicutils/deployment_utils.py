@@ -430,6 +430,7 @@ class IniFileManager:
                                      auth0_allowed_connections=None,
                                      re_captcha_key=None, re_captcha_secret=None,
                                      redis_server=None,
+                                     google_api_key=None,
                                      file_upload_bucket=None, file_wfout_bucket=None,
                                      blob_bucket=None, system_bucket=None, metadata_bundles_bucket=None):
 
@@ -506,6 +507,7 @@ class IniFileManager:
                                                re_captcha_key=re_captcha_key,
                                                re_captcha_secret=re_captcha_secret,
                                                redis_server=redis_server,
+                                               google_api_key=google_api_key,
                                                file_upload_bucket=file_upload_bucket,
                                                file_wfout_bucket=file_wfout_bucket,
                                                blob_bucket=blob_bucket,
@@ -576,6 +578,7 @@ class IniFileManager:
                                        auth0_allowed_connections=None,
                                        re_captcha_key=None, re_captcha_secret=None,
                                        redis_server=None,
+                                       google_api_key=None,
                                        file_upload_bucket=None,
                                        file_wfout_bucket=None, blob_bucket=None, system_bucket=None,
                                        metadata_bundles_bucket=None):
@@ -632,6 +635,7 @@ class IniFileManager:
         higlass_server = higlass_server or os.environ.get('ENCODED_HIGLASS_SERVER', "MISSING_ENCODED_HIGLASS_SERVER")
         es_server = es_server or os.environ.get('ENCODED_ES_SERVER', "MISSING_ENCODED_ES_SERVER")
         redis_server = redis_server or os.environ.get('ENCODED_REDIS_SERVER', '')  # optional
+        google_api_key = google_api_key or os.environ.get('GOOGLE_API_KEY', '')  # optional
         env_bucket = (env_bucket
                       or EnvBase.global_env_bucket_name()
                       or ("MISSING_GLOBAL_ENV_BUCKET"
@@ -773,6 +777,7 @@ class IniFileManager:
             'HIGLASS_SERVER': higlass_server,
             'ES_SERVER': es_server,
             'REDIS_SERVER': redis_server,
+            'GOOGLE_API_KEY': google_api_key,
             'ENV_BUCKET': env_bucket,
             'ENV_ECOSYSTEM': env_ecosystem,
             'ENV_NAME': env_name,
@@ -945,6 +950,9 @@ class IniFileManager:
             parser.add_argument("--redis_server",
                                 help="server URL to a Redis Cluster",
                                 default=None)
+            parser.add_argument("--google_api_key",
+                                help="Google API key to get smaht-submitr metadata template version",
+                                default=None)
             parser.add_argument("--tibanna_cwls_bucket",
                                 help="the name of a Tibanna CWLs bucket to use",
                                 default=None)
@@ -1024,6 +1032,7 @@ class IniFileManager:
                                              auth0_allowed_connections=args.auth0_allowed_connections,
                                              re_captcha_key=args.recaptcha_key, re_captcha_secret=args.recaptcha_secret,
                                              redis_server=args.redis_server,
+                                             google_api_key=args.google_api_key,
                                              file_upload_bucket=args.file_upload_bucket,
                                              file_wfout_bucket=args.file_wfout_bucket,
                                              blob_bucket=args.blob_bucket, system_bucket=args.system_bucket,

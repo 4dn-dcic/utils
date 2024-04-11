@@ -12,6 +12,8 @@ Change Log
 * Minor fix in structured_data related to smaht-submitr progress monitoring.
 * Added progress_bar module (orginally lived in smaht-submitr).
 * Added Portal.is_schema_type_file to portal_utils.
+* Updated deployment_utils.py with support for GOOGLE_API_KEY in smaht-portal;
+  this is to get the version of the latest smaht-submitr metadata template.
 
 
 8.8.2

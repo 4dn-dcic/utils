@@ -64,7 +64,7 @@ class ProgressBar:
         self._started = time.time()
         self._stop_requested = False
         # Interrupt handling. We do not do the actual (signal) interrupt setup
-        # in self._initialiaze as that could be called from a (sub) thread; and in
+        # in self._initialize as that could be called from a (sub) thread; and in
         # Python we can only set a signal (SIGINT in our case) on the main thread.
         self._catch_interrupt = (catch_interrupt is True)
         self._interrupt = interrupt if callable(interrupt) else None
