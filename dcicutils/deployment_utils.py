@@ -471,6 +471,7 @@ class IniFileManager:
             re_captcha_key (str): key used for reCaptcha for throttling/detecting humans on login
             re_captcha_secret (str): secret used for reCaptcha
             redis_server (str): A server URL to a Redis cluster, for use with sessions
+            google_api_key (str): A Google (Sheets) API key for submitr to get latest metadata template version.
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
             file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
             blob_bucket (str): Specific name of the bucket to use on S3 for blob data.
