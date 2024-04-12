@@ -653,7 +653,8 @@ class Schema(SchemaBase):
         def map_ref(value: str, link_to: str, portal: Optional[Portal], src: Optional[str]) -> Any:
             nonlocal self, typeinfo
             if self._norefs:
-                self._resolved_refs.add((f"/{link_to}/{value}", None))
+                if value:
+                    self._resolved_refs.add((f"/{link_to}/{value}", None))
                 return value
             if not value:
                 if (column := typeinfo.get("column")) and column in self.data.get("required", []):

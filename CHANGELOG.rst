@@ -7,6 +7,12 @@ Change Log
 ----------
 
 
+8.8.4
+=====
+* Minor fix in structured_data to not try to resolve empty refs in norefs mode; not a
+  functionally substantive change as only used with submit-metadata-bundle --info --refs.
+
+
 8.8.3
 =====
 * Minor fix in structured_data related to smaht-submitr progress monitoring.
