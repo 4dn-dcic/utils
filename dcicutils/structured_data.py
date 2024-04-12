@@ -40,7 +40,6 @@ DOTTED_NAME_DELIMITER_CHAR = "."
 
 
 # TODO: Should probably pass this knowledge in from callers.
-FILE_TYPE_NAME = "File"
 FILE_TYPE_PROPERTY_NAME = "filename"
 
 # Forward type references for type hints.
@@ -162,7 +161,7 @@ class StructuredDataSet:
         result = []
         if self._portal:
             for type_name in self.data:
-                if self._portal.is_file_schema(type_name):
+                if self._portal.is_schema_file_type(type_name):
                     for item in self.data[type_name]:
                         if (file_name := item.get(FILE_TYPE_PROPERTY_NAME)):
                             result.append({"type": type_name, "file": file_name})
@@ -335,7 +334,7 @@ class StructuredDataSet:
             self._add(type_name, structured_row)
             if self._progress:
                 self._progress({
-                    PROGRESS.LOAD_ITEM: True,
+                    PROGRESS.LOAD_ITEM: self._nrows,
                     PROGRESS.LOAD_COUNT_REFS: self.ref_total_count,
                     PROGRESS.LOAD_COUNT_REFS_FOUND: self.ref_total_found_count,
                     PROGRESS.LOAD_COUNT_REFS_NOT_FOUND: self.ref_total_notfound_count,
@@ -871,12 +870,6 @@ class Portal(PortalBase):
                 if user_specified_schema.get("title"):
                     schemas[user_specified_schema["title"]] = user_specified_schema
         return schemas
-
-    def is_file_schema(self, schema_name: str) -> bool:
-        """
-        Returns True iff the given schema name isa File type, i.e. has an ancestor which is of type File.
-        """
-        return self.is_schema_type(schema_name, FILE_TYPE_NAME)
 
     def ref_exists(self, type_name: str, value: Optional[str] = None,
                    called_from_map_ref: bool = False) -> Optional[dict]:
