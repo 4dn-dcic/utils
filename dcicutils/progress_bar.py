@@ -5,7 +5,7 @@ import threading
 import time
 from tqdm import tqdm
 from types import FrameType as frame
-from typing import Callable, Optional, Union
+from typing import Callable, List, Optional, Union
 from contextlib import contextmanager
 from dcicutils.command_utils import yes_or_no
 
@@ -54,12 +54,11 @@ class ProgressBar:
                  interrupt_exit: bool = False,
                  interrupt_exit_message: Optional[Union[Callable, str]] = None,
                  interrupt_message: Optional[str] = None,
-                 printf: Optional[Callable] = None,
-                 tidy_output_hack: bool = True) -> None:
+                 tidy_output_hack: bool = True,
+                 capture_output_for_testing: bool = False) -> None:
         self._bar = None
         self._disabled = False
         self._done = False
-        self._printf = printf if callable(printf) else print
         self._tidy_output_hack = (tidy_output_hack is True)
         self._started = time.time()
         self._stop_requested = False
@@ -90,7 +89,7 @@ class ProgressBar:
             self._tidy_output_hack = self._define_tidy_output_hack()
         self._total = total if isinstance(total, int) and total >= 0 else 0
         self._description = self._format_description(description)
-        # self._initialize()
+        self._captured_output_for_testing = [] if capture_output_for_testing else None
 
     def _initialize(self) -> bool:
         # Do not actually create the tqdm object unless/until we have a positive total.
@@ -197,6 +196,10 @@ class ProgressBar:
     def duration(self) -> None:
         return time.time() - self._started
 
+    @property
+    def captured_output_for_testing(self) -> Optional[List[str]]:
+        return self._captured_output_for_testing
+
     def _format_description(self, value: str) -> str:
         if not isinstance(value, str):
             value = ""
@@ -209,7 +212,7 @@ class ProgressBar:
             nonlocal self
             def handle_secondary_interrupt(signum: int, frame: frame) -> None:  # noqa
                 nonlocal self
-                self._printf("\nEnter 'yes' or 'no' or CTRL-\\ to completely abort ...")
+                print("\nEnter 'yes' or 'no' or CTRL-\\ to completely abort ...")
             self.disable()
             self._interrupt(self) if self._interrupt else None
             set_interrupt_handler(handle_secondary_interrupt)
@@ -226,7 +229,7 @@ class ProgressBar:
                         restore_interrupt_handler()
                         if self._interrupt_exit_message:
                             if isinstance(interrupt_exit_message := self._interrupt_exit_message(self), str):
-                                self._printf(interrupt_exit_message)
+                                print(interrupt_exit_message)
                         exit(1)
                     elif interrupt_stop is False or ((interrupt_stop is None) and (self._interrupt_exit is False)):
                         set_interrupt_handler(handle_interrupt)
@@ -261,6 +264,12 @@ class ProgressBar:
             nonlocal self, sys_stdout_write, sentinel_internal, spina, spini, spinn
             def replace_first(value: str, match: str, replacement: str) -> str:  # noqa
                 return value[:i] + replacement + value[i + len(match):] if (i := value.find(match)) >= 0 else value
+            def remove_extra_trailing_spaces(text: str) -> str:  # noqa
+                while text.endswith("  "):
+                    text = text[:-1]
+                return text
+            if not text:
+                return
             if (self._disabled or self._done) and sentinel_internal in text:
                 # Another hack to really disable output on interrupt; in this case we set
                 # tqdm.disable to True, but output can still dribble out, so if the output
@@ -270,11 +279,14 @@ class ProgressBar:
                 spinc = spina[spini % spinn] if not ("100%|" in text) else "| ✓" ; spini += 1  # noqa
                 text = replace_first(text, sentinel_internal, f" {spinc}")
                 text = replace_first(text, "%|", "% ◀|")
+                text = remove_extra_trailing_spaces(text)
                 # Another oddity: for the rate sometimes tqdm intermittently prints
                 # something like "1.54s/" rather than "1.54/s"; something to do with
                 # the unit we gave, which is empty; idunno; just replace it here.
                 text = replace_first(text, "s/ ", "/s ")
             sys_stdout_write(text)
+            if self._captured_output_for_testing is not None:
+                self._captured_output_for_testing.append(text)
             sys.stdout.flush()
         def restore_stdout_write() -> None:  # noqa
             nonlocal sys_stdout_write

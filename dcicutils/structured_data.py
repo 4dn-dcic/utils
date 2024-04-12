@@ -654,7 +654,9 @@ class Schema(SchemaBase):
             nonlocal self, typeinfo
             if self._norefs:
                 if value:
-                    self._resolved_refs.add((f"/{link_to}/{value}", None))
+                    # Dump the src because this cannot add dictionary to a set; note that
+                    # this is ONLY used for smaht-submitr/submit-metadata-bundle --info --refs.
+                    self._resolved_refs.add((f"/{link_to}/{value}", json.dumps(src) if isinstance(src, dict) else None))
                 return value
             if not value:
                 if (column := typeinfo.get("column")) and column in self.data.get("required", []):

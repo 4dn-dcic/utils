@@ -11,6 +11,8 @@ Change Log
 =====
 * Minor fix in structured_data to not try to resolve empty refs in norefs mode; not a
   functionally substantive change as only used with submit-metadata-bundle --info --refs.
+* Fixed up captured_output module to handle UTF-8 encoding to help unit testing progress_bar.
+* Added hooks to progress_bar to help unit testing.
 
 
 8.8.3
