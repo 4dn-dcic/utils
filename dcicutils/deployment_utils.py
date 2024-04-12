@@ -431,6 +431,7 @@ class IniFileManager:
                                      re_captcha_key=None, re_captcha_secret=None,
                                      redis_server=None,
                                      google_api_key=None,
+                                     submitr_metadata_template_sheet_id=None,
                                      file_upload_bucket=None, file_wfout_bucket=None,
                                      blob_bucket=None, system_bucket=None, metadata_bundles_bucket=None):
 
@@ -471,7 +472,8 @@ class IniFileManager:
             re_captcha_key (str): key used for reCaptcha for throttling/detecting humans on login
             re_captcha_secret (str): secret used for reCaptcha
             redis_server (str): A server URL to a Redis cluster, for use with sessions
-            google_api_key (str): A Google (Sheets) API key for submitr to get latest metadata template version.
+            google_api_key (str): A Google (Sheets) API key for smaht-submitr to get latest metadata template version.
+            submitr_metadata_template_sheet_id (str): A Google Sheets doc ID key for smaht-submitr metadata template.
             file_upload_bucket (str): Specific name of the bucket to use on S3 for file upload data.
             file_wfout_bucket (str): Specific name of the bucket to use on S3 for wfout data.
             blob_bucket (str): Specific name of the bucket to use on S3 for blob data.
@@ -509,6 +511,7 @@ class IniFileManager:
                                                re_captcha_secret=re_captcha_secret,
                                                redis_server=redis_server,
                                                google_api_key=google_api_key,
+                                               submitr_metadata_template_sheet_id=submitr_metadata_template_sheet_id,
                                                file_upload_bucket=file_upload_bucket,
                                                file_wfout_bucket=file_wfout_bucket,
                                                blob_bucket=blob_bucket,
@@ -580,6 +583,7 @@ class IniFileManager:
                                        re_captcha_key=None, re_captcha_secret=None,
                                        redis_server=None,
                                        google_api_key=None,
+                                       submitr_metadata_template_sheet_id=None,
                                        file_upload_bucket=None,
                                        file_wfout_bucket=None, blob_bucket=None, system_bucket=None,
                                        metadata_bundles_bucket=None):
@@ -637,6 +641,8 @@ class IniFileManager:
         es_server = es_server or os.environ.get('ENCODED_ES_SERVER', "MISSING_ENCODED_ES_SERVER")
         redis_server = redis_server or os.environ.get('ENCODED_REDIS_SERVER', '')  # optional
         google_api_key = google_api_key or os.environ.get('GOOGLE_API_KEY', '')  # optional
+        submitr_metadata_template_sheet_id = (
+            submitr_metadata_template_sheet_id or os.environ.get('SUBMITR_METADATA_TEMPLATE_SHEET_ID', ''))  # optional
         env_bucket = (env_bucket
                       or EnvBase.global_env_bucket_name()
                       or ("MISSING_GLOBAL_ENV_BUCKET"
@@ -779,6 +785,7 @@ class IniFileManager:
             'ES_SERVER': es_server,
             'REDIS_SERVER': redis_server,
             'GOOGLE_API_KEY': google_api_key,
+            'SUBMITR_METADATA_TEMPLATE_SHEET_ID': submitr_metadata_template_sheet_id,
             'ENV_BUCKET': env_bucket,
             'ENV_ECOSYSTEM': env_ecosystem,
             'ENV_NAME': env_name,
@@ -954,6 +961,9 @@ class IniFileManager:
             parser.add_argument("--google_api_key",
                                 help="Google API key to get smaht-submitr metadata template version",
                                 default=None)
+            parser.add_argument("--submitr_metadata_template_sheet_id",
+                                help="Google Sheets API document ID of smaht-submitr metadata template",
+                                default=None)
             parser.add_argument("--tibanna_cwls_bucket",
                                 help="the name of a Tibanna CWLs bucket to use",
                                 default=None)
@@ -1013,31 +1023,33 @@ class IniFileManager:
             ini_file_name = args.target
             # print("template_file_name=", template_file_name)
             # print("ini_file_name=", ini_file_name)
-            cls.build_ini_file_from_template(template_file_name, ini_file_name,
-                                             bs_env=args.bs_env, bs_mirror_env=args.bs_mirror_env,
-                                             env_bucket=args.env_bucket, env_ecosystem=args.env_ecosystem,
-                                             env_name=args.env_name,
-                                             s3_bucket_org=args.s3_bucket_org, s3_bucket_env=args.s3_bucket_env,
-                                             data_set=args.data_set, s3_encrypt_key_id=args.s3_encrypt_key_id,
-                                             es_server=args.es_server, es_namespace=args.es_namespace,
-                                             indexer=args.indexer, index_server=args.index_server,
-                                             identity=args.identity, higlass_server=args.higlass_server,
-                                             sentry_dsn=args.sentry_dsn,
-                                             tibanna_cwls_bucket=args.tibanna_cwls_bucket,
-                                             tibanna_output_bucket=args.tibanna_output_bucket,
-                                             application_bucket_prefix=args.application_bucket_prefix,
-                                             foursight_bucket_prefix=args.foursight_bucket_prefix,
-                                             auth0_domain=args.auth0_domain,
-                                             auth0_client=args.auth0_client,
-                                             auth0_secret=args.auth0_secret,
-                                             auth0_allowed_connections=args.auth0_allowed_connections,
-                                             re_captcha_key=args.recaptcha_key, re_captcha_secret=args.recaptcha_secret,
-                                             redis_server=args.redis_server,
-                                             google_api_key=args.google_api_key,
-                                             file_upload_bucket=args.file_upload_bucket,
-                                             file_wfout_bucket=args.file_wfout_bucket,
-                                             blob_bucket=args.blob_bucket, system_bucket=args.system_bucket,
-                                             metadata_bundles_bucket=args.metadata_bundles_bucket)
+            cls.build_ini_file_from_template(
+                template_file_name, ini_file_name,
+                bs_env=args.bs_env, bs_mirror_env=args.bs_mirror_env,
+                env_bucket=args.env_bucket, env_ecosystem=args.env_ecosystem,
+                env_name=args.env_name,
+                s3_bucket_org=args.s3_bucket_org, s3_bucket_env=args.s3_bucket_env,
+                data_set=args.data_set, s3_encrypt_key_id=args.s3_encrypt_key_id,
+                es_server=args.es_server, es_namespace=args.es_namespace,
+                indexer=args.indexer, index_server=args.index_server,
+                identity=args.identity, higlass_server=args.higlass_server,
+                sentry_dsn=args.sentry_dsn,
+                tibanna_cwls_bucket=args.tibanna_cwls_bucket,
+                tibanna_output_bucket=args.tibanna_output_bucket,
+                application_bucket_prefix=args.application_bucket_prefix,
+                foursight_bucket_prefix=args.foursight_bucket_prefix,
+                auth0_domain=args.auth0_domain,
+                auth0_client=args.auth0_client,
+                auth0_secret=args.auth0_secret,
+                auth0_allowed_connections=args.auth0_allowed_connections,
+                re_captcha_key=args.recaptcha_key, re_captcha_secret=args.recaptcha_secret,
+                redis_server=args.redis_server,
+                google_api_key=args.google_api_key,
+                submitr_metadata_template_sheet_id=args.submitr_metadata_template_sheet_id,
+                file_upload_bucket=args.file_upload_bucket,
+                file_wfout_bucket=args.file_wfout_bucket,
+                blob_bucket=args.blob_bucket, system_bucket=args.system_bucket,
+                metadata_bundles_bucket=args.metadata_bundles_bucket)
         except Exception as e:
             PRINT("Error (%s): %s" % (e.__class__.__name__, e))
             sys.exit(1)
