@@ -211,7 +211,6 @@ class ProgressBar:
         def handle_interrupt(signum: int, frame: frame) -> None:  # noqa
             nonlocal self
             def handle_secondary_interrupt(signum: int, frame: frame) -> None:  # noqa
-                nonlocal self
                 print("\nEnter 'yes' or 'no' or CTRL-\\ to completely abort ...")
             self.disable()
             self._interrupt(self) if self._interrupt else None
@@ -260,16 +259,25 @@ class ProgressBar:
         # string in the display string where the progress bar should actually go,
         # which we do in _format_description. Other minor things too; see below.
         sys_stdout_write = sys.stdout.write
+        total_most_recent = None
+        progress_most_recent = None
+        description_most_recent = None
         def tidy_stdout_write(text: str) -> None:  # noqa
             nonlocal self, sys_stdout_write, sentinel_internal, spina, spini, spinn
+            nonlocal total_most_recent, progress_most_recent, description_most_recent
             def replace_first(value: str, match: str, replacement: str) -> str:  # noqa
                 return value[:i] + replacement + value[i + len(match):] if (i := value.find(match)) >= 0 else value
             def remove_extra_trailing_spaces(text: str) -> str:  # noqa
                 while text.endswith("  "):
                     text = text[:-1]
                 return text
-            if not text:
+            if not text or not self._bar:
                 return
+            if (self._bar.total == total_most_recent) and (self._bar.n == progress_most_recent):
+                return
+            total_most_recent = self._bar.total
+            progress_most_recent = self._bar.n
+            description_most_recent = self._description
             if (self._disabled or self._done) and sentinel_internal in text:
                 # Another hack to really disable output on interrupt; in this case we set
                 # tqdm.disable to True, but output can still dribble out, so if the output
