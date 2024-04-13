@@ -2548,6 +2548,29 @@ def normalize_spaces(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
+def find_nth_from_end(string: str, substring: str, nth: int) -> int:
+    """
+    Returns the index of the nth occurrence of the given substring within
+    the given string from the END of the given string; or -1 if not found.
+    """
+    index = -1
+    string = string[::-1]
+    for i in range(0, nth):
+        index = string.find(substring, index + 1)
+    return len(string) - index - 1 if index >= 0 else -1
+
+
+def set_nth(string: str, nth: int, replacement: str) -> str:
+    """
+    Sets the nth character of the given string to the given replacement string.
+    """
+    if not isinstance(string, str) or not isinstance(nth, int) or not isinstance(replacement, str):
+        return string
+    if nth < 0:
+        nth += len(string)
+    return string[:nth] + replacement + string[nth + 1:] if 0 <= nth < len(string) else string
+
+
 class JsonLinesReader:
 
     def __init__(self, fp, padded=False, padding=None):
