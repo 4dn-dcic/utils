@@ -1,4 +1,5 @@
 from collections import namedtuple
+import re
 from signal import signal, SIGINT
 import sys
 import threading
@@ -8,6 +9,7 @@ from types import FrameType as frame
 from typing import Callable, List, Optional, Union
 from contextlib import contextmanager
 from dcicutils.command_utils import yes_or_no
+from dcicutils.misc_utils import find_nth_from_end, set_nth
 
 
 class TQDM(tqdm):
@@ -281,7 +283,7 @@ class ProgressBar:
                 # looks like it is from tqdm and we are disabled/done then do no output.
                 return
             if sentinel_internal in text:
-                spinc = spina[spini % spinn] if not ("100%|" in text) else "| ✓" ; spini += 1  # noqa
+                spinc = spina[spini % spinn] if not ("100%|" in text) else "✓" ; spini += 1  # noqa
                 text = replace_first(text, sentinel_internal, f" {spinc}")
                 text = replace_first(text, "%|", "% ◀|")
                 text = remove_extra_trailing_spaces(text)
@@ -290,9 +292,26 @@ class ProgressBar:
                 # the unit we gave, which is empty; idunno; just replace it here.
                 text = replace_first(text, "s/ ", "/s ")
             sys_stdout_write(text)
-            if self._captured_output_for_testing is not None:
-                self._captured_output_for_testing.append(text)
             sys.stdout.flush()
+            if self._captured_output_for_testing is not None:
+                # For testing only we replace vacilliting values in the out like rate,
+                # time elapsed, and ETA with static values; so that something like this:
+                # > Working /  20% ◀|█████████▌  | 1/5 | 536.00/s | 00:01 | ETA: 00:02
+                # becomes something more static like this after calling this function:
+                # > Working |  20% ◀|### | 1/5 | 0.0/s | 00:00 | ETA: 00:00
+                # This function obviously has intimate knowledge of the output; better here than in tests.
+                def replace_vacillating_values_with_static(text: str) -> str:
+                    blocks = "\u2587|\u2588|\u2589|\u258a|\u258b|\u258c|\u258d|\u258e|\u258f"
+                    if (n := find_nth_from_end(text, "|", 5)) >= 8:
+                        pattern = re.compile(
+                            rf"(\s*)(\d*%? ◀\|)(?:\s*{blocks}|#)*\s*(\|\s*\d+/\d+)?(\s*\|\s*)"
+                            rf"(?:\d+\.?\d*|\?)(\/s\s*\|\s*)(?:\d+:\d+)?(\s*\|\s*ETA:\s*)(?:\d+:\d+|\?)?")
+                        if match := pattern.match(text[n - 6:]):
+                            if text[n - 8:n - 7] != "✓": text = set_nth(text, n - 8, "|")  # noqa
+                            return (text[0:n - 6].replace("\r", "") +
+                                    match.expand(rf"\g<1>\g<2>### \g<3>\g<4>0.0\g<5>00:00\g<6>00:00"))
+                    return text
+                self._captured_output_for_testing.append(replace_vacillating_values_with_static(text))
         def restore_stdout_write() -> None:  # noqa
             nonlocal sys_stdout_write
             if sys_stdout_write is not None:
