@@ -14,6 +14,7 @@ Change Log
 * Fixed up captured_output module to handle UTF-8 encoding to help unit testing progress_bar.
 * Added hooks to progress_bar to help unit testing.
 * Added a find_nth_from_end and set_nth to misc_utils to help progress_bar unit testing.
+* Added test_progress_bar module.
 
 
 8.8.3

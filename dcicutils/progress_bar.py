@@ -61,6 +61,8 @@ class ProgressBar:
         self._bar = None
         self._disabled = False
         self._done = False
+        self._really_done = False
+        self.foo = time.time()
         self._tidy_output_hack = (tidy_output_hack is True)
         self._started = time.time()
         self._stop_requested = False
@@ -104,11 +106,9 @@ class ProgressBar:
             return True
         return False
 
-    def set_total(self, value: int, reset_eta: bool = False) -> None:
+    def set_total(self, value: int) -> None:
         if value == self._total:
             # If the total has not changed since last set then do nothing.
-            if reset_eta and self._bar is not None:
-                self._bar.reset()
             return
         if isinstance(value, int) and value > 0:
             self._total = value
@@ -118,16 +118,6 @@ class ProgressBar:
                 self._bar.reset()
                 self._bar.total = value
                 self._bar.refresh()
-
-    def reset_eta(self) -> None:
-        # Since set_total does nothing if total is the same, provide
-        # a way to reset the ETA if starting over with the same total.
-        if self._bar is not None:
-            progress = self._bar.n
-            self._bar.reset()
-            self._bar.total = self._total
-            self._bar.n = progress
-            self._bar.refresh()
 
     def set_progress(self, value: int) -> None:
         if isinstance(value, int) and value >= 0:
@@ -141,17 +131,29 @@ class ProgressBar:
                 self._bar.update(value)
                 self._bar.refresh()
 
-    def set_description(self, value: str) -> None:
-        self._description = self._format_description(value)
+    def reset_eta(self) -> None:
+        # Since set_total does nothing if total is the same, provide
+        # a way to reset the ETA if starting over with the same total.
+        # But NOTE that resetting ETA will ALSO reset the ELAPSED time.
         if self._bar is not None:
-            self._bar.set_description(self._description)
+            progress = self._bar.n
+            self._bar.reset()
+            self._bar.total = self._total
+            self._bar.n = progress
+            self._bar.refresh()
 
-    def done(self) -> None:
+    def set_description(self, value: str) -> None:
+        if isinstance(value, str):
+            self._description = self._format_description(value)
+            if self._bar is not None:
+                self._bar.set_description(self._description)
+
+    def done(self, description: Optional[str] = None) -> None:
         if self._done or self._bar is None:
             return
         self._ended = time.time()
         self.set_progress(self.total)
-        self._bar.set_description(self._description)
+        self.set_description(description)
         self._bar.refresh()
         # FYI: Do NOT do a bar.disable = True before a bar.close() or it messes up output
         # on multiple calls; found out the hard way; a couple hours will never get back :-/
@@ -201,6 +203,12 @@ class ProgressBar:
     @property
     def captured_output_for_testing(self) -> Optional[List[str]]:
         return self._captured_output_for_testing
+
+    @staticmethod
+    def format_captured_output_for_testing(description: str, total: int, progress: int) -> str:
+        percent = round((progress / total) * 100.0)
+        separator = "✓" if percent == 100 else "|"
+        return f"{description} {separator} {percent:>3}% ◀|### | {progress}/{total} | 0.0/s | 00:00 | ETA: 00:00"
 
     def _format_description(self, value: str) -> str:
         if not isinstance(value, str):
@@ -261,22 +269,19 @@ class ProgressBar:
         # string in the display string where the progress bar should actually go,
         # which we do in _format_description. Other minor things too; see below.
         sys_stdout_write = sys.stdout.write
-        last_total = None ; last_progress = None ; last_text = None  # noqa
+        last_text = None ; last_captured_output_text = None  # noqa
         def tidy_stdout_write(text: str) -> None:  # noqa
             nonlocal self, sys_stdout_write, sentinel_internal, spina, spini, spinn
-            nonlocal last_total, last_progress, last_text
+            nonlocal last_text, last_captured_output_text
             def replace_first(value: str, match: str, replacement: str) -> str:  # noqa
                 return value[:i] + replacement + value[i + len(match):] if (i := value.find(match)) >= 0 else value
             def remove_extra_trailing_spaces(text: str) -> str:  # noqa
                 while text.endswith("  "):
                     text = text[:-1]
                 return text
-            if not text:
+            if (not text) or (last_text == text) or self._really_done:
                 return
-            if self._bar:
-                if ((self._bar.total == last_total) and (self._bar.n == last_progress) and (last_text == text)):
-                    return
-                last_total = self._bar.total ; last_progress = self._bar.n ; last_text = text  # noqa
+            last_text = text
             if (self._disabled or self._done) and sentinel_internal in text:
                 # Another hack to really disable output on interrupt; in this case we set
                 # tqdm.disable to True, but output can still dribble out, so if the output
@@ -293,6 +298,9 @@ class ProgressBar:
                 text = replace_first(text, "s/ ", "/s ")
             sys_stdout_write(text)
             sys.stdout.flush()
+            if self._done:
+                self._really_done = True
+                return
             if self._captured_output_for_testing is not None:
                 # For testing only we replace vacilliting values in the out like rate,
                 # time elapsed, and ETA with static values; so that something like this:
@@ -300,7 +308,7 @@ class ProgressBar:
                 # becomes something more static like this after calling this function:
                 # > Working |  20% ◀|### | 1/5 | 0.0/s | 00:00 | ETA: 00:00
                 # This function obviously has intimate knowledge of the output; better here than in tests.
-                def replace_vacillating_values_with_static(text: str) -> str:
+                def replace_time_dependent_values_with_static(text: str) -> str:
                     blocks = "\u2587|\u2588|\u2589|\u258a|\u258b|\u258c|\u258d|\u258e|\u258f"
                     if (n := find_nth_from_end(text, "|", 5)) >= 8:
                         pattern = re.compile(
@@ -311,7 +319,11 @@ class ProgressBar:
                             return (text[0:n - 6].replace("\r", "") +
                                     match.expand(rf"\g<1>\g<2>### \g<3>\g<4>0.0\g<5>00:00\g<6>00:00"))
                     return text
-                self._captured_output_for_testing.append(replace_vacillating_values_with_static(text))
+                if text != "\n":
+                    captured_output_text = replace_time_dependent_values_with_static(text)
+                    if captured_output_text != last_captured_output_text:
+                        self._captured_output_for_testing.append(captured_output_text)
+                        last_captured_output_text = captured_output_text
         def restore_stdout_write() -> None:  # noqa
             nonlocal sys_stdout_write
             if sys_stdout_write is not None:
