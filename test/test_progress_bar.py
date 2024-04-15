@@ -13,7 +13,7 @@ def test_progress_bar_a():
     bar.done("Done")
 
     bar_output = bar.captured_output_for_testing
-    # Bar output count is total plus-1 for 0/total and andother plus-1 for "Done" after total/total (100%).
+    # Bar output count is total plus-one for 0/total and and other plus-one for "Done" after total/total (100%).
     assert len(bar_output) == total + 2
     i = 0
     for line in bar_output:
