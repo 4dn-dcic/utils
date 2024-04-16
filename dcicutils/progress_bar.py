@@ -106,7 +106,7 @@ class ProgressBar:
             return True
         return False
 
-    def set_total(self, value: int) -> None:
+    def set_total(self, value: int, _norefresh: bool = False) -> None:
         if value == self._total:
             # If the total has not changed since last set then do nothing.
             return
@@ -117,19 +117,28 @@ class ProgressBar:
                 # the total during the course of a single ProgressBar instance.
                 self._bar.reset()
                 self._bar.total = value
-                self._bar.refresh()
+                if not _norefresh:
+                    self._bar.refresh()
 
-    def set_progress(self, value: int) -> None:
+    def set_progress(self, value: int, _norefresh: bool = False) -> None:
         if isinstance(value, int) and value >= 0:
             if (self._bar is not None) or self._initialize():
                 self._bar.n = value
-                self._bar.refresh()
+                if not _norefresh:
+                    self._bar.refresh()
 
     def increment_progress(self, value: int) -> None:
         if isinstance(value, int) and value > 0:
             if (self._bar is not None) or self._initialize():
                 self._bar.update(value)
                 self._bar.refresh()
+
+    def set_description(self, value: str) -> None:
+        if isinstance(value, str):
+            self._description = self._format_description(value)
+            if self._bar is not None:
+                # FYI: tqdm.set_description seems to imply a refresh.
+                self._bar.set_description(self._description)
 
     def reset_eta(self) -> None:
         # Since set_total does nothing if total is the same, provide
@@ -142,11 +151,10 @@ class ProgressBar:
             self._bar.n = progress
             self._bar.refresh()
 
-    def set_description(self, value: str) -> None:
-        if isinstance(value, str):
-            self._description = self._format_description(value)
-            if self._bar is not None:
-                self._bar.set_description(self._description)
+    def reset(self, total: int, progress: int = 0, description: Optional[str] = None) -> None:
+        self.set_total(total, _norefresh=True)
+        self.set_progress(progress, _norefresh=True)
+        self.set_description(description)
 
     def done(self, description: Optional[str] = None) -> None:
         if self._done or self._bar is None:
