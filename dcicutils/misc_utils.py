@@ -2571,6 +2571,28 @@ def set_nth(string: str, nth: int, replacement: str) -> str:
     return string[:nth] + replacement + string[nth + 1:] if 0 <= nth < len(string) else string
 
 
+def format_size(nbytes: Union[int, float], precision: int = 2, nospace: bool = False, terse: bool = False) -> str:
+    if isinstance(nbytes, str) and nbytes.isdigit():
+        nbytes = int(nbytes)
+    elif not isinstance(nbytes, (int, float)):
+        return ""
+    UNITS = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+    UNITS_TERSE = ['b', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
+    MAX_UNITS_INDEX = len(UNITS) - 1
+    ONE_K = 1024
+    index = 0
+    if (precision := max(precision, 0)) and (nbytes <= ONE_K):
+        precision -= 1
+    while abs(nbytes) >= ONE_K and index < MAX_UNITS_INDEX:
+        nbytes /= ONE_K
+        index += 1
+    if index == 0:
+        nbytes = int(nbytes)
+        return f"{nbytes} byte{'s' if nbytes != 1 else ''}"
+    unit = (UNITS_TERSE if terse else UNITS)[index]
+    return f"{nbytes:.{precision}f}{'' if nospace else ' '}{unit}"
+
+
 class JsonLinesReader:
 
     def __init__(self, fp, padded=False, padding=None):

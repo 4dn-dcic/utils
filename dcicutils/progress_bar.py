@@ -9,7 +9,7 @@ from types import FrameType as frame
 from typing import Callable, List, Optional, Union
 from contextlib import contextmanager
 from dcicutils.command_utils import yes_or_no
-from dcicutils.misc_utils import find_nth_from_end, set_nth
+from dcicutils.misc_utils import find_nth_from_end, format_size, set_nth
 
 
 class TQDM(tqdm):
@@ -49,6 +49,7 @@ class ProgressBar:
 
     def __init__(self, total: Optional[int] = None,
                  description: Optional[str] = None,
+                 use_byte_size_for_rate: bool = False,
                  catch_interrupt: bool = True,
                  interrupt: Optional[Callable] = None,
                  interrupt_continue: Optional[Callable] = None,
@@ -59,11 +60,12 @@ class ProgressBar:
                  tidy_output_hack: bool = True,
                  capture_output_for_testing: bool = False) -> None:
         self._bar = None
+        self._started = 0
         self._disabled = False
         self._done = False
         self._tidy_output_hack = (tidy_output_hack is True)
-        self._started = time.time()
         self._stop_requested = False
+        self._use_byte_size_for_rate = (use_byte_size_for_rate is True and self._tidy_output_hack)
         # Interrupt handling. We do not do the actual (signal) interrupt setup
         # in self._initialize as that could be called from a (sub) thread; and in
         # Python we can only set a signal (SIGINT in our case) on the main thread.
@@ -96,9 +98,13 @@ class ProgressBar:
     def _initialize(self) -> bool:
         # Do not actually create the tqdm object unless/until we have a positive total.
         if (self._bar is None) and (self._total > 0):
-            bar_format = "{l_bar}{bar}| {n_fmt}/{total_fmt} | {rate_fmt} | {elapsed}{postfix} | ETA: {remaining} "
+            if self._use_byte_size_for_rate:
+                bar_format = "{l_bar}{bar}| {n_fmt}/{total_fmt} | [rate] | {elapsed}{postfix} | ETA: {remaining} "
+            else:
+                bar_format = "{l_bar}{bar}| {n_fmt}/{total_fmt} | {rate_fmt} | {elapsed}{postfix} | ETA: {remaining} "
             self._bar = TQDM(total=self._total, desc=self._description,
                              dynamic_ncols=True, bar_format=bar_format, unit="", file=sys.stdout)
+            self._started = time.time()
             if self._disabled:
                 self._bar.disable = True
             return True
@@ -153,6 +159,7 @@ class ProgressBar:
         self.set_total(total, _norefresh=True)
         self.set_progress(progress, _norefresh=True)
         self.set_description(description)
+        self._started = time.time()
 
     def done(self, description: Optional[str] = None) -> None:
         if self._done or self._bar is None:
@@ -197,14 +204,6 @@ class ProgressBar:
     @property
     def stop_requested(self) -> bool:
         return self._stop_requested
-
-    @property
-    def started(self) -> None:
-        return self._started
-
-    @property
-    def duration(self) -> None:
-        return time.time() - self._started
 
     @property
     def captured_output_for_testing(self) -> Optional[List[str]]:
@@ -302,6 +301,9 @@ class ProgressBar:
                 # something like "1.54s/" rather than "1.54/s"; something to do with
                 # the unit we gave, which is empty; idunno; just replace it here.
                 text = replace_first(text, "s/ ", "/s ")
+            if self._use_byte_size_for_rate and self._bar:
+                rate = self._bar.n / (time.time() - self._started)
+                text = text.replace("[rate]", f"{format_size(rate)}/s")
             sys_stdout_write(text)
             sys.stdout.flush()
             if self._captured_output_for_testing is not None:
