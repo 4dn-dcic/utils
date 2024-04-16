@@ -2,8 +2,6 @@ import time
 from dcicutils.progress_bar import ProgressBar
 
 sleep_seconds = 0.000001
-sleep_seconds = 0.0001
-sleep_seconds = 0
 sleep = lambda: time.sleep(sleep_seconds) if sleep_seconds > 0 else None  # noqa
 
 
@@ -40,9 +38,9 @@ def test_progress_bar_b():
             bar.increment_progress(1) ; sleep()  # noqa
 
     global sleep
+    ntasks = 9
     total = 1001
     description = "Working"
-    ntasks = 9
     bar = ProgressBar(total=total, description=description, capture_output_for_testing=True)
 
     for i in range(ntasks):
