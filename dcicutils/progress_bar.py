@@ -61,8 +61,6 @@ class ProgressBar:
         self._bar = None
         self._disabled = False
         self._done = False
-        self._really_done = False
-        self.foo = time.time()
         self._tidy_output_hack = (tidy_output_hack is True)
         self._started = time.time()
         self._stop_requested = False
@@ -287,7 +285,7 @@ class ProgressBar:
                 while text.endswith("  "):
                     text = text[:-1]
                 return text
-            if (not text) or (last_text == text) or self._really_done:
+            if (not text) or (last_text == text):
                 return
             last_text = text
             if (self._disabled or self._done) and sentinel_internal in text:
@@ -306,9 +304,6 @@ class ProgressBar:
                 text = replace_first(text, "s/ ", "/s ")
             sys_stdout_write(text)
             sys.stdout.flush()
-            if self._done:
-                self._really_done = True
-                return
             if self._captured_output_for_testing is not None:
                 # For testing only we replace vacilliting values in the out like rate,
                 # time elapsed, and ETA with static values; so that something like this:
