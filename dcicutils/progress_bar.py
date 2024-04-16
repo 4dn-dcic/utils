@@ -11,9 +11,6 @@ from contextlib import contextmanager
 from dcicutils.command_utils import yes_or_no
 from dcicutils.misc_utils import find_nth_from_end, set_nth
 
-xyzzy = open("/tmp/f", "w")
-def deb(s):
-    xyzzy.write(f"{s}\n")
 
 class TQDM(tqdm):
 
@@ -290,7 +287,6 @@ class ProgressBar:
                 while text.endswith("  "):
                     text = text[:-1]
                 return text
-            deb(text)
             if (not text) or (last_text == text) or self._really_done:
                 return
             last_text = text
