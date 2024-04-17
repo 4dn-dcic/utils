@@ -114,43 +114,12 @@ def get_timezone(hours: int, minutes: Optional[int] = None) -> timezone:
         return timezone.utc
 
 
-def format_datetime(value: datetime,
-                    tz: Optional[timezone] = None,
-                    notz: bool = False,
-                    noseconds: bool = False,
-                    verbose: bool = False,
-                    noseparator: bool = False,
-                    noday: bool = False) -> Optional[str]:
-    """
-    Returns the given datetime as a string in standard "YYYY:MM:DD hh:mm:ss tz" format,
-    for example "2024-04-17 15:42:26 EDT". If the given notz argument is True then omits
-    the timezone; if the noseconds argument is given the omits the seconds. If the verbose
-    option is given returns a really verbose version of the datetime, for example "Wednesday,
-    April 17, 2024 | 15:42:26 EDT"; if the noseparator argument is True then omits the "|"
-    separator; if the noday argument is True then omits the day of week part.
-    """
-    if not isinstance(value, datetime):
-        if not isinstance(value, str) or not (value := parse_datetime(value)):
-            return None
-    try:
-        tzlocal = datetime.now().astimezone().tzinfo if not isinstance(tz, timezone) else tz
-        if verbose:
-            return value.astimezone(tzlocal).strftime(
-                f"{'' if noday is True else '%A, '}%B %-d, %Y{'' if noseparator is True else ' |'}"
-                f" %-I:%M{'' if noseconds is True else ':%S'} %p{'' if notz is True else ' %Z'}")
-        else:
-            return value.astimezone(tzlocal).strftime(
-                f"%Y-%m-%d %H:%M{'' if noseconds is True else ':%S'}{'' if notz is True else ' %Z'}")
-    except Exception:
-        return None
-
-
 def parse_datetime(value: str, utc: bool = False, tz: Optional[timezone] = None) -> Optional[datetime]:
     """
     Parses the given string into a datetime, if possible, and returns that value,
-    or None if not able to parse. The timezone of the returned datetime will be
-    the local timezone; or if the given utc argument is True then it will be UTC; or
-    if the given tz argument is a datetime.timezone then it will be in that timezone.
+    or None if not able to parse. The timezone of the returned datetime will be the
+    local timezone; or if the given utc argument is True then it will be UTC; or if the
+    given tz argument is a datetime.timezone then return datetime will be in that timezone.
     """
     if isinstance(value, datetime):
         return value
@@ -165,5 +134,43 @@ def parse_datetime(value: str, utc: bool = False, tz: Optional[timezone] = None)
             return value.astimezone(tz)
         else:
             return value.astimezone(get_local_timezone())
+    except Exception:
+        return None
+
+
+def format_datetime(value: datetime,
+                    utc: bool = False,
+                    tz: Optional[timezone] = None,
+                    notz: bool = False,
+                    noseconds: bool = False,
+                    verbose: bool = False,
+                    noseparator: bool = False,
+                    noday: bool = False) -> Optional[str]:
+    """
+    Returns the given datetime as a string in "YYYY:MM:DD hh:mm:ss tz" format, for
+    example "2024-04-17 15:42:26 EDT". If the given notz argument is True then omits
+    the timezone; if the noseconds argument is given the omits the seconds. If the given
+    verbose argument is True then returns a really verbose version of the datetime, for
+    example "Wednesday, April 17, 2024 | 15:42:26 EDT"; if the noseparator argument is
+    True then omits the "|" separator; if the noday argument is True then omits the day
+    of week part. The timezone of the returned datetime string will default to the local
+    one; if the given utc argument is True then it will be UTC; or if the given tz
+    argument is a datetime.timezone it will be in that timezone.
+    """
+    if not isinstance(value, datetime):
+        if not isinstance(value, str) or not (value := parse_datetime(value)):
+            return None
+    try:
+        if utc is True:
+            tz = timezone.utc
+        elif not isinstance(tz, timezone):
+            tz = get_local_timezone()
+        if verbose:
+            return value.astimezone(tz).strftime(
+                f"{'' if noday is True else '%A, '}%B %-d, %Y{'' if noseparator is True else ' |'}"
+                f" %-I:%M{'' if noseconds is True else ':%S'} %p{'' if notz is True else ' %Z'}")
+        else:
+            return value.astimezone(tz).strftime(
+                f"%Y-%m-%d %H:%M{'' if noseconds is True else ':%S'}{'' if notz is True else ' %Z'}")
     except Exception:
         return None
