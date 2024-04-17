@@ -1,19 +1,19 @@
 import time
 from dcicutils.progress_bar import ProgressBar
 
-sleep_seconds = 0
-sleep = lambda: time.sleep(sleep_seconds) if sleep_seconds > 0 else None  # noqa
+# sleep_seconds = 0
+# sleep = lambda: time.sleep(sleep_seconds) if sleep_seconds > 0 else None  # noqa
 
 
-def disable_test_progress_bar_a():
+def _disable_test_progress_bar_a():
 
-    global sleep
+    # global sleep
     total = 1000
     description = "Working"
     bar = ProgressBar(total=total, description=description, capture_output_for_testing=True)
 
     for i in range(total):
-        bar.increment_progress(1) ; sleep()  # noqa
+        bar.increment_progress(1)  # ; sleep()  # noqa
     bar.done("Done")
 
     bar_output = bar.captured_output_for_testing
@@ -30,14 +30,14 @@ def disable_test_progress_bar_a():
         i += 1
 
 
-def disable_test_progress_bar_b():
+def _disable_test_progress_bar_b():
 
     def run_single_task(bar: ProgressBar, total: int, task_number: int) -> None:
         bar.reset(total=total, progress=0, description=f"Task-{task_number}")
         for i in range(total):
-            bar.increment_progress(1) ; sleep()  # noqa
+            bar.increment_progress(1)  # ; sleep()  # noqa
 
-    global sleep
+    # global sleep
     ntasks = 9
     total = 1001
     description = "Working"
