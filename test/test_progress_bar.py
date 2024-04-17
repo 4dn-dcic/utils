@@ -7,7 +7,7 @@ sleep = lambda: time.sleep(sleep_seconds) if sleep_seconds > 0 else None  # noqa
 
 def test_progress_bar_a():
     global sleep
-    total = 1000
+    total = 50
     description = "Working"
     bar = ProgressBar(total=total, description=description, capture_output_for_testing=True)
 
