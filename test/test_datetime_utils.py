@@ -64,6 +64,8 @@ def test_parse_datetime_a():
 
     value = "2024-04-17T15:04:16.434698+00:00"
     _assert_datetime_equals(parse_datetime(value), 2024, 4, 17, 15, 4, 16, 434698, tz=_tzutc)
-
     _assert_datetime_equals(parse_datetime(value), 2024, 4, 17,
                             15 + _tzlocal_offset_hours, 4 + _tzlocal_offset_minutes, 16, 434698, tz=_tzlocal)
+
+    value = "2024-04-17T15:04:16.434698-04:00"
+    _assert_datetime_equals(parse_datetime(value), 2024, 4, 17, 15, 4, 16, 434698)

@@ -1,7 +1,7 @@
 from dcicutils.misc_utils import normalize_spaces
 from datetime import datetime, timedelta, timezone
 from dateutil import parser as datetime_parser
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 
 def parse_datetime_string(value: str) -> Optional[datetime]:
@@ -142,16 +142,19 @@ def parse_datetime(value: str, utc: bool = False, tz: Optional[timezone] = None)
         if utc:
             return value
         elif isinstance(tz, timezone):
-            return value.astimezone(tz)
+            return value.astimezone(tz) if tz != value.tzinfo else value
         else:
-            return value.astimezone(get_local_timezone())
+            tzlocal = get_local_timezone()
+            return value.astimezone(tzlocal) if tzlocal != value.tzinfo else value
     except Exception:
         return None
 
 
 def format_datetime(value: datetime,
                     utc: bool = False,
-                    tz: Optional[timezone] = None,
+                    iso: bool = False,
+                    ms: bool = False,
+                    tz: Optional[Union[timezone, bool]] = None,
                     notz: bool = False,
                     noseconds: bool = False,
                     verbose: bool = False,
@@ -176,12 +179,23 @@ def format_datetime(value: datetime,
             tz = timezone.utc
         elif not isinstance(tz, timezone):
             tz = get_local_timezone()
-        if verbose:
-            return value.astimezone(tz).strftime(
+            if tz is True:
+                notz = False
+            elif tz is False:
+                notz = True
+        value = value.astimezone(tz)
+        if iso:
+            if notz is True:
+                value = value.replace(tzinfo=None)
+            if not (ms is True):
+                value = value.replace(microsecond=0)
+            return value.isoformat()
+        elif verbose:
+            return value.strftime(
                 f"{'' if noday is True else '%A, '}%B %-d, %Y{'' if noseparator is True else ' |'}"
                 f" %-I:%M{'' if noseconds is True else ':%S'} %p{'' if notz is True else ' %Z'}")
         else:
-            return value.astimezone(tz).strftime(
+            return value.strftime(
                 f"%Y-%m-%d %H:%M{'' if noseconds is True else ':%S'}{'' if notz is True else ' %Z'}")
     except Exception:
         return None
