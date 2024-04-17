@@ -1,7 +1,7 @@
 import time
 from dcicutils.progress_bar import ProgressBar
 
-sleep_seconds = 0.000001
+sleep_seconds = 0
 sleep = lambda: time.sleep(sleep_seconds) if sleep_seconds > 0 else None  # noqa
 
 
