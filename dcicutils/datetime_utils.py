@@ -1,5 +1,6 @@
 from dcicutils.misc_utils import normalize_spaces
 from datetime import datetime, timedelta, timezone
+from dateutil import parser as datetime_parser
 from typing import Optional, Tuple
 
 
@@ -96,3 +97,37 @@ def get_local_timezone_hours_minutes() -> Tuple[int, int]:
     """
     tz_minutes = datetime.now(timezone.utc).astimezone().utcoffset().total_seconds() / 60
     return int(tz_minutes // 60), int(abs(tz_minutes % 60))
+
+
+def format_datetime(value: datetime,
+                    notz: bool = False,
+                    noseconds: bool = False,
+                    verbose: bool = False,
+                    noseparator: bool = False,
+                    noday: bool = False) -> Optional[str]:
+    if not isinstance(value, datetime):
+        if not isinstance(value, str) or not (value := parse_datetime(value)):
+            return None
+    try:
+        tzlocal = datetime.now().astimezone().tzinfo
+        if verbose:
+            return value.astimezone(tzlocal).strftime(
+                f"{'' if noday else '%A, '}%B %-d, %Y{'' if noseparator else ' |'}"
+                f" %-I:%M{'' if noseconds else ':%S'} %p{'' if notz else ' %Z'}")
+        else:
+            return value.astimezone(tzlocal).strftime(
+                f"%Y-%m-%d %H:%M{'' if noseconds else ':%S'}{'' if notz else ' %Z'}")
+    except Exception:
+        return None
+
+
+def parse_datetime(value: str) -> Optional[datetime]:
+    if isinstance(value, datetime):
+        return value
+    elif not isinstance(value, str):
+        return None
+    try:
+        # This dateutil.parser parsed quite a wide variety of formats and suits our needs.
+        return datetime_parser.parse(value)
+    except Exception:
+        return None
