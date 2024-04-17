@@ -29,5 +29,34 @@ def test_progress_bar_a():
         i += 1
 
 
-def test_progress_bar_b():
-    pass
+def _disable_test_progress_bar_b():
+    def run_single_task(bar: ProgressBar, total: int, task_number: int) -> None:
+        bar.reset(total=total, progress=0, description=f"Task-{task_number}")
+        for i in range(total):
+            bar.increment_progress(1) ; sleep()  # noqa
+
+    global sleep
+    ntasks = 9
+    total = 1001
+    description = "Working"
+    bar = ProgressBar(total=total, description=description, capture_output_for_testing=True)
+
+    for i in range(ntasks):
+        run_single_task(bar, total, i + 1)
+    bar.done("Done")
+
+    # i = 0
+    # for line in bar.captured_output_for_testing:
+    #     print(f"{i}: {line}")
+    #     i += 1
+    # return
+
+    bar_output = bar.captured_output_for_testing
+    assert len(bar_output) == 1 + (ntasks * (total + 1)) + 1
+    assert bar_output[0] == bar.format_captured_output_for_testing("Working", total, 0)
+    assert bar_output[len(bar_output) - 1] == bar.format_captured_output_for_testing("Done", total, total)
+
+    bar_output = bar_output[1:]
+    for n in range(ntasks):
+        for i in range(total + 1):
+            assert bar_output[n * (total + 1) + i] == bar.format_captured_output_for_testing(f"Task-{n + 1}", total, i)
