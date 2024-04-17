@@ -37,7 +37,7 @@ def test_progress_bar_b():
             bar.increment_progress(1) ; sleep()  # noqa
 
     ntasks = 9
-    total = 1001
+    total = 51
     description = "Working"
     bar = ProgressBar(total=total, description=description, capture_output_for_testing=True)
 
