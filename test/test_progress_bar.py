@@ -30,7 +30,6 @@ def test_progress_bar_a():
 
 
 def test_progress_bar_b():
-    return
 
     def run_single_task(bar: ProgressBar, total: int, task_number: int) -> None:
         global sleep
@@ -43,6 +42,7 @@ def test_progress_bar_b():
     description = "Working"
     bar = ProgressBar(total=total, description=description, capture_output_for_testing=True)
 
+    return
     for i in range(ntasks):
         run_single_task(bar, total, i + 1)
     bar.done("Done")
