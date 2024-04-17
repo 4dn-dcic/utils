@@ -83,7 +83,29 @@ def normalize_date_string(value: str) -> Optional[str]:
     return d.strftime("%Y-%m-%d") if d else None
 
 
+def get_timezone(hours: int, minutes: Optional[int] = None) -> timezone:
+    try:
+        return timezone(timedelta(hours=hours, minutes=minutes or 0))
+    except Exception:
+        return timezone.utc
+
+
+def get_timezone_hours_minutes(tz: timezone) -> Tuple[int, int]:
+    """
+    Returns a tuple with the integer hours and minutes offset for the given timezone.
+    """
+    tz_minutes = datetime.now(tz).utcoffset().total_seconds() / 60
+    return int(tz_minutes // 60), int(abs(tz_minutes % 60))
+
+
+def get_utc_timezone() -> timezone:
+    return timezone.utc
+
+
 def get_local_timezone() -> timezone:
+    """
+    Returns current/local timezone as a datetime.timezone object.
+    """
     return datetime.now().astimezone().tzinfo
 
 
@@ -101,17 +123,6 @@ def get_local_timezone_hours_minutes() -> Tuple[int, int]:
     """
     tz_minutes = datetime.now(timezone.utc).astimezone().utcoffset().total_seconds() / 60
     return int(tz_minutes // 60), int(abs(tz_minutes % 60))
-
-
-def get_utc_timezone() -> timezone:
-    return timezone.utc
-
-
-def get_timezone(hours: int, minutes: Optional[int] = None) -> timezone:
-    try:
-        return timezone(timedelta(hours=hours, minutes=minutes or 0))
-    except Exception:
-        return timezone.utc
 
 
 def parse_datetime(value: str, utc: bool = False, tz: Optional[timezone] = None) -> Optional[datetime]:
