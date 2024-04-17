@@ -50,6 +50,7 @@ class ProgressBar:
     def __init__(self, total: Optional[int] = None,
                  description: Optional[str] = None,
                  use_byte_size_for_rate: bool = False,
+                 use_ascii: bool = False,
                  catch_interrupt: bool = True,
                  interrupt: Optional[Callable] = None,
                  interrupt_continue: Optional[Callable] = None,
@@ -66,6 +67,7 @@ class ProgressBar:
         self._tidy_output_hack = (tidy_output_hack is True)
         self._stop_requested = False
         self._use_byte_size_for_rate = (use_byte_size_for_rate is True and self._tidy_output_hack)
+        self._use_ascii = (use_ascii is True)
         # Interrupt handling. We do not do the actual (signal) interrupt setup
         # in self._initialize as that could be called from a (sub) thread; and in
         # Python we can only set a signal (SIGINT in our case) on the main thread.
@@ -103,7 +105,7 @@ class ProgressBar:
             else:
                 bar_format = "{l_bar}{bar}| {n_fmt}/{total_fmt} | {rate_fmt} | {elapsed}{postfix} | ETA: {remaining} "
             self._bar = TQDM(total=self._total, desc=self._description,
-                             dynamic_ncols=True, bar_format=bar_format, unit="", file=sys.stdout)
+                             dynamic_ncols=True, bar_format=bar_format, unit="", file=sys.stdout, ascii=self._use_ascii)
             self._started = time.time()
             if self._disabled:
                 self._bar.disable = True

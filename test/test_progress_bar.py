@@ -42,7 +42,6 @@ def test_progress_bar_b():
     description = "Working"
     bar = ProgressBar(total=total, description=description, capture_output_for_testing=True)
 
-    return
     for i in range(ntasks):
         run_single_task(bar, total, i + 1)
     bar.done("Done")
@@ -51,7 +50,6 @@ def test_progress_bar_b():
     # for line in bar.captured_output_for_testing:
     #     print(f"{i}: {line}")
     #     i += 1
-    # return
 
     bar_output = bar.captured_output_for_testing
     assert len(bar_output) == 1 + (ntasks * (total + 1)) + 1
