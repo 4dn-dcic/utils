@@ -15,8 +15,9 @@ Change Log
 * Fixed up captured_output module to handle UTF-8 encoding to help unit testing progress_bar.
 * Added hooks to progress_bar to help unit testing.
 * Added a find_nth_from_end and set_nth to misc_utils to help progress_bar unit testing.
-* Added format_size to misc_utils (refactor from smaht-submitr). 
+* Added format_size and format_duration to misc_utils (refactor from smaht-submitr).
 * Added test_progress_bar module.
+* Added check_only flag to portal_utils.Portal.{post,patch}_metadata.
 
 
 8.8.3

@@ -2593,6 +2593,26 @@ def format_size(nbytes: Union[int, float], precision: int = 2, nospace: bool = F
     return f"{nbytes:.{precision}f}{'' if nospace else ' '}{unit}"
 
 
+def format_duration(seconds: Union[int, float]) -> str:
+    seconds_actual = seconds
+    seconds = round(max(seconds, 0))
+    durations = [("year", 31536000), ("day", 86400), ("hour", 3600), ("minute", 60), ("second", 1)]
+    parts = []
+    for name, duration in durations:
+        if seconds >= duration:
+            count = seconds // duration
+            seconds %= duration
+            if count != 1:
+                name += "s"
+            parts.append(f"{count} {name}")
+    if len(parts) == 0:
+        return f"{seconds_actual:.1f} seconds"
+    elif len(parts) == 1:
+        return f"{seconds_actual:.1f} seconds"
+    else:
+        return " ".join(parts[:-1]) + " " + parts[-1]
+
+
 class JsonLinesReader:
 
     def __init__(self, fp, padded=False, padding=None):

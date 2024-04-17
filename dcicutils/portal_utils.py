@@ -282,15 +282,17 @@ class Portal:
             except Exception:
                 return None
 
-    def patch_metadata(self, object_id: str, data: dict) -> Optional[dict]:
+    def patch_metadata(self, object_id: str, data: dict, check_only: bool = False) -> Optional[dict]:
         if self.key:
-            return patch_metadata(obj_id=object_id, patch_item=data, key=self.key)
-        return self.patch(f"/{object_id}", data).json()
+            return patch_metadata(obj_id=object_id, patch_item=data, key=self.key,
+                                  add_on="check_only=True" if check_only else "")
+        return self.patch(f"/{object_id}{'?check_only=True' if check_only else ''}", data).json()
 
-    def post_metadata(self, object_type: str, data: dict) -> Optional[dict]:
+    def post_metadata(self, object_type: str, data: dict, check_only: bool = False) -> Optional[dict]:
         if self.key:
-            return post_metadata(schema_name=object_type, post_item=data, key=self.key)
-        return self.post(f"/{object_type}", data).json()
+            return post_metadata(schema_name=object_type, post_item=data, key=self.key,
+                                 add_on="check_only=True" if check_only else "")
+        return self.post(f"/{object_type}{'?check_only=True' if check_only else ''}", data).json()
 
     def get_health(self) -> OptionalResponse:
         return self.get("/health")
