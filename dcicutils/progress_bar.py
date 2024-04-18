@@ -335,9 +335,15 @@ class ProgressBar:
             nonlocal sys_stdout_write
             if sys_stdout_write is not None:
                 sys.stdout.write = sys_stdout_write
+        def ascii_spinners() -> list:  # noqa
+            # Fun with ASCII spinners.
+            return list("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")  # borrowed from rich python package
+            # return list("⣾⣽⣻⢿⡿⣟⣯⣷")  # borrowed from rich python package
+            # return list("⠿⠻⠽⠾⠷⠯⠟")
+            # return list("⠏⠛⠹⠼⠶⠧")
+            # return list("⠻⠽⠾⠷⠯⠟")
+            # return list("|/—◦\\")
         sys.stdout.write = tidy_stdout_write
-        # spina = ["|", "/", "—", "◦", "\\"]
-        spina = ["⠿", "⠻", "⠽", "⠾", "⠷", "⠯", "⠟"]
-        spini = 0 ; spinn = len(spina)  # noqa
+        spina = ascii_spinners() ; spini = 0 ; spinn = len(spina)  # noqa
         sentinel = "[progress]" ; sentinel_internal = f"{sentinel}:"  # noqa
         return namedtuple("tidy_output_hack", ["restore", "sentinel"])(restore_stdout_write, sentinel)
