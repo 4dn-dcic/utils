@@ -185,7 +185,7 @@ class StructuredDataSet:
                 # this dump is also done in Schema._map_function_ref (should probably change this
                 # to be a list to avoid this - TODO); we only even store this src info for this
                 # norefs case, as not really needed otherwise. This is just to support the
-                # useful-for-troublehsooting options --info --ref for smaht-submitr.
+                # useful-for-troublehsooting options --info --refs for smaht-submitr.
                 if len(ref) >= 3 and (ref_path := ref[0]) and (ref_src := load_json(ref[2])):
                     if existing_ref := [item for item in result if item.get("path") == ref_path]:
                         existing_ref[0]["srcs"].append(ref_src)
