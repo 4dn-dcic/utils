@@ -337,8 +337,8 @@ class ProgressBar:
                 sys.stdout.write = sys_stdout_write
         def ascii_spinners() -> list:  # noqa
             # Fun with ASCII spinners.
-            return list("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")  # borrowed from rich python package
-            # return list("⣾⣽⣻⢿⡿⣟⣯⣷")  # borrowed from rich python package
+            return list("⣾⣽⣻⢿⡿⣟⣯⣷")  # borrowed from rich python package
+            # return list("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")  # borrowed from rich python package
             # return list("⠿⠻⠽⠾⠷⠯⠟")
             # return list("⠏⠛⠹⠼⠶⠧")
             # return list("⠻⠽⠾⠷⠯⠟")
