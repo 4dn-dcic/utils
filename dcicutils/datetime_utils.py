@@ -185,15 +185,21 @@ def format_datetime(value: datetime,
                 notz = False
             elif tz is False:
                 notz = True
+        if noseconds is True:
+            ms = False
         value = value.astimezone(tz)
         if iso:
             if notz is True:
                 value = value.replace(tzinfo=None)
             if not (ms is True):
                 value = value.replace(microsecond=0)
+            if noseconds is True:
+                if notz is True:
+                    return value.strftime(f"%Y-%m-%dT%H:%M")
+                tz = value.strftime("%z")
+                tz = tz[:3] + ":" + tz[3:]
+                return value.strftime(f"%Y-%m-%dT%H:%M") + tz
             return value.isoformat()
-        if noseconds is True:
-            ms = False
         if verbose:
             return value.strftime(
                 f"{'' if noday is True else '%A, '}%B %-d, %Y{'' if noseparator is True else ' |'}"
