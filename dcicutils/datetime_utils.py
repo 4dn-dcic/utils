@@ -3,6 +3,22 @@ from datetime import datetime, timedelta, timezone
 from dateutil import parser as datetime_parser
 from typing import Optional, Tuple, Union
 
+TIMEZONE_LOCAL = datetime.now().astimezone().tzinfo  # type: datetime.timezone
+TIMEZONE_LOCAL_NAME = TIMEZONE_LOCAL.tzname(None)  # type: str
+TIMEZONE_LOCAL_OFFSET = TIMEZONE_LOCAL.utcoffset(None)  # type: datetime.timedelta
+TIMEZONE_LOCAL_OFFSET_TOTAL_MINUTES = int(TIMEZONE_LOCAL_OFFSET.total_seconds()) // 60  # type: int
+TIMEZONE_LOCAL_OFFSET_HOURS = TIMEZONE_LOCAL_OFFSET_TOTAL_MINUTES // 60  # type: int
+TIMEZONE_LOCAL_OFFSET_MINUTES = TIMEZONE_LOCAL_OFFSET_TOTAL_MINUTES % 60  # type: int
+TIMEZONE_LOCAL_SUFFIX = f"{TIMEZONE_LOCAL_OFFSET_HOURS:+03d}:{TIMEZONE_LOCAL_OFFSET_MINUTES:02d}"  # type: str
+
+TIMEZONE_UTC = timezone.utc  # type: datetime.timezone
+TIMEZONE_UTC_NAME = TIMEZONE_UTC.tzname(None)  # type: str
+TIMEZONE_UTC_OFFSET = timedelta(0)  # type: datetime.timedelta
+TIMEZONE_UTC_OFFSET_TOTAL_MINUTES = 0  # type: int
+TIMEZONE_UTC_OFFSET_HOURS = 0  # type: int
+TIMEZONE_UTC_OFFSET_MINUTES = 0  # type: int
+TIMEZONE_UTC_SUFFIX = "Z"  # type: str
+
 
 def parse_datetime_string(value: str) -> Optional[datetime]:
     """
@@ -83,46 +99,60 @@ def normalize_date_string(value: str) -> Optional[str]:
     return d.strftime("%Y-%m-%d") if d else None
 
 
-def get_timezone(hours: int, minutes: Optional[int] = None) -> timezone:
+def get_timezone(hours_or_timedelta: Union[int, timedelta], minutes: Optional[int] = None) -> timezone:
     try:
-        return timezone(timedelta(hours=hours, minutes=minutes or 0))
+        if isinstance(hours_or_timedelta, timedelta):
+            return timezone(hours_or_timedelta)
+        return timezone(timedelta(hours=hours_or_timedelta, minutes=minutes or 0))
     except Exception:
-        return timezone.utc
+        return TIMEZONE_LOCAL
+
+
+def get_timezone_offset(tz: timezone) -> timedelta:
+    try:
+        return tz.utcoffset(None)
+    except Exception:
+        return TIMEZONE_LOCAL_OFFSET
 
 
 def get_timezone_hours_minutes(tz: timezone) -> Tuple[int, int]:
     """
     Returns a tuple with the integer hours and minutes offset for the given timezone.
+    If negative then only the hours is negative; the mintutes is always positive;
+    this is okay because there are no timezones less than one hour from UTC.
     """
-    tz_minutes = datetime.now(tz).utcoffset().total_seconds() / 60
-    return int(tz_minutes // 60), int(abs(tz_minutes % 60))
+    tz_offset = get_timezone_offset(tz)
+    tz_offset_total_minutes = int(tz_offset.total_seconds()) // 60
+    tz_offset_hours = tz_offset_total_minutes // 60
+    tz_offset_minutes = abs(tz_offset_total_minutes % 60)
+    return tz_offset_hours, tz_offset_minutes
 
 
 def get_utc_timezone() -> timezone:
-    return timezone.utc
+    return TIMEZONE_UTC
 
 
 def get_local_timezone() -> timezone:
     """
     Returns current/local timezone as a datetime.timezone object.
     """
-    return datetime.now().astimezone().tzinfo
+    return TIMEZONE_LOCAL
 
 
 def get_local_timezone_string() -> str:
     """
     Returns current/local timezone in format like: "-05:00".
     """
-    tz_hours, tz_minutes = get_local_timezone_hours_minutes()
-    return f"{tz_hours:+03d}:{tz_minutes:02d}"
+    return TIMEZONE_LOCAL_SUFFIX
 
 
 def get_local_timezone_hours_minutes() -> Tuple[int, int]:
     """
     Returns a tuple with the integer hours and minutes offset for the current/local timezone.
+    If negative then only the hours is negative; the mintutes is always positive;
+    this is okay because there are no timezones less than one hour from UTC.
     """
-    tz_minutes = datetime.now(timezone.utc).astimezone().utcoffset().total_seconds() / 60
-    return int(tz_minutes // 60), int(abs(tz_minutes % 60))
+    return TIMEZONE_LOCAL_OFFSET_HOURS, TIMEZONE_LOCAL_OFFSET_MINUTES
 
 
 def parse_datetime(value: str, utc: bool = False, tz: Optional[timezone] = None) -> Optional[datetime]:

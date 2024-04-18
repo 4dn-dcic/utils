@@ -64,6 +64,7 @@ def _setup_global_timezone_constants(tzlocal: Optional[timezone] = None) -> None
 
     TZUTC = get_utc_timezone()
     TZUTC_SUFFIX = f"+00:00"
+    TZUTC_SUFFIX = "Z"
 
 
 def _assert_datetime_equals(value: datetime, year: int, month: int, day: int,
