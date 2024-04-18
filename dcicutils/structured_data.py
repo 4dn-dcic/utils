@@ -174,6 +174,18 @@ class StructuredDataSet:
         result = []
         if self._norefs:
             for ref in self._resolved_refs:
+                # The structure of this self._resolved_refs is setup in Schema._map_function_ref,
+                # which is called whenever a reference (linkTo) is encountered. It is a set of
+                # tuples containing three items: [0] the ref path, [1] its uuid (if applicable),
+                # and [2] its src. The src identifies the place where this ref occurred and is a
+                # dictionary containing file, type, column, and row properties. For this case, of
+                # unchecked (norefs) references, the uuid ([1]) is None because we are skipping
+                # ref resolution. And the src is actually a *string* dump of the dictionary, only
+                # because dictionarties cannot be put in a set (which is what _resolved_refs is);
+                # this dump is also done in Schema._map_function_ref (should probably change this
+                # to be a list to avoid this - TODO); we only even store this src info for this
+                # norefs case, as not really needed otherwise. This is just to support the
+                # smaht-submitr/submit-metadata-bundle --info --refs options.
                 if len(ref) >= 3 and (ref_path := ref[0]) and (ref_src := load_json(ref[2])):
                     if existing_ref := [item for item in result if item.get("path") == ref_path]:
                         existing_ref[0]["srcs"].append(ref_src)
@@ -681,9 +693,11 @@ class Schema(SchemaBase):
                 # Here the caller has specified the (StructuredDataSet) norefs option
                 # which means we do not check for the existence of references at all.
                 if value:
-                    # Dump the src as a JSON string because a dictionary cannot be added to a set; note
-                    # that this is ONLY used for smaht-submitr/submit-metadata-bundle --info --refs.
-                    # This info can be gotten at using StructureDataSet.unchecked_refs.
+                    # Dump the src as a JSON string because a dictionary cannot be added to a set;
+                    # this is ONLY used for smaht-submitr/submit-metadata-bundle --info --refs.
+                    # This info exposed via StructureDataSet.unchecked_refs. TODO: Should probably
+                    # make this not a set type so we dont' have to do this dump (and corresponding
+                    # load, in StructureDataSet.unchecked_refs).
                     self._resolved_refs.add((f"/{link_to}/{value}", None,
                                              json.dumps(src) if isinstance(src, dict) else None))
                 return value
