@@ -147,8 +147,7 @@ def parse_datetime(value: str, utc: bool = False, tz: Optional[timezone] = None)
             if isinstance(tz, timezone):
                 return value.astimezone(tz)
             return value
-        else:
-            return value.replace(tzinfo=tz if isinstance(tz, timezone) else get_local_timezone())
+        return value.replace(tzinfo=tz if isinstance(tz, timezone) else get_local_timezone())
     except Exception:
         return None
 
