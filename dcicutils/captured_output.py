@@ -24,6 +24,8 @@ def captured_output(capture: bool = True, encoding: Optional[str] = None):
 
     original_stdout = _real_stdout
     original_stderr = _real_stderr
+    # FYI: This encoding business with _EncodedStringIO was introduced (circa April 2024)
+    # when ran into issues unit testing progress_bar which outputs those funny block characters.
     captured_output = io.StringIO() if not encoding else _EncodedStringIO(encoding)
 
     def set_original_output() -> None:
