@@ -179,13 +179,13 @@ class StructuredDataSet:
                 # tuples containing three items: [0] the ref path, [1] its uuid (if applicable),
                 # and [2] its src. The src identifies the place where this ref occurred and is a
                 # dictionary containing file, type, column, and row properties. For this case, of
-                # unchecked (norefs) references, the uuid ([1]) is None because we are skipping
-                # ref resolution. And the src is actually a *string* dump of the dictionary, only
-                # because dictionarties cannot be put in a set (which is what _resolved_refs is);
+                # norefs (i.e. unchecked refs), the uuid ([1]) is None because we are skipping
+                # ref resolution. But the src is actually a *string* dump of the dictionary, only
+                # because dictionaries cannot be put in a set (which is what _resolved_refs is);
                 # this dump is also done in Schema._map_function_ref (should probably change this
                 # to be a list to avoid this - TODO); we only even store this src info for this
                 # norefs case, as not really needed otherwise. This is just to support the
-                # smaht-submitr/submit-metadata-bundle --info --refs options.
+                # useful-for-troublehsooting options --info --ref for smaht-submitr.
                 if len(ref) >= 3 and (ref_path := ref[0]) and (ref_src := load_json(ref[2])):
                     if existing_ref := [item for item in result if item.get("path") == ref_path]:
                         existing_ref[0]["srcs"].append(ref_src)
