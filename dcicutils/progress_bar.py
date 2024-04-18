@@ -336,6 +336,8 @@ class ProgressBar:
             if sys_stdout_write is not None:
                 sys.stdout.write = sys_stdout_write
         sys.stdout.write = tidy_stdout_write
-        spina = ["|", "/", "—", "◦", "\\"] ; spini = 0 ; spinn = len(spina)  # noqa
+        # spina = ["|", "/", "—", "◦", "\\"]
+        spina = ["⠿", "⠻", "⠽", "⠾", "⠷", "⠯", "⠟"]
+        spini = 0 ; spinn = len(spina)  # noqa
         sentinel = "[progress]" ; sentinel_internal = f"{sentinel}:"  # noqa
         return namedtuple("tidy_output_hack", ["restore", "sentinel"])(restore_stdout_write, sentinel)
