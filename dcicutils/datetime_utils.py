@@ -139,13 +139,16 @@ def parse_datetime(value: str, utc: bool = False, tz: Optional[timezone] = None)
     try:
         # This dateutil.parser handles quite a wide variety of formats and suits our needs.
         value = datetime_parser.parse(value)
-        if utc:
+        if utc is True:
+            # If the given utc argument is True then it trumps any tz argument if given.
+            tz = timezone.utc
+        if value.tzinfo is not None:
+            # The given value had an explicit timezone specified.
+            if isinstance(tz, timezone):
+                return value.astimezone(tz)
             return value
-        elif isinstance(tz, timezone):
-            return value.astimezone(tz) if tz != value.tzinfo else value
         else:
-            tzlocal = get_local_timezone()
-            return value.astimezone(tzlocal) if tzlocal != value.tzinfo else value
+            return value.replace(tzinfo=tz if isinstance(tz, timezone) else get_local_timezone())
     except Exception:
         return None
 
