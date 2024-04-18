@@ -192,12 +192,14 @@ def format_datetime(value: datetime,
             if not (ms is True):
                 value = value.replace(microsecond=0)
             return value.isoformat()
-        elif verbose:
+        if noseconds is True:
+            ms = False
+        if verbose:
             return value.strftime(
                 f"{'' if noday is True else '%A, '}%B %-d, %Y{'' if noseparator is True else ' |'}"
-                f" %-I:%M{'' if noseconds is True else ':%S'} %p{'' if notz is True else ' %Z'}")
+                f" %-I:%M{'' if noseconds is True else ':%S'}{f'.%f' if ms is True else ''} %p{'' if notz is True else ' %Z'}")
         else:
             return value.strftime(
-                f"%Y-%m-%d %H:%M{'' if noseconds is True else ':%S'}{'' if notz is True else ' %Z'}")
+                f"%Y-%m-%d %H:%M{'' if noseconds is True else ':%S'}{f'.%f' if ms is True else ''}{'' if notz is True else ' %Z'}")
     except Exception:
         return None

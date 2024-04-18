@@ -4,8 +4,8 @@ from dcicutils.datetime_utils import (
     get_local_timezone_string, normalize_date_string, normalize_datetime_string,
 )
 from dcicutils.datetime_utils import (
-    get_local_timezone, get_timezone, get_timezone_hours_minutes,
-    get_utc_timezone, parse_datetime
+    format_datetime, get_local_timezone, get_timezone,
+    get_timezone_hours_minutes, get_utc_timezone, parse_datetime
 )
 
 
@@ -42,13 +42,14 @@ TZLOCAL = None
 TZLOCAL_OFFSET_HOURS = None
 TZLOCAL_OFFSET_MINUTES = None
 TZLOCAL_SUFFIX = None
+TZLOCAL_NAME = None
 TZUTC = None
 TZUTC_SUFFIX = None
 
 
 def _setup_global_timezone_constants(tzlocal: Optional[timezone] = None) -> None:
 
-    global TZLOCAL, TZLOCAL_OFFSET_HOURS, TZLOCAL_OFFSET_MINUTES, TZLOCAL_SUFFIX, TZUTC, TZUTC_SUFFIX
+    global TZLOCAL, TZLOCAL_OFFSET_HOURS, TZLOCAL_OFFSET_MINUTES, TZLOCAL_SUFFIX, TZLOCAL_NAME, TZUTC, TZUTC_SUFFIX
 
     TZLOCAL = tzlocal if isinstance(tzlocal, timezone) else get_local_timezone()
 
@@ -59,6 +60,8 @@ def _setup_global_timezone_constants(tzlocal: Optional[timezone] = None) -> None
     TZLOCAL_OFFSET_HOURS, TZLOCAL_OFFSET_MINUTES = get_timezone_hours_minutes(TZLOCAL)
     TZLOCAL_SUFFIX = (f"{'-' if TZLOCAL_OFFSET_HOURS < 0 else '+'}"
                       f"{abs(TZLOCAL_OFFSET_HOURS):02}:{TZLOCAL_OFFSET_MINUTES:02}")
+    TZLOCAL_NAME = TZLOCAL.tzname(None)
+
     TZUTC = get_utc_timezone()
     TZUTC_SUFFIX = f"+00:00"
 
@@ -90,6 +93,15 @@ def _test_parse_datetime_a(ms: Optional[int] = None):
     value = f"2024-04-17T15:04:16{ms_suffix}"
     parsed = parse_datetime(value)
     _assert_datetime_equals(parsed, 2024, 4, 17, 15, 4, 16, ms, TZLOCAL)
+    assert format_datetime(parsed, notz=True) == f"2024-04-17 15:04:16"
+    assert format_datetime(parsed) == f"2024-04-17 15:04:16 {TZLOCAL_NAME}"
+    assert format_datetime(parsed, ms=ms > 0) == f"2024-04-17 15:04:16{ms_suffix} {TZLOCAL_NAME}"
+    assert format_datetime(parsed, noseconds=True) == f"2024-04-17 15:04 {TZLOCAL_NAME}"
+    assert format_datetime(parsed, iso=True) == f"2024-04-17T15:04:16{TZLOCAL_SUFFIX}"
+    assert format_datetime(parsed, iso=True, notz=True) == f"2024-04-17T15:04:16"
+    assert format_datetime(parsed, iso=True, ms=ms > 0) == f"2024-04-17T15:04:16{ms_suffix}{TZLOCAL_SUFFIX}"
+    assert (format_datetime(parsed, verbose=True, ms=ms > 0) ==
+            f"Wednesday, April 17, 2024 | 3:04:16{ms_suffix} PM {TZLOCAL_NAME}")
 
     value = f"2024-04-17T15:04:16{ms_suffix}"
     parsed = parse_datetime(value, utc=True)
