@@ -67,7 +67,7 @@ def _setup_global_timezone_constants(tzlocal: Optional[timezone] = None) -> None
 
 
 def _assert_datetime_equals(value: datetime, year: int, month: int, day: int,
-                            hour: int, minute: int, second: int, microsecond: int,
+                            hour: int, minute: int, second: int, microsecond: Optional[int],
                             tz: timezone = TZLOCAL,
                             shift_hours: Optional[int] = None,
                             shift_minutes: Optional[int] = None):
@@ -76,7 +76,7 @@ def _assert_datetime_equals(value: datetime, year: int, month: int, day: int,
         tz = TZLOCAL
 
     expected_value = datetime(year=year, month=month, day=day, hour=hour,
-                              minute=minute, second=second, microsecond=microsecond, tzinfo=tz)
+                              minute=minute, second=second, microsecond=microsecond or 0, tzinfo=tz)
     if isinstance(shift_hours, int):
         expected_value = expected_value + timedelta(hours=shift_hours)
     if isinstance(shift_minutes, int):
@@ -87,7 +87,7 @@ def _assert_datetime_equals(value: datetime, year: int, month: int, day: int,
 def _test_parse_datetime_a(ms: Optional[int] = None):
 
     ms_suffix = f".{ms}" if isinstance(ms, int) else ""
-    ms = ms if isinstance(ms, int) else 0
+    ms = ms if isinstance(ms, int) else None
 
     # --------------------------------------------------------------------------------------------------
     value = f"2024-04-17T15:04:16{ms_suffix}"
@@ -95,13 +95,17 @@ def _test_parse_datetime_a(ms: Optional[int] = None):
     _assert_datetime_equals(parsed, 2024, 4, 17, 15, 4, 16, ms, TZLOCAL)
     assert format_datetime(parsed, notz=True) == f"2024-04-17 15:04:16"
     assert format_datetime(parsed) == f"2024-04-17 15:04:16 {TZLOCAL_NAME}"
-    assert format_datetime(parsed, ms=ms > 0) == f"2024-04-17 15:04:16{ms_suffix} {TZLOCAL_NAME}"
+    assert format_datetime(parsed, ms=ms is not None) == f"2024-04-17 15:04:16{ms_suffix} {TZLOCAL_NAME}"
     assert format_datetime(parsed, noseconds=True) == f"2024-04-17 15:04 {TZLOCAL_NAME}"
     assert format_datetime(parsed, iso=True) == f"2024-04-17T15:04:16{TZLOCAL_SUFFIX}"
     assert format_datetime(parsed, iso=True, notz=True) == f"2024-04-17T15:04:16"
-    assert format_datetime(parsed, iso=True, ms=ms > 0) == f"2024-04-17T15:04:16{ms_suffix}{TZLOCAL_SUFFIX}"
-    assert (format_datetime(parsed, verbose=True, ms=ms > 0) ==
+    assert format_datetime(parsed, iso=True, ms=ms is not None) == f"2024-04-17T15:04:16{ms_suffix}{TZLOCAL_SUFFIX}"
+    assert (format_datetime(parsed, verbose=True, ms=ms is not None) ==
             f"Wednesday, April 17, 2024 | 3:04:16{ms_suffix} PM {TZLOCAL_NAME}")
+    assert (format_datetime(parsed, ms=ms is not None, verbose=True, noseparator=True) ==
+            f"Wednesday, April 17, 2024 3:04:16{ms_suffix} PM {TZLOCAL_NAME}")
+    assert (format_datetime(parsed, ms=ms is not None, verbose=True, noseparator=True, noday=True) ==
+            f"April 17, 2024 3:04:16{ms_suffix} PM {TZLOCAL_NAME}")
 
     value = f"2024-04-17T15:04:16{ms_suffix}"
     parsed = parse_datetime(value, utc=True)
