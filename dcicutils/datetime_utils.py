@@ -184,14 +184,16 @@ def parse_datetime(value: str, utc: bool = False, tz: Optional[timezone] = None)
 
 def format_datetime(value: datetime,
                     utc: bool = False,
-                    iso: bool = False,
-                    ms: bool = False,
                     tz: Optional[Union[timezone, bool]] = None,
+                    iso: bool = False,
                     notz: bool = False,
                     noseconds: bool = False,
+                    ms: bool = False,
                     verbose: bool = False,
                     noseparator: bool = False,
-                    noday: bool = False) -> Optional[str]:
+                    noday: bool = False,
+                    nodate: bool = False,
+                    notime: bool = False) -> str:
     """
     Returns the given datetime as a string in "YYYY:MM:DD hh:mm:ss tz" format, for
     example "2024-04-17 15:42:26 EDT". If the given notz argument is True then omits
@@ -203,9 +205,11 @@ def format_datetime(value: datetime,
     one; if the given utc argument is True then it will be UTC; or if the given tz
     argument is a datetime.timezone it will be in that timezone.
     """
+    if nodate is True and notime is True:
+        return ""
     if not isinstance(value, datetime):
         if not isinstance(value, str) or not (value := parse_datetime(value)):
-            return None
+            return ""
     try:
         if utc is True:
             tz = timezone.utc
@@ -225,19 +229,70 @@ def format_datetime(value: datetime,
                 value = value.replace(microsecond=0)
             if noseconds is True:
                 if notz is True:
-                    return value.strftime(f"%Y-%m-%dT%H:%M")
+                    if nodate is True:
+                        return value.strftime(f"%H:%M")
+                    elif notime is True:
+                        return value.strftime(f"%Y-%m-%d")
+                    else:
+                        return value.strftime(f"%Y-%m-%dT%H:%M")
                 tz = value.strftime("%z")
                 tz = tz[:3] + ":" + tz[3:]
-                return value.strftime(f"%Y-%m-%dT%H:%M") + tz
-            return value.isoformat()
+                if nodate is True:
+                    return value.strftime(f"%H:%M") + tz
+                elif notime is True:
+                    return value.strftime(f"%Y-%m-%d") + tz
+                else:
+                    return value.strftime(f"%Y-%m-%dT%H:%M") + tz
+            if nodate is True:
+                return value.strftime(f"%H:%M:%S{f'.%f' if ms is True else ''}")
+            elif notime is True:
+                return value.strftime(f"%Y-%m-%d")
+            else:
+                return value.isoformat()
         if verbose:
-            return value.strftime(
-                f"{'' if noday is True else '%A, '}%B %-d, %Y{'' if noseparator is True else ' |'}"
-                f" %-I:%M{'' if noseconds is True else ':%S'}"
-                f"{f'.%f' if ms is True else ''} %p{'' if notz is True else ' %Z'}")
+            if nodate is True:
+                return value.strftime(
+                    f"%-I:%M{'' if noseconds is True else ':%S'}"
+                    f"{f'.%f' if ms is True else ''} %p{'' if notz is True else ' %Z'}")
+            elif notime is True:
+                return value.strftime(f"{'' if noday is True else '%A, '}%B %-d, %Y")
+            else:
+                return value.strftime(
+                    f"{'' if noday is True else '%A, '}%B %-d, %Y{'' if noseparator is True else ' |'}"
+                    f" %-I:%M{'' if noseconds is True else ':%S'}"
+                    f"{f'.%f' if ms is True else ''} %p{'' if notz is True else ' %Z'}")
         else:
-            return value.strftime(
-                f"%Y-%m-%d %H:%M{'' if noseconds is True else ':%S'}"
-                f"{f'.%f' if ms is True else ''}{'' if notz is True else ' %Z'}")
+            if nodate is True:
+                return value.strftime(
+                    f"%H:%M{'' if noseconds is True else ':%S'}"
+                    f"{f'.%f' if ms is True else ''}{'' if notz is True else ' %Z'}")
+            elif notime is True:
+                return value.strftime(f"%Y-%m-%d")
+            else:
+                return value.strftime(
+                    f"%Y-%m-%d %H:%M{'' if noseconds is True else ':%S'}"
+                    f"{f'.%f' if ms is True else ''}{'' if notz is True else ' %Z'}")
     except Exception:
         return None
+
+
+def format_date(value: datetime,
+                utc: bool = False,
+                iso: bool = False,
+                tz: Optional[Union[timezone, bool]] = None,
+                verbose: bool = False,
+                noday: bool = False) -> str:
+    return format_datetime(value, utc=utc, iso=iso, tz=tz, verbose=verbose, noday=noday, notime=True)
+
+
+def format_time(value: datetime,
+                utc: bool = False,
+                iso: bool = False,
+                ms: bool = False,
+                tz: Optional[Union[timezone, bool]] = None,
+                notz: bool = False,
+                noseconds: bool = False,
+                verbose: bool = False,
+                noday: bool = False) -> str:
+    return format_datetime(value, utc=utc, iso=iso, ms=ms, tz=tz, notz=notz,
+                           noseconds=noseconds, verbose=verbose, nodate=True)

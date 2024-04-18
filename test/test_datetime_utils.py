@@ -4,7 +4,7 @@ from dcicutils.datetime_utils import (
     get_local_timezone_string, normalize_date_string, normalize_datetime_string,
 )
 from dcicutils.datetime_utils import (
-    format_datetime, get_local_timezone, get_timezone,
+    format_date, format_datetime, format_time, get_local_timezone, get_timezone,
     get_timezone_hours_minutes, get_utc_timezone, parse_datetime
 )
 
@@ -107,6 +107,18 @@ def _test_parse_datetime_a(ms: Optional[int] = None):
             f"Wednesday, April 17, 2024 3:04:16{ms_suffix} PM {TZLOCAL_NAME}")
     assert (format_datetime(parsed, ms=ms is not None, verbose=True, noseparator=True, noday=True) ==
             f"April 17, 2024 3:04:16{ms_suffix} PM {TZLOCAL_NAME}")
+    assert format_datetime(parsed, nodate=True, notz=True) == f"15:04:16"
+    assert format_datetime(parsed, nodate=True) == f"15:04:16 {TZLOCAL_NAME}"
+    assert format_datetime(parsed, notime=True) == f"2024-04-17"
+    assert format_time(parsed, notz=True) == f"15:04:16"
+    assert format_time(parsed) == f"15:04:16 {TZLOCAL_NAME}"
+    assert format_date(parsed) == f"2024-04-17"
+    assert format_date(parsed, verbose=True) == f"Wednesday, April 17, 2024"
+    assert format_date(parsed, verbose=True, noday=True) == f"April 17, 2024"
+    assert format_date(parsed) == f"2024-04-17"
+    assert format_date(parsed, iso=True) == f"2024-04-17"
+    assert format_time(parsed, iso=True) == f"15:04:16"
+    assert format_time(parsed, iso=True, ms=ms is not None) == f"15:04:16{ms_suffix}"
 
     value = f"2024-04-17T15:04:16{ms_suffix}"
     parsed = parse_datetime(value, utc=True)
