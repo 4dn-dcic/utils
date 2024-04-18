@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from dcicutils.datetime_utils import (
     get_local_timezone_string, normalize_date_string, normalize_datetime_string,
@@ -64,20 +64,20 @@ def _setup_global_timezone_constants(tzlocal: Optional[timezone] = None) -> None
 
 
 def _assert_datetime_equals(value: datetime, year: int, month: int, day: int,
-                            hour: int, minute: int, second: int, microsecond: int, tz: timezone = TZLOCAL):
+                            hour: int, minute: int, second: int, microsecond: int,
+                            tz: timezone = TZLOCAL,
+                            shift_hours: Optional[int] = None,
+                            shift_minutes: Optional[int] = None):
 
     if not isinstance(tz, timezone):
         tz = TZLOCAL
 
     expected_value = datetime(year=year, month=month, day=day, hour=hour,
                               minute=minute, second=second, microsecond=microsecond, tzinfo=tz)
-    assert value == expected_value
-
-    tz_offset_hours, tz_offset_minutes = get_timezone_hours_minutes(tz)
-    expected_value = datetime(year=year, month=month, day=day,
-                              hour=(hour - tz_offset_hours),
-                              minute=(minute - tz_offset_minutes),
-                              second=second, microsecond=microsecond, tzinfo=TZUTC)
+    if isinstance(shift_hours, int):
+        expected_value = expected_value + timedelta(hours=shift_hours)
+    if isinstance(shift_minutes, int):
+        expected_value = expected_value + timedelta(hours=shift_minutes)
     assert value == expected_value
 
 
@@ -118,7 +118,8 @@ def _test_parse_datetime_a(ms: Optional[int] = None):
 
     value = f"2024-04-17T15:04:16{ms_suffix}{TZUTC_SUFFIX}"
     parsed = parse_datetime(value, tz=TZLOCAL)
-    _assert_datetime_equals(parsed, 2024, 4, 17, 15 + TZLOCAL_OFFSET_HOURS, 4, 16, ms, TZLOCAL)
+    _assert_datetime_equals(parsed, 2024, 4, 17, 15, 4, 16, ms, TZLOCAL,
+                            shift_hours=TZLOCAL_OFFSET_HOURS, shift_minutes=TZLOCAL_OFFSET_MINUTES)
 
     # --------------------------------------------------------------------------------------------------
     value = f"2024-04-17T15:04:16{ms_suffix}{TZLOCAL_SUFFIX}"
@@ -127,11 +128,13 @@ def _test_parse_datetime_a(ms: Optional[int] = None):
 
     value = f"2024-04-17T15:04:16{ms_suffix}{TZLOCAL_SUFFIX}"
     parsed = parse_datetime(value, utc=True)
-    _assert_datetime_equals(parsed, 2024, 4, 17, 15 - TZLOCAL_OFFSET_HOURS, 4, 16, ms, TZUTC)
+    _assert_datetime_equals(parsed, 2024, 4, 17, 15, 4, 16, ms, TZUTC,
+                            shift_hours=-TZLOCAL_OFFSET_HOURS, shift_minutes=TZLOCAL_OFFSET_MINUTES)
 
     value = f"2024-04-17T15:04:16{ms_suffix}{TZLOCAL_SUFFIX}"
     parsed = parse_datetime(value, tz=TZUTC)
-    _assert_datetime_equals(parsed, 2024, 4, 17, 15 - TZLOCAL_OFFSET_HOURS, 4, 16, ms, TZUTC)
+    _assert_datetime_equals(parsed, 2024, 4, 17, 15, 4, 16, ms, TZUTC,
+                            shift_hours=-TZLOCAL_OFFSET_HOURS, shift_minutes=TZLOCAL_OFFSET_MINUTES)
 
     value = f"2024-04-17T15:04:16{ms_suffix}{TZLOCAL_SUFFIX}"
     parsed = parse_datetime(value, tz=TZLOCAL)
@@ -139,7 +142,6 @@ def _test_parse_datetime_a(ms: Optional[int] = None):
 
 
 def test_parse_datetime_a(ms: Optional[int] = None):
-
     _setup_global_timezone_constants()
     _test_parse_datetime_a()
     _test_parse_datetime_a(ms=434698)
@@ -155,3 +157,15 @@ def test_parse_datetime_a(ms: Optional[int] = None):
     _setup_global_timezone_constants(tzlocal=get_timezone(-4))
     _test_parse_datetime_a()
     _test_parse_datetime_a(ms=434698)
+
+    _setup_global_timezone_constants(tzlocal=get_timezone(7))
+    _test_parse_datetime_a()
+    _test_parse_datetime_a(ms=434698)
+
+    _setup_global_timezone_constants(tzlocal=get_timezone(9))
+    _test_parse_datetime_a()
+
+    for zone in range(-24, 24 + 1):
+        _setup_global_timezone_constants(tzlocal=get_timezone(zone))
+        _test_parse_datetime_a()
+        _test_parse_datetime_a(ms=434698)
