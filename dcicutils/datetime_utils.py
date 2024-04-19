@@ -235,8 +235,8 @@ def format_datetime(value: datetime,
                         return value.strftime(f"%Y-%m-%d")
                     else:
                         return value.strftime(f"%Y-%m-%dT%H:%M")
-                tz = value.strftime("%z")
-                tz = tz[:3] + ":" + tz[3:]
+                if len(tz := value.strftime("%z")) > 3:
+                    tz = tz[:3] + ":" + tz[3:]
                 if nodate is True:
                     return value.strftime(f"%H:%M") + tz
                 elif notime is True:
@@ -244,7 +244,11 @@ def format_datetime(value: datetime,
                 else:
                     return value.strftime(f"%Y-%m-%dT%H:%M") + tz
             if nodate is True:
-                return value.strftime(f"%H:%M:%S{f'.%f' if ms is True else ''}")
+                if (not (notz is True)) and len(tz := value.strftime("%z")) > 3:
+                    tz = tz[:3] + ":" + tz[3:]
+                else:
+                    tz = ""
+                return value.strftime(f"%H:%M:%S{f'.%f' if ms is True else ''}") + tz
             elif notime is True:
                 return value.strftime(f"%Y-%m-%d")
             else:
@@ -278,21 +282,20 @@ def format_datetime(value: datetime,
 
 def format_date(value: datetime,
                 utc: bool = False,
-                iso: bool = False,
                 tz: Optional[Union[timezone, bool]] = None,
                 verbose: bool = False,
                 noday: bool = False) -> str:
-    return format_datetime(value, utc=utc, iso=iso, tz=tz, verbose=verbose, noday=noday, notime=True)
+    return format_datetime(value, utc=utc, tz=tz, verbose=verbose, noday=noday, notime=True)
 
 
 def format_time(value: datetime,
                 utc: bool = False,
                 iso: bool = False,
-                ms: bool = False,
                 tz: Optional[Union[timezone, bool]] = None,
+                ms: bool = False,
                 notz: bool = False,
                 noseconds: bool = False,
                 verbose: bool = False,
                 noday: bool = False) -> str:
-    return format_datetime(value, utc=utc, iso=iso, ms=ms, tz=tz, notz=notz,
+    return format_datetime(value, utc=utc, tz=tz, iso=iso, ms=ms, notz=notz,
                            noseconds=noseconds, verbose=verbose, nodate=True)

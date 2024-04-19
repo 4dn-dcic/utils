@@ -116,9 +116,11 @@ def _test_parse_datetime_a(ms: Optional[int] = None):
     assert format_date(parsed, verbose=True) == f"Wednesday, April 17, 2024"
     assert format_date(parsed, verbose=True, noday=True) == f"April 17, 2024"
     assert format_date(parsed) == f"2024-04-17"
-    assert format_date(parsed, iso=True) == f"2024-04-17"
-    assert format_time(parsed, iso=True) == f"15:04:16"
-    assert format_time(parsed, iso=True, ms=ms is not None) == f"15:04:16{ms_suffix}"
+    assert format_date(parsed) == f"2024-04-17"
+    assert format_time(parsed, iso=True) == f"15:04:16{TZLOCAL_SUFFIX}"
+    assert format_time(parsed, iso=True, ms=ms is not None) == f"15:04:16{ms_suffix}{TZLOCAL_SUFFIX}"
+    assert format_time(parsed, iso=True, notz=True, ms=ms is not None) == f"15:04:16{ms_suffix}"
+    assert format_time(parsed, iso=True, notz=True) == f"15:04:16"
 
     value = f"2024-04-17T15:04:16{ms_suffix}"
     parsed = parse_datetime(value, utc=True)
