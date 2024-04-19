@@ -298,7 +298,7 @@ class ProgressBar:
                 spinc = spina[spini % spinn] if not ("100%|" in text) else "✓" ; spini += 1  # noqa
                 text = replace_first(text, sentinel_internal, f" {spinc}")
                 text = replace_first(text, "%|", "% ◀|")
-                text = remove_extra_trailing_spaces(text)
+                text = remove_extra_trailing_spaces(text) + f"{spinc} "
                 # Another oddity: for the rate sometimes tqdm intermittently prints
                 # something like "1.54s/" rather than "1.54/s"; something to do with
                 # the unit we gave, which is empty; idunno; just replace it here.
