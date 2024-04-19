@@ -343,7 +343,8 @@ class ProgressBar:
                 sys.stdout.write = sys_stdout_write
         def ascii_spinners() -> list:  # noqa
             # Fun with ASCII spinners.
-            spinner_chars = "⣾⣽⣻⢿⡿⣟⣯⣷"  # borrowed from rich python package (other: ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏)
+            # Dots borrowed from "rich" python package (others: ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏).
+            spinner_chars = "⣾⣽⣻⢿⡿⣟⣯⣷"
             return (list(spinner_chars[::-1]) * 7) + (list("|/-\\") * 2)
         sys.stdout.write = tidy_stdout_write
         spina = ascii_spinners() ; spini = 0 ; spinn = len(spina)  # noqa
