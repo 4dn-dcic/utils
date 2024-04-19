@@ -161,6 +161,9 @@ class ProgressBar:
         self.set_total(total, _norefresh=True)
         self.set_progress(progress, _norefresh=True)
         self.set_description(description)
+        self.enable()
+        self._done = False
+        self._bar.reset()
         self._started = time.time()
 
     def done(self, description: Optional[str] = None) -> None:
@@ -311,12 +314,15 @@ class ProgressBar:
             if self._captured_output_for_testing is not None:
                 # For testing only we replace vacilliting values in the out like rate,
                 # time elapsed, and ETA with static values; so that something like this:
-                # > Working /  20% ◀|█████████▌  | 1/5 | 536.00/s | 00:01 | ETA: 00:02
+                # > Working ⣾  20% ◀|█████████▌  | 1/5 | 536.00/s | 00:01 | ETA: 00:02 ⣾
                 # becomes something more static like this after calling this function:
                 # > Working |  20% ◀|### | 1/5 | 0.0/s | 00:00 | ETA: 00:00
                 # This function obviously has intimate knowledge of the output; better here than in tests.
                 def replace_time_dependent_values_with_static(text: str) -> str:
                     blocks = "\u2587|\u2588|\u2589|\u258a|\u258b|\u258c|\u258d|\u258e|\u258f"
+                    if text.endswith("| "):
+                        # In case "|" is in the trailing spinner it messes up regex below.
+                        text = set_nth(text, len(text) - 2, "-")
                     if (n := find_nth_from_end(text, "|", 5)) >= 8:
                         pattern = re.compile(
                             rf"(\s*)(\d*%? ◀\|)(?:\s*{blocks}|#)*\s*(\|\s*\d+/\d+)?(\s*\|\s*)"
@@ -337,12 +343,8 @@ class ProgressBar:
                 sys.stdout.write = sys_stdout_write
         def ascii_spinners() -> list:  # noqa
             # Fun with ASCII spinners.
-            return list("⣾⣽⣻⢿⡿⣟⣯⣷")  # borrowed from rich python package
-            # return list("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")  # borrowed from rich python package
-            # return list("⠿⠻⠽⠾⠷⠯⠟")
-            # return list("⠏⠛⠹⠼⠶⠧")
-            # return list("⠻⠽⠾⠷⠯⠟")
-            # return list("|/—◦\\")
+            spinner_chars = "⣾⣽⣻⢿⡿⣟⣯⣷"  # borrowed from rich python package (other: ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏)
+            return (list(spinner_chars[::-1]) * 7) + (list("|/-\\") * 2)
         sys.stdout.write = tidy_stdout_write
         spina = ascii_spinners() ; spini = 0 ; spinn = len(spina)  # noqa
         sentinel = "[progress]" ; sentinel_internal = f"{sentinel}:"  # noqa
