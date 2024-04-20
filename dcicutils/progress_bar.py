@@ -346,7 +346,7 @@ class ProgressBar:
             # Dots borrowed from "rich" python package (others: ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏).
             # Others: "◴◷◶◵" "◰◳◲◱" "◡⊙◠" "⠁⠂⠄⡀⢀⠠⠐⠈" "▁▃▄▅▆▇█▇▆▅▄▃" "◢◣◤◥" "◐◓◑◒" "✶✸✹✺✹✷" "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
             spinner_chars_a = "⣾⣽⣻⢿⡿⣟⣯⣷"
-            spinner_chars_b = "|/-\\"
+            spinner_chars_b = "|/—\\"
             spinner_chars_c = "◰◳◲◱"
             return (list(spinner_chars_a[::-1]) * 9) + (list(spinner_chars_b) * 3) + (list(spinner_chars_c) * 3)
         sys.stdout.write = tidy_stdout_write
