@@ -279,10 +279,10 @@ class ProgressBar:
         # string in the display string where the progress bar should actually go,
         # which we do in _format_description. Other minor things too; see below.
         sys_stdout_write = sys.stdout.write
-        last_text = None ; last_captured_output_text = None  # noqa
+        last_text = None ; last_captured_output_text = None ; last_spin_change_time = None  # noqa
         def tidy_stdout_write(text: str) -> None:  # noqa
             nonlocal self, sys_stdout_write, sentinel_internal, spina, spini, spinn
-            nonlocal last_text, last_captured_output_text
+            nonlocal last_text, last_captured_output_text, last_spin_change_time
             def replace_first(value: str, match: str, replacement: str) -> str:  # noqa
                 return value[:i] + replacement + value[i + len(match):] if (i := value.find(match)) >= 0 else value
             def remove_extra_trailing_spaces(text: str) -> str:  # noqa
@@ -292,13 +292,17 @@ class ProgressBar:
             if (not text) or (last_text == text):
                 return
             last_text = text
+            now = time.time()
             if (self._disabled or self._done) and sentinel_internal in text:
                 # Another hack to really disable output on interrupt; in this case we set
                 # tqdm.disable to True, but output can still dribble out, so if the output
                 # looks like it is from tqdm and we are disabled/done then do no output.
                 return
             if sentinel_internal in text:
-                spinc = spina[spini % spinn] if not ("100%|" in text) else "✓" ; spini += 1  # noqa
+                spinc = spina[spini % spinn] if not ("100%|" in text) else "✓"
+                if last_spin_change_time is None or ((now - last_spin_change_time) >= 0.05):
+                    spini += 1
+                    last_spin_change_time = now
                 text = replace_first(text, sentinel_internal, f" {spinc}")
                 text = replace_first(text, "%|", "% ◀|")
                 text = remove_extra_trailing_spaces(text) + f"{spinc} "
@@ -307,7 +311,7 @@ class ProgressBar:
                 # the unit we gave, which is empty; idunno; just replace it here.
                 text = replace_first(text, "s/ ", "/s ")
             if self._use_byte_size_for_rate and self._bar:
-                rate = self._bar.n / (time.time() - self._started)
+                rate = self._bar.n / (now - self._started)
                 text = text.replace("[rate]", f"{format_size(rate)}/s")
             sys_stdout_write(text)
             sys.stdout.flush()
@@ -348,7 +352,11 @@ class ProgressBar:
             spinner_chars_a = "⣾⣽⣻⢿⡿⣟⣯⣷"
             spinner_chars_b = "|/—\\"
             spinner_chars_c = "◰◳◲◱"
-            return (list(spinner_chars_a[::-1]) * 9) + (list(spinner_chars_b) * 3) + (list(spinner_chars_c) * 3)
+            spinner_chars_d = "◐◓◑◒"
+            spinner_chars_e = "◴◷◶◵"
+            return ((list(spinner_chars_a[::-1]) * 18) +
+                    (list(spinner_chars_b) * 3) + (list(spinner_chars_c) * 3) +
+                    (list(spinner_chars_d) * 3) + (list(spinner_chars_e) * 3))
         sys.stdout.write = tidy_stdout_write
         spina = ascii_spinners() ; spini = 0 ; spinn = len(spina)  # noqa
         sentinel = "[progress]" ; sentinel_internal = f"{sentinel}:"  # noqa
