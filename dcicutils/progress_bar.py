@@ -342,10 +342,13 @@ class ProgressBar:
             if sys_stdout_write is not None:
                 sys.stdout.write = sys_stdout_write
         def ascii_spinners() -> list:  # noqa
-            # Fun with ASCII spinners.
+            # Fun with ASCII spinner characters.
             # Dots borrowed from "rich" python package (others: ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏).
-            spinner_chars = "⣾⣽⣻⢿⡿⣟⣯⣷"
-            return (list(spinner_chars[::-1]) * 7) + (list("|/-\\") * 2)
+            # Others: "◴◷◶◵" "◰◳◲◱" "◡⊙◠" "⠁⠂⠄⡀⢀⠠⠐⠈" "▁▃▄▅▆▇█▇▆▅▄▃" "◢◣◤◥" "◐◓◑◒" "✶✸✹✺✹✷" "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+            spinner_chars_a = "⣾⣽⣻⢿⡿⣟⣯⣷"
+            spinner_chars_b = "|/-\\"
+            spinner_chars_c = "◰◳◲◱"
+            return (list(spinner_chars_a[::-1]) * 9) + (list(spinner_chars_b) * 3) + (list(spinner_chars_c) * 3)
         sys.stdout.write = tidy_stdout_write
         spina = ascii_spinners() ; spini = 0 ; spinn = len(spina)  # noqa
         sentinel = "[progress]" ; sentinel_internal = f"{sentinel}:"  # noqa
