@@ -300,7 +300,7 @@ class ProgressBar:
                 return
             if sentinel_internal in text:
                 spinc = spina[spini % spinn] if not ("100%|" in text) else "✓"
-                if last_spin_change_time is None or ((now - last_spin_change_time) >= 0.05):
+                if last_spin_change_time is None or ((now - last_spin_change_time) >= 0.08):
                     spini += 1
                     last_spin_change_time = now
                 text = replace_first(text, sentinel_internal, f" {spinc}")
@@ -350,13 +350,16 @@ class ProgressBar:
             # Dots borrowed from "rich" python package (others: ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏).
             # Others: "◴◷◶◵" "◰◳◲◱" "◡⊙◠" "⠁⠂⠄⡀⢀⠠⠐⠈" "▁▃▄▅▆▇█▇▆▅▄▃" "◢◣◤◥" "◐◓◑◒" "✶✸✹✺✹✷" "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
             spinner_chars_a = "⣾⣽⣻⢿⡿⣟⣯⣷"
-            spinner_chars_b = "|/—\\"
+            spinner_chars_b = "◐◓◑◒"
             spinner_chars_c = "◰◳◲◱"
-            spinner_chars_d = "◐◓◑◒"
-            spinner_chars_e = "◴◷◶◵"
-            return ((list(spinner_chars_a[::-1]) * 18) +
-                    (list(spinner_chars_b) * 3) + (list(spinner_chars_c) * 3) +
-                    (list(spinner_chars_d) * 3) + (list(spinner_chars_e) * 3))
+            spinner_chars_d = "◴◷◶◵"
+            spinner_chars_e = "|/—*—\\"
+            spinner_chars_f = "◡⊙◠"
+            return ((list(spinner_chars_a[::-1]) * 8) + (list(spinner_chars_b) * 4) +
+                    (list(spinner_chars_a[::-1]) * 8) + (list(spinner_chars_c) * 4) +
+                    (list(spinner_chars_a[::-1]) * 8) + (list(spinner_chars_d) * 4) +
+                    (list(spinner_chars_a[::-1]) * 8) + (list(spinner_chars_e) * 4) +
+                    (list(spinner_chars_a[::-1]) * 8) + (list(spinner_chars_f) * 4))
         sys.stdout.write = tidy_stdout_write
         spina = ascii_spinners() ; spini = 0 ; spinn = len(spina)  # noqa
         sentinel = "[progress]" ; sentinel_internal = f"{sentinel}:"  # noqa
