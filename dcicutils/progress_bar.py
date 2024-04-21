@@ -300,12 +300,11 @@ class ProgressBar:
                 return
             if sentinel_internal in text:
                 spinc = spina[spini % spinn] if not ("100%|" in text) else "✓"
-                if last_spin_change_time is None or ((now - last_spin_change_time) >= 0.08):
+                if last_spin_change_time is None or ((now - last_spin_change_time) >= 0.07):
                     spini += 1
                     last_spin_change_time = now
                 text = replace_first(text, sentinel_internal, f" {spinc}")
                 text = replace_first(text, "%|", "% ◀|")
-                text = remove_extra_trailing_spaces(text) + f"{spinc} "
                 # Another oddity: for the rate sometimes tqdm intermittently prints
                 # something like "1.54s/" rather than "1.54/s"; something to do with
                 # the unit we gave, which is empty; idunno; just replace it here.
@@ -324,9 +323,6 @@ class ProgressBar:
                 # This function obviously has intimate knowledge of the output; better here than in tests.
                 def replace_time_dependent_values_with_static(text: str) -> str:
                     blocks = "\u2587|\u2588|\u2589|\u258a|\u258b|\u258c|\u258d|\u258e|\u258f"
-                    if text.endswith("| "):
-                        # In case "|" is in the trailing spinner it messes up regex below.
-                        text = set_nth(text, len(text) - 2, "-")
                     if (n := find_nth_from_end(text, "|", 5)) >= 8:
                         pattern = re.compile(
                             rf"(\s*)(\d*%? ◀\|)(?:\s*{blocks}|#)*\s*(\|\s*\d+/\d+)?(\s*\|\s*)"
@@ -349,17 +345,25 @@ class ProgressBar:
             # Fun with ASCII spinner characters.
             # Dots borrowed from "rich" python package (others: ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏).
             # Others: "◴◷◶◵" "◰◳◲◱" "◡⊙◠" "⠁⠂⠄⡀⢀⠠⠐⠈" "▁▃▄▅▆▇█▇▆▅▄▃" "◢◣◤◥" "◐◓◑◒" "✶✸✹✺✹✷" "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
-            spinner_chars_a = "⣾⣽⣻⢿⡿⣟⣯⣷"
-            spinner_chars_b = "◐◓◑◒"
-            spinner_chars_c = "◰◳◲◱"
-            spinner_chars_d = "◴◷◶◵"
-            spinner_chars_e = "|/—*—\\"
-            spinner_chars_f = "◡⊙◠"
-            return ((list(spinner_chars_a[::-1]) * 8) + (list(spinner_chars_b) * 4) +
-                    (list(spinner_chars_a[::-1]) * 8) + (list(spinner_chars_c) * 4) +
-                    (list(spinner_chars_a[::-1]) * 8) + (list(spinner_chars_d) * 4) +
-                    (list(spinner_chars_a[::-1]) * 8) + (list(spinner_chars_e) * 4) +
-                    (list(spinner_chars_a[::-1]) * 8) + (list(spinner_chars_f) * 4))
+            spinner_chars_a = "⣾⣽⣻⢿⡿⣟⣯⣷"[::-1]
+            spinner_chars_b = "⠋⠙⠹⠸⢰⣰⣠⣄⣆⡆⡖⠖⠚⠙⠋⠏⠇⡆⣆⣄⣠⣰⢰⢲⠲"
+            spinner_chars_c = "⠉⠒⠤⣀⠤⠒"
+            spinner_chars_d = "⡀⡄⡆⠇⠋⠙⠸⢰⢠⢀⢠⢰⠸⠙⠋⠇⡆⡄"
+            spinner_chars_e = "⠀⡀⠄⠂⠁⠈⠐⠠⢀⣀⢄⢂⢁⢈⢐⢠⣠⢤⢢⢡⢨⢰⣰⢴⢲⢱⢸⣸⢼⢺⢹⣹⢽⢻⣻⢿⣿⣶⣤⣀"
+            spinner_chars_f = "⣀⣤⣶⣿⣶⣤"
+            spinner_chars_g = "⠋⠙⠹⠸⢰⣰⣠⣄⣆⡆⠇⠏"
+            spinner_chars_h = "⠁⠉⠙⠚⠒⠂⠂⠒⠲⠴⠤⠄⠄⠤⢤⣠⣀⢀⢀⣀⣠⢤⠤⠄⠄⠤⠴⠲⠒⠂⠂⠒⠚⠙⠉⠁"
+            spinner_chars_i = "◐◓◑◒"
+            spinner_chars_j = "|/—*—\\"
+            return ((list(spinner_chars_a) * 8) + (list(spinner_chars_b) * 2) +
+                    (list(spinner_chars_a) * 8) + (list(spinner_chars_c) * 4) +
+                    (list(spinner_chars_a) * 8) + (list(spinner_chars_d) * 2) +
+                    (list(spinner_chars_a) * 8) + (list(spinner_chars_e) * 2) +
+                    (list(spinner_chars_a) * 8) + (list(spinner_chars_f) * 4) +
+                    (list(spinner_chars_a) * 8) + (list(spinner_chars_g) * 4) +
+                    (list(spinner_chars_a) * 8) + (list(spinner_chars_h) * 2) +
+                    (list(spinner_chars_a) * 8) + (list(spinner_chars_i) * 2) +
+                    (list(spinner_chars_a) * 8) + (list(spinner_chars_j) * 2))
         sys.stdout.write = tidy_stdout_write
         spina = ascii_spinners() ; spini = 0 ; spinn = len(spina)  # noqa
         sentinel = "[progress]" ; sentinel_internal = f"{sentinel}:"  # noqa
