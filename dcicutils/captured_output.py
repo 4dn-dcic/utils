@@ -9,7 +9,7 @@ _real_stderr = sys.stderr
 
 
 @contextmanager
-def captured_output(capture: bool = True):
+def captured_output(capture: bool = True, encoding: Optional[str] = None):
     """
     Context manager to capture any/all output to stdout or stderr, and not actually output it to stdout
     or stderr. Yields and object with a get_captured_output() method to get the output captured thus far,
@@ -24,7 +24,9 @@ def captured_output(capture: bool = True):
 
     original_stdout = _real_stdout
     original_stderr = _real_stderr
-    captured_output = io.StringIO()
+    # FYI: This encoding business with _EncodedStringIO was introduced (circa April 2024)
+    # when ran into issues unit testing progress_bar which outputs those funny block characters.
+    captured_output = io.StringIO() if not encoding else _EncodedStringIO(encoding)
 
     def set_original_output() -> None:
         sys.stdout = original_stdout
@@ -68,3 +70,19 @@ def uncaptured_output():
     finally:
         sys.stdout = original_stdout
         sys.stderr = original_stderr
+
+
+class _EncodedStringIO:
+    def __init__(self, encoding: str = "utf-8"):
+        self.encoding = encoding
+        self.buffer = io.BytesIO()
+    def write(self, s):  # noqa
+        self.buffer.write(s.encode(self.encoding))
+    def flush(self):  # noqa
+        self.buffer.flush()
+    def getvalue(self):  # noqa
+        return self.buffer.getvalue().decode(self.encoding)
+    def __str__(self):  # noqa
+        return self.getvalue()
+    def __repr__(self):  # noqa
+        return repr(self.getvalue())

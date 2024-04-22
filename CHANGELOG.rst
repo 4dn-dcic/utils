@@ -7,6 +7,21 @@ Change Log
 ----------
 
 
+8.8.4
+=====
+* Minor fix in structured_data to not try to resolve empty refs in norefs mode;
+  and added StructuredDataSet.unchecked_refs; not functionally substantive as
+  used (only) with smaht-submitr/submit-metadata-bundle --info --refs.
+* Added nrows and nsheets to data_reader; convenience for smaht-submitr/submit-metadata-bundle --info.
+* Added test_progress_bar module for progress_bar testing; would like to add more tests.
+* Fixed up captured_output module to handle UTF-8 encoding to help unit testing progress_bar.
+* Added hooks to progress_bar to help unit testing.
+* Added a find_nth_from_end and set_nth to misc_utils to help progress_bar unit testing.
+* Added format_size and format_duration misc_utils; refactor from smaht-submitr.
+* Added format_datetime, parse_datetime to datetime_utils; refactor from smaht-submitr; and some tests.
+* Added check_only flag to portal_utils.Portal.{post,patch}_metadata (came up in ad hoc troubleshooting).
+
+
 8.8.3
 =====
 * Minor fix in structured_data related to smaht-submitr progress monitoring.

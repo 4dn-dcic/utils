@@ -66,6 +66,13 @@ class RowReader(abc.ABC):
         else:
             return value
 
+    @property
+    def nrows(self) -> int:
+        nrows = 0
+        for row in self:
+            nrows += 1
+        return nrows
+
     def open(self) -> None:
         pass
 
@@ -191,6 +198,10 @@ class Excel:
                 (sheet.title.startswith("<") and sheet.title.endswith(">"))):  # noqa
                 return True
         return False
+
+    @property
+    def nsheets(self) -> int:
+        return len(self.sheet_names)
 
     def __del__(self) -> None:
         if (workbook := self._workbook) is not None:

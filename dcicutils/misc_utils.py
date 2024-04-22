@@ -2548,6 +2548,71 @@ def normalize_spaces(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
+def find_nth_from_end(string: str, substring: str, nth: int) -> int:
+    """
+    Returns the index of the nth occurrence of the given substring within
+    the given string from the END of the given string; or -1 if not found.
+    """
+    index = -1
+    string = string[::-1]
+    for i in range(0, nth):
+        index = string.find(substring, index + 1)
+    return len(string) - index - 1 if index >= 0 else -1
+
+
+def set_nth(string: str, nth: int, replacement: str) -> str:
+    """
+    Sets the nth character of the given string to the given replacement string.
+    """
+    if not isinstance(string, str) or not isinstance(nth, int) or not isinstance(replacement, str):
+        return string
+    if nth < 0:
+        nth += len(string)
+    return string[:nth] + replacement + string[nth + 1:] if 0 <= nth < len(string) else string
+
+
+def format_size(nbytes: Union[int, float], precision: int = 2, nospace: bool = False, terse: bool = False) -> str:
+    if isinstance(nbytes, str) and nbytes.isdigit():
+        nbytes = int(nbytes)
+    elif not isinstance(nbytes, (int, float)):
+        return ""
+    UNITS = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+    UNITS_TERSE = ['b', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
+    MAX_UNITS_INDEX = len(UNITS) - 1
+    ONE_K = 1024
+    index = 0
+    if (precision := max(precision, 0)) and (nbytes <= ONE_K):
+        precision -= 1
+    while abs(nbytes) >= ONE_K and index < MAX_UNITS_INDEX:
+        nbytes /= ONE_K
+        index += 1
+    if index == 0:
+        nbytes = int(nbytes)
+        return f"{nbytes} byte{'s' if nbytes != 1 else ''}"
+    unit = (UNITS_TERSE if terse else UNITS)[index]
+    return f"{nbytes:.{precision}f}{'' if nospace else ' '}{unit}"
+
+
+def format_duration(seconds: Union[int, float]) -> str:
+    seconds_actual = seconds
+    seconds = round(max(seconds, 0))
+    durations = [("year", 31536000), ("day", 86400), ("hour", 3600), ("minute", 60), ("second", 1)]
+    parts = []
+    for name, duration in durations:
+        if seconds >= duration:
+            count = seconds // duration
+            seconds %= duration
+            if count != 1:
+                name += "s"
+            parts.append(f"{count} {name}")
+    if len(parts) == 0:
+        return f"{seconds_actual:.1f} seconds"
+    elif len(parts) == 1:
+        return f"{seconds_actual:.1f} seconds"
+    else:
+        return " ".join(parts[:-1]) + " " + parts[-1]
+
+
 class JsonLinesReader:
 
     def __init__(self, fp, padded=False, padding=None):

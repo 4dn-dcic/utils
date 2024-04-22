@@ -154,7 +154,44 @@ class StructuredDataSet:
 
     @property
     def resolved_refs_with_uuids(self) -> List[str]:
-        return list([{"path": resolved_ref[0], "uuid": resolved_ref[1]} for resolved_ref in self._resolved_refs])
+        return list([{"path": resolved_ref[0],
+                      "uuid": resolved_ref[1] if len(resolved_ref) >= 2 else None}
+                     for resolved_ref in self._resolved_refs])
+
+    @property
+    def unchecked_refs(self) -> List[str]:
+        """
+        Returns list of unchecked (for existence) references, grouped by reference path;
+        each object in the list has a path property and a srcs property which is a list of
+        src objects containing the type, column and row of the reference to the reference.
+        Note that this is only populated if the norefs option is specified.
+        """
+        def load_json(value: str) -> Optional[dict]:
+            try:
+                return json.loads(value)
+            except Exception:
+                return None
+        result = []
+        if self._norefs:
+            for ref in self._resolved_refs:
+                # The structure of this self._resolved_refs is setup in Schema._map_function_ref,
+                # which is called whenever a reference (linkTo) is encountered. It is a set of
+                # tuples containing three items: [0] the ref path, [1] its uuid (if applicable),
+                # and [2] its src. The src identifies the place where this ref occurred and is a
+                # dictionary containing file, type, column, and row properties. For this case, of
+                # norefs (i.e. unchecked refs), the uuid ([1]) is None because we are skipping
+                # ref resolution. But the src is actually a *string* dump of the dictionary, only
+                # because dictionaries cannot be put in a set (which is what _resolved_refs is);
+                # this dump is also done in Schema._map_function_ref (should probably change this
+                # to be a list to avoid this - TODO); we only even store this src info for this
+                # norefs case, as not really needed otherwise. This is just to support the
+                # useful-for-troublehsooting options --info --refs for smaht-submitr.
+                if len(ref) >= 3 and (ref_path := ref[0]) and (ref_src := load_json(ref[2])):
+                    if existing_ref := [item for item in result if item.get("path") == ref_path]:
+                        existing_ref[0]["srcs"].append(ref_src)
+                    else:
+                        result.append({"path": ref_path, "srcs": [ref_src]})
+        return result
 
     @property
     def upload_files(self) -> List[str]:
@@ -653,7 +690,16 @@ class Schema(SchemaBase):
         def map_ref(value: str, link_to: str, portal: Optional[Portal], src: Optional[str]) -> Any:
             nonlocal self, typeinfo
             if self._norefs:
-                self._resolved_refs.add((f"/{link_to}/{value}", None))
+                # Here the caller has specified the (StructuredDataSet) norefs option
+                # which means we do not check for the existence of references at all.
+                if value:
+                    # Dump the src as a JSON string because a dictionary cannot be added to a set;
+                    # this is ONLY used for smaht-submitr/submit-metadata-bundle --info --refs.
+                    # This info exposed via StructureDataSet.unchecked_refs. TODO: Should probably
+                    # make this not a set type so we dont' have to do this dump (and corresponding
+                    # load, in StructureDataSet.unchecked_refs).
+                    self._resolved_refs.add((f"/{link_to}/{value}", None,
+                                             json.dumps(src) if isinstance(src, dict) else None))
                 return value
             if not value:
                 if (column := typeinfo.get("column")) and column in self.data.get("required", []):

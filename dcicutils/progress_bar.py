@@ -1,13 +1,15 @@
 from collections import namedtuple
+import re
 from signal import signal, SIGINT
 import sys
 import threading
 import time
 from tqdm import tqdm
 from types import FrameType as frame
-from typing import Callable, Optional, Union
+from typing import Callable, List, Optional, Union
 from contextlib import contextmanager
 from dcicutils.command_utils import yes_or_no
+from dcicutils.misc_utils import find_nth_from_end, format_size, set_nth
 
 
 class TQDM(tqdm):
@@ -47,6 +49,8 @@ class ProgressBar:
 
     def __init__(self, total: Optional[int] = None,
                  description: Optional[str] = None,
+                 use_byte_size_for_rate: bool = False,
+                 use_ascii: bool = False,
                  catch_interrupt: bool = True,
                  interrupt: Optional[Callable] = None,
                  interrupt_continue: Optional[Callable] = None,
@@ -54,15 +58,16 @@ class ProgressBar:
                  interrupt_exit: bool = False,
                  interrupt_exit_message: Optional[Union[Callable, str]] = None,
                  interrupt_message: Optional[str] = None,
-                 printf: Optional[Callable] = None,
-                 tidy_output_hack: bool = True) -> None:
+                 tidy_output_hack: bool = True,
+                 capture_output_for_testing: bool = False) -> None:
         self._bar = None
+        self._started = 0
         self._disabled = False
         self._done = False
-        self._printf = printf if callable(printf) else print
         self._tidy_output_hack = (tidy_output_hack is True)
-        self._started = time.time()
         self._stop_requested = False
+        self._use_byte_size_for_rate = (use_byte_size_for_rate is True and self._tidy_output_hack)
+        self._use_ascii = (use_ascii is True)
         # Interrupt handling. We do not do the actual (signal) interrupt setup
         # in self._initialize as that could be called from a (sub) thread; and in
         # Python we can only set a signal (SIGINT in our case) on the main thread.
@@ -90,24 +95,26 @@ class ProgressBar:
             self._tidy_output_hack = self._define_tidy_output_hack()
         self._total = total if isinstance(total, int) and total >= 0 else 0
         self._description = self._format_description(description)
-        # self._initialize()
+        self._captured_output_for_testing = [] if capture_output_for_testing else None
 
     def _initialize(self) -> bool:
         # Do not actually create the tqdm object unless/until we have a positive total.
         if (self._bar is None) and (self._total > 0):
-            bar_format = "{l_bar}{bar}| {n_fmt}/{total_fmt} | {rate_fmt} | {elapsed}{postfix} | ETA: {remaining} "
+            if self._use_byte_size_for_rate:
+                bar_format = "{l_bar}{bar}| {n_fmt}/{total_fmt} | [rate] | {elapsed}{postfix} | ETA: {remaining} "
+            else:
+                bar_format = "{l_bar}{bar}| {n_fmt}/{total_fmt} | {rate_fmt} | {elapsed}{postfix} | ETA: {remaining} "
             self._bar = TQDM(total=self._total, desc=self._description,
-                             dynamic_ncols=True, bar_format=bar_format, unit="", file=sys.stdout)
+                             dynamic_ncols=True, bar_format=bar_format, unit="", file=sys.stdout, ascii=self._use_ascii)
+            self._started = time.time()
             if self._disabled:
                 self._bar.disable = True
             return True
         return False
 
-    def set_total(self, value: int, reset_eta: bool = False) -> None:
+    def set_total(self, value: int, _norefresh: bool = False) -> None:
         if value == self._total:
             # If the total has not changed since last set then do nothing.
-            if reset_eta and self._bar is not None:
-                self._bar.reset()
             return
         if isinstance(value, int) and value > 0:
             self._total = value
@@ -116,11 +123,33 @@ class ProgressBar:
                 # the total during the course of a single ProgressBar instance.
                 self._bar.reset()
                 self._bar.total = value
+                if not _norefresh:
+                    self._bar.refresh()
+
+    def set_progress(self, value: int, _norefresh: bool = False) -> None:
+        if isinstance(value, int) and value >= 0:
+            if (self._bar is not None) or self._initialize():
+                self._bar.n = value
+                if not _norefresh:
+                    self._bar.refresh()
+
+    def increment_progress(self, value: int = 1) -> None:
+        if isinstance(value, int) and value > 0:
+            if (self._bar is not None) or self._initialize():
+                self._bar.update(value)
                 self._bar.refresh()
+
+    def set_description(self, value: str) -> None:
+        if isinstance(value, str):
+            self._description = self._format_description(value)
+            if self._bar is not None:
+                # FYI: tqdm.set_description seems to imply a refresh.
+                self._bar.set_description(self._description)
 
     def reset_eta(self) -> None:
         # Since set_total does nothing if total is the same, provide
         # a way to reset the ETA if starting over with the same total.
+        # But NOTE that resetting ETA will ALSO reset the ELAPSED time.
         if self._bar is not None:
             progress = self._bar.n
             self._bar.reset()
@@ -128,29 +157,21 @@ class ProgressBar:
             self._bar.n = progress
             self._bar.refresh()
 
-    def set_progress(self, value: int) -> None:
-        if isinstance(value, int) and value >= 0:
-            if (self._bar is not None) or self._initialize():
-                self._bar.n = value
-                self._bar.refresh()
+    def reset(self, total: int, progress: int = 0, description: Optional[str] = None) -> None:
+        self.set_total(total, _norefresh=True)
+        self.set_progress(progress, _norefresh=True)
+        self.set_description(description)
+        self.enable()
+        self._done = False
+        self._bar.reset()
+        self._started = time.time()
 
-    def increment_progress(self, value: int) -> None:
-        if isinstance(value, int) and value > 0:
-            if (self._bar is not None) or self._initialize():
-                self._bar.update(value)
-                self._bar.refresh()
-
-    def set_description(self, value: str) -> None:
-        self._description = self._format_description(value)
-        if self._bar is not None:
-            self._bar.set_description(self._description)
-
-    def done(self) -> None:
+    def done(self, description: Optional[str] = None) -> None:
         if self._done or self._bar is None:
             return
         self._ended = time.time()
         self.set_progress(self.total)
-        self._bar.set_description(self._description)
+        self.set_description(description)
         self._bar.refresh()
         # FYI: Do NOT do a bar.disable = True before a bar.close() or it messes up output
         # on multiple calls; found out the hard way; a couple hours will never get back :-/
@@ -190,12 +211,14 @@ class ProgressBar:
         return self._stop_requested
 
     @property
-    def started(self) -> None:
-        return self._started
+    def captured_output_for_testing(self) -> Optional[List[str]]:
+        return self._captured_output_for_testing
 
-    @property
-    def duration(self) -> None:
-        return time.time() - self._started
+    @staticmethod
+    def format_captured_output_for_testing(description: str, total: int, progress: int) -> str:
+        percent = round((progress / total) * 100.0)
+        separator = "✓" if percent == 100 else "|"
+        return f"{description} {separator} {percent:>3}% ◀|### | {progress}/{total} | 0.0/s | 00:00 | ETA: 00:00"
 
     def _format_description(self, value: str) -> str:
         if not isinstance(value, str):
@@ -208,8 +231,7 @@ class ProgressBar:
         def handle_interrupt(signum: int, frame: frame) -> None:  # noqa
             nonlocal self
             def handle_secondary_interrupt(signum: int, frame: frame) -> None:  # noqa
-                nonlocal self
-                self._printf("\nEnter 'yes' or 'no' or CTRL-\\ to completely abort ...")
+                print("\nEnter 'yes' or 'no' or CTRL-\\ to completely abort ...")
             self.disable()
             self._interrupt(self) if self._interrupt else None
             set_interrupt_handler(handle_secondary_interrupt)
@@ -226,7 +248,7 @@ class ProgressBar:
                         restore_interrupt_handler()
                         if self._interrupt_exit_message:
                             if isinstance(interrupt_exit_message := self._interrupt_exit_message(self), str):
-                                self._printf(interrupt_exit_message)
+                                print(interrupt_exit_message)
                         exit(1)
                     elif interrupt_stop is False or ((interrupt_stop is None) and (self._interrupt_exit is False)):
                         set_interrupt_handler(handle_interrupt)
@@ -257,30 +279,92 @@ class ProgressBar:
         # string in the display string where the progress bar should actually go,
         # which we do in _format_description. Other minor things too; see below.
         sys_stdout_write = sys.stdout.write
+        last_text = None ; last_captured_output_text = None ; last_spin_change_time = None  # noqa
         def tidy_stdout_write(text: str) -> None:  # noqa
             nonlocal self, sys_stdout_write, sentinel_internal, spina, spini, spinn
+            nonlocal last_text, last_captured_output_text, last_spin_change_time
             def replace_first(value: str, match: str, replacement: str) -> str:  # noqa
                 return value[:i] + replacement + value[i + len(match):] if (i := value.find(match)) >= 0 else value
+            def remove_extra_trailing_spaces(text: str) -> str:  # noqa
+                while text.endswith("  "):
+                    text = text[:-1]
+                return text
+            if (not text) or (last_text == text):
+                return
+            last_text = text
+            now = time.time()
             if (self._disabled or self._done) and sentinel_internal in text:
                 # Another hack to really disable output on interrupt; in this case we set
                 # tqdm.disable to True, but output can still dribble out, so if the output
                 # looks like it is from tqdm and we are disabled/done then do no output.
                 return
             if sentinel_internal in text:
-                spinc = spina[spini % spinn] if not ("100%|" in text) else "| ✓" ; spini += 1  # noqa
+                spinc = spina[spini % spinn] if not ("100%|" in text) else "✓"
+                if last_spin_change_time is None or ((now - last_spin_change_time) >= 0.06):
+                    spini += 1
+                    last_spin_change_time = now
                 text = replace_first(text, sentinel_internal, f" {spinc}")
                 text = replace_first(text, "%|", "% ◀|")
                 # Another oddity: for the rate sometimes tqdm intermittently prints
                 # something like "1.54s/" rather than "1.54/s"; something to do with
                 # the unit we gave, which is empty; idunno; just replace it here.
                 text = replace_first(text, "s/ ", "/s ")
+            if self._use_byte_size_for_rate and self._bar:
+                rate = self._bar.n / (now - self._started)
+                text = text.replace("[rate]", f"{format_size(rate)}/s")
             sys_stdout_write(text)
             sys.stdout.flush()
+            if self._captured_output_for_testing is not None:
+                # For testing only we replace vacilliting values in the out like rate,
+                # time elapsed, and ETA with static values; so that something like this:
+                # > Working ⣾  20% ◀|█████████▌  | 1/5 | 536.00/s | 00:01 | ETA: 00:02 ⣾
+                # becomes something more static like this after calling this function:
+                # > Working |  20% ◀|### | 1/5 | 0.0/s | 00:00 | ETA: 00:00
+                # This function obviously has intimate knowledge of the output; better here than in tests.
+                def replace_time_dependent_values_with_static(text: str) -> str:
+                    blocks = "\u2587|\u2588|\u2589|\u258a|\u258b|\u258c|\u258d|\u258e|\u258f"
+                    if (n := find_nth_from_end(text, "|", 5)) >= 8:
+                        pattern = re.compile(
+                            rf"(\s*)(\d*%? ◀\|)(?:\s*{blocks}|#)*\s*(\|\s*\d+/\d+)?(\s*\|\s*)"
+                            rf"(?:\d+\.?\d*|\?)(\/s\s*\|\s*)(?:\d+:\d+)?(\s*\|\s*ETA:\s*)(?:\d+:\d+|\?)?")
+                        if match := pattern.match(text[n - 6:]):
+                            if text[n - 8:n - 7] != "✓": text = set_nth(text, n - 8, "|")  # noqa
+                            return (text[0:n - 6].replace("\r", "") +
+                                    match.expand(rf"\g<1>\g<2>### \g<3>\g<4>0.0\g<5>00:00\g<6>00:00"))
+                    return text
+                if text != "\n":
+                    captured_output_text = replace_time_dependent_values_with_static(text)
+                    if captured_output_text != last_captured_output_text:
+                        self._captured_output_for_testing.append(captured_output_text)
+                        last_captured_output_text = captured_output_text
         def restore_stdout_write() -> None:  # noqa
             nonlocal sys_stdout_write
             if sys_stdout_write is not None:
                 sys.stdout.write = sys_stdout_write
+        def ascii_spinners() -> list:  # noqa
+            # Fun with ASCII spinner characters.
+            # Dots borrowed from "rich" python package (others: ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏).
+            # Others: "◴◷◶◵" "◰◳◲◱" "◡⊙◠" "⠁⠂⠄⡀⢀⠠⠐⠈" "▁▃▄▅▆▇█▇▆▅▄▃" "◢◣◤◥" "◐◓◑◒" "✶✸✹✺✹✷" "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+            spinner_chars_a = list("⣾⣽⣻⢿⡿⣟⣯⣷"[::-1]) * 8
+            spinner_chars_b = list("⠋⠙⠹⠸⢰⣰⣠⣄⣆⡆⡖⠖⠚⠙⠋⠏⠇⡆⣆⣄⣠⣰⢰⢲⠲")
+            spinner_chars_c = list("⣀⣤⣶⣿⣶⣤")
+            spinner_chars_d = list("⡀⡄⡆⠇⠋⠙⠸⢰⢠⢀⢠⢰⠸⠙⠋⠇⡆⡄")
+            spinner_chars_e = list("⠀⡀⠄⠂⠁⠈⠐⠠⢀⣀⢄⢂⢁⢈⢐⢠⣠⢤⢢⢡⢨⢰⣰⢴⢲⢱⢸⣸⢼⢺⢹⣹⢽⢻⣻⢿⣿⣶⣤⣀")
+            spinner_chars_f = list("⠉⠒⠤⣀⠤⠒")
+            spinner_chars_g = list("⠋⠙⠹⠸⢰⣰⣠⣄⣆⡆⠇⠏")
+            spinner_chars_h = list("⠁⠉⠙⠚⠒⠂⠂⠒⠲⠴⠤⠄⠄⠤⢤⣠⣀⢀⢀⣀⣠⢤⠤⠄⠄⠤⠴⠲⠒⠂⠂⠒⠚⠙⠉⠁")
+            spinner_chars_i = list("◐◓◑◒")
+            spinner_chars_j = list("|/—*—\\")
+            return (spinner_chars_a + (spinner_chars_b * 2) +
+                    spinner_chars_a + (spinner_chars_c * 4) +
+                    spinner_chars_a + (spinner_chars_d * 2) +
+                    spinner_chars_a + (spinner_chars_e * 2) +
+                    spinner_chars_a + (spinner_chars_f * 4) +
+                    spinner_chars_a + (spinner_chars_g * 5) +
+                    spinner_chars_a + (spinner_chars_h * 2) +
+                    spinner_chars_a + (spinner_chars_i * 5) +
+                    spinner_chars_a + (spinner_chars_j * 4))
         sys.stdout.write = tidy_stdout_write
-        spina = ["|", "/", "—", "◦", "\\"] ; spini = 0 ; spinn = len(spina)  # noqa
+        spina = ascii_spinners() ; spini = 0 ; spinn = len(spina)  # noqa
         sentinel = "[progress]" ; sentinel_internal = f"{sentinel}:"  # noqa
         return namedtuple("tidy_output_hack", ["restore", "sentinel"])(restore_stdout_write, sentinel)
