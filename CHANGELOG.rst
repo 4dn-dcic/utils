@@ -7,6 +7,13 @@ Change Log
 ----------
 
 
+8.8.5
+=====
+* Added check for ES_HOST_LOCAL environment variable in ff_utils.get_es_metadata;
+  for running Foursight checks locally (with local ssh tunnel to ES proxy);
+  came up in foursight/checks/audit_checks (2024-04-23).
+
+
 8.8.4
 =====
 * Minor fix in structured_data to not try to resolve empty refs in norefs mode;
