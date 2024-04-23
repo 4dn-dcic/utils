@@ -14,6 +14,7 @@ Change Log
   came up in foursight/checks/audit_checks (2024-04-23).
 * Added extract_file_from_zip to zip_utils.
 * Added http_utils with download function.
+* Added get_app_specific_directory to misc_utils.
 
 
 8.8.4

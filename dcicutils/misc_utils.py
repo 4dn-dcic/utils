@@ -3,6 +3,7 @@ This file contains functions that might be generally useful.
 """
 
 from collections import namedtuple
+import appdirs
 import contextlib
 import datetime
 import functools
@@ -2670,3 +2671,14 @@ class JsonLinesReader:
                 yield line
             else:
                 raise Exception(f"If the first line is not a list, all lines must be dictionaries: {line!r}")
+
+
+def get_app_specific_directory() -> str:
+    """
+    Returns the standard system application specific directory:
+    - On MacOS this directory: is: ~/Library/Application Support
+    - On Linux this directory is: ~/.local/share
+    - On Windows this directory is: %USERPROFILE%\AppData\Local  # noqa
+    N.B. This is has been tested on MacOS and Linux but not on Windows.
+    """
+    return appdirs.user_data_dir()
