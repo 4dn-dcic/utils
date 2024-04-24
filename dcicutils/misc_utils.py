@@ -1524,7 +1524,7 @@ def right_trim(list_or_tuple: Union[List[Any], Tuple[Any]],
 def create_dict(**kwargs) -> dict:
     result = {}
     for name in kwargs:
-        if kwargs[name]:
+        if not (kwargs[name] is None):
             result[name] = kwargs[name]
     return result
 

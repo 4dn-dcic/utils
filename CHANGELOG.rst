@@ -13,11 +13,13 @@ Change Log
 * Added check for ES_HOST_LOCAL environment variable in ff_utils.get_es_metadata;
   for running Foursight checks locally (with local ssh tunnel to ES proxy);
   came up in foursight/checks/audit_checks (2024-04-23).
-* Added extract_file_from_zip to zip_utils.
-* Added http_utils with download function.
-* Added get_app_specific_directory, get_os_name, and get_cpu_architecture_name to misc_utils.
-* Added normalize_file_path to file_utils.
 * Allow Python 3.12 (pyproject.toml).
+* Few general things initially related to rclone support in smaht-submitr:
+  - Added extract_file_from_zip to zip_utils.
+  - Added http_utils with download function.
+  - Added get_app_specific_directory, get_os_name, and get_cpu_architecture_name to misc_utils.
+  - Added normalize_file_path to file_utils.
+  - Minor fix to misc_utils.create_dict.
 
 
 8.8.4
