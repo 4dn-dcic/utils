@@ -39,11 +39,11 @@ def remove_temporary_directory(tmp_directory_name: str) -> None:
         shutil.rmtree(tmp_directory_name)
 
 
-def create_temporary_file_name(suffix: Optional[str] = None) -> str:
+def create_temporary_file_name(prefix: Optional[str] = None, suffix: Optional[str] = None) -> str:
     """
     Generates and returns the full path to file within the system temporary directory.
     """
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp_file:
+    with tempfile.NamedTemporaryFile(prefix=prefix, suffix=suffix, delete=False) as tmp_file:
         tmp_file_name = tmp_file.name
     return tmp_file_name
 
