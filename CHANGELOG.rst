@@ -15,6 +15,7 @@ Change Log
 * Added extract_file_from_zip to zip_utils.
 * Added http_utils with download function.
 * Added get_app_specific_directory to misc_utils.
+* Added normalize_file_path to file_utils.
 
 
 8.8.4

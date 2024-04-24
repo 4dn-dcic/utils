@@ -56,3 +56,17 @@ def search_for_file(file: str,
         if files_found:
             return files_found[0] if single else files_found
         return None if single else []
+
+
+def normalize_file_path(path: str, including_home_directory: bool = False) -> str:
+    if not isinstance(path, str) or not path:
+        path = os.getcwd()
+    path = os.path.normpath(path)
+    home_directory = os.path.expanduser("~")
+    if path.startswith("~"):
+        path = os.path.join(home_directory, path[2 if path.startswith("~/") else 1:])
+    path = os.path.abspath(path)
+    if including_home_directory and (os.name == "posix"):
+        if path.startswith(home_directory) and path != home_directory:
+            path = "~/" + pathlib.Path(path).relative_to(home_directory).as_posix()
+    return path
