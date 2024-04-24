@@ -14,6 +14,7 @@ import json
 import logging
 import math
 import os
+import platform
 import pytz
 import re
 import rfc3986.validators
@@ -2682,3 +2683,18 @@ def get_app_specific_directory() -> str:
     N.B. This is has been tested on MacOS and Linux but not on Windows.
     """
     return appdirs.user_data_dir()
+
+
+def get_os_name() -> str:
+    if os_name := platform.system():
+        if os_name == "Darwin": return "osx"  # noqa
+        elif os_name == "Linux": return "linux"  # noqa
+        elif os_name == "Windows": return "windows"  # noqa
+    return ""
+
+
+def get_cpu_architecture_name() -> str:
+    if os_architecture_name := platform.machine():
+        if os_architecture_name == "x86_64": return "amd64"  # noqa
+        return os_architecture_name
+    return ""

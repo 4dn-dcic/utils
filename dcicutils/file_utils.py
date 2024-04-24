@@ -58,15 +58,21 @@ def search_for_file(file: str,
         return None if single else []
 
 
-def normalize_file_path(path: str, including_home_directory: bool = False) -> str:
+def normalize_file_path(path: str, home_directory: bool = True) -> str:
+    """
+    Normalizes the given file path name and returns. Does things like remove multiple
+    consecutive slashes and redundant/unnecessary parent paths; if the home_directory
+    argument is True (the default) then also handles the special tilde home directory
+    component/convention and uses this in the result if applicable.
+    """
     if not isinstance(path, str) or not path:
         path = os.getcwd()
     path = os.path.normpath(path)
-    home_directory = os.path.expanduser("~")
-    if path.startswith("~"):
+    home_directory = os.path.expanduser("~") if home_directory is True else None
+    if home_directory and path.startswith("~"):
         path = os.path.join(home_directory, path[2 if path.startswith("~/") else 1:])
     path = os.path.abspath(path)
-    if including_home_directory and (os.name == "posix"):
+    if home_directory and (os.name == "posix"):
         if path.startswith(home_directory) and path != home_directory:
             path = "~/" + pathlib.Path(path).relative_to(home_directory).as_posix()
     return path
