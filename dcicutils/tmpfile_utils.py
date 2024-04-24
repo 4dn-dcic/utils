@@ -26,6 +26,9 @@ def temporary_file(name: Optional[str] = None, suffix: Optional[str] = None,
 
 
 def remove_temporary_directory(tmp_directory_name: str) -> None:
+    """
+    Removes the given directory, recursively; but ONLY if it is (somewhere) within the system temporary directory.
+    """
     def is_temporary_directory(path: str) -> bool:
         try:
             tmpdir = tempfile.gettempdir()
@@ -34,3 +37,26 @@ def remove_temporary_directory(tmp_directory_name: str) -> None:
             return False
     if is_temporary_directory(tmp_directory_name):  # Guard against errant deletion.
         shutil.rmtree(tmp_directory_name)
+
+
+def create_temporary_file_name(suffix: Optional[str] = None) -> str:
+    """
+    Generates and returns the full path to file within the system temporary directory.
+    """
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp_file:
+        tmp_file_name = tmp_file.name
+    return tmp_file_name
+
+
+def remove_temporary_file(tmp_file_name: str) -> bool:
+    """
+    Removes the given file; but ONLY if it is (somewhere) within the system temporary directory.
+    """
+    try:
+        tmpdir = tempfile.gettempdir()
+        if (os.path.commonpath([tmpdir, tmp_file_name]) == tmpdir) and os.path.isfile(tmp_file_name):
+            os.remove(tmp_file_name)
+            return True
+        return False
+    except Exception:
+        return False

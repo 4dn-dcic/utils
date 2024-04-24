@@ -19,7 +19,8 @@ Change Log
   - Added http_utils with download function.
   - Added get_app_specific_directory, get_os_name, and get_cpu_architecture_name to misc_utils.
   - Added normalize_file_path to file_utils.
-  - Minor fix to misc_utils.create_dict.
+  - Added create_temporary_file_name and remove_temporary_file tmpfile_utils.
+  - Minor fix to misc_utils.create_dict (do not create property only if its value is None).
 
 
 8.8.4
