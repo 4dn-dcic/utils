@@ -17,6 +17,7 @@ Change Log
 * Added http_utils with download function.
 * Added get_app_specific_directory, get_os_name, and get_cpu_architecture_name to misc_utils.
 * Added normalize_file_path to file_utils.
+* Allow Python 3.12 (pyproject.toml).
 
 
 8.8.4

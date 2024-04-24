@@ -51,6 +51,11 @@ def unpack_gz_file_to_temporary_file(file: str, suffix: Optional[str] = None) ->
 
 def extract_file_from_zip(zip_file: str, file_to_extract: str,
                           destination_file: str, raise_exception: bool = True) -> bool:
+    """
+    Extracts from the given zip file, the given file to extract, writing it to the
+    given destination file. Returns True if all is well, otherwise False, or if the
+    raise_exception argument is True (the default), then raises and exception on error.
+    """
     try:
         if not (destination_directory := os.path.dirname(destination_file)):
             destination_directory = os.getcwd()
