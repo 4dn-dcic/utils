@@ -76,3 +76,23 @@ def normalize_file_path(path: str, home_directory: bool = True) -> str:
         if path.startswith(home_directory) and path != home_directory:
             path = "~/" + pathlib.Path(path).relative_to(home_directory).as_posix()
     return path
+
+
+def are_files_equal(filea: str, fileb: str) -> bool:
+    """
+    Returns True iff the contents of the two given files are exactly the same.
+    """
+    try:
+        with open(filea, "rb") as fa:
+            with open(fileb, "rb") as fb:
+                chunk_size = 4096
+                while True:
+                    chunka = fa.read(chunk_size)
+                    chunkb = fb.read(chunk_size)
+                    if chunka != chunkb:
+                        return False
+                    if not chunka:
+                        break
+        return True
+    except Exception:
+        return False
