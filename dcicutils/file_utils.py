@@ -1,7 +1,10 @@
 import glob
 import os
 import pathlib
+import random
+import string
 from typing import List, Optional, Union
+from dcicutils.tmpfile_utils import create_temporary_file_name
 
 
 def search_for_file(file: str,
@@ -96,3 +99,16 @@ def are_files_equal(filea: str, fileb: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def create_random_file(file: Optional[str] = None,
+                       prefix: Optional[str] = None, suffix: Optional[str] = None,
+                       nbytes: int = 1024, binary: bool = False) -> str:
+    if not file:
+        file = create_temporary_file_name(prefix=prefix, suffix=suffix)
+    with open(file, "wb" if binary is True else "w") as f:
+        if binary is True:
+            f.write(os.urandom(nbytes))
+        else:
+            f.write(''.join(random.choices(string.ascii_letters + string.digits, k=nbytes)))
+    return file
