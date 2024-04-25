@@ -104,11 +104,26 @@ def are_files_equal(filea: str, fileb: str) -> bool:
 def create_random_file(file: Optional[str] = None,
                        prefix: Optional[str] = None, suffix: Optional[str] = None,
                        nbytes: int = 1024, binary: bool = False) -> str:
-    if not file:
+    if not isinstance(nbytes, int) or nbytes < 0:
+        nbytes = 0
+    if not isinstance(file, str) or not file:
+        if not isinstance(prefix, str):
+            prefix = ""
+        if not isinstance(suffix, str):
+            suffix = ""
         file = create_temporary_file_name(prefix=prefix, suffix=suffix)
     with open(file, "wb" if binary is True else "w") as f:
         if binary is True:
             f.write(os.urandom(nbytes))
         else:
-            f.write(''.join(random.choices(string.ascii_letters + string.digits, k=nbytes)))
+            nchars = 81
+            nlines = nbytes // nchars
+            nremainder = nbytes % nchars
+            for n in range(nlines):
+                f.write("".join(random.choices(string.ascii_letters + string.digits, k=nchars - 1)))
+                f.write("\n")
+            if nremainder > 1:
+                f.write("".join(random.choices(string.ascii_letters + string.digits, k=nremainder - 1)))
+            if nremainder > 0:
+                f.write("\n")
     return file
