@@ -103,7 +103,7 @@ def are_files_equal(filea: str, fileb: str) -> bool:
 
 def create_random_file(file: Optional[str] = None,
                        prefix: Optional[str] = None, suffix: Optional[str] = None,
-                       nbytes: int = 1024, binary: bool = False) -> str:
+                       nbytes: int = 1024, binary: bool = False, line_length: Optional[int] = None) -> str:
     if not isinstance(nbytes, int) or nbytes < 0:
         nbytes = 0
     if not isinstance(file, str) or not file:
@@ -116,11 +116,13 @@ def create_random_file(file: Optional[str] = None,
         if binary is True:
             f.write(os.urandom(nbytes))
         else:
-            nchars = 81
-            nlines = nbytes // nchars
-            nremainder = nbytes % nchars
+            if (not isinstance(line_length, int)) or (line_length < 1):
+                line_length = 80
+            line_length += 1
+            nlines = nbytes // line_length
+            nremainder = nbytes % line_length
             for n in range(nlines):
-                f.write("".join(random.choices(string.ascii_letters + string.digits, k=nchars - 1)))
+                f.write("".join(random.choices(string.ascii_letters + string.digits, k=line_length - 1)))
                 f.write("\n")
             if nremainder > 1:
                 f.write("".join(random.choices(string.ascii_letters + string.digits, k=nremainder - 1)))
