@@ -1,8 +1,11 @@
 from contextlib import contextmanager
+from datetime import datetime
 import os
 import shutil
 import tempfile
+from uuid import uuid4 as uuid
 from typing import List, Optional, Union
+from dcicutils.file_utils import create_random_file
 
 
 @contextmanager
@@ -25,6 +28,23 @@ def temporary_file(name: Optional[str] = None, suffix: Optional[str] = None,
         yield tmp_file_name
 
 
+def create_temporary_file_name(prefix: Optional[str] = None, suffix: Optional[str] = None) -> str:
+    """
+    Generates and returns the full path to file within the system temporary directory.
+    """
+    tmp_file_name = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{str(uuid()).replace('-', '')}"
+    return os.path.join(tempfile.gettempdir(), tmp_file_name)
+
+
+@contextmanager
+def temporary_random_file(prefix: Optional[str] = None, suffix: Optional[str] = None,
+                          nbytes: int = 1024, binary: bool = False, line_length: Optional[int] = None) -> str:
+    with temporary_file() as tmp_file_path:
+        create_random_file(tmp_file_path, prefix=prefix, suffix=suffix,
+                           nbytes=nbytes, binary=binary, line_length=line_length)
+        yield tmp_file_path
+
+
 def remove_temporary_directory(tmp_directory_name: str) -> None:
     """
     Removes the given directory, recursively; but ONLY if it is (somewhere) within the system temporary directory.
@@ -37,15 +57,6 @@ def remove_temporary_directory(tmp_directory_name: str) -> None:
             return False
     if is_temporary_directory(tmp_directory_name):  # Guard against errant deletion.
         shutil.rmtree(tmp_directory_name)
-
-
-def create_temporary_file_name(prefix: Optional[str] = None, suffix: Optional[str] = None) -> str:
-    """
-    Generates and returns the full path to file within the system temporary directory.
-    """
-    with tempfile.NamedTemporaryFile(prefix=prefix, suffix=suffix, delete=False) as tmp_file:
-        tmp_file_name = tmp_file.name
-    return tmp_file_name
 
 
 def remove_temporary_file(tmp_file_name: str) -> bool:

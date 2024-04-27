@@ -1,10 +1,12 @@
 import glob
 import os
 import pathlib
+from datetime import datetime
 import random
 import string
+from tempfile import gettempdir as get_temporary_directory
 from typing import List, Optional, Union
-from dcicutils.tmpfile_utils import create_temporary_file_name
+from uuid import uuid4 as uuid
 
 
 def search_for_file(file: str,
@@ -111,7 +113,8 @@ def create_random_file(file: Optional[str] = None,
             prefix = ""
         if not isinstance(suffix, str):
             suffix = ""
-        file = create_temporary_file_name(prefix=prefix, suffix=suffix)
+        file = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{str(uuid()).replace('-', '')}"
+        file = os.path.join(get_temporary_directory(), file)
     with open(file, "wb" if binary is True else "w") as f:
         if binary is True:
             f.write(os.urandom(nbytes))
