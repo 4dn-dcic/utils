@@ -18,30 +18,31 @@ def temporary_directory() -> str:
 
 
 @contextmanager
-def temporary_file(name: Optional[str] = None, suffix: Optional[str] = None,
+def temporary_file(name: Optional[str] = None, prefix: Optional[str] = None, suffix: Optional[str] = None,
                    content: Optional[Union[str, bytes, List[str]]] = None) -> str:
     with temporary_directory() as tmp_directory_name:
-        tmp_file_name = os.path.join(tmp_directory_name, name or tempfile.mktemp(dir="")) + (suffix or "")
-        with open(tmp_file_name, "wb" if isinstance(content, bytes) else "w") as tmp_file:
+        tmp_file_name = f"{prefix or ''}{name or tempfile.mktemp(dir='')}{suffix or ''}"
+        tmp_file_path = os.path.join(tmp_directory_name, tmp_file_name)
+        with open(tmp_file_path, "wb" if isinstance(content, bytes) else "w") as tmp_file:
             if content is not None:
                 tmp_file.write("\n".join(content) if isinstance(content, list) else content)
-        yield tmp_file_name
+        yield tmp_file_path
 
 
 def create_temporary_file_name(prefix: Optional[str] = None, suffix: Optional[str] = None) -> str:
     """
     Generates and returns the full path to file within the system temporary directory.
     """
-    tmp_file_name = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{str(uuid()).replace('-', '')}"
+    random_string = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{str(uuid()).replace('-', '')}"
+    tmp_file_name = f"{prefix or ''}{random_string}{suffix or ''}"
     return os.path.join(tempfile.gettempdir(), tmp_file_name)
 
 
 @contextmanager
 def temporary_random_file(prefix: Optional[str] = None, suffix: Optional[str] = None,
                           nbytes: int = 1024, binary: bool = False, line_length: Optional[int] = None) -> str:
-    with temporary_file() as tmp_file_path:
-        create_random_file(tmp_file_path, prefix=prefix, suffix=suffix,
-                           nbytes=nbytes, binary=binary, line_length=line_length)
+    with temporary_file(prefix=prefix, suffix=suffix) as tmp_file_path:
+        create_random_file(tmp_file_path, nbytes=nbytes, binary=binary, line_length=line_length)
         yield tmp_file_path
 
 

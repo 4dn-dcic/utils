@@ -103,9 +103,15 @@ def are_files_equal(filea: str, fileb: str) -> bool:
         return False
 
 
-def create_random_file(file: Optional[str] = None,
-                       prefix: Optional[str] = None, suffix: Optional[str] = None,
+def create_random_file(file: Optional[str] = None, prefix: Optional[str] = None, suffix: Optional[str] = None,
                        nbytes: int = 1024, binary: bool = False, line_length: Optional[int] = None) -> str:
+    """
+    Write to the given file (name/path) some random content. If the given file is None then writes
+    to a temporary file. In either case, returns the file written to. The of bytes written is 1024
+    by default be can be specified with the nbytes argument; default to writing ASCII text but if
+    the binary argument is True then writes binary data as well; if not binary the content is in
+    lines of 80 characters each; use the line_length argumetn in this case to change the line length.
+    """
     if not isinstance(nbytes, int) or nbytes < 0:
         nbytes = 0
     if not isinstance(file, str) or not file:
