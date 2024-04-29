@@ -17,7 +17,7 @@ Change Log
 * Few general things initially related to rclone support in smaht-submitr:
   - Added extract_file_from_zip to zip_utils.
   - Added http_utils with download function.
-  - Added get_app_specific_directory, get_os_name, and get_cpu_architecture_name to misc_utils.
+  - Added get_app_specific_directory, get_os_name, get_cpu_architecture_name, short_uuid to misc_utils.
   - Added normalize_file_path, are_files_equal, and create_random_file to file_utils.
   - Added create_temporary_file_name and remove_temporary_file tmpfile_utils.
   - Minor fix to misc_utils.create_dict (do not create property only if its value is None).

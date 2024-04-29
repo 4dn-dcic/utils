@@ -19,6 +19,7 @@ import pytz
 import re
 import rfc3986.validators
 import rfc3986.exceptions
+import shortuuid
 import time
 import uuid
 import warnings
@@ -2698,3 +2699,9 @@ def get_cpu_architecture_name() -> str:
         if os_architecture_name == "x86_64": return "amd64"  # noqa
         return os_architecture_name
     return ""
+
+
+def short_uuid(length: Optional[int] = None):
+    if (length is None) or (not isinstance(length, int)) or (length < 1):
+        length = 16
+    return shortuuid.ShortUUID().random(length=length)
