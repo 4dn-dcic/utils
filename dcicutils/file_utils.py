@@ -1,4 +1,6 @@
 import glob
+import hashlib
+import io
 import os
 import pathlib
 from datetime import datetime
@@ -101,6 +103,76 @@ def are_files_equal(filea: str, fileb: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def compute_file_md5(file: str) -> str:
+    """
+    Returns the md5 checksum for the given file.
+    """
+    if not isinstance(file, str):
+        return ""
+    try:
+        md5 = hashlib.md5()
+        with open(file, "rb") as file:
+            for chunk in iter(lambda: file.read(4096), b""):
+                md5.update(chunk)
+        return md5.hexdigest()
+    except Exception:
+        return ""
+
+
+def compute_file_etag(file: str) -> Optional[str]:
+    """
+    Returns the AWS S3 "etag" for the given file; this value is md5-like but
+    not the same as a normal md5. We use this to compare that a file in S3
+    appears to be the exact the same file as a local file.
+    """
+    try:
+        with io.open(file, "rb") as f:
+            return _compute_file_etag(f)
+    except Exception:
+        return None
+
+
+def _compute_file_etag(f: io.BufferedReader) -> str:
+    # See: https://stackoverflow.com/questions/75723647/calculate-md5-from-aws-s3-etag
+    MULTIPART_THRESHOLD = 8388608
+    MULTIPART_CHUNKSIZE = 8388608
+    # BUFFER_SIZE = 1048576
+    # Verify some assumptions are correct
+    # assert(MULTIPART_CHUNKSIZE >= MULTIPART_THRESHOLD)
+    # assert((MULTIPART_THRESHOLD % BUFFER_SIZE) == 0)
+    # assert((MULTIPART_CHUNKSIZE % BUFFER_SIZE) == 0)
+    hash = hashlib.md5()
+    read = 0
+    chunks = None
+    while True:
+        # Read some from stdin, if we're at the end, stop reading
+        bits = f.read(1048576)
+        if len(bits) == 0:
+            break
+        read += len(bits)
+        hash.update(bits)
+        if chunks is None:
+            # We're handling a multi-part upload, so switch to calculating
+            # hashes of each chunk
+            if read >= MULTIPART_THRESHOLD:
+                chunks = b''
+        if chunks is not None:
+            if (read % MULTIPART_CHUNKSIZE) == 0:
+                # Dont with a chunk, add it to the list of hashes to hash later
+                chunks += hash.digest()
+                hash = hashlib.md5()
+    if chunks is None:
+        # Normal upload, just output the MD5 hash
+        etag = hash.hexdigest()
+    else:
+        # Multipart upload, need to output the hash of the hashes
+        if (read % MULTIPART_CHUNKSIZE) != 0:
+            # Add the last part if we have a partial chunk
+            chunks += hash.digest()
+        etag = hashlib.md5(chunks).hexdigest() + "-" + str(len(chunks) // 16)
+    return etag
 
 
 def create_random_file(file: Optional[str] = None, prefix: Optional[str] = None, suffix: Optional[str] = None,
