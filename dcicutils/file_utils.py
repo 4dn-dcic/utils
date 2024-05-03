@@ -44,7 +44,7 @@ def search_for_file(file: str,
             directory = str(directory)
         if not (directory := directory.strip()):
             continue
-        if os.path.isfile(directory := os.path.normpath(directory)):
+        if os.path.isfile(directory := os.path.abspath(os.path.normpath(directory))):
             # Allow a file; assume its parent directory was intended.
             if not (directory := os.path.dirname(directory)):
                 continue
