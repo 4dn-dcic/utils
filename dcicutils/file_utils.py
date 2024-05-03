@@ -23,46 +23,59 @@ def search_for_file(file: str,
     first file which is found is returns (as a string), or None if none; if the single flag
     is False, then all matched files are returned in a list, or and empty list if none.
     """
-    if file and isinstance(file, (str, pathlib.PosixPath)):
-        if os.path.isabs(file):
-            if os.path.exists(file):
-                return file if single else [file]
-            return None if single else []
-        files_found = []
-        if not location:
-            location = ["."]
-        elif isinstance(location, (str, pathlib.PosixPath)):
-            location = [location]
-        elif not isinstance(location, list):
-            location = []
+    if not (file and isinstance(file, (str, pathlib.PosixPath))):
+        return None if single is True else []
+    if os.path.isabs(file):
+        if os.path.exists(file):
+            return file if single is True else [file]
+        return None if single is True else []
+    files_found = []
+    if not location:
+        location = ["."]
+    elif isinstance(location, (str, pathlib.PosixPath)):
+        location = [location]
+    elif not isinstance(location, list):
+        location = []
+    location_pruned = []
+    for directory in location:
+        if not isinstance(directory, str):
+            if not isinstance(directory, pathlib.PosixPath):
+                continue
+            directory = str(directory)
+        if not (directory := directory.strip()):
+            continue
+        if os.path.isfile(directory):
+            # Allow a file; assume its parent directory was intended.
+            if not (directory := os.path.dirname(directory)):
+                continue
+        location_pruned.append(directory)
+    location = location_pruned
+    for directory in location:
+        if os.path.exists(os.path.join(directory, file)):
+            file_found = os.path.abspath(os.path.normpath(os.path.join(directory, file)))
+            if single is True:
+                return file_found
+            if file_found not in files_found:
+                files_found.append(file_found)
+    if recursive is True:
         for directory in location:
             if not directory:
                 continue
-            if isinstance(directory, (str, pathlib.PosixPath)) and os.path.exists(os.path.join(directory, file)):
-                file_found = os.path.abspath(os.path.normpath(os.path.join(directory, file)))
-                if single:
-                    return file_found
-                if file_found not in files_found:
-                    files_found.append(file_found)
-        if recursive:
-            for directory in location:
-                if not directory:
-                    continue
-                if not directory.endswith("/**") and not file.startswith("**/"):
-                    path = f"{directory}/**/{file}"
-                else:
-                    path = f"{directory}/{file}"
-                files = glob.glob(path, recursive=recursive)
-                if files:
-                    for file_found in files:
-                        file_found = os.path.abspath(file_found)
-                        if single:
-                            return file_found
-                        if file_found not in files_found:
-                            files_found.append(file_found)
-        if files_found:
-            return files_found[0] if single else files_found
-        return None if single else []
+            if not directory.endswith("/**") and not file.startswith("**/"):
+                path = f"{directory}/**/{file}"
+            else:
+                path = f"{directory}/{file}"
+            files = glob.glob(path, recursive=True if recursive is True else False)
+            if files:
+                for file_found in files:
+                    file_found = os.path.abspath(file_found)
+                    if single is True:
+                        return file_found
+                    if file_found not in files_found:
+                        files_found.append(file_found)
+    if files_found:
+        return files_found[0] if single is True else files_found
+    return None if single is True else []
 
 
 def normalize_file_path(path: str, home_directory: bool = True) -> str:
