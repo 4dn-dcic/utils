@@ -44,11 +44,12 @@ def search_for_file(file: str,
             directory = str(directory)
         if not (directory := directory.strip()):
             continue
-        if os.path.isfile(directory):
+        if os.path.isfile(directory := os.path.normpath(directory)):
             # Allow a file; assume its parent directory was intended.
             if not (directory := os.path.dirname(directory)):
                 continue
-        location_pruned.append(directory)
+        if directory not in location_pruned:
+            location_pruned.append(directory)
     location = location_pruned
     for directory in location:
         if os.path.exists(os.path.join(directory, file)):
@@ -59,8 +60,6 @@ def search_for_file(file: str,
                 files_found.append(file_found)
     if recursive is True:
         for directory in location:
-            if not directory:
-                continue
             if not directory.endswith("/**") and not file.startswith("**/"):
                 path = f"{directory}/**/{file}"
             else:
