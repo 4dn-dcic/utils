@@ -10,6 +10,8 @@ from tempfile import gettempdir as get_temporary_directory
 from typing import List, Optional, Union
 from uuid import uuid4 as uuid
 
+HOME_DIRECTORY = str(pathlib.Path().home())
+
 
 def search_for_file(file: str,
                     location: Union[str, Optional[List[str]]] = None,
@@ -77,24 +79,43 @@ def search_for_file(file: str,
     return None if single is True else []
 
 
-def normalize_file_path(path: str, home_directory: bool = True) -> str:
+def normalize_path(value: Union[str, pathlib.Path], absolute: bool = False, home: Optional[bool] = None) -> str:
     """
-    Normalizes the given file path name and returns. Does things like remove multiple
-    consecutive slashes and redundant/unnecessary parent paths; if the home_directory
-    argument is True (the default) then also handles the special tilde home directory
-    component/convention and uses this in the result if applicable.
+    Normalizes the given path value and returns the result; does things like remove redundant
+    consecutive directory separators and redundant parent paths. If the given absolute argument
+    is True than converts the path to an absolute path. If the given home argument is True and
+    if the path can reasonably be represented with a home directory indicator (i.e. "~"), then
+    converts it to such. If the home argument is False and path starts with the home directory
+    indicator then expands it to the actual (absolute) home path. If the given value is not
+    actually even a string (or pathlib.Path) then returns an empty string.
     """
-    if not isinstance(path, str) or not path:
-        path = os.getcwd()
-    path = os.path.normpath(path)
-    home_directory = os.path.expanduser("~") if home_directory is True else None
-    if home_directory and path.startswith("~"):
-        path = os.path.join(home_directory, path[2 if path.startswith("~/") else 1:])
-    path = os.path.abspath(path)
-    if home_directory and (os.name == "posix"):
-        if path.startswith(home_directory) and path != home_directory:
-            path = "~/" + pathlib.Path(path).relative_to(home_directory).as_posix()
-    return path
+    if isinstance(value, pathlib.Path):
+        value = str(value)
+    elif not isinstance(value, str):
+        return ""
+    if not (value := value.strip()) or not (value := os.path.normpath(value)):
+        return ""
+    if home is False:
+        value = os.path.expanduser(value)
+    elif (home is True) and (os.name == "posix") and value.startswith(home := HOME_DIRECTORY + os.sep):
+        value = "~/" + value[len(home):]
+    if absolute is True:
+        value = os.path.abspath(value)
+    return value
+
+
+def get_file_size(file: str) -> Optional[int]:
+    try:
+        return os.path.getsize(file) if isinstance(file, str) else None
+    except Exception:
+        return None
+
+
+def get_file_modified_datetime(file: str) -> Optional[datetime]:
+    try:
+        return datetime.fromtimestamp(os.path.getmtime(file)) if isinstance(file, str) else None
+    except Exception:
+        return None
 
 
 def are_files_equal(filea: str, fileb: str) -> bool:

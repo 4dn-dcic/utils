@@ -2551,6 +2551,19 @@ def normalize_spaces(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
+def normalize_string(value: Optional[str]) -> Optional[str]:
+    """
+    Strips leading/trailing spaces, and converts multiple consecutive spaces to a single space
+    in the given string value and returns the result. If the given value is None returns an
+    empty string. If the given value is not actually even a string then return None.
+    """
+    if value is None:
+        return ""
+    elif isinstance(value, str):
+        return value.strip()
+    return None
+
+
 def find_nth_from_end(string: str, substring: str, nth: int) -> int:
     """
     Returns the index of the nth occurrence of the given substring within
