@@ -79,15 +79,15 @@ def search_for_file(file: str,
     return None if single is True else []
 
 
-def normalize_path(value: Union[str, pathlib.Path], absolute: bool = False, home: Optional[bool] = None) -> str:
+def normalize_path(value: Union[str, pathlib.Path], absolute: bool = False, expand_home: Optional[bool] = None) -> str:
     """
     Normalizes the given path value and returns the result; does things like remove redundant
     consecutive directory separators and redundant parent paths. If the given absolute argument
-    is True than converts the path to an absolute path. If the given home argument is True and
-    if the path can reasonably be represented with a home directory indicator (i.e. "~"), then
-    converts it to such. If the home argument is False and path starts with the home directory
-    indicator then expands it to the actual (absolute) home path. If the given value is not
-    actually even a string (or pathlib.Path) then returns an empty string.
+    is True than converts the path to an absolute path. If the given expand_home argument is False
+    and if the path can reasonably be represented with a home directory indicator (i.e. "~"), then
+    converts it to such. If the expand_home argument is True and path starts with the home directory
+    indicator (i.e. "~") then expands it to the actual (absolute) home path of the caller. If the
+    given path value is not actually even a string (or pathlib.Path) then returns an empty string.
     """
     if isinstance(value, pathlib.Path):
         value = str(value)
@@ -95,9 +95,9 @@ def normalize_path(value: Union[str, pathlib.Path], absolute: bool = False, home
         return ""
     if not (value := value.strip()) or not (value := os.path.normpath(value)):
         return ""
-    if home is False:
+    if expand_home is True:
         value = os.path.expanduser(value)
-    elif (home is True) and (os.name == "posix") and value.startswith(home := HOME_DIRECTORY + os.sep):
+    elif (expand_home is False) and (os.name == "posix") and value.startswith(home := HOME_DIRECTORY + os.sep):
         value = "~/" + value[len(home):]
     if absolute is True:
         value = os.path.abspath(value)
