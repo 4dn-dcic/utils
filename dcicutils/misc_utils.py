@@ -2714,7 +2714,20 @@ def get_cpu_architecture_name() -> str:
     return ""
 
 
-def short_uuid(length: Optional[int] = None):
+def create_uuid(nodash: bool = False, upper: bool = False) -> str:
+    value = str(uuid.uuid4())
+    if nodash is True:
+        value = value.replace("-", "")
+    if upper is True:
+        value = value.upper()
+    return value
+
+
+def create_short_uuid(length: Optional[int] = None, upper: bool = False):
+    # Not really techincally a uuid of course.
     if (length is None) or (not isinstance(length, int)) or (length < 1):
         length = 16
-    return shortuuid.ShortUUID().random(length=length)
+    value = shortuuid.ShortUUID().random(length=length)
+    if upper is True:
+        value = value.upper()
+    return value
