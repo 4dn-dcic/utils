@@ -104,21 +104,25 @@ def normalize_path(value: Union[str, pathlib.Path], absolute: bool = False, expa
     return value
 
 
-def get_file_size(file: str) -> Optional[int]:
+def get_file_size(file: str, raise_exception: bool = True) -> Optional[int]:
     try:
         return os.path.getsize(file) if isinstance(file, str) else None
     except Exception:
+        if raise_exception is True:
+            raise
         return None
 
 
-def get_file_modified_datetime(file: str) -> Optional[datetime]:
+def get_file_modified_datetime(file: str, raise_exception: bool = True) -> Optional[datetime]:
     try:
         return datetime.fromtimestamp(os.path.getmtime(file)) if isinstance(file, str) else None
     except Exception:
+        if raise_exception is True:
+            raise
         return None
 
 
-def are_files_equal(filea: str, fileb: str) -> bool:
+def are_files_equal(filea: str, fileb: str, raise_exception: bool = True) -> bool:
     """
     Returns True iff the contents of the two given files are exactly the same.
     """
@@ -135,10 +139,12 @@ def are_files_equal(filea: str, fileb: str) -> bool:
                         break
         return True
     except Exception:
+        if raise_exception is True:
+            raise
         return False
 
 
-def compute_file_md5(file: str) -> str:
+def compute_file_md5(file: str, raise_exception: bool = True) -> str:
     """
     Returns the md5 checksum for the given file.
     """
@@ -151,10 +157,12 @@ def compute_file_md5(file: str) -> str:
                 md5.update(chunk)
         return md5.hexdigest()
     except Exception:
+        if raise_exception is True:
+            raise
         return ""
 
 
-def compute_file_etag(file: str) -> Optional[str]:
+def compute_file_etag(file: str, raise_exception: bool = True) -> Optional[str]:
     """
     Returns the AWS S3 "etag" for the given file; this value is md5-like but
     not the same as a normal md5. We use this to compare that a file in S3
@@ -164,6 +172,8 @@ def compute_file_etag(file: str) -> Optional[str]:
         with io.open(file, "rb") as f:
             return _compute_file_etag(f)
     except Exception:
+        if raise_exception is True:
+            raise
         return None
 
 
