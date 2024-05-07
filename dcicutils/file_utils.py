@@ -97,8 +97,11 @@ def normalize_path(value: Union[str, pathlib.Path], absolute: bool = False, expa
         return ""
     if expand_home is True:
         value = os.path.expanduser(value)
-    elif (expand_home is False) and (os.name == "posix") and value.startswith(home := HOME_DIRECTORY + os.sep):
-        value = "~/" + value[len(home):]
+    elif (expand_home is False) and (os.name == "posix"):
+        if value.startswith(home := HOME_DIRECTORY + os.sep):
+            value = "~/" + value[len(home):]
+        elif value == HOME_DIRECTORY:
+            value = "~"
     if absolute is True:
         value = os.path.abspath(value)
     return value

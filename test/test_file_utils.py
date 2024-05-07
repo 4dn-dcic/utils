@@ -79,3 +79,7 @@ def test_normalize_path():
     assert normalize_path("~///Ghi//Jkl/", expand_home=False, absolute=True) == f"{CURRENT_DIRECTORY}/~/Ghi/Jkl"
     assert normalize_path("~///Ghi//Jkl/", expand_home=True) == f"{HOME_DIRECTORY}/Ghi/Jkl"
     assert normalize_path(f"{HOME_DIRECTORY}/Ghi//Jkl/", expand_home=False) == "~/Ghi/Jkl"
+    assert normalize_path(f"{HOME_DIRECTORY}", expand_home=False) == "~"
+    assert normalize_path(f"{HOME_DIRECTORY}/", expand_home=False) == "~"
+    assert normalize_path(f"{HOME_DIRECTORY}/.ssh", expand_home=False) == "~/.ssh"
+    assert normalize_path(f"~/.ssh", expand_home=True) == f"{HOME_DIRECTORY}/.ssh"
