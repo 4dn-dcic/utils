@@ -29,7 +29,7 @@ def search_for_file(file: str,
     def order_by_fewest_number_of_paths_and_then_alphabetically(paths: List[str]) -> List[str]:
         def order_by(path: str):
             return len(path.split(os.path.sep)), path
-        return sorted(paths, key=order_by, reverse=True)
+        return sorted(paths, key=order_by)
 
     if not (file and isinstance(file, (str, pathlib.PosixPath))):
         return None if single is True else []
