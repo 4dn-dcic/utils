@@ -21,6 +21,7 @@ Change Log
   - Added are_files_equal, create_random_file to file_utils,  compute_file_md5, compute_file_etag,
     normalize_path, get_file_size, get_file_modified_datetime to file_utils.
   - Minor extra sanity check to search_for_file in file_utils.
+  - Added deterministic ordering to paths returned by search_for_file in file_utils.
   - Added create_temporary_file_name and remove_temporary_file tmpfile_utils.
   - Minor fix to misc_utils.create_dict (do not create property only if its value is None).
 

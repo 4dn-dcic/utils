@@ -16,7 +16,8 @@ HOME_DIRECTORY = str(pathlib.Path().home())
 def search_for_file(file: str,
                     location: Union[str, Optional[List[str]]] = None,
                     recursive: bool = False,
-                    single: bool = False) -> Union[List[str], Optional[str]]:
+                    single: bool = False,
+                    order: bool = True) -> Union[List[str], Optional[str]]:
     """
     Searches for the existence of the given file name, first directly in the given directory or list
     of directories, if specified, and if not then just in the current (working) directory; if the
@@ -25,6 +26,11 @@ def search_for_file(file: str,
     first file which is found is returns (as a string), or None if none; if the single flag
     is False, then all matched files are returned in a list, or and empty list if none.
     """
+    def order_by_fewest_number_of_paths_and_then_alphabetically(paths: List[str]) -> List[str]:
+        def order_by(path: str):
+            return len(path.split(os.path.sep)), path
+        return sorted(paths, key=order_by, reverse=True)
+
     if not (file and isinstance(file, (str, pathlib.PosixPath))):
         return None if single is True else []
     if os.path.isabs(file):
@@ -74,9 +80,12 @@ def search_for_file(file: str,
                         return file_found
                     if file_found not in files_found:
                         files_found.append(file_found)
-    if files_found:
-        return files_found[0] if single is True else files_found
-    return None if single is True else []
+    if single is True:
+        return files_found[0] if files_found else None
+    elif order is True:
+        return order_by_fewest_number_of_paths_and_then_alphabetically(files_found)
+    else:
+        return files_found
 
 
 def normalize_path(value: Union[str, pathlib.Path], absolute: bool = False, expand_home: Optional[bool] = None) -> str:
