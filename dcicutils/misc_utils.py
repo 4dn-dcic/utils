@@ -2560,7 +2560,7 @@ def normalize_string(value: Optional[str]) -> Optional[str]:
     if value is None:
         return ""
     elif isinstance(value, str):
-        return value.strip()
+        return re.sub(r"\s+", " ", value).strip()
     return None
 
 
