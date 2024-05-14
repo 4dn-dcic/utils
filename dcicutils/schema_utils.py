@@ -190,7 +190,7 @@ def get_one_of_formats(schema: Dict[str, Any]) -> List[str]:
 
 def is_link(property_schema: Dict[str, Any]) -> bool:
     """Is property schema a link?"""
-    return property_schema.get(SchemaConstants.LINK_TO, False)
+    return bool(property_schema.get(SchemaConstants.LINK_TO))
 
 
 def get_enum(property_schema: Dict[str, Any]) -> List[str]:
