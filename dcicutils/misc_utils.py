@@ -2693,7 +2693,7 @@ def get_app_specific_directory() -> str:
     Returns the standard system application specific directory:
     - On MacOS this directory: is: ~/Library/Application Support
     - On Linux this directory is: ~/.local/share
-    - On Windows this directory is: %USERPROFILE%\AppData\Local  # noqa
+    - On Windows this directory is: %USERPROFILE%\\AppData\\Local  # noqa
     N.B. This is has been tested on MacOS and Linux but not on Windows.
     """
     return appdirs.user_data_dir()
