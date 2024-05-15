@@ -50,12 +50,6 @@ def remove_temporary_directory(tmp_directory_name: str) -> None:
     """
     Removes the given directory, recursively; but ONLY if it is (somewhere) within the system temporary directory.
     """
-    def is_temporary_directory(path: str) -> bool:
-        try:
-            tmpdir = tempfile.gettempdir()
-            return os.path.commonpath([path, tmpdir]) == tmpdir and os.path.exists(path) and os.path.isdir(path)
-        except Exception:
-            return False
     if is_temporary_directory(tmp_directory_name):  # Guard against errant deletion.
         shutil.rmtree(tmp_directory_name)
 
@@ -70,5 +64,13 @@ def remove_temporary_file(tmp_file_name: str) -> bool:
             os.remove(tmp_file_name)
             return True
         return False
+    except Exception:
+        return False
+
+
+def is_temporary_directory(path: str) -> bool:
+    try:
+        tmpdir = tempfile.gettempdir()
+        return os.path.commonpath([path, tmpdir]) == tmpdir and os.path.exists(path) and os.path.isdir(path)
     except Exception:
         return False
