@@ -7,6 +7,11 @@ Change Log
 ----------
 
 
+8.9.0
+=====
+* Add more schema parsing functions to `schema_utils`.
+
+
 8.8.4
 =====
 * Minor fix in structured_data to not try to resolve empty refs in norefs mode;
