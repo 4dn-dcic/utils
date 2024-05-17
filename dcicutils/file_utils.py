@@ -14,7 +14,7 @@ HOME_DIRECTORY = str(pathlib.Path().home())
 
 
 def search_for_file(file: str,
-                    location: Union[str, Optional[List[str]]] = None,
+                    location: Union[str, pathlib.PosixPath, Optional[List[Union[str, pathlib.PosixPath]]]] = None,
                     recursive: bool = False,
                     single: bool = False,
                     order: bool = True) -> Union[List[str], Optional[str]]:
@@ -35,7 +35,7 @@ def search_for_file(file: str,
         return None if single is True else []
     if os.path.isabs(file):
         if os.path.exists(file):
-            return file if single is True else [file]
+            return str(file) if single is True else [str(file)]
         return None if single is True else []
     files_found = []
     if not location:
@@ -53,7 +53,7 @@ def search_for_file(file: str,
         if not (directory := directory.strip()):
             continue
         if os.path.isfile(directory := os.path.abspath(os.path.normpath(directory))):
-            # Allow a file; assume its parent directory was intended.
+            # Actually, allow a file rather then a directory; assume its parent directory was intended.
             if not (directory := os.path.dirname(directory)):
                 continue
         if directory not in location_pruned:
