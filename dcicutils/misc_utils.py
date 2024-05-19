@@ -2606,7 +2606,11 @@ def format_size(nbytes: Union[int, float], precision: int = 2, nospace: bool = F
         nbytes = int(nbytes)
         return f"{nbytes} byte{'s' if nbytes != 1 else ''}"
     unit = (UNITS_TERSE if terse else UNITS)[index]
-    return f"{nbytes:.{precision}f}{'' if nospace else ' '}{unit}"
+    size = f"{nbytes:.{precision}f}"
+    if size.endswith(f".{'0' * precision}"):
+        # Tidy up extraneous zeros.
+        size = size[:-(precision - 1)]
+    return f"{size}{'' if nospace else ' '}{unit}"
 
 
 def format_duration(seconds: Union[int, float]) -> str:
@@ -2731,3 +2735,6 @@ def create_short_uuid(length: Optional[int] = None, upper: bool = False):
     if upper is True:
         value = value.upper()
     return value
+
+
+print(format_size(1024 * 1024))
