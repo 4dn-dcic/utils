@@ -2735,6 +2735,3 @@ def create_short_uuid(length: Optional[int] = None, upper: bool = False):
     if upper is True:
         value = value.upper()
     return value
-
-
-print(format_size(1024 * 1024))
