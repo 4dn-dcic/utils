@@ -170,7 +170,7 @@ class KeyManager:
                 raise ValueError(f"A KeyManager named {name!r} has already been defined.")
             key_manager_class._init_class_variables()
             key_manager_class._REGISTERED = True
-            _KEY_MANAGERS[name] = cls
+            _KEY_MANAGERS[name] = key_manager_class
             return key_manager_class
         return _register_class
 
