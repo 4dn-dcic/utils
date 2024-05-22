@@ -7,6 +7,12 @@ Change Log
 ----------
 
 
+8.8.5
+=====
+
+* Fix bug in `creds_utils` to register portal key managers instead of parent class
+
+
 8.8.4
 =====
 * Minor fix in structured_data to not try to resolve empty refs in norefs mode;
