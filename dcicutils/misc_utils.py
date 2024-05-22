@@ -1155,7 +1155,8 @@ def remove_suffix(suffix: str, text: str, required: bool = False):
 
 def remove_empty_properties(data: Optional[Union[list, dict]],
                             isempty: Optional[Callable] = None,
-                            isempty_array_element: Optional[Callable] = None) -> None:
+                            isempty_array_element: Optional[Callable] = None,
+                            raise_exception_on_nonempty_array_element_after_empty: bool = False) -> None:
     def _isempty(value: Any) -> bool:  # noqa
         return isempty(value) if callable(isempty) else value in [None, "", {}, []]
     if isinstance(data, dict):
@@ -1163,11 +1164,22 @@ def remove_empty_properties(data: Optional[Union[list, dict]],
             if _isempty(value := data[key]):
                 del data[key]
             else:
-                remove_empty_properties(value, isempty=isempty, isempty_array_element=isempty_array_element)
+                remove_empty_properties(value, isempty=isempty, isempty_array_element=isempty_array_element,
+                                        raise_exception_on_nonempty_array_element_after_empty=  # noqa
+                                        raise_exception_on_nonempty_array_element_after_empty)
     elif isinstance(data, list):
         for item in data:
-            remove_empty_properties(item, isempty=isempty, isempty_array_element=isempty_array_element)
+            remove_empty_properties(item, isempty=isempty, isempty_array_element=isempty_array_element,
+                                    raise_exception_on_nonempty_array_element_after_empty=  # noqa
+                                    raise_exception_on_nonempty_array_element_after_empty)
         if callable(isempty_array_element):
+            if raise_exception_on_nonempty_array_element_after_empty is True:
+                empty_element_seen = False
+                for item in data:
+                    if not empty_element_seen and isempty_array_element(item):
+                        empty_element_seen = True
+                    elif empty_element_seen and not isempty_array_element(item):
+                        raise Exception("Non-empty element found after empty element.")
             data[:] = [item for item in data if not isempty_array_element(item)]
 
 

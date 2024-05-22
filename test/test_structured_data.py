@@ -943,9 +943,37 @@ def _pytest_kwargs(kwargs: List[dict]) -> List[dict]:
                 }
             }
         ],
-        # "expected": {"Test": [{"arrayofobject": [{"name": "anastasiia", "id": 1234}]}]},
         "expected": {"Test": [{"arrayofobject": [{}, {}, {"name": "olha", "id": 5678},
-                                                 {}, {"name": "anastasiia", "id": 1234}]}]}
+                                                 {}, {"name": "anastasiia", "id": 1234}]}]},
+        "remove_empty_objects_from_lists": False
+    },
+    # ----------------------------------------------------------------------------------------------
+    {
+        "rows": [
+            "arrayofobject#0.name,arrayofobject#0.id,arrayofobject#1.name,arrayofobject#1.id,"
+            "arrayofobject#2.name,arrayofobject#2.id",
+            "anastasiia,1234,olha,5678,,"
+        ],
+        "as_file_name": "test.csv",
+        "schemas": [
+            {
+                "title": "Test",
+                "properties": {
+                    "arrayofobject": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "id": {"type": "integer"}
+                            }
+                        }
+                    }
+                }
+            }
+        ],
+        "expected": {"Test": [{"arrayofobject": [{"name": "anastasiia", "id": 1234},
+                                                 {"name": "olha", "id": 5678}]}]}
     },
     # ----------------------------------------------------------------------------------------------
     {
@@ -1332,6 +1360,7 @@ def _test_parse_structured_data(testapp,
                                 schemas: Optional[List[dict]] = None,
                                 autoadd: Optional[dict] = None,
                                 prune: bool = True,
+                                remove_empty_objects_from_lists: bool = True,
                                 ignore: bool = False,
                                 debug: bool = False) -> None:
 
@@ -1360,12 +1389,13 @@ def _test_parse_structured_data(testapp,
     def assert_parse_structured_data():
 
         def call_parse_structured_data(file: str):
-            nonlocal portal, novalidate, autoadd, prune, debug
+            nonlocal portal, novalidate, autoadd, prune, remove_empty_objects_from_lists, debug
             if debug:
                 # import pdb ; pdb.set_trace()
                 pass
             return parse_structured_data(file=file, portal=portal, novalidate=novalidate,
-                                         autoadd=autoadd, prune=True if prune is not False else False)
+                                         autoadd=autoadd, prune=True if prune is not False else False,
+                                         remove_empty_objects_from_lists=remove_empty_objects_from_lists)
 
         nonlocal file, expected, expected_errors, schemas, noschemas, debug
         portal = Portal(testapp, schemas=schemas) if not noschemas else None  # But see mocked_schemas.
@@ -1511,6 +1541,7 @@ def is_accession(value: str) -> bool:
 # Same as in smaht-portal/../ingestion_processors.py
 def parse_structured_data(file: str, portal: Optional[Union[VirtualApp, TestApp, Portal]], novalidate: bool = False,
                           autoadd: Optional[dict] = None, prune: bool = True,
+                          remove_empty_objects_from_lists: bool = True,
                           ref_nocache: bool = False) -> StructuredDataSet:
 
     def ref_lookup_strategy(portal: Portal, type_name: str, schema: dict, value: str) -> Tuple[int, Optional[str]]:
@@ -1528,6 +1559,7 @@ def parse_structured_data(file: str, portal: Optional[Union[VirtualApp, TestApp,
 
     structured_data = StructuredDataSet.load(file=file, portal=portal,
                                              autoadd=autoadd, order=ITEM_INDEX_ORDER, prune=prune,
+                                             remove_empty_objects_from_lists=remove_empty_objects_from_lists,
                                              ref_lookup_strategy=ref_lookup_strategy,
                                              ref_lookup_nocache=ref_nocache)
     if not novalidate:
