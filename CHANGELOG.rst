@@ -27,6 +27,7 @@ Change Log
   - Added deterministic ordering to paths returned by search_for_file in file_utils.
   - Added create_temporary_file_name and remove_temporary_file tmpfile_utils.
   - Minor fix to misc_utils.create_dict (do not create property only if its value is None).
+  - Minor updates to utility dcicutils.scripts.view_portal_object.
 
 
 8.8.4
