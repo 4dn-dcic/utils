@@ -350,7 +350,18 @@ class StructuredDataSet:
 
     def _load_json_file(self, file: str) -> None:
         with open(file) as f:
-            self._add(Schema.type_name(file), json.load(f))
+            file_json = json.load(f)
+            schema_inferred_from_file_name = Schema.type_name(file)
+            if self._portal.get_schema(schema_inferred_from_file_name) is not None:
+                # If the JSON file name looks like a schema name then assume it
+                # contains an object or an array of object of that schema type.
+                self._add(Schema.type_name(file), file_json)
+            elif isinstance(file_json, dict):
+                # Otherwise if the JSON file name does not look like a schema name then
+                # assume it a dictionary where each property is the name of a schema, and
+                # which (each property) contains a list of object of that schema type.
+                for schema_name in file_json:
+                    self._add(schema_name, file_json[schema_name])
 
     def _load_reader(self, reader: RowReader, type_name: str) -> None:
         schema = None
