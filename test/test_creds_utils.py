@@ -3,8 +3,14 @@ import json
 import os
 import pytest
 
-from dcicutils.creds_utils import KeyManager, CGAPKeyManager, FourfrontKeyManager, SMaHTKeyManager
-from dcicutils.exceptions import AppEnvKeyMissing, AppServerKeyMissing  # , AppKeyMissing
+from dcicutils.creds_utils import (
+    _KEY_MANAGERS,
+    KeyManager,
+    CGAPKeyManager,
+    FourfrontKeyManager,
+    SMaHTKeyManager,
+)
+from dcicutils.exceptions import AppEnvKeyMissing, AppServerKeyMissing
 from dcicutils.misc_utils import override_environ
 from dcicutils.qa_utils import MockFileSystem
 
@@ -41,6 +47,18 @@ def _make_sample_fourfront_key_manager():
 
 def _make_sample_smaht_key_manager():
     return CGAPKeyManager(keys_file=SAMPLE_SMAHT_KEYS_FILE)
+
+
+def test_keymanager_registry():
+    """Ensure portal key managers are registered with registered classes."""
+    portal_names = ["CGAP", "Fourfront", "SMaHT"]
+    assert len(_KEY_MANAGERS) == len(portal_names)
+    for portal_name in portal_names:
+        assert portal_name.lower() in _KEY_MANAGERS
+        key_manager = _KEY_MANAGERS[portal_name.lower()]
+        assert key_manager.APP_NAME == portal_name
+        assert key_manager._REGISTERED is True
+        assert key_manager()  # Ensure we can instantiate the key manager
 
 
 def test_cgap_keymanager_creation():

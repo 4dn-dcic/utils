@@ -7,9 +7,9 @@ Change Log
 ----------
 
 
-8.8.5
+8.8.6
 =====
-* 2024-04-23/dmichaels
+
 * Added check for ES_HOST_LOCAL environment variable in ff_utils.get_es_metadata;
   for running Foursight checks locally (with local ssh tunnel to ES proxy);
   came up in foursight/checks/audit_checks (2024-04-23).
@@ -28,6 +28,12 @@ Change Log
   - Added create_temporary_file_name and remove_temporary_file tmpfile_utils.
   - Minor fix to misc_utils.create_dict (do not create property only if its value is None).
   - Minor updates to utility dcicutils.scripts.view_portal_object.
+
+
+8.8.5
+=====
+
+* Fix bug in `creds_utils` to register portal key managers instead of parent class
 
 
 8.8.4
