@@ -895,9 +895,12 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth):
     used to create the generator.
     Should NOT be used directly
     """
+    def get_es_host_local() -> Optional[str]:
+        return os.environ.get("ES_HOST_LOCAL", None)
     health = get_health_page(key=auth)
     if es_client is None:
-        es_url = health['elasticsearch']
+        if not (es_url := get_es_host_local()):
+            es_url = health['elasticsearch']
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
     namespace_star = health.get('namespace', '') + '*'
     # match all given uuids to _id fields

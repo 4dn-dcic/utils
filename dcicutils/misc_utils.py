@@ -3,6 +3,7 @@ This file contains functions that might be generally useful.
 """
 
 from collections import namedtuple
+import appdirs
 import contextlib
 import datetime
 import functools
@@ -13,10 +14,12 @@ import json
 import logging
 import math
 import os
+import platform
 import pytz
 import re
 import rfc3986.validators
 import rfc3986.exceptions
+import shortuuid
 import time
 import uuid
 import warnings
@@ -1152,7 +1155,8 @@ def remove_suffix(suffix: str, text: str, required: bool = False):
 
 def remove_empty_properties(data: Optional[Union[list, dict]],
                             isempty: Optional[Callable] = None,
-                            isempty_array_element: Optional[Callable] = None) -> None:
+                            isempty_array_element: Optional[Callable] = None,
+                            raise_exception_on_nonempty_array_element_after_empty: bool = False) -> None:
     def _isempty(value: Any) -> bool:  # noqa
         return isempty(value) if callable(isempty) else value in [None, "", {}, []]
     if isinstance(data, dict):
@@ -1160,11 +1164,22 @@ def remove_empty_properties(data: Optional[Union[list, dict]],
             if _isempty(value := data[key]):
                 del data[key]
             else:
-                remove_empty_properties(value, isempty=isempty, isempty_array_element=isempty_array_element)
+                remove_empty_properties(value, isempty=isempty, isempty_array_element=isempty_array_element,
+                                        raise_exception_on_nonempty_array_element_after_empty=  # noqa
+                                        raise_exception_on_nonempty_array_element_after_empty)
     elif isinstance(data, list):
         for item in data:
-            remove_empty_properties(item, isempty=isempty, isempty_array_element=isempty_array_element)
+            remove_empty_properties(item, isempty=isempty, isempty_array_element=isempty_array_element,
+                                    raise_exception_on_nonempty_array_element_after_empty=  # noqa
+                                    raise_exception_on_nonempty_array_element_after_empty)
         if callable(isempty_array_element):
+            if raise_exception_on_nonempty_array_element_after_empty is True:
+                empty_element_seen = False
+                for item in data:
+                    if not empty_element_seen and isempty_array_element(item):
+                        empty_element_seen = True
+                    elif empty_element_seen and not isempty_array_element(item):
+                        raise Exception("Non-empty element found after empty element.")
             data[:] = [item for item in data if not isempty_array_element(item)]
 
 
@@ -1522,7 +1537,7 @@ def right_trim(list_or_tuple: Union[List[Any], Tuple[Any]],
 def create_dict(**kwargs) -> dict:
     result = {}
     for name in kwargs:
-        if kwargs[name]:
+        if not (kwargs[name] is None):
             result[name] = kwargs[name]
     return result
 
@@ -2548,6 +2563,19 @@ def normalize_spaces(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
+def normalize_string(value: Optional[str]) -> Optional[str]:
+    """
+    Strips leading/trailing spaces, and converts multiple consecutive spaces to a single space
+    in the given string value and returns the result. If the given value is None returns an
+    empty string. If the given value is not actually even a string then return None.
+    """
+    if value is None:
+        return ""
+    elif isinstance(value, str):
+        return re.sub(r"\s+", " ", value).strip()
+    return None
+
+
 def find_nth_from_end(string: str, substring: str, nth: int) -> int:
     """
     Returns the index of the nth occurrence of the given substring within
@@ -2590,7 +2618,11 @@ def format_size(nbytes: Union[int, float], precision: int = 2, nospace: bool = F
         nbytes = int(nbytes)
         return f"{nbytes} byte{'s' if nbytes != 1 else ''}"
     unit = (UNITS_TERSE if terse else UNITS)[index]
-    return f"{nbytes:.{precision}f}{'' if nospace else ' '}{unit}"
+    size = f"{nbytes:.{precision}f}"
+    if size.endswith(f".{'0' * precision}"):
+        # Tidy up extraneous zeros.
+        size = size[:-(precision - 1)]
+    return f"{size}{'' if nospace else ' '}{unit}"
 
 
 def format_duration(seconds: Union[int, float]) -> str:
@@ -2670,3 +2702,48 @@ class JsonLinesReader:
                 yield line
             else:
                 raise Exception(f"If the first line is not a list, all lines must be dictionaries: {line!r}")
+
+
+def get_app_specific_directory() -> str:
+    """
+    Returns the standard system application specific directory:
+    - On MacOS this directory: is: ~/Library/Application Support
+    - On Linux this directory is: ~/.local/share
+    - On Windows this directory is: %USERPROFILE%\\AppData\\Local  # noqa
+    N.B. This is has been tested on MacOS and Linux but not on Windows.
+    """
+    return appdirs.user_data_dir()
+
+
+def get_os_name() -> str:
+    if os_name := platform.system():
+        if os_name == "Darwin": return "osx"  # noqa
+        elif os_name == "Linux": return "linux"  # noqa
+        elif os_name == "Windows": return "windows"  # noqa
+    return ""
+
+
+def get_cpu_architecture_name() -> str:
+    if os_architecture_name := platform.machine():
+        if os_architecture_name == "x86_64": return "amd64"  # noqa
+        return os_architecture_name
+    return ""
+
+
+def create_uuid(nodash: bool = False, upper: bool = False) -> str:
+    value = str(uuid.uuid4())
+    if nodash is True:
+        value = value.replace("-", "")
+    if upper is True:
+        value = value.upper()
+    return value
+
+
+def create_short_uuid(length: Optional[int] = None, upper: bool = False):
+    # Not really techincally a uuid of course.
+    if (length is None) or (not isinstance(length, int)) or (length < 1):
+        length = 16
+    value = shortuuid.ShortUUID().random(length=length)
+    if upper is True:
+        value = value.upper()
+    return value
