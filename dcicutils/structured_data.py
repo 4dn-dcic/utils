@@ -445,7 +445,7 @@ class StructuredDataSet:
         just returns the given object. Note that the given object may be CHANGED in place.
         """
         for identifying_path in self._portal.get_identifying_paths(portal_object, portal_type):
-            if existing_portal_object := self._portal.get_metadata(identifying_path, raw=True):
+            if existing_portal_object := self._portal.get_metadata(identifying_path, raw=True, raise_exception=False):
                 return merge_objects(existing_portal_object, portal_object)
         return portal_object
 
