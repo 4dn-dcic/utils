@@ -3,7 +3,7 @@ from typing import Optional
 from dcicutils.structured_data import Portal
 
 # This function is exposed (to smaht-portal/ingester and smaht-submitr) only because previously,
-# before it was fully developeda, we had differing behaviors; but this has been unified; this
+# before it was fully developed, we had differing behaviors; but this has been unified; this
 # could now be internalized to structured_data, and portal_object_utils (TODO).
 
 
