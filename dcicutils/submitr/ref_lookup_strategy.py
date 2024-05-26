@@ -6,6 +6,7 @@ from dcicutils.structured_data import Portal
 # before it was fully developeda, we had differing behaviors; but this has been unified; this
 # could now be internalized to structured_data, and portal_object_utils (TODO).
 
+
 def ref_lookup_strategy(portal: Portal, type_name: str, schema: dict, value: str) -> (int, Optional[str]):
     #
     # Note this slight odd situation WRT object lookups by submitted_id and accession ...
