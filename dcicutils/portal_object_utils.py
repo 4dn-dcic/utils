@@ -14,11 +14,9 @@ class PortalObject:
 
     _PROPERTY_DELETION_SENTINEL = RowReader.CELL_DELETION_SENTINEL
 
-    def __init__(self, data: dict, portal: Portal = None,
-                 schema: Optional[Union[dict, Schema]] = None, type: Optional[str] = None) -> None:
+    def __init__(self, data: dict, portal: Portal = None, type: Optional[str] = None) -> None:
         self._data = data if isinstance(data, dict) else {}
         self._portal = portal if isinstance(portal, Portal) else None
-        self._schema = schema if isinstance(schema, dict) else (schema.data if isinstance(schema, Schema) else None)
         self._type = type if isinstance(type, str) else ""
 
     @property
@@ -32,7 +30,7 @@ class PortalObject:
     @property
     @lru_cache(maxsize=1)
     def type(self) -> str:
-        return self._type or Portal.get_schema_type(self._data) or (Schema(self._schema).type if self._schema else "")
+        return self._type or Portal.get_schema_type(self._data) or ""
 
     @property
     @lru_cache(maxsize=1)
@@ -47,7 +45,7 @@ class PortalObject:
     @property
     @lru_cache(maxsize=1)
     def schema(self) -> Optional[dict]:
-        return self._schema if self._schema else (self._portal.get_schema(self.type) if self._portal else None)
+        return self._portal.get_schema(self.type) if self._portal else None
 
     def copy(self) -> PortalObject:
         return PortalObject(deepcopy(self.data), portal=self.portal, type=self.type)
