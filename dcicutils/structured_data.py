@@ -56,7 +56,7 @@ class StructuredDataSet:
                  remove_empty_objects_from_lists: bool = True,
                  ref_lookup_strategy: Optional[Callable] = None,
                  ref_lookup_nocache: bool = False,
-                 norefs: bool = False,
+                 norefs: bool = False, merge: bool = False,
                  progress: Optional[Callable] = None,
                  debug_sleep: Optional[str] = None) -> None:
         self._progress = progress if callable(progress) else None
@@ -75,6 +75,7 @@ class StructuredDataSet:
         self._nrows = 0
         self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
         self._norefs = True if norefs is True else False
+        self._merge = True if merge is True else False
         self._debug_sleep = None
         if debug_sleep:
             try:
@@ -98,13 +99,13 @@ class StructuredDataSet:
              remove_empty_objects_from_lists: bool = True,
              ref_lookup_strategy: Optional[Callable] = None,
              ref_lookup_nocache: bool = False,
-             norefs: bool = False,
+             norefs: bool = False, merge: bool = False,
              progress: Optional[Callable] = None,
              debug_sleep: Optional[str] = None) -> StructuredDataSet:
         return StructuredDataSet(file=file, portal=portal, schemas=schemas, autoadd=autoadd, order=order, prune=prune,
                                  remove_empty_objects_from_lists=remove_empty_objects_from_lists,
                                  ref_lookup_strategy=ref_lookup_strategy, ref_lookup_nocache=ref_lookup_nocache,
-                                 norefs=norefs, progress=progress, debug_sleep=debug_sleep)
+                                 norefs=norefs, merge=merge, progress=progress, debug_sleep=debug_sleep)
 
     def validate(self, force: bool = False) -> None:
         def data_without_deleted_properties(data: dict) -> dict:
@@ -383,6 +384,11 @@ class StructuredDataSet:
                 structured_row_template.set_value(structured_row, column_name, value, reader.file, reader.row_number)
                 if self._autoadd_properties:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
+            # New merge functionality (2024-05-25).
+            if self._merge:
+                for identifying_path in self.get_identifying_paths(self._portal, structured_row, type_name):
+                    if existing_portal_object := self._portal.get_metadata(identifying_path):
+                        structured_row = merge_objects(existing_portal_object, structured_row)
             if (prune_error := self._prune_structured_row(structured_row)) is not None:
                 self._note_error({"src": create_dict(type=schema_name, row=reader.row_number),
                                   "error": prune_error}, "validation")

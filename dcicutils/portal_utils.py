@@ -1,5 +1,6 @@
 from collections import deque
 from functools import lru_cache
+from dcicutils.function_cache_decorator import function_cache
 import io
 import json
 from pyramid.config import Configurator as PyramidConfigurator
@@ -18,6 +19,7 @@ from wsgiref.simple_server import make_server as wsgi_make_server
 from dcicutils.common import APP_SMAHT, OrchestratedApp, ORCHESTRATED_APPS
 from dcicutils.ff_utils import get_metadata, get_schema, patch_metadata, post_metadata
 from dcicutils.misc_utils import to_camel_case, VirtualApp
+from dcicutils.schema_utils import get_identifying_properties
 from dcicutils.tmpfile_utils import temporary_file
 
 Portal = Type["Portal"]  # Forward type reference for type hints.
@@ -440,6 +442,54 @@ class Portal:
         if isinstance(timeout := kwargs.get("timeout"), int):
             result_kwargs["timeout"] = timeout
         return result_kwargs
+
+    @function_cache(maxsize=100, serialize_key=True)
+    def get_identifying_paths(self, portal_object: dict, portal_type: Optional[str] = None) -> List[str]:
+        """
+        Returns the list of the identifying Portal (URL) paths for the given Portal object. Favors any
+        uuid based path and defavors aliases based paths (ala self.get_identifying_property_names);
+        no other ordering defined. Returns empty list of none or otherwise not found.
+        """
+        results = []
+        if not isinstance(portal_object, dict):
+            return results
+        if not isinstance(portal_type, str) or not portal_type:
+            if not (portal_type := self.get_schema_type(portal_object)):
+                return results
+        for identifying_property in self.get_identifying_property_names(portal_type):
+            if identifying_value := portal_object.get(identifying_property):
+                if isinstance(identifying_value, list):
+                    for identifying_value_item in identifying_value:
+                        results.append(f"/{portal_type}/{identifying_value_item}")
+                elif identifying_property == "uuid":
+                    results.append(f"/{identifying_value}")
+                else:
+                    results.append(f"/{portal_type}/{identifying_value}")
+        return results
+
+    @function_cache(maxsize=100, serialize_key=True)
+    def get_identifying_property_names(self, schema: Union[str, dict]) -> List[str]:
+        """
+        Returns the list of identifying property names for the given Portal schema, which may
+        be either a schema name or a schema object; empty list of none or otherwise not found.
+        """
+        results = []
+        if isinstance(schema, str):
+            try:
+                if not (schema := self.get_schema(schema)):
+                    return results
+            except Exception:
+                return results
+        elif not isinstance(schema, dict):
+            return results
+        if not (identifying_properties := get_identifying_properties(schema)):
+            return results
+        identifying_properties = [*identifying_properties]
+        for favored_identifying_property in reversed(["uuid", "identifier"]):
+            if favored_identifying_property in identifying_properties:
+                identifying_properties.remove(favored_identifying_property)
+                identifying_properties.insert(0, favored_identifying_property)
+        return identifying_properties
 
     @staticmethod
     def _default_keys_file(app: Optional[str], env: Optional[str], server: Optional[str]) -> Optional[str]:
