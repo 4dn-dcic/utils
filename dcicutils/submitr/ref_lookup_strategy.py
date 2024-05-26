@@ -2,10 +2,13 @@ import re
 from typing import Optional
 from dcicutils.structured_data import Portal
 
+# This function is exposed (to smaht-portal/ingester and smaht-submitr) only because previously,
+# before it was fully developeda, we had differing behaviors; but this has been unified; this
+# could now be internalized to structured_data, and portal_object_utils (TODO).
 
 def ref_lookup_strategy(portal: Portal, type_name: str, schema: dict, value: str) -> (int, Optional[str]):
     #
-    # FYI: Note this situation WRT object lookups ...
+    # Note this slight odd situation WRT object lookups by submitted_id and accession ...
     #
     # /{submitted_id}                # NOT FOUND
     # /UnalignedReads/{submitted_id} # OK
@@ -20,21 +23,20 @@ def ref_lookup_strategy(portal: Portal, type_name: str, schema: dict, value: str
     def ref_validator(schema: Optional[dict],
                       property_name: Optional[str], property_value: Optional[str]) -> Optional[bool]:
         """
-        Returns False iff the type represented by the given schema can NOT be referenced by
-        the given property name with the given property value, otherwise returns None.
+        Returns False iff objects of type represented by the given schema, CANNOT be referenced with
+        a Portal path using the given property name and its given property value, otherwise returns None.
 
-        For example, if the schema is for the UnalignedReads type and the property name
-        is accession, then we will return False iff the given property value is NOT a properly
-        formatted accession ID. Otherwise, we will return None, which indicates that the
-        caller (in dcicutils.structured_data.Portal.ref_exists) will continue executing
-        its default behavior, which is to check other ways in which the given type can NOT
-        be referenced by the given value, i.e. it checks other identifying properties for
-        the type and makes sure any patterns (e.g. for submitted_id or uuid) are ahered to.
+        For example, if the schema is for UnalignedReads and the property name is accession, then we will
+        return False iff the given property value is NOT a properly formatted accession ID; otherwise, we
+        will return None, which indicates that the caller (e.g. dcicutils.structured_data.Portal.ref_exists)
+        will continue executing its default behavior, which is to check other ways in which the given type
+        CANNOT be referenced by the given value, i.e. it checks other identifying properties for the type
+        and makes sure any patterns (e.g. for submitted_id or uuid) are ahered to.
 
-        The goal (in structured_data) being to detect if a type is being referenced in such
-        a way that  can NOT possibly be allowed, i.e. because none of its identifying types
-        are in the required form (if indeed there any requirements). Note that it is guaranteed
-        that the given property name is indeed an identifying property for the given type.
+        The goal (in structured_data) being to detect if a type is being referenced in such a way that
+        CANNOT possibly be allowed, i.e. because none of its identifying types are in the required form,
+        if indeed there any requirements. It is assumed/guaranteed the given property name is indeed an
+        identifying property for the given type.
         """
         if property_format := schema.get("properties", {}).get(property_name, {}).get("format"):
             if (property_format == "accession") and (property_name == "accession"):

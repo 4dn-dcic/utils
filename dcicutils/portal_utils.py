@@ -422,11 +422,12 @@ class Portal:
         return schemas_super_type_map.get(type_name, [])
 
     @function_cache(maxsize=100, serialize_key=True)
-    def get_identifying_paths(self, portal_object: dict, portal_type: Optional[str] = None) -> List[str]:
+    def get_identifying_paths(self, portal_object: dict, portal_type: Optional[str] = None,
+                              ref_lookup_strategy: Optional[Callable] = None) -> List[str]:
         """
-        Returns the list of the identifying Portal (URL) paths for the given Portal object. Favors any
-        uuid based path and defavors aliases based paths (ala self.get_identifying_property_names);
-        no other ordering defined. Returns empty list of none or otherwise not found.
+        Returns the list of the identifying Portal (URL) paths for the given Portal object. Favors any uuid
+        and identifier based paths and defavors aliases based paths (ala self.get_identifying_property_names);
+        no other ordering defined. Returns an empty list if no identifying properties or otherwise not found.
         """
         results = []
         if not isinstance(portal_object, dict):
@@ -440,6 +441,26 @@ class Portal:
                     for identifying_value_item in identifying_value:
                         results.append(f"/{portal_type}/{identifying_value_item}")
                 elif identifying_property == "uuid":
+                    #
+                    # Note this idiosyncrasy with Portal paths: the only way we do NOT get a (HTTP 301) redirect
+                    # is if we use the lower-case-dashed-plural based version of the path, e.g. all of these:
+                    #
+                    # - /d13d06c1-218e-4f61-aaf0-91f226248b3c
+                    # - /d13d06c1-218e-4f61-aaf0-91f226248b3c/
+                    # - /FileFormat/d13d06c1-218e-4f61-aaf0-91f226248b3c
+                    # - /FileFormat/d13d06c1-218e-4f61-aaf0-91f226248b3c/
+                    # - /files-formats/d13d06c1-218e-4f61-aaf0-91f226248b3c
+                    #
+                    # Will result in a (HTTP 301) redirect to:
+                    #
+                    # - /files-formats/d13d06c1-218e-4f61-aaf0-91f226248b3c/
+                    #
+                    # Unfortunately, this code here has no reasonable way of getting that lower-case-dashed-plural
+                    # based name (e.g. file-formats) from the schema/portal type name (e.g. FileFormat); as the
+                    # information is contained, for this example, in the snovault.collection decorator for the
+                    # endpoint definition in smaht-portal/.../types/file_format.py. Unfortunately merely because
+                    # behind-the-scenes an extra round-trip HTTP request will occurm but happens automatically.
+                    #
                     results.append(f"/{identifying_value}")
                 else:
                     results.append(f"/{portal_type}/{identifying_value}")
@@ -452,7 +473,8 @@ class Portal:
         Returns the list of identifying property names for the given Portal schema, which may be
         either a schema name or a schema object. If a Portal object is also given then restricts this
         set of identifying properties to those which actually have values within this Portal object.
-        Returns empty list if no identifying properties or somehow otherwise not found.
+        Favors the uuid and identifier property names and defavors the aliases property name; no other
+        ordering imposed. Returns empty list if no identifying properties or otherwise not found.
         """
         results = []
         if isinstance(schema, str):
@@ -465,15 +487,15 @@ class Portal:
         identifying_properties = list(set(identifying_properties))  # paranoid dedup
         identifying_properties = [*identifying_properties]  # copy so as not to change schema if given
         favored_identifying_properties = ["uuid", "identifier"]
-        unfavored_identifying_properties = ["aliases"]
+        defavored_identifying_properties = ["aliases"]
         for favored_identifying_property in reversed(favored_identifying_properties):
             if favored_identifying_property in identifying_properties:
                 identifying_properties.remove(favored_identifying_property)
                 identifying_properties.insert(0, favored_identifying_property)
-        for unfavored_identifying_property in unfavored_identifying_properties:
-            if unfavored_identifying_property in identifying_properties:
-                identifying_properties.remove(unfavored_identifying_property)
-                identifying_properties.append(unfavored_identifying_property)
+        for defavored_identifying_property in defavored_identifying_properties:
+            if defavored_identifying_property in identifying_properties:
+                identifying_properties.remove(defavored_identifying_property)
+                identifying_properties.append(defavored_identifying_property)
         if isinstance(portal_object, dict):
             for identifying_property in [*identifying_properties]:
                 if portal_object.get(identifying_property) is None:
