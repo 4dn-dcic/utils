@@ -307,7 +307,10 @@ class Portal:
 
     @lru_cache(maxsize=100)
     def get_schema(self, schema_name: str) -> Optional[dict]:
-        return get_schema(self.schema_name(schema_name), portal_vapp=self.vapp, key=self.key)
+        try:
+            return get_schema(self.schema_name(schema_name), portal_vapp=self.vapp, key=self.key)
+        except Exception:
+            return None
 
     @lru_cache(maxsize=1)
     def get_schemas(self) -> dict:
@@ -446,14 +449,11 @@ class Portal:
     def get_identifying_property_names(self, schema: Union[str, dict]) -> List[str]:
         """
         Returns the list of identifying property names for the given Portal schema, which may
-        be either a schema name or a schema object; empty list of none or otherwise not found.
+        be either a schema name or a schema object; empty list if none or otherwise not found.
         """
         results = []
         if isinstance(schema, str):
-            try:
-                if not (schema := self.get_schema(schema)):
-                    return results
-            except Exception:
+            if not (schema := self.get_schema(schema)):
                 return results
         elif not isinstance(schema, dict):
             return results

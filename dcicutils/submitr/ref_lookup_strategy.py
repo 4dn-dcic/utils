@@ -20,7 +20,7 @@ def ref_lookup_strategy(portal: Portal, type_name: str, schema: dict, value: str
     def ref_validator(schema: Optional[dict],
                       property_name: Optional[str], property_value: Optional[str]) -> Optional[bool]:
         """
-        Returns False iff the type represented by the given schema, can NOT be referenced by
+        Returns False iff the type represented by the given schema can NOT be referenced by
         the given property name with the given property value, otherwise returns None.
 
         For example, if the schema is for the UnalignedReads type and the property name
@@ -32,7 +32,7 @@ def ref_lookup_strategy(portal: Portal, type_name: str, schema: dict, value: str
         the type and makes sure any patterns (e.g. for submitted_id or uuid) are ahered to.
 
         The goal (in structured_data) being to detect if a type is being referenced in such
-        a way that cannot possibly be allowed, i.e. because none of its identifying types
+        a way that  can NOT possibly be allowed, i.e. because none of its identifying types
         are in the required form (if indeed there any requirements). Note that it is guaranteed
         that the given property name is indeed an identifying property for the given type.
         """
