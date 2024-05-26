@@ -418,31 +418,6 @@ class Portal:
             return []
         return schemas_super_type_map.get(type_name, [])
 
-    def url(self, url: str, raw: bool = False, database: bool = False) -> str:
-        if not isinstance(url, str) or not url:
-            return "/"
-        elif (lowercase_url := url.lower()).startswith("http://") or lowercase_url.startswith("https://"):
-            return url
-        elif not (url := re.sub(r"/+", "/", url)).startswith("/"):
-            url = "/"
-        url = self.server + url if self.server else url
-        if isinstance(raw, bool) and raw:
-            url += ("&" if "?" in url else "?") + "frame=raw"
-        if isinstance(database, bool) and database:
-            url += ("&" if "?" in url else "?") + "datastore=database"
-        return url
-
-    def _kwargs(self, **kwargs) -> dict:
-        if "headers" in kwargs:
-            result_kwargs = {"headers": kwargs["headers"]}
-        else:
-            result_kwargs = {"headers": {"Content-type": Portal.MIME_TYPE_JSON, "Accept": Portal.MIME_TYPE_JSON}}
-        if self.key_pair:
-            result_kwargs["auth"] = self.key_pair
-        if isinstance(timeout := kwargs.get("timeout"), int):
-            result_kwargs["timeout"] = timeout
-        return result_kwargs
-
     @function_cache(maxsize=100, serialize_key=True)
     def get_identifying_paths(self, portal_object: dict, portal_type: Optional[str] = None) -> List[str]:
         """
@@ -490,6 +465,31 @@ class Portal:
                 identifying_properties.remove(favored_identifying_property)
                 identifying_properties.insert(0, favored_identifying_property)
         return identifying_properties
+
+    def url(self, url: str, raw: bool = False, database: bool = False) -> str:
+        if not isinstance(url, str) or not url:
+            return "/"
+        elif (lowercase_url := url.lower()).startswith("http://") or lowercase_url.startswith("https://"):
+            return url
+        elif not (url := re.sub(r"/+", "/", url)).startswith("/"):
+            url = "/"
+        url = self.server + url if self.server else url
+        if isinstance(raw, bool) and raw:
+            url += ("&" if "?" in url else "?") + "frame=raw"
+        if isinstance(database, bool) and database:
+            url += ("&" if "?" in url else "?") + "datastore=database"
+        return url
+
+    def _kwargs(self, **kwargs) -> dict:
+        if "headers" in kwargs:
+            result_kwargs = {"headers": kwargs["headers"]}
+        else:
+            result_kwargs = {"headers": {"Content-type": Portal.MIME_TYPE_JSON, "Accept": Portal.MIME_TYPE_JSON}}
+        if self.key_pair:
+            result_kwargs["auth"] = self.key_pair
+        if isinstance(timeout := kwargs.get("timeout"), int):
+            result_kwargs["timeout"] = timeout
+        return result_kwargs
 
     @staticmethod
     def _default_keys_file(app: Optional[str], env: Optional[str], server: Optional[str]) -> Optional[str]:
@@ -567,6 +567,22 @@ class Portal:
         return response
 
     @staticmethod
+    def _create_vapp(arg: Union[TestApp, VirtualApp, PyramidRouter, str] = None) -> TestApp:
+        if isinstance(arg, TestApp):
+            return arg
+        elif isinstance(arg, VirtualApp):
+            if not isinstance(arg.wrapped_app, TestApp):
+                raise Exception("Portal._create_vapp VirtualApp argument error.")
+            return arg.wrapped_app
+        if isinstance(arg, PyramidRouter):
+            router = arg
+        elif isinstance(arg, str) or not arg:
+            router = pyramid_get_app(arg or "development.ini", "app")
+        else:
+            raise Exception("Portal._create_vapp argument error.")
+        return TestApp(router, {"HTTP_ACCEPT": Portal.MIME_TYPE_JSON, "REMOTE_USER": "TEST"})
+
+    @staticmethod
     def create_for_testing(arg: Optional[Union[str, bool, List[dict], dict, Callable]] = None) -> Portal:
         if isinstance(arg, list) or isinstance(arg, dict) or isinstance(arg, Callable):
             return Portal(Portal._create_router_for_testing(arg))
@@ -596,22 +612,6 @@ class Portal:
             minimal_ini_for_testing = "[app:app]\nuse = egg:encoded\nsqlalchemy.url = postgresql://dummy\n"
         with temporary_file(content=minimal_ini_for_testing, suffix=".ini") as ini_file:
             return Portal(ini_file)
-
-    @staticmethod
-    def _create_vapp(arg: Union[TestApp, VirtualApp, PyramidRouter, str] = None) -> TestApp:
-        if isinstance(arg, TestApp):
-            return arg
-        elif isinstance(arg, VirtualApp):
-            if not isinstance(arg.wrapped_app, TestApp):
-                raise Exception("Portal._create_vapp VirtualApp argument error.")
-            return arg.wrapped_app
-        if isinstance(arg, PyramidRouter):
-            router = arg
-        elif isinstance(arg, str) or not arg:
-            router = pyramid_get_app(arg or "development.ini", "app")
-        else:
-            raise Exception("Portal._create_vapp argument error.")
-        return TestApp(router, {"HTTP_ACCEPT": Portal.MIME_TYPE_JSON, "REMOTE_USER": "TEST"})
 
     @staticmethod
     def _create_router_for_testing(endpoints: Optional[List[Dict[str, Union[str, Callable]]]] = None) -> PyramidRouter:

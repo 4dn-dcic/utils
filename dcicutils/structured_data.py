@@ -351,18 +351,23 @@ class StructuredDataSet:
 
     def _load_json_file(self, file: str) -> None:
         with open(file) as f:
-            file_json = json.load(f)
-            schema_inferred_from_file_name = Schema.type_name(file)
-            if self._portal.get_schema(schema_inferred_from_file_name) is not None:
+            item = json.load(f)
+            if ((schema_name_inferred_from_file_name := Schema.type_name(file)) and
+                (self._portal.get_schema(schema_name_inferred_from_file_name) is not None)):  # noqa
                 # If the JSON file name looks like a schema name then assume it
                 # contains an object or an array of object of that schema type.
-                self._add(Schema.type_name(file), file_json)
-            elif isinstance(file_json, dict):
+                if self._merge:
+                    item = self._merge_with_existing_portal_object(item, schema_name_inferred_from_file_name)
+                self._add(Schema.type_name(file), item)
+            elif isinstance(item, dict):
                 # Otherwise if the JSON file name does not look like a schema name then
                 # assume it a dictionary where each property is the name of a schema, and
                 # which (each property) contains a list of object of that schema type.
-                for schema_name in file_json:
-                    self._add(schema_name, file_json[schema_name])
+                for schema_name in item:
+                    item = item[schema_name]
+                    if self._merge:
+                        item = self._merge_with_existing_portal_object(item, schema_name)
+                    self._add(schema_name, item)
 
     def _load_reader(self, reader: RowReader, type_name: str) -> None:
         schema = None
@@ -386,14 +391,12 @@ class StructuredDataSet:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
             # New merge functionality (2024-05-25).
             if self._merge:
-                for identifying_path in self.get_identifying_paths(self._portal, structured_row, type_name):
-                    if existing_portal_object := self._portal.get_metadata(identifying_path):
-                        structured_row = merge_objects(existing_portal_object, structured_row)
+                structured_row = self._merge_with_existing_portal_object(structured_row, schema_name)
             if (prune_error := self._prune_structured_row(structured_row)) is not None:
                 self._note_error({"src": create_dict(type=schema_name, row=reader.row_number),
                                   "error": prune_error}, "validation")
             else:
-                self._add(type_name, structured_row)
+                self._add(type_name, structured_row)  # TODO: why type_name and not schema_name?
             if self._progress:
                 self._progress({
                     PROGRESS.LOAD_ITEM: self._nrows,
@@ -433,6 +436,18 @@ class StructuredDataSet:
         for name in properties:
             if name not in structured_row and (not schema or schema.data.get("properties", {}).get(name)):
                 structured_row[name] = properties[name]
+
+    def _merge_with_existing_portal_object(self, portal_object: dict, portal_type: str) -> dict:
+        """
+        Given a Portal object (presumably/in-practice from the given metadata), if there is
+        an existing Portal item, identified by the identifying properties for the given object,
+        then merges the given object into the existing one and returns the result; otherwise
+        just returns the given object. Note that the given object may be CHANGED in place.
+        """
+        for identifying_path in self._portal.get_identifying_paths(portal_object, portal_type):
+            if existing_portal_object := self._portal.get_metadata(identifying_path, raw=True):
+                return merge_objects(existing_portal_object, portal_object)
+        return portal_object
 
     def _is_ref_lookup_specified_type(ref_lookup_flags: int) -> bool:
         return (ref_lookup_flags &
