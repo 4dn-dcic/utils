@@ -14,7 +14,7 @@ class PortalObject:
 
     _PROPERTY_DELETION_SENTINEL = RowReader.CELL_DELETION_SENTINEL
 
-    def __init__(self, data: dict, portal: Portal = None, type: Optional[str] = None) -> None:
+    def __init__(self, data: dict, portal: Optional[Portal] = None, type: Optional[str] = None) -> None:
         self._data = data if isinstance(data, dict) else {}
         self._portal = portal if isinstance(portal, Portal) else None
         self._type = type if isinstance(type, str) else ""
@@ -58,38 +58,26 @@ class PortalObject:
         Implicitly include "uuid" and "identifier" properties as identifying properties if they are actually
         properties in the object schema, and favor these (first); defavor "aliases"; no other ordering defined.
         """
-        if not (schema := self.schema) or not (schema_identifying_properties := schema.get("identifyingProperties")):
-            return None
-        identifying_properties = []
-        for identifying_property in schema_identifying_properties:
-            if identifying_property not in ["uuid", "identifier", "aliases"]:
-                if self._data.get(identifying_property):
-                    identifying_properties.append(identifying_property)
-        if self._data.get("identifier"):
-            identifying_properties.insert(0, "identifier")
-        if self._data.get("uuid"):
-            identifying_properties.insert(0, "uuid")
-        if "aliases" in schema_identifying_properties and self._data.get("aliases"):
-            identifying_properties.append("aliases")
-        return identifying_properties or None
+        return self._portal.get_identifying_property_names(self.type, portal_object=self._data) if self._portal else []
 
     @lru_cache(maxsize=8192)
     def lookup(self, raw: bool = False,
                ref_lookup_strategy: Optional[Callable] = None) -> Tuple[Optional[PortalObject], Optional[str], int]:
+        if not (identifying_paths := self._get_identifying_paths(ref_lookup_strategy=ref_lookup_strategy)):
+            return None, None, 0
         nlookups = 0
         first_identifying_path = None
         try:
-            if identifying_paths := self._get_identifying_paths(ref_lookup_strategy=ref_lookup_strategy):
-                for identifying_path in identifying_paths:
-                    if not first_identifying_path:
-                        first_identifying_path = identifying_path
-                    nlookups += 1
-                    if (value := self._portal.get(identifying_path, raw=raw)) and (value.status_code == 200):
-                        return (
-                            PortalObject(value.json(), portal=self._portal, type=self.type if raw else None),
-                            identifying_path,
-                            nlookups
-                        )
+            for identifying_path in identifying_paths:
+                if not first_identifying_path:
+                    first_identifying_path = identifying_path
+                nlookups += 1
+                if self._portal and (item := self._portal.get(identifying_path, raw=raw)) and (item.status_code == 200):
+                    return (
+                        PortalObject(item.json(), portal=self._portal, type=self.type if raw else None),
+                        identifying_path,
+                        nlookups
+                    )
         except Exception:
             pass
         return None, first_identifying_path, nlookups

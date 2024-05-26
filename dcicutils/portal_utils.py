@@ -446,10 +446,13 @@ class Portal:
         return results
 
     @function_cache(maxsize=100, serialize_key=True)
-    def get_identifying_property_names(self, schema: Union[str, dict]) -> List[str]:
+    def get_identifying_property_names(self, schema: Union[str, dict],
+                                       portal_object: Optional[dict] = None) -> List[str]:
         """
-        Returns the list of identifying property names for the given Portal schema, which may
-        be either a schema name or a schema object; empty list if none or otherwise not found.
+        Returns the list of identifying property names for the given Portal schema, which may be
+        either a schema name or a schema object. If a Portal object is also given then restricts this
+        set of identifying properties to those which actually have values within this Portal object.
+        Returns empty list if no identifying properties or somehow otherwise not found.
         """
         results = []
         if isinstance(schema, str):
@@ -459,11 +462,22 @@ class Portal:
             return results
         if not (identifying_properties := get_identifying_properties(schema)):
             return results
-        identifying_properties = [*identifying_properties]
-        for favored_identifying_property in reversed(["uuid", "identifier"]):
+        identifying_properties = list(set(identifying_properties))  # paranoid dedup
+        identifying_properties = [*identifying_properties]  # copy so as not to change schema if given
+        favored_identifying_properties = ["uuid", "identifier"]
+        unfavored_identifying_properties = ["aliases"]
+        for favored_identifying_property in reversed(favored_identifying_properties):
             if favored_identifying_property in identifying_properties:
                 identifying_properties.remove(favored_identifying_property)
                 identifying_properties.insert(0, favored_identifying_property)
+        for unfavored_identifying_property in unfavored_identifying_properties:
+            if unfavored_identifying_property in identifying_properties:
+                identifying_properties.remove(unfavored_identifying_property)
+                identifying_properties.append(unfavored_identifying_property)
+        if isinstance(portal_object, dict):
+            for identifying_property in [*identifying_properties]:
+                if portal_object.get(identifying_property) is None:
+                    identifying_properties.remove(identifying_property)
         return identifying_properties
 
     def url(self, url: str, raw: bool = False, database: bool = False) -> str:
