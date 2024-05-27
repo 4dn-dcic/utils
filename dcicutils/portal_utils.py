@@ -480,7 +480,7 @@ class Portal:
                 lookup_options = Portal.LOOKUP_UNDEFINED
                 if schema := self.get_schema(portal_type):
                     if callable(lookup_strategy):
-                        lookup_options, validator = lookup_strategy(self._portal, self.type, schema, identifying_value)
+                        lookup_options, validator = lookup_strategy(self, self.type, schema, identifying_value)
                         if callable(validator):
                             if validator(schema, identifying_property, identifying_value) is False:
                                 continue
@@ -499,7 +499,7 @@ class Portal:
                 if is_lookup_root(lookup_options) and not is_lookup_root_first(lookup_options):
                     results.append(f"/{identifying_value}")
                 if is_lookup_subtypes(lookup_options):
-                    for subtype_name in self._portal.get_schema_subtype_names(self.type):
+                    for subtype_name in self.get_schema_subtype_names(self.type):
                         results.append(f"/{subtype_name}/{identifying_value}")
         return results
 
