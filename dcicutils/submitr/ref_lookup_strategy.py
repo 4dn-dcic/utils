@@ -3,23 +3,26 @@ from typing import Optional
 from dcicutils.structured_data import Portal
 
 # This function is exposed (to smaht-portal/ingester and smaht-submitr) only because previously,
-# before it was fully developed, we had differing behaviors; but this has been unified; this
+# before it was fully developed, we had differing behaviors; but this has been unified; so this
 # could now be internalized to structured_data, and portal_object_utils (TODO).
 
 
 def ref_lookup_strategy(portal: Portal, type_name: str, schema: dict, value: str) -> (int, Optional[str]):
     #
-    # Note this slight odd situation WRT object lookups by submitted_id and accession ...
-    #
-    # /{submitted_id}                # NOT FOUND
-    # /UnalignedReads/{submitted_id} # OK
-    # /SubmittedFile/{submitted_id}  # OK
-    # /File/{submitted_id}           # NOT FOUND
-    #
-    # /{accession}                   # OK
-    # /UnalignedReads/{accession}    # NOT FOUND
-    # /SubmittedFile/{accession}     # NOT FOUND
-    # /File/{accession}              # OK
+    # Note this slight odd situation WRT object lookups by submitted_id and accession:
+    # -----------------------------+-----------------------------------------------+---------------+
+    # PATH                         | EXAMPLE                                       | LOOKUP RESULT |
+    # -----------------------------+-----------------------------------------------+---------------+
+    # /submitted_id                | //UW_FILE-SET_COLO-829BL_HI-C_1               | NOT FOUND     |
+    # /UnalignedReads/submitted_id | /UnalignedReads/UW_FILE-SET_COLO-829BL_HI-C_1 | FOUND         |
+    # /SubmittedFile/submitted_id  | /SubmittedFile/UW_FILE-SET_COLO-829BL_HI-C_1  | FOUND         |
+    # /File/submitted_id           | /File/UW_FILE-SET_COLO-829BL_HI-C_1           | NOT FOUND     |
+    # -----------------------------+-----------------------------------------------+---------------+
+    # /accession                   | /SMAFSFXF1RO4                                 | FOUND         |
+    # /UnalignedReads/accession    | /UnalignedReads/SMAFSFXF1RO4                  | NOT FOUND     |
+    # /SubmittedFile/accession     | /SubmittedFile/SMAFSFXF1RO4                   | NOT FOUND     |
+    # /File/accession              | /File/SMAFSFXF1RO4                            | FOUND         |
+    # -----------------------------+-----------------------------------------------+---------------+
     #
     def ref_validator(schema: Optional[dict],
                       property_name: Optional[str], property_value: Optional[str]) -> Optional[bool]:
@@ -65,6 +68,6 @@ def ref_lookup_strategy(portal: Portal, type_name: str, schema: dict, value: str
 
 
 # This is here for now because of problems with circular dependencies.
-# See: smaht-portal/.../schema_formats.py
+# See: smaht-portal/.../schema_formats.py/is_accession(instance) ...
 def _is_accession_id(value: str) -> bool:
     return isinstance(value, str) and re.match(r"^SMA[1-9A-Z]{9}$", value) is not None

@@ -50,15 +50,16 @@ class Portal:
     FILE_TYPE_SCHEMA_NAME = "File"
 
     # Object lookup strategies; on a per-reference (type/value) basis, used currently ONLY by
-    # structured_data.py; controlled by an optional ref_lookup_strategy callable; default is
+    # structured_data.py; controlled by an optional lookup_strategy callable; default is
     # lookup at root path but after the specified type path lookup, and then lookup all subtypes;
     # can choose to lookup root path first, or not lookup root path at all, or not lookup
-    # subtypes at all; the ref_lookup_strategy callable if specified should take a type_name
+    # subtypes at all; the lookup_strategy callable if specified should take a type_name
     # and value (string) arguements and return an integer of any of the below ORed together.
     # The main purpose of this is optimization; to minimize portal lookups; since for example,
     # currently at least, /{type}/{accession} does not work but /{accession} does; so we
     # currently (smaht-portal/.../ingestion_processors) use LOOKUP_ROOT_FIRST for this.
     # And current usage NEVER has LOOKUP_SUBTYPES turned OFF; but support just in case.
+    LOOKUP_UNDEFINED = 0
     LOOKUP_SPECIFIED_TYPE = 0x0001
     LOOKUP_ROOT = 0x0002
     LOOKUP_ROOT_FIRST = 0x0004 | LOOKUP_ROOT
@@ -206,23 +207,6 @@ class Portal:
     @property
     def vapp(self) -> Optional[TestApp]:
         return self._vapp
-
-    @staticmethod
-    def is_lookup_specified_type(lookup_options: int) -> bool:
-        return (lookup_options &
-                Portal.LOOKUP_SPECIFIED_TYPE) == Portal.LOOKUP_SPECIFIED_TYPE
-
-    @staticmethod
-    def is_lookup_root(lookup_options: int) -> bool:
-        return (lookup_options & Portal.LOOKUP_ROOT) == Portal.LOOKUP_ROOT
-
-    @staticmethod
-    def is_lookup_root_first(lookup_options: int) -> bool:
-        return (lookup_options & Portal.LOOKUP_ROOT_FIRST) == Portal.LOOKUP_ROOT_FIRST
-
-    @staticmethod
-    def is_lookup_subtypes(lookup_options: int) -> bool:
-        return (lookup_options & Portal.LOOKUP_SUBTYPES) == Portal.LOOKUP_SUBTYPES
 
     def get(self, url: str, follow: bool = True,
             raw: bool = False, database: bool = False, raise_for_status: bool = False, **kwargs) -> OptionalResponse:
@@ -422,48 +406,101 @@ class Portal:
         return schemas_super_type_map.get(type_name, [])
 
     @function_cache(maxsize=100, serialize_key=True)
-    def get_identifying_paths(self, portal_object: dict, portal_type: Optional[str] = None,
-                              ref_lookup_strategy: Optional[Callable] = None) -> List[str]:
+    def get_identifying_paths(self, portal_object: dict, portal_type: Optional[Union[str, dict]] = None,
+                              all: bool = True, lookup_strategy: Optional[Union[Callable, bool]] = None) -> List[str]:
         """
         Returns the list of the identifying Portal (URL) paths for the given Portal object. Favors any uuid
         and identifier based paths and defavors aliases based paths (ala self.get_identifying_property_names);
         no other ordering defined. Returns an empty list if no identifying properties or otherwise not found.
+        Note that this is a newer version of what was in portal_object_utils and just uses the ref_lookup_stratey
+        module directly, as it no longer needs to be exposed (to smaht-portal/ingester and smaht-submitr) and so
+        this is a first step toward internalizing it to structured_data/portal_utils/portal_object_utils usages.
         """
+        def is_lookup_specified_type(lookup_options: int) -> bool:
+            return (lookup_options & Portal.LOOKUP_SPECIFIED_TYPE) == Portal.LOOKUP_SPECIFIED_TYPE
+        def is_lookup_root(lookup_options: int) -> bool:  # noqa
+            return (lookup_options & Portal.LOOKUP_ROOT) == Portal.LOOKUP_ROOT
+        def is_lookup_root_first(lookup_options: int) -> bool:  # noqa
+            return (lookup_options & Portal.LOOKUP_ROOT_FIRST) == Portal.LOOKUP_ROOT_FIRST
+        def is_lookup_subtypes(lookup_options: int) -> bool:  # noqa
+            return (lookup_options & Portal.LOOKUP_SUBTYPES) == Portal.LOOKUP_SUBTYPES
+
         results = []
         if not isinstance(portal_object, dict):
             return results
-        if not isinstance(portal_type, str) or not portal_type:
-            if not (portal_type := self.get_schema_type(portal_object)):
-                return results
+        if not (isinstance(portal_type, str) and portal_type):
+            if isinstance(portal_type, dict):
+                # It appears that the given portal_type is an actual schema dictionary.
+                portal_type = self.schema_name(portal_type.get("title"))
+            if not (isinstance(portal_type, str) and portal_type):
+                if not (portal_type := self.get_schema_type(portal_object)):
+                    return results
+        if not callable(lookup_strategy):
+            lookup_strategy = None if lookup_strategy is False else Portal._lookup_strategy
         for identifying_property in self.get_identifying_property_names(portal_type):
-            if identifying_value := portal_object.get(identifying_property):
-                if isinstance(identifying_value, list):
-                    for identifying_value_item in identifying_value:
-                        results.append(f"/{portal_type}/{identifying_value_item}")
-                elif identifying_property == "uuid":
-                    #
-                    # Note this idiosyncrasy with Portal paths: the only way we do NOT get a (HTTP 301) redirect
-                    # is if we use the lower-case-dashed-plural based version of the path, e.g. all of these:
-                    #
-                    # - /d13d06c1-218e-4f61-aaf0-91f226248b3c
-                    # - /d13d06c1-218e-4f61-aaf0-91f226248b3c/
-                    # - /FileFormat/d13d06c1-218e-4f61-aaf0-91f226248b3c
-                    # - /FileFormat/d13d06c1-218e-4f61-aaf0-91f226248b3c/
-                    # - /files-formats/d13d06c1-218e-4f61-aaf0-91f226248b3c
-                    #
-                    # Will result in a (HTTP 301) redirect to:
-                    #
-                    # - /files-formats/d13d06c1-218e-4f61-aaf0-91f226248b3c/
-                    #
-                    # Unfortunately, this code here has no reasonable way of getting that lower-case-dashed-plural
-                    # based name (e.g. file-formats) from the schema/portal type name (e.g. FileFormat); as the
-                    # information is contained, for this example, in the snovault.collection decorator for the
-                    # endpoint definition in smaht-portal/.../types/file_format.py. Unfortunately merely because
-                    # behind-the-scenes an extra round-trip HTTP request will occurm but happens automatically.
-                    #
-                    results.append(f"/{identifying_value}")
-                else:
+            if not (identifying_value := portal_object.get(identifying_property)):
+                continue
+            # The get_identifying_property_names call above ensures uuid is first if it is in the object.
+            # And also note that ALL schemas do in fact have identifyingProperties which do in fact have
+            # uuid, except for a couple "Test" ones, and (for some reason) SubmittedItem; otherwise we
+            # might have a special case to check the Portal object explicitly for uuid, but no need.
+            if identifying_property == "uuid":
+                #
+                # Note this idiosyncrasy with Portal paths: the only way we do NOT get a (HTTP 301) redirect
+                # is if we use the lower-case-dashed-plural based version of the path, e.g. all of these:
+                #
+                # - /d13d06c1-218e-4f61-aaf0-91f226248b3c
+                # - /d13d06c1-218e-4f61-aaf0-91f226248b3c/
+                # - /FileFormat/d13d06c1-218e-4f61-aaf0-91f226248b3c
+                # - /FileFormat/d13d06c1-218e-4f61-aaf0-91f226248b3c/
+                # - /files-formats/d13d06c1-218e-4f61-aaf0-91f226248b3c
+                #
+                # Will result in a (HTTP 301) redirect to:
+                #
+                # - /files-formats/d13d06c1-218e-4f61-aaf0-91f226248b3c/
+                #
+                # Unfortunately, this code here has no reasonable way of getting that lower-case-dashed-plural
+                # based name (e.g. file-formats) from the schema/portal type name (e.g. FileFormat); as the
+                # information is contained, for this example, in the snovault.collection decorator for the
+                # endpoint definition in smaht-portal/.../types/file_format.py. Unfortunately merely because
+                # behind-the-scenes an extra round-trip HTTP request will occur, but happens automatically.
+                # And note the disction of just using /{uuid} here rather than /{type}/{uuid} as in the else
+                # statement below is not really necessary; just here for emphasis that this is all that's needed.
+                #
+                if all is True:
                     results.append(f"/{portal_type}/{identifying_value}")
+                results.append(f"/{identifying_value}")
+            elif isinstance(identifying_value, list):
+                for identifying_value_item in identifying_value:
+                    if identifying_value_item:
+                        results.append(f"/{portal_type}/{identifying_value_item}")
+                        if all is True:
+                            results.append(f"/{identifying_value_item}")
+            else:
+                lookup_options = Portal.LOOKUP_UNDEFINED
+                if schema := self.get_schema(portal_type):
+                    if callable(lookup_strategy):
+                        lookup_options, validator = lookup_strategy(self._portal, self.type, schema, identifying_value)
+                        if callable(validator):
+                            if validator(schema, identifying_property, identifying_value) is False:
+                                continue
+                    if pattern := schema.get("properties", {}).get(identifying_property, {}).get("pattern"):
+                        if not re.match(pattern, identifying_value):
+                            # If this identifying value is for a (identifying) property which has a
+                            # pattern, and the value does NOT match the pattern, then do NOT include
+                            # this value as an identifying path, since it cannot possibly be found.
+                            continue
+                if lookup_options == Portal.LOOKUP_UNDEFINED:
+                    lookup_options = Portal.LOOKUP_DEFAULT
+                if is_lookup_root_first(lookup_options):
+                    results.append(f"/{identifying_value}")
+                if is_lookup_specified_type(lookup_options) and self.type:
+                    results.append(f"/{self.type}/{identifying_value}")
+                if is_lookup_root(lookup_options) and not is_lookup_root_first(lookup_options):
+                    results.append(f"/{identifying_value}")
+                if is_lookup_subtypes(lookup_options):
+                    for subtype_name in self._portal.get_schema_subtype_names(self.type):
+                        results.append(f"/{subtype_name}/{identifying_value}")
         return results
 
     @function_cache(maxsize=100, serialize_key=True)
@@ -501,6 +538,71 @@ class Portal:
                 if portal_object.get(identifying_property) is None:
                     identifying_properties.remove(identifying_property)
         return identifying_properties
+
+    @staticmethod
+    def _lookup_strategy(portal: Portal, type_name: str, schema: dict, value: str) -> (int, Optional[str]):
+        #
+        # Note this slight odd situation WRT object lookups by submitted_id and accession:
+        # -----------------------------+-----------------------------------------------+---------------+
+        # PATH                         | EXAMPLE                                       | LOOKUP RESULT |
+        # -----------------------------+-----------------------------------------------+---------------+
+        # /submitted_id                | //UW_FILE-SET_COLO-829BL_HI-C_1               | NOT FOUND     |
+        # /UnalignedReads/submitted_id | /UnalignedReads/UW_FILE-SET_COLO-829BL_HI-C_1 | FOUND         |
+        # /SubmittedFile/submitted_id  | /SubmittedFile/UW_FILE-SET_COLO-829BL_HI-C_1  | FOUND         |
+        # /File/submitted_id           | /File/UW_FILE-SET_COLO-829BL_HI-C_1           | NOT FOUND     |
+        # -----------------------------+-----------------------------------------------+---------------+
+        # /accession                   | /SMAFSFXF1RO4                                 | FOUND         |
+        # /UnalignedReads/accession    | /UnalignedReads/SMAFSFXF1RO4                  | NOT FOUND     |
+        # /SubmittedFile/accession     | /SubmittedFile/SMAFSFXF1RO4                   | NOT FOUND     |
+        # /File/accession              | /File/SMAFSFXF1RO4                            | FOUND         |
+        # -----------------------------+-----------------------------------------------+---------------+
+        #
+        def ref_validator(schema: Optional[dict],
+                          property_name: Optional[str], property_value: Optional[str]) -> Optional[bool]:
+            """
+            Returns False iff objects of type represented by the given schema, CANNOT be referenced with
+            a Portal path using the given property name and its given property value, otherwise returns None.
+
+            For example, if the schema is for UnalignedReads and the property name is accession, then we will
+            return False iff the given property value is NOT a properly formatted accession ID; otherwise, we
+            will return None, which indicates that the caller (e.g. dcicutils.structured_data.Portal.ref_exists)
+            will continue executing its default behavior, which is to check other ways in which the given type
+            CANNOT be referenced by the given value, i.e. it checks other identifying properties for the type
+            and makes sure any patterns (e.g. for submitted_id or uuid) are ahered to.
+
+            The goal (in structured_data) being to detect if a type is being referenced in such a way that
+            CANNOT possibly be allowed, i.e. because none of its identifying types are in the required form,
+            if indeed there any requirements. It is assumed/guaranteed the given property name is indeed an
+            identifying property for the given type.
+            """
+            if property_format := schema.get("properties", {}).get(property_name, {}).get("format"):
+                if (property_format == "accession") and (property_name == "accession"):
+                    if not Portal._is_accession_id(property_value):
+                        return False
+            return None
+
+        DEFAULT_RESULT = (Portal.LOOKUP_DEFAULT, ref_validator)
+        if not value:
+            return DEFAULT_RESULT
+        if not schema:
+            if not isinstance(portal, Portal) or not (schema := portal.get_schema(type_name)):
+                return DEFAULT_RESULT
+        if schema_properties := schema.get("properties"):
+            if schema_properties.get("accession") and Portal._is_accession_id(value):
+                # Case: lookup by accession (only by root).
+                return (Portal.LOOKUP_ROOT, ref_validator)
+            elif schema_property_info_submitted_id := schema_properties.get("submitted_id"):
+                if schema_property_pattern_submitted_id := schema_property_info_submitted_id.get("pattern"):
+                    if re.match(schema_property_pattern_submitted_id, value):
+                        # Case: lookup by submitted_id (only by specified type).
+                        return (Portal.LOOKUP_SPECIFIED_TYPE, ref_validator)
+        return DEFAULT_RESULT
+
+    @staticmethod
+    def _is_accession_id(value: str) -> bool:
+        # This is here for now because of problems with circular dependencies.
+        # See: smaht-portal/.../schema_formats.py/is_accession(instance) ...
+        return isinstance(value, str) and re.match(r"^SMA[1-9A-Z]{9}$", value) is not None
 
     def url(self, url: str, raw: bool = False, database: bool = False) -> str:
         if not isinstance(url, str) or not url:

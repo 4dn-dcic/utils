@@ -57,7 +57,9 @@ class PortalObject:
         Returns the list of all identifying property names of this Portal object which actually have values.
         Implicitly include "uuid" and "identifier" properties as identifying properties if they are actually
         properties in the object schema, and favor these (first); defavor "aliases"; no other ordering defined.
+        Changed (2024-05-26) to use portal_utils.get_identifying_property_names; migrating some intricate stuff there.
         """
+        # Migrating to and unifying this in portal_utils.Portal.get_identifying_paths (2024-05-26).
         return self._portal.get_identifying_property_names(self.type, portal_object=self._data) if self._portal else []
 
     @lru_cache(maxsize=8192)
@@ -144,65 +146,16 @@ class PortalObject:
         return diffs
 
     @lru_cache(maxsize=1)
-    def _get_identifying_paths(self, ref_lookup_strategy: Optional[Callable] = None) -> Optional[List[str]]:
-        """
-        Returns a list of the possible Portal URL paths identifying this Portal object.
-        """
-        identifying_paths = []
-        if not (identifying_properties := self.identifying_properties):
-            if self.uuid:
-                if self.type:
-                    identifying_paths.append(f"/{self.type}/{self.uuid}")
-                identifying_paths.append(f"/{self.uuid}")
-            return identifying_paths
-        for identifying_property in identifying_properties:
-            if identifying_value := self._data.get(identifying_property):
-                if identifying_property == "uuid":
-                    if self.type:
-                        identifying_paths.append(f"/{self.type}/{identifying_value}")
-                    identifying_paths.append(f"/{identifying_value}")
-                # For now at least we include the path both with and without the schema type component,
-                # as for some identifying values, it works (only) with, and some, it works (only) without.
-                # For example: If we have FileSet with "accession", an identifying property, with value
-                # SMAFSFXF1RO4 then /SMAFSFXF1RO4 works but /FileSet/SMAFSFXF1RO4 does not; and
-                # conversely using "submitted_id", also an identifying property, with value
-                # UW_FILE-SET_COLO-829BL_HI-C_1 then /UW_FILE-SET_COLO-829BL_HI-C_1 does
-                # not work but /FileSet/UW_FILE-SET_COLO-829BL_HI-C_1 does work.
-                elif isinstance(identifying_value, list):
-                    for identifying_value_item in identifying_value:
-                        if self.type:
-                            identifying_paths.append(f"/{self.type}/{identifying_value_item}")
-                        identifying_paths.append(f"/{identifying_value_item}")
-                else:
-                    # TODO: Import from somewhere ...
-                    lookup_options = 0
-                    if schema := self.schema:
-                        # TODO: Hook into the ref_lookup_strategy thing in structured_data to make
-                        # sure we check accession format (since it does not have a pattern).
-                        if callable(ref_lookup_strategy):
-                            lookup_options, ref_validator = ref_lookup_strategy(
-                                self._portal, self.type, schema, identifying_value)
-                            if callable(ref_validator):
-                                if ref_validator(schema, identifying_property, identifying_value) is False:
-                                    continue
-                        if pattern := schema.get("properties", {}).get(identifying_property, {}).get("pattern"):
-                            if not re.match(pattern, identifying_value):
-                                # If this identifying value is for a (identifying) property which has a
-                                # pattern, and the value does NOT match the pattern, then do NOT include
-                                # this value as an identifying path, since it cannot possibly be found.
-                                continue
-                    if not lookup_options:
-                        lookup_options = Portal.LOOKUP_DEFAULT
-                    if Portal.is_lookup_root_first(lookup_options):
-                        identifying_paths.append(f"/{identifying_value}")
-                    if Portal.is_lookup_specified_type(lookup_options) and self.type:
-                        identifying_paths.append(f"/{self.type}/{identifying_value}")
-                    if Portal.is_lookup_root(lookup_options) and not Portal.is_lookup_root_first(lookup_options):
-                        identifying_paths.append(f"/{identifying_value}")
-                    if Portal.is_lookup_subtypes(lookup_options):
-                        for subtype_name in self._portal.get_schema_subtype_names(self.type):
-                            identifying_paths.append(f"/{subtype_name}/{identifying_value}")
-        return identifying_paths or None
+    def _get_identifying_paths(self, all: bool = True,
+                               ref_lookup_strategy: Optional[Callable] = None) -> Optional[List[str]]:
+        if not self._portal and (uuid := self.uuid):
+            if all is True and (type := self.type):
+                return [f"/{type}/{uuid}", f"/{uuid}"]
+            return [f"/{uuid}"]
+        # Migrating to and unifying this in portal_utils.Portal.get_identifying_paths (2024-05-26).
+        return self._portal.get_identifying_paths(self._data,
+                                                  portal_type=self.schema, all=all,
+                                                  lookup_strategy=ref_lookup_strategy) if self._portal else None
 
     def _normalized_refs(self, refs: List[dict]) -> Tuple[PortalObject, int]:
         """
