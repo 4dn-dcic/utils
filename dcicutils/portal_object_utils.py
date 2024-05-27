@@ -1,6 +1,5 @@
 from copy import deepcopy
 from functools import lru_cache
-import re
 from typing import Any, Callable, List, Optional, Tuple, Type, Union
 from dcicutils.data_readers import RowReader
 from dcicutils.misc_utils import create_readonly_object
