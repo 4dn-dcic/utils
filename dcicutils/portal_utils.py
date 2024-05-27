@@ -407,7 +407,7 @@ class Portal:
 
     @function_cache(maxsize=100, serialize_key=True)
     def get_identifying_paths(self, portal_object: dict, portal_type: Optional[Union[str, dict]] = None,
-                              all: bool = True, lookup_strategy: Optional[Union[Callable, bool]] = None) -> List[str]:
+                              lookup_strategy: Optional[Union[Callable, bool]] = None) -> List[str]:
         """
         Returns the list of the identifying Portal (URL) paths for the given Portal object. Favors any uuid
         and identifier based paths and defavors aliases based paths (ala self.get_identifying_property_names);
@@ -467,15 +467,11 @@ class Portal:
                 # And note the disction of just using /{uuid} here rather than /{type}/{uuid} as in the else
                 # statement below is not really necessary; just here for emphasis that this is all that's needed.
                 #
-                if all is True:
-                    results.append(f"/{portal_type}/{identifying_value}")
                 results.append(f"/{identifying_value}")
             elif isinstance(identifying_value, list):
                 for identifying_value_item in identifying_value:
                     if identifying_value_item:
                         results.append(f"/{portal_type}/{identifying_value_item}")
-                        if all is True:
-                            results.append(f"/{identifying_value_item}")
             else:
                 lookup_options = Portal.LOOKUP_UNDEFINED
                 if schema := self.get_schema(portal_type):
@@ -542,7 +538,7 @@ class Portal:
     @staticmethod
     def _lookup_strategy(portal: Portal, type_name: str, schema: dict, value: str) -> (int, Optional[str]):
         #
-        # Note this slight odd situation WRT object lookups by submitted_id and accession:
+        # Note this slightly odd situation WRT object lookups by submitted_id and accession:
         # -----------------------------+-----------------------------------------------+---------------+
         # PATH                         | EXAMPLE                                       | LOOKUP RESULT |
         # -----------------------------+-----------------------------------------------+---------------+

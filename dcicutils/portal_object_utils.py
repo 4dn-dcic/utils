@@ -145,15 +145,12 @@ class PortalObject:
         return diffs
 
     @lru_cache(maxsize=1)
-    def _get_identifying_paths(self, all: bool = True,
-                               ref_lookup_strategy: Optional[Callable] = None) -> Optional[List[str]]:
+    def _get_identifying_paths(self, ref_lookup_strategy: Optional[Callable] = None) -> Optional[List[str]]:
         if not self._portal and (uuid := self.uuid):
-            if all is True and (type := self.type):
-                return [f"/{type}/{uuid}", f"/{uuid}"]
             return [f"/{uuid}"]
         # Migrating to and unifying this in portal_utils.Portal.get_identifying_paths (2024-05-26).
         return self._portal.get_identifying_paths(self._data,
-                                                  portal_type=self.schema, all=all,
+                                                  portal_type=self.schema,
                                                   lookup_strategy=ref_lookup_strategy) if self._portal else None
 
     def _normalized_refs(self, refs: List[dict]) -> Tuple[PortalObject, int]:
