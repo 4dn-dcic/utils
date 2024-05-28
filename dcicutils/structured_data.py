@@ -53,6 +53,7 @@ class StructuredDataSet:
     def __init__(self, file: Optional[str] = None, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
                  schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
                  order: Optional[List[str]] = None, prune: bool = True,
+                 remove_empty_objects_from_lists: bool = True,
                  ref_lookup_strategy: Optional[Callable] = None,
                  ref_lookup_nocache: bool = False,
                  norefs: bool = False,
@@ -65,7 +66,8 @@ class StructuredDataSet:
                               ref_lookup_nocache=ref_lookup_nocache) if portal else None
         self._ref_lookup_strategy = ref_lookup_strategy
         self._order = order
-        self._prune = prune
+        self._prune = prune is True
+        self._remove_empty_objects_from_lists = remove_empty_objects_from_lists is True
         self._warnings = {}
         self._errors = {}
         self._resolved_refs = set()
@@ -93,12 +95,14 @@ class StructuredDataSet:
     def load(file: str, portal: Optional[Union[VirtualApp, TestApp, Portal]] = None,
              schemas: Optional[List[dict]] = None, autoadd: Optional[dict] = None,
              order: Optional[List[str]] = None, prune: bool = True,
+             remove_empty_objects_from_lists: bool = True,
              ref_lookup_strategy: Optional[Callable] = None,
              ref_lookup_nocache: bool = False,
              norefs: bool = False,
              progress: Optional[Callable] = None,
              debug_sleep: Optional[str] = None) -> StructuredDataSet:
         return StructuredDataSet(file=file, portal=portal, schemas=schemas, autoadd=autoadd, order=order, prune=prune,
+                                 remove_empty_objects_from_lists=remove_empty_objects_from_lists,
                                  ref_lookup_strategy=ref_lookup_strategy, ref_lookup_nocache=ref_lookup_nocache,
                                  norefs=norefs, progress=progress, debug_sleep=debug_sleep)
 
@@ -346,7 +350,18 @@ class StructuredDataSet:
 
     def _load_json_file(self, file: str) -> None:
         with open(file) as f:
-            self._add(Schema.type_name(file), json.load(f))
+            file_json = json.load(f)
+            schema_inferred_from_file_name = Schema.type_name(file)
+            if self._portal.get_schema(schema_inferred_from_file_name) is not None:
+                # If the JSON file name looks like a schema name then assume it
+                # contains an object or an array of object of that schema type.
+                self._add(Schema.type_name(file), file_json)
+            elif isinstance(file_json, dict):
+                # Otherwise if the JSON file name does not look like a schema name then
+                # assume it a dictionary where each property is the name of a schema, and
+                # which (each property) contains a list of object of that schema type.
+                for schema_name in file_json:
+                    self._add(schema_name, file_json[schema_name])
 
     def _load_reader(self, reader: RowReader, type_name: str) -> None:
         schema = None
@@ -368,7 +383,11 @@ class StructuredDataSet:
                 structured_row_template.set_value(structured_row, column_name, value, reader.file, reader.row_number)
                 if self._autoadd_properties:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
-            self._add(type_name, structured_row)
+            if (prune_error := self._prune_structured_row(structured_row)) is not None:
+                self._note_error({"src": create_dict(type=schema_name, row=reader.row_number),
+                                  "error": prune_error}, "validation")
+            else:
+                self._add(type_name, structured_row)
             if self._progress:
                 self._progress({
                     PROGRESS.LOAD_ITEM: self._nrows,
@@ -385,9 +404,20 @@ class StructuredDataSet:
             self._note_error(schema._unresolved_refs, "ref")
             self._resolved_refs.update(schema._resolved_refs)
 
-    def _add(self, type_name: str, data: Union[dict, List[dict]]) -> None:
-        if self._prune:
+    def _prune_structured_row(self, data: dict) -> Optional[str]:
+        if not self._prune:
+            return None
+        if not self._remove_empty_objects_from_lists:
             remove_empty_properties(data)
+            return None
+        try:
+            remove_empty_properties(data, isempty_array_element=lambda element: element == {},
+                                    raise_exception_on_nonempty_array_element_after_empty=True)
+        except Exception as e:
+            return str(e)
+        return None
+
+    def _add(self, type_name: str, data: Union[dict, List[dict]]) -> None:
         if type_name in self._data:
             self._data[type_name].extend([data] if isinstance(data, dict) else data)
         else:

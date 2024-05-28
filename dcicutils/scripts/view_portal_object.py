@@ -57,6 +57,7 @@
 
 import argparse
 from functools import lru_cache
+import io
 import json
 import pyperclip
 import os
@@ -97,11 +98,18 @@ def main():
                         help="Include all properties for schema usage.")
     parser.add_argument("--raw", action="store_true", required=False, default=False, help="Raw output.")
     parser.add_argument("--tree", action="store_true", required=False, default=False, help="Tree output for schemas.")
+    parser.add_argument("--post", type=str, required=False, default=None,
+                        help="POST data of the main arg type with data from file specified with this option.")
+    parser.add_argument("--patch", type=str, required=False, default=None,
+                        help="PATCH data of the main arg type with data from file specified with this option.")
     parser.add_argument("--database", action="store_true", required=False, default=False,
                         help="Read from database output.")
+    parser.add_argument("--bool", action="store_true", required=False,
+                        default=False, help="Only return whether found or not.")
     parser.add_argument("--yaml", action="store_true", required=False, default=False, help="YAML output.")
     parser.add_argument("--copy", "-c", action="store_true", required=False, default=False,
                         help="Copy object data to clipboard.")
+    parser.add_argument("--indent", required=False, default=False, help="Indent output.", type=int)
     parser.add_argument("--details", action="store_true", required=False, default=False, help="Detailed output.")
     parser.add_argument("--more-details", action="store_true", required=False, default=False,
                         help="More detailed output.")
@@ -151,6 +159,18 @@ def main():
         args.schema = True
 
     if args.schema:
+        if args.post:
+            if post_data := _read_json_from_file(args.post):
+                if args.verbose:
+                    _print(f"POSTing data from file ({args.post}) as type: {args.uuid}")
+                if isinstance(post_data, dict):
+                    post_data = [post_data]
+                elif not isinstance(post_data, list):
+                    _print(f"POST data neither list nor dictionary: {args.post}")
+                for item in post_data:
+                    portal.post_metadata(args.uuid, item)
+                if args.verbose:
+                    _print(f"Done POSTing data from file ({args.post}) as type: {args.uuid}")
         schema, schema_name = _get_schema(portal, args.uuid)
         if schema:
             if args.copy:
@@ -166,14 +186,50 @@ def main():
             _print_schema(schema, details=args.details, more_details=args.details,
                           all=args.all, raw=args.raw, raw_yaml=args.yaml)
             return
+    elif args.patch:
+        if patch_data := _read_json_from_file(args.patch):
+            if args.verbose:
+                _print(f"PATCHing data from file ({args.patch}) for object: {args.uuid}")
+            if isinstance(patch_data, dict):
+                patch_data = [patch_data]
+            elif not isinstance(patch_data, list):
+                _print(f"PATCH data neither list nor dictionary: {args.patch}")
+            for item in patch_data:
+                portal.patch_metadata(args.uuid, item)
+            if args.verbose:
+                _print(f"Done PATCHing data from file ({args.patch}) as type: {args.uuid}")
+            return
+        else:
+            _print(f"No PATCH data found in file: {args.patch}")
+            exit(1)
 
-    data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw, database=args.database, verbose=args.verbose)
+    data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw,
+                              database=args.database, check=args.bool, verbose=args.verbose)
+    if args.bool:
+        if data:
+            _print(f"{args.uuid}: found")
+            exit(0)
+        else:
+            _print(f"{args.uuid}: not found")
+            exit(1)
     if args.copy:
         pyperclip.copy(json.dumps(data, indent=4))
     if args.yaml:
         _print(yaml.dump(data))
     else:
-        _print(json.dumps(data, default=str, indent=4))
+        if args.indent > 0:
+            _print(_format_json_with_indent(data, indent=args.indent))
+        else:
+            _print(json.dumps(data, default=str, indent=4))
+
+
+def _format_json_with_indent(value: dict, indent: int = 0) -> Optional[str]:
+    if isinstance(value, dict):
+        result = json.dumps(value, indent=4)
+        if indent > 0:
+            result = f"{indent * ' '}{result}"
+            result = result.replace("\n", f"\n{indent * ' '}")
+        return result
 
 
 def _create_portal(ini: str, env: Optional[str] = None,
@@ -198,7 +254,8 @@ def _create_portal(ini: str, env: Optional[str] = None,
 
 
 def _get_portal_object(portal: Portal, uuid: str,
-                       raw: bool = False, database: bool = False, verbose: bool = False) -> dict:
+                       raw: bool = False, database: bool = False,
+                       check: bool = False, verbose: bool = False) -> dict:
     response = None
     try:
         if not uuid.startswith("/"):
@@ -212,13 +269,18 @@ def _get_portal_object(portal: Portal, uuid: str,
             _exit()
         _exit(f"Exception getting Portal object from {portal.server}: {uuid}\n{get_error_message(e)}")
     if not response:
+        if check:
+            return None
         _exit(f"Null response getting Portal object from {portal.server}: {uuid}")
     if response.status_code not in [200, 307]:
         # TODO: Understand why the /me endpoint returns HTTP status code 307, which is only why we mention it above.
         _exit(f"Invalid status code ({response.status_code}) getting Portal object from {portal.server}: {uuid}")
     if not response.json:
         _exit(f"Invalid JSON getting Portal object: {uuid}")
-    return response.json()
+    response = response.json()
+    if raw:
+        response.pop("schema_version", None)
+    return response
 
 
 @lru_cache(maxsize=1)
@@ -257,6 +319,7 @@ def _print_schema_info(schema: dict, level: int = 0,
                        required: Optional[List[str]] = None) -> None:
     if not schema or not isinstance(schema, dict):
         return
+    identifying_properties = schema.get("identifyingProperties")
     if level == 0:
         if required_properties := schema.get("required"):
             _print("- required properties:")
@@ -383,6 +446,8 @@ def _print_schema_info(schema: dict, level: int = 0,
                         suffix += f" | enum"
                     if property_required:
                         suffix += f" | required"
+                    if property_name in (identifying_properties or []):
+                        suffix += f" | identifying"
                     if property.get("uniqueKey"):
                         suffix += f" | unique"
                     if pattern := property.get("pattern"):
@@ -527,6 +592,23 @@ def _print_tree(root_name: Optional[str],
     print(first + ((name_of(root_name) if callable(name_of) else root_name) or "root"))
     for line in tree_generator(root_name, prefix="   "):
         print(line)
+
+
+def _read_json_from_file(file: str) -> Optional[dict]:
+    if not os.path.exists(file):
+        _print(f"Cannot find file: {file}")
+        exit(1)
+    try:
+        with io.open(file, "r") as f:
+            try:
+                return json.load(f)
+            except Exception:
+                _print(f"Cannot parse JSON in file: {file}")
+                exit(1)
+    except Exception as e:
+        print(e)
+        _print(f"Cannot open file: {file}")
+        exit(1)
 
 
 def _print(*args, **kwargs):

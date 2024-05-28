@@ -225,6 +225,13 @@ glacier_utils
    :members:
 
 
+http_utils
+^^^^^^^^^^^
+
+.. automodule:: dcicutils.http_utils
+  :members:
+
+
 lang_utils
 ^^^^^^^^^^
 

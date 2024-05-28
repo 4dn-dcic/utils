@@ -9,7 +9,37 @@ Change Log
 
 8.9.0
 =====
+
 * Add more schema parsing functions to `schema_utils`.
+
+
+8.8.6
+=====
+
+* Added check for ES_HOST_LOCAL environment variable in ff_utils.get_es_metadata;
+  for running Foursight checks locally (with local ssh tunnel to ES proxy);
+  came up in foursight/checks/audit_checks (2024-04-23).
+* Allow Python 3.12 (pyproject.toml).
+* Added remove_empty_objects_from_lists options to structured_data.StructuredDataSet, defaulting
+  to True, which deletes empty objects from lists; however, only from the *end* of a list; if
+  this flag is True and there are non-empty objects following empty objects then we flag an error.
+* Few general things initially related to and factored out of rclone support in smaht-submitr:
+  - Added extract_file_from_zip to zip_utils.
+  - Added http_utils with download function.
+  - Added get_app_specific_directory, get_os_name, get_cpu_architecture_name, short_uuid to misc_utils.
+  - Added are_files_equal, create_random_file to file_utils,  compute_file_md5, compute_file_etag,
+    normalize_path, get_file_size, get_file_modified_datetime to file_utils.
+  - Minor extra sanity check to search_for_file in file_utils.
+  - Added deterministic ordering to paths returned by search_for_file in file_utils.
+  - Added create_temporary_file_name and remove_temporary_file tmpfile_utils.
+  - Minor fix to misc_utils.create_dict (do not create property only if its value is None).
+  - Minor updates to utility dcicutils.scripts.view_portal_object.
+
+
+8.8.5
+=====
+
+* Fix bug in `creds_utils` to register portal key managers instead of parent class
 
 
 8.8.4
