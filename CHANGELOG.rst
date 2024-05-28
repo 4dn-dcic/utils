@@ -7,6 +7,12 @@ Change Log
 ----------
 
 
+8.9.0
+=====
+
+* Add more schema parsing functions to `schema_utils`.
+
+
 8.8.6
 =====
 

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "8.8.6"
+version = "8.9.0"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"

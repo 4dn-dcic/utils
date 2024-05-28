@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import pytest
 from dcicutils import schema_utils
@@ -41,7 +41,16 @@ SCHEMA = {
 }
 FORMAT = "email"
 PATTERN = "some_regex"
-STRING_SCHEMA = {"type": "string", "format": FORMAT, "pattern": PATTERN}
+ENUM = ["foo", "bar"]
+DESCRIPTION = "foo"
+STRING_SCHEMA = {
+    "type": "string",
+    "format": FORMAT,
+    "pattern": PATTERN,
+    "linkTo": "foo",
+    "enum": ENUM,
+    "description": DESCRIPTION,
+}
 ARRAY_SCHEMA = {"type": "array", "items": [STRING_SCHEMA]}
 OBJECT_SCHEMA = {"type": "object", "properties": {"foo": STRING_SCHEMA}}
 NUMBER_SCHEMA = {"type": "number"}
@@ -320,3 +329,37 @@ def test_get_conditional_formats(
     schema: Dict[str, Any], expected: Dict[str, Any]
 ) -> None:
     assert schema_utils.get_conditional_formats(schema) == expected
+
+
+@pytest.mark.parametrize(
+    "schema,expected",
+    [
+        ({}, False),
+        (STRING_SCHEMA, True),
+        (FORMAT_SCHEMA, False),
+    ],
+)
+def test_is_link(schema: Dict[str, Any], expected: bool) -> None:
+    assert schema_utils.is_link(schema) == expected
+
+
+@pytest.mark.parametrize(
+    "schema,expected",
+    [
+        ({}, []),
+        (STRING_SCHEMA, ENUM),
+    ],
+)
+def test_get_enum(schema: Dict[str, Any], expected: List[str]) -> None:
+    assert schema_utils.get_enum(schema) == expected
+
+
+@pytest.mark.parametrize(
+    "schema,expected",
+    [
+        ({}, ""),
+        (STRING_SCHEMA, DESCRIPTION),
+    ],
+)
+def test_get_description(schema: Dict[str, Any], expected: str) -> None:
+    assert schema_utils.get_description(schema) == expected
