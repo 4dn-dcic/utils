@@ -407,6 +407,7 @@ class Portal:
 
     @function_cache(maxsize=100, serialize_key=True)
     def get_identifying_paths(self, portal_object: dict, portal_type: Optional[Union[str, dict]] = None,
+                              first_only: bool = False,
                               lookup_strategy: Optional[Union[Callable, bool]] = None) -> List[str]:
         """
         Returns the list of the identifying Portal (URL) paths for the given Portal object. Favors any uuid
@@ -467,7 +468,10 @@ class Portal:
                 # And note the disction of just using /{uuid} here rather than /{type}/{uuid} as in the else
                 # statement below is not really necessary; just here for emphasis that this is all that's needed.
                 #
-                results.append(f"/{identifying_value}")
+                if first_only is True:
+                    results.append(f"/{portal_type}/{identifying_value}")
+                else:
+                    results.append(f"/{identifying_value}")
             elif isinstance(identifying_value, list):
                 for identifying_value_item in identifying_value:
                     if identifying_value_item:
@@ -497,12 +501,15 @@ class Portal:
                 if is_lookup_subtypes(lookup_options):
                     for subtype_name in self.get_schema_subtype_names(portal_type):
                         results.append(f"/{subtype_name}/{identifying_value}")
+            if (first_only is True) and results:
+                return results
         return results
 
     @function_cache(maxsize=100, serialize_key=True)
     def get_identifying_path(self, portal_object: dict, portal_type: Optional[Union[str, dict]] = None,
                              lookup_strategy: Optional[Union[Callable, bool]] = None) -> Optional[str]:
-        if identifying_paths := self.get_identifying_paths(portal_object, portal_type, lookup_strategy):
+        if identifying_paths := self.get_identifying_paths(portal_object, portal_type, first_only=True,
+                                                           lookup_strategy=lookup_strategy):
             return identifying_paths[0]
         return None
 
