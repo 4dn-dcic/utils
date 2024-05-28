@@ -502,7 +502,7 @@ class Portal:
     @function_cache(maxsize=100, serialize_key=True)
     def get_identifying_path(self, portal_object: dict, portal_type: Optional[Union[str, dict]] = None,
                              lookup_strategy: Optional[Union[Callable, bool]] = None) -> Optional[str]:
-        if identifying_paths := self.get_identifying_path(portal_object, portal_type, lookup_strategy):
+        if identifying_paths := self.get_identifying_paths(portal_object, portal_type, lookup_strategy):
             return identifying_paths[0]
         return None
 
