@@ -11,7 +11,6 @@ from webtest.app import TestApp
 from dcicutils.common import OrchestratedApp
 from dcicutils.data_readers import CsvReader, Excel, RowReader
 from dcicutils.datetime_utils import normalize_date_string, normalize_datetime_string
-from dcicutils.file_utils import search_for_file
 from dcicutils.misc_utils import (create_dict, create_readonly_object, is_uuid, load_json_if,
                                   merge_objects, remove_empty_properties, right_trim, split_string,
                                   to_boolean, to_enum, to_float, to_integer, VirtualApp)
@@ -208,14 +207,6 @@ class StructuredDataSet:
                         if (file_name := item.get(FILE_TYPE_PROPERTY_NAME)):
                             result.append({"type": type_name, "file": file_name})
         return result
-
-    def upload_files_located(self,
-                             location: Union[str, Optional[List[str]]] = None, recursive: bool = False) -> List[str]:
-        upload_files = copy.deepcopy(self.upload_files)
-        for upload_file in upload_files:
-            if file_path := search_for_file(upload_file["file"], location, recursive=recursive, single=True):
-                upload_file["path"] = file_path
-        return upload_files
 
     @property
     def nrows(self) -> int:
