@@ -1,5 +1,6 @@
 import os
 from typing import Any, Dict, List, Optional, Tuple
+
 from dcicutils.misc_utils import to_camel_case
 
 
@@ -29,6 +30,7 @@ class EncodedSchemaConstants:
     LINK_TO = "linkTo"
     MERGE_REF = "$merge"
     MIXIN_PROPERTIES = "mixinProperties"
+    SUBMITTER_REQUIRED = "submitterRequired"
     UNIQUE_KEY = "uniqueKey"
 
 
@@ -201,6 +203,17 @@ def get_enum(property_schema: Dict[str, Any]) -> List[str]:
 def get_description(schema: Dict[str, Any]) -> str:
     """Return the description of a schema."""
     return schema.get(SchemaConstants.DESCRIPTION, "")
+
+
+def is_submitter_required(schema: Dict[str, Any]) -> bool:
+    """Return True if the schema is marked as required for submitters.
+
+    This is a custom property that can be manually added to a property
+    to designate explicitly it as required for external submitters.
+    This is typically validated within the context of a oneOf, anyOf,
+    or allOf schema, which is tricky to pick up on automatically.
+    """
+    return schema.get(SchemaConstants.SUBMITTER_REQUIRED, False)
 
 
 class Schema:

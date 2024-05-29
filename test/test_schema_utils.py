@@ -50,6 +50,7 @@ STRING_SCHEMA = {
     "linkTo": "foo",
     "enum": ENUM,
     "description": DESCRIPTION,
+    "submitterRequired": True,
 }
 ARRAY_SCHEMA = {"type": "array", "items": [STRING_SCHEMA]}
 OBJECT_SCHEMA = {"type": "object", "properties": {"foo": STRING_SCHEMA}}
@@ -363,3 +364,15 @@ def test_get_enum(schema: Dict[str, Any], expected: List[str]) -> None:
 )
 def test_get_description(schema: Dict[str, Any], expected: str) -> None:
     assert schema_utils.get_description(schema) == expected
+
+
+@pytest.mark.parametrize(
+    "schema,expected",
+    [
+        ({}, False),
+        (NUMBER_SCHEMA, False),
+        (STRING_SCHEMA, True),
+    ],
+)
+def test_is_submitter_required(schema: Dict[str, Any], expected: bool) -> None:
+    assert schema_utils.is_submitter_required(schema) == expected
