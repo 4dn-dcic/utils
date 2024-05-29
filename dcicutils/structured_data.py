@@ -343,8 +343,6 @@ class StructuredDataSet:
     def _load_json_file(self, file: str) -> None:
         with open(file) as f:
             data = json.load(f)
-            import pdb ; pdb.set_trace()  # noqa
-            pass
             if ((schema_name_inferred_from_file_name := Schema.type_name(file)) and
                 (self._portal.get_schema(schema_name_inferred_from_file_name) is not None)):  # noqa
                 # If the JSON file name looks like a schema name then assume it
