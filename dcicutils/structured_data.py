@@ -351,20 +351,22 @@ class StructuredDataSet:
 
     def _load_json_file(self, file: str) -> None:
         with open(file) as f:
-            item = json.load(f)
+            data = json.load(f)
+            import pdb ; pdb.set_trace()  # noqa
+            pass
             if ((schema_name_inferred_from_file_name := Schema.type_name(file)) and
                 (self._portal.get_schema(schema_name_inferred_from_file_name) is not None)):  # noqa
                 # If the JSON file name looks like a schema name then assume it
                 # contains an object or an array of object of that schema type.
                 if self._merge:
-                    item = self._merge_with_existing_portal_object(item, schema_name_inferred_from_file_name)
-                self._add(Schema.type_name(file), item)
-            elif isinstance(item, dict):
+                    data = self._merge_with_existing_portal_object(data, schema_name_inferred_from_file_name)
+                self._add(Schema.type_name(file), data)
+            elif isinstance(data, dict):
                 # Otherwise if the JSON file name does not look like a schema name then
                 # assume it a dictionary where each property is the name of a schema, and
                 # which (each property) contains a list of object of that schema type.
-                for schema_name in item:
-                    item = item[schema_name]
+                for schema_name in data:
+                    item = data[schema_name]
                     if self._merge:
                         item = self._merge_with_existing_portal_object(item, schema_name)
                     self._add(schema_name, item)
