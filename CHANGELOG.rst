@@ -11,6 +11,7 @@ Change Log
 =====
 
 * Added merge capabilities to structured_data. (IN PROGRESS: 2025-05-25)
+* Added Question class to command_utils (factored out of smaht-submitr).
 
 
 8.8.6

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import contextlib
 import functools
 import glob
@@ -7,7 +8,7 @@ import re
 import requests
 import subprocess
 
-from typing import Optional
+from typing import Callable, Optional
 from .exceptions import InvalidParameterError
 from .lang_utils import there_are
 from .misc_utils import INPUT, PRINT, environ_bool, print_error_message, decorator
@@ -384,3 +385,70 @@ def script_catch_errors():
                 message = str(e)  # Note: We ignore the type, which isn't intended to be shown.
                 PRINT(message)
             exit(1)
+
+
+class Question:
+    """
+    Supports asking the user (via stdin) a yes/no question, possibly repeatedly; and after
+    some maximum number times of the same answer in a row (consecutively), then asks them
+    if they want to automatically give that same answer to any/all subsequent questions.
+    Supports static/global list of such Question instances, hashed (only) by the question text.
+    """
+    _static_instances = {}
+
+    @staticmethod
+    def instance(question: Optional[str] = None,
+                 max: Optional[int] = None, printf: Optional[Callable] = None) -> Question:
+        question = question if isinstance(question, str) else ""
+        if not (instance := Question._static_instances.get(question)):
+            Question._static_instances[question] = (instance := Question(question, max=max, printf=printf))
+        return instance
+
+    @staticmethod
+    def yes(question: Optional[str] = None,
+            max: Optional[int] = None, printf: Optional[Callable] = None) -> bool:
+        return Question.instance(question, max=max, printf=printf).ask()
+
+    def __init__(self, question: Optional[str] = None,
+                 max: Optional[int] = None, printf: Optional[Callable] = None) -> None:
+        self._question = question if isinstance(question, str) else ""
+        self._max = max if isinstance(max, int) and max > 0 else None
+        self._print = printf if callable(printf) else print
+        self._yes_consecutive_count = 0
+        self._no_consecutive_count = 0
+        self._yes_automatic = False
+        self._no_automatic = False
+
+    def ask(self, question: Optional[str] = None) -> bool:
+
+        def question_automatic(value: str) -> bool:
+            nonlocal self
+            RARROW = "▶"
+            LARROW = "◀"
+            if yes_or_no(f"{RARROW}{RARROW}{RARROW}"
+                         f" Do you want to answer {value} to all such questions?"
+                         f" {LARROW}{LARROW}{LARROW}"):
+                return True
+            self._yes_consecutive_count = 0
+            self._no_consecutive_count = 0
+
+        if self._yes_automatic:
+            return True
+        elif self._no_automatic:
+            return False
+        elif yes_or_no((question if isinstance(question, str) else "") or self._question or "Undefined question"):
+            self._yes_consecutive_count += 1
+            self._no_consecutive_count = 0
+            if (self._no_consecutive_count == 0) and self._max and (self._yes_consecutive_count >= self._max):
+                # Have reached the maximum number of consecutive YES answers; ask if YES to all subsequent.
+                if question_automatic("YES"):
+                    self._yes_automatic = True
+            return True
+        else:
+            self._no_consecutive_count += 1
+            self._yes_consecutive_count = 0
+            if (self._yes_consecutive_count == 0) and self._max and (self._no_consecutive_count >= self._max):
+                # Have reached the maximum number of consecutive NO answers; ask if NO to all subsequent.
+                if question_automatic("NO"):
+                    self._no_automatic = True
+            return False
