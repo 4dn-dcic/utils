@@ -6,12 +6,17 @@ dcicutils
 Change Log
 ----------
 
-
-8.8.6
-=====
+8.10.0
+======
 
 * Added merge capabilities to structured_data. (IN PROGRESS: 2025-05-25)
 * Added Question class to command_utils (factored out of smaht-submitr).
+
+
+8.9.0
+=====
+
+* Add more schema parsing functions to `schema_utils`.
 
 
 8.8.6

@@ -24,6 +24,7 @@ class JsonSchemaConstants:
 
 
 class EncodedSchemaConstants:
+    DESCRIPTION = "description"
     IDENTIFYING_PROPERTIES = "identifyingProperties"
     LINK_TO = "linkTo"
     MERGE_REF = "$merge"
@@ -185,6 +186,21 @@ def get_one_of_formats(schema: Dict[str, Any]) -> List[str]:
         for one_of_schema in get_one_of(schema)
         if get_format(one_of_schema)
     ]
+
+
+def is_link(property_schema: Dict[str, Any]) -> bool:
+    """Is property schema a link?"""
+    return bool(property_schema.get(SchemaConstants.LINK_TO))
+
+
+def get_enum(property_schema: Dict[str, Any]) -> List[str]:
+    """Return the enum of a property schema."""
+    return property_schema.get(SchemaConstants.ENUM, [])
+
+
+def get_description(schema: Dict[str, Any]) -> str:
+    """Return the description of a schema."""
+    return schema.get(SchemaConstants.DESCRIPTION, "")
 
 
 class Schema:
