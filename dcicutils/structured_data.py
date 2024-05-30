@@ -74,7 +74,7 @@ class StructuredDataSet:
         self._nrows = 0
         self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
         self._norefs = True if norefs is True else False
-        self._merge = True if merge is True else False
+        self._merge = True if merge is True else False  # New merge functionality (2024-05-25)
         self._debug_sleep = None
         if debug_sleep:
             try:
@@ -347,7 +347,7 @@ class StructuredDataSet:
                 (self._portal.get_schema(schema_name_inferred_from_file_name) is not None)):  # noqa
                 # If the JSON file name looks like a schema name then assume it
                 # contains an object or an array of object of that schema type.
-                if self._merge:
+                if self._merge:  # New merge functionality (2024-05-25)
                     data = self._merge_with_existing_portal_object(data, schema_name_inferred_from_file_name)
                 self._add(Schema.type_name(file), data)
             elif isinstance(data, dict):
@@ -356,7 +356,7 @@ class StructuredDataSet:
                 # which (each property) contains a list of object of that schema type.
                 for schema_name in data:
                     item = data[schema_name]
-                    if self._merge:
+                    if self._merge:  # New merge functionality (2024-05-25)
                         item = self._merge_with_existing_portal_object(item, schema_name)
                     self._add(schema_name, item)
 
@@ -380,8 +380,7 @@ class StructuredDataSet:
                 structured_row_template.set_value(structured_row, column_name, value, reader.file, reader.row_number)
                 if self._autoadd_properties:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
-            # New merge functionality (2024-05-25).
-            if self._merge:
+            if self._merge:  # New merge functionality (2024-05-25)
                 structured_row = self._merge_with_existing_portal_object(structured_row, schema_name)
             if (prune_error := self._prune_structured_row(structured_row)) is not None:
                 self._note_error({"src": create_dict(type=schema_name, row=reader.row_number),
@@ -437,7 +436,7 @@ class StructuredDataSet:
         """
         for identifying_path in self._portal.get_identifying_paths(portal_object, portal_type):
             if existing_portal_object := self._portal.get_metadata(identifying_path, raw=True, raise_exception=False):
-                return merge_objects(existing_portal_object, portal_object)
+                return merge_objects(existing_portal_object, portal_object, primitive_lists=True)
         return portal_object
 
     def _is_ref_lookup_specified_type(ref_lookup_flags: int) -> bool:

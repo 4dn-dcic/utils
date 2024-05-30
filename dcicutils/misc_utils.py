@@ -4,6 +4,7 @@ This file contains functions that might be generally useful.
 
 from collections import namedtuple
 import appdirs
+from copy import deepcopy
 import contextlib
 import datetime
 import functools
@@ -2199,28 +2200,58 @@ def merge_key_value_dict_lists(x, y):
     return [key_value_dict(k, v) for k, v in merged.items()]
 
 
-def merge_objects(target: Union[dict, List[Any]], source: Union[dict, List[Any]], full: bool = False) -> dict:
+def merge_objects(target: Union[dict, List[Any]], source: Union[dict, List[Any]],
+                  full: bool = False,  # deprecated
+                  expand_lists: Optional[bool] = None,
+                  primitive_lists: bool = False,
+                  copy: bool = False, _recursing: bool = False) -> Union[dict, List[Any]]:
     """
-    Merges the given source dictionary or list into the target dictionary or list.
-    This MAY well change the given target (dictionary or list) IN PLACE.
-    The the full argument is True then any target lists longer than the
-    source be will be filled out with the last element(s) of the source.
+    Merges the given source dictionary or list into the target dictionary or list and returns the
+    result. This MAY well change the given target (dictionary or list) IN PLACE ... UNLESS the copy
+    argument is True, then the given target will not change as a local copy is made (and returned).
+
+    If the expand_lists argument is True then any target lists longer than the
+    source be will be filled out with the last element(s) of the source; the full
+    argument (is deprecated and) is a synomym for this. The default is False.
+
+    If the primitive_lists argument is True then lists of primitives (i.e. lists in which
+    NONE of its elements are dictionaries, lists, or tuples) will themselves be treated
+    like primitives, meaning the whole of a source list will replace the corresponding
+    target; otherwise they  will be merged normally, meaning each element of a source list
+    will be merged, recursively, into the corresponding target list. The default is False.
     """
+    def is_primitive_list(value: Any) -> bool:  # noqa
+        if not isinstance(value, list):
+            return False
+        for item in value:
+            if isinstance(item, (dict, list, tuple)):
+                return False
+        return True
+
     if target is None:
         return source
+    if expand_lists not in (True, False):
+        expand_lists = full is True
+    if (copy is True) and (_recursing is not True):
+        target = deepcopy(target)
     if isinstance(target, dict) and isinstance(source, dict) and source:
         for key, value in source.items():
-            target[key] = merge_objects(target[key], value, full) if key in target else value
+            if ((primitive_lists is True) and
+                (key in target) and is_primitive_list(target[key]) and is_primitive_list(value)):  # noqa
+                target[key] = value
+            else:
+                target[key] = merge_objects(target[key], value,
+                                            expand_lists=expand_lists, _recursing=True) if key in target else value
     elif isinstance(target, list) and isinstance(source, list) and source:
         for i in range(max(len(source), len(target))):
             if i < len(target):
                 if i < len(source):
-                    target[i] = merge_objects(target[i], source[i], full)
-                elif full:
-                    target[i] = merge_objects(target[i], source[len(source) - 1], full)
+                    target[i] = merge_objects(target[i], source[i], expand_lists=expand_lists, _recursing=True)
+                elif expand_lists is True:
+                    target[i] = merge_objects(target[i], source[len(source) - 1], expand_lists=expand_lists)
             else:
                 target.append(source[i])
-    elif source:
+    elif source not in (None, {}, []):
         target = source
     return target
 
