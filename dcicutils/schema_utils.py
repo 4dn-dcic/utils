@@ -31,6 +31,7 @@ class EncodedSchemaConstants:
     MERGE_REF = "$merge"
     MIXIN_PROPERTIES = "mixinProperties"
     SUBMISSION_COMMENT = "submissionComment"
+    SUBMISSION_EXAMPLE = "submissionExample"
     SUBMITTER_REQUIRED = "submitterRequired"
     UNIQUE_KEY = "uniqueKey"
 
@@ -209,21 +210,31 @@ def get_description(schema: Dict[str, Any]) -> str:
 def is_submitter_required(schema: Dict[str, Any]) -> bool:
     """Return True if the schema is marked as required for submitters.
 
-    This is a custom property that can be manually added to a property
-    to designate explicitly it as required for external submitters.
+    Specifically, required for external (i.e. non-admin) submitters.
+
     This is typically validated within the context of a oneOf, anyOf,
-    or allOf schema, which is tricky to pick up on automatically.
+    or allOf schema on an item type which is used within the team and
+    by external submitters, and is tricky to pick up on automatically.
     """
     return schema.get(SchemaConstants.SUBMITTER_REQUIRED, False)
 
 
 def get_submission_comment(schema: Dict[str, Any]) -> str:
-    """Return the submission comment of a schema.
+    """Return the submission comment for a property.
 
     Custom property that can be manually added to a schema to provide
     additional context for submitters.
     """
     return schema.get(SchemaConstants.SUBMISSION_COMMENT, "")
+
+
+def get_submission_example(schema: Dict[str, Any]) -> str:
+    """Return the submission example for a property.
+
+    Custom property that can be manually added to a schema to provide
+    an example for submitters.
+    """
+    return schema.get(SchemaConstants.SUBMISSION_EXAMPLE, "")
 
 
 class Schema:
