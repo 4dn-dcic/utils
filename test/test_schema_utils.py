@@ -43,6 +43,7 @@ FORMAT = "email"
 PATTERN = "some_regex"
 ENUM = ["foo", "bar"]
 DESCRIPTION = "foo"
+COMMENT = "bar"
 STRING_SCHEMA = {
     "type": "string",
     "format": FORMAT,
@@ -51,6 +52,7 @@ STRING_SCHEMA = {
     "enum": ENUM,
     "description": DESCRIPTION,
     "submitterRequired": True,
+    "submissionComment": COMMENT,
 }
 ARRAY_SCHEMA = {"type": "array", "items": [STRING_SCHEMA]}
 OBJECT_SCHEMA = {"type": "object", "properties": {"foo": STRING_SCHEMA}}
@@ -376,3 +378,14 @@ def test_get_description(schema: Dict[str, Any], expected: str) -> None:
 )
 def test_is_submitter_required(schema: Dict[str, Any], expected: bool) -> None:
     assert schema_utils.is_submitter_required(schema) == expected
+
+
+@pytest.mark.parametrize(
+    "schema,expected",
+    [
+        ({}, ""),
+        (STRING_SCHEMA, COMMENT),
+    ],
+)
+def test_get_submission_comment(schema: Dict[str, Any], expected: str) -> None:
+    assert schema_utils.get_submission_comment(schema) == expected

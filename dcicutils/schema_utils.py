@@ -30,6 +30,7 @@ class EncodedSchemaConstants:
     LINK_TO = "linkTo"
     MERGE_REF = "$merge"
     MIXIN_PROPERTIES = "mixinProperties"
+    SUBMISSION_COMMENT = "submissionComment"
     SUBMITTER_REQUIRED = "submitterRequired"
     UNIQUE_KEY = "uniqueKey"
 
@@ -214,6 +215,15 @@ def is_submitter_required(schema: Dict[str, Any]) -> bool:
     or allOf schema, which is tricky to pick up on automatically.
     """
     return schema.get(SchemaConstants.SUBMITTER_REQUIRED, False)
+
+
+def get_submission_comment(schema: Dict[str, Any]) -> str:
+    """Return the submission comment of a schema.
+
+    Custom property that can be manually added to a schema to provide
+    additional context for submitters.
+    """
+    return schema.get(SchemaConstants.SUBMISSION_COMMENT, "")
 
 
 class Schema:
