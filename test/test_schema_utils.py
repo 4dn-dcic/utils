@@ -31,6 +31,10 @@ PROPERTIES = {
     },
     "fun": {"type": "array", "items": {"type": "string"}},
 }
+DEPENDENT_REQUIRED = {
+    "bar": ["baz"],
+    "foo": ["fu"],
+}
 SCHEMA = {
     "required": REQUIRED,
     "anyOf": ANY_OF,
@@ -38,13 +42,14 @@ SCHEMA = {
     "identifyingProperties": IDENTIFYING_PROPERTIES,
     "mixinProperties": MIXIN_PROPERTIES,
     "properties": PROPERTIES,
+    "dependentRequired": DEPENDENT_REQUIRED,
 }
 FORMAT = "email"
 PATTERN = "some_regex"
 ENUM = ["foo", "bar"]
 DESCRIPTION = "foo"
 COMMENT = "bar"
-EXAMPLE = "baz"
+EXAMPLE = ENUM
 STRING_SCHEMA = {
     "type": "string",
     "format": FORMAT,
@@ -54,7 +59,8 @@ STRING_SCHEMA = {
     "description": DESCRIPTION,
     "submitterRequired": True,
     "submissionComment": COMMENT,
-    "submissionExample": EXAMPLE,
+    "submissionExamples": EXAMPLE,
+    "suggested_enum": ENUM,
 }
 ARRAY_SCHEMA = {"type": "array", "items": [STRING_SCHEMA]}
 OBJECT_SCHEMA = {"type": "object", "properties": {"foo": STRING_SCHEMA}}
@@ -396,9 +402,33 @@ def test_get_submission_comment(schema: Dict[str, Any], expected: str) -> None:
 @pytest.mark.parametrize(
     "schema,expected",
     [
-        ({}, ""),
+        ({}, []),
         (STRING_SCHEMA, EXAMPLE),
     ],
 )
-def test_get_submission_example(schema: Dict[str, Any], expected: str) -> None:
-    assert schema_utils.get_submission_example(schema) == expected
+def test_get_submission_examples(schema: Dict[str, Any], expected: List[str]) -> None:
+    assert schema_utils.get_submission_examples(schema) == expected
+
+
+@pytest.mark.parametrize(
+    "schema,expected",
+    [
+        ({}, []),
+        (STRING_SCHEMA, ENUM),
+    ],
+)
+def test_get_suggested_enum(schema: Dict[str, Any], expected: List[str]) -> None:
+    assert schema_utils.get_suggested_enum(schema) == expected
+
+
+@pytest.mark.parametrize(
+    "schema,expected",
+    [
+        ({}, {}),
+        (SCHEMA, DEPENDENT_REQUIRED),
+    ],
+)
+def test_get_dependent_required(
+    schema: Dict[str, Any], expected: Dict[str, List[str]]
+) -> None:
+    assert schema_utils.get_dependent_required(schema) == expected

@@ -9,6 +9,7 @@ class JsonSchemaConstants:
     ARRAY = "array"
     BOOLEAN = "boolean"
     DEFAULT = "default"
+    DEPENDENT_REQUIRED = "dependentRequired"
     ENUM = "enum"
     FORMAT = "format"
     INTEGER = "integer"
@@ -31,8 +32,9 @@ class EncodedSchemaConstants:
     MERGE_REF = "$merge"
     MIXIN_PROPERTIES = "mixinProperties"
     SUBMISSION_COMMENT = "submissionComment"
-    SUBMISSION_EXAMPLE = "submissionExample"
+    SUBMISSION_EXAMPLES = "submissionExamples"
     SUBMITTER_REQUIRED = "submitterRequired"
+    SUGGESTED_ENUM = "suggested_enum"
     UNIQUE_KEY = "uniqueKey"
 
 
@@ -228,13 +230,27 @@ def get_submission_comment(schema: Dict[str, Any]) -> str:
     return schema.get(SchemaConstants.SUBMISSION_COMMENT, "")
 
 
-def get_submission_example(schema: Dict[str, Any]) -> str:
+def get_submission_examples(schema: Dict[str, Any]) -> List[str]:
     """Return the submission example for a property.
 
     Custom property that can be manually added to a schema to provide
     an example for submitters.
     """
-    return schema.get(SchemaConstants.SUBMISSION_EXAMPLE, "")
+    return schema.get(SchemaConstants.SUBMISSION_EXAMPLES, [])
+
+
+def get_suggested_enum(schema: Dict[str, Any]) -> List[str]:
+    """Return the suggested enum for a property.
+
+    Custom property that can be manually added to a schema to provide
+    a suggested list of values for submitters.
+    """
+    return schema.get(SchemaConstants.SUGGESTED_ENUM, [])
+
+
+def get_dependent_required(schema: Dict[str, Any]) -> Dict[str, List[str]]:
+    """Return the dependent required properties of a schema."""
+    return schema.get(SchemaConstants.DEPENDENT_REQUIRED, {})
 
 
 class Schema:
