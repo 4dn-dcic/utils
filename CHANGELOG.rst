@@ -11,6 +11,9 @@ Change Log
 
 * Added merge capabilities to structured_data. (IN PROGRESS: 2025-05-25)
 * Added Question class to command_utils (factored out of smaht-submitr).
+* Refactored out some identifying property related code from portal_object_utils to portal_utils.
+* Internalized lookup_strategy related code to structured_data/portal_object_utils/portal_utils.
+* Added delete/purge_metadata to portal_utils.Portol, for testing and completeness.
 
 
 8.9.0
