@@ -11,7 +11,6 @@ from webtest.app import TestApp
 from dcicutils.common import OrchestratedApp
 from dcicutils.data_readers import CsvReader, Excel, RowReader
 from dcicutils.datetime_utils import normalize_date_string, normalize_datetime_string
-from dcicutils.file_utils import search_for_file
 from dcicutils.misc_utils import (create_dict, create_readonly_object, is_uuid, load_json_if,
                                   merge_objects, remove_empty_properties, right_trim, split_string,
                                   to_boolean, to_enum, to_float, to_integer, VirtualApp)
@@ -56,7 +55,7 @@ class StructuredDataSet:
                  remove_empty_objects_from_lists: bool = True,
                  ref_lookup_strategy: Optional[Callable] = None,
                  ref_lookup_nocache: bool = False,
-                 norefs: bool = False,
+                 norefs: bool = False, merge: bool = False,
                  progress: Optional[Callable] = None,
                  debug_sleep: Optional[str] = None) -> None:
         self._progress = progress if callable(progress) else None
@@ -75,6 +74,7 @@ class StructuredDataSet:
         self._nrows = 0
         self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
         self._norefs = True if norefs is True else False
+        self._merge = True if merge is True else False  # New merge functionality (2024-05-25)
         self._debug_sleep = None
         if debug_sleep:
             try:
@@ -98,13 +98,13 @@ class StructuredDataSet:
              remove_empty_objects_from_lists: bool = True,
              ref_lookup_strategy: Optional[Callable] = None,
              ref_lookup_nocache: bool = False,
-             norefs: bool = False,
+             norefs: bool = False, merge: bool = False,
              progress: Optional[Callable] = None,
              debug_sleep: Optional[str] = None) -> StructuredDataSet:
         return StructuredDataSet(file=file, portal=portal, schemas=schemas, autoadd=autoadd, order=order, prune=prune,
                                  remove_empty_objects_from_lists=remove_empty_objects_from_lists,
                                  ref_lookup_strategy=ref_lookup_strategy, ref_lookup_nocache=ref_lookup_nocache,
-                                 norefs=norefs, progress=progress, debug_sleep=debug_sleep)
+                                 norefs=norefs, merge=merge, progress=progress, debug_sleep=debug_sleep)
 
     def validate(self, force: bool = False) -> None:
         def data_without_deleted_properties(data: dict) -> dict:
@@ -207,14 +207,6 @@ class StructuredDataSet:
                         if (file_name := item.get(FILE_TYPE_PROPERTY_NAME)):
                             result.append({"type": type_name, "file": file_name})
         return result
-
-    def upload_files_located(self,
-                             location: Union[str, Optional[List[str]]] = None, recursive: bool = False) -> List[str]:
-        upload_files = copy.deepcopy(self.upload_files)
-        for upload_file in upload_files:
-            if file_path := search_for_file(upload_file["file"], location, recursive=recursive, single=True):
-                upload_file["path"] = file_path
-        return upload_files
 
     @property
     def nrows(self) -> int:
@@ -350,18 +342,23 @@ class StructuredDataSet:
 
     def _load_json_file(self, file: str) -> None:
         with open(file) as f:
-            file_json = json.load(f)
-            schema_inferred_from_file_name = Schema.type_name(file)
-            if self._portal.get_schema(schema_inferred_from_file_name) is not None:
+            data = json.load(f)
+            if ((schema_name_inferred_from_file_name := Schema.type_name(file)) and
+                (self._portal.get_schema(schema_name_inferred_from_file_name) is not None)):  # noqa
                 # If the JSON file name looks like a schema name then assume it
                 # contains an object or an array of object of that schema type.
-                self._add(Schema.type_name(file), file_json)
-            elif isinstance(file_json, dict):
+                if self._merge:  # New merge functionality (2024-05-25)
+                    data = self._merge_with_existing_portal_object(data, schema_name_inferred_from_file_name)
+                self._add(Schema.type_name(file), data)
+            elif isinstance(data, dict):
                 # Otherwise if the JSON file name does not look like a schema name then
                 # assume it a dictionary where each property is the name of a schema, and
                 # which (each property) contains a list of object of that schema type.
-                for schema_name in file_json:
-                    self._add(schema_name, file_json[schema_name])
+                for schema_name in data:
+                    item = data[schema_name]
+                    if self._merge:  # New merge functionality (2024-05-25)
+                        item = self._merge_with_existing_portal_object(item, schema_name)
+                    self._add(schema_name, item)
 
     def _load_reader(self, reader: RowReader, type_name: str) -> None:
         schema = None
@@ -383,11 +380,13 @@ class StructuredDataSet:
                 structured_row_template.set_value(structured_row, column_name, value, reader.file, reader.row_number)
                 if self._autoadd_properties:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
+            if self._merge:  # New merge functionality (2024-05-25)
+                structured_row = self._merge_with_existing_portal_object(structured_row, schema_name)
             if (prune_error := self._prune_structured_row(structured_row)) is not None:
                 self._note_error({"src": create_dict(type=schema_name, row=reader.row_number),
                                   "error": prune_error}, "validation")
             else:
-                self._add(type_name, structured_row)
+                self._add(type_name, structured_row)  # TODO: why type_name and not schema_name?
             if self._progress:
                 self._progress({
                     PROGRESS.LOAD_ITEM: self._nrows,
@@ -427,6 +426,18 @@ class StructuredDataSet:
         for name in properties:
             if name not in structured_row and (not schema or schema.data.get("properties", {}).get(name)):
                 structured_row[name] = properties[name]
+
+    def _merge_with_existing_portal_object(self, portal_object: dict, portal_type: str) -> dict:
+        """
+        Given a Portal object (presumably/in-practice from the given metadata), if there is
+        an existing Portal item, identified by the identifying properties for the given object,
+        then merges the given object into the existing one and returns the result; otherwise
+        just returns the given object. Note that the given object may be CHANGED in place.
+        """
+        for identifying_path in self._portal.get_identifying_paths(portal_object, portal_type):
+            if existing_portal_object := self._portal.get_metadata(identifying_path, raw=True, raise_exception=False):
+                return merge_objects(existing_portal_object, portal_object, primitive_lists=True)
+        return portal_object
 
     def _is_ref_lookup_specified_type(ref_lookup_flags: int) -> bool:
         return (ref_lookup_flags &
