@@ -17,7 +17,7 @@ from uuid import uuid4 as uuid
 from webtest.app import TestApp, TestResponse
 from wsgiref.simple_server import make_server as wsgi_make_server
 from dcicutils.common import APP_SMAHT, OrchestratedApp, ORCHESTRATED_APPS
-from dcicutils.ff_utils import delete_metadata, get_metadata, get_schema, patch_metadata, post_metadata, purge_metadata
+from dcicutils.ff_utils import get_metadata, get_schema, patch_metadata, post_metadata
 from dcicutils.misc_utils import to_camel_case, VirtualApp
 from dcicutils.schema_utils import get_identifying_properties
 from dcicutils.tmpfile_utils import temporary_file
@@ -279,20 +279,6 @@ class Portal:
             return post_metadata(schema_name=object_type, post_item=data, key=self.key,
                                  add_on="check_only=True" if check_only else "")
         return self.post(f"/{object_type}{'?check_only=True' if check_only else ''}", data).json()
-
-    def delete_metadata(self, object_id: str) -> Optional[dict]:
-        if isinstance(object_id, str) and object_id:
-            if self.key:
-                return delete_metadata(obj_id=object_id, key=self.key)
-            else:
-                return self.patch_metadata(object_id, {"status": "deleted"})
-        return None
-
-    def purge_metadata(self, object_id: str) -> Optional[dict]:
-        if isinstance(object_id, str) and object_id:
-            if self.key:
-                return purge_metadata(obj_id=object_id, key=self.key)
-        return None
 
     def get_health(self) -> OptionalResponse:
         return self.get("/health")
