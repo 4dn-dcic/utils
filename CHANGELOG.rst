@@ -6,6 +6,11 @@ dcicutils
 Change Log
 ----------
 
+8.10.1
+======
+* Changes related to pyinstaller experimentation for smaht-submitr.
+
+
 8.10.0
 ======
 
