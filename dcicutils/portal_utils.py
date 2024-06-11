@@ -468,6 +468,9 @@ class Portal:
                 # And note the disction of just using /{uuid} here rather than /{type}/{uuid} as in the else
                 # statement below is not really necessary; just here for emphasis that this is all that's needed.
                 #
+                # TODO
+                # Consider (from PR-308) writing a portal API for retrieving possible path formats.
+                #
                 if first_only is True:
                     results.append(f"/{portal_type}/{identifying_value}")
                 else:
