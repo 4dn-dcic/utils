@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+8.11.0
+======
+
+* Add more schema parsing functions to `schema_utils`, including for new properties for
+  generating submission templates
+
+
 8.10.0
 ======
 
