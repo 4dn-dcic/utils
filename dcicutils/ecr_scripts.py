@@ -3,6 +3,7 @@ import botocore.exceptions
 import boto3
 import contextlib
 import os
+import sys
 
 from typing import Optional, Union, List
 from .command_utils import yes_or_no
@@ -68,7 +69,7 @@ def ecr_command_context(account_number, ecs_repository=None, ecr_client=None):
             elif account_number != account_number_in_environ:
                 raise RuntimeError("The account number you have specified does not match your declared credentials.")
             yield ECRCommandContext(account_number=account_number, ecs_repository=ecs_repository, ecr_client=ecr_client)
-            exit(0)
+            sys.exit(0)
         except botocore.exceptions.ClientError as e:
             error_info = e.response.get('Error', {})
             message = error_info.get('Message')
@@ -77,12 +78,12 @@ def ecr_command_context(account_number, ecs_repository=None, ecr_client=None):
                 raise RuntimeError("Your security token seems to have expired.")
             elif message:
                 PRINT(f"{code}: {message}")
-                exit(1)
+                sys.exit(1)
             else:
                 raise
     except Exception as e:
         PRINT(f"{full_class_name(e)}: {e}")
-        exit(1)
+        sys.exit(1)
 
 
 class ECRCommandContext:

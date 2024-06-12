@@ -9,6 +9,7 @@ Change Log
 8.10.1
 ======
 * Changes related to pyinstaller experimentation for smaht-submitr.
+  Mostly changing calls to exit to sys.exit; and related license_utils change.
 
 
 8.10.0

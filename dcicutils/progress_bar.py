@@ -249,7 +249,7 @@ class ProgressBar:
                         if self._interrupt_exit_message:
                             if isinstance(interrupt_exit_message := self._interrupt_exit_message(self), str):
                                 print(interrupt_exit_message)
-                        exit(1)
+                        sys.exit(1)
                     elif interrupt_stop is False or ((interrupt_stop is None) and (self._interrupt_exit is False)):
                         set_interrupt_handler(handle_interrupt)
                         interrupt_continue = self._interrupt_continue(self) if self._interrupt_continue else None

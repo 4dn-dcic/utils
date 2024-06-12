@@ -7,6 +7,7 @@ import os
 import re
 import requests
 import subprocess
+import sys
 
 from typing import Callable, Optional
 from .exceptions import InvalidParameterError
@@ -372,7 +373,7 @@ def script_catch_errors():
         raise ScriptFailure(' '.join(message))
     try:
         yield fail
-        exit(0)
+        sys.exit(0)
     except (Exception, ScriptFailure) as e:
         if DEBUG_SCRIPT:
             # If debugging, let the error propagate, do not trap it.
@@ -384,7 +385,7 @@ def script_catch_errors():
             else:
                 message = str(e)  # Note: We ignore the type, which isn't intended to be shown.
                 PRINT(message)
-            exit(1)
+            sys.exit(1)
 
 
 class Question:
