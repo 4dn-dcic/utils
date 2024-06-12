@@ -3684,6 +3684,22 @@ def test_merge_objects_8():
     assert target == expected
 
 
+def test_merge_objects_9():
+    target = {"abc": [1, 2, 3]}
+    source = {"abc": [4, 5]}
+    expected = {"abc": [4, 5]}
+    result = merge_objects(target, source, primitive_lists=True, copy=True)
+    assert result == expected
+    assert id(target) != id(result)
+
+    target = {"abc": [1, 2, 3]}
+    source = {"abc": [4, 5]}
+    expected = {"abc": [4, 5, 3]}
+    result = merge_objects(target, source, primitive_lists=False, copy=False)
+    assert result == expected
+    assert id(target) == id(result)
+
+
 def test_to_integer():
     assert to_integer("17") == 17
     assert to_integer("17.0") == 17
