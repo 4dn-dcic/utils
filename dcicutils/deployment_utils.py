@@ -396,9 +396,9 @@ class EBDeployer:
             packaging_was_successful = cls.build_application_version(args.repo, args.version_name, branch=args.branch)
             if packaging_was_successful:  # XXX: how to best detect?
                 time.sleep(5)  # give EB a second to catch up (it needs it)
-                exit(cls.deploy_new_version(args.env, args.repo, args.version_name))
+                sys.exit(cls.deploy_new_version(args.env, args.repo, args.version_name))
         else:
-            exit(cls.deploy_indexer(args.env, args.application_version))
+            sys.exit(cls.deploy_indexer(args.env, args.application_version))
 
 
 class IniFileManager:

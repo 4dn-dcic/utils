@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+8.12.0
+======
+* Changes related to pyinstaller experimentation for smaht-submitr.
+  Mostly changing calls to exit to sys.exit; and related license_utils change.
+* Added hook to structured_data (row_reader_hook) for integration testing purposes.
+
+
 8.11.0
 ======
 

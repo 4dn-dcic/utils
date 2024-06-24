@@ -33,6 +33,7 @@ import argparse
 import os
 import requests
 import subprocess
+import sys
 import toml
 
 from typing import Tuple, Union
@@ -335,7 +336,7 @@ def exit_with_no_action() -> None:
     first prints a message saying no action was taken.
     """
     PRINT("Exiting without taking action.")
-    exit(1)
+    sys.exit(1)
 
 
 PRINT = print

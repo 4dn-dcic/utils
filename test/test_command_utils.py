@@ -1,5 +1,6 @@
 import os
 import pytest
+import sys
 import tempfile
 
 from unittest import mock
@@ -378,7 +379,7 @@ def test_script_catch_errors():
             with script_catch_errors():
                 PRINT(normal_output)
                 PRINT(custom_exit_message)
-                exit(1)  # Bypasses script_catch_errors context manager, so won't show SCRIPT_ERROR_HERALD
+                sys.exit(1)  # Bypasses script_catch_errors context manager, so won't show SCRIPT_ERROR_HERALD
         sys_exit = exit_exc.value
         assert isinstance(sys_exit, SystemExit)
         assert sys_exit.code == 1

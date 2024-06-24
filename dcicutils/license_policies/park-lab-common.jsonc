@@ -248,6 +248,12 @@
             "docutils"  // Used only privately as a separate documentation-generation task for ReadTheDocs
         ],
 
+
+        "GNU General Public License v2 (GPLv2)": [
+            "pyinstaller",
+            "pyinstaller-hooks-contrib"
+        ],
+
         "MIT/X11 Derivative": [
             // The license used by libxkbcommon is complicated and involves numerous included licenses,
             // but all are permissive.

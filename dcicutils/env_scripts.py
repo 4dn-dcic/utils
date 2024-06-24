@@ -1,6 +1,7 @@
 import argparse
 import boto3
 import json
+import sys
 import yaml
 
 from .lang_utils import disjoined_list
@@ -52,7 +53,7 @@ def show_global_env_bucket(bucket, mode='json', key=None):
         else:
             PRINT(f"There is no default bucket. Please use a '--bucket' argument"
                   f" to specify one of {disjoined_list(envs_buckets)}.")
-        exit(1)
+        sys.exit(1)
 
     print_heading(bucket, style='=')
 
@@ -70,7 +71,7 @@ def show_global_env_bucket(bucket, mode='json', key=None):
         except Exception as e:
             PRINT("Bucket contents could not be downlaoded.")
             print_error_message(e)
-            exit(1)
+            sys.exit(1)
 
         object = None  # Without this, PyCharm fusses that object might not get set. -kmp 20-Jul-2022
         try:
@@ -78,7 +79,7 @@ def show_global_env_bucket(bucket, mode='json', key=None):
         except Exception as e:
             PRINT("Bucket contents could not be parsed as JSON.")
             print_error_message(e)
-            exit(1)
+            sys.exit(1)
 
         if mode == 'json':
             PRINT(json.dumps(object, indent=2, default=str))
@@ -86,7 +87,7 @@ def show_global_env_bucket(bucket, mode='json', key=None):
             PRINT(yaml.dump(object))
         else:
             PRINT(f"Unknown mode: {mode}. Try 'json' or 'yaml'.")
-            exit(1)
+            sys.exit(1)
 
 
 DEFAULT_BUCKET = get_env_bucket()
