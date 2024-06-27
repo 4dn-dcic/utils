@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "8.12.0.1b3"  # TODO: To become 8.13.0
+version = "8.12.0.1b4"  # TODO: To become 8.13.0
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -43,8 +43,8 @@ boto3 = "^1.34.93"
 botocore = "^1.34.93"
 # The DCIC portals (cgap-portal and fourfront) are very particular about which ElasticSearch version.
 # This value is intentionally pinned and must not be changed casually.
-#elasticsearch = "7.13.4"
-elasticsearch = "^7.17.9"
+elasticsearch = "7.13.4"
+#python-3.12 elasticsearch = "^7.17.9"
 appdirs = "^1.4.4"
 aws-requests-auth = ">=0.4.2,<1"
 chardet = "^5.2.0"
