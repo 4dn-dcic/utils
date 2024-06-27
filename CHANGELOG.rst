@@ -12,6 +12,7 @@ Change Log
   - Had to update flake8 (from 5.0.4) to 7.1.0.
   - Had to update lower bound of Python version (from 3.8.0) to 3.8.1.
   - Had to update pyramid (from 1.10.4) to 2.0.2 (imp import not found).
+  - Had to update elasticsearch (from 7.13.4) to 7.17.9 (for snovault).
 
 
 8.12.0
