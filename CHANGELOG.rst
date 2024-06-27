@@ -9,6 +9,8 @@ Change Log
 8.13.0
 ======
 * Updates related to Python 3.12.
+  - Had to update flake8 (to 7.1.0).
+  - Had to update lower bound of Python version (from 3.8.0) to 3.8.1.
 
 
 8.12.0

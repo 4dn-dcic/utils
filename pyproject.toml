@@ -38,7 +38,7 @@ classifiers = [
 
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.13"
+python = ">=3.8.1,<3.13"
 boto3 = "^1.34.93"
 botocore = "^1.34.93"
 # The DCIC portals (cgap-portal and fourfront) are very particular about which ElasticSearch version.
@@ -78,7 +78,7 @@ coverage = ">=7.2.3"
 # Loaded manually in GA workflow for coverage because a dependency on 2to3
 # in its docopts dependency makes a problem for laoding it here in poetry. -kmp 7-Apr-2023
 # coveralls = ">=3.3.1"
-flake8 = ">=3.9.2"
+flake8 = "^7.1.0"
 flaky = ">=3.7.0"
 pip-licenses = "^4.3.3"
 pytest = "^7.4.2"
