@@ -32,7 +32,8 @@ classifiers = [
     'Programming Language :: Python :: 3.8',
     'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
-    'Programming Language :: Python :: 3.11'
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12'
 ]
 
 
@@ -54,7 +55,7 @@ openpyxl = "^3.1.2"
 opensearch-py = "^2.0.1"
 pyOpenSSL = "^23.1.1"
 PyJWT = "^2.6.0"
-pyramid = "1.10.4"
+pyramid = "^2.0.2"
 pytz = ">=2020.4"
 redis = "^4.5.1"
 pyperclip = "^1.8.2"
