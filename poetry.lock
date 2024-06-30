@@ -1531,14 +1531,14 @@ dev = ["pre-commit", "pytest-asyncio", "tox"]
 
 [[package]]
 name = "pytest-redis"
-version = "3.0.2"
+version = "3.1.2"
 description = "Redis fixtures and fixture factories for Pytest."
 category = "dev"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pytest-redis-3.0.2.tar.gz", hash = "sha256:e54660e95fb1ec0feb7426523e37710ac7850380c60f9ee693c4045a6fc28ac5"},
-    {file = "pytest_redis-3.0.2-py3-none-any.whl", hash = "sha256:e2fd39658f396b6ae22976b80f94c61ebda5bc2bb8fe7eabcc7a7f994f7659f8"},
+    {file = "pytest_redis-3.1.2-py3-none-any.whl", hash = "sha256:d06403986dfc2c5bbb11d1b213b75d9108d1ebc2cd9f943dfa8d4d1977c08d03"},
+    {file = "pytest_redis-3.1.2.tar.gz", hash = "sha256:41c98c01def18af533805c0862bc098dede03b8228a4e17761daef1beb701fdf"},
 ]
 
 [package.dependencies]
@@ -1694,14 +1694,14 @@ ocsp = ["cryptography (>=36.0.1)", "pyopenssl (==20.0.1)", "requests (>=2.26.0)"
 
 [[package]]
 name = "referencing"
-version = "0.35.0"
+version = "0.35.1"
 description = "JSON Referencing + Python"
 category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "referencing-0.35.0-py3-none-any.whl", hash = "sha256:8080727b30e364e5783152903672df9b6b091c926a146a759080b62ca3126cd6"},
-    {file = "referencing-0.35.0.tar.gz", hash = "sha256:191e936b0c696d0af17ad7430a3dc68e88bc11be6514f4757dc890f04ab05889"},
+    {file = "referencing-0.35.1-py3-none-any.whl", hash = "sha256:eda6d3234d62814d1c64e305c1331c9a3a6132da475ab6382eaa997b21ee75de"},
+    {file = "referencing-0.35.1.tar.gz", hash = "sha256:25b42124a6c8b632a425174f24087783efb348a6f1e0008e63cd4466fedf703c"},
 ]
 
 [package.dependencies]
@@ -1710,14 +1710,14 @@ rpds-py = ">=0.7.0"
 
 [[package]]
 name = "requests"
-version = "2.31.0"
+version = "2.32.3"
 description = "Python HTTP for Humans."
 category = "main"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "requests-2.31.0-py3-none-any.whl", hash = "sha256:58cd2187c01e70e6e26505bca751777aa9f2ee0b7f4300988b709f44e013003f"},
-    {file = "requests-2.31.0.tar.gz", hash = "sha256:942c5a758f98d790eaed1a29cb6eefc7ffb0d1cf7af05c3d2791656dbd6ad1e1"},
+    {file = "requests-2.32.3-py3-none-any.whl", hash = "sha256:70761cfe03c773ceb22aa2f671b4757976145175cdfca038c02654d061d6dcc6"},
+    {file = "requests-2.32.3.tar.gz", hash = "sha256:55365417734eb18255590a9ff9eb97e9e1da868d4ccd6402399eaf68af20a760"},
 ]
 
 [package.dependencies]
