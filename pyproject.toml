@@ -75,7 +75,7 @@ webtest = "^2.0.34"
 [tool.poetry.dev-dependencies]
 boto3-stubs = "^1.34.136"
 botocore-stubs = "^1.34.136"
-coverage = ">=7.2.3"
+coverage = "^7.5.4"
 # Loaded manually in GA workflow for coverage because a dependency on 2to3
 # in its docopts dependency makes a problem for laoding it here in poetry. -kmp 7-Apr-2023
 # coveralls = ">=3.3.1"
