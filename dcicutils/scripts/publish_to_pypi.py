@@ -203,7 +203,7 @@ def verify_untracked_files() -> bool:
     untracked_files = get_untracked_files()
     if untracked_files:
         PRINT(f"You are about to PUBLISH the following ({len(untracked_files)})"
-              f" UNTRACKED file{'' if len(untracked_files) == 1 else 's' } -> SECURITY risk:")
+              f" UNTRACKED file{'' if len(untracked_files) == 1 else 's'} -> SECURITY risk:")
         for untracked_file in untracked_files:
             PRINT(f"-- {untracked_file}")
         PRINT("DO NOT continue UNLESS you KNOW what you are doing!")
