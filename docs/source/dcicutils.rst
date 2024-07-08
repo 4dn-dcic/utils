@@ -225,6 +225,13 @@ glacier_utils
    :members:
 
 
+hack_for_elasticsearch_numpy_usage
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.hack_for_elasticsearch_numpy_usage
+   :members:
+
+
 http_utils
 ^^^^^^^^^^^
 
