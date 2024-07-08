@@ -6,6 +6,12 @@ dcicutils
 Change Log
 ----------
 
+8.13.1
+======
+* Fallout from Python 3.12 support.
+  - Since numpy not in pyproject.toml and we need numpy < 2 (^1.26.4) failed to import dcicutils.ff_utils.
+
+
 8.13.0
 ======
 * Updates related to Python 3.12.
