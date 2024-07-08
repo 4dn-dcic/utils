@@ -7,7 +7,7 @@ import requests
 import time
 
 from collections import namedtuple
-import dcicutils.hack_for_elasticsearch_numpy_usage
+import dcicutils.hack_for_elasticsearch_numpy_usage  # noqa
 from elasticsearch.exceptions import AuthorizationException
 from typing import Dict, List, Optional
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
