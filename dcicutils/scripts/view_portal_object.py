@@ -62,9 +62,10 @@ import json
 import pyperclip
 import os
 import sys
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, TextIO, Tuple, Union
 import yaml
 from dcicutils.captured_output import captured_output, uncaptured_output
+from dcicutils.command_utils import yes_or_no
 from dcicutils.misc_utils import get_error_message, is_uuid, PRINT
 from dcicutils.portal_utils import Portal
 
@@ -78,11 +79,15 @@ _SCHEMAS_IGNORE_PROPERTIES = [
     "schema_version"
 ]
 
+_output_file: TextIO = None
+
 
 def main():
 
+    global _output_file
+
     parser = argparse.ArgumentParser(description="View Portal object.")
-    parser.add_argument("uuid", type=str,
+    parser.add_argument("uuid", nargs="?", type=str,
                         help=f"The uuid (or path) of the object to fetch and view. ")
     parser.add_argument("--ini", type=str, required=False, default=None,
                         help=f"Name of the application .ini file.")
@@ -97,11 +102,9 @@ def main():
     parser.add_argument("--all", action="store_true", required=False, default=False,
                         help="Include all properties for schema usage.")
     parser.add_argument("--raw", action="store_true", required=False, default=False, help="Raw output.")
+    parser.add_argument("--inserts", action="store_true", required=False, default=False,
+                        help="Format output for subsequent inserts.")
     parser.add_argument("--tree", action="store_true", required=False, default=False, help="Tree output for schemas.")
-    parser.add_argument("--post", type=str, required=False, default=None,
-                        help="POST data of the main arg type with data from file specified with this option.")
-    parser.add_argument("--patch", type=str, required=False, default=None,
-                        help="PATCH data of the main arg type with data from file specified with this option.")
     parser.add_argument("--database", action="store_true", required=False, default=False,
                         help="Read from database output.")
     parser.add_argument("--bool", action="store_true", required=False,
@@ -109,6 +112,7 @@ def main():
     parser.add_argument("--yaml", action="store_true", required=False, default=False, help="YAML output.")
     parser.add_argument("--copy", "-c", action="store_true", required=False, default=False,
                         help="Copy object data to clipboard.")
+    parser.add_argument("--output", required=False, help="Output file.", type=str)
     parser.add_argument("--indent", required=False, default=False, help="Indent output.", type=int)
     parser.add_argument("--details", action="store_true", required=False, default=False, help="Detailed output.")
     parser.add_argument("--more-details", action="store_true", required=False, default=False,
@@ -123,54 +127,57 @@ def main():
     portal = _create_portal(ini=args.ini, env=args.env or os.environ.get("SMAHT_ENV"),
                             server=args.server, app=args.app, verbose=args.verbose, debug=args.debug)
 
-    if args.uuid.lower() == "schemas" or args.uuid.lower() == "schema":
+    if not args.uuid:
+        _print("UUID or schema or path required.")
+        _exit(1)
+
+    if args.output:
+        if os.path.exists(args.output):
+            if os.path.isdir(args.output):
+                _print(f"Specified output file already exists as a directory: {args.output}")
+                _exit(1)
+            elif os.path.isfile(args.output):
+                _print(f"Specified output file already exists: {args.output}")
+                if not yes_or_no(f"Do you want to overwrite this file?"):
+                    _exit(0)
+        _output_file = io.open(args.output, "w")
+
+    if args.uuid and ((args.uuid.lower() == "schemas") or (args.uuid.lower() == "schema")):
         _print_all_schema_names(portal=portal, details=args.details,
                                 more_details=args.more_details, all=args.all,
                                 tree=args.tree, raw=args.raw, raw_yaml=args.yaml)
         return
-    elif args.uuid.lower() == "info":  # TODO: need word for what consortiums and submission centers are collectively
+    elif args.uuid and (args.uuid.lower() == "info"):
         if consortia := portal.get_metadata("/consortia?limit=1000"):
-            _print("Known Consortia:")
+            _print_output("Known Consortia:")
             consortia = sorted(consortia.get("@graph", []), key=lambda key: key.get("identifier"))
             for consortium in consortia:
                 if ((consortium_name := consortium.get("identifier")) and
                     (consortium_uuid := consortium.get("uuid"))):  # noqa
-                    _print(f"- {consortium_name}: {consortium_uuid}")
+                    _print_output(f"- {consortium_name}: {consortium_uuid}")
         if submission_centers := portal.get_metadata("/submission-centers?limit=1000"):
-            _print("Known Submission Centers:")
+            _print_output("Known Submission Centers:")
             submission_centers = sorted(submission_centers.get("@graph", []), key=lambda key: key.get("identifier"))
             for submission_center in submission_centers:
                 if ((submission_center_name := submission_center.get("identifier")) and
                     (submission_center_uuid := submission_center.get("uuid"))):  # noqa
-                    _print(f"- {submission_center_name}: {submission_center_uuid}")
+                    _print_output(f"- {submission_center_name}: {submission_center_uuid}")
         try:
             if file_formats := portal.get_metadata("/file-formats?limit=1000"):
-                _print("Known File Formats:")
+                _print_output("Known File Formats:")
                 file_formats = sorted(file_formats.get("@graph", []), key=lambda key: key.get("identifier"))
                 for file_format in file_formats:
                     if ((file_format_name := file_format.get("identifier")) and
                         (file_format_uuid := file_format.get("uuid"))):  # noqa
-                        _print(f"- {file_format_name}: {file_format_uuid}")
+                        _print_output(f"- {file_format_name}: {file_format_uuid}")
         except Exception:
-            _print("Known File Formats: None")
+            _print_output("Known File Formats: None")
         return
 
     if _is_maybe_schema_name(args.uuid):
         args.schema = True
 
     if args.schema:
-        if args.post:
-            if post_data := _read_json_from_file(args.post):
-                if args.verbose:
-                    _print(f"POSTing data from file ({args.post}) as type: {args.uuid}")
-                if isinstance(post_data, dict):
-                    post_data = [post_data]
-                elif not isinstance(post_data, list):
-                    _print(f"POST data neither list nor dictionary: {args.post}")
-                for item in post_data:
-                    portal.post_metadata(args.uuid, item)
-                if args.verbose:
-                    _print(f"Done POSTing data from file ({args.post}) as type: {args.uuid}")
         schema, schema_name = _get_schema(portal, args.uuid)
         if schema:
             if args.copy:
@@ -178,49 +185,33 @@ def main():
             if not args.raw:
                 if parent_schema_name := _get_parent_schema_name(schema):
                     if schema.get("isAbstract") is True:
-                        _print(f"{schema_name} | parent: {parent_schema_name} | abstract")
+                        _print_output(f"{schema_name} | parent: {parent_schema_name} | abstract")
                     else:
-                        _print(f"{schema_name} | parent: {parent_schema_name}")
+                        _print_output(f"{schema_name} | parent: {parent_schema_name}")
                 else:
-                    _print(schema_name)
+                    _print_output(schema_name)
             _print_schema(schema, details=args.details, more_details=args.details,
                           all=args.all, raw=args.raw, raw_yaml=args.yaml)
             return
-    elif args.patch:
-        if patch_data := _read_json_from_file(args.patch):
-            if args.verbose:
-                _print(f"PATCHing data from file ({args.patch}) for object: {args.uuid}")
-            if isinstance(patch_data, dict):
-                patch_data = [patch_data]
-            elif not isinstance(patch_data, list):
-                _print(f"PATCH data neither list nor dictionary: {args.patch}")
-            for item in patch_data:
-                portal.patch_metadata(args.uuid, item)
-            if args.verbose:
-                _print(f"Done PATCHing data from file ({args.patch}) as type: {args.uuid}")
-            return
-        else:
-            _print(f"No PATCH data found in file: {args.patch}")
-            sys.exit(1)
 
-    data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw,
+    data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw, inserts=args.inserts,
                               database=args.database, check=args.bool, verbose=args.verbose)
     if args.bool:
         if data:
             _print(f"{args.uuid}: found")
-            sys.exit(0)
+            _exit(0)
         else:
             _print(f"{args.uuid}: not found")
-            sys.exit(1)
+            _exit(1)
     if args.copy:
         pyperclip.copy(json.dumps(data, indent=4))
     if args.yaml:
-        _print(yaml.dump(data))
+        _print_output(yaml.dump(data))
     else:
         if args.indent > 0:
-            _print(_format_json_with_indent(data, indent=args.indent))
+            _print_output(_format_json_with_indent(data, indent=args.indent))
         else:
-            _print(json.dumps(data, default=str, indent=4))
+            _print_output(json.dumps(data, default=str, indent=4))
 
 
 def _format_json_with_indent(value: dict, indent: int = 0) -> Optional[str]:
@@ -254,7 +245,7 @@ def _create_portal(ini: str, env: Optional[str] = None,
 
 
 def _get_portal_object(portal: Portal, uuid: str,
-                       raw: bool = False, database: bool = False,
+                       raw: bool = False, inserts: bool = False, database: bool = False,
                        check: bool = False, verbose: bool = False) -> dict:
     response = None
     try:
@@ -262,7 +253,7 @@ def _get_portal_object(portal: Portal, uuid: str,
             path = f"/{uuid}"
         else:
             path = uuid
-        response = portal.get(path, raw=raw, database=database)
+        response = portal.get(path, raw=raw or inserts, database=database)
     except Exception as e:
         if "404" in str(e) and "not found" in str(e).lower():
             _print(f"Portal object not found at {portal.server}: {uuid}")
@@ -278,7 +269,21 @@ def _get_portal_object(portal: Portal, uuid: str,
     if not response.json:
         _exit(f"Invalid JSON getting Portal object: {uuid}")
     response = response.json()
-    if raw:
+    if inserts:
+        # Format results as suitable for inserts (e.g. via update-portal-object).
+        response.pop("schema_version", None)
+        if ((isinstance(results := response.get("@graph"), list) and results) and
+            (isinstance(results_type := response.get("@type"), list) and results_type) and
+            (isinstance(results_type := results_type[0], str) and results_type.endswith("SearchResults")) and
+            (results_type := results_type[0:-len("SearchResults")])):  # noqa
+            for result in results:
+                result.pop("schema_version", None)
+            response = {f"{results_type}": results}
+        # Get the result as non-raw so we can get its type.
+        elif ((response_cooked := portal.get(path, database=database)) and
+              (isinstance(response_type := response_cooked.json().get("@type"), list) and response_type)):
+            response = {f"{response_type[0]}": [response]}
+    elif raw:
         response.pop("schema_version", None)
     return response
 
@@ -292,7 +297,7 @@ def _get_schema(portal: Portal, name: str) -> Tuple[Optional[dict], Optional[str
     if portal and name and (name := name.replace("_", "").replace("-", "").strip().lower()):
         if schemas := _get_schemas(portal):
             for schema_name in schemas:
-                if schema_name.replace("_", "").replace("-", "").strip().lower() == name:
+                if schema_name.replace("_", "").replace("-", "").strip().lower() == name.lower():
                     return schemas[schema_name], schema_name
     return None, None
 
@@ -303,13 +308,37 @@ def _is_maybe_schema_name(value: str) -> bool:
     return False
 
 
+def _is_schema_name(portal: Portal, value: str) -> bool:
+    try:
+        return _get_schema(portal, value)[0] is not None
+    except Exception:
+        return False
+
+
+def _is_schema_named_json_file_name(portal: Portal, value: str) -> bool:
+    try:
+        return value.endswith(".json") and _is_schema_name(portal, os.path.basename(value[:-5]))
+    except Exception:
+        return False
+
+
+def _get_schema_name_from_schema_named_json_file_name(portal: Portal, value: str) -> Optional[str]:
+    try:
+        if not value.endswith(".json"):
+            return None
+        _, schema_name = _get_schema(portal, os.path.basename(value[:-5]))
+        return schema_name
+    except Exception:
+        return False
+
+
 def _print_schema(schema: dict, details: bool = False, more_details: bool = False, all: bool = False,
                   raw: bool = False, raw_yaml: bool = False) -> None:
     if raw:
         if raw_yaml:
-            _print(yaml.dump(schema))
+            _print_output(yaml.dump(schema))
         else:
-            _print(json.dumps(schema, indent=4))
+            _print_output(json.dumps(schema, indent=4))
         return
     _print_schema_info(schema, details=details, more_details=more_details, all=all)
 
@@ -322,37 +351,37 @@ def _print_schema_info(schema: dict, level: int = 0,
     identifying_properties = schema.get("identifyingProperties")
     if level == 0:
         if required_properties := schema.get("required"):
-            _print("- required properties:")
+            _print_output("- required properties:")
             for required_property in sorted(list(set(required_properties))):
                 if not all and required_property in _SCHEMAS_IGNORE_PROPERTIES:
                     continue
                 if property_type := (info := schema.get("properties", {}).get(required_property, {})).get("type"):
                     if property_type == "array" and (array_type := info.get("items", {}).get("type")):
-                        _print(f"  - {required_property}: {property_type} of {array_type}")
+                        _print_output(f"  - {required_property}: {property_type} of {array_type}")
                     else:
-                        _print(f"  - {required_property}: {property_type}")
+                        _print_output(f"  - {required_property}: {property_type}")
                 else:
-                    _print(f"  - {required_property}")
+                    _print_output(f"  - {required_property}")
             if isinstance(any_of := schema.get("anyOf"), list):
                 if ((any_of == [{"required": ["submission_centers"]}, {"required": ["consortia"]}]) or
                     (any_of == [{"required": ["consortia"]}, {"required": ["submission_centers"]}])):  # noqa
                     # Very very special case.
-                    _print(f"  - at least one of:")
-                    _print(f"    - consortia: array of string")
-                    _print(f"    - submission_centers: array of string")
+                    _print_output(f"  - at least one of:")
+                    _print_output(f"    - consortia: array of string")
+                    _print_output(f"    - submission_centers: array of string")
             required = required_properties
         if identifying_properties := schema.get("identifyingProperties"):
-            _print("- identifying properties:")
+            _print_output("- identifying properties:")
             for identifying_property in sorted(list(set(identifying_properties))):
                 if not all and identifying_property in _SCHEMAS_IGNORE_PROPERTIES:
                     continue
                 if property_type := (info := schema.get("properties", {}).get(identifying_property, {})).get("type"):
                     if property_type == "array" and (array_type := info.get("items", {}).get("type")):
-                        _print(f"  - {identifying_property}: {property_type} of {array_type}")
+                        _print_output(f"  - {identifying_property}: {property_type} of {array_type}")
                     else:
-                        _print(f"  - {identifying_property}: {property_type}")
+                        _print_output(f"  - {identifying_property}: {property_type}")
                 else:
-                    _print(f"  - {identifying_property}")
+                    _print_output(f"  - {identifying_property}")
         if properties := schema.get("properties"):
             reference_properties = []
             for property_name in properties:
@@ -362,16 +391,16 @@ def _print_schema_info(schema: dict, level: int = 0,
                 if link_to := property.get("linkTo"):
                     reference_properties.append({"name": property_name, "ref": link_to})
             if reference_properties:
-                _print("- reference properties:")
+                _print_output("- reference properties:")
                 for reference_property in sorted(reference_properties, key=lambda key: key["name"]):
-                    _print(f"  - {reference_property['name']}: {reference_property['ref']}")
+                    _print_output(f"  - {reference_property['name']}: {reference_property['ref']}")
         if schema.get("additionalProperties") is True:
-            _print(f"  - additional properties are allowed")
+            _print_output(f"  - additional properties are allowed")
     if not more_details:
         return
     if properties := (schema.get("properties") if level == 0 else schema):
         if level == 0:
-            _print("- properties:")
+            _print_output("- properties:")
         for property_name in sorted(properties):
             if not all and property_name in _SCHEMAS_IGNORE_PROPERTIES:
                 continue
@@ -392,7 +421,7 @@ def _print_schema_info(schema: dict, level: int = 0,
                         property_type = "open ended object"
                     if property.get("calculatedProperty"):
                         suffix += f" | calculated"
-                    _print(f"{spaces}- {property_name}: {property_type}{suffix}")
+                    _print_output(f"{spaces}- {property_name}: {property_type}{suffix}")
                     _print_schema_info(object_properties, level=level + 1,
                                        details=details, more_details=more_details, all=all,
                                        required=property.get("required"))
@@ -416,28 +445,28 @@ def _print_schema_info(schema: dict, level: int = 0,
                         if property_type := property_items.get("type"):
                             if property_type == "object":
                                 suffix = ""
-                                _print(f"{spaces}- {property_name}: array of object{suffix}")
+                                _print_output(f"{spaces}- {property_name}: array of object{suffix}")
                                 _print_schema_info(property_items.get("properties"), level=level + 1,
                                                    details=details, more_details=more_details, all=all,
                                                    required=property_items.get("required"))
                             elif property_type == "array":
                                 # This (array-of-array) never happens to occur at this time (February 2024).
-                                _print(f"{spaces}- {property_name}: array of array{suffix}")
+                                _print_output(f"{spaces}- {property_name}: array of array{suffix}")
                             else:
-                                _print(f"{spaces}- {property_name}: array of {property_type}{suffix}")
+                                _print_output(f"{spaces}- {property_name}: array of {property_type}{suffix}")
                         else:
-                            _print(f"{spaces}- {property_name}: array{suffix}")
+                            _print_output(f"{spaces}- {property_name}: array{suffix}")
                     else:
-                        _print(f"{spaces}- {property_name}: array{suffix}")
+                        _print_output(f"{spaces}- {property_name}: array{suffix}")
                     if enumeration:
                         nenums = 0
                         maxenums = 15
                         for enum in sorted(enumeration):
                             if (nenums := nenums + 1) >= maxenums:
                                 if (remaining := len(enumeration) - nenums) > 0:
-                                    _print(f"{spaces}  - [{remaining} more ...]")
+                                    _print_output(f"{spaces}  - [{remaining} more ...]")
                                 break
-                            _print(f"{spaces}  - {enum}")
+                            _print_output(f"{spaces}  - {enum}")
                 else:
                     if isinstance(property_type, list):
                         property_type = " or ".join(sorted(property_type))
@@ -479,18 +508,18 @@ def _print_schema_info(schema: dict, level: int = 0,
                         suffix += f" | max length: {max_length}"
                     if (min_length := property.get("minLength")) is not None:
                         suffix += f" | min length: {min_length}"
-                    _print(f"{spaces}- {property_name}: {property_type}{suffix}")
+                    _print_output(f"{spaces}- {property_name}: {property_type}{suffix}")
                     if enumeration:
                         nenums = 0
                         maxenums = 15
                         for enum in sorted(enumeration):
                             if (nenums := nenums + 1) >= maxenums:
                                 if (remaining := len(enumeration) - nenums) > 0:
-                                    _print(f"{spaces}  - [{remaining} more ...]")
+                                    _print_output(f"{spaces}  - [{remaining} more ...]")
                                 break
-                            _print(f"{spaces}  - {enum}")
+                            _print_output(f"{spaces}  - {enum}")
             else:
-                _print(f"{spaces}- {property_name}")
+                _print_output(f"{spaces}- {property_name}")
 
 
 def _print_all_schema_names(portal: Portal,
@@ -501,9 +530,9 @@ def _print_all_schema_names(portal: Portal,
 
     if raw:
         if raw_yaml:
-            _print(yaml.dump(schemas))
+            _print_output(yaml.dump(schemas))
         else:
-            _print(json.dumps(schemas, indent=4))
+            _print_output(json.dumps(schemas, indent=4))
         return
 
     if tree:
@@ -513,14 +542,14 @@ def _print_all_schema_names(portal: Portal,
     for schema_name in sorted(schemas.keys()):
         if parent_schema_name := _get_parent_schema_name(schemas[schema_name]):
             if schemas[schema_name].get("isAbstract") is True:
-                _print(f"{schema_name} | parent: {parent_schema_name} | abstract")
+                _print_output(f"{schema_name} | parent: {parent_schema_name} | abstract")
             else:
-                _print(f"{schema_name} | parent: {parent_schema_name}")
+                _print_output(f"{schema_name} | parent: {parent_schema_name}")
         else:
             if schemas[schema_name].get("isAbstract") is True:
-                _print(f"{schema_name} | abstract")
+                _print_output(f"{schema_name} | abstract")
             else:
-                _print(schema_name)
+                _print_output(schema_name)
         if details:
             _print_schema(schemas[schema_name], details=details, more_details=more_details, all=all)
 
@@ -559,8 +588,7 @@ def _print_schemas_tree(schemas: dict) -> None:
 def _print_tree(root_name: Optional[str],
                 children_of: Callable,
                 has_children: Optional[Callable] = None,
-                name_of: Optional[Callable] = None,
-                print: Callable = print) -> None:
+                name_of: Optional[Callable] = None) -> None:
     """
     Recursively prints as a tree structure the given root name and any of its
     children (again, recursively) as specified by the given children_of callable;
@@ -589,26 +617,26 @@ def _print_tree(root_name: Optional[str],
             if has_children(path):
                 extension = branch if pointer == tee else space
                 yield from tree_generator(path, prefix=prefix+extension)
-    print(first + ((name_of(root_name) if callable(name_of) else root_name) or "root"))
+    _print_output(first + ((name_of(root_name) if callable(name_of) else root_name) or "root"))
     for line in tree_generator(root_name, prefix="   "):
-        print(line)
+        _print_output(line)
 
 
 def _read_json_from_file(file: str) -> Optional[dict]:
     if not os.path.exists(file):
         _print(f"Cannot find file: {file}")
-        sys.exit(1)
+        _exit(1)
     try:
         with io.open(file, "r") as f:
             try:
                 return json.load(f)
             except Exception:
                 _print(f"Cannot parse JSON in file: {file}")
-                sys.exit(1)
+                _exit(1)
     except Exception as e:
-        print(e)
+        _print(e)
         _print(f"Cannot open file: {file}")
-        sys.exit(1)
+        _exit(1)
 
 
 def _print(*args, **kwargs):
@@ -617,10 +645,26 @@ def _print(*args, **kwargs):
     sys.stdout.flush()
 
 
-def _exit(message: Optional[str] = None) -> None:
-    if message:
+def _print_output(value: str):
+    global _output_file
+    if _output_file:
+        _output_file.write(value)
+        _output_file.write("\n")
+    else:
+        with uncaptured_output():
+            PRINT(value)
+        sys.stdout.flush()
+
+
+def _exit(message: Optional[Union[str, int]] = None, status: Optional[int] = None) -> None:
+    global _output_file
+    if isinstance(message, str):
         _print(f"ERROR: {message}")
-    sys.exit(1)
+    elif isinstance(message, int) and not isinstance(status, int):
+        status = message
+    if _output_file:
+        _output_file.close()
+    sys.exit(status if isinstance(status, int) else (0 if status is None else 1))
 
 
 if __name__ == "__main__":

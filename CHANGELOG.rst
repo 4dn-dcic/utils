@@ -6,15 +6,18 @@ dcicutils
 Change Log
 ----------
 
-8.13.2
+8.13.3
 ======
-* N.B. Accidentially tagged/pushed 8.13.1 -> PLEASE IGNORE VERSION: 8.13.1
+* N.B. Accidentially tagged/pushed 8.13.1 -> PLEASE IGNORE VERSION: 8.13.1 (subsequently yanked).
+  And then to correct (while no permission to delete above) pushed unofficial 8.13.2.
 * Fallout from Python 3.12 support.
   - Though dcicutils is not dependent on numpy, elasticsearch tries to import it,
     and if it is installed and if it is a version greater than 1.x, we get this error:
     AttributeError: `np.float_` was removed in the NumPy 2.0 release. Use `np.float64` instead.
     So added a hack in  hack_for_elasticsearch_numpy_usage.py for this specific case;
     to be imported before we import elasticsearch modules.
+* Added/updated scripts from submitr: view_portal_object.py and update_portal_object.py
+  for dev/troubleshooting purposes.
 
 
 8.13.0
