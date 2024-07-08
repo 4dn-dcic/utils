@@ -24,10 +24,10 @@ test-for-ga:
 	poetry run flake8 dcicutils
 	poetry run flake8 test --exclude=data_files
 	make test-units-with-coverage
-	mnake test-last
+	make test-last
 
 test-last:
-	pytest -vv -m "last"
+	poetry run pytest -vv -m "last"
 
 retest:  # runs only failed tests from the last test run. (if no failures, it seems to run all?? -kmp 17-Dec-2020)
 	poetry run pytest -vv -r w --last-failed -m "not last"
