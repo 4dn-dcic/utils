@@ -1,6 +1,7 @@
 import datetime
 import logging
 
+import dcicutils.hack_for_elasticsearch_numpy_usage
 from elasticsearch.exceptions import NotFoundError
 from .misc_utils import (
     environ_bool, PRINT, camel_case_to_snake_case, full_object_name,
