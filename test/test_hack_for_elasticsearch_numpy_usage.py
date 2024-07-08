@@ -2,8 +2,8 @@ import pytest
 import subprocess
 import sys
 
-
 pytestmark = [pytest.mark.last]
+
 
 def test_hack_for_elasticsearch_numpy_usage():
     try:
