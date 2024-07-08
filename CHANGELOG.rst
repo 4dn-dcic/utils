@@ -6,8 +6,9 @@ dcicutils
 Change Log
 ----------
 
-8.13.1
+8.13.2
 ======
+* N.B. Accidentially tagged/pushed 8.13.1 -> PLEASE IGNORE VERSION: 8.13.1
 * Fallout from Python 3.12 support.
   - Though dcicutils is not dependent on numpy, elasticsearch tries to import it,
     and if it is installed and if it is a version greater than 1.x, we get this error:
