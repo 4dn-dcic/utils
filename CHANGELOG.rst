@@ -9,7 +9,11 @@ Change Log
 8.13.1
 ======
 * Fallout from Python 3.12 support.
-  - Since numpy not in pyproject.toml and we need numpy < 2 (^1.26.4) failed to import dcicutils.ff_utils.
+  - Though dcicutils is not dependent on numpy, elasticsearch tries to import it,
+    and if it is installed and if it is a version greater than 1.x, we get this error:
+    AttributeError: `np.float_` was removed in the NumPy 2.0 release. Use `np.float64` instead.
+    So added a hack in  hack_for_elasticsearch_numpy_usage.py for this specific case;
+    to be imported before we import elasticsearch modules.
 
 
 8.13.0
