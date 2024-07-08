@@ -2,6 +2,7 @@ import subprocess
 import sys
 
 
+@pytest.mark.skip("This test seems to break others intermittently probably because messing with numpy installation.")
 def test_hack_for_elasticsearch_numpy_usage():
     try:
         subprocess.run("pip install numpy==2.0.0".split())
