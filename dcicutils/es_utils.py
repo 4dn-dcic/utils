@@ -1,6 +1,7 @@
 import logging
 import boto3
 from .misc_utils import PRINT
+import dcicutils.hack_for_elasticsearch_numpy_usage  # noqa
 from elasticsearch import Elasticsearch, RequestsHttpConnection
 from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
 

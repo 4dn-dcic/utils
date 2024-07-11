@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "8.13.0"
+version = "8.13.3"
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -96,6 +96,7 @@ publish-to-pypi = "dcicutils.scripts.publish_to_pypi:main"
 show-contributors = "dcicutils.contribution_scripts:show_contributors_main"
 run-license-checker = "dcicutils.scripts.run_license_checker:main"
 view-portal-object = "dcicutils.scripts.view_portal_object:main"
+update-portal-object = "dcicutils.scripts.update_portal_object:main"
 
 
 [tool.pytest.ini_options]
