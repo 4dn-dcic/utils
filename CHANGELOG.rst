@@ -6,6 +6,11 @@ dcicutils
 Change Log
 ----------
 
+8.13.4
+======
+* Minor updates to the view-portal-object dev/troubleshooting utility script.
+
+
 8.13.3
 ======
 * N.B. Accidentially tagged/pushed 8.13.1 -> PLEASE IGNORE VERSION: 8.13.1 (subsequently yanked).

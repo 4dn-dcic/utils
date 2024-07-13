@@ -114,15 +114,11 @@ def main():
                         help="Copy object data to clipboard.")
     parser.add_argument("--output", required=False, help="Output file.", type=str)
     parser.add_argument("--indent", required=False, default=False, help="Indent output.", type=int)
-    parser.add_argument("--details", action="store_true", required=False, default=False, help="Detailed output.")
-    parser.add_argument("--more-details", action="store_true", required=False, default=False,
-                        help="More detailed output.")
+    parser.add_argument("--summary", action="store_true", required=False, default=False, help="Summary output (for schema only) .")
+    parser.add_argument("--terse", action="store_true", required=False, default=False, help="Terse output.")
     parser.add_argument("--verbose", action="store_true", required=False, default=False, help="Verbose output.")
     parser.add_argument("--debug", action="store_true", required=False, default=False, help="Debugging output.")
     args = parser.parse_args()
-
-    if args.more_details:
-        args.details = True
 
     portal = _create_portal(ini=args.ini, env=args.env or os.environ.get("SMAHT_ENV"),
                             server=args.server, app=args.app, verbose=args.verbose, debug=args.debug)
@@ -143,9 +139,8 @@ def main():
         _output_file = io.open(args.output, "w")
 
     if args.uuid and ((args.uuid.lower() == "schemas") or (args.uuid.lower() == "schema")):
-        _print_all_schema_names(portal=portal, details=args.details,
-                                more_details=args.more_details, all=args.all,
-                                tree=args.tree, raw=args.raw, raw_yaml=args.yaml)
+        _print_all_schema_names(portal=portal, terse=args.terse, all=args.all,
+                                tree=args.tree, summary=args.summary, yaml=args.yaml)
         return
     elif args.uuid and (args.uuid.lower() == "info"):
         if consortia := portal.get_metadata("/consortia?limit=1000"):
@@ -182,7 +177,7 @@ def main():
         if schema:
             if args.copy:
                 pyperclip.copy(json.dumps(schema, indent=4))
-            if not args.raw:
+            if args.summary:
                 if parent_schema_name := _get_parent_schema_name(schema):
                     if schema.get("isAbstract") is True:
                         _print_output(f"{schema_name} | parent: {parent_schema_name} | abstract")
@@ -190,8 +185,8 @@ def main():
                         _print_output(f"{schema_name} | parent: {parent_schema_name}")
                 else:
                     _print_output(schema_name)
-            _print_schema(schema, details=args.details, more_details=args.details,
-                          all=args.all, raw=args.raw, raw_yaml=args.yaml)
+            _print_schema(schema, terse=args.terse,
+                          all=args.all, summary=args.summary, yaml=args.yaml)
             return
 
     data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw, inserts=args.inserts,
@@ -276,9 +271,26 @@ def _get_portal_object(portal: Portal, uuid: str,
             (isinstance(results_type := response.get("@type"), list) and results_type) and
             (isinstance(results_type := results_type[0], str) and results_type.endswith("SearchResults")) and
             (results_type := results_type[0:-len("SearchResults")])):  # noqa
+            # For search results, the type (from XyzSearchResults, above) may not be precisely correct for
+            # each of the results; it may be the supertype (e.g. QualityMetric vs QualityMetricWorkflowRun);
+            # so for types which are supertypes (gotten via Portal.get_schemas_super_type_map) we actually
+            # lookup each result individually to determine its actual precise type.
+            if not ((supertypes := portal.get_schemas_super_type_map()) and (subtypes := supertypes.get(results_type))):
+                subtypes = None
+            response = {}
             for result in results:
                 result.pop("schema_version", None)
-            response = {f"{results_type}": results}
+                if (subtypes and
+                    (result_uuid := result.get("uuid")) and
+                    (individual_result := portal.get_metadata(result_uuid, raise_exception=False)) and
+                    isinstance(result_type:= individual_result.get("@type"), list) and result_type and result_type[0]):
+                    result_type = result_type[0]
+                else:
+                    result_type = results_type
+                if response.get(result_type):
+                    response[result_type].append(result)
+                else:
+                    response[result_type] = [result]
         # Get the result as non-raw so we can get its type.
         elif ((response_cooked := portal.get(path, database=database)) and
               (isinstance(response_type := response_cooked.json().get("@type"), list) and response_type)):
@@ -332,19 +344,19 @@ def _get_schema_name_from_schema_named_json_file_name(portal: Portal, value: str
         return False
 
 
-def _print_schema(schema: dict, details: bool = False, more_details: bool = False, all: bool = False,
-                  raw: bool = False, raw_yaml: bool = False) -> None:
-    if raw:
-        if raw_yaml:
+def _print_schema(schema: dict, terse: bool = False, all: bool = False,
+                  summary: bool = False, yaml: bool = False) -> None:
+    if summary is not True:
+        if yaml:
             _print_output(yaml.dump(schema))
         else:
             _print_output(json.dumps(schema, indent=4))
         return
-    _print_schema_info(schema, details=details, more_details=more_details, all=all)
+    _print_schema_info(schema, terse=terse, all=all)
 
 
 def _print_schema_info(schema: dict, level: int = 0,
-                       details: bool = False, more_details: bool = False, all: bool = False,
+                       terse: bool = False, all: bool = False,
                        required: Optional[List[str]] = None) -> None:
     if not schema or not isinstance(schema, dict):
         return
@@ -396,7 +408,7 @@ def _print_schema_info(schema: dict, level: int = 0,
                     _print_output(f"  - {reference_property['name']}: {reference_property['ref']}")
         if schema.get("additionalProperties") is True:
             _print_output(f"  - additional properties are allowed")
-    if not more_details:
+    if terse:
         return
     if properties := (schema.get("properties") if level == 0 else schema):
         if level == 0:
@@ -422,8 +434,7 @@ def _print_schema_info(schema: dict, level: int = 0,
                     if property.get("calculatedProperty"):
                         suffix += f" | calculated"
                     _print_output(f"{spaces}- {property_name}: {property_type}{suffix}")
-                    _print_schema_info(object_properties, level=level + 1,
-                                       details=details, more_details=more_details, all=all,
+                    _print_schema_info(object_properties, level=level + 1, terse=terse, all=all,
                                        required=property.get("required"))
                 elif property_type == "array":
                     suffix = ""
@@ -447,7 +458,7 @@ def _print_schema_info(schema: dict, level: int = 0,
                                 suffix = ""
                                 _print_output(f"{spaces}- {property_name}: array of object{suffix}")
                                 _print_schema_info(property_items.get("properties"), level=level + 1,
-                                                   details=details, more_details=more_details, all=all,
+                                                   terse=terse, all=all,
                                                    required=property_items.get("required"))
                             elif property_type == "array":
                                 # This (array-of-array) never happens to occur at this time (February 2024).
@@ -523,13 +534,13 @@ def _print_schema_info(schema: dict, level: int = 0,
 
 
 def _print_all_schema_names(portal: Portal,
-                            details: bool = False, more_details: bool = False, all: bool = False,
-                            tree: bool = False, raw: bool = False, raw_yaml: bool = False) -> None:
+                            terse: bool = False, all: bool = False,
+                            tree: bool = False, summary: bool = False, yaml: bool = False) -> None:
     if not (schemas := _get_schemas(portal)):
         return
 
-    if raw:
-        if raw_yaml:
+    if summary is not True:
+        if yaml:
             _print_output(yaml.dump(schemas))
         else:
             _print_output(json.dumps(schemas, indent=4))
@@ -550,8 +561,8 @@ def _print_all_schema_names(portal: Portal,
                 _print_output(f"{schema_name} | abstract")
             else:
                 _print_output(schema_name)
-        if details:
-            _print_schema(schemas[schema_name], details=details, more_details=more_details, all=all)
+        if not terse:
+            _print_schema(schemas[schema_name], terse=terse, all=all)
 
 
 def _get_parent_schema_name(schema: dict) -> Optional[str]:
