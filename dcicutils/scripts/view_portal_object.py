@@ -114,7 +114,8 @@ def main():
                         help="Copy object data to clipboard.")
     parser.add_argument("--output", required=False, help="Output file.", type=str)
     parser.add_argument("--indent", required=False, default=False, help="Indent output.", type=int)
-    parser.add_argument("--summary", action="store_true", required=False, default=False, help="Summary output (for schema only) .")
+    parser.add_argument("--summary", action="store_true", required=False, default=False,
+                        help="Summary output (for schema only).")
     parser.add_argument("--terse", action="store_true", required=False, default=False, help="Terse output.")
     parser.add_argument("--verbose", action="store_true", required=False, default=False, help="Verbose output.")
     parser.add_argument("--debug", action="store_true", required=False, default=False, help="Debugging output.")
@@ -283,7 +284,7 @@ def _get_portal_object(portal: Portal, uuid: str,
                 if (subtypes and
                     (result_uuid := result.get("uuid")) and
                     (individual_result := portal.get_metadata(result_uuid, raise_exception=False)) and
-                    isinstance(result_type:= individual_result.get("@type"), list) and result_type and result_type[0]):
+                    isinstance(result_type:= individual_result.get("@type"), list) and result_type and result_type[0]):  # noqa
                     result_type = result_type[0]
                 else:
                     result_type = results_type
