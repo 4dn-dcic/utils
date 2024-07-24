@@ -9,6 +9,7 @@ Change Log
 8.13.4
 ======
 * Minor updates to the view-portal-object dev/troubleshooting utility script.
+* Downgrade flake8 from ^7.1.0 to ^5.0.4 so we can support Python 3.8.0 (so magma can also).
 
 
 8.13.3
