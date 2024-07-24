@@ -27,7 +27,7 @@ class TQDM(tqdm):
 
     # Nevermind the above; found a more pointed solution from here:
     # https://stackoverflow.com/questions/41707229/why-is-tqdm-printing-to-a-newline-instead-of-updating-the-same-line
-    # Why in the world would tqdm be maintaining state across instances?? Whatever, this (the clear) fixes it.
+    # Why in the world would tqdm be maintaining state across instances?? Whatever, this fixes it.
     def __init__(self, *args, **kwargs):
         super()._instances.clear() if super()._instances else None
         super().__init__(*args, **kwargs)
@@ -273,9 +273,9 @@ class ProgressBar:
         return namedtuple("interrupt_handler", ["restore"])(restore_interrupt_handler)
 
     def _define_tidy_output_hack(self) -> None:
-        # Some minor tqdm output tidying-up to account for annoying anomalies; e.g. tqdm
-        # forces a colon (:) before the percentage like ":  25%|"; and while we're at it
-        # do a little ASCII progress animation, requiring a special [progress] sentinal
+        # Some minor tqdm output tidying-up which for annoying anomalies; tqdm forces
+        # a colon (:) before the percentage, e.g. ":  25%|"; and while we're at it do
+        # a little ASCII progress animation, requiring a special ([progress]) sentinal
         # string in the display string where the progress bar should actually go,
         # which we do in _format_description. Other minor things too; see below.
         sys_stdout_write = sys.stdout.write
