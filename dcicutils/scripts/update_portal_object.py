@@ -13,6 +13,7 @@ import glob
 import io
 import json
 import os
+import re
 import sys
 from typing import Callable, List, Optional, Tuple, Union
 from dcicutils.command_utils import yes_or_no
@@ -162,6 +163,7 @@ def main():
                                  explicit_schema_name=explicit_schema_name,
                                  update_function=patch_data,
                                  update_action_name="PATCH",
+                                 patch_delete_fields=args.delete,
                                  confirm=args.confirm, verbose=args.verbose, quiet=args.quiet, debug=args.debug)
     if args.upsert:
         _post_or_patch_or_upsert(portal=portal,
@@ -169,6 +171,7 @@ def main():
                                  explicit_schema_name=explicit_schema_name,
                                  update_function=upsert_data,
                                  update_action_name="UPSERT",
+                                 patch_delete_fields=args.delete,
                                  confirm=args.confirm, verbose=args.verbose, quiet=args.quiet, debug=args.debug)
 
     if args.delete:
@@ -202,6 +205,7 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
         return False
 
     def post_or_patch_or_upsert(portal: Portal, file: str, schema_name: Optional[str],
+                                patch_delete_fields: Optional[str] = None,
                                 confirm: bool = False, verbose: bool = False,
                                 quiet: bool = False, debug: bool = False) -> None:
 
@@ -213,8 +217,9 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
                 if isinstance(schema_name, str) and schema_name:
                     if debug:
                         _print(f"DEBUG: File ({file}) contains an object of type: {schema_name}")
-                    update_function(portal, data, schema_name, confirm=confirm,
-                                    file=file, verbose=verbose, debug=debug)
+                    update_function(portal, data, schema_name, file=file,
+                                    patch_delete_fields=patch_delete_fields,
+                                    confirm=confirm, verbose=verbose, debug=debug)
                 elif is_schema_name_list(portal, list(data.keys())):
                     if debug:
                         _print(f"DEBUG: File ({file}) contains a dictionary of schema names.")
@@ -223,8 +228,9 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
                             if debug:
                                 _print(f"DEBUG: Processing {update_action_name}s for type: {schema_name}")
                             for index, item in enumerate(schema_data):
-                                update_function(portal, item, schema_name, confirm=confirm,
-                                                file=file, index=index, verbose=verbose, debug=debug)
+                                update_function(portal, item, schema_name, file=file, index=index,
+                                                patch_delete_fields=patch_delete_fields,
+                                                confirm=confirm, verbose=verbose, debug=debug)
                         else:
                             _print(f"WARNING: File ({file}) contains schema item which is not a list: {schema_name}")
                 else:
@@ -233,8 +239,9 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
                 if debug:
                     _print(f"DEBUG: File ({file}) contains a list of objects of type: {schema_name}")
                 for index, item in enumerate(data):
-                    update_function(portal, item, schema_name, confirm=confirm,
-                                    file=file, index=index, verbose=verbose, debug=debug)
+                    update_function(portal, item, schema_name, file=file, index=index,
+                                    patch_delete_fields=patch_delete_fields,
+                                    confirm=confirm, verbose=verbose, debug=debug)
             if debug:
                 _print(f"DEBUG: Processing {update_action_name} file done: {file}")
 
@@ -263,9 +270,10 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
         _print(f"ERROR: Cannot find file or directory: {file_or_directory}")
 
 
-def post_data(portal: Portal, data: dict, schema_name: str, confirm: bool = False,
+def post_data(portal: Portal, data: dict, schema_name: str,
               file: Optional[str] = None, index: int = 0,
-              verbose: bool = False, debug: bool = False) -> None:
+              patch_delete_fields: Optional[str] = None,  # unused here
+              confirm: bool = False, verbose: bool = False, debug: bool = False) -> None:
     if not (identifying_path := portal.get_identifying_path(data, portal_type=schema_name)):
         if isinstance(file, str) and isinstance(index, int):
             _print(f"ERROR: Item for POST has no identifying property: {file} (#{index + 1})")
@@ -289,9 +297,10 @@ def post_data(portal: Portal, data: dict, schema_name: str, confirm: bool = Fals
         return
 
 
-def patch_data(portal: Portal, data: dict, schema_name: str, confirm: bool = False,
+def patch_data(portal: Portal, data: dict, schema_name: str,
                file: Optional[str] = None, index: int = 0,
-               verbose: bool = False, debug: bool = False) -> None:
+               patch_delete_fields: Optional[str] = None,
+               confirm: bool = False, verbose: bool = False, debug: bool = False) -> None:
     if not (identifying_path := portal.get_identifying_path(data, portal_type=schema_name)):
         if isinstance(file, str) and isinstance(index, int):
             _print(f"ERROR: Item for PATCH has no identifying property: {file} (#{index + 1})")
@@ -306,6 +315,8 @@ def patch_data(portal: Portal, data: dict, schema_name: str, confirm: bool = Fal
     if verbose:
         _print(f"PATCH {schema_name} item: {identifying_path}")
     try:
+        if delete_fields := _parse_delete_fields(patch_delete_fields):
+            identifying_path += f"?delete_fields={delete_fields}"
         portal.patch_metadata(identifying_path, data)
         if debug:
             _print(f"DEBUG: PATCH {schema_name} item OK: {identifying_path}")
@@ -315,9 +326,10 @@ def patch_data(portal: Portal, data: dict, schema_name: str, confirm: bool = Fal
         return
 
 
-def upsert_data(portal: Portal, data: dict, schema_name: str, confirm: bool = False,
+def upsert_data(portal: Portal, data: dict, schema_name: str,
                 file: Optional[str] = None, index: int = 0,
-                verbose: bool = False, debug: bool = False) -> None:
+                patch_delete_fields: Optional[str] = None,
+                confirm: bool = False, verbose: bool = False, debug: bool = False) -> None:
     if not (identifying_path := portal.get_identifying_path(data, portal_type=schema_name)):
         if isinstance(file, str) and isinstance(index, int):
             _print(f"ERROR: Item for UPSERT has no identifying property: {file} (#{index + 1})")
@@ -330,7 +342,12 @@ def upsert_data(portal: Portal, data: dict, schema_name: str, confirm: bool = Fa
     if verbose:
         _print(f"{'PATCH' if exists else 'POST'} {schema_name} item: {identifying_path}")
     try:
-        portal.post_metadata(schema_name, data) if not exists else portal.patch_metadata(identifying_path, data)
+        if not exists:
+            portal.post_metadata(schema_name, data)
+        else:
+            if delete_fields := _parse_delete_fields(patch_delete_fields):
+                identifying_path += f"?delete_fields={delete_fields}"
+            portal.patch_metadata(identifying_path, data)
         if debug:
             _print(f"DEBUG: UPSERT {schema_name} item OK: {identifying_path}")
     except Exception as e:
@@ -394,6 +411,14 @@ def _file_names_to_ordered_file_and_schema_names(portal: Portal,
             results.remove(result)
     ordered_results.extend(results) if results else None
     return ordered_results
+
+
+def _parse_delete_fields(value: str) -> str:
+    if not isinstance(value, str):
+        value = []
+    else:
+        value = list(set([part.strip() for part in re.split(r'[,;|\s]+', value) if part.strip()]))
+    return ",".join(value)
 
 
 def _get_schema_name_from_schema_named_json_file_name(portal: Portal, value: str) -> Optional[str]:
