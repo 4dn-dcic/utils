@@ -165,6 +165,7 @@ def main():
                                  update_action_name="PATCH",
                                  patch_delete_fields=args.delete,
                                  confirm=args.confirm, verbose=args.verbose, quiet=args.quiet, debug=args.debug)
+        args.delete = None
     if args.upsert:
         _post_or_patch_or_upsert(portal=portal,
                                  file_or_directory=args.upsert,
@@ -173,6 +174,7 @@ def main():
                                  update_action_name="UPSERT",
                                  patch_delete_fields=args.delete,
                                  confirm=args.confirm, verbose=args.verbose, quiet=args.quiet, debug=args.debug)
+        args.delete = None
 
     if args.delete:
         if not portal.get_metadata(args.delete, raise_exception=False):
@@ -256,14 +258,17 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
                     _print(f"ERROR: Schema cannot be inferred from file name and --schema not specified: {file}")
                     continue
                 post_or_patch_or_upsert(portal, file_and_schema[0], schema_name=schema_name,
+                                        patch_delete_fields=patch_delete_fields,
                                         confirm=confirm, quiet=quiet, verbose=verbose, debug=debug)
     elif os.path.isfile(file := file_or_directory):
         if ((schema_name := _get_schema_name_from_schema_named_json_file_name(portal, file)) or
             (schema_name := explicit_schema_name)):  # noqa
             post_or_patch_or_upsert(portal, file, schema_name=schema_name,
+                                    patch_delete_fields=patch_delete_fields,
                                     confirm=confirm, quiet=quiet, verbose=verbose, debug=debug)
         else:
             post_or_patch_or_upsert(portal, file, schema_name=schema_name,
+                                    patch_delete_fields=patch_delete_fields,
                                     confirm=confirm, quiet=quiet, verbose=verbose, debug=debug)
             # _print(f"ERROR: Schema cannot be inferred from file name and --schema not specified: {file}")
             # return
