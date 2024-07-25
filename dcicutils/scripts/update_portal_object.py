@@ -193,6 +193,7 @@ def main():
 def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
                              explicit_schema_name: str,
                              update_function: Callable, update_action_name: str,
+                             patch_delete_fields: Optional[str] = None,
                              confirm: bool = False, verbose: bool = False,
                              quiet: bool = False, debug: bool = False) -> None:
 
