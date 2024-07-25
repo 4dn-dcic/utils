@@ -13,8 +13,6 @@ import warnings
 try:
     import piplicenses
 except ImportError:  # pragma: no cover - not worth unit testing this case
-    if (sys.version_info[0] == 3) and (sys.version_info[1] >= 12):
-        print("XYZZY: DEBUG GA FOR PYTHON 3.12 AND SUBMITR")
     if not ((sys.version_info[0] == 3) and (sys.version_info[1] >= 12)):
         # For some reason for with Python 3.12 this gets triggered at least for submitr (TODO: track down further).
         raise Exception("The dcicutils.license_utils module is intended for use at development time, not runtime."
