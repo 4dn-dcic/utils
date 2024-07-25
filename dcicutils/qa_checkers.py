@@ -6,8 +6,7 @@ import toml
 import warnings
 
 from collections import defaultdict
-from typing import Optional, List, Dict, Type
-from typing_extensions import Literal
+from typing import Optional, List, Dict, Type, Literal
 from .contribution_utils import Contributions
 from .lang_utils import conjoined_list, n_of, there_are
 from .misc_utils import PRINT, remove_prefix, remove_suffix, getattr_customized, CustomizableProperty

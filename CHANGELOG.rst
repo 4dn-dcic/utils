@@ -9,6 +9,7 @@ Change Log
 8.13.4
 ======
 * Minor updates to the view-portal-object dev/troubleshooting utility script.
+* Changed from typing_extensions import Literal to import from typing (Python 3.12 issue).
 
 
 8.13.3

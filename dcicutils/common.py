@@ -3,8 +3,7 @@ import os
 import re
 
 from tempfile import TemporaryFile
-from typing import Dict, Union, Tuple, List, Any
-from typing_extensions import Literal
+from typing import Dict, Union, Tuple, List, Any, Literal
 
 
 # ===== Useful constants =====
