@@ -16,8 +16,8 @@ except ImportError:  # pragma: no cover - not worth unit testing this case
     if not ((sys.version_info[0] == 3) and (sys.version_info[1] >= 12)):
         raise Exception("The dcicutils.license_utils module is intended for use at development time, not runtime."
                         " It does not export a requirement for the pip-licenses library,"
-                        " but to use this in your unit tests, you are expected to assure a dev dependency on that library"
-                        " as part of the [tool.poetry.dependencies] section of your pyproject.toml file."
+                        " but to use this in your unit tests, you are expected to assure a dev dependency on that"
+                        " library as part of the [tool.poetry.dependencies] section of your pyproject.toml file."
                         " If you are trying to manually evaluate the utility of this library, you can"
                         " do 'pip install pip-licenses' and then retry importing this library.")
 # or you can comment out the above raise of Exception and instead execute:
