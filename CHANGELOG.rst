@@ -11,6 +11,7 @@ Change Log
 * Minor updates to the view-portal-object dev/troubleshooting utility script.
 * Changed from typing_extensions import Literal to import from typing;
   odd Python 3.12 issue but only in GitHub Actions (observed for submitr).
+* Added tomli dependency in pyproject.toml (came up in submitr GA for Pyhthon 3.12).
 
 
 8.13.3
