@@ -70,7 +70,6 @@ structlog = "^19.2.0"
 toml = ">=0.10.1,<1"
 tqdm = "^4.66.2"
 typing-extensions = ">=3.8"  # Fourfront uses 3.8
-tomli = "^2.0.1"  # Came up submitr for Python 3.12
 urllib3 = "^1.26.19"
 webtest = "^2.0.34"
 
