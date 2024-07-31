@@ -984,14 +984,15 @@ def str_to_bool(x: Optional[str]) -> Optional[bool]:
         raise ValueError(f"An argument to str_or_bool must be a string or None: {x!r}")
 
 
-def to_integer(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
+def to_integer(value: str, fallback: Optional[Any] = None, strict: bool = False) -> Optional[Any]:
     try:
         return int(value)
     except Exception:
-        try:
-            return int(float(value))
-        except Exception:
-            pass
+        if strict is not True:
+            try:
+                return int(float(value))
+            except Exception:
+                pass
     return fallback
 
 

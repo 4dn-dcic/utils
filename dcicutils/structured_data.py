@@ -706,7 +706,7 @@ class Schema(SchemaBase):
 
     def _map_function_integer(self, typeinfo: dict) -> Callable:
         def map_integer(value: str, src: Optional[str]) -> Any:
-            return to_integer(value, value)
+            return to_integer(value, value, strict=True)
         return map_integer
 
     def _map_function_number(self, typeinfo: dict) -> Callable:
