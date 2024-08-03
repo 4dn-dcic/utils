@@ -12,8 +12,9 @@ Change Log
 * Changed from typing_extensions import Literal to import from typing;
   odd Python 3.12 issue but only in GitHub Actions (observed for submitr).
 * Added tomli dependency in pyproject.toml (came up in submitr GA for Pyhthon 3.12).
-* Change to structured_data.py to NOT silently convert a string representing a floating
-  point number to an integer.
+* Change to structured_data.py to NOT silently convert a string representing
+  a floating point number to an integer.
+* Changes in structured_data.py for validator hook. 
 
 
 8.13.3

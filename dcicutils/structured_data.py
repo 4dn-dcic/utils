@@ -57,7 +57,7 @@ class StructuredDataSet:
                  ref_lookup_nocache: bool = False,
                  norefs: bool = False, merge: bool = False,
                  progress: Optional[Callable] = None,
-                 row_reader_hook: Optional[Callable] = None,
+                 validator_hook: Optional[Callable] = None,
                  debug_sleep: Optional[str] = None) -> None:
         self._progress = progress if callable(progress) else None
         self._data = {}
@@ -76,7 +76,7 @@ class StructuredDataSet:
         self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
         self._norefs = True if norefs is True else False
         self._merge = True if merge is True else False  # New merge functionality (2024-05-25)
-        self._row_reader_hook = row_reader_hook if callable(row_reader_hook) else None  # Testing support (2024-06-12)
+        self._validator_hook = validator_hook if callable(validator_hook) else None  # Testing support (2024-06-12)
         self._debug_sleep = None
         if debug_sleep:
             try:
@@ -379,8 +379,13 @@ class StructuredDataSet:
                 structured_row_template = _StructuredRowTemplate(reader.header, schema)
             structured_row = structured_row_template.create_row()
             for column_name, value in row.items():
-                if self._row_reader_hook:
-                    value = self._row_reader_hook(reader.sheet_name, column_name, value)
+                if self._validator_hook:
+                    value, validator_error = self._validator_hook(reader.sheet_name, column_name, value)
+                    if validator_error:
+                        self._note_error({
+                            "src": create_dict(type=schema_name, row=reader.row_number),
+                            "error": validator_error
+                        }, "validation")
                 structured_row_template.set_value(structured_row, column_name, value, reader.file, reader.row_number)
                 if self._autoadd_properties:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
