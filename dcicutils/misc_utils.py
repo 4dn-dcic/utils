@@ -5,6 +5,7 @@ This file contains functions that might be generally useful.
 from collections import namedtuple
 import appdirs
 from copy import deepcopy
+import concurrent.futures
 import contextlib
 import datetime
 import functools
@@ -2779,3 +2780,8 @@ def create_short_uuid(length: Optional[int] = None, upper: bool = False):
     if upper is True:
         value = value.upper()
     return value
+
+
+def run_concurrently(functions: List[Callable], nthreads: int = 4) -> None:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=nthreads) as executor:
+        [_ for _ in concurrent.futures.as_completed([executor.submit(f) for f in functions])]

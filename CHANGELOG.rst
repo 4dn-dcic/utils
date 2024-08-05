@@ -15,6 +15,7 @@ Change Log
 * Change to structured_data.py to NOT silently convert a string representing
   a floating point number to an integer.
 * Changes in structured_data.py for validator hook. 
+* Added run_concurrently function to misc_utils.
 
 
 8.13.3
