@@ -31,7 +31,7 @@ from dcicutils.misc_utils import (
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
     MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case, json_file_contents,
-    pad_to, JsonLinesReader, split_string, merge_objects, to_integer,
+    pad_to, JsonLinesReader, split_string, merge_objects, to_integer, to_number,
     load_json_from_file_expanding_environment_variables, create_readonly_object
 )
 from dcicutils.qa_utils import (
@@ -3727,3 +3727,17 @@ def test_create_readonly_object():
     assert a.ghi == 456
     assert a.jk == "xyzzy"
     assert a.lmnop == {"greeting": "Hello, world!"}
+
+
+
+def test_to_number():
+    assert to_number("1234") == 1234
+    assert to_number("1,234,567") == None
+    assert to_number("1,234,567", allow_commas=True) == 1234567
+    assert to_number("1,234,567K", allow_commas=True) == None
+    assert to_number("1,234,567K", allow_commas=True, allow_suffix=True) == 1234567000
+    assert to_number("-1,234,567K", allow_commas=True, allow_prefix=False, allow_suffix=True) == None
+    assert to_number("-1,234,567K", allow_commas=True, allow_prefix=True, allow_suffix=True) == -1234567000
+    assert to_number("1234.0567", allow_float=True) == 1234.0567
+    # TODO: More ...
+    pass
