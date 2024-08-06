@@ -3738,5 +3738,17 @@ def test_to_number():
     assert to_number("-1,234,567K", allow_commas=True, allow_prefix=False, allow_suffix=True) is None
     assert to_number("-1,234,567K", allow_commas=True, allow_prefix=True, allow_suffix=True) == -1234567000
     assert to_number("1234.0567", allow_float=True) == 1234.0567
+    assert to_number("1K", allow_suffix=True) == 1000
+    assert to_number("1Kb", allow_suffix=True) == 1000
+    assert to_number("1KB", allow_suffix=True) == 1000
+    assert to_number("1M", allow_suffix=True) == 1000000
+    assert to_number("1Mb", allow_suffix=True) == 1000000
+    assert to_number("1MB", allow_suffix=True) == 1000000
+    assert to_number("1G", allow_suffix=True) == 1000000000
+    assert to_number("1Gb", allow_suffix=True) == 1000000000
+    assert to_number("1GB", allow_suffix=True) == 1000000000
+    assert to_number("1T", allow_suffix=True) == 1000000000000
+    assert to_number("1Tb", allow_suffix=True) == 1000000000000
+    assert to_number("1TB", allow_suffix=True) == 1000000000000
     # TODO: More ...
     pass
