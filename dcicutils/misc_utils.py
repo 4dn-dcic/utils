@@ -3,6 +3,7 @@ This file contains functions that might be generally useful.
 """
 
 from collections import namedtuple
+from collections.abc import Iterable
 import appdirs
 from copy import deepcopy
 import concurrent.futures
@@ -2870,6 +2871,6 @@ def create_short_uuid(length: Optional[int] = None, upper: bool = False):
     return value
 
 
-def run_concurrently(functions: List[Callable], nthreads: int = 4) -> None:
+def run_concurrently(functions: Iterable[Callable], nthreads: int = 4) -> None:
     with concurrent.futures.ThreadPoolExecutor(max_workers=nthreads) as executor:
-        [_ for _ in concurrent.futures.as_completed([executor.submit(f) for f in functions])]
+        concurrent.futures.as_completed([executor.submit(f) for f in functions])

@@ -3746,6 +3746,7 @@ def test_to_number():
     assert to_number("4T", allow_suffix=True) == 4000000000000
     assert to_number("4Tb", allow_suffix=True) == 4000000000000
     assert to_number("4TB", allow_suffix=True) == 4000000000000
+    assert to_number("4k", allow_suffix=True) is None
     assert to_number("1,234,567K", allow_commas=True) is None
     assert to_number("1,234,567K", allow_commas=True, allow_suffix=True) == 1234567000
     assert to_number("-1,234,567K", allow_commas=True, allow_suffix=True) == -1234567000
