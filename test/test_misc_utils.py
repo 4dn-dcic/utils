@@ -3729,14 +3729,13 @@ def test_create_readonly_object():
     assert a.lmnop == {"greeting": "Hello, world!"}
 
 
-
 def test_to_number():
     assert to_number("1234") == 1234
-    assert to_number("1,234,567") == None
+    assert to_number("1,234,567") is None
     assert to_number("1,234,567", allow_commas=True) == 1234567
-    assert to_number("1,234,567K", allow_commas=True) == None
+    assert to_number("1,234,567K", allow_commas=True) is None
     assert to_number("1,234,567K", allow_commas=True, allow_suffix=True) == 1234567000
-    assert to_number("-1,234,567K", allow_commas=True, allow_prefix=False, allow_suffix=True) == None
+    assert to_number("-1,234,567K", allow_commas=True, allow_prefix=False, allow_suffix=True) is None
     assert to_number("-1,234,567K", allow_commas=True, allow_prefix=True, allow_suffix=True) == -1234567000
     assert to_number("1234.0567", allow_float=True) == 1234.0567
     # TODO: More ...

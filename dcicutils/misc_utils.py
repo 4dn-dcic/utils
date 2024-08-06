@@ -1017,6 +1017,7 @@ _MULTIPLIER_SUFFIXES = {
     "TB": _MULTIPLIER_T
 }
 
+
 def to_number(value: str,
               allow_prefix: bool = True,
               allow_commas: bool = False,
