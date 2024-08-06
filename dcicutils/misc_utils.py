@@ -3,7 +3,7 @@ This file contains functions that might be generally useful.
 """
 
 from collections import namedtuple
-from collections.abc import Iterable
+from typing import Iterable  # would prefer this but error from Python 3.8: from collections.abc import Iterable
 import appdirs
 from copy import deepcopy
 import concurrent.futures
