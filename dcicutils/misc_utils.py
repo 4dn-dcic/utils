@@ -1019,14 +1019,12 @@ _MULTIPLIER_SUFFIXES = {
 
 
 def to_number(value: str,
-              allow_prefix: bool = True,
               allow_commas: bool = False,
               allow_suffix: bool = False,
               allow_float: bool = False) -> Optional[Union[int, float]]:
 
     """
     Converts the give string value to an int, or possibly float if allow_float is True.
-    If allow_prefix is True (default: True) then allow/respect a preceeding '+' or '-'.
     If allow_commas is True (default: False) then allow commas (only) every three digits.
     If allow_suffix is True (default: False) allow any of K, Kb, KB; or M, Mb, MB; or
     G, Gb, or GB; or T, Tb, TB, to mean multiply value by one thousand; one million;
@@ -1042,14 +1040,13 @@ def to_number(value: str,
     value_negative = False
     value_fraction = None
 
-    if allow_prefix is True:
-        if value.startswith("-"):
-            if not (value := value[1:].strip()):
-                return None
-            value_negative = True
-        elif value.startswith("+"):
-            if not (value := value[1:].strip()):
-                return None
+    if value.startswith("-"):
+        if not (value := value[1:].strip()):
+            return None
+        value_negative = True
+    elif value.startswith("+"):
+        if not (value := value[1:].strip()):
+            return None
 
     if allow_suffix is True:
         for suffix in _MULTIPLIER_SUFFIXES:
