@@ -531,11 +531,12 @@ class StructuredDataSet:
                 issues[group] = []
             issues[group].extend(item)
 
-    def note_validation_error(self, validation_error: str, schema_name: Optional[str] = None, row_number: Optional[int] = None) -> None:
+    def note_validation_error(self, validation_error: str,
+                              schema_name: Optional[str] = None, row_number: Optional[int] = None) -> None:
         if isinstance(validation_error, str) and validation_error:
             if isinstance(schema_name, str) and schema_name:
                 if isinstance(row_number, int):
-                     src = create_dict(type=schema_name, row=row_number)
+                    src = create_dict(type=schema_name, row=row_number)
                 else:
                     src = create_dict(type=schema_name)
             else:
