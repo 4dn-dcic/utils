@@ -727,7 +727,7 @@ class Schema(SchemaBase):
         allow_multiplier_suffix = typeinfo.get("allow_multiplier_suffix") is True
         def map_integer(value: str, src: Optional[str]) -> Any:  # noqa
             nonlocal allow_commas, allow_multiplier_suffix
-            return to_number(value, fallback=value, allow_float=False,
+            return to_number(value, fallback=value, as_float=False,
                              allow_commas=allow_commas,
                              allow_multiplier_suffix=allow_multiplier_suffix)
         return map_integer
@@ -737,7 +737,7 @@ class Schema(SchemaBase):
         allow_multiplier_suffix = typeinfo.get("allow_multiplier_suffix") is True
         def map_number(value: str, src: Optional[str]) -> Any:  # noqa
             nonlocal allow_commas, allow_multiplier_suffix
-            return to_number(value, fallback=value, allow_float=True,
+            return to_number(value, fallback=value, as_float=True,
                              allow_commas=allow_commas,
                              allow_multiplier_suffix=allow_multiplier_suffix)
         return map_number

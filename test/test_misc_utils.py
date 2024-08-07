@@ -3733,9 +3733,11 @@ def test_to_number():
     assert to_number("1234") == 1234
     assert to_number("1,234,567") is None
     assert to_number("27500") == 27500
+    assert to_number("789", as_float=True) == 789.0
+    assert type(to_number("789", as_float=True)) == float
     assert to_number("27500", allow_commas=True) == 27500
     assert to_number("1,234,567", allow_commas=True) == 1234567
-    assert to_number("1234.0567", allow_float=True) == 1234.0567
+    assert to_number("1234.0567", as_float=True) == 1234.0567
     assert to_number("1K", allow_multiplier_suffix=True) == 1000
     assert to_number("1Kb", allow_multiplier_suffix=True) == 1000
     assert to_number("1KB", allow_multiplier_suffix=True) == 1000

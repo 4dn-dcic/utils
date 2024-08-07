@@ -1022,15 +1022,15 @@ _MULTIPLIER_SUFFIXES = {
 def to_number(value: str,
               allow_commas: bool = False,
               allow_multiplier_suffix: bool = False,
-              allow_float: bool = False,
+              as_float: bool = False,
               fallback: Optional[Union[int, float]] = None) -> Optional[Union[int, float]]:
 
     """
-    Converts the give string value to an int, or possibly float if allow_float is True.
+    Converts the give string value to an int, or float if as_float is True.
     If allow_commas is True (default: False) then allow commas (only) every three digits.
     If allow_multiplier_suffix is True (default: False) allow any of K, Kb, KB; or M, Mb, MB;
     or G, Gb, or GB; or T, Tb, TB, to mean multiply value by one thousand; one million;
-    one billion; or one trillion; respectively. If allow_float is True (default: False)
+    one billion; or one trillion; respectively. If as_float is True (default: False)
     allow the value to be floating point (i.e. with a decimal point and a fractional part),
     in which case the returned value will be of type float rather than int.
     If the string is not well formated then returns None.
@@ -1058,7 +1058,7 @@ def to_number(value: str,
                     return fallback
                 break
 
-    if allow_float is True:
+    if as_float is True:
         if (dot_index := value.rfind(".")) >= 0:
             if value_fraction := value[dot_index + 1:].strip():
                 try:
@@ -1083,7 +1083,7 @@ def to_number(value: str,
     if value_negative:
         result = -result
 
-    return result
+    return float(result) if as_float is True else result
 
 
 def to_float(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
