@@ -1059,7 +1059,6 @@ def to_number(value: str,
         if (dot_index := value.rfind(".")) >= 0:
             if value_fraction := value[dot_index + 1:].strip():
                 try:
-                    # value_fraction = float(f"0.{value_fraction}")
                     value_fraction = float(f"0.{value_fraction}")
                 except Exception:
                     return fallback
