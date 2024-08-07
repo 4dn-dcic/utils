@@ -380,7 +380,7 @@ class StructuredDataSet:
             structured_row = structured_row_template.create_row()
             for column_name, value in row.items():
                 if self._validator_hook:
-                    value, validator_error = self._validator_hook(reader.sheet_name, column_name, value)
+                    value, validator_error = self._validator_hook(self, reader.sheet_name, column_name, value)
                     if validator_error:
                         self._note_error({
                             "src": create_dict(type=schema_name, row=reader.row_number),
