@@ -1022,17 +1022,17 @@ _MULTIPLIER_SUFFIXES = {
 def to_number(value: str,
               allow_commas: bool = False,
               allow_multiplier_suffix: bool = False,
-              as_float: bool = False,
+              allow_float: bool = False,
               fallback: Optional[Union[int, float]] = None) -> Optional[Union[int, float]]:
 
     """
-    Converts the give string value to an int, or float if as_float is True.
+    Converts the give string value to an int, or possibly float if allow_float is True.
     If allow_commas is True (default: False) then allow commas (only) every three digits.
     If allow_multiplier_suffix is True (default: False) allow any of K, Kb, KB; or M, Mb, MB;
     or G, Gb, or GB; or T, Tb, TB, to mean multiply value by one thousand; one million;
-    one billion; or one trillion; respectively. If as_float is True (default: False)
+    one billion; or one trillion; respectively. If allow_float is True (default: False)
     allow the value to be floating point (i.e. with a decimal point and a fractional part),
-    in which case the returned value will be of type float rather than int.
+    in which case the returned value will be of type float, if it needs to be, and not int.
     If the string is not well formated then returns None.
     """
     if not (isinstance(value, str) and (value := value.strip())):
@@ -1058,10 +1058,11 @@ def to_number(value: str,
                     return fallback
                 break
 
-    if as_float is True:
+    if allow_float is True:
         if (dot_index := value.rfind(".")) >= 0:
             if value_fraction := value[dot_index + 1:].strip():
                 try:
+                    # value_fraction = float(f"0.{value_fraction}")
                     value_fraction = float(f"0.{value_fraction}")
                 except Exception:
                     return fallback
@@ -1075,15 +1076,21 @@ def to_number(value: str,
     if not value.isdigit():
         return fallback
 
-    result = int(value) * value_multiplier
+    result = int(value)
 
     if value_fraction:
         result += value_fraction
 
+    result *= value_multiplier
+
     if value_negative:
         result = -result
 
-    return float(result) if as_float is True else result
+    if allow_float is True:
+        if result == int(result):
+            result = int(result)
+
+    return result
 
 
 def to_float(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
