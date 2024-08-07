@@ -1005,16 +1005,12 @@ _MULTIPLIER_T = 1000 * _MULTIPLIER_G
 
 _MULTIPLIER_SUFFIXES = {
     "K": _MULTIPLIER_K,
-    "Kb": _MULTIPLIER_K,
     "KB": _MULTIPLIER_K,
     "M": _MULTIPLIER_M,
-    "Mb": _MULTIPLIER_M,
     "MB": _MULTIPLIER_M,
     "G": _MULTIPLIER_G,
-    "Gb": _MULTIPLIER_G,
     "GB": _MULTIPLIER_G,
     "T": _MULTIPLIER_T,
-    "Tb": _MULTIPLIER_T,
     "TB": _MULTIPLIER_T
 }
 
@@ -1051,8 +1047,9 @@ def to_number(value: str,
             return fallback
 
     if allow_multiplier_suffix is True:
+        value_upper = value.upper()
         for suffix in _MULTIPLIER_SUFFIXES:
-            if value.endswith(suffix):
+            if value_upper.endswith(suffix):
                 value_multiplier *= _MULTIPLIER_SUFFIXES[suffix]
                 if not (value := value[:-len(suffix)].strip()):
                     return fallback
