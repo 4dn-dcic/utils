@@ -17,6 +17,8 @@ Change Log
 * Changes in structured_data.py for validator hook. 
 * Added to_number function to misc_utils.
 * Added run_concurrently function to misc_utils.
+* Changed misc_utils.to_enum to default to non-fuzzy (prefix) match, for structured_data,
+  i.e for smaht-submitr to match on (case-insensitive) full enum namess.
 
 
 8.13.3
