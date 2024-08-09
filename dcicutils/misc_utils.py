@@ -1027,25 +1027,32 @@ def to_number(value: str,
               allow_multiplier_suffix: bool = False,
               fallback: Optional[Union[int, float]] = None) -> Optional[Union[int, float]]:
     """
-    Converts the given string value to an int, or float if as_float is True, or None if malformed.
-    If allow_commas is True then allow commas (only) every three digits. If allow_multiplier_suffix
-    is True  allow any of K, KB; or M, MB; or G, or GB; or T, TB (case-insensitive), to mean multiply
-    value by one thousand; one million; one billion; or one trillion; respectively. If as_float is True
-    then value is parsed and returned as a float rather than int. Note that even if as_float is False,
-    values that might look like a float, can be an int, for example, "1.5K", returns 1500 as an int;
-    but "1.5002K" returns None, i.e. since 1.5002K is 1500.2 which is not an int.
+    Converts the given string value to an int, or float if as_float is True,
+    or None or the give fallback value if malformed.
+
+    If allow_commas is True then allows appropriately placed commas (i.e. every three digits).
+
+    If allow_multiplier_suffix is True allows any of the multiplier suffixes K, KB; M, MB;
+    or G, GB; or T, TB; all case-insensitive; which will multiply the value by a thousand;
+    a million; a billion; or a trillion; respectively.
+
+    If as_float is True then value is parsed and returned as a float rather than int.
+
+    Note that even if as_float is False, values that might LOOK like a float, can be
+    an int, for example, "1.5K", returns 1500 as an int since it is; but "1.5002K"
+    is malformed, since 1.5002K is equivalent to 1500.2 which is not an int.
     """
 
     if not (isinstance(value, str) and (value := value.strip())):
-        # Just in case the actual/desired return types are passed.
+        # Just in case the value is already the actual/desired return type.
         if as_float is True:
             return float(value) if isinstance(value, (float, int)) else fallback
         else:
             return value if isinstance(value, int) else fallback
 
     value_multiplier = 1
-    value_negative = False
     value_fraction = None
+    value_negative = False
 
     if value.startswith("-"):
         if not (value := value[1:].strip()):
@@ -1093,11 +1100,11 @@ def to_number(value: str,
 
     if value_fraction:
         value_float = float(value) + value_fraction
-        # We do not simply do: value_float *= float(value_multiplier);
-        # because it introduces obvious float point precision errors;
-        # e.g. to_integer("1.5678K", allow_multiplier_suffix=True) evaluates to: 1567.8000000000002;
-        # but do the multiplication 10 at a time obviates this idiosyncracy;
-        # this ASSUMES of course that the multipliers are simple multiples of 10.
+        # Here we do NOT simply do: value_float *= float(value_multiplier);
+        # because it introduces obvious FLOATing point precision ERRORs; for example,
+        # to_integer("1.5678K", allow_multiplier_suffix=True) would yield 1567.8000000000002
+        # if we simply did 1.5678 * 1000.0; but doing the multiplication 10 at a time obviates this
+        # idiosyncracy yielding 1567.8; this ASSUMES that the multipliers are simple multiples of 10.
         while value_multiplier > 1:
             value_float *= 10
             value_multiplier /= 10
