@@ -3824,6 +3824,9 @@ def test_to_float():
     assert to_float("1.0K", allow_multiplier_suffix=True) == 1000
     assert to_float("1.K", allow_multiplier_suffix=True) == 1000
     assert to_float(".2K", allow_multiplier_suffix=True) == 200
+    assert to_float(".2M", allow_multiplier_suffix=True) == 200000
+    assert to_float("0.9G", allow_multiplier_suffix=True) == 900000000
+    assert to_float("1.9G", allow_multiplier_suffix=True) == 1900000000
     assert to_float("4.0000000012309TB", allow_multiplier_suffix=True) == 4000000001230.9
     assert to_float(4321.1234) == 4321.1234
 
@@ -3832,9 +3835,15 @@ def test_to_float():
     assert to_float("12,345.0K", allow_commas=True, allow_multiplier_suffix=True) == 12345000
     assert to_float("12,345.06K", allow_commas=True, allow_multiplier_suffix=True) == 12345060
     assert to_float("12,345.06789K", allow_commas=True, allow_multiplier_suffix=True) == 12345067.89
+    assert to_float("123,456.9876G", allow_commas=True, allow_multiplier_suffix=True) == 123456987600000
+    assert to_float("123,456.9876G", allow_commas=True, allow_multiplier_suffix=True) == 123456987600000.0
+    assert to_float("123,456.123498765G", allow_commas=True, allow_multiplier_suffix=True) == 123456123498765.0
+    assert to_float("123,456.1234987656G", allow_commas=True, allow_multiplier_suffix=True) == 123456123498765.6
+    assert to_float("123,456.1234987656Tb", allow_commas=True, allow_multiplier_suffix=True) == 123456123498765600
 
     assert type(to_float("789")) == float
     assert type(to_float("1.5K", allow_multiplier_suffix=True)) == float
+    assert type(to_float("123,456.9876G", allow_commas=True, allow_multiplier_suffix=True)) == float
 
 
 def test_to_float_errors():

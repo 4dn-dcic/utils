@@ -1107,11 +1107,11 @@ def to_number(value: str,
         return fallback
 
     if value_multiplier != _TO_NUMBER_POWER_OF_TEN_FOR_NOTHING:
-        # We do string manipulation for the (power of ten) multiplier because normal multiplicative
-        # arithmetic can easily yield unexpected floating point related inaccuracies. For example,
-        # to_integer("1.5678K", allow_multiplier_suffix=True) would yield 1567.8000000000002 rather
-        # than 1567.8 if (we simply did 1.5678 * 1000.0); also tried multiplying by 10 at a time,
-        # and using Decimal, which obviated some, but not all, of the precision idiosyncrasies.
+        # We do string manipulation for the (power of ten) multiplier and NOT normal multiplicative
+        # arithmetic because this can easily yield unexpected floating point related inaccuracies.
+        # E.g. to_integer("1.5678K", allow_multiplier_suffix=True) would yield 1567.8000000000002
+        # rather than 1567.8 if (we simply did 1.5678 * 1000.0); also tried multiplying by 10 at
+        # a time, and using Decimal, which obviated some, but not all, of the idiosyncrasies.
         if value_fraction:
             for n in range(value_multiplier):
                 if value_fraction:
@@ -1136,10 +1136,7 @@ def to_number(value: str,
     else:
         value = int(value)
 
-    if value_negative:
-        value = -value
-
-    return value
+    return -value if value_negative else value
 
 
 def to_boolean(value: str, fallback: Optional[Any]) -> Optional[Any]:
