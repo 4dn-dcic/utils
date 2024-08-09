@@ -1098,7 +1098,7 @@ def to_number(value: str,
         value = value[:value_dot_zero_suffix.start()]
 
     if (allow_commas is True) and ("," in value):
-        # Make sure that any commas are properly placed/spaced.
+        # Make sure any commas are properly placed/spaced.
         if not re.fullmatch(r"(-?\d{1,3}(,\d{3})*)", value):
             return fallback
         value = value.replace(",", "")
@@ -1108,7 +1108,7 @@ def to_number(value: str,
 
     if value_multiplier != _TO_NUMBER_POWER_OF_TEN_FOR_NOTHING:
         # We do string manipulation for the (power of ten) multiplier and NOT normal multiplicative
-        # arithmetic because this can easily yield unexpected floating point related inaccuracies.
+        # arithmetic because this can EASILY yield UNEXPECTED floating point related INACCURACIES.
         # E.g. to_integer("1.5678K", allow_multiplier_suffix=True) would yield 1567.8000000000002
         # rather than 1567.8 if (we simply did 1.5678 * 1000.0); also tried multiplying by 10 at
         # a time, and using Decimal, which obviated some, but not all, of the idiosyncrasies.
