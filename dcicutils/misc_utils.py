@@ -1113,7 +1113,7 @@ def to_number(value: str,
         # rather than 1567.8 if (we simply did 1.5678 * 1000.0); also tried multiplying by 10 at
         # a time, and using Decimal, which obviated some, but not all, of the idiosyncrasies.
         if value_fraction:
-            for n in range(value_multiplier):
+            for _ in range(value_multiplier):
                 if value_fraction:
                     value += value_fraction[0]
                     value_fraction = value_fraction[1:]
