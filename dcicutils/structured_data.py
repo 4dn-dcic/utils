@@ -749,14 +749,16 @@ class Schema(SchemaBase):
 
     def _map_function_date(self, typeinfo: dict) -> Callable:
         def map_date(value: str, src: Optional[str]) -> str:
-            value = normalize_date_string(value)
-            return value if value is not None else ""
+            if not (parsed_value := normalize_date_string(value)):
+                return value
+            return parsed_value
         return map_date
 
     def _map_function_datetime(self, typeinfo: dict) -> Callable:
         def map_datetime(value: str, src: Optional[str]) -> str:
-            value = normalize_datetime_string(value)
-            return value if value is not None else ""
+            if not (parsed_value := normalize_datetime_string(value)):
+                return value
+            return parsed_value
         return map_datetime
 
     def _map_function_ref(self, typeinfo: dict) -> Callable:

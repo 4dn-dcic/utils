@@ -19,6 +19,8 @@ Change Log
 * Added run_concurrently function to misc_utils.
 * Changed misc_utils.to_enum to default to non-fuzzy (prefix) match, for structured_data,
   i.e for smaht-submitr to match on (case-insensitive) full enum namess.
+* Changed dcicutils.structured_data.Schema._map_function_date/time to
+  report malformed dates, e.g. "6/29/2024" rather than "2024-06-29".
 
 
 8.13.3
