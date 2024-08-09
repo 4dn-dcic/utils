@@ -57,7 +57,7 @@ class StructuredDataSet:
                  ref_lookup_nocache: bool = False,
                  norefs: bool = False, merge: bool = False,
                  progress: Optional[Callable] = None,
-                 row_reader_hook: Optional[Callable] = None,
+                 validator_hook: Optional[Callable] = None,
                  debug_sleep: Optional[str] = None) -> None:
         self._progress = progress if callable(progress) else None
         self._data = {}
@@ -76,7 +76,7 @@ class StructuredDataSet:
         self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
         self._norefs = True if norefs is True else False
         self._merge = True if merge is True else False  # New merge functionality (2024-05-25)
-        self._row_reader_hook = row_reader_hook if callable(row_reader_hook) else None  # Testing support (2024-06-12)
+        self._validator_hook = validator_hook if callable(validator_hook) else None  # Testing support (2024-06-12)
         self._debug_sleep = None
         if debug_sleep:
             try:
@@ -379,8 +379,14 @@ class StructuredDataSet:
                 structured_row_template = _StructuredRowTemplate(reader.header, schema)
             structured_row = structured_row_template.create_row()
             for column_name, value in row.items():
-                if self._row_reader_hook:
-                    value = self._row_reader_hook(reader.sheet_name, column_name, value)
+                if self._validator_hook:
+                    value, validator_error = (
+                        self._validator_hook(self, type_name, column_name, reader.row_number, value))
+                    if validator_error:
+                        self._note_error({
+                            "src": create_dict(type=schema_name, row=reader.row_number),
+                            "error": validator_error
+                        }, "validation")
                 structured_row_template.set_value(structured_row, column_name, value, reader.file, reader.row_number)
                 if self._autoadd_properties:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
@@ -525,6 +531,18 @@ class StructuredDataSet:
             if not issues.get(group):
                 issues[group] = []
             issues[group].extend(item)
+
+    def note_validation_error(self, validation_error: str,
+                              schema_name: Optional[str] = None, row_number: Optional[int] = None) -> None:
+        if isinstance(validation_error, str) and validation_error:
+            if isinstance(schema_name, str) and schema_name:
+                if isinstance(row_number, int):
+                    src = create_dict(type=schema_name, row=row_number)
+                else:
+                    src = create_dict(type=schema_name)
+            else:
+                src = None
+            self._note_error({"src": src, "error": validation_error}, "validation")
 
 
 class _StructuredRowTemplate:
@@ -705,13 +723,23 @@ class Schema(SchemaBase):
         return lambda value, src: map_enum(value, typeinfo.get("enum", []), src)
 
     def _map_function_integer(self, typeinfo: dict) -> Callable:
-        def map_integer(value: str, src: Optional[str]) -> Any:
-            return to_integer(value, value)
+        allow_commas = typeinfo.get("allow_commas") is True
+        allow_multiplier_suffix = typeinfo.get("allow_multiplier_suffix") is True
+        def map_integer(value: str, src: Optional[str]) -> Any:  # noqa
+            nonlocal allow_commas, allow_multiplier_suffix
+            return to_integer(value, fallback=value,
+                              allow_commas=allow_commas,
+                              allow_multiplier_suffix=allow_multiplier_suffix)
         return map_integer
 
     def _map_function_number(self, typeinfo: dict) -> Callable:
-        def map_number(value: str, src: Optional[str]) -> Any:
-            return to_float(value, value)
+        allow_commas = typeinfo.get("allow_commas") is True
+        allow_multiplier_suffix = typeinfo.get("allow_multiplier_suffix") is True
+        def map_number(value: str, src: Optional[str]) -> Any:  # noqa
+            nonlocal allow_commas, allow_multiplier_suffix
+            return to_float(value, fallback=value,
+                            allow_commas=allow_commas,
+                            allow_multiplier_suffix=allow_multiplier_suffix)
         return map_number
 
     def _map_function_string(self, typeinfo: dict) -> Callable:
@@ -721,14 +749,16 @@ class Schema(SchemaBase):
 
     def _map_function_date(self, typeinfo: dict) -> Callable:
         def map_date(value: str, src: Optional[str]) -> str:
-            value = normalize_date_string(value)
-            return value if value is not None else ""
+            if not (parsed_value := normalize_date_string(value)):
+                return value
+            return parsed_value
         return map_date
 
     def _map_function_datetime(self, typeinfo: dict) -> Callable:
         def map_datetime(value: str, src: Optional[str]) -> str:
-            value = normalize_datetime_string(value)
-            return value if value is not None else ""
+            if not (parsed_value := normalize_datetime_string(value)):
+                return value
+            return parsed_value
         return map_datetime
 
     def _map_function_ref(self, typeinfo: dict) -> Callable:

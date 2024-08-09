@@ -6,12 +6,29 @@ dcicutils
 Change Log
 ----------
 
+8.14.0
+======
+* Minor updates to the view-portal-object dev/troubleshooting utility script.
+* Changed from typing_extensions import Literal to import from typing;
+  odd Python 3.12 issue but only in GitHub Actions (observed for submitr).
+* Added tomli dependency in pyproject.toml (came up in submitr GA for Pyhthon 3.12).
+* Change to structured_data.py to NOT silently convert a string
+  representing a floating point number to an integer.
+* Changes in structured_data.py for validator hook. 
+* Added to_number function to misc_utils.
+* Added run_concurrently function to misc_utils.
+* Changed misc_utils.to_enum to default to non-fuzzy (prefix) match, for structured_data,
+  i.e for smaht-submitr to match on (case-insensitive) full enum namess.
+* Changed dcicutils.structured_data.Schema._map_function_date/time to
+  report malformed dates, e.g. "6/29/2024" rather than "2024-06-29".
+
+
 8.13.3
 ======
 * N.B. Accidentially tagged/pushed 8.13.1 -> PLEASE IGNORE VERSION: 8.13.1 (subsequently yanked).
   And then to correct (while no permission to delete above) pushed unofficial 8.13.2.
 * Fallout from Python 3.12 support.
-  - Though dcicutils is not dependent on numpy, elasticsearch tries to import it,
+  - Though dcicutils is not dependent on numpy, elasticsearch *tries* to import it,
     and if it is installed and if it is a version greater than 1.x, we get this error:
     AttributeError: `np.float_` was removed in the NumPy 2.0 release. Use `np.float64` instead.
     So added a hack in  hack_for_elasticsearch_numpy_usage.py for this specific case;

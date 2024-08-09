@@ -31,8 +31,7 @@ from dcicutils.qa_utils import (
 )
 # The following line needs to be separate from other imports. It is PART OF A TEST.
 from dcicutils.qa_utils import notice_pytest_fixtures   # Use care if editing this line. It is PART OF A TEST.
-from typing import List, Dict
-from typing_extensions import Literal
+from typing import List, Dict, Literal
 from unittest import mock
 from .fixtures.sample_fixtures import MockMathError, MockMath, math_enabled
 
