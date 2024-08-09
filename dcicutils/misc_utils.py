@@ -986,53 +986,61 @@ def str_to_bool(x: Optional[str]) -> Optional[bool]:
         raise ValueError(f"An argument to str_or_bool must be a string or None: {x!r}")
 
 
-def to_integer(value: str, fallback: Optional[Any] = None, strict: bool = False) -> Optional[Any]:
-    try:
-        return int(value)
-    except Exception:
-        if strict is not True:
-            try:
-                return int(float(value))
-            except Exception:
-                pass
-    return fallback
+def to_integer(value: str,
+               allow_commas: bool = False,
+               allow_multiplier_suffix: bool = False,
+               fallback: Optional[Union[int, float]] = None) -> Optional[int]:
+    return to_number(value, fallback=fallback, as_float=False,
+                     allow_commas=allow_commas,
+                     allow_multiplier_suffix=allow_multiplier_suffix)
 
 
-_MULTIPLIER_K = 1000
-_MULTIPLIER_M = 1000 * _MULTIPLIER_K
-_MULTIPLIER_G = 1000 * _MULTIPLIER_M
-_MULTIPLIER_T = 1000 * _MULTIPLIER_G
+def to_float(value: str,
+             allow_commas: bool = False,
+             allow_multiplier_suffix: bool = False,
+             fallback: Optional[Union[int, float]] = None) -> Optional[int]:
+    return to_number(value, fallback=fallback, as_float=True,
+                     allow_commas=allow_commas,
+                     allow_multiplier_suffix=allow_multiplier_suffix)
 
-_MULTIPLIER_SUFFIXES = {
-    "K": _MULTIPLIER_K,
-    "KB": _MULTIPLIER_K,
-    "M": _MULTIPLIER_M,
-    "MB": _MULTIPLIER_M,
-    "G": _MULTIPLIER_G,
-    "GB": _MULTIPLIER_G,
-    "T": _MULTIPLIER_T,
-    "TB": _MULTIPLIER_T
+
+_TO_NUMBER_MULTIPLIER_K = 1000
+_TO_NUMBER_MULTIPLIER_M = 1000 * _TO_NUMBER_MULTIPLIER_K
+_TO_NUMBER_MULTIPLIER_G = 1000 * _TO_NUMBER_MULTIPLIER_M
+_TO_NUMBER_MULTIPLIER_T = 1000 * _TO_NUMBER_MULTIPLIER_G
+
+_TO_NUMBER_MULTIPLIER_SUFFIXES = {
+    "K": _TO_NUMBER_MULTIPLIER_K,
+    "KB": _TO_NUMBER_MULTIPLIER_K,
+    "M": _TO_NUMBER_MULTIPLIER_M,
+    "MB": _TO_NUMBER_MULTIPLIER_M,
+    "G": _TO_NUMBER_MULTIPLIER_G,
+    "GB": _TO_NUMBER_MULTIPLIER_G,
+    "T": _TO_NUMBER_MULTIPLIER_T,
+    "TB": _TO_NUMBER_MULTIPLIER_T
 }
 
 
 def to_number(value: str,
+              as_float: bool = False,
               allow_commas: bool = False,
               allow_multiplier_suffix: bool = False,
-              allow_float: bool = False,
               fallback: Optional[Union[int, float]] = None) -> Optional[Union[int, float]]:
+    """
+    Converts the given string value to an int, or float if as_float is True, or None if malformed.
+    If allow_commas is True then allow commas (only) every three digits. If allow_multiplier_suffix
+    is True  allow any of K, KB; or M, MB; or G, or GB; or T, TB (case-insensitive), to mean multiply
+    value by one thousand; one million; one billion; or one trillion; respectively. If as_float is True
+    then value is parsed and returned as a float rather than int. Note that even if as_float is False,
+    values that might look like a float, can be an int, for example, "1.5K", returns 1500 as an int;
+    but "1.5002K" returns None, i.e. since 1.5002K is 1500.2 which is not an int.
+    """
 
-    """
-    Converts the give string value to an int, or possibly float if allow_float is True.
-    If allow_commas is True (default: False) then allow commas (only) every three digits.
-    If allow_multiplier_suffix is True (default: False) allow any of K, Kb, KB; or M, Mb, MB;
-    or G, Gb, or GB; or T, Tb, TB, to mean multiply value by one thousand; one million;
-    one billion; or one trillion; respectively. If allow_float is True (default: False)
-    allow the value to be floating point (i.e. with a decimal point and a fractional part),
-    in which case the returned value will be of type float, if it needs to be, and not int.
-    If the string is not well formated then returns None.
-    """
     if not (isinstance(value, str) and (value := value.strip())):
-        return value if isinstance(value, (int, float)) else fallback
+        if as_float is True:
+            return float(value) if isinstance(value, (float, int)) else fallback
+        else:
+            return value if isinstance(value, int) else fallback
 
     value_multiplier = 1
     value_negative = False
@@ -1048,21 +1056,28 @@ def to_number(value: str,
 
     if allow_multiplier_suffix is True:
         value_upper = value.upper()
-        for suffix in _MULTIPLIER_SUFFIXES:
+        for suffix in _TO_NUMBER_MULTIPLIER_SUFFIXES:
             if value_upper.endswith(suffix):
-                value_multiplier *= _MULTIPLIER_SUFFIXES[suffix]
+                value_multiplier *= _TO_NUMBER_MULTIPLIER_SUFFIXES[suffix]
                 if not (value := value[:-len(suffix)].strip()):
                     return fallback
                 break
 
-    if allow_float is True:
+    if (allow_multiplier_suffix is True) or (as_float is True):
+        # Allow for example "1.5K" to mean 1500 (integer).
         if (dot_index := value.rfind(".")) >= 0:
             if value_fraction := value[dot_index + 1:].strip():
                 try:
                     value_fraction = float(f"0.{value_fraction}")
                 except Exception:
                     return fallback
-            value = value[:dot_index].strip()
+            if not (value := value[:dot_index].strip()):
+                if not value_fraction:
+                    return fallback
+                value = "0"
+    elif (as_float is not True) and (value_dot_zero_suffix := re.search(r"\.0*$", value)):
+        # Allow for example "123.00" to mean 123 (integer).
+        value = value[:value_dot_zero_suffix.start()]
 
     if (allow_commas is True) and ("," in value):
         if not re.fullmatch(r"(-?\d{1,3}(,\d{3})*)", value):
@@ -1072,28 +1087,23 @@ def to_number(value: str,
     if not value.isdigit():
         return fallback
 
-    result = int(value)
+    value = float(value) if as_float is True else int(value)
 
     if value_fraction:
-        result += value_fraction
-
-    result *= value_multiplier
+        value_float = (float(value) + value_fraction) * float(value_multiplier)
+        if as_float is True:
+            value = value_float
+        else:
+            value = int(value_float)
+            if value_float != value:
+                return fallback
+    else:
+        value *= value_multiplier
 
     if value_negative:
-        result = -result
+        value = -value
 
-    if allow_float is True:
-        if result == int(result):
-            result = int(result)
-
-    return result
-
-
-def to_float(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
-    try:
-        return float(value)
-    except Exception:
-        return fallback
+    return value
 
 
 def to_boolean(value: str, fallback: Optional[Any]) -> Optional[Any]:

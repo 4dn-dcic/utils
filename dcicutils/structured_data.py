@@ -13,7 +13,7 @@ from dcicutils.data_readers import CsvReader, Excel, RowReader
 from dcicutils.datetime_utils import normalize_date_string, normalize_datetime_string
 from dcicutils.misc_utils import (create_dict, create_readonly_object, is_uuid, load_json_if,
                                   merge_objects, remove_empty_properties, right_trim, split_string,
-                                  to_boolean, to_enum, to_integer, to_number, VirtualApp)
+                                  to_boolean, to_enum, to_float, to_integer, VirtualApp)
 from dcicutils.portal_object_utils import PortalObject
 from dcicutils.portal_utils import Portal as PortalBase
 from dcicutils.submitr.progress_constants import PROGRESS_PARSE as PROGRESS
@@ -727,9 +727,9 @@ class Schema(SchemaBase):
         allow_multiplier_suffix = typeinfo.get("allow_multiplier_suffix") is True
         def map_integer(value: str, src: Optional[str]) -> Any:  # noqa
             nonlocal allow_commas, allow_multiplier_suffix
-            return to_number(value, fallback=value, allow_float=False,
-                             allow_commas=allow_commas,
-                             allow_multiplier_suffix=allow_multiplier_suffix)
+            return to_integer(value, fallback=value,
+                              allow_commas=allow_commas,
+                              allow_multiplier_suffix=allow_multiplier_suffix)
         return map_integer
 
     def _map_function_number(self, typeinfo: dict) -> Callable:
@@ -737,9 +737,9 @@ class Schema(SchemaBase):
         allow_multiplier_suffix = typeinfo.get("allow_multiplier_suffix") is True
         def map_number(value: str, src: Optional[str]) -> Any:  # noqa
             nonlocal allow_commas, allow_multiplier_suffix
-            return to_number(value, fallback=value, allow_float=True,
-                             allow_commas=allow_commas,
-                             allow_multiplier_suffix=allow_multiplier_suffix)
+            return to_float(value, fallback=value,
+                            allow_commas=allow_commas,
+                            allow_multiplier_suffix=allow_multiplier_suffix)
         return map_number
 
     def _map_function_string(self, typeinfo: dict) -> Callable:

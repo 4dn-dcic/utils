@@ -31,7 +31,7 @@ from dcicutils.misc_utils import (
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
     MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case, json_file_contents,
-    pad_to, JsonLinesReader, split_string, merge_objects, to_integer, to_number,
+    pad_to, JsonLinesReader, split_string, merge_objects, to_float, to_integer,
     load_json_from_file_expanding_environment_variables, create_readonly_object
 )
 from dcicutils.qa_utils import (
@@ -3703,12 +3703,45 @@ def test_merge_objects_9():
 def test_to_integer():
     assert to_integer("17") == 17
     assert to_integer("17.0") == 17
-    assert to_integer("17.1") == 17
-    assert to_integer("17.9", "123") == 17
+    assert to_integer("17.1") is None
+    assert to_integer("17.9", fallback="123") == "123"
     assert to_integer("0") == 0
     assert to_integer("0.0") == 0
     assert to_integer("asdf") is None
-    assert to_integer("asdf", "myfallback") == "myfallback"
+    assert to_integer("asdf", fallback="myfallback") == "myfallback"
+
+    assert to_integer("1234") == 1234
+    assert to_integer("1,234,567") is None
+    assert to_integer("27500") == 27500
+    assert to_integer("27500", allow_commas=True) == 27500
+    assert to_integer("1,234,567", allow_commas=True) == 1234567
+    assert to_integer("1K", allow_multiplier_suffix=True) == 1000
+    assert to_integer("1Kb", allow_multiplier_suffix=True) == 1000
+    assert to_integer("1kB", allow_multiplier_suffix=True) == 1000
+    assert to_integer("2M", allow_multiplier_suffix=True) == 2000000
+    assert to_integer("2Mb", allow_multiplier_suffix=True) == 2000000
+    assert to_integer("2MB", allow_multiplier_suffix=True) == 2000000
+    assert to_integer("3G", allow_multiplier_suffix=True) == 3000000000
+    assert to_integer("3Gb", allow_multiplier_suffix=True) == 3000000000
+    assert to_integer("3GB", allow_multiplier_suffix=True) == 3000000000
+    assert to_integer("4T", allow_multiplier_suffix=True) == 4000000000000
+    assert to_integer("4Tb", allow_multiplier_suffix=True) == 4000000000000
+    assert to_integer("4TB", allow_multiplier_suffix=True) == 4000000000000
+    assert to_integer("1,234,567K", allow_commas=True) is None
+    assert to_integer("1,234,567K", allow_commas=True, allow_multiplier_suffix=True) == 1234567000
+    assert to_integer("-1,234,567K", allow_commas=True, allow_multiplier_suffix=True) == -1234567000
+    assert to_integer(4321) == 4321
+    # TODO: More ...
+    pass
+
+
+def test_to_float():
+    assert to_float("789") == 789.0
+    assert type(to_float("789")) == float
+    assert to_float("1234.0567") == 1234.0567
+    assert to_float("1.5K", allow_multiplier_suffix=True) == 1500
+    assert type(to_float("1.5K", allow_multiplier_suffix=True)) == float
+    assert to_float(4321.1234) == 4321.1234
 
 
 def test_load_json_from_file_expanding_environment_variables():
@@ -3727,35 +3760,3 @@ def test_create_readonly_object():
     assert a.ghi == 456
     assert a.jk == "xyzzy"
     assert a.lmnop == {"greeting": "Hello, world!"}
-
-
-def test_to_number():
-    assert to_number("1234") == 1234
-    assert to_number("1,234,567") is None
-    assert to_number("27500") == 27500
-    assert to_number("789", allow_float=True) == 789.0
-    assert type(to_number("789", allow_float=True)) == int
-    assert to_number("27500", allow_commas=True) == 27500
-    assert to_number("1,234,567", allow_commas=True) == 1234567
-    assert to_number("1234.0567", allow_float=True) == 1234.0567
-    assert to_number("1K", allow_multiplier_suffix=True) == 1000
-    assert to_number("1Kb", allow_multiplier_suffix=True) == 1000
-    assert to_number("1kB", allow_multiplier_suffix=True) == 1000
-    assert to_number("2M", allow_multiplier_suffix=True) == 2000000
-    assert to_number("2Mb", allow_multiplier_suffix=True) == 2000000
-    assert to_number("2MB", allow_multiplier_suffix=True) == 2000000
-    assert to_number("3G", allow_multiplier_suffix=True) == 3000000000
-    assert to_number("3Gb", allow_multiplier_suffix=True) == 3000000000
-    assert to_number("3GB", allow_multiplier_suffix=True) == 3000000000
-    assert to_number("4T", allow_multiplier_suffix=True) == 4000000000000
-    assert to_number("4Tb", allow_multiplier_suffix=True) == 4000000000000
-    assert to_number("4TB", allow_multiplier_suffix=True) == 4000000000000
-    assert to_number("1,234,567K", allow_commas=True) is None
-    assert to_number("1,234,567K", allow_commas=True, allow_multiplier_suffix=True) == 1234567000
-    assert to_number("-1,234,567K", allow_commas=True, allow_multiplier_suffix=True) == -1234567000
-    assert to_number(4321) == 4321
-    assert to_number(4321.1234) == 4321.1234
-    assert to_number("1.5K", allow_multiplier_suffix=True, allow_float=True) == 1500
-    assert type(to_number("1.5K", allow_multiplier_suffix=True, allow_float=True)) == int
-    # TODO: More ...
-    pass
