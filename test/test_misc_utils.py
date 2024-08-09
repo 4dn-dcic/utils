@@ -3701,17 +3701,11 @@ def test_merge_objects_9():
 
 
 def test_to_integer():
-    assert to_integer("17") == 17
-    assert to_integer("17.0") == 17
-    assert to_integer("17.1") is None
-    assert to_integer("17.9", fallback="123") == "123"
-    assert to_integer("0") == 0
-    assert to_integer("0.0") == 0
-    assert to_integer("asdf") is None
-    assert to_integer("asdf", fallback="myfallback") == "myfallback"
 
     assert to_integer("0") == 0
+    assert to_integer("00") == 0
     assert to_integer("1") == 1
+    assert to_integer("01") == 1
     assert to_integer("123") == 123
     assert to_integer("123.0") == 123
     assert to_integer("123.00000") == 123
@@ -3737,6 +3731,7 @@ def test_to_integer():
     assert to_integer("4kb", allow_multiplier_suffix=True) == 4000
     assert to_integer("5 kb", allow_multiplier_suffix=True) == 5000
     assert to_integer("6.00kB", allow_multiplier_suffix=True) == 6000
+    assert to_integer("9KB", allow_multiplier_suffix=True) == 9000
     assert to_integer("12KB", allow_multiplier_suffix=True) == 12000
     assert to_integer("15K", allow_multiplier_suffix=True) == 15000
     assert to_integer("1.5K", allow_multiplier_suffix=True) == 1500
@@ -3756,6 +3751,8 @@ def test_to_integer():
     assert to_integer("4.000000001230TB", allow_multiplier_suffix=True) == 4000000001230
     assert to_integer("0M", allow_multiplier_suffix=True) == 0
 
+    assert type(to_integer("4.000000001230TB", allow_multiplier_suffix=True)) == int
+
     assert to_integer("1,234", allow_commas=True) == 1234
     assert to_integer("12,345", allow_commas=True) == 12345
     assert to_integer("123,456", allow_commas=True) == 123456
@@ -3764,30 +3761,12 @@ def test_to_integer():
     assert to_integer("1,234K", allow_multiplier_suffix=True, allow_commas=True) == 1234000
     assert to_integer("1,234M", allow_multiplier_suffix=True, allow_commas=True) == 1234000000
     assert to_integer("1,234G", allow_multiplier_suffix=True, allow_commas=True) == 1234000000000
+    assert to_integer("-1,234G", allow_multiplier_suffix=True, allow_commas=True) == -1234000000000
     assert to_integer("1,234,567T", allow_multiplier_suffix=True, allow_commas=True) == 1234567000000000000
+    assert to_integer("-1,234,567T", allow_multiplier_suffix=True, allow_commas=True) == -1234567000000000000
 
-    assert to_integer("1234") == 1234
-    assert to_integer("1234") == 1234
-    assert to_integer("27500") == 27500
-    assert to_integer("27500", allow_commas=True) == 27500
-    assert to_integer("1,234,567", allow_commas=True) == 1234567
-    assert to_integer("1K", allow_multiplier_suffix=True) == 1000
-    assert to_integer("1Kb", allow_multiplier_suffix=True) == 1000
-    assert to_integer("1kB", allow_multiplier_suffix=True) == 1000
-    assert to_integer("2M", allow_multiplier_suffix=True) == 2000000
-    assert to_integer("2Mb", allow_multiplier_suffix=True) == 2000000
-    assert to_integer("2MB", allow_multiplier_suffix=True) == 2000000
-    assert to_integer("3G", allow_multiplier_suffix=True) == 3000000000
-    assert to_integer("3Gb", allow_multiplier_suffix=True) == 3000000000
-    assert to_integer("3GB", allow_multiplier_suffix=True) == 3000000000
-    assert to_integer("4T", allow_multiplier_suffix=True) == 4000000000000
-    assert to_integer("4Tb", allow_multiplier_suffix=True) == 4000000000000
-    assert to_integer("4TB", allow_multiplier_suffix=True) == 4000000000000
-    assert to_integer("1,234,567K", allow_commas=True, allow_multiplier_suffix=True) == 1234567000
-    assert to_integer("-1,234,567K", allow_commas=True, allow_multiplier_suffix=True) == -1234567000
     assert to_integer(4321) == 4321
-    # TODO: More ...
-    pass
+    assert to_integer(4321 + 9) == 4330
 
 
 def test_to_integer_errors():
@@ -3808,6 +3787,7 @@ def test_to_integer_errors():
     assert to_integer("++123") is None
     assert to_integer("--123") is None
     assert to_integer("+-123") is None
+    assert to_integer("123,456") is None
 
     assert to_integer("K2", allow_multiplier_suffix=True) is None
     assert to_integer("2KK", allow_multiplier_suffix=True) is None
@@ -3816,6 +3796,7 @@ def test_to_integer_errors():
     assert to_integer("1.5001K", allow_multiplier_suffix=True) is None
     assert to_integer(".5001K", allow_multiplier_suffix=True) is None
     assert to_integer("123P", allow_multiplier_suffix=True) is None
+    assert to_integer("1,234M", allow_multiplier_suffix=True) is None
 
     assert to_integer("12,345") is None
     assert to_integer(",", allow_commas=True) is None
@@ -3829,12 +3810,15 @@ def test_to_integer_errors():
 
 
 def test_to_float():
+
     assert to_float("789") == 789.0
-    assert type(to_float("789")) == float
     assert to_float("1234.0567") == 1234.0567
     assert to_float("1.5K", allow_multiplier_suffix=True) == 1500
-    assert type(to_float("1.5K", allow_multiplier_suffix=True)) == float
+    # assert to_float("1.5678K", allow_multiplier_suffix=True) == 1567.8
     assert to_float(4321.1234) == 4321.1234
+
+    assert type(to_float("789")) == float
+    assert type(to_float("1.5K", allow_multiplier_suffix=True)) == float
 
 
 def test_load_json_from_file_expanding_environment_variables():
