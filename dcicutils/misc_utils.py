@@ -1027,7 +1027,7 @@ _TO_NUMBER_MULTIPLIER_SUFFIXES = {
     "GB": _TO_NUMBER_POWER_OF_TEN_FOR_G,
     "T": _TO_NUMBER_POWER_OF_TEN_FOR_T,
     "TB": _TO_NUMBER_POWER_OF_TEN_FOR_T,
-    # B means bytes or bases and BP means base pairs; needs to be last.
+    # B means bytes or bases and BP means base pairs; this needs to be last.
     "B": _TO_NUMBER_POWER_OF_TEN_FOR_NOTHING,
     "BP": _TO_NUMBER_POWER_OF_TEN_FOR_NOTHING
 }
@@ -1093,9 +1093,9 @@ def to_number(value: str,
                 if not value_fraction:
                     return fallback
                 value = "0"
-    elif (as_float is not True) and (value_dot_zero_suffix := re.search(r"\.0*$", value)):
+    elif (as_float is not True) and (value_dot_zeros_suffix := re.search(r"\.0*$", value)):
         # Allow for example "123.00" to mean 123 (int).
-        value = value[:value_dot_zero_suffix.start()]
+        value = value[:value_dot_zeros_suffix.start()]
 
     if (allow_commas is True) and ("," in value):
         # Make sure any commas are properly placed/spaced.

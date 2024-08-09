@@ -3825,6 +3825,7 @@ def test_to_float():
     assert to_float("1.K", allow_multiplier_suffix=True) == 1000
     assert to_float(".2K", allow_multiplier_suffix=True) == 200
     assert to_float(".2M", allow_multiplier_suffix=True) == 200000
+    assert to_float("3.M", allow_multiplier_suffix=True) == 3000000
     assert to_float("0.9G", allow_multiplier_suffix=True) == 900000000
     assert to_float("1.9G", allow_multiplier_suffix=True) == 1900000000
     assert to_float("4.0000000012309TB", allow_multiplier_suffix=True) == 4000000001230.9
@@ -3840,6 +3841,8 @@ def test_to_float():
     assert to_float("123,456.123498765G", allow_commas=True, allow_multiplier_suffix=True) == 123456123498765.0
     assert to_float("123,456.1234987656G", allow_commas=True, allow_multiplier_suffix=True) == 123456123498765.6
     assert to_float("123,456.1234987656Tb", allow_commas=True, allow_multiplier_suffix=True) == 123456123498765600
+    assert to_float("123,456.g", allow_commas=True, allow_multiplier_suffix=True) == 123456 * 1000 * 1000 * 1000
+    assert to_float("0.0m", allow_commas=True, allow_multiplier_suffix=True) == 0
 
     assert type(to_float("789")) == float
     assert type(to_float("1.5K", allow_multiplier_suffix=True)) == float
@@ -3854,12 +3857,15 @@ def test_to_float_errors():
     assert to_float([]) is None
     assert to_float({}) is None
     assert to_float(datetime_module.datetime.now()) is None
+    assert to_float({}, fallback="123") == "123"
 
     assert to_float("abc") is None
     assert to_float("123 456") is None
     assert to_float("123.456K") is None
     assert to_float("123,456") is None
     assert to_float(".") is None
+    assert to_float(".M", allow_multiplier_suffix=True) is None
+    assert to_float("M", allow_multiplier_suffix=True) is None
 
 
 def test_load_json_from_file_expanding_environment_variables():
