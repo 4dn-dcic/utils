@@ -3715,15 +3715,39 @@ def test_to_integer():
     assert to_integer("123") == 123
     assert to_integer("123.0") == 123
     assert to_integer("123.00000") == 123
+    assert to_integer(" 1234567890 ") == 1234567890
+
+    assert to_integer("+0") == 0
+    assert to_integer("+1") == 1
+    assert to_integer("+123") == 123
+    assert to_integer("+123.0") == 123
+    assert to_integer("+123.00000") == 123
+    assert to_integer("+ 1234567890 ") == 1234567890
+
+    assert to_integer("-0") == 0
+    assert to_integer("-1") == -1
+    assert to_integer("-123") == -123
+    assert to_integer("-123.0") == -123
+    assert to_integer("-123.00000") == -123
+    assert to_integer("- 1234567890 ") == -1234567890
 
     assert to_integer("1K", allow_multiplier_suffix=True) == 1000
+    assert to_integer("2KB", allow_multiplier_suffix=True) == 2000
+    assert to_integer("3Kb", allow_multiplier_suffix=True) == 3000
+    assert to_integer("4kb", allow_multiplier_suffix=True) == 4000
+    assert to_integer("5 kb", allow_multiplier_suffix=True) == 5000
+    assert to_integer("6.00kB", allow_multiplier_suffix=True) == 6000
+    assert to_integer("12KB", allow_multiplier_suffix=True) == 12000
     assert to_integer("15K", allow_multiplier_suffix=True) == 15000
     assert to_integer("1.5K", allow_multiplier_suffix=True) == 1500
     assert to_integer("15.K", allow_multiplier_suffix=True) == 15000
     assert to_integer("15.0K", allow_multiplier_suffix=True) == 15000
     assert to_integer("15.01K", allow_multiplier_suffix=True) == 15010
     assert to_integer(" 15.01 K ", allow_multiplier_suffix=True) == 15010
-    assert to_integer("15.01 KB", allow_multiplier_suffix=True) == 15010
+    assert to_integer("15.012  KB", allow_multiplier_suffix=True) == 15012
+    assert to_integer("25k", allow_multiplier_suffix=True) == 25000
+    assert to_integer("35Kb", allow_multiplier_suffix=True) == 35000
+    assert to_integer("-35Kb", allow_multiplier_suffix=True) == -35000
     assert to_integer("0K", allow_multiplier_suffix=True) == 0
     assert to_integer("1M", allow_multiplier_suffix=True) == 1000000
     assert to_integer("2G", allow_multiplier_suffix=True) == 2000000000
@@ -3731,6 +3755,16 @@ def test_to_integer():
     assert to_integer("345T", allow_multiplier_suffix=True) == 345000000000000
     assert to_integer("4.000000001230TB", allow_multiplier_suffix=True) == 4000000001230
     assert to_integer("0M", allow_multiplier_suffix=True) == 0
+
+    assert to_integer("1,234", allow_commas=True) == 1234
+    assert to_integer("12,345", allow_commas=True) == 12345
+    assert to_integer("123,456", allow_commas=True) == 123456
+    assert to_integer("1,234,567", allow_commas=True) == 1234567
+
+    assert to_integer("1,234K", allow_multiplier_suffix=True, allow_commas=True) == 1234000
+    assert to_integer("1,234M", allow_multiplier_suffix=True, allow_commas=True) == 1234000000
+    assert to_integer("1,234G", allow_multiplier_suffix=True, allow_commas=True) == 1234000000000
+    assert to_integer("1,234,567T", allow_multiplier_suffix=True, allow_commas=True) == 1234567000000000000
 
     assert to_integer("1234") == 1234
     assert to_integer("1234") == 1234
@@ -3766,9 +3800,14 @@ def test_to_integer_errors():
     assert to_integer(datetime_module.datetime.now()) is None
 
     assert to_integer("abc") is None
+    assert to_integer("123 456") is None
     assert to_integer("1.2") is None
     assert to_integer("123K") is None
     assert to_integer("123 K") is None
+    assert to_integer("123K B") is None
+    assert to_integer("++123") is None
+    assert to_integer("--123") is None
+    assert to_integer("+-123") is None
 
     assert to_integer("K2", allow_multiplier_suffix=True) is None
     assert to_integer("2KK", allow_multiplier_suffix=True) is None
@@ -3786,6 +3825,7 @@ def test_to_integer_errors():
     assert to_integer("123,45", allow_commas=True) is None
     assert to_integer("12,4356", allow_commas=True) is None
     assert to_integer("12,,456", allow_commas=True) is None
+    assert to_integer("1,234,5678", allow_commas=True) is None
 
 
 def test_to_float():
