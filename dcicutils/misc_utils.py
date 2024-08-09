@@ -1084,7 +1084,7 @@ def to_number(value: str,
                 break
 
     if (allow_multiplier_suffix is True) or (as_float is True):
-        # Allow for example "1.5K" to mean 1500 (integer).
+        # Allow for example "1.5K" to mean 1500 (int).
         if (dot_index := value.rfind(".")) >= 0:
             if value_fraction := value[dot_index + 1:].strip():
                 if not value_fraction.isdigit():
@@ -1094,7 +1094,7 @@ def to_number(value: str,
                     return fallback
                 value = "0"
     elif (as_float is not True) and (value_dot_zero_suffix := re.search(r"\.0*$", value)):
-        # Allow for example "123.00" to mean 123 (integer).
+        # Allow for example "123.00" to mean 123 (int).
         value = value[:value_dot_zero_suffix.start()]
 
     if (allow_commas is True) and ("," in value):
@@ -1121,6 +1121,7 @@ def to_number(value: str,
                     value += "0"
             if value_fraction:
                 if as_float is not True:
+                    # Left over fraction for int with multiplier, e.g. "1.2345K" -> 1234.5.
                     return fallback
                 value = float(f"{value}.{value_fraction}")
             else:
