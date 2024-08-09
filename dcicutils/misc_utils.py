@@ -990,6 +990,10 @@ def to_integer(value: str,
                allow_commas: bool = False,
                allow_multiplier_suffix: bool = False,
                fallback: Optional[Union[int, float]] = None) -> Optional[int]:
+    """
+    Converts the given string value to an int or None or the given fallback value if malformed.
+    See comments in to_number for details on the other arguments.
+    """
     return to_number(value, fallback=fallback, as_float=False,
                      allow_commas=allow_commas,
                      allow_multiplier_suffix=allow_multiplier_suffix)
@@ -999,25 +1003,33 @@ def to_float(value: str,
              allow_commas: bool = False,
              allow_multiplier_suffix: bool = False,
              fallback: Optional[Union[int, float]] = None) -> Optional[int]:
+    """
+    Converts the given string value to a float or None or the given fallback value if malformed.
+    See comments in to_number for details on the other arguments.
+    """
     return to_number(value, fallback=fallback, as_float=True,
                      allow_commas=allow_commas,
                      allow_multiplier_suffix=allow_multiplier_suffix)
 
 
-_TO_NUMBER_MULTIPLIER_K = 1000
-_TO_NUMBER_MULTIPLIER_M = 1000 * _TO_NUMBER_MULTIPLIER_K
-_TO_NUMBER_MULTIPLIER_G = 1000 * _TO_NUMBER_MULTIPLIER_M
-_TO_NUMBER_MULTIPLIER_T = 1000 * _TO_NUMBER_MULTIPLIER_G
+_TO_NUMBER_POWER_OF_TEN_FOR_NOTHING = 0
+_TO_NUMBER_POWER_OF_TEN_FOR_K = 3
+_TO_NUMBER_POWER_OF_TEN_FOR_M = 6
+_TO_NUMBER_POWER_OF_TEN_FOR_G = 9
+_TO_NUMBER_POWER_OF_TEN_FOR_T = 12
 
 _TO_NUMBER_MULTIPLIER_SUFFIXES = {
-    "K": _TO_NUMBER_MULTIPLIER_K,
-    "KB": _TO_NUMBER_MULTIPLIER_K,
-    "M": _TO_NUMBER_MULTIPLIER_M,
-    "MB": _TO_NUMBER_MULTIPLIER_M,
-    "G": _TO_NUMBER_MULTIPLIER_G,
-    "GB": _TO_NUMBER_MULTIPLIER_G,
-    "T": _TO_NUMBER_MULTIPLIER_T,
-    "TB": _TO_NUMBER_MULTIPLIER_T
+    "K": _TO_NUMBER_POWER_OF_TEN_FOR_K,
+    "KB": _TO_NUMBER_POWER_OF_TEN_FOR_K,
+    "M": _TO_NUMBER_POWER_OF_TEN_FOR_M,
+    "MB": _TO_NUMBER_POWER_OF_TEN_FOR_M,
+    "G": _TO_NUMBER_POWER_OF_TEN_FOR_G,
+    "GB": _TO_NUMBER_POWER_OF_TEN_FOR_G,
+    "T": _TO_NUMBER_POWER_OF_TEN_FOR_T,
+    "TB": _TO_NUMBER_POWER_OF_TEN_FOR_T,
+    # B means bytes or bases and BP means base pairs; needs to be last.
+    "B": _TO_NUMBER_POWER_OF_TEN_FOR_NOTHING,
+    "BP": _TO_NUMBER_POWER_OF_TEN_FOR_NOTHING
 }
 
 
@@ -1028,7 +1040,7 @@ def to_number(value: str,
               fallback: Optional[Union[int, float]] = None) -> Optional[Union[int, float]]:
     """
     Converts the given string value to an int, or float if as_float is True,
-    or None or the give fallback value if malformed.
+    or None or the given fallback value if malformed.
 
     If allow_commas is True then allows appropriately placed commas (i.e. every three digits).
 
@@ -1050,7 +1062,7 @@ def to_number(value: str,
         else:
             return value if isinstance(value, int) else fallback
 
-    value_multiplier = 1
+    value_multiplier = _TO_NUMBER_POWER_OF_TEN_FOR_NOTHING
     value_fraction = None
     value_negative = False
 
@@ -1066,7 +1078,7 @@ def to_number(value: str,
         value_upper = value.upper()
         for suffix in _TO_NUMBER_MULTIPLIER_SUFFIXES:
             if value_upper.endswith(suffix):
-                value_multiplier *= _TO_NUMBER_MULTIPLIER_SUFFIXES[suffix]
+                value_multiplier = _TO_NUMBER_MULTIPLIER_SUFFIXES[suffix]
                 if not (value := value[:-len(suffix)].strip()):
                     return fallback
                 break
@@ -1075,9 +1087,7 @@ def to_number(value: str,
         # Allow for example "1.5K" to mean 1500 (integer).
         if (dot_index := value.rfind(".")) >= 0:
             if value_fraction := value[dot_index + 1:].strip():
-                try:
-                    value_fraction = float(f"0.{value_fraction}")
-                except Exception:
+                if not value_fraction.isdigit():
                     return fallback
             if not (value := value[:dot_index].strip()):
                 if not value_fraction:
@@ -1088,7 +1098,7 @@ def to_number(value: str,
         value = value[:value_dot_zero_suffix.start()]
 
     if (allow_commas is True) and ("," in value):
-        # Make sure that any commas are properly placed.
+        # Make sure that any commas are properly placed/spaced.
         if not re.fullmatch(r"(-?\d{1,3}(,\d{3})*)", value):
             return fallback
         value = value.replace(",", "")
@@ -1096,26 +1106,35 @@ def to_number(value: str,
     if not value.isdigit():
         return fallback
 
-    value = float(value) if as_float is True else int(value)
-
-    if value_fraction:
-        value_float = float(value) + value_fraction
-        # Here we do NOT simply do: value_float *= float(value_multiplier);
-        # because it introduces obvious FLOATing point precision ERRORs; for example,
-        # to_integer("1.5678K", allow_multiplier_suffix=True) would yield 1567.8000000000002
-        # if we simply did 1.5678 * 1000.0; but doing the multiplication 10 at a time obviates this
-        # idiosyncracy yielding 1567.8; this ASSUMES that the multipliers are simple multiples of 10.
-        while value_multiplier > 1:
-            value_float *= 10
-            value_multiplier /= 10
-        if as_float is True:
-            value = value_float
+    if value_multiplier != _TO_NUMBER_POWER_OF_TEN_FOR_NOTHING:
+        # We do string manipulation for the (power of ten) multiplier because normal multiplicative
+        # arithmetic can easily yield unexpected floating point related inaccuracies. For example,
+        # to_integer("1.5678K", allow_multiplier_suffix=True) would yield 1567.8000000000002 rather
+        # than 1567.8 if (we simply did 1.5678 * 1000.0); also tried multiplying by 10 at a time,
+        # and using Decimal, which obviated some, but not all, of the precision idiosyncrasies.
+        if value_fraction:
+            for n in range(value_multiplier):
+                if value_fraction:
+                    value += value_fraction[0]
+                    value_fraction = value_fraction[1:]
+                else:
+                    value += "0"
+            if value_fraction:
+                if as_float is not True:
+                    return fallback
+                value = float(f"{value}.{value_fraction}")
+            else:
+                value = float(value) if as_float else int(value)
         else:
-            value = int(value_float)
-            if value_float != value:
-                return fallback
+            value = value + ("0" * value_multiplier)
+            value = float(value) if as_float else int(value)
+    elif as_float is True:
+        if value_fraction:
+            value = float(f"{value}.{value_fraction}")
+        else:
+            value = float(value)
     else:
-        value *= value_multiplier
+        value = int(value)
 
     if value_negative:
         value = -value

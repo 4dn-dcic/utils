@@ -3797,6 +3797,7 @@ def test_to_integer_errors():
     assert to_integer(".5001K", allow_multiplier_suffix=True) is None
     assert to_integer("123P", allow_multiplier_suffix=True) is None
     assert to_integer("1,234M", allow_multiplier_suffix=True) is None
+    assert to_integer("4.0000000012309TB", allow_multiplier_suffix=True) is None  # 4000000001230.9
 
     assert to_integer("12,345") is None
     assert to_integer(",", allow_commas=True) is None
@@ -3813,14 +3814,43 @@ def test_to_float():
 
     assert to_float("789") == 789.0
     assert to_float("1234.0567") == 1234.0567
+    assert to_float("1234.0") == 1234.0
+    assert to_float(".1234") == 0.1234
+    assert to_float("1234.") == 1234.0
     assert to_float("1.5K", allow_multiplier_suffix=True) == 1500
     assert to_float("1.5678K", allow_multiplier_suffix=True) == 1567.8
     assert to_float("1.56789K", allow_multiplier_suffix=True) == 1567.89
     assert to_float("1.567898K", allow_multiplier_suffix=True) == 1567.898
+    assert to_float("1.0K", allow_multiplier_suffix=True) == 1000
+    assert to_float("1.K", allow_multiplier_suffix=True) == 1000
+    assert to_float(".2K", allow_multiplier_suffix=True) == 200
+    assert to_float("4.0000000012309TB", allow_multiplier_suffix=True) == 4000000001230.9
     assert to_float(4321.1234) == 4321.1234
+
+    assert to_float("1,234.K", allow_commas=True, allow_multiplier_suffix=True) == 1234000
+    assert to_float("12,345.K", allow_commas=True, allow_multiplier_suffix=True) == 12345000
+    assert to_float("12,345.0K", allow_commas=True, allow_multiplier_suffix=True) == 12345000
+    assert to_float("12,345.06K", allow_commas=True, allow_multiplier_suffix=True) == 12345060
+    assert to_float("12,345.06789K", allow_commas=True, allow_multiplier_suffix=True) == 12345067.89
 
     assert type(to_float("789")) == float
     assert type(to_float("1.5K", allow_multiplier_suffix=True)) == float
+
+
+def test_to_float_errors():
+
+    assert to_float("") is None
+    assert to_float("  ") is None
+    assert to_float(None) is None
+    assert to_float([]) is None
+    assert to_float({}) is None
+    assert to_float(datetime_module.datetime.now()) is None
+
+    assert to_float("abc") is None
+    assert to_float("123 456") is None
+    assert to_float("123.456K") is None
+    assert to_float("123,456") is None
+    assert to_float(".") is None
 
 
 def test_load_json_from_file_expanding_environment_variables():
