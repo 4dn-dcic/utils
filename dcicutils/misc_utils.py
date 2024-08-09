@@ -1037,6 +1037,7 @@ def to_number(value: str,
     """
 
     if not (isinstance(value, str) and (value := value.strip())):
+        # Just in case the actual/desired return types are passed.
         if as_float is True:
             return float(value) if isinstance(value, (float, int)) else fallback
         else:

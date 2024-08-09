@@ -3710,8 +3710,30 @@ def test_to_integer():
     assert to_integer("asdf") is None
     assert to_integer("asdf", fallback="myfallback") == "myfallback"
 
+    assert to_integer("0") == 0
+    assert to_integer("1") == 1
+    assert to_integer("123") == 123
+    assert to_integer("123.0") == 123
+    assert to_integer("123.00000") == 123
+
+    assert to_integer("1K", allow_multiplier_suffix=True) == 1000
+    assert to_integer("15K", allow_multiplier_suffix=True) == 15000
+    assert to_integer("1.5K", allow_multiplier_suffix=True) == 1500
+    assert to_integer("15.K", allow_multiplier_suffix=True) == 15000
+    assert to_integer("15.0K", allow_multiplier_suffix=True) == 15000
+    assert to_integer("15.01K", allow_multiplier_suffix=True) == 15010
+    assert to_integer(" 15.01 K ", allow_multiplier_suffix=True) == 15010
+    assert to_integer("15.01 KB", allow_multiplier_suffix=True) == 15010
+    assert to_integer("0K", allow_multiplier_suffix=True) == 0
+    assert to_integer("1M", allow_multiplier_suffix=True) == 1000000
+    assert to_integer("2G", allow_multiplier_suffix=True) == 2000000000
+    assert to_integer("2.123456G", allow_multiplier_suffix=True) == 2123456000
+    assert to_integer("345T", allow_multiplier_suffix=True) == 345000000000000
+    assert to_integer("4.000000001230TB", allow_multiplier_suffix=True) == 4000000001230
+    assert to_integer("0M", allow_multiplier_suffix=True) == 0
+
     assert to_integer("1234") == 1234
-    assert to_integer("1,234,567") is None
+    assert to_integer("1234") == 1234
     assert to_integer("27500") == 27500
     assert to_integer("27500", allow_commas=True) == 27500
     assert to_integer("1,234,567", allow_commas=True) == 1234567
@@ -3727,12 +3749,43 @@ def test_to_integer():
     assert to_integer("4T", allow_multiplier_suffix=True) == 4000000000000
     assert to_integer("4Tb", allow_multiplier_suffix=True) == 4000000000000
     assert to_integer("4TB", allow_multiplier_suffix=True) == 4000000000000
-    assert to_integer("1,234,567K", allow_commas=True) is None
     assert to_integer("1,234,567K", allow_commas=True, allow_multiplier_suffix=True) == 1234567000
     assert to_integer("-1,234,567K", allow_commas=True, allow_multiplier_suffix=True) == -1234567000
     assert to_integer(4321) == 4321
     # TODO: More ...
     pass
+
+
+def test_to_integer_errors():
+
+    assert to_integer("") is None
+    assert to_integer("  ") is None
+    assert to_integer(None) is None
+    assert to_integer([]) is None
+    assert to_integer({}) is None
+    assert to_integer(datetime_module.datetime.now()) is None
+
+    assert to_integer("abc") is None
+    assert to_integer("1.2") is None
+    assert to_integer("123K") is None
+    assert to_integer("123 K") is None
+
+    assert to_integer("K2", allow_multiplier_suffix=True) is None
+    assert to_integer("2KK", allow_multiplier_suffix=True) is None
+    assert to_integer(".", allow_multiplier_suffix=True) is None
+    assert to_integer(".K", allow_multiplier_suffix=True) is None
+    assert to_integer("1.5001K", allow_multiplier_suffix=True) is None
+    assert to_integer(".5001K", allow_multiplier_suffix=True) is None
+    assert to_integer("123P", allow_multiplier_suffix=True) is None
+
+    assert to_integer("12,345") is None
+    assert to_integer(",", allow_commas=True) is None
+    assert to_integer("1,", allow_commas=True) is None
+    assert to_integer("123,", allow_commas=True) is None
+    assert to_integer(",123", allow_commas=True) is None
+    assert to_integer("123,45", allow_commas=True) is None
+    assert to_integer("12,4356", allow_commas=True) is None
+    assert to_integer("12,,456", allow_commas=True) is None
 
 
 def test_to_float():
