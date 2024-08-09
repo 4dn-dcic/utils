@@ -3814,7 +3814,9 @@ def test_to_float():
     assert to_float("789") == 789.0
     assert to_float("1234.0567") == 1234.0567
     assert to_float("1.5K", allow_multiplier_suffix=True) == 1500
-    # assert to_float("1.5678K", allow_multiplier_suffix=True) == 1567.8
+    assert to_float("1.5678K", allow_multiplier_suffix=True) == 1567.8
+    assert to_float("1.56789K", allow_multiplier_suffix=True) == 1567.89
+    assert to_float("1.567898K", allow_multiplier_suffix=True) == 1567.898
     assert to_float(4321.1234) == 4321.1234
 
     assert type(to_float("789")) == float

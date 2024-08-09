@@ -1081,6 +1081,7 @@ def to_number(value: str,
         value = value[:value_dot_zero_suffix.start()]
 
     if (allow_commas is True) and ("," in value):
+        # Make sure that any commas are properly placed.
         if not re.fullmatch(r"(-?\d{1,3}(,\d{3})*)", value):
             return fallback
         value = value.replace(",", "")
@@ -1091,7 +1092,15 @@ def to_number(value: str,
     value = float(value) if as_float is True else int(value)
 
     if value_fraction:
-        value_float = (float(value) + value_fraction) * float(value_multiplier)
+        value_float = float(value) + value_fraction
+        # We do not simply do: value_float *= float(value_multiplier);
+        # because it introduces obvious float point precision errors;
+        # e.g. to_integer("1.5678K", allow_multiplier_suffix=True) evaluates to: 1567.8000000000002;
+        # but do the multiplication 10 at a time obviates this idiosyncracy;
+        # this ASSUMES of course that the multipliers are simple multiples of 10.
+        while value_multiplier > 1:
+            value_float *= 10
+            value_multiplier /= 10
         if as_float is True:
             value = value_float
         else:
