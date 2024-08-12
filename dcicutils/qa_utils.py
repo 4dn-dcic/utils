@@ -25,8 +25,7 @@ from botocore.credentials import Credentials as Boto3Credentials
 from botocore.exceptions import ClientError
 from collections import defaultdict
 from json import dumps as json_dumps, loads as json_loads
-from typing import Any, Optional, List, DefaultDict, Union, Type, Dict
-from typing_extensions import Literal
+from typing import Any, Optional, List, DefaultDict, Union, Type, Dict, Literal
 from unittest import mock
 from . import misc_utils as misc_utils_module, command_utils as command_utils_module
 from .common import S3StorageClass

@@ -5,8 +5,7 @@ import mimetypes
 import os
 
 from io import BytesIO
-from typing import Optional, Any, Union
-from typing_extensions import Literal
+from typing import Optional, Any, Union, Literal
 from zipfile import ZipFile
 from .base import get_beanstalk_real_url
 from .common import (

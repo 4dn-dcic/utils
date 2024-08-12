@@ -31,7 +31,7 @@ from dcicutils.misc_utils import (
     ObsoleteError, CycleError, TopologicalSorter, keys_and_values_to_dict, dict_to_keys_and_values, is_c4_arn,
     deduplicate_list, chunked, parse_in_radix, format_in_radix, managed_property, future_datetime,
     MIN_DATETIME, MIN_DATETIME_UTC, INPUT, builtin_print, map_chunked, to_camel_case, json_file_contents,
-    pad_to, JsonLinesReader, split_string, merge_objects, to_integer,
+    pad_to, JsonLinesReader, split_string, merge_objects, to_float, to_integer,
     load_json_from_file_expanding_environment_variables, create_readonly_object
 )
 from dcicutils.qa_utils import (
@@ -3701,14 +3701,171 @@ def test_merge_objects_9():
 
 
 def test_to_integer():
-    assert to_integer("17") == 17
-    assert to_integer("17.0") == 17
-    assert to_integer("17.1") == 17
-    assert to_integer("17.9", "123") == 17
+
     assert to_integer("0") == 0
-    assert to_integer("0.0") == 0
-    assert to_integer("asdf") is None
-    assert to_integer("asdf", "myfallback") == "myfallback"
+    assert to_integer("00") == 0
+    assert to_integer("1") == 1
+    assert to_integer("01") == 1
+    assert to_integer("123") == 123
+    assert to_integer("123.0") == 123
+    assert to_integer("123.00000") == 123
+    assert to_integer(" 1234567890 ") == 1234567890
+
+    assert to_integer("+0") == 0
+    assert to_integer("+1") == 1
+    assert to_integer("+123") == 123
+    assert to_integer("+123.0") == 123
+    assert to_integer("+123.00000") == 123
+    assert to_integer("+ 1234567890 ") == 1234567890
+
+    assert to_integer("-0") == 0
+    assert to_integer("-1") == -1
+    assert to_integer("-123") == -123
+    assert to_integer("-123.0") == -123
+    assert to_integer("-123.00000") == -123
+    assert to_integer("- 1234567890 ") == -1234567890
+
+    assert to_integer("1K", allow_multiplier_suffix=True) == 1000
+    assert to_integer("2KB", allow_multiplier_suffix=True) == 2000
+    assert to_integer("3Kb", allow_multiplier_suffix=True) == 3000
+    assert to_integer("4kb", allow_multiplier_suffix=True) == 4000
+    assert to_integer("5 kb", allow_multiplier_suffix=True) == 5000
+    assert to_integer("6.00kB", allow_multiplier_suffix=True) == 6000
+    assert to_integer("9KB", allow_multiplier_suffix=True) == 9000
+    assert to_integer("12KB", allow_multiplier_suffix=True) == 12000
+    assert to_integer("15K", allow_multiplier_suffix=True) == 15000
+    assert to_integer("1.5K", allow_multiplier_suffix=True) == 1500
+    assert to_integer("15.K", allow_multiplier_suffix=True) == 15000
+    assert to_integer("15.0K", allow_multiplier_suffix=True) == 15000
+    assert to_integer("15.01K", allow_multiplier_suffix=True) == 15010
+    assert to_integer(" 15.01 K ", allow_multiplier_suffix=True) == 15010
+    assert to_integer("15.012  KB", allow_multiplier_suffix=True) == 15012
+    assert to_integer("25k", allow_multiplier_suffix=True) == 25000
+    assert to_integer("35Kb", allow_multiplier_suffix=True) == 35000
+    assert to_integer("-35Kb", allow_multiplier_suffix=True) == -35000
+    assert to_integer("0K", allow_multiplier_suffix=True) == 0
+    assert to_integer("1M", allow_multiplier_suffix=True) == 1000000
+    assert to_integer("2G", allow_multiplier_suffix=True) == 2000000000
+    assert to_integer("2.123456G", allow_multiplier_suffix=True) == 2123456000
+    assert to_integer("345T", allow_multiplier_suffix=True) == 345000000000000
+    assert to_integer("4.000000001230TB", allow_multiplier_suffix=True) == 4000000001230
+    assert to_integer("0M", allow_multiplier_suffix=True) == 0
+
+    assert type(to_integer("4.000000001230TB", allow_multiplier_suffix=True)) == int
+
+    assert to_integer("1,234", allow_commas=True) == 1234
+    assert to_integer("12,345", allow_commas=True) == 12345
+    assert to_integer("123,456", allow_commas=True) == 123456
+    assert to_integer("1,234,567", allow_commas=True) == 1234567
+
+    assert to_integer("1,234K", allow_multiplier_suffix=True, allow_commas=True) == 1234000
+    assert to_integer("1,234M", allow_multiplier_suffix=True, allow_commas=True) == 1234000000
+    assert to_integer("1,234G", allow_multiplier_suffix=True, allow_commas=True) == 1234000000000
+    assert to_integer("-1,234G", allow_multiplier_suffix=True, allow_commas=True) == -1234000000000
+    assert to_integer("1,234,567T", allow_multiplier_suffix=True, allow_commas=True) == 1234567000000000000
+    assert to_integer("-1,234,567T", allow_multiplier_suffix=True, allow_commas=True) == -1234567000000000000
+
+    assert to_integer(4321) == 4321
+    assert to_integer(4321 + 9) == 4330
+
+
+def test_to_integer_errors():
+
+    assert to_integer("") is None
+    assert to_integer("  ") is None
+    assert to_integer(None) is None
+    assert to_integer([]) is None
+    assert to_integer({}) is None
+    assert to_integer(datetime_module.datetime.now()) is None
+
+    assert to_integer("abc") is None
+    assert to_integer("123 456") is None
+    assert to_integer("1.2") is None
+    assert to_integer("123K") is None
+    assert to_integer("123 K") is None
+    assert to_integer("123K B") is None
+    assert to_integer("++123") is None
+    assert to_integer("--123") is None
+    assert to_integer("+-123") is None
+    assert to_integer("123,456") is None
+
+    assert to_integer("K2", allow_multiplier_suffix=True) is None
+    assert to_integer("2KK", allow_multiplier_suffix=True) is None
+    assert to_integer(".", allow_multiplier_suffix=True) is None
+    assert to_integer(".K", allow_multiplier_suffix=True) is None
+    assert to_integer("1.5001K", allow_multiplier_suffix=True) is None
+    assert to_integer(".5001K", allow_multiplier_suffix=True) is None
+    assert to_integer("123P", allow_multiplier_suffix=True) is None
+    assert to_integer("1,234M", allow_multiplier_suffix=True) is None
+    assert to_integer("4.0000000012309TB", allow_multiplier_suffix=True) is None  # 4000000001230.9
+
+    assert to_integer("12,345") is None
+    assert to_integer(",", allow_commas=True) is None
+    assert to_integer("1,", allow_commas=True) is None
+    assert to_integer("123,", allow_commas=True) is None
+    assert to_integer(",123", allow_commas=True) is None
+    assert to_integer("123,45", allow_commas=True) is None
+    assert to_integer("12,4356", allow_commas=True) is None
+    assert to_integer("12,,456", allow_commas=True) is None
+    assert to_integer("1,234,5678", allow_commas=True) is None
+
+
+def test_to_float():
+
+    assert to_float("789") == 789.0
+    assert to_float("1234.0567") == 1234.0567
+    assert to_float("1234.0") == 1234.0
+    assert to_float(".1234") == 0.1234
+    assert to_float("1234.") == 1234.0
+    assert to_float("1.5K", allow_multiplier_suffix=True) == 1500
+    assert to_float("1.5678K", allow_multiplier_suffix=True) == 1567.8
+    assert to_float("1.56789K", allow_multiplier_suffix=True) == 1567.89
+    assert to_float("1.567898K", allow_multiplier_suffix=True) == 1567.898
+    assert to_float("1.0K", allow_multiplier_suffix=True) == 1000
+    assert to_float("1.K", allow_multiplier_suffix=True) == 1000
+    assert to_float(".2K", allow_multiplier_suffix=True) == 200
+    assert to_float(".2M", allow_multiplier_suffix=True) == 200000
+    assert to_float("3.M", allow_multiplier_suffix=True) == 3000000
+    assert to_float("0.9G", allow_multiplier_suffix=True) == 900000000
+    assert to_float("1.9G", allow_multiplier_suffix=True) == 1900000000
+    assert to_float("4.0000000012309TB", allow_multiplier_suffix=True) == 4000000001230.9
+    assert to_float(4321.1234) == 4321.1234
+
+    assert to_float("1,234.K", allow_commas=True, allow_multiplier_suffix=True) == 1234000
+    assert to_float("12,345.K", allow_commas=True, allow_multiplier_suffix=True) == 12345000
+    assert to_float("12,345.0K", allow_commas=True, allow_multiplier_suffix=True) == 12345000
+    assert to_float("12,345.06K", allow_commas=True, allow_multiplier_suffix=True) == 12345060
+    assert to_float("12,345.06789K", allow_commas=True, allow_multiplier_suffix=True) == 12345067.89
+    assert to_float("123,456.9876G", allow_commas=True, allow_multiplier_suffix=True) == 123456987600000
+    assert to_float("123,456.9876G", allow_commas=True, allow_multiplier_suffix=True) == 123456987600000.0
+    assert to_float("123,456.123498765G", allow_commas=True, allow_multiplier_suffix=True) == 123456123498765.0
+    assert to_float("123,456.1234987656G", allow_commas=True, allow_multiplier_suffix=True) == 123456123498765.6
+    assert to_float("123,456.1234987656Tb", allow_commas=True, allow_multiplier_suffix=True) == 123456123498765600
+    assert to_float("123,456.g", allow_commas=True, allow_multiplier_suffix=True) == 123456 * 1000 * 1000 * 1000
+    assert to_float("0.0m", allow_commas=True, allow_multiplier_suffix=True) == 0
+
+    assert type(to_float("789")) == float
+    assert type(to_float("1.5K", allow_multiplier_suffix=True)) == float
+    assert type(to_float("123,456.9876G", allow_commas=True, allow_multiplier_suffix=True)) == float
+
+
+def test_to_float_errors():
+
+    assert to_float("") is None
+    assert to_float("  ") is None
+    assert to_float(None) is None
+    assert to_float([]) is None
+    assert to_float({}) is None
+    assert to_float(datetime_module.datetime.now()) is None
+    assert to_float({}, fallback="123") == "123"
+
+    assert to_float("abc") is None
+    assert to_float("123 456") is None
+    assert to_float("123.456K") is None
+    assert to_float("123,456") is None
+    assert to_float(".") is None
+    assert to_float(".M", allow_multiplier_suffix=True) is None
+    assert to_float("M", allow_multiplier_suffix=True) is None
 
 
 def test_load_json_from_file_expanding_environment_variables():

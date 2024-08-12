@@ -3,8 +3,10 @@ This file contains functions that might be generally useful.
 """
 
 from collections import namedtuple
+from typing import Iterable  # would prefer this but error from Python 3.8: from collections.abc import Iterable
 import appdirs
 from copy import deepcopy
+import concurrent.futures
 import contextlib
 import datetime
 import functools
@@ -984,22 +986,158 @@ def str_to_bool(x: Optional[str]) -> Optional[bool]:
         raise ValueError(f"An argument to str_or_bool must be a string or None: {x!r}")
 
 
-def to_integer(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
-    try:
-        return int(value)
-    except Exception:
-        try:
-            return int(float(value))
-        except Exception:
-            pass
-    return fallback
+def to_integer(value: str,
+               allow_commas: bool = False,
+               allow_multiplier_suffix: bool = False,
+               fallback: Optional[Union[int, float]] = None) -> Optional[int]:
+    """
+    Converts the given string value to an int or None or the given fallback value if malformed.
+    See comments in to_number for details on the other arguments.
+    """
+    return to_number(value, fallback=fallback, as_float=False,
+                     allow_commas=allow_commas,
+                     allow_multiplier_suffix=allow_multiplier_suffix)
 
 
-def to_float(value: str, fallback: Optional[Any] = None) -> Optional[Any]:
-    try:
-        return float(value)
-    except Exception:
+def to_float(value: str,
+             allow_commas: bool = False,
+             allow_multiplier_suffix: bool = False,
+             fallback: Optional[Union[int, float]] = None) -> Optional[int]:
+    """
+    Converts the given string value to a float or None or the given fallback value if malformed.
+    See comments in to_number for details on the other arguments.
+    """
+    return to_number(value, fallback=fallback, as_float=True,
+                     allow_commas=allow_commas,
+                     allow_multiplier_suffix=allow_multiplier_suffix)
+
+
+_TO_NUMBER_POWER_OF_TEN_FOR_NOTHING = 0
+_TO_NUMBER_POWER_OF_TEN_FOR_K = 3
+_TO_NUMBER_POWER_OF_TEN_FOR_M = 6
+_TO_NUMBER_POWER_OF_TEN_FOR_G = 9
+_TO_NUMBER_POWER_OF_TEN_FOR_T = 12
+
+_TO_NUMBER_MULTIPLIER_SUFFIXES = {
+    "K": _TO_NUMBER_POWER_OF_TEN_FOR_K,
+    "KB": _TO_NUMBER_POWER_OF_TEN_FOR_K,
+    "M": _TO_NUMBER_POWER_OF_TEN_FOR_M,
+    "MB": _TO_NUMBER_POWER_OF_TEN_FOR_M,
+    "G": _TO_NUMBER_POWER_OF_TEN_FOR_G,
+    "GB": _TO_NUMBER_POWER_OF_TEN_FOR_G,
+    "T": _TO_NUMBER_POWER_OF_TEN_FOR_T,
+    "TB": _TO_NUMBER_POWER_OF_TEN_FOR_T,
+    # B means bytes or bases and BP means base pairs; this needs to be last.
+    "B": _TO_NUMBER_POWER_OF_TEN_FOR_NOTHING,
+    "BP": _TO_NUMBER_POWER_OF_TEN_FOR_NOTHING
+}
+
+
+def to_number(value: str,
+              as_float: bool = False,
+              allow_commas: bool = False,
+              allow_multiplier_suffix: bool = False,
+              fallback: Optional[Union[int, float]] = None) -> Optional[Union[int, float]]:
+    """
+    Converts the given string value to an int, or float if as_float is True,
+    or None or the given fallback value if malformed.
+
+    If allow_commas is True then allows appropriately placed commas (i.e. every three digits).
+
+    If allow_multiplier_suffix is True allows any of the multiplier suffixes K, KB; M, MB;
+    or G, GB; or T, TB; all case-insensitive; which will multiply the value by a thousand;
+    a million; a billion; or a trillion; respectively.
+
+    If as_float is True then value is parsed and returned as a float rather than int.
+
+    Note that even if as_float is False, values that might LOOK like a float, can be
+    an int, for example, "1.5K", returns 1500 as an int since it is; but "1.5002K"
+    is malformed, since 1.5002K is equivalent to 1500.2 which is not an int.
+    """
+
+    if not (isinstance(value, str) and (value := value.strip())):
+        # Just in case the value is already the actual/desired return type.
+        if as_float is True:
+            return float(value) if isinstance(value, (float, int)) else fallback
+        else:
+            return value if isinstance(value, int) else fallback
+
+    value_multiplier = _TO_NUMBER_POWER_OF_TEN_FOR_NOTHING
+    value_fraction = None
+    value_negative = False
+
+    if value.startswith("-"):
+        if not (value := value[1:].strip()):
+            return fallback
+        value_negative = True
+    elif value.startswith("+"):
+        if not (value := value[1:].strip()):
+            return fallback
+
+    if allow_multiplier_suffix is True:
+        value_upper = value.upper()
+        for suffix in _TO_NUMBER_MULTIPLIER_SUFFIXES:
+            if value_upper.endswith(suffix):
+                value_multiplier = _TO_NUMBER_MULTIPLIER_SUFFIXES[suffix]
+                if not (value := value[:-len(suffix)].strip()):
+                    return fallback
+                break
+
+    if (allow_multiplier_suffix is True) or (as_float is True):
+        # Allow for example "1.5K" to mean 1500 (int).
+        if (dot_index := value.rfind(".")) >= 0:
+            if value_fraction := value[dot_index + 1:].strip():
+                if not value_fraction.isdigit():
+                    return fallback
+            if not (value := value[:dot_index].strip()):
+                if not value_fraction:
+                    return fallback
+                value = "0"
+    elif (as_float is not True) and (value_dot_zeros_suffix := re.search(r"\.0*$", value)):
+        # Allow for example "123.00" to mean 123 (int).
+        value = value[:value_dot_zeros_suffix.start()]
+
+    if (allow_commas is True) and ("," in value):
+        # Make sure any commas are properly placed/spaced.
+        if not re.fullmatch(r"(-?\d{1,3}(,\d{3})*)", value):
+            return fallback
+        value = value.replace(",", "")
+
+    if not value.isdigit():
         return fallback
+
+    if value_multiplier != _TO_NUMBER_POWER_OF_TEN_FOR_NOTHING:
+        # We do string manipulation for the (power of ten) multiplier and NOT normal multiplicative
+        # arithmetic because this can EASILY yield UNEXPECTED floating point related INACCURACIES.
+        # E.g. to_integer("1.5678K", allow_multiplier_suffix=True) would yield 1567.8000000000002
+        # rather than 1567.8 if (we simply did 1.5678 * 1000.0); also tried multiplying by 10 at
+        # a time, and using Decimal, which obviated some, but not all, of the idiosyncrasies.
+        if value_fraction:
+            for _ in range(value_multiplier):
+                if value_fraction:
+                    value += value_fraction[0]
+                    value_fraction = value_fraction[1:]
+                else:
+                    value += "0"
+            if value_fraction:
+                if as_float is not True:
+                    # Left over fraction for int with multiplier, e.g. "1.2345K" -> 1234.5.
+                    return fallback
+                value = float(f"{value}.{value_fraction}")
+            else:
+                value = float(value) if as_float else int(value)
+        else:
+            value = value + ("0" * value_multiplier)
+            value = float(value) if as_float else int(value)
+    elif as_float is True:
+        if value_fraction:
+            value = float(f"{value}.{value_fraction}")
+        else:
+            value = float(value)
+    else:
+        value = int(value)
+
+    return -value if value_negative else value
 
 
 def to_boolean(value: str, fallback: Optional[Any]) -> Optional[Any]:
@@ -1011,12 +1149,14 @@ def to_boolean(value: str, fallback: Optional[Any]) -> Optional[Any]:
     return fallback
 
 
-def to_enum(value: str, enumerators: List[str]) -> Optional[str]:
+def to_enum(value: str, enumerators: List[str], fuzzy: bool = False) -> Optional[str]:
     matches = []
     if isinstance(value, str) and (value := value.strip()) and isinstance(enumerators, List):
         enum_specifiers = {str(enum).lower(): enum for enum in enumerators}
         if (enum_value := enum_specifiers.get(lower_value := value.lower())) is not None:
             return enum_value
+        if fuzzy is not True:
+            return value
         for enum_canonical, _ in enum_specifiers.items():
             if enum_canonical.startswith(lower_value):
                 matches.append(enum_canonical)
@@ -2778,3 +2918,8 @@ def create_short_uuid(length: Optional[int] = None, upper: bool = False):
     if upper is True:
         value = value.upper()
     return value
+
+
+def run_concurrently(functions: Iterable[Callable], nthreads: int = 4) -> None:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=nthreads) as executor:
+        concurrent.futures.as_completed([executor.submit(f) for f in functions])
