@@ -279,13 +279,31 @@ def _get_portal_object(portal: Portal, uuid: str,
             if not ((supertypes := portal.get_schemas_super_type_map()) and (subtypes := supertypes.get(results_type))):
                 subtypes = None
             response = {}
+            results_index = 0
+            results_total = len(results)
+            def get_metadata_for_individual_result_type(uuid: str) -> Optional[dict]:  # noqa
+                # There can be a lot of individual results for which we may need to get the actual type,
+                # so do this in a function we were can give verbose output feedback.
+                nonlocal portal, results_index, results_total, verbose
+                if verbose:
+                    _print(f"Getting actual type for {results_type} result:"
+                           f" {uuid} [{results_index} of {results_total}]", end="")
+                result = portal.get_metadata(uuid, raise_exception=False)
+                if (isinstance(result_types := result.get("@type"), list) and
+                    result_types and (result_type := result_types[0])):  # noqa
+                    if verbose:
+                        _print(f" -> {result_type}")
+                    return result_type
+                if verbose:
+                    _print()
+                return None
             for result in results:
+                results_index += 1
                 result.pop("schema_version", None)
                 if (subtypes and
                     (result_uuid := result.get("uuid")) and
-                    (individual_result := portal.get_metadata(result_uuid, raise_exception=False)) and
-                    isinstance(result_type:= individual_result.get("@type"), list) and result_type and result_type[0]):  # noqa
-                    result_type = result_type[0]
+                    (individual_result_type := get_metadata_for_individual_result_type(result_uuid))):  # noqa
+                    result_type = individual_result_type
                 else:
                     result_type = results_type
                 if response.get(result_type):
