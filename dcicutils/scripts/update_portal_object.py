@@ -19,7 +19,7 @@ from typing import Callable, List, Optional, Tuple, Union
 from dcicutils.command_utils import yes_or_no
 from dcicutils.common import ORCHESTRATED_APPS, APP_SMAHT
 from dcicutils.ff_utils import delete_metadata, purge_metadata
-from dcicutils.misc_utils import get_error_message, PRINT
+from dcicutils.misc_utils import get_error_message, ignored, PRINT
 from dcicutils.portal_utils import Portal as PortalFromUtils
 
 
@@ -40,7 +40,7 @@ _DEFAULT_APP = "smaht"
 _SMAHT_ENV_ENVIRON_NAME = "SMAHT_ENV"
 
 # Schema properties to ignore (by default) for the view schema usage.
-_SCHEMAS_IGNORE_PROPERTIES = [
+_IGNORE_PROPERTIES_ON_UPDATE = [
     "date_created",
     "last_modified",
     "principals_allowed",
@@ -122,6 +122,8 @@ def main():
     parser.add_argument("--upsert", type=str, required=False, default=None, help="Upsert data.")
     parser.add_argument("--delete", type=str, required=False, default=None, help="Delete data.")
     parser.add_argument("--purge", type=str, required=False, default=None, help="Purge data.")
+    parser.add_argument("--noignore", action="store_true", required=False, default=False,
+                        help="Do not ignore standard fields on insert.")
     parser.add_argument("--confirm", action="store_true", required=False, default=False, help="Confirm before action.")
     parser.add_argument("--verbose", action="store_true", required=False, default=False, help="Verbose output.")
     parser.add_argument("--quiet", action="store_true", required=False, default=False, help="Quiet output.")
@@ -156,6 +158,7 @@ def main():
                                  explicit_schema_name=explicit_schema_name,
                                  update_function=post_data,
                                  update_action_name="POST",
+                                 noignore=args.noignore,
                                  confirm=args.confirm, verbose=args.verbose, quiet=args.quiet, debug=args.debug)
     if args.patch:
         _post_or_patch_or_upsert(portal=portal,
@@ -164,6 +167,7 @@ def main():
                                  update_function=patch_data,
                                  update_action_name="PATCH",
                                  patch_delete_fields=args.delete,
+                                 noignore=args.noignore,
                                  confirm=args.confirm, verbose=args.verbose, quiet=args.quiet, debug=args.debug)
         args.delete = None
     if args.upsert:
@@ -173,6 +177,7 @@ def main():
                                  update_function=upsert_data,
                                  update_action_name="UPSERT",
                                  patch_delete_fields=args.delete,
+                                 noignore=args.noignore,
                                  confirm=args.confirm, verbose=args.verbose, quiet=args.quiet, debug=args.debug)
         args.delete = None
 
@@ -196,6 +201,7 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
                              explicit_schema_name: str,
                              update_function: Callable, update_action_name: str,
                              patch_delete_fields: Optional[str] = None,
+                             noignore: bool = False,
                              confirm: bool = False, verbose: bool = False,
                              quiet: bool = False, debug: bool = False) -> None:
 
@@ -221,7 +227,7 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
                     if debug:
                         _print(f"DEBUG: File ({file}) contains an object of type: {schema_name}")
                     update_function(portal, data, schema_name, file=file,
-                                    patch_delete_fields=patch_delete_fields,
+                                    patch_delete_fields=patch_delete_fields, noignore=noignore,
                                     confirm=confirm, verbose=verbose, debug=debug)
                 elif is_schema_name_list(portal, list(data.keys())):
                     if debug:
@@ -232,7 +238,7 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
                                 _print(f"DEBUG: Processing {update_action_name}s for type: {schema_name}")
                             for index, item in enumerate(schema_data):
                                 update_function(portal, item, schema_name, file=file, index=index,
-                                                patch_delete_fields=patch_delete_fields,
+                                                patch_delete_fields=patch_delete_fields, noignore=noignore,
                                                 confirm=confirm, verbose=verbose, debug=debug)
                         else:
                             _print(f"WARNING: File ({file}) contains schema item which is not a list: {schema_name}")
@@ -243,7 +249,7 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
                     _print(f"DEBUG: File ({file}) contains a list of objects of type: {schema_name}")
                 for index, item in enumerate(data):
                     update_function(portal, item, schema_name, file=file, index=index,
-                                    patch_delete_fields=patch_delete_fields,
+                                    patch_delete_fields=patch_delete_fields, noignore=noignore,
                                     confirm=confirm, verbose=verbose, debug=debug)
             if debug:
                 _print(f"DEBUG: Processing {update_action_name} file done: {file}")
@@ -278,8 +284,9 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
 
 def post_data(portal: Portal, data: dict, schema_name: str,
               file: Optional[str] = None, index: int = 0,
-              patch_delete_fields: Optional[str] = None,  # unused here
+              patch_delete_fields: Optional[str] = None, noignore: bool = False,
               confirm: bool = False, verbose: bool = False, debug: bool = False) -> None:
+    ignored(patch_delete_fields)
     if not (identifying_path := portal.get_identifying_path(data, portal_type=schema_name)):
         if isinstance(file, str) and isinstance(index, int):
             _print(f"ERROR: Item for POST has no identifying property: {file} (#{index + 1})")
@@ -294,6 +301,7 @@ def post_data(portal: Portal, data: dict, schema_name: str,
     if verbose:
         _print(f"POST {schema_name} item: {identifying_path}")
     try:
+        data = _prune_data_for_update(data, noignore=noignore)
         portal.post_metadata(schema_name, data)
         if debug:
             _print(f"DEBUG: POST {schema_name} item done: {identifying_path}")
@@ -305,7 +313,7 @@ def post_data(portal: Portal, data: dict, schema_name: str,
 
 def patch_data(portal: Portal, data: dict, schema_name: str,
                file: Optional[str] = None, index: int = 0,
-               patch_delete_fields: Optional[str] = None,
+               patch_delete_fields: Optional[str] = None, noignore: bool = False,
                confirm: bool = False, verbose: bool = False, debug: bool = False) -> None:
     if not (identifying_path := portal.get_identifying_path(data, portal_type=schema_name)):
         if isinstance(file, str) and isinstance(index, int):
@@ -323,6 +331,7 @@ def patch_data(portal: Portal, data: dict, schema_name: str,
     try:
         if delete_fields := _parse_delete_fields(patch_delete_fields):
             identifying_path += f"?delete_fields={delete_fields}"
+        data = _prune_data_for_update(data, noignore=noignore)
         portal.patch_metadata(identifying_path, data)
         if debug:
             _print(f"DEBUG: PATCH {schema_name} item OK: {identifying_path}")
@@ -334,7 +343,7 @@ def patch_data(portal: Portal, data: dict, schema_name: str,
 
 def upsert_data(portal: Portal, data: dict, schema_name: str,
                 file: Optional[str] = None, index: int = 0,
-                patch_delete_fields: Optional[str] = None,
+                patch_delete_fields: Optional[str] = None, noignore: bool = False,
                 confirm: bool = False, verbose: bool = False, debug: bool = False) -> None:
     if not (identifying_path := portal.get_identifying_path(data, portal_type=schema_name)):
         if isinstance(file, str) and isinstance(index, int):
@@ -349,10 +358,12 @@ def upsert_data(portal: Portal, data: dict, schema_name: str,
         _print(f"{'PATCH' if exists else 'POST'} {schema_name} item: {identifying_path}")
     try:
         if not exists:
+            data = _prune_data_for_update(data, noignore=noignore)
             portal.post_metadata(schema_name, data)
         else:
             if delete_fields := _parse_delete_fields(patch_delete_fields):
                 identifying_path += f"?delete_fields={delete_fields}"
+            data = _prune_data_for_update(data, noignore=noignore)
             portal.patch_metadata(identifying_path, data)
         if debug:
             _print(f"DEBUG: UPSERT {schema_name} item OK: {identifying_path}")
@@ -360,6 +371,12 @@ def upsert_data(portal: Portal, data: dict, schema_name: str,
         _print(f"ERROR: Cannot UPSERT {schema_name} item: {identifying_path}")
         _print(e)
         return
+
+
+def _prune_data_for_update(data: dict, noignore: bool = False) -> dict:
+    if noignore is True:
+        return data
+    return {key: value for key, value in data.items() if key not in _IGNORE_PROPERTIES_ON_UPDATE}
 
 
 def _create_portal(env: Optional[str] = None, app: Optional[str] = None,

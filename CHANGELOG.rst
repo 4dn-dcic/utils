@@ -8,7 +8,7 @@ Change Log
 
 8.14.1
 ======
-* Minor changes to utility/troubleshooting/convenience script view-portal-object.
+* Minor changes to utility/troubleshooting/convenience scripts view-portal-object and update-portal-object.
 
 
 8.14.0
