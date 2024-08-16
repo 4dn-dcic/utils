@@ -122,11 +122,13 @@ def main():
     parser.add_argument("--force", action="store_true", required=False, default=False, help="Debugging output.")
     parser.add_argument("--terse", action="store_true", required=False, default=False, help="Terse output.")
     parser.add_argument("--verbose", action="store_true", required=False, default=False, help="Verbose output.")
+    parser.add_argument("--noheader", action="store_true", required=False, default=False, help="Supress header output.")
     parser.add_argument("--debug", action="store_true", required=False, default=False, help="Debugging output.")
     args = parser.parse_args()
 
     portal = _create_portal(ini=args.ini, env=args.env or os.environ.get("SMAHT_ENV"),
-                            server=args.server, app=args.app, verbose=args.verbose, debug=args.debug)
+                            server=args.server, app=args.app,
+                            verbose=args.verbose and not args.noheader, debug=args.debug)
 
     if not args.uuid:
         _print("UUID or schema or path required.")
@@ -205,7 +207,8 @@ def main():
 
     data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw, database=args.database,
                               inserts=args.inserts, insert_files=args.insert_files,
-                              ignore=args.ignore, check=args.bool, force=args.force, verbose=args.verbose)
+                              ignore=args.ignore, check=args.bool,
+                              force=args.force, verbose=args.verbose, debug=args.debug)
     if args.insert_files:
         return
 
@@ -261,13 +264,31 @@ def _get_portal_object(portal: Portal, uuid: str,
                        raw: bool = False, database: bool = False,
                        inserts: bool = False, insert_files: bool = False,
                        ignore: Optional[List[str]] = None,
-                       check: bool = False, force: bool = False, verbose: bool = False) -> dict:
+                       check: bool = False, force: bool = False,
+                       verbose: bool = False, debug: bool = False) -> dict:
 
     def prune_data(data: dict) -> dict:
         nonlocal ignore
         if not isinstance(ignore, list) or not ignore:
             return data
         return {key: value for key, value in data.items() if key not in ignore}
+
+    def get_metadata_for_individual_result_type(uuid: str) -> Optional[dict]:  # noqa
+        # There can be a lot of individual results for which we may need to get the actual type,
+        # so do this in a function we were can give verbose output feedback.
+        nonlocal portal, results_index, results_total, verbose
+        if verbose:
+            _print(f"Getting actual type for {results_type} result:"
+                   f" {uuid} [{results_index} of {results_total}]", end="")
+        result = portal.get_metadata(uuid, raise_exception=False)
+        if (isinstance(result_types := result.get("@type"), list) and
+            result_types and (result_type := result_types[0])):  # noqa
+            if verbose:
+                _print(f" -> {result_type}")
+            return result_type
+        if verbose:
+            _print()
+        return None
 
     response = None
     try:
@@ -307,27 +328,11 @@ def _get_portal_object(portal: Portal, uuid: str,
             response = {}
             results_index = 0
             results_total = len(results)
-            def get_metadata_for_individual_result_type(uuid: str) -> Optional[dict]:  # noqa
-                # There can be a lot of individual results for which we may need to get the actual type,
-                # so do this in a function we were can give verbose output feedback.
-                nonlocal portal, results_index, results_total, verbose
-                if verbose:
-                    _print(f"Getting actual type for {results_type} result:"
-                           f" {uuid} [{results_index} of {results_total}]", end="")
-                result = portal.get_metadata(uuid, raise_exception=False)
-                if (isinstance(result_types := result.get("@type"), list) and
-                    result_types and (result_type := result_types[0])):  # noqa
-                    if verbose:
-                        _print(f" -> {result_type}")
-                    return result_type
-                if verbose:
-                    _print()
-                return None
             for result in results:
                 results_index += 1
                 result.pop("schema_version", None)
                 result = prune_data(result)
-                if (subtypes and
+                if (subtypes and one_or_more_objects_of_types_exists(portal, subtypes, debug=debug) and
                     (result_uuid := result.get("uuid")) and
                     (individual_result_type := get_metadata_for_individual_result_type(result_uuid))):  # noqa
                     result_type = individual_result_type
@@ -365,6 +370,37 @@ def _get_portal_object(portal: Portal, uuid: str,
     elif raw:
         response.pop("schema_version", None)
     return response
+
+
+def one_or_more_objects_of_types_exists(portal: Portal, schema_types: List[str], debug: bool = False) -> bool:
+    for schema_type in schema_types:
+        try:
+            if one_or_more_objects_of_type_exists(portal, schema_type, debug=debug):
+                return True
+            response = portal.get(f"/{schema_type}")
+            if response and response.status_code == 404:
+                _print(f"There are no objects of sub-type: {schema_type}")
+                return False
+        except Exception:
+            return True
+    return False
+
+
+@lru_cache(maxsize=64)
+def one_or_more_objects_of_type_exists(portal: Portal, schema_type: str, debug: bool = False) -> bool:
+    try:
+        if debug:
+            _print(f"Checking if there are actually any objects of type: {schema_type}")
+        if portal.get(f"/{schema_type}").status_code == 404:
+            if debug:
+                _print(f"No any objects of type exist: {schema_type}")
+        else:
+            if debug:
+                _print(f"One or more objects of type exist: {schema_type}")
+    except Exception as e:
+        _print(f"ERROR: Checking if there are actually any objects of type: {schema_type}")
+        _print(e)
+    return False
 
 
 @lru_cache(maxsize=1)
