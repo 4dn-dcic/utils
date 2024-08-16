@@ -251,7 +251,6 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
             elif isinstance(data, list):
                 if debug:
                     _print(f"DEBUG: File ({file}) contains a list of objects of type: {schema_name}")
-                import pdb ; pdb.set_trace()  # noqa
                 data = _impose_special_ordering(data, schema_name)
                 for index, item in enumerate(data):
                     update_function(portal, item, schema_name, file=file, index=index,

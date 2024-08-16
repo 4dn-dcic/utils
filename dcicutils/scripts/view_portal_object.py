@@ -347,19 +347,18 @@ def _get_portal_object(portal: Portal, uuid: str,
                 schema_data = response[schema_name]
                 file_name = f"{to_snake_case(schema_name)}.json"
                 file_path = os.path.join(output_directory, file_name)
+                message_verb = "Writing"
                 if os.path.exists(file_path):
+                    message_verb = "Overwriting"
                     if os.path.isdir(file_path):
                         _print(f"WARNING: Output file already exists as a directory. SKIPPING: {file_path}")
                         continue
-                    if force:
-                        if verbose:
-                            _print(f"Overwriting extant file (per --force option): {file_path}")
-                    else:
+                    if not force:
                         _print(f"Output file already exists: {file_path}")
-                    if (not force) and not yes_or_no(f"Overwrite this file?"):
-                        continue
+                        if not yes_or_no(f"Overwrite this file?"):
+                            continue
                 if verbose:
-                    _print(f"Writing {schema_name} (object{'s' if len(schema_data) != 1 else ''}:"
+                    _print(f"{message_verb} {schema_name} (object{'s' if len(schema_data) != 1 else ''}:"
                            f" {len(schema_data)}) file: {file_path}")
                 with io.open(file_path, "w") as f:
                     json.dump(schema_data, f, indent=4)
