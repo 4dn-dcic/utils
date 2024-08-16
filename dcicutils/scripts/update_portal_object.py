@@ -236,6 +236,7 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
                         _print(f"DEBUG: File ({file}) contains a dictionary of schema names.")
                     for schema_name in data:
                         if isinstance(schema_data := data[schema_name], list):
+                            schema_data = _impose_special_ordering(schema_data, schema_name)
                             if debug:
                                 _print(f"DEBUG: Processing {update_action_name}s for type: {schema_name}")
                             for index, item in enumerate(schema_data):
@@ -250,6 +251,8 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
             elif isinstance(data, list):
                 if debug:
                     _print(f"DEBUG: File ({file}) contains a list of objects of type: {schema_name}")
+                import pdb ; pdb.set_trace()  # noqa
+                data = _impose_special_ordering(data, schema_name)
                 for index, item in enumerate(data):
                     update_function(portal, item, schema_name, file=file, index=index,
                                     patch_delete_fields=patch_delete_fields,
@@ -284,6 +287,12 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
             # return
     else:
         _print(f"ERROR: Cannot find file or directory: {file_or_directory}")
+
+
+def _impose_special_ordering(data: List[dict], schema_name: str) -> List[dict]:
+    if schema_name == "FileFormat":
+        return sorted(data, key=lambda item: "extra_file_formats" in item)
+    return data
 
 
 def post_data(portal: Portal, data: dict, schema_name: str,
