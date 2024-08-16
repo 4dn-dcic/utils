@@ -38,6 +38,7 @@ class Portal(PortalFromUtils):
 
 _DEFAULT_APP = "smaht"
 _SMAHT_ENV_ENVIRON_NAME = "SMAHT_ENV"
+_DEFAULT_INI_FILE_FOR_LOAD = "development.ini"
 
 # Schema properties to ignore (by default) for the view schema usage.
 _IGNORE_PROPERTIES_ON_UPDATE = [
@@ -120,6 +121,8 @@ def main():
     parser.add_argument("--post", type=str, required=False, default=None, help="POST data.")
     parser.add_argument("--patch", type=str, required=False, default=None, help="PATCH data.")
     parser.add_argument("--upsert", type=str, required=False, default=None, help="Upsert data.")
+    parser.add_argument("--load", type=str, required=False, default=None, help="Load data via snovault.loadxl.")
+    parser.add_argument("--ini", type=str, required=False, default=None, help="INI file for data via snovault.loadxl.")
     parser.add_argument("--delete", type=str, required=False, default=None, help="Delete data.")
     parser.add_argument("--purge", type=str, required=False, default=None, help="Purge data.")
     parser.add_argument("--noignore", action="store_true", required=False, default=False,
@@ -143,15 +146,47 @@ def main():
     else:
         app = APP_SMAHT
 
+    if not (args.post or args.patch or args.upsert or args.delete or args.purge or args.load):
+        usage()
+
+    if args.load:
+        if args.post or args.patch or args.upsert or args.delete or args.purge:
+            _print("Cannot use any other update option"
+                   "when using the --load option (to load data via snovault.loadxl).")
+            exit(1)
+        if args.env:
+            _print("The --env is not used for the --load option (to load data via snovault.loadxl).")
+        if args.schema:
+            _print("The --schema is not used for the --load option (to load data via snovault.loadxl).")
+        from snovault.loadxl import load_data
+        from dcicutils.captured_output import captured_output
+        if args.ini:
+            ini_file = args.ini
+        else:
+            ini_file = _DEFAULT_INI_FILE_FOR_LOAD
+        if not os.path.exists(ini_file):
+            _print(f"The INI file required for --load is not found: {ini_file}")
+            exit(1)
+        if not os.path.isdir(args.load):
+            _print(f"Load directory does not exist: {args.load}")
+            exit(1)
+        portal = None
+        with captured_output(not args.debug):
+            portal = Portal(ini_file)
+        if args.verbose:
+            _print(f"Loading data files into Portal (via snovault.loadxl) from: {args.load}")
+            _print(f"Portal INI file for load is: {ini_file}")
+        load_data(portal.vapp, indir=args.load, overwrite=True, use_master_inserts=False)
+        if args.verbose:
+            _print(f"Done loading data into Portal (via snovault.loadxl) files from: {args.load}")
+        exit(0)
+
     portal = _create_portal(env=args.env, app=app, verbose=args.verbose, debug=args.debug)
 
     if explicit_schema_name := args.schema:
         schema, explicit_schema_name = _get_schema(portal, explicit_schema_name)
         if not schema:
             usage(f"ERROR: Unknown schema name: {args.schema}")
-
-    if not (args.post or args.patch or args.upsert or args.delete or args.purge):
-        usage()
 
     if args.post:
         _post_or_patch_or_upsert(portal=portal,
