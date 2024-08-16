@@ -104,6 +104,7 @@ def main():
     parser.add_argument("--raw", action="store_true", required=False, default=False, help="Raw output.")
     parser.add_argument("--inserts", action="store_true", required=False, default=False,
                         help="Format output for subsequent inserts.")
+    parser.add_argument("--ignore", nargs="+", help="Ignore these fields for --inserts.")
     parser.add_argument("--tree", action="store_true", required=False, default=False, help="Tree output for schemas.")
     parser.add_argument("--database", action="store_true", required=False, default=False,
                         help="Read from database output.")
@@ -191,7 +192,7 @@ def main():
             return
 
     data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw, inserts=args.inserts,
-                              database=args.database, check=args.bool, verbose=args.verbose)
+                              ignore=args.ignore, database=args.database, check=args.bool, verbose=args.verbose)
     if args.bool:
         if data:
             _print(f"{args.uuid}: found")
@@ -242,7 +243,15 @@ def _create_portal(ini: str, env: Optional[str] = None,
 
 def _get_portal_object(portal: Portal, uuid: str,
                        raw: bool = False, inserts: bool = False, database: bool = False,
+                       ignore: Optional[List[str]] = None,
                        check: bool = False, verbose: bool = False) -> dict:
+
+    def prune_data(data: dict) -> dict:
+        nonlocal ignore
+        if not isinstance(ignore, list) or not ignore:
+            return data
+        return {key: value for key, value in data.items() if key not in ignore}
+
     response = None
     try:
         if not uuid.startswith("/"):
@@ -300,6 +309,7 @@ def _get_portal_object(portal: Portal, uuid: str,
             for result in results:
                 results_index += 1
                 result.pop("schema_version", None)
+                result = prune_data(result)
                 if (subtypes and
                     (result_uuid := result.get("uuid")) and
                     (individual_result_type := get_metadata_for_individual_result_type(result_uuid))):  # noqa
@@ -313,7 +323,7 @@ def _get_portal_object(portal: Portal, uuid: str,
         # Get the result as non-raw so we can get its type.
         elif ((response_cooked := portal.get(path, database=database)) and
               (isinstance(response_type := response_cooked.json().get("@type"), list) and response_type)):
-            response = {f"{response_type[0]}": [response]}
+            response = {f"{response_type[0]}": [prune_data(response)]}
     elif raw:
         response.pop("schema_version", None)
     return response
