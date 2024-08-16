@@ -66,7 +66,7 @@ from typing import Callable, List, Optional, TextIO, Tuple, Union
 import yaml
 from dcicutils.captured_output import captured_output, uncaptured_output
 from dcicutils.command_utils import yes_or_no
-from dcicutils.misc_utils import get_error_message, is_uuid, PRINT
+from dcicutils.misc_utils import get_error_message, is_uuid, PRINT, to_snake_case
 from dcicutils.portal_utils import Portal
 
 
@@ -104,6 +104,8 @@ def main():
     parser.add_argument("--raw", action="store_true", required=False, default=False, help="Raw output.")
     parser.add_argument("--inserts", action="store_true", required=False, default=False,
                         help="Format output for subsequent inserts.")
+    parser.add_argument("--insert-files", action="store_true", required=False, default=False,
+                        help="Output for to insert files.")
     parser.add_argument("--ignore", nargs="+", help="Ignore these fields for --inserts.")
     parser.add_argument("--tree", action="store_true", required=False, default=False, help="Tree output for schemas.")
     parser.add_argument("--database", action="store_true", required=False, default=False,
@@ -117,6 +119,7 @@ def main():
     parser.add_argument("--indent", required=False, default=False, help="Indent output.", type=int)
     parser.add_argument("--summary", action="store_true", required=False, default=False,
                         help="Summary output (for schema only).")
+    parser.add_argument("--force", action="store_true", required=False, default=False, help="Debugging output.")
     parser.add_argument("--terse", action="store_true", required=False, default=False, help="Terse output.")
     parser.add_argument("--verbose", action="store_true", required=False, default=False, help="Verbose output.")
     parser.add_argument("--debug", action="store_true", required=False, default=False, help="Debugging output.")
@@ -129,6 +132,15 @@ def main():
         _print("UUID or schema or path required.")
         _exit(1)
 
+    if args.insert_files:
+        args.inserts = True
+        if args.output:
+            if not os.path.isdir(args.output):
+                _print(f"Specified output directory for insert files does not exist: {args.output}")
+                exit(1)
+            args.insert_files = args.output
+            args.output = None
+
     if args.output:
         if os.path.exists(args.output):
             if os.path.isdir(args.output):
@@ -136,7 +148,7 @@ def main():
                 _exit(1)
             elif os.path.isfile(args.output):
                 _print(f"Specified output file already exists: {args.output}")
-                if not yes_or_no(f"Do you want to overwrite this file?"):
+                if (not args.force) and not yes_or_no(f"Do you want to overwrite this file?"):
                     _exit(0)
         _output_file = io.open(args.output, "w")
 
@@ -191,8 +203,12 @@ def main():
                           all=args.all, summary=args.summary, yaml=args.yaml)
             return
 
-    data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw, inserts=args.inserts,
-                              ignore=args.ignore, database=args.database, check=args.bool, verbose=args.verbose)
+    data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw, database=args.database,
+                              inserts=args.inserts, insert_files=args.insert_files,
+                              ignore=args.ignore, check=args.bool, force=args.force, verbose=args.verbose)
+    if args.insert_files:
+        return
+
     if args.bool:
         if data:
             _print(f"{args.uuid}: found")
@@ -242,9 +258,10 @@ def _create_portal(ini: str, env: Optional[str] = None,
 
 
 def _get_portal_object(portal: Portal, uuid: str,
-                       raw: bool = False, inserts: bool = False, database: bool = False,
+                       raw: bool = False, database: bool = False,
+                       inserts: bool = False, insert_files: bool = False,
                        ignore: Optional[List[str]] = None,
-                       check: bool = False, verbose: bool = False) -> dict:
+                       check: bool = False, force: bool = False, verbose: bool = False) -> dict:
 
     def prune_data(data: dict) -> dict:
         nonlocal ignore
@@ -324,6 +341,28 @@ def _get_portal_object(portal: Portal, uuid: str,
         elif ((response_cooked := portal.get(path, database=database)) and
               (isinstance(response_type := response_cooked.json().get("@type"), list) and response_type)):
             response = {f"{response_type[0]}": [prune_data(response)]}
+        if insert_files:
+            output_directory = insert_files if isinstance(insert_files, str) else os.getcwd()
+            for schema_name in response:
+                schema_data = response[schema_name]
+                file_name = f"{to_snake_case(schema_name)}.json"
+                file_path = os.path.join(output_directory, file_name)
+                if os.path.exists(file_path):
+                    if os.path.isdir(file_path):
+                        _print(f"WARNING: Output file already exists as a directory. SKIPPING: {file_path}")
+                        continue
+                    if force:
+                        if verbose:
+                            _print(f"Overwriting extant file (per --force option): {file_path}")
+                    else:
+                        _print(f"Output file already exists: {file_path}")
+                    if (not force) and not yes_or_no(f"Overwrite this file?"):
+                        continue
+                if verbose:
+                    _print(f"Writing {schema_name} (object{'s' if len(schema_data) != 1 else ''}:"
+                           f" {len(schema_data)}) file: {file_path}")
+                with io.open(file_path, "w") as f:
+                    json.dump(schema_data, f, indent=4)
     elif raw:
         response.pop("schema_version", None)
     return response
