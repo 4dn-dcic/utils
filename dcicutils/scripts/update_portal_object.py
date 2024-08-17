@@ -14,13 +14,15 @@ import io
 import json
 import os
 import re
+import shutil
 import sys
 from typing import Callable, List, Optional, Tuple, Union
 from dcicutils.command_utils import yes_or_no
 from dcicutils.common import ORCHESTRATED_APPS, APP_SMAHT
 from dcicutils.ff_utils import delete_metadata, purge_metadata
-from dcicutils.misc_utils import get_error_message, ignored, PRINT
+from dcicutils.misc_utils import get_error_message, ignored, PRINT, to_camel_case, to_snake_case
 from dcicutils.portal_utils import Portal as PortalFromUtils
+from dcicutils.tmpfile_utils import temporary_directory
 
 
 class Portal(PortalFromUtils):
@@ -131,6 +133,8 @@ def main():
     parser.add_argument("--confirm", action="store_true", required=False, default=False, help="Confirm before action.")
     parser.add_argument("--verbose", action="store_true", required=False, default=False, help="Verbose output.")
     parser.add_argument("--quiet", action="store_true", required=False, default=False, help="Quiet output.")
+    parser.add_argument("--noprogress", action="store_true", required=False, default=False,
+                        help="No progress bar output for --load.")
     parser.add_argument("--debug", action="store_true", required=False, default=False, help="Debugging output.")
     args = parser.parse_args()
 
@@ -158,27 +162,8 @@ def main():
             _print("The --env is not used for the --load option (to load data via snovault.loadxl).")
         if args.schema:
             _print("The --schema is not used for the --load option (to load data via snovault.loadxl).")
-        from snovault.loadxl import load_data
-        from dcicutils.captured_output import captured_output
-        if args.ini:
-            ini_file = args.ini
-        else:
-            ini_file = _DEFAULT_INI_FILE_FOR_LOAD
-        if not os.path.exists(ini_file):
-            _print(f"The INI file required for --load is not found: {ini_file}")
-            exit(1)
-        if not os.path.isdir(args.load):
-            _print(f"Load directory does not exist: {args.load}")
-            exit(1)
-        portal = None
-        with captured_output(not args.debug):
-            portal = Portal(ini_file)
-        if args.verbose:
-            _print(f"Loading data files into Portal (via snovault.loadxl) from: {args.load}")
-            _print(f"Portal INI file for load is: {ini_file}")
-        load_data(portal.vapp, indir=args.load, overwrite=True, use_master_inserts=False)
-        if args.verbose:
-            _print(f"Done loading data into Portal (via snovault.loadxl) files from: {args.load}")
+        _load_data(inserts_directory=args.load, ini_file=args.ini,
+                   verbose=args.verbose, debug=args.debug, noprogress=args.noprogress)
         exit(0)
 
     portal = _create_portal(env=args.env, app=app, verbose=args.verbose, debug=args.debug)
@@ -192,7 +177,7 @@ def main():
         _post_or_patch_or_upsert(portal=portal,
                                  file_or_directory=args.post,
                                  explicit_schema_name=explicit_schema_name,
-                                 update_function=post_data,
+                                 update_function=_post_data,
                                  update_action_name="POST",
                                  noignore=args.noignore, ignore=args.ignore,
                                  confirm=args.confirm, verbose=args.verbose, quiet=args.quiet, debug=args.debug)
@@ -200,7 +185,7 @@ def main():
         _post_or_patch_or_upsert(portal=portal,
                                  file_or_directory=args.patch,
                                  explicit_schema_name=explicit_schema_name,
-                                 update_function=patch_data,
+                                 update_function=_patch_data,
                                  update_action_name="PATCH",
                                  patch_delete_fields=args.delete,
                                  noignore=args.noignore, ignore=args.ignore,
@@ -210,7 +195,7 @@ def main():
         _post_or_patch_or_upsert(portal=portal,
                                  file_or_directory=args.upsert,
                                  explicit_schema_name=explicit_schema_name,
-                                 update_function=upsert_data,
+                                 update_function=_upsert_data,
                                  update_action_name="UPSERT",
                                  patch_delete_fields=args.delete,
                                  noignore=args.noignore, ignore=args.ignore,
@@ -329,11 +314,11 @@ def _impose_special_ordering(data: List[dict], schema_name: str) -> List[dict]:
     return data
 
 
-def post_data(portal: Portal, data: dict, schema_name: str,
-              file: Optional[str] = None, index: int = 0,
-              patch_delete_fields: Optional[str] = None,
-              noignore: bool = False, ignore: Optional[List[str]] = None,
-              confirm: bool = False, verbose: bool = False, debug: bool = False) -> None:
+def _post_data(portal: Portal, data: dict, schema_name: str,
+               file: Optional[str] = None, index: int = 0,
+               patch_delete_fields: Optional[str] = None,
+               noignore: bool = False, ignore: Optional[List[str]] = None,
+               confirm: bool = False, verbose: bool = False, debug: bool = False) -> None:
     ignored(patch_delete_fields)
     if not (identifying_path := portal.get_identifying_path(data, portal_type=schema_name)):
         if isinstance(file, str) and isinstance(index, int):
@@ -359,11 +344,11 @@ def post_data(portal: Portal, data: dict, schema_name: str,
         return
 
 
-def patch_data(portal: Portal, data: dict, schema_name: str,
-               file: Optional[str] = None, index: int = 0,
-               patch_delete_fields: Optional[str] = None,
-               noignore: bool = False, ignore: Optional[List[str]] = None,
-               confirm: bool = False, verbose: bool = False, debug: bool = False) -> None:
+def _patch_data(portal: Portal, data: dict, schema_name: str,
+                file: Optional[str] = None, index: int = 0,
+                patch_delete_fields: Optional[str] = None,
+                noignore: bool = False, ignore: Optional[List[str]] = None,
+                confirm: bool = False, verbose: bool = False, debug: bool = False) -> None:
     if not (identifying_path := portal.get_identifying_path(data, portal_type=schema_name)):
         if isinstance(file, str) and isinstance(index, int):
             _print(f"ERROR: Item for PATCH has no identifying property: {file} (#{index + 1})")
@@ -390,11 +375,11 @@ def patch_data(portal: Portal, data: dict, schema_name: str,
         return
 
 
-def upsert_data(portal: Portal, data: dict, schema_name: str,
-                file: Optional[str] = None, index: int = 0,
-                patch_delete_fields: Optional[str] = None,
-                noignore: bool = False, ignore: Optional[List[str]] = None,
-                confirm: bool = False, verbose: bool = False, debug: bool = False) -> None:
+def _upsert_data(portal: Portal, data: dict, schema_name: str,
+                 file: Optional[str] = None, index: int = 0,
+                 patch_delete_fields: Optional[str] = None,
+                 noignore: bool = False, ignore: Optional[List[str]] = None,
+                 confirm: bool = False, verbose: bool = False, debug: bool = False) -> None:
     if not (identifying_path := portal.get_identifying_path(data, portal_type=schema_name)):
         if isinstance(file, str) and isinstance(index, int):
             _print(f"ERROR: Item for UPSERT has no identifying property: {file} (#{index + 1})")
@@ -421,6 +406,126 @@ def upsert_data(portal: Portal, data: dict, schema_name: str,
         _print(f"ERROR: Cannot UPSERT {schema_name} item: {identifying_path}")
         _print(e)
         return
+
+
+def _load_data(inserts_directory: str, ini_file: str,
+               verbose: bool = False, debug: bool = False, noprogress: bool = False) -> None:
+
+    from snovault.loadxl import load_all_gen, LoadGenWrapper
+    from dcicutils.captured_output import captured_output
+    from dcicutils.progress_bar import ProgressBar
+
+    def loadxl(portal: Portal, inserts_directory: str, schema_names_to_load: dict):
+
+        nonlocal LoadGenWrapper, load_all_gen, verbose, debug
+        progress_total = sum(schema_names_to_load.values()) * 2  # loadxl does two passes
+        progress_bar = ProgressBar(progress_total) if not noprogress else None
+
+        def decode_bytes(str_or_bytes: Union[str, bytes], *, encoding: str = "utf-8") -> str:
+            if not isinstance(encoding, str):
+                encoding = "utf-8"
+            if isinstance(str_or_bytes, bytes):
+                return str_or_bytes.decode(encoding).strip()
+            elif isinstance(str_or_bytes, str):
+                return str_or_bytes.strip()
+            return ""
+
+        LOADXL_RESPONSE_PATTERN = re.compile(r"^([A-Z]+):\s*([a-zA-Z\/\d_-]+)\s*(\S+)\s*(\S+)?\s*(.*)$")
+        LOADXL_ACTION_NAME = {"POST": "Create", "PATCH": "Update", "SKIP": "Skip",
+                              "CHECK": "Validate", "ERROR": "Error"}
+        current_item_type = None
+        current_item_count = 0
+        current_item_total = 0
+        total_item_count = 0
+        for item in LoadGenWrapper(load_all_gen(testapp=portal.vapp, inserts=inserts_directory,
+                                                docsdir=None, overwrite=True, verbose=True)):
+            total_item_count += 1
+            item = decode_bytes(item)
+            match = LOADXL_RESPONSE_PATTERN.match(item)
+            if not match or match.re.groups < 3:
+                continue
+            action = LOADXL_ACTION_NAME[match.group(1).upper()]
+            # response_value = match.group(0)
+            # identifying_value = match.group(2)
+            item_type = match.group(3)
+            if current_item_type != item_type:
+                if noprogress and debug and current_item_type is not None:
+                    print()
+                current_item_type = item_type
+                current_item_count = 0
+                current_item_total = schema_names_to_load[item_type]
+                if progress_bar:
+                    progress_bar.set_description(f"▶ {to_camel_case(current_item_type)}: {action}")
+            current_item_count += 1
+            if progress_bar:
+                progress_bar.set_progress(total_item_count)
+            elif debug:
+                print(f"{current_item_type}: {current_item_count} or {current_item_total} ({action})")
+        if progress_bar:
+            progress_bar.set_description("▶ Load Complete")
+            print()
+
+    if not ini_file:
+        ini_file = _DEFAULT_INI_FILE_FOR_LOAD
+    if not os.path.isabs(ini_file := os.path.expanduser(ini_file)):
+        ini_file = os.path.join(os.getcwd(), ini_file)
+    if not os.path.exists(ini_file):
+        _print(f"The INI file required for --load is not found: {ini_file}")
+        exit(1)
+    if not os.path.isabs(inserts_directory := os.path.expanduser(inserts_directory)):
+        inserts_directory = os.path.join(os.getcwd(), inserts_directory)
+    if not os.path.isdir(inserts_directory := os.path.expanduser(inserts_directory)):
+        _print(f"Load directory does not exist: {inserts_directory}")
+        exit(1)
+    portal = None
+    with captured_output(not debug):
+        portal = Portal(ini_file)
+    if verbose:
+        _print(f"Loading data files into Portal (via snovault.loadxl) from: {inserts_directory}")
+        _print(f"Portal INI file for load is: {ini_file}")
+
+    schema_names = list(_get_schemas(portal).keys())
+    schema_snake_case_names = [to_snake_case(item) for item in schema_names]
+    schema_names_to_load = {}
+
+    copy_to_temporary_directory = False
+    for json_file_path in glob.glob(os.path.join(inserts_directory, "*.json")):
+        json_file_name = os.path.basename(json_file_path)
+        schema_name = os.path.basename(json_file_name)[:-len(".json")]
+        if (schema_name not in schema_snake_case_names) and (schema_name not in schema_names):
+            _print(f"File is not named for a known schema: {json_file_name} ▶ ignoring")
+            copy_to_temporary_directory = True
+        else:
+            try:
+                with io.open(json_file_path, "r") as f:
+                    if not isinstance(data := json.load(f), list):
+                        _print("Data JSON file does not contain an array: {json_file_path} ▶ ignoring")
+                        copy_to_temporary_directory = True
+                    elif (nobjects := len(data)) < 1:
+                        _print("Data JSON file contains no items: {json_file_path} ▶ ignoring")
+                        copy_to_temporary_directory = True
+                    else:
+                        schema_names_to_load[schema_name] = nobjects
+            except Exception:
+                _print("Cannot load JSON data from file: {json_file_path} ▶ ignoring")
+                copy_to_temporary_directory = True
+    if not schema_names_to_load:
+        _print("Directory contains no valid data: {inserts_directory}")
+        return
+    if copy_to_temporary_directory:
+        with temporary_directory() as tmpdir:
+            if debug:
+                _print(f"Using temporary directory: {tmpdir}")
+            for json_file_path in glob.glob(os.path.join(inserts_directory, "*.json")):
+                json_file_name = os.path.basename(json_file_path)
+                schema_name = os.path.basename(json_file_name)[:-len(".json")]
+                if (schema_name in schema_snake_case_names) or (schema_name in schema_names):
+                    shutil.copy(json_file_path, tmpdir)
+            loadxl(portal=portal, inserts_directory=tmpdir, schema_names_to_load=schema_names_to_load)
+    else:
+        loadxl(portal=portal, inserts_directory=inserts_directory, schema_names_to_load=schema_names_to_load)
+    if verbose:
+        _print(f"Done loading data into Portal (via snovault.loadxl) files from: {inserts_directory}")
 
 
 def _prune_data_for_update(data: dict, noignore: bool = False, ignore: Optional[List[str]] = None) -> dict:
@@ -509,6 +614,8 @@ def _get_schema_name_from_schema_named_json_file_name(portal: Portal, value: str
 
 @lru_cache(maxsize=1)
 def _get_schemas(portal: Portal) -> Optional[dict]:
+    if portal.vapp:
+        return portal.vapp.get("/profiles/?frame=raw").json
     return portal.get_schemas()
 
 
