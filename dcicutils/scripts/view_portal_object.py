@@ -330,6 +330,8 @@ def _get_portal_object(portal: Portal, uuid: str,
             results_total = len(results)
             for result in results:
                 results_index += 1
+                if debug:
+                    print(f"Processing result: {results_index}")
                 result.pop("schema_version", None)
                 result = prune_data(result)
                 if (subtypes and one_or_more_objects_of_types_exists(portal, subtypes, debug=debug) and
@@ -374,14 +376,7 @@ def _get_portal_object(portal: Portal, uuid: str,
 
 def one_or_more_objects_of_types_exists(portal: Portal, schema_types: List[str], debug: bool = False) -> bool:
     for schema_type in schema_types:
-        try:
-            if one_or_more_objects_of_type_exists(portal, schema_type, debug=debug):
-                return True
-            response = portal.get(f"/{schema_type}")
-            if response and response.status_code == 404:
-                _print(f"There are no objects of sub-type: {schema_type}")
-                return False
-        except Exception:
+        if one_or_more_objects_of_type_exists(portal, schema_type, debug=debug):
             return True
     return False
 
@@ -393,14 +388,15 @@ def one_or_more_objects_of_type_exists(portal: Portal, schema_type: str, debug: 
             _print(f"Checking if there are actually any objects of type: {schema_type}")
         if portal.get(f"/{schema_type}").status_code == 404:
             if debug:
-                _print(f"No any objects of type exist: {schema_type}")
+                _print(f"No objects of type actually exist: {schema_type}")
+            return False
         else:
             if debug:
                 _print(f"One or more objects of type exist: {schema_type}")
     except Exception as e:
-        _print(f"ERROR: Checking if there are actually any objects of type: {schema_type}")
+        _print(f"ERROR: Cannot determine if there are actually any objects of type: {schema_type}")
         _print(e)
-    return False
+    return True
 
 
 @lru_cache(maxsize=1)
