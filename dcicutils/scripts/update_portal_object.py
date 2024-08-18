@@ -123,7 +123,8 @@ def main():
     parser.add_argument("--post", type=str, required=False, default=None, help="POST data.")
     parser.add_argument("--patch", type=str, required=False, default=None, help="PATCH data.")
     parser.add_argument("--upsert", type=str, required=False, default=None, help="Upsert data.")
-    parser.add_argument("--load", type=str, required=False, default=None, help="Load data via snovault.loadxl.")
+    parser.add_argument("--load", "--loadxl", type=str, required=False, default=None,
+                        help="Load data via snovault.loadxl.")
     parser.add_argument("--ini", type=str, required=False, default=None, help="INI file for data via snovault.loadxl.")
     parser.add_argument("--delete", type=str, required=False, default=None, help="Delete data.")
     parser.add_argument("--purge", type=str, required=False, default=None, help="Purge data.")
@@ -159,11 +160,12 @@ def main():
                    "when using the --load option (to load data via snovault.loadxl).")
             exit(1)
         if args.env:
-            _print("The --env is not used for the --load option (to load data via snovault.loadxl).")
-        if args.schema:
-            _print("The --schema is not used for the --load option (to load data via snovault.loadxl).")
-        _load_data(load=args.load, ini_file=args.ini,
-                   verbose=args.verbose, debug=args.debug, noprogress=args.noprogress)
+            if args.ini:
+                _print("The --env is not used for the --load option (to load data via snovault.loadxl).")
+            args.ini = args.env
+        if not _load_data(load=args.load, ini_file=args.ini, explicit_schema_name=args.schema,
+                          verbose=args.verbose, debug=args.debug, noprogress=args.noprogress):
+            exit(1)
         exit(0)
 
     portal = _create_portal(env=args.env, app=app, verbose=args.verbose, debug=args.debug)
@@ -171,7 +173,7 @@ def main():
     if explicit_schema_name := args.schema:
         schema, explicit_schema_name = _get_schema(portal, explicit_schema_name)
         if not schema:
-            usage(f"ERROR: Unknown schema name: {args.schema}")
+            usage(f"Unknown specified schema name: {args.schema}")
 
     if args.post:
         _post_or_patch_or_upsert(portal=portal,
@@ -494,15 +496,25 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
                     if not (schema_name := _get_schema_name_from_schema_named_json_file_name(portal, inserts_file)):
                         _print("Unable to determine schema name for JSON data file: {inserts_file}")
                         return False
+                elif not (schema_name := _get_schema(portal, explicit_schema_name)[1]):
+                    _print(f"Unknown specified schema name: {explicit_schema_name}")
+                    return False
                 with temporary_directory() as tmpdir:
                     file_name = os.path.join(tmpdir, f"{to_snake_case(schema_name)}.json")
                     with io.open(file_name, "w") as f:
                         json.dump(data, f)
-                    return _load_data(load=tmpdir, ini_file=ini_file, explicit_schema_name=explicit_schema_name,
+                    return _load_data(load=tmpdir, ini_file=ini_file, explicit_schema_name=schema_name,
                                       verbose=verbose, debug=debug, noprogress=noprogress,
                                       _portal=portal, _single_insert_file=inserts_file)
             elif isinstance(data, dict):
-                _print("DICT IN FILE FOR LOAD NOT YET SUPPPORTED")
+                if schema_name := explicit_schema_name:
+                    if _is_schema_name_list(portal, schema_names := list(data.keys())):
+                        _print(f"Ignoring specify --schema: {schema_name}")
+                    elif not (schema_name := _get_schema(portal, schema_name)[1]):
+                        _print(f"Unknown specified schema name: {explicit_schema_name}")
+                        return False
+                    else:
+                        data = {schema_name: [data]}
                 if not _is_schema_name_list(portal, schema_names := list(data.keys())):
                     _print(f"Unrecognized types in JSON data file: {inserts_file}")
                     return False
@@ -529,9 +541,9 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
         return True
     if verbose:
         if _single_insert_file:
-            _print(f"Loading data file into Portal (via snovault.loadxl) from: {_single_insert_file}")
+            _print(f"Loading data into Portal (via snovault.loadxl) from file: {_single_insert_file}")
         else:
-            _print(f"Loading data files into Portal (via snovault.loadxl) from: {inserts_directory}")
+            _print(f"Loading data into Portal (via snovault.loadxl) from directory: {inserts_directory}")
         _print(f"Portal INI file for load is: {ini_file}")
 
     schema_names = list(_get_schemas(portal).keys())
@@ -575,7 +587,10 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
     else:
         loadxl(portal=portal, inserts_directory=inserts_directory, schema_names_to_load=schema_names_to_load)
     if verbose:
-        _print(f"Done loading data into Portal (via snovault.loadxl) files from: {inserts_directory}")
+        if _single_insert_file:
+            _print(f"Done loading data into Portal (via snovault.loadxl) from file: {_single_insert_file}")
+        else:
+            _print(f"Done loading data into Portal (via snovault.loadxl) from directory: {inserts_directory}")
     return True
 
 
