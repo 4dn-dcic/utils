@@ -433,7 +433,7 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
         current_item_total = 0
 
         for item in LoadGenWrapper(load_all_gen(testapp=portal.vapp, inserts=inserts_directory,
-                                                docsdir=None, overwrite=True, verbose=True)):
+                                                docsdir=None, overwrite=True, verbose=True, continue_on_exception=True)):
             loadxl_total_item_count += 1
             item = decode_bytes(item)
             match = LOADXL_RESPONSE_PATTERN.match(item)
