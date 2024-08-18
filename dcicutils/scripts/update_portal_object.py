@@ -462,14 +462,14 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
 
     if not ini_file:
         ini_file = _DEFAULT_INI_FILE_FOR_LOAD
-    if not os.path.isabs(ini_file := os.path.expanduser(ini_file)):
-        ini_file = os.path.join(os.getcwd(), ini_file)
+    if not os.path.isabs(ini_file := os.path.normpath(os.path.expanduser(ini_file))):
+        ini_file = os.path.normpath(os.path.join(os.getcwd(), ini_file))
     if not os.path.exists(ini_file):
         _print(f"The INI file required for --load is not found: {ini_file}")
         exit(1)
 
-    if not os.path.isabs(load := os.path.expanduser(load)):
-        load = os.path.join(os.getcwd(), load)
+    if not os.path.isabs(load := os.path.normpath(os.path.expanduser(load))):
+        load = os.path.normpath(os.path.join(os.getcwd(), load))
     if not os.path.exists(load):
         return False
 
