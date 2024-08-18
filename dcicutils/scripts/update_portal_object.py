@@ -21,7 +21,7 @@ from dcicutils.captured_output import captured_output
 from dcicutils.command_utils import yes_or_no
 from dcicutils.common import ORCHESTRATED_APPS, APP_CGAP, APP_FOURFRONT, APP_SMAHT
 from dcicutils.ff_utils import delete_metadata, purge_metadata
-from dcicutils.misc_utils import get_error_message, ignored, PRINT, to_camel_case, to_snake_case
+from dcicutils.misc_utils import get_error_message, ignored, normalize_string, PRINT, to_camel_case, to_snake_case
 from dcicutils.portal_utils import Portal as PortalFromUtils
 from dcicutils.tmpfile_utils import temporary_directory
 
@@ -393,14 +393,20 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                verbose: bool = False, debug: bool = False, noprogress: bool = False,
                _single_insert_file: Optional[str] = None) -> bool:
 
+    import snovault.loadxl
     from snovault.loadxl import load_all_gen, LoadGenWrapper
     from dcicutils.progress_bar import ProgressBar
 
     loadxl_summary = {}
+    loadxl_unresolved = {}
+    loadxl_output = []
+    loadxl_total_item_count = 0
+    loadxl_total_error_count = 0
 
     def loadxl(portal: Portal, inserts_directory: str, schema_names_to_load: dict):
 
         nonlocal LoadGenWrapper, load_all_gen, loadxl_summary, verbose, debug
+        nonlocal loadxl_total_item_count, loadxl_total_error_count
         progress_total = sum(schema_names_to_load.values()) * 2  # loadxl does two passes
         progress_bar = ProgressBar(progress_total, interrupt_exit=True) if not noprogress else None
 
@@ -413,27 +419,54 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                 return str_or_bytes.strip()
             return ""
 
+        def loadxl_print(arg):
+            if arg:
+                loadxl_output.append(normalize_string(str(arg)))
+
+        snovault.loadxl.print = loadxl_print
+
         LOADXL_RESPONSE_PATTERN = re.compile(r"^([A-Z]+):\s*([a-zA-Z\/\d_-]+)\s*(\S+)\s*(\S+)?\s*(.*)$")
         LOADXL_ACTION_NAME = {"POST": "Create", "PATCH": "Update", "SKIP": "Check",
                               "CHECK": "Validate", "ERROR": "Error"}
         current_item_type = None
         current_item_count = 0
         current_item_total = 0
-        total_item_count = 0
+
         for item in LoadGenWrapper(load_all_gen(testapp=portal.vapp, inserts=inserts_directory,
                                                 docsdir=None, overwrite=True, verbose=True)):
-            total_item_count += 1
+            loadxl_total_item_count += 1
             item = decode_bytes(item)
             match = LOADXL_RESPONSE_PATTERN.match(item)
             if not match or match.re.groups < 3:
                 continue
-            action = LOADXL_ACTION_NAME[match.group(1).upper()]
-            # response_value = match.group(0)
-            # identifying_value = match.group(2)
+            if (action := LOADXL_ACTION_NAME[match.group(1).upper()]) == "Error":
+                identifying_value = match.group(2)
+                # Example message for unresolved link:
+                # ERROR: /22813a02-906b-4b60-b2b2-4afaea24aa28 Bad response: 422 Unprocessable Entity
+                # (not 200 OK or 3xx redirect for http://localhost/file_set?skip_indexing=true)b\'{"@type":
+                # ["ValidationFailure", "Error"], "status": "error", "code": # 422, "title": "Unprocessable Entity",
+                # "description": "Failed validation", "errors": [{"location": "body", "name": # "Schema: ",
+                # "description": "Unable to resolve link: /Library/a4e8f79f-4d47-4e85-9707-c343c940a315"},
+                # {"location": "body", "name": "Schema: libraries.0",
+                # "description": "\\\'a4e8f79f-4d47-4e85-9707-c343c940a315\\\' not found"}]}\'
+                unresolved_link_error_message_prefix = "Unable to resolve link:"
+                if (i := item.find(unresolved_link_error_message_prefix)) > 0:
+                    unresolved_link = item[i + len(unresolved_link_error_message_prefix):].strip()
+                    if (i := unresolved_link.find("\"")) > 0:
+                        if (unresolved_link := unresolved_link[0:i]):
+                            if ((error_type := re.search(r"https?://.*/(.*)\?skip_indexing=.*", item)) and
+                                (len(error_type.groups()) == 1)):  # noqa
+                                error_type = to_camel_case(error_type.group(1))
+                                identifying_value = f"/{error_type}{identifying_value}"
+                                if not loadxl_unresolved.get(identifying_value):
+                                    loadxl_unresolved[identifying_value] = []
+                                loadxl_unresolved[identifying_value].append(unresolved_link)
+                loadxl_total_error_count += 1
+                continue
             item_type = match.group(3)
             if current_item_type != item_type:
                 if noprogress and debug and current_item_type is not None:
-                    print()
+                    _print()
                 current_item_type = item_type
                 current_item_count = 0
                 current_item_total = schema_names_to_load[item_type]
@@ -444,12 +477,13 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                 loadxl_summary[current_item_type] = 0
             loadxl_summary[current_item_type] += 1
             if progress_bar:
-                progress_bar.set_progress(total_item_count)
+                progress_bar.set_progress(loadxl_total_item_count)
             elif debug:
-                print(f"{current_item_type}: {current_item_count} or {current_item_total} ({action})")
+                _print(f"{current_item_type}: {current_item_count} or {current_item_total} ({action})")
         if progress_bar:
             progress_bar.set_description("▶ Load Complete")
-            print()
+            if loadxl_total_item_count > loadxl_total_error_count:
+                _print()
 
     if not portal.vapp:
         _print("Must using INI based Portal object with --load (use --ini option to specify an INI file).")
@@ -573,8 +607,20 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
             _print(f"Done loading data into Portal (via snovault.loadxl) from file: {_single_insert_file}")
         else:
             _print(f"Done loading data into Portal (via snovault.loadxl) from directory: {inserts_directory}")
+        _print(f"Total items loaded: {loadxl_total_item_count}"
+               f"{f' (errors: {loadxl_total_error_count})' if loadxl_total_error_count else ''}")
         for item in sorted(loadxl_summary.keys()):
             _print(f"▷ {to_camel_case(item)}: {loadxl_summary[item]}")
+    if loadxl_unresolved:
+        _print("✗ Unresolved references:")
+        for item in loadxl_unresolved:
+            _print(f"  ▶ {item}: {len(loadxl_unresolved[item])}")
+            for subitem in loadxl_unresolved[item]:
+                _print(f"    ▷ {subitem}")
+    if debug and loadxl_output:
+        _print("✗ Output from loadxl:")
+        for item in loadxl_output:
+            _print(f"  ▶ {item}")
 
     return True
 
