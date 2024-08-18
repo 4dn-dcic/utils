@@ -17,8 +17,9 @@ import re
 import shutil
 import sys
 from typing import Callable, List, Optional, Tuple, Union
+from dcicutils.captured_output import captured_output
 from dcicutils.command_utils import yes_or_no
-from dcicutils.common import ORCHESTRATED_APPS, APP_SMAHT
+from dcicutils.common import ORCHESTRATED_APPS, APP_CGAP, APP_FOURFRONT, APP_SMAHT
 from dcicutils.ff_utils import delete_metadata, purge_metadata
 from dcicutils.misc_utils import get_error_message, ignored, PRINT, to_camel_case, to_snake_case
 from dcicutils.portal_utils import Portal as PortalFromUtils
@@ -145,30 +146,16 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    if app := args.app:
-        if (app not in ORCHESTRATED_APPS) and ((app := app.lower()) not in ORCHESTRATED_APPS):
-            usage(f"ERROR: Unknown app name; must be one of: {' | '.join(ORCHESTRATED_APPS)}")
-    else:
-        app = APP_SMAHT
-
     if not (args.post or args.patch or args.upsert or args.delete or args.purge or args.load):
         usage()
 
-    if args.load:
-        if args.post or args.patch or args.upsert or args.delete or args.purge:
-            _print("Cannot use any other update option"
-                   "when using the --load option (to load data via snovault.loadxl).")
-            exit(1)
-        if args.env:
-            if args.ini:
-                _print("The --env is not used for the --load option (to load data via snovault.loadxl).")
-            args.ini = args.env
-        if not _load_data(load=args.load, ini_file=args.ini, explicit_schema_name=args.schema,
-                          verbose=args.verbose, debug=args.debug, noprogress=args.noprogress):
-            exit(1)
-        exit(0)
+    if not (portal := _create_portal(env=args.env, ini=args.ini, app=args.app, load=args.load,
+                                     verbose=args.verbose, debug=args.debug, quiet=args.quiet)):
+        exit(1)
 
-    portal = _create_portal(env=args.env, app=app, verbose=args.verbose, debug=args.debug)
+    if args.load:
+        _load_data(portal=portal, load=args.load, ini_file=args.ini, explicit_schema_name=args.schema,
+                   verbose=args.verbose, debug=args.debug, noprogress=args.noprogress)
 
     if explicit_schema_name := args.schema:
         schema, explicit_schema_name = _get_schema(portal, explicit_schema_name)
@@ -402,17 +389,18 @@ def _upsert_data(portal: Portal, data: dict, schema_name: str,
         return
 
 
-def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = None,
+def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: Optional[str] = None,
                verbose: bool = False, debug: bool = False, noprogress: bool = False,
-               _portal: Optional[Portal] = None, _single_insert_file: Optional[str] = None) -> bool:
+               _single_insert_file: Optional[str] = None) -> bool:
 
     from snovault.loadxl import load_all_gen, LoadGenWrapper
-    from dcicutils.captured_output import captured_output
     from dcicutils.progress_bar import ProgressBar
+
+    loadxl_summary = {}
 
     def loadxl(portal: Portal, inserts_directory: str, schema_names_to_load: dict):
 
-        nonlocal LoadGenWrapper, load_all_gen, verbose, debug
+        nonlocal LoadGenWrapper, load_all_gen, loadxl_summary, verbose, debug
         progress_total = sum(schema_names_to_load.values()) * 2  # loadxl does two passes
         progress_bar = ProgressBar(progress_total, interrupt_exit=True) if not noprogress else None
 
@@ -452,6 +440,9 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
                 if progress_bar:
                     progress_bar.set_description(f"▶ {to_camel_case(current_item_type)}: {action}")
             current_item_count += 1
+            if loadxl_summary.get(current_item_type, None) is None:
+                loadxl_summary[current_item_type] = 0
+            loadxl_summary[current_item_type] += 1
             if progress_bar:
                 progress_bar.set_progress(total_item_count)
             elif debug:
@@ -460,14 +451,9 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
             progress_bar.set_description("▶ Load Complete")
             print()
 
-    if not ini_file:
-        ini_file = _DEFAULT_INI_FILE_FOR_LOAD
-    if not os.path.isabs(ini_file := os.path.normpath(os.path.expanduser(ini_file))):
-        ini_file = os.path.normpath(os.path.join(os.getcwd(), ini_file))
-    if not os.path.exists(ini_file):
-        _print(f"The INI file required for --load is not found: {ini_file}")
-        exit(1)
-
+    if not portal.vapp:
+        _print("Must using INI based Portal object with --load (use --ini option to specify an INI file).")
+        return False
     if not os.path.isabs(load := os.path.normpath(os.path.expanduser(load))):
         load = os.path.normpath(os.path.join(os.getcwd(), load))
     if not os.path.exists(load):
@@ -479,10 +465,6 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
     else:
         inserts_directory = None
         inserts_file = load
-
-    if not (portal := _portal):
-        with captured_output(not debug):
-            portal = Portal(ini_file)
 
     if inserts_file:
         with io.open(inserts_file, "r") as f:
@@ -503,9 +485,9 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
                     file_name = os.path.join(tmpdir, f"{to_snake_case(schema_name)}.json")
                     with io.open(file_name, "w") as f:
                         json.dump(data, f)
-                    return _load_data(load=tmpdir, ini_file=ini_file, explicit_schema_name=schema_name,
+                    return _load_data(portal=portal, load=tmpdir, ini_file=ini_file, explicit_schema_name=schema_name,
                                       verbose=verbose, debug=debug, noprogress=noprogress,
-                                      _portal=portal, _single_insert_file=inserts_file)
+                                      _single_insert_file=inserts_file)
             elif isinstance(data, dict):
                 if schema_name := explicit_schema_name:
                     if _is_schema_name_list(portal, schema_names := list(data.keys())):
@@ -530,20 +512,20 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
                             json.dump(schema_data, f)
                         nfiles += 1
                     if nfiles > 0:
-                        return _load_data(load=tmpdir, ini_file=ini_file,
+                        return _load_data(portal=portal, load=tmpdir, ini_file=ini_file,
                                           verbose=verbose, debug=debug, noprogress=noprogress,
-                                          _portal=portal, _single_insert_file=inserts_file)
+                                          _single_insert_file=inserts_file)
                 return True
             else:
                 _print(f"Unrecognized JSON data in file: {inserts_file}")
                 return False
         return True
+
     if verbose:
         if _single_insert_file:
             _print(f"Loading data into Portal (via snovault.loadxl) from file: {_single_insert_file}")
         else:
             _print(f"Loading data into Portal (via snovault.loadxl) from directory: {inserts_directory}")
-        _print(f"Portal INI file for load is: {ini_file}")
 
     schema_names = list(_get_schemas(portal).keys())
     schema_snake_case_names = [to_snake_case(item) for item in schema_names]
@@ -585,11 +567,15 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
             loadxl(portal=portal, inserts_directory=tmpdir, schema_names_to_load=schema_names_to_load)
     else:
         loadxl(portal=portal, inserts_directory=inserts_directory, schema_names_to_load=schema_names_to_load)
+
     if verbose:
         if _single_insert_file:
             _print(f"Done loading data into Portal (via snovault.loadxl) from file: {_single_insert_file}")
         else:
             _print(f"Done loading data into Portal (via snovault.loadxl) from directory: {inserts_directory}")
+        for item in sorted(loadxl_summary.keys()):
+            _print(f"▷ {to_camel_case(item)}: {loadxl_summary[item]}")
+
     return True
 
 
@@ -611,25 +597,67 @@ def _prune_data_for_update(data: dict, noignore: bool = False, ignore: Optional[
     return {key: value for key, value in data.items() if key not in ignore_these_properties}
 
 
-def _create_portal(env: Optional[str] = None, app: Optional[str] = None,
-                   verbose: bool = False, debug: bool = False) -> Optional[Portal]:
+def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Optional[str] = None,
+                   load: Optional[str] = None, verbose: bool = False, debug: bool = False,
+                   quiet: bool = False) -> Optional[Portal]:
 
-    env_from_environ = None
-    if not env and (app == APP_SMAHT):
-        if env := os.environ.get(_SMAHT_ENV_ENVIRON_NAME):
-            env_from_environ = True
-    if not (portal := Portal(env, app=app) if env or app else None):
-        return None
-    if verbose:
-        if (env := portal.env) or (env := os.environ(_SMAHT_ENV_ENVIRON_NAME)):
-            _print(f"Portal environment"
-                   f"{f' (from {_SMAHT_ENV_ENVIRON_NAME})' if env_from_environ else ''}: {portal.env}")
-        if portal.keys_file:
-            _print(f"Portal keys file: {portal.keys_file}")
-        if portal.key_id:
-            _print(f"Portal key prefix: {portal.key_id[0:2]}******")
-        if portal.server:
-            _print(f"Portal server: {portal.server}")
+    if app:
+        if (app not in ORCHESTRATED_APPS) and ((app := app.lower()) not in ORCHESTRATED_APPS):
+            _print(f"Unknown app name; must be one of: {' | '.join(ORCHESTRATED_APPS)}")
+            return None
+    elif APP_SMAHT in (env or os.environ.get(_SMAHT_ENV_ENVIRON_NAME) or ""):
+        app = APP_SMAHT
+    elif APP_CGAP in (env or ""):
+        app = APP_CGAP
+    elif APP_FOURFRONT in (env or ""):
+        app = APP_FOURFRONT
+
+    if ini:
+        if env:
+            if not quiet:
+                _print("Ignoring --env option when --ini option is given.")
+        elif (app == _SMAHT_ENV_ENVIRON_NAME) and (env := os.environ.get(_SMAHT_ENV_ENVIRON_NAME)):
+            if not quiet:
+                _print(f"Ignoring SMAHT_ENV environment variable ({env}) when --ini option is given.")
+        if not os.path.isabs(ini_file := os.path.normpath(os.path.expanduser(ini))):
+            ini_file = os.path.normpath(os.path.join(os.getcwd(), ini_file))
+        if not os.path.exists(ini_file):
+            _print(f"Specified Portal INI file not found: {ini_file}")
+            return None
+        with captured_output(not debug):
+            if not (portal := Portal(ini_file, app=app)):
+                _print(f"Cannot create INI based Portal object: {env} ({app})")
+                return None
+    else:
+        env_from_environ = False
+        if not env and app:
+            # If the --load option is specified, and no --ini option is specified, then do NOT default
+            # to using the SMAHT_ENV environment variable (if set) for an access-key based Portal
+            # object; rather default to the default INI file (i.e. development.ini).
+            if (not load) and (app == APP_SMAHT) and (env := os.environ.get(_SMAHT_ENV_ENVIRON_NAME)):
+                env_from_environ = True
+        if not env:
+            if os.path.exists(ini_file := os.path.normpath(os.path.join(os.getcwd(), _DEFAULT_INI_FILE_FOR_LOAD))):
+                return _create_portal(ini=ini_file, app=app, verbose=verbose, debug=debug)
+            return None
+        if not (portal := Portal(env, app=app) if env or app else None):
+            _print(f"Cannot create access-key based Portal object: {env}{f' ({app})' if app else ''}")
+            return None
+
+    if (ini_file := portal.ini_file):
+        if not quiet:
+            _print(f"Portal environment: {ini_file}")
+    elif (env := portal.env) or (env := os.environ.get(_SMAHT_ENV_ENVIRON_NAME)):
+        _print(f"Portal environment"
+               f"{f' (from {_SMAHT_ENV_ENVIRON_NAME})' if env_from_environ else ''}: {portal.env}")
+        if verbose:
+            if portal.keys_file:
+                _print(f"Portal keys file: {portal.keys_file}")
+            if portal.key_id:
+                _print(f"Portal key prefix: {portal.key_id[0:2]}******")
+            if portal.server:
+                _print(f"Portal server: {portal.server}")
+
     return portal
 
 
