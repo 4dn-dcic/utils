@@ -401,7 +401,8 @@ def _upsert_data(portal: Portal, data: dict, schema_name: str,
 
 
 def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = None,
-               verbose: bool = False, debug: bool = False, noprogress: bool = False) -> bool:
+               verbose: bool = False, debug: bool = False, noprogress: bool = False,
+               _portal: Optional[Portal] = None, _single_insert_file: Optional[str] = None) -> bool:
 
     from snovault.loadxl import load_all_gen, LoadGenWrapper
     from dcicutils.captured_output import captured_output
@@ -411,7 +412,7 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
 
         nonlocal LoadGenWrapper, load_all_gen, verbose, debug
         progress_total = sum(schema_names_to_load.values()) * 2  # loadxl does two passes
-        progress_bar = ProgressBar(progress_total) if not noprogress else None
+        progress_bar = ProgressBar(progress_total, interrupt_exit=True) if not noprogress else None
 
         def decode_bytes(str_or_bytes: Union[str, bytes], *, encoding: str = "utf-8") -> str:
             if not isinstance(encoding, str):
@@ -477,9 +478,9 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
         inserts_directory = None
         inserts_file = load
 
-    portal = None
-    with captured_output(not debug):
-        portal = Portal(ini_file)
+    if not (portal := _portal):
+        with captured_output(not debug):
+            portal = Portal(ini_file)
 
     if inserts_file:
         with io.open(inserts_file, "r") as f:
@@ -498,7 +499,8 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
                     with io.open(file_name, "w") as f:
                         json.dump(data, f)
                     return _load_data(load=tmpdir, ini_file=ini_file, explicit_schema_name=explicit_schema_name,
-                                      verbose=verbose, debug=debug, noprogress=noprogress)
+                                      verbose=verbose, debug=debug, noprogress=noprogress,
+                                      _portal=portal, _single_insert_file=inserts_file)
             elif isinstance(data, dict):
                 _print("DICT IN FILE FOR LOAD NOT YET SUPPPORTED")
                 if not _is_schema_name_list(portal, schema_names := list(data.keys())):
@@ -517,7 +519,8 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
                         nfiles += 1
                     if nfiles > 0:
                         return _load_data(load=tmpdir, ini_file=ini_file,
-                                          verbose=verbose, debug=debug, noprogress=noprogress)
+                                          verbose=verbose, debug=debug, noprogress=noprogress,
+                                          _portal=portal, _single_insert_file=inserts_file)
                 # TODO
                 return True
             else:
@@ -525,7 +528,10 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
                 return False
         return True
     if verbose:
-        _print(f"Loading data files into Portal (via snovault.loadxl) from: {inserts_directory}")
+        if _single_insert_file:
+            _print(f"Loading data file into Portal (via snovault.loadxl) from: {_single_insert_file}")
+        else:
+            _print(f"Loading data files into Portal (via snovault.loadxl) from: {inserts_directory}")
         _print(f"Portal INI file for load is: {ini_file}")
 
     schema_names = list(_get_schemas(portal).keys())
