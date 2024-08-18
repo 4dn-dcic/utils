@@ -485,7 +485,7 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
         with io.open(inserts_file, "r") as f:
             try:
                 data = json.load(f)
-            except Exception as e:
+            except Exception:
                 _print(f"Cannot load JSON data from file: {inserts_file}")
                 return False
             if isinstance(data, list):
@@ -509,7 +509,7 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
                     for schema_name in schema_names:
                         if not isinstance(schema_data := data[schema_name], list):
                             _print(f"Unexpected value for data type ({schema_name})"
-                                f" in JSON data file: {inserts_file} ▶ ignoring")
+                                   f" in JSON data file: {inserts_file} ▶ ignoring")
                             continue
                         file_name = os.path.join(tmpdir, f"{to_snake_case(schema_name)}.json")
                         with io.open(file_name, "w") as f:
@@ -580,6 +580,7 @@ def _is_schema_name_list(portal: Portal, keys: list) -> bool:
                 return False
             return True
     return False
+
 
 def _prune_data_for_update(data: dict, noignore: bool = False, ignore: Optional[List[str]] = None) -> dict:
     ignore_these_properties = [] if noignore is True else _IGNORE_PROPERTIES_ON_UPDATE
