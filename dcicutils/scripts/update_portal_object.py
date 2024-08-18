@@ -533,7 +533,6 @@ def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = N
                         return _load_data(load=tmpdir, ini_file=ini_file,
                                           verbose=verbose, debug=debug, noprogress=noprogress,
                                           _portal=portal, _single_insert_file=inserts_file)
-                # TODO
                 return True
             else:
                 _print(f"Unrecognized JSON data in file: {inserts_file}")
