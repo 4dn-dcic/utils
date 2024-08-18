@@ -162,7 +162,7 @@ def main():
             _print("The --env is not used for the --load option (to load data via snovault.loadxl).")
         if args.schema:
             _print("The --schema is not used for the --load option (to load data via snovault.loadxl).")
-        _load_data(inserts_directory=args.load, ini_file=args.ini,
+        _load_data(load=args.load, ini_file=args.ini,
                    verbose=args.verbose, debug=args.debug, noprogress=args.noprogress)
         exit(0)
 
@@ -226,14 +226,6 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
                              confirm: bool = False, verbose: bool = False,
                              quiet: bool = False, debug: bool = False) -> None:
 
-    def is_schema_name_list(portal: Portal, keys: list) -> bool:
-        if isinstance(keys, list):
-            for key in keys:
-                if portal.get_schema(key) is None:
-                    return False
-                return True
-        return False
-
     def post_or_patch_or_upsert(portal: Portal, file: str, schema_name: Optional[str],
                                 patch_delete_fields: Optional[str] = None,
                                 confirm: bool = False, verbose: bool = False,
@@ -251,7 +243,7 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
                                     patch_delete_fields=patch_delete_fields,
                                     noignore=noignore, ignore=ignore,
                                     confirm=confirm, verbose=verbose, debug=debug)
-                elif is_schema_name_list(portal, list(data.keys())):
+                elif _is_schema_name_list(portal, list(data.keys())):
                     if debug:
                         _print(f"DEBUG: File ({file}) contains a dictionary of schema names.")
                     for schema_name in data:
@@ -408,8 +400,8 @@ def _upsert_data(portal: Portal, data: dict, schema_name: str,
         return
 
 
-def _load_data(inserts_directory: str, ini_file: str,
-               verbose: bool = False, debug: bool = False, noprogress: bool = False) -> None:
+def _load_data(load: str, ini_file: str, explicit_schema_name: Optional[str] = None,
+               verbose: bool = False, debug: bool = False, noprogress: bool = False) -> bool:
 
     from snovault.loadxl import load_all_gen, LoadGenWrapper
     from dcicutils.captured_output import captured_output
@@ -431,7 +423,7 @@ def _load_data(inserts_directory: str, ini_file: str,
             return ""
 
         LOADXL_RESPONSE_PATTERN = re.compile(r"^([A-Z]+):\s*([a-zA-Z\/\d_-]+)\s*(\S+)\s*(\S+)?\s*(.*)$")
-        LOADXL_ACTION_NAME = {"POST": "Create", "PATCH": "Update", "SKIP": "Skip",
+        LOADXL_ACTION_NAME = {"POST": "Create", "PATCH": "Update", "SKIP": "Check",
                               "CHECK": "Validate", "ERROR": "Error"}
         current_item_type = None
         current_item_count = 0
@@ -472,14 +464,66 @@ def _load_data(inserts_directory: str, ini_file: str,
     if not os.path.exists(ini_file):
         _print(f"The INI file required for --load is not found: {ini_file}")
         exit(1)
-    if not os.path.isabs(inserts_directory := os.path.expanduser(inserts_directory)):
-        inserts_directory = os.path.join(os.getcwd(), inserts_directory)
-    if not os.path.isdir(inserts_directory := os.path.expanduser(inserts_directory)):
-        _print(f"Load directory does not exist: {inserts_directory}")
-        exit(1)
+
+    if not os.path.isabs(load := os.path.expanduser(load)):
+        load = os.path.join(os.getcwd(), load)
+    if not os.path.exists(load):
+        return False
+
+    if os.path.isdir(load):
+        inserts_directory = load
+        inserts_file = None
+    else:
+        inserts_directory = None
+        inserts_file = load
+
     portal = None
     with captured_output(not debug):
         portal = Portal(ini_file)
+
+    if inserts_file:
+        with io.open(inserts_file, "r") as f:
+            try:
+                data = json.load(f)
+            except Exception as e:
+                _print(f"Cannot load JSON data from file: {inserts_file}")
+                return False
+            if isinstance(data, list):
+                if not (schema_name := explicit_schema_name):
+                    if not (schema_name := _get_schema_name_from_schema_named_json_file_name(portal, inserts_file)):
+                        _print("Unable to determine schema name for JSON data file: {inserts_file}")
+                        return False
+                with temporary_directory() as tmpdir:
+                    file_name = os.path.join(tmpdir, f"{to_snake_case(schema_name)}.json")
+                    with io.open(file_name, "w") as f:
+                        json.dump(data, f)
+                    return _load_data(load=tmpdir, ini_file=ini_file, explicit_schema_name=explicit_schema_name,
+                                      verbose=verbose, debug=debug, noprogress=noprogress)
+            elif isinstance(data, dict):
+                _print("DICT IN FILE FOR LOAD NOT YET SUPPPORTED")
+                if not _is_schema_name_list(portal, schema_names := list(data.keys())):
+                    _print(f"Unrecognized types in JSON data file: {inserts_file}")
+                    return False
+                with temporary_directory() as tmpdir:
+                    nfiles = 0
+                    for schema_name in schema_names:
+                        if not isinstance(schema_data := data[schema_name], list):
+                            _print(f"Unexpected value for data type ({schema_name})"
+                                f" in JSON data file: {inserts_file} ▶ ignoring")
+                            continue
+                        file_name = os.path.join(tmpdir, f"{to_snake_case(schema_name)}.json")
+                        with io.open(file_name, "w") as f:
+                            json.dump(schema_data, f)
+                        nfiles += 1
+                    if nfiles > 0:
+                        return _load_data(load=tmpdir, ini_file=ini_file,
+                                          verbose=verbose, debug=debug, noprogress=noprogress)
+                # TODO
+                return True
+            else:
+                _print(f"Unrecognized JSON data in file: {inserts_file}")
+                return False
+        return True
     if verbose:
         _print(f"Loading data files into Portal (via snovault.loadxl) from: {inserts_directory}")
         _print(f"Portal INI file for load is: {ini_file}")
@@ -511,7 +555,7 @@ def _load_data(inserts_directory: str, ini_file: str,
                 copy_to_temporary_directory = True
     if not schema_names_to_load:
         _print("Directory contains no valid data: {inserts_directory}")
-        return
+        return False
     if copy_to_temporary_directory:
         with temporary_directory() as tmpdir:
             if debug:
@@ -526,7 +570,16 @@ def _load_data(inserts_directory: str, ini_file: str,
         loadxl(portal=portal, inserts_directory=inserts_directory, schema_names_to_load=schema_names_to_load)
     if verbose:
         _print(f"Done loading data into Portal (via snovault.loadxl) files from: {inserts_directory}")
+    return True
 
+
+def _is_schema_name_list(portal: Portal, keys: list) -> bool:
+    if isinstance(keys, list):
+        for key in keys:
+            if portal.get_schema(key) is None:
+                return False
+            return True
+    return False
 
 def _prune_data_for_update(data: dict, noignore: bool = False, ignore: Optional[List[str]] = None) -> dict:
     ignore_these_properties = [] if noignore is True else _IGNORE_PROPERTIES_ON_UPDATE
@@ -603,13 +656,15 @@ def _parse_delete_fields(value: str) -> str:
 
 
 def _get_schema_name_from_schema_named_json_file_name(portal: Portal, value: str) -> Optional[str]:
-    try:
-        if not value.endswith(".json"):
-            return None
-        _, schema_name = _get_schema(portal, os.path.basename(value[:-5]))
-        return schema_name
-    except Exception:
-        return False
+    if isinstance(value, str) and value:
+        try:
+            if value.endswith(".json"):
+                value = value[:-5]
+            _, schema_name = _get_schema(portal, os.path.basename(value))
+            return schema_name
+        except Exception:
+            pass
+    return False
 
 
 @lru_cache(maxsize=1)
