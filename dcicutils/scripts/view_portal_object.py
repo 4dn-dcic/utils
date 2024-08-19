@@ -290,6 +290,23 @@ def _get_portal_object(portal: Portal, uuid: str,
             _print()
         return None
 
+    def get_metadata_types(path: str) -> Optional[dict]:
+        nonlocal portal, debug
+        metadata_types = {}
+        try:
+            if debug:
+                _print(f"Executing separted query to get actual  metadata types for raw/inserts query.")
+            if ((response := portal.get(path)) and (response.status_code in [200, 307]) and
+                (response := response.json()) and (results := response.get("@graph"))):  # noqa
+                for result in results:
+                    if (result_type := result.get("@type")) and (result_uuid := result.get("uuid")):
+                        if ((isinstance(result_type, list) and (result_type := result_type[0])) or
+                            isinstance(result_type, str)):  # noqa
+                            metadata_types[result_uuid] = result_type
+        except Exception:
+            return None
+        return metadata_types
+
     response = None
     try:
         if not uuid.startswith("/"):
@@ -312,6 +329,7 @@ def _get_portal_object(portal: Portal, uuid: str,
     if not response.json:
         _exit(f"Invalid JSON getting Portal object: {uuid}")
     response = response.json()
+    response_types = {}
     if inserts:
         # Format results as suitable for inserts (e.g. via update-portal-object).
         response.pop("schema_version", None)
@@ -319,10 +337,12 @@ def _get_portal_object(portal: Portal, uuid: str,
             (isinstance(results_type := response.get("@type"), list) and results_type) and
             (isinstance(results_type := results_type[0], str) and results_type.endswith("SearchResults")) and
             (results_type := results_type[0:-len("SearchResults")])):  # noqa
-            # For search results, the type (from XyzSearchResults, above) may not be precisely correct for
-            # each of the results; it may be the supertype (e.g. QualityMetric vs QualityMetricWorkflowRun);
+            # For (raw frame) search results, the type (from XyzSearchResults, above) may not be precisely correct
+            # for each of the results; it may be the supertype (e.g. QualityMetric vs QualityMetricWorkflowRun);
             # so for types which are supertypes (gotten via Portal.get_schemas_super_type_map) we actually
-            # lookup each result individually to determine its actual precise type.
+            # lookup each result individually to determine its actual precise type. Although, if we have
+            # more than (say) 5 results to do this for, then do a separate query (get_metadata_types)
+            # to get the result types all at once.
             if not ((supertypes := portal.get_schemas_super_type_map()) and (subtypes := supertypes.get(results_type))):
                 subtypes = None
             response = {}
@@ -335,9 +355,16 @@ def _get_portal_object(portal: Portal, uuid: str,
                 result.pop("schema_version", None)
                 result = prune_data(result)
                 if (subtypes and one_or_more_objects_of_types_exists(portal, subtypes, debug=debug) and
-                    (result_uuid := result.get("uuid")) and
-                    (individual_result_type := get_metadata_for_individual_result_type(result_uuid))):  # noqa
-                    result_type = individual_result_type
+                    (result_uuid := result.get("uuid"))):  # noqa
+                    # If we have more than (say) 5 results for which we need to determine that actual result type,
+                    # then get them all at once via separate query (get_metadata_types)) which is not the raw frame.
+                    if (results_total > 5) and (not response_types):
+                        response_types = get_metadata_types(path)
+                    if not (response_types and (result_type := response_types.get(result_uuid))):
+                        if individual_result_type := get_metadata_for_individual_result_type(result_uuid):
+                            result_type = individual_result_type
+                        else:
+                            result_type = results_type
                 else:
                     result_type = results_type
                 if response.get(result_type):
