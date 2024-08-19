@@ -562,8 +562,11 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                     else:
                         data = {schema_name: [data]}
                 if not _is_schema_name_list(portal, schema_names := list(data.keys())):
-                    _print(f"Unrecognized types in JSON data file: {inserts_file}")
-                    return False
+                    if not (schema_name := _get_schema_name_from_schema_named_json_file_name(portal, inserts_file)):
+                        _print(f"Unrecognized types in JSON data file: {inserts_file}")
+                    # Assume simple object of type from the JSON file name.
+                    schema_names = [schema_name]
+                    data = {schema_name: [data]}
                 with temporary_directory() as tmpdir:
                     nfiles = 0
                     for schema_name in schema_names:
