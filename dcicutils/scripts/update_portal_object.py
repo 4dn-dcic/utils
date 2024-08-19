@@ -2,16 +2,9 @@
 # Command-line utility to update (post, patch, upsert) portal objects for SMaHT/CGAP/Fourfront.
 # ------------------------------------------------------------------------------------------------------
 # Example commands:
-#
-# update-portal-object --load {json-file | directory-with-json-files}
-# update-portal-object --post {json-file | directory-with-json-files}
-# update-portal-object --upsert {json-file | directory-with-json-files}
-# update-portal-object --patch {json-file | directory-with-json-files}
-#
-# The specified json-file or file withing directory-with-jaon-files must be JSON containing either
-# a list of objects, which which case the file name for the target schema name, or if not, then
-# the --schema option must be used to specified the target schema; or the JSON must be a dictionary
-# of schema names, where the value of each is a list of objects for that schema.
+# update-portal-object --post file_format.json
+# update-portal-object --upsert directory-with-schema-named-dot-json-files
+# update-portal-object --patch file-not-named-for-schema-name.json --schema UnalignedReads
 # --------------------------------------------------------------------------------------------------
 
 import argparse
@@ -471,7 +464,8 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                 # view_name: \\\'22813a02-906b-4b60-b2b2-4afaea24aa28\\\', subpath: (), traversed: (), root:
                 # <encoded.root.SMAHTRoot object at 0x136d41460>, vroot: <encoded.root.SMAHTRoot object at 0x136d41460>, vroot_path: ()"}\' # noqa
                 #
-                if (item_type := re.search(r"https?://.*/(.*)\?skip_indexing=.*", item)) and (len(item_type.groups()) == 1):  # noqa
+                if ((item_type := re.search(r"https?://.*/(.*)\?skip_indexing=.*", item)) and
+                    (len(item_type.groups()) == 1)):  # noqa
                     item_type = to_snake_case(item_type.group(1))
                     identifying_value = f"/{to_camel_case(item_type)}{identifying_value}"
                 unresolved_link_error_message_prefix = "Unable to resolve link:"
@@ -634,7 +628,7 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
         _print(f"Total items loaded: {loadxl_total_item_count // 2}"  # TODO: straightend out this arithmetic
                f"{f' (errors: {loadxl_total_error_count})' if loadxl_total_error_count else ''}")
         for item in sorted(loadxl_summary.keys()):
-            _print(f"▷ {to_camel_case(item)}: {loadxl_summary[item] // 2}")  # TODO: straightend out this arithmetic
+            _print(f"▷ {to_camel_case(item)}: {loadxl_summary[item]}")
     if loadxl_unresolved:
         _print("✗ Unresolved references:")
         for item in loadxl_unresolved:
