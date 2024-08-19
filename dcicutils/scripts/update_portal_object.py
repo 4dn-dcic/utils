@@ -139,6 +139,8 @@ def main():
     parser.add_argument("--noignore", action="store_true", required=False, default=False,
                         help="Do not ignore standard fields on update(s).")
     parser.add_argument("--ignore", nargs="+", help="Ignore these additional fields.")
+    parser.add_argument("--unresolved-output", "--unresolved", type=str,
+                        help="Output file to write unresolved references to for --load only.")
     parser.add_argument("--confirm", action="store_true", required=False, default=False, help="Confirm before action.")
     parser.add_argument("--verbose", action="store_true", required=False, default=False, help="Verbose output.")
     parser.add_argument("--quiet", action="store_true", required=False, default=False, help="Quiet output.")
@@ -162,6 +164,7 @@ def main():
 
     if args.load:
         _load_data(portal=portal, load=args.load, ini_file=args.ini, explicit_schema_name=args.schema,
+                   unresolved_output=args.unresolved_output,
                    verbose=args.verbose, debug=args.debug, noprogress=args.noprogress)
 
     if explicit_schema_name := args.schema:
@@ -397,6 +400,7 @@ def _upsert_data(portal: Portal, data: dict, schema_name: str,
 
 
 def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: Optional[str] = None,
+               unresolved_output: Optional[str] = False,
                verbose: bool = False, debug: bool = False, noprogress: bool = False,
                _single_insert_file: Optional[str] = None) -> bool:
 
@@ -515,6 +519,7 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
     if not os.path.isabs(load := os.path.normpath(os.path.expanduser(load))):
         load = os.path.normpath(os.path.join(os.getcwd(), load))
     if not os.path.exists(load):
+        _print(f"Specified JSON data file not found: {load}")
         return False
 
     if os.path.isdir(load):
@@ -544,6 +549,7 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                     with io.open(file_name, "w") as f:
                         json.dump(data, f)
                     return _load_data(portal=portal, load=tmpdir, ini_file=ini_file, explicit_schema_name=schema_name,
+                                      unresolved_output=unresolved_output,
                                       verbose=verbose, debug=debug, noprogress=noprogress,
                                       _single_insert_file=inserts_file)
             elif isinstance(data, dict):
@@ -571,6 +577,7 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                         nfiles += 1
                     if nfiles > 0:
                         return _load_data(portal=portal, load=tmpdir, ini_file=ini_file,
+                                          unresolved_output=unresolved_output,
                                           verbose=verbose, debug=debug, noprogress=noprogress,
                                           _single_insert_file=inserts_file)
                 return True
@@ -641,6 +648,19 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
             _print(f"  ✗ {item}: {len(loadxl_unresolved[item])}")
             for subitem in loadxl_unresolved[item]:
                 _print(f"     ▶ {subitem}")
+        if unresolved_output:
+            if unresolved_output:
+                if not os.path.isabs(unresolved_output := os.path.normpath(os.path.expanduser(unresolved_output))):
+                    unresolved_output = os.path.normpath(os.path.join(os.getcwd(), unresolved_output))
+                if os.path.exists(unresolved_output):
+                    if os.path.isdir(unresolved_output):
+                        _print("Unresolved output file exists as a directory: {unresolved_output}")
+                        return False
+                    _print(f"Unresolved output file already exists: {unresolved_output}")
+                    if yes_or_no(f"Do you want to overwrite this file?"):
+                        with io.open(unresolved_output, "w") as f:
+                            for item in loadxl_unresolved:
+                                f.write(f"{item}\n")
     if debug and loadxl_output:
         _print("✗ Output from loadxl:")
         for item in loadxl_output:
