@@ -294,8 +294,8 @@ def _get_portal_object(portal: Portal, uuid: str,
         nonlocal portal, debug
         metadata_types = {}
         try:
-            if debug:
-                _print(f"Executing separted query to get actual  metadata types for raw/inserts query.")
+            if verbose:
+                _print(f"Executing separted query to get actual metadata types for raw/inserts query.")
             if ((response := portal.get(path)) and (response.status_code in [200, 307]) and
                 (response := response.json()) and (results := response.get("@graph"))):  # noqa
                 for result in results:
@@ -356,6 +356,7 @@ def _get_portal_object(portal: Portal, uuid: str,
                 result = prune_data(result)
                 if (subtypes and one_or_more_objects_of_types_exists(portal, subtypes, debug=debug) and
                     (result_uuid := result.get("uuid"))):  # noqa
+                    import pdb ; pdb.set_trace()  # noqa
                     # If we have more than (say) 5 results for which we need to determine that actual result type,
                     # then get them all at once via separate query (get_metadata_types)) which is not the raw frame.
                     if (results_total > 5) and (not response_types):
