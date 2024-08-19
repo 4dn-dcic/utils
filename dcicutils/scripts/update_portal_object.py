@@ -534,7 +534,7 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
             if isinstance(data, list):
                 if not (schema_name := explicit_schema_name):
                     if not (schema_name := _get_schema_name_from_schema_named_json_file_name(portal, inserts_file)):
-                        _print("Unable to determine schema name for JSON data file: {inserts_file}")
+                        _print(f"Unable to determine schema name for JSON data file: {inserts_file}")
                         return False
                 elif not (schema_name := _get_schema(portal, explicit_schema_name)[1]):
                     _print(f"Unknown specified schema name: {explicit_schema_name}")
