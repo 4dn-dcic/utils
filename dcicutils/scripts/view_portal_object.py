@@ -307,28 +307,76 @@ def _get_portal_object(portal: Portal, uuid: str,
             return None
         return metadata_types
 
-    response = None
-    try:
-        if not uuid.startswith("/"):
-            path = f"/{uuid}"
-        else:
-            path = uuid
-        response = portal.get(path, raw=raw or inserts, database=database)
-    except Exception as e:
-        if "404" in str(e) and "not found" in str(e).lower():
-            _print(f"Portal object not found at {portal.server}: {uuid}")
-            _exit()
-        _exit(f"Exception getting Portal object from {portal.server}: {uuid}\n{get_error_message(e)}")
-    if not response:
-        if check:
-            return None
-        _exit(f"Null response getting Portal object from {portal.server}: {uuid}")
-    if response.status_code not in [200, 307]:
-        # TODO: Understand why the /me endpoint returns HTTP status code 307, which is only why we mention it above.
-        _exit(f"Invalid status code ({response.status_code}) getting Portal object from {portal.server}: {uuid}")
-    if not response.json:
-        _exit(f"Invalid JSON getting Portal object: {uuid}")
-    response = response.json()
+    def write_insert_files(response: dict) -> None:
+        nonlocal insert_files, force
+        output_directory = insert_files if isinstance(insert_files, str) else os.getcwd()
+        for schema_name in response:
+            schema_data = response[schema_name]
+            file_name = f"{to_snake_case(schema_name)}.json"
+            file_path = os.path.join(output_directory, file_name)
+            message_verb = "Writing"
+            if os.path.exists(file_path):
+                message_verb = "Overwriting"
+                if os.path.isdir(file_path):
+                    _print(f"WARNING: Output file already exists as a directory. SKIPPING: {file_path}")
+                    continue
+                if not force:
+                    _print(f"Output file already exists: {file_path}")
+                    if not yes_or_no(f"Overwrite this file?"):
+                        continue
+            if verbose:
+                _print(f"{message_verb} {schema_name} (object{'s' if len(schema_data) != 1 else ''}:"
+                       f" {len(schema_data)}) file: {file_path}")
+            with io.open(file_path, "w") as f:
+                json.dump(schema_data, f, indent=4)
+
+    if os.path.exists(uuid) and inserts:
+        # Very special case: If given "uuid" (or other path) as actually a file then assume it
+        # contains a list of references (e.g. /Donor/3039a6ca-9849-432d-ad49-2c5630bcbee7) to fetch.
+        response = {}
+        if verbose:
+            _print(f"Reading references from file: {uuid}")
+        with io.open(uuid) as f:
+            for line in f:
+                if ((line := line.strip()) and (components := line.split("/")) and (len(components) > 1) and
+                    (schema_name := components[1]) and (schema_name := _get_schema(portal, schema_name)[1])):  # noqa
+                    try:
+                        if ((result := portal.get(line, raw=True, database=database)) and
+                            (result.status_code in [200, 307]) and (result := result.json())):  # noqa
+                            if not response.get(schema_name):
+                                response[schema_name] = []
+                            response[schema_name].append(result)
+                            continue
+                    except Exception:
+                        pass
+                    _print(f"Cannot get reference: {line}")
+            if insert_files:
+                write_insert_files(response)
+            return response
+    else:
+        response = None
+        try:
+            if not uuid.startswith("/"):
+                path = f"/{uuid}"
+            else:
+                path = uuid
+            response = portal.get(path, raw=raw or inserts, database=database)
+        except Exception as e:
+            if "404" in str(e) and "not found" in str(e).lower():
+                _print(f"Portal object not found at {portal.server}: {uuid}")
+                _exit()
+            _exit(f"Exception getting Portal object from {portal.server}: {uuid}\n{get_error_message(e)}")
+        if not response:
+            if check:
+                return None
+            _exit(f"Null response getting Portal object from {portal.server}: {uuid}")
+        if response.status_code not in [200, 307]:
+            # TODO: Understand why the /me endpoint returns HTTP status code 307, which is only why we mention it above.
+            _exit(f"Invalid status code ({response.status_code}) getting Portal object from {portal.server}: {uuid}")
+        if not response.json:
+            _exit(f"Invalid JSON getting Portal object: {uuid}")
+        response = response.json()
+
     response_types = {}
     if inserts:
         # Format results as suitable for inserts (e.g. via update-portal-object).
@@ -376,26 +424,27 @@ def _get_portal_object(portal: Portal, uuid: str,
               (isinstance(response_type := response_cooked.json().get("@type"), list) and response_type)):
             response = {f"{response_type[0]}": [prune_data(response)]}
         if insert_files:
-            output_directory = insert_files if isinstance(insert_files, str) else os.getcwd()
-            for schema_name in response:
-                schema_data = response[schema_name]
-                file_name = f"{to_snake_case(schema_name)}.json"
-                file_path = os.path.join(output_directory, file_name)
-                message_verb = "Writing"
-                if os.path.exists(file_path):
-                    message_verb = "Overwriting"
-                    if os.path.isdir(file_path):
-                        _print(f"WARNING: Output file already exists as a directory. SKIPPING: {file_path}")
-                        continue
-                    if not force:
-                        _print(f"Output file already exists: {file_path}")
-                        if not yes_or_no(f"Overwrite this file?"):
-                            continue
-                if verbose:
-                    _print(f"{message_verb} {schema_name} (object{'s' if len(schema_data) != 1 else ''}:"
-                           f" {len(schema_data)}) file: {file_path}")
-                with io.open(file_path, "w") as f:
-                    json.dump(schema_data, f, indent=4)
+            write_insert_files(response)
+#           output_directory = insert_files if isinstance(insert_files, str) else os.getcwd()
+#           for schema_name in response:
+#               schema_data = response[schema_name]
+#               file_name = f"{to_snake_case(schema_name)}.json"
+#               file_path = os.path.join(output_directory, file_name)
+#               message_verb = "Writing"
+#               if os.path.exists(file_path):
+#                   message_verb = "Overwriting"
+#                   if os.path.isdir(file_path):
+#                       _print(f"WARNING: Output file already exists as a directory. SKIPPING: {file_path}")
+#                       continue
+#                   if not force:
+#                       _print(f"Output file already exists: {file_path}")
+#                       if not yes_or_no(f"Overwrite this file?"):
+#                           continue
+#               if verbose:
+#                   _print(f"{message_verb} {schema_name} (object{'s' if len(schema_data) != 1 else ''}:"
+#                          f" {len(schema_data)}) file: {file_path}")
+#               with io.open(file_path, "w") as f:
+#                   json.dump(schema_data, f, indent=4)
     elif raw:
         response.pop("schema_version", None)
     return response
