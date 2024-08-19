@@ -634,7 +634,7 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
         _print(f"Total items loaded: {loadxl_total_item_count // 2}"  # TODO: straightend out this arithmetic
                f"{f' (errors: {loadxl_total_error_count})' if loadxl_total_error_count else ''}")
         for item in sorted(loadxl_summary.keys()):
-            _print(f"▷ {to_camel_case(item)}: {loadxl_summary[item]}")
+            _print(f"▷ {to_camel_case(item)}: {loadxl_summary[item] // 2}")  # TODO: straightend out this arithmetic
     if loadxl_unresolved:
         _print("✗ Unresolved references:")
         for item in loadxl_unresolved:
