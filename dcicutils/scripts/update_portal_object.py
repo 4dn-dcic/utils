@@ -441,8 +441,11 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
             if not match or match.re.groups < 3:
                 continue
             if (action := LOADXL_ACTION_NAME[match.group(1).upper()]) == "Error":
+                loadxl_total_error_count += 1
                 identifying_value = match.group(2)
-                # Example message for unresolved link:
+                #
+                # Example message for unresolved link ...
+                #
                 # ERROR: /22813a02-906b-4b60-b2b2-4afaea24aa28 Bad response: 422 Unprocessable Entity
                 # (not 200 OK or 3xx redirect for http://localhost/file_set?skip_indexing=true)b\'{"@type":
                 # ["ValidationFailure", "Error"], "status": "error", "code": # 422, "title": "Unprocessable Entity",
@@ -450,21 +453,33 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                 # "description": "Unable to resolve link: /Library/a4e8f79f-4d47-4e85-9707-c343c940a315"},
                 # {"location": "body", "name": "Schema: libraries.0",
                 # "description": "\\\'a4e8f79f-4d47-4e85-9707-c343c940a315\\\' not found"}]}\'
+                #
+                # OR ...
+                #
+                # ERROR: /22813a02-906b-4b60-b2b2-4afaea24aa28 Bad response: 404 Not Found (not 200 OK or 3xx
+                # redirect for http://localhost/22813a02-906b-4b60-b2b2-4afaea24aa28)b\'{"@type": ["HTTPNotFound",
+                # "Error"], "status": "error", "code": 404, "title": "Not Found", "description": "The resource
+                # could not be found.", "detail": "debug_notfound of url http://localhost/22813a02-906b-4b60-b2b2-4afaea24aa28; # noqa
+                # path_info: \\\'/22813a02-906b-4b60-b2b2-4afaea24aa28\\\', context: <encoded.root.SMAHTRoot object at 0x136d41460>, # noqa
+                # view_name: \\\'22813a02-906b-4b60-b2b2-4afaea24aa28\\\', subpath: (), traversed: (), root:
+                # <encoded.root.SMAHTRoot object at 0x136d41460>, vroot: <encoded.root.SMAHTRoot object at 0x136d41460>, vroot_path: ()"}\' # noqa
+                #
+                if (item_type := re.search(r"https?://.*/(.*)\?skip_indexing=.*", item)) and (len(item_type.groups()) == 1):  # noqa
+                    item_type = to_snake_case(item_type.group(1))
+                    identifying_value = f"/{to_camel_case(item_type)}{identifying_value}"
                 unresolved_link_error_message_prefix = "Unable to resolve link:"
                 if (i := item.find(unresolved_link_error_message_prefix)) > 0:
                     unresolved_link = item[i + len(unresolved_link_error_message_prefix):].strip()
                     if (i := unresolved_link.find("\"")) > 0:
                         if (unresolved_link := unresolved_link[0:i]):
-                            if ((error_type := re.search(r"https?://.*/(.*)\?skip_indexing=.*", item)) and
-                                (len(error_type.groups()) == 1)):  # noqa
-                                error_type = to_camel_case(error_type.group(1))
-                                identifying_value = f"/{error_type}{identifying_value}"
-                                if not loadxl_unresolved.get(identifying_value):
-                                    loadxl_unresolved[identifying_value] = []
-                                loadxl_unresolved[identifying_value].append(unresolved_link)
-                loadxl_total_error_count += 1
-                continue
-            item_type = match.group(3)
+                            if not loadxl_unresolved.get(unresolved_link):
+                                loadxl_unresolved[unresolved_link] = []
+                            if identifying_value not in loadxl_unresolved[unresolved_link]:
+                                loadxl_unresolved[unresolved_link].append(identifying_value)
+                if not item_type:
+                    continue
+            else:
+                item_type = match.group(3)
             if current_item_type != item_type:
                 if noprogress and debug and current_item_type is not None:
                     _print()
@@ -483,6 +498,7 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                 _print(f"{current_item_type}: {current_item_count} or {current_item_total} ({action})")
         if progress_bar:
             progress_bar.set_description("▶ Load Complete")
+            progress_bar.set_progress(progress_total)
             if loadxl_total_item_count > loadxl_total_error_count:
                 _print()
 
@@ -608,16 +624,16 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
             _print(f"Done loading data into Portal (via snovault.loadxl) from file: {_single_insert_file}")
         else:
             _print(f"Done loading data into Portal (via snovault.loadxl) from directory: {inserts_directory}")
-        _print(f"Total items loaded: {loadxl_total_item_count}"
+        _print(f"Total items loaded: {loadxl_total_item_count // 2}"  # TODO: straightend out this arithmetic
                f"{f' (errors: {loadxl_total_error_count})' if loadxl_total_error_count else ''}")
         for item in sorted(loadxl_summary.keys()):
             _print(f"▷ {to_camel_case(item)}: {loadxl_summary[item]}")
     if loadxl_unresolved:
         _print("✗ Unresolved references:")
         for item in loadxl_unresolved:
-            _print(f"  ▶ {item}: {len(loadxl_unresolved[item])}")
+            _print(f"  ✗ {item}: {len(loadxl_unresolved[item])}")
             for subitem in loadxl_unresolved[item]:
-                _print(f"    ▷ {subitem}")
+                _print(f"     ▶ {subitem}")
     if debug and loadxl_output:
         _print("✗ Output from loadxl:")
         for item in loadxl_output:
