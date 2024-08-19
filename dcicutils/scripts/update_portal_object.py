@@ -707,9 +707,10 @@ def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Op
             if (not load) and (app == APP_SMAHT) and (env := os.environ.get(_SMAHT_ENV_ENVIRON_NAME)):
                 env_from_environ = True
         if not env:
-            if os.path.exists(ini_file := os.path.normpath(os.path.join(os.getcwd(), _DEFAULT_INI_FILE_FOR_LOAD))):
-                return _create_portal(ini=ini_file, app=app, verbose=verbose, debug=debug)
-            return None
+            if not os.path.exists(ini_file := os.path.normpath(os.path.join(os.getcwd(), _DEFAULT_INI_FILE_FOR_LOAD))):
+                _print("Must specify --ini or --env option in order to create a Portal object.")
+                return None
+            return _create_portal(ini=ini_file, app=app, verbose=verbose, debug=debug)
         if not (portal := Portal(env, app=app) if env or app else None):
             _print(f"Cannot create access-key based Portal object: {env}{f' ({app})' if app else ''}")
             return None
