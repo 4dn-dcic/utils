@@ -2,9 +2,16 @@
 # Command-line utility to update (post, patch, upsert) portal objects for SMaHT/CGAP/Fourfront.
 # ------------------------------------------------------------------------------------------------------
 # Example commands:
-# update-portal-object --post file_format.json
-# update-portal-object --upsert directory-with-schema-named-dot-json-files
-# update-portal-object --patch file-not-named-for-schema-name.json --schema UnalignedReads
+#
+# update-portal-object --load {json-file | directory-with-json-files}
+# update-portal-object --post {json-file | directory-with-json-files}
+# update-portal-object --upsert {json-file | directory-with-json-files}
+# update-portal-object --patch {json-file | directory-with-json-files}
+#
+# The specified json-file or file withing directory-with-jaon-files must be JSON containing either
+# a list of objects, which which case the file name for the target schema name, or if not, then
+# the --schema option must be used to specified the target schema; or the JSON must be a dictionary
+# of schema names, where the value of each is a list of objects for that schema.
 # --------------------------------------------------------------------------------------------------
 
 import argparse
