@@ -6,6 +6,11 @@ dcicutils
 Change Log
 ----------
 
+8.14.2
+======
+* Corrected requests version on pyproject.toml to not be pinned.
+
+
 8.14.1
 ======
 * Minor changes to utility/troubleshooting/convenience scripts view-portal-object and update-portal-object.
