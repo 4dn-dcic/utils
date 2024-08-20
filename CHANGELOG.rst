@@ -6,6 +6,14 @@ dcicutils
 Change Log
 ----------
 
+8.14.2
+======
+* Corrected requests version (to ^2.27.0 from 2.31.0) on pyproject.toml to not be pinned; but doing
+  so (which resolves to 2.32.3) results in this error on test/test_ecr_utils.py::test_ecr_utils_workflow:
+  docker.errors.DockerException: Error while fetching server API version: Not supported URL scheme http+docker
+  But upgrading the docker package (from ^4.4.4) version to ^7.1.0 fixes that.
+
+
 8.14.1
 ======
 * Minor changes to utility/troubleshooting/convenience scripts view-portal-object and update-portal-object.
