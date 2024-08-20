@@ -66,7 +66,7 @@ from typing import Callable, List, Optional, TextIO, Tuple, Union
 import yaml
 from dcicutils.captured_output import captured_output, uncaptured_output
 from dcicutils.command_utils import yes_or_no
-from dcicutils.misc_utils import get_error_message, is_uuid, PRINT
+from dcicutils.misc_utils import get_error_message, is_uuid, PRINT, to_snake_case
 from dcicutils.portal_utils import Portal
 
 
@@ -104,6 +104,9 @@ def main():
     parser.add_argument("--raw", action="store_true", required=False, default=False, help="Raw output.")
     parser.add_argument("--inserts", action="store_true", required=False, default=False,
                         help="Format output for subsequent inserts.")
+    parser.add_argument("--insert-files", action="store_true", required=False, default=False,
+                        help="Output for to insert files.")
+    parser.add_argument("--ignore", nargs="+", help="Ignore these fields for --inserts.")
     parser.add_argument("--tree", action="store_true", required=False, default=False, help="Tree output for schemas.")
     parser.add_argument("--database", action="store_true", required=False, default=False,
                         help="Read from database output.")
@@ -116,17 +119,29 @@ def main():
     parser.add_argument("--indent", required=False, default=False, help="Indent output.", type=int)
     parser.add_argument("--summary", action="store_true", required=False, default=False,
                         help="Summary output (for schema only).")
+    parser.add_argument("--force", action="store_true", required=False, default=False, help="Debugging output.")
     parser.add_argument("--terse", action="store_true", required=False, default=False, help="Terse output.")
     parser.add_argument("--verbose", action="store_true", required=False, default=False, help="Verbose output.")
+    parser.add_argument("--noheader", action="store_true", required=False, default=False, help="Supress header output.")
     parser.add_argument("--debug", action="store_true", required=False, default=False, help="Debugging output.")
     args = parser.parse_args()
 
     portal = _create_portal(ini=args.ini, env=args.env or os.environ.get("SMAHT_ENV"),
-                            server=args.server, app=args.app, verbose=args.verbose, debug=args.debug)
+                            server=args.server, app=args.app,
+                            verbose=args.verbose and not args.noheader, debug=args.debug)
 
     if not args.uuid:
         _print("UUID or schema or path required.")
         _exit(1)
+
+    if args.insert_files:
+        args.inserts = True
+        if args.output:
+            if not os.path.isdir(args.output):
+                _print(f"Specified output directory for insert files does not exist: {args.output}")
+                exit(1)
+            args.insert_files = args.output
+            args.output = None
 
     if args.output:
         if os.path.exists(args.output):
@@ -135,7 +150,7 @@ def main():
                 _exit(1)
             elif os.path.isfile(args.output):
                 _print(f"Specified output file already exists: {args.output}")
-                if not yes_or_no(f"Do you want to overwrite this file?"):
+                if (not args.force) and not yes_or_no(f"Do you want to overwrite this file?"):
                     _exit(0)
         _output_file = io.open(args.output, "w")
 
@@ -190,8 +205,13 @@ def main():
                           all=args.all, summary=args.summary, yaml=args.yaml)
             return
 
-    data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw, inserts=args.inserts,
-                              database=args.database, check=args.bool, verbose=args.verbose)
+    data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw, database=args.database,
+                              inserts=args.inserts, insert_files=args.insert_files,
+                              ignore=args.ignore, check=args.bool,
+                              force=args.force, verbose=args.verbose, debug=args.debug)
+    if args.insert_files:
+        return
+
     if args.bool:
         if data:
             _print(f"{args.uuid}: found")
@@ -241,30 +261,123 @@ def _create_portal(ini: str, env: Optional[str] = None,
 
 
 def _get_portal_object(portal: Portal, uuid: str,
-                       raw: bool = False, inserts: bool = False, database: bool = False,
-                       check: bool = False, verbose: bool = False) -> dict:
-    response = None
-    try:
-        if not uuid.startswith("/"):
-            path = f"/{uuid}"
-        else:
-            path = uuid
-        response = portal.get(path, raw=raw or inserts, database=database)
-    except Exception as e:
-        if "404" in str(e) and "not found" in str(e).lower():
-            _print(f"Portal object not found at {portal.server}: {uuid}")
-            _exit()
-        _exit(f"Exception getting Portal object from {portal.server}: {uuid}\n{get_error_message(e)}")
-    if not response:
-        if check:
+                       raw: bool = False, database: bool = False,
+                       inserts: bool = False, insert_files: bool = False,
+                       ignore: Optional[List[str]] = None,
+                       check: bool = False, force: bool = False,
+                       verbose: bool = False, debug: bool = False) -> dict:
+
+    def prune_data(data: dict) -> dict:
+        nonlocal ignore
+        if not isinstance(ignore, list) or not ignore:
+            return data
+        return {key: value for key, value in data.items() if key not in ignore}
+
+    def get_metadata_for_individual_result_type(uuid: str) -> Optional[dict]:  # noqa
+        # There can be a lot of individual results for which we may need to get the actual type,
+        # so do this in a function we were can give verbose output feedback.
+        nonlocal portal, results_index, results_total, verbose
+        if verbose:
+            _print(f"Getting actual type for {results_type} result:"
+                   f" {uuid} [{results_index} of {results_total}]", end="")
+        result = portal.get_metadata(uuid, raise_exception=False)
+        if (isinstance(result_types := result.get("@type"), list) and
+            result_types and (result_type := result_types[0])):  # noqa
+            if verbose:
+                _print(f" -> {result_type}")
+            return result_type
+        if verbose:
+            _print()
+        return None
+
+    def get_metadata_types(path: str) -> Optional[dict]:
+        nonlocal portal, debug
+        metadata_types = {}
+        try:
+            if verbose:
+                _print(f"Executing separted query to get actual metadata types for raw/inserts query.")
+            if ((response := portal.get(path)) and (response.status_code in [200, 307]) and
+                (response := response.json()) and (results := response.get("@graph"))):  # noqa
+                for result in results:
+                    if (result_type := result.get("@type")) and (result_uuid := result.get("uuid")):
+                        if ((isinstance(result_type, list) and (result_type := result_type[0])) or
+                            isinstance(result_type, str)):  # noqa
+                            metadata_types[result_uuid] = result_type
+        except Exception:
             return None
-        _exit(f"Null response getting Portal object from {portal.server}: {uuid}")
-    if response.status_code not in [200, 307]:
-        # TODO: Understand why the /me endpoint returns HTTP status code 307, which is only why we mention it above.
-        _exit(f"Invalid status code ({response.status_code}) getting Portal object from {portal.server}: {uuid}")
-    if not response.json:
-        _exit(f"Invalid JSON getting Portal object: {uuid}")
-    response = response.json()
+        return metadata_types
+
+    def write_insert_files(response: dict) -> None:
+        nonlocal insert_files, force
+        output_directory = insert_files if isinstance(insert_files, str) else os.getcwd()
+        for schema_name in response:
+            schema_data = response[schema_name]
+            file_name = f"{to_snake_case(schema_name)}.json"
+            file_path = os.path.join(output_directory, file_name)
+            message_verb = "Writing"
+            if os.path.exists(file_path):
+                message_verb = "Overwriting"
+                if os.path.isdir(file_path):
+                    _print(f"WARNING: Output file already exists as a directory. SKIPPING: {file_path}")
+                    continue
+                if not force:
+                    _print(f"Output file already exists: {file_path}")
+                    if not yes_or_no(f"Overwrite this file?"):
+                        continue
+            if verbose:
+                _print(f"{message_verb} {schema_name} (object{'s' if len(schema_data) != 1 else ''}:"
+                       f" {len(schema_data)}) file: {file_path}")
+            with io.open(file_path, "w") as f:
+                json.dump(schema_data, f, indent=4)
+
+    if os.path.exists(uuid) and inserts:
+        # Very special case: If given "uuid" (or other path) as actually a file then assume it
+        # contains a list of references (e.g. /Donor/3039a6ca-9849-432d-ad49-2c5630bcbee7) to fetch.
+        response = {}
+        if verbose:
+            _print(f"Reading references from file: {uuid}")
+        with io.open(uuid) as f:
+            for line in f:
+                if ((line := line.strip()) and (components := line.split("/")) and (len(components) > 1) and
+                    (schema_name := components[1]) and (schema_name := _get_schema(portal, schema_name)[1])):  # noqa
+                    try:
+                        if ((result := portal.get(line, raw=True, database=database)) and
+                            (result.status_code in [200, 307]) and (result := result.json())):  # noqa
+                            if not response.get(schema_name):
+                                response[schema_name] = []
+                            response[schema_name].append(result)
+                            continue
+                    except Exception:
+                        pass
+                    _print(f"Cannot get reference: {line}")
+            if insert_files:
+                write_insert_files(response)
+            return response
+    else:
+        response = None
+        try:
+            if not uuid.startswith("/"):
+                path = f"/{uuid}"
+            else:
+                path = uuid
+            response = portal.get(path, raw=raw or inserts, database=database)
+        except Exception as e:
+            if "404" in str(e) and "not found" in str(e).lower():
+                _print(f"Portal object not found at {portal.server}: {uuid}")
+                _exit()
+            _exit(f"Exception getting Portal object from {portal.server}: {uuid}\n{get_error_message(e)}")
+        if not response:
+            if check:
+                return None
+            _exit(f"Null response getting Portal object from {portal.server}: {uuid}")
+        if response.status_code not in [200, 307]:
+            # TODO: Understand why the /me endpoint returns HTTP status code 307, which is only why we mention it above.
+            _exit(f"Invalid status code ({response.status_code}) getting Portal object from {portal.server}: {uuid}")
+        if not response.json:
+            _exit(f"Invalid JSON getting Portal object: {uuid}")
+        response = response.json()
+
+    response_types = {}
     if inserts:
         # Format results as suitable for inserts (e.g. via update-portal-object).
         response.pop("schema_version", None)
@@ -272,20 +385,34 @@ def _get_portal_object(portal: Portal, uuid: str,
             (isinstance(results_type := response.get("@type"), list) and results_type) and
             (isinstance(results_type := results_type[0], str) and results_type.endswith("SearchResults")) and
             (results_type := results_type[0:-len("SearchResults")])):  # noqa
-            # For search results, the type (from XyzSearchResults, above) may not be precisely correct for
-            # each of the results; it may be the supertype (e.g. QualityMetric vs QualityMetricWorkflowRun);
+            # For (raw frame) search results, the type (from XyzSearchResults, above) may not be precisely correct
+            # for each of the results; it may be the supertype (e.g. QualityMetric vs QualityMetricWorkflowRun);
             # so for types which are supertypes (gotten via Portal.get_schemas_super_type_map) we actually
-            # lookup each result individually to determine its actual precise type.
+            # lookup each result individually to determine its actual precise type. Although, if we have
+            # more than (say) 5 results to do this for, then do a separate query (get_metadata_types)
+            # to get the result types all at once.
             if not ((supertypes := portal.get_schemas_super_type_map()) and (subtypes := supertypes.get(results_type))):
                 subtypes = None
             response = {}
+            results_index = 0
+            results_total = len(results)
             for result in results:
+                results_index += 1
+                if debug:
+                    print(f"Processing result: {results_index}")
                 result.pop("schema_version", None)
-                if (subtypes and
-                    (result_uuid := result.get("uuid")) and
-                    (individual_result := portal.get_metadata(result_uuid, raise_exception=False)) and
-                    isinstance(result_type:= individual_result.get("@type"), list) and result_type and result_type[0]):  # noqa
-                    result_type = result_type[0]
+                result = prune_data(result)
+                if (subtypes and one_or_more_objects_of_types_exists(portal, subtypes, debug=debug) and
+                    (result_uuid := result.get("uuid"))):  # noqa
+                    # If we have more than (say) 5 results for which we need to determine that actual result type,
+                    # then get them all at once via separate query (get_metadata_types)) which is not the raw frame.
+                    if (results_total > 5) and (not response_types):
+                        response_types = get_metadata_types(path)
+                    if not (response_types and (result_type := response_types.get(result_uuid))):
+                        if individual_result_type := get_metadata_for_individual_result_type(result_uuid):
+                            result_type = individual_result_type
+                        else:
+                            result_type = results_type
                 else:
                     result_type = results_type
                 if response.get(result_type):
@@ -295,10 +422,57 @@ def _get_portal_object(portal: Portal, uuid: str,
         # Get the result as non-raw so we can get its type.
         elif ((response_cooked := portal.get(path, database=database)) and
               (isinstance(response_type := response_cooked.json().get("@type"), list) and response_type)):
-            response = {f"{response_type[0]}": [response]}
+            response = {f"{response_type[0]}": [prune_data(response)]}
+        if insert_files:
+            write_insert_files(response)
+#           output_directory = insert_files if isinstance(insert_files, str) else os.getcwd()
+#           for schema_name in response:
+#               schema_data = response[schema_name]
+#               file_name = f"{to_snake_case(schema_name)}.json"
+#               file_path = os.path.join(output_directory, file_name)
+#               message_verb = "Writing"
+#               if os.path.exists(file_path):
+#                   message_verb = "Overwriting"
+#                   if os.path.isdir(file_path):
+#                       _print(f"WARNING: Output file already exists as a directory. SKIPPING: {file_path}")
+#                       continue
+#                   if not force:
+#                       _print(f"Output file already exists: {file_path}")
+#                       if not yes_or_no(f"Overwrite this file?"):
+#                           continue
+#               if verbose:
+#                   _print(f"{message_verb} {schema_name} (object{'s' if len(schema_data) != 1 else ''}:"
+#                          f" {len(schema_data)}) file: {file_path}")
+#               with io.open(file_path, "w") as f:
+#                   json.dump(schema_data, f, indent=4)
     elif raw:
         response.pop("schema_version", None)
     return response
+
+
+def one_or_more_objects_of_types_exists(portal: Portal, schema_types: List[str], debug: bool = False) -> bool:
+    for schema_type in schema_types:
+        if one_or_more_objects_of_type_exists(portal, schema_type, debug=debug):
+            return True
+    return False
+
+
+@lru_cache(maxsize=64)
+def one_or_more_objects_of_type_exists(portal: Portal, schema_type: str, debug: bool = False) -> bool:
+    try:
+        if debug:
+            _print(f"Checking if there are actually any objects of type: {schema_type}")
+        if portal.get(f"/{schema_type}").status_code == 404:
+            if debug:
+                _print(f"No objects of type actually exist: {schema_type}")
+            return False
+        else:
+            if debug:
+                _print(f"One or more objects of type exist: {schema_type}")
+    except Exception as e:
+        _print(f"ERROR: Cannot determine if there are actually any objects of type: {schema_type}")
+        _print(e)
+    return True
 
 
 @lru_cache(maxsize=1)

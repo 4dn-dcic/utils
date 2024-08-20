@@ -6,6 +6,11 @@ dcicutils
 Change Log
 ----------
 
+8.14.1
+======
+* Minor changes to utility/troubleshooting/convenience scripts view-portal-object and update-portal-object.
+
+
 8.14.0
 ======
 * Minor updates to the view-portal-object dev/troubleshooting utility script.
