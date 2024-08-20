@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dcicutils"
-version = "8.14.1.1b1"  # TODO: To become 8.14.2
+version = "8.14.1.1b2"  # TODO: To become 8.14.2
 description = "Utility package for interacting with the 4DN Data Portal and other 4DN resources"
 authors = ["4DN-DCIC Team <support@4dnucleome.org>"]
 license = "MIT"
@@ -47,7 +47,7 @@ elasticsearch = "7.13.4"
 appdirs = "^1.4.4"
 aws-requests-auth = ">=0.4.2,<1"
 chardet = "^5.2.0"
-docker = "^4.4.4"
+docker = "^7.1.0"
 gitpython = "^3.1.2"
 jsonc-parser = "^1.1.5"
 jsonschema = "^4.22.0"
@@ -63,7 +63,7 @@ pyperclip = "^1.8.2"
 PyYAML = "^6.0.1"
 # N.B. 2024-06-30: Updating (via poetry update) from requests 2.31.0 (2023-05-22)
 # to 2.32.3 (2024-05-29) causes utils GA/CI to fail (on test_ecr_utils_workflow) for some reason.
-requests = "^2.31.0"
+requests = "^2.27.1"
 rfc3986 = "^1.4.0"
 shortuuid = "^1.0.13"
 structlog = "^19.2.0"

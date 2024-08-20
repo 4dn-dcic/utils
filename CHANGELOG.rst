@@ -8,7 +8,10 @@ Change Log
 
 8.14.2
 ======
-* Corrected requests version on pyproject.toml to not be pinned.
+* Corrected requests version on pyproject.toml to not be pinned (^2.27.0); but doing that (which causes the requests
+  package to be 2.32.3) results in this error on test/test_ecr_utils.py::test_ecr_utils_workflow:
+  docker.errors.DockerException: Error while fetching server API version: Not supported URL scheme http+docker
+  But upgrading the docker package (from ^4.4.4) version to ^7.1.0 fixes that.
 
 
 8.14.1
