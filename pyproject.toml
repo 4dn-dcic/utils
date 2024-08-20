@@ -61,8 +61,6 @@ pytz = ">=2020.4"
 redis = "^4.5.1"
 pyperclip = "^1.8.2"
 PyYAML = "^6.0.1"
-# N.B. 2024-06-30: Updating (via poetry update) from requests 2.31.0 (2023-05-22)
-# to 2.32.3 (2024-05-29) causes utils GA/CI to fail (on test_ecr_utils_workflow) for some reason.
 requests = "^2.27.1"
 rfc3986 = "^1.4.0"
 shortuuid = "^1.0.13"
