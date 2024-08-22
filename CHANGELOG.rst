@@ -10,6 +10,8 @@ Change Log
 ======
 
 * 2024-08-22 (dmichaels)
+* Modified structured_data hook interface slightly to
+  check for and call the "finish" attribute/callable hook.
 * Added portal_utils.Portal.head method.
 
 

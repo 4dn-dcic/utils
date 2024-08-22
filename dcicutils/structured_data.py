@@ -287,6 +287,10 @@ class StructuredDataSet:
             self._load_json_file(file)
         elif file.endswith(".tar") or file.endswith(".zip"):
             self._load_packed_file(file)
+        if (self._validator_hook and
+            hasattr(self._validator_hook, "finish") and
+            callable(finish_validator_hook := getattr(self._validator_hook, "finish"))):  # noqa
+            finish_validator_hook(self)
 
     def _load_packed_file(self, file: str) -> None:
         for file in unpack_files(file, suffixes=ACCEPTABLE_FILE_SUFFIXES):
