@@ -280,10 +280,10 @@ class Portal:
                                  add_on="check_only=True" if check_only else "")
         return self.post(f"/{object_type}{'?check_only=True' if check_only else ''}", data).json()
 
-    def head(self, url: str, follow: bool = False, raise_exception: bool = False, **kwargs) -> Optional[int]:
+    def head(self, url: str, follow: bool = True, raise_exception: bool = False, **kwargs) -> Optional[int]:
         try:
             response = requests.head(self.url(url), **self._kwargs(**kwargs))
-            if response and response.status_code in [301, 302, 303, 307, 308] and (follow is True):
+            if response and response.status_code in [301, 302, 303, 307, 308] and (follow is not False):
                 response = response.follow()
             return response.status_code
         except Exception as e:
