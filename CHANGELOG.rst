@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+8.14.3
+======
+
+* 2024-08-22 (dmichaels)
+* Added portal_utils.Portal.head method.
+
+
 8.14.2
 ======
 * Corrected requests version (to ^2.27.0 from 2.31.0) on pyproject.toml to not be pinned; but doing
