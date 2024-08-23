@@ -360,7 +360,12 @@ def _get_portal_object(portal: Portal, uuid: str,
                 path = f"/{uuid}"
             else:
                 path = uuid
-            response = portal.get(path, raw=raw or inserts, database=database)
+            if (response := portal.get(path, raw=raw or inserts, database=database)) is not None:
+                if response.status_code == 403:
+                    _exit(f"Permission error getting Portal object from {portal.server}: {uuid}")
+                elif response.status_code == 404:
+                    _exit(f"Not found Portal object from {portal.server}: {uuid}")
+
         except Exception as e:
             if "404" in str(e) and "not found" in str(e).lower():
                 _print(f"Portal object not found at {portal.server}: {uuid}")
