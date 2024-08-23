@@ -10,8 +10,8 @@ Change Log
 ======
 
 * 2024-08-22 (dmichaels)
-* Modified structured_data hook interface slightly to
-  check for and call the "finish" attribute/callable hook.
+* Modified structured_data property hook for "finish" attribute/callable.
+* Added sheet hook to structured_data.
 * Added portal_utils.Portal.head method.
 
 
