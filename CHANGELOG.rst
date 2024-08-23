@@ -6,6 +6,15 @@ dcicutils
 Change Log
 ----------
 
+8.14.3
+======
+
+* 2024-08-22 (dmichaels)
+* Modified structured_data property hook for "finish" attribute/callable.
+* Added sheet hook to structured_data.
+* Added portal_utils.Portal.head method.
+
+
 8.14.2
 ======
 * Corrected requests version (to ^2.27.0 from 2.31.0) on pyproject.toml to not be pinned; but doing

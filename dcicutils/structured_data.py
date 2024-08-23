@@ -58,6 +58,7 @@ class StructuredDataSet:
                  norefs: bool = False, merge: bool = False,
                  progress: Optional[Callable] = None,
                  validator_hook: Optional[Callable] = None,
+                 validator_sheet_hook: Optional[Callable] = None,
                  debug_sleep: Optional[str] = None) -> None:
         self._progress = progress if callable(progress) else None
         self._data = {}
@@ -76,7 +77,8 @@ class StructuredDataSet:
         self._autoadd_properties = autoadd if isinstance(autoadd, dict) and autoadd else None
         self._norefs = True if norefs is True else False
         self._merge = True if merge is True else False  # New merge functionality (2024-05-25)
-        self._validator_hook = validator_hook if callable(validator_hook) else None  # Testing support (2024-06-12)
+        self._validator_hook = validator_hook if callable(validator_hook) else None
+        self._validator_sheet_hook = validator_sheet_hook if callable(validator_sheet_hook) else None
         self._debug_sleep = None
         if debug_sleep:
             try:
@@ -287,6 +289,10 @@ class StructuredDataSet:
             self._load_json_file(file)
         elif file.endswith(".tar") or file.endswith(".zip"):
             self._load_packed_file(file)
+        if (self._validator_hook and
+            hasattr(self._validator_hook, "finish") and
+            callable(finish_validator_hook := getattr(self._validator_hook, "finish"))):  # noqa
+            finish_validator_hook(self)
 
     def _load_packed_file(self, file: str) -> None:
         for file in unpack_files(file, suffixes=ACCEPTABLE_FILE_SUFFIXES):
@@ -312,6 +318,8 @@ class StructuredDataSet:
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
             self._load_reader(excel.sheet_reader(sheet_name), type_name=Schema.type_name(sheet_name))
+            if self._validator_sheet_hook:
+                self._validator_sheet_hook(self, sheet_name, self.data[sheet_name])
         # TODO: Do we really need progress reporting for the below?
         # Check for unresolved reference errors which really are not because of ordering.
         # Yes such internal references will be handled correctly on actual database update via snovault.loadxl.
