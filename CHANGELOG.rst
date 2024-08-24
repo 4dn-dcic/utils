@@ -11,6 +11,7 @@ Change Log
 
 * Minor changes to view_portal_object utility script.
 * Minor changes to validators hooks in structured_data.
+* Added portal_utils.Portal.get_version method.
 
 
 8.14.3

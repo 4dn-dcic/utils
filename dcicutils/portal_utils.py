@@ -294,6 +294,12 @@ class Portal:
     def get_health(self) -> OptionalResponse:
         return self.get("/health")
 
+    def get_version(self) -> Optional[str]:
+        try:
+            return self.get_health().json()["project_version"]
+        except Exception:
+            return None
+
     def ping(self) -> bool:
         try:
             return self.get_health().status_code == 200
