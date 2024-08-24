@@ -9,7 +9,8 @@ Change Log
 8.14.4
 ======
 
-* Minor changes to view-portal-object utility script.
+* Minor changes to view_portal_object utility script.
+* Minor changes to validators hooks in structured_data.
 
 
 8.14.3

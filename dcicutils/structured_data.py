@@ -388,13 +388,7 @@ class StructuredDataSet:
             structured_row = structured_row_template.create_row()
             for column_name, value in row.items():
                 if self._validator_hook:
-                    value, validator_error = (
-                        self._validator_hook(self, type_name, column_name, reader.row_number, value))
-                    if validator_error:
-                        self._note_error({
-                            "src": create_dict(type=schema_name, row=reader.row_number),
-                            "error": validator_error
-                        }, "validation")
+                    value = self._validator_hook(self, type_name, column_name, reader.row_number, value)
                 structured_row_template.set_value(structured_row, column_name, value, reader.file, reader.row_number)
                 if self._autoadd_properties:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
