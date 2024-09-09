@@ -2802,7 +2802,7 @@ def format_duration(seconds: Union[int, float]) -> str:
     durations = [("year", 31536000), ("day", 86400), ("hour", 3600), ("minute", 60), ("second", 1)]
     parts = []
     for name, duration in durations:
-        if seconds >= duration:
+        if (seconds == 0) or (seconds >= duration):
             count = seconds // duration
             seconds %= duration
             if count != 1:
