@@ -9,7 +9,7 @@ Change Log
 8.15.0
 ======
 * 2024-10-04 (dmichaels)
-* Added optional bucket argument to s3_utils.read_s3 (initially for Andy).
+* Added optional bucket argument to s3_utils.s3Utils.read_s3 (initially for Andy).
 
 
 8.14.3
