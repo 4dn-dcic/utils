@@ -318,7 +318,7 @@ class StructuredDataSet:
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
             self._load_reader(excel.sheet_reader(sheet_name), type_name=Schema.type_name(sheet_name))
-            if self._validator_sheet_hook:
+            if self._validator_sheet_hook and self.data.get(sheet_name):
                 self._validator_sheet_hook(self, sheet_name, self.data[sheet_name])
         # TODO: Do we really need progress reporting for the below?
         # Check for unresolved reference errors which really are not because of ordering.
@@ -388,13 +388,7 @@ class StructuredDataSet:
             structured_row = structured_row_template.create_row()
             for column_name, value in row.items():
                 if self._validator_hook:
-                    value, validator_error = (
-                        self._validator_hook(self, type_name, column_name, reader.row_number, value))
-                    if validator_error:
-                        self._note_error({
-                            "src": create_dict(type=schema_name, row=reader.row_number),
-                            "error": validator_error
-                        }, "validation")
+                    value = self._validator_hook(self, type_name, column_name, reader.row_number, value)
                 structured_row_template.set_value(structured_row, column_name, value, reader.file, reader.row_number)
                 if self._autoadd_properties:
                     self._add_properties(structured_row, self._autoadd_properties, schema)
