@@ -328,8 +328,10 @@ class s3Utils(s3Base):  # NOQA - This class name violates style rules, but a lot
             # maybe its not json after all
             return auth_text
 
-    def read_s3(self, filename: str):
-        response = self.s3.get_object(Bucket=self.outfile_bucket, Key=filename)
+    def read_s3(self, filename: str, bucket: Optional[str] = None):
+        if (not isinstance(bucket, str)) or (not bucket):
+            bucket = self.outfile_bucket
+        response = self.s3.get_object(Bucket=bucket, Key=filename)
         logger.info(str(response))
         return response['Body'].read()
 

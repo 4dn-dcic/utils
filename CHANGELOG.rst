@@ -6,13 +6,19 @@ dcicutils
 Change Log
 ----------
 
-8.14.4
+8.16.0
 ======
 
 * Minor changes to view_portal_object utility script.
 * Minor changes to validators hooks in structured_data.
 * Added portal_utils.Portal.get_version method.
 * Minor fix in misc_utils.format_duration.
+
+
+8.15.0
+======
+* 2024-10-04 (dmichaels)
+* Added optional bucket argument to s3_utils.s3Utils.read_s3 (initially for Andy).
 
 
 8.14.3
