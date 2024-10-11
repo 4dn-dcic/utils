@@ -6,6 +6,12 @@ dcicutils
 Change Log
 ----------
 
+8.16.1
+======
+* Updated (added) version (43.0.1) for cryptography for (AWS reported) vulnerabilities (CVE-2023-50782, CVE-2024-0727, etc)
+  Updated pyopenssl version (24.2.1) related to above.
+
+
 8.16.0
 ======
 
