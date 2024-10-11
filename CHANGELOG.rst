@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+8.16.1
+======
+* dmichaels / 2024-10-11
+* Updated (added) version (43.0.1) for cryptography library for vulnerabilities (CVE-2023-50782, CVE-2024-0727, et.al.).
+  Updated pyopenssl version (24.2.1) related to above.
+
+
 8.16.0
 ======
 
