@@ -6,6 +6,12 @@ dcicutils
 Change Log
 ----------
 
+8.16.2
+======
+* dmichaels / 2024-10-30
+* Added license exception for autocommand: GNU Lesser General Public License v3 (LGPLv3);
+  see license_policies/"c4-python-infrastructure.jsonc.
+
 8.16.1
 ======
 * dmichaels / 2024-10-11

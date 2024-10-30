@@ -4,5 +4,11 @@
     "inherits_from": ["c4-infrastructure"],
     "description": "Checker for C4 python library infrastructure (Fourfront, CGAP, SMaHT) from Park Lab.",
 
-    "LICENSE_FRAMEWORKS": ["python"]
+    "LICENSE_FRAMEWORKS": ["python"],
+
+    "EXCEPTIONS": {
+        "GNU Lesser General Public License v3 (LGPLv3)": [
+            "autocommand"
+        ]
+    }
 }
