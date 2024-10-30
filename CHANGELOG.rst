@@ -10,7 +10,7 @@ Change Log
 ======
 * dmichaels / 2024-10-30
 * Added license exception for autocommand: GNU Lesser General Public License v3 (LGPLv3);
-  see license_policies/"c4-python-infrastructure.jsonc.
+  see license_policies/"c4-python-infrastructure.jsonc. Ran into this with latest building of submitr.
 
 8.16.1
 ======
