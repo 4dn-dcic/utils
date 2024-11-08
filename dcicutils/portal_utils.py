@@ -220,14 +220,14 @@ class Portal:
                 url += f"?limit={limit}"
         if isinstance(offset, int) and (offset >= 0):
             if "?" in url:
-                url += "&from={offset}"
+                url += f"&from={offset}"
             else:
-                url += "?from={offset}"
+                url += f"?from={offset}"
         if isinstance(field, str) and field:
             if "?" in url:
-                url += "&field={field}"
+                url += f"&field={field}"
             else:
-                url += "?field={field}"
+                url += f"?field={field}"
         if not self.vapp:
             response = requests.get(url, allow_redirects=follow, **self._kwargs(**kwargs))
         else:
@@ -285,14 +285,14 @@ class Portal:
                 add_on += f"limit={limit}"
         if isinstance(offset, int) and (offset >= 0):
             if add_on:
-                add_on += "&from={offset}"
+                add_on += f"&from={offset}"
             else:
-                add_on += "from={offset}"
+                add_on += f"from={offset}"
         if isinstance(field, int) and field:
             if add_on:
-                add_on += "&field={field}"
+                add_on += f"&field={field}"
             else:
-                add_on += "field={field}"
+                add_on += f"field={field}"
         if raise_exception:
             return get_metadata(obj_id=object_id, vapp=self.vapp, key=self.key, add_on=add_on)
         else:
