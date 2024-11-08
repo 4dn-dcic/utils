@@ -209,8 +209,25 @@ class Portal:
         return self._vapp
 
     def get(self, url: str, follow: bool = True,
-            raw: bool = False, database: bool = False, raise_for_status: bool = False, **kwargs) -> OptionalResponse:
+            raw: bool = False, database: bool = False,
+            limit: Optional[int] = None, offset: Optional[int] = None, field: Optional[str] = None,
+            raise_for_status: bool = False, **kwargs) -> OptionalResponse:
         url = self.url(url, raw, database)
+        if isinstance(limit, int) and (limit >= 0):
+            if "?" in url:
+                url += f"&limit={limit}"
+            else:
+                url += f"?limit={limit}"
+        if isinstance(offset, int) and (offset >= 0):
+            if "?" in url:
+                url += "&from={offset}"
+            else:
+                url += "?from={offset}"
+        if isinstance(field, str) and field:
+            if "?" in url:
+                url += "&field={field}"
+            else:
+                url += "?field={field}"
         if not self.vapp:
             response = requests.get(url, allow_redirects=follow, **self._kwargs(**kwargs))
         else:
@@ -252,14 +269,30 @@ class Portal:
             response.raise_for_status()
         return response
 
-    def get_metadata(self, object_id: str, raw: bool = False,
-                     database: bool = False, raise_exception: bool = True) -> Optional[dict]:
+    def get_metadata(self, object_id: str, raw: bool = False, database: bool = False,
+                     limit: Optional[int] = None, offset: Optional[int] = None, field: Optional[str] = None,
+                     raise_exception: bool = True) -> Optional[dict]:
         if isinstance(raw, bool) and raw:
             add_on = "frame=raw" + ("&datastore=database" if isinstance(database, bool) and database else "")
         elif database:
             add_on = "datastore=database"
         else:
             add_on = ""
+        if isinstance(limit, int) and (limit >= 0):
+            if add_on:
+                add_on += f"&limit={limit}"
+            else:
+                add_on += f"limit={limit}"
+        if isinstance(offset, int) and (offset >= 0):
+            if add_on:
+                add_on += "&from={offset}"
+            else:
+                add_on += "from={offset}"
+        if isinstance(field, int) and field:
+            if add_on:
+                add_on += "&field={field}"
+            else:
+                add_on += "field={field}"
         if raise_exception:
             return get_metadata(obj_id=object_id, vapp=self.vapp, key=self.key, add_on=add_on)
         else:
