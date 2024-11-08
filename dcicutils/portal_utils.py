@@ -210,7 +210,8 @@ class Portal:
 
     def get(self, url: str, follow: bool = True,
             raw: bool = False, database: bool = False,
-            limit: Optional[int] = None, offset: Optional[int] = None, field: Optional[str] = None,
+            limit: Optional[int] = None, offset: Optional[int] = None,
+            field: Optional[str] = None, deleted: bool = False,
             raise_for_status: bool = False, **kwargs) -> OptionalResponse:
         url = self.url(url, raw, database)
         if isinstance(limit, int) and (limit >= 0):
@@ -228,6 +229,11 @@ class Portal:
                 url += f"&field={field}"
             else:
                 url += f"?field={field}"
+        if deleted is True:
+            if "?" in url:
+                url += "&status=deleted"
+            else:
+                url += "?status=deleted"
         if not self.vapp:
             response = requests.get(url, allow_redirects=follow, **self._kwargs(**kwargs))
         else:
@@ -270,7 +276,8 @@ class Portal:
         return response
 
     def get_metadata(self, object_id: str, raw: bool = False, database: bool = False,
-                     limit: Optional[int] = None, offset: Optional[int] = None, field: Optional[str] = None,
+                     limit: Optional[int] = None, offset: Optional[int] = None,
+                     field: Optional[str] = None, deleted: bool = False,
                      raise_exception: bool = True) -> Optional[dict]:
         if isinstance(raw, bool) and raw:
             add_on = "frame=raw" + ("&datastore=database" if isinstance(database, bool) and database else "")
@@ -293,6 +300,11 @@ class Portal:
                 add_on += f"&field={field}"
             else:
                 add_on += f"field={field}"
+        if deleted is True:
+            if add_on:
+                add_on += "&status=deleted"
+            else:
+                add_on += "status=deleted"
         if raise_exception:
             return get_metadata(obj_id=object_id, vapp=self.vapp, key=self.key, add_on=add_on)
         else:
