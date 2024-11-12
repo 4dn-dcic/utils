@@ -13,6 +13,7 @@ import requests
 from requests.models import Response
 from threading import Thread
 from typing import Callable, Dict, List, Optional, Tuple, Type, Union
+# from urllib.parse import parse_qs as parse_url_query_string
 from uuid import uuid4 as uuid
 from webtest.app import TestApp, TestResponse
 from wsgiref.simple_server import make_server as wsgi_make_server
@@ -209,8 +210,31 @@ class Portal:
         return self._vapp
 
     def get(self, url: str, follow: bool = True,
-            raw: bool = False, database: bool = False, raise_for_status: bool = False, **kwargs) -> OptionalResponse:
+            raw: bool = False, database: bool = False,
+            limit: Optional[int] = None, offset: Optional[int] = None,
+            field: Optional[str] = None, deleted: bool = False,
+            raise_for_status: bool = False, **kwargs) -> OptionalResponse:
         url = self.url(url, raw, database)
+        if isinstance(limit, int) and (limit >= 0):
+            if "?" in url:
+                url += f"&limit={limit}"
+            else:
+                url += f"?limit={limit}"
+        if isinstance(offset, int) and (offset >= 0):
+            if "?" in url:
+                url += f"&from={offset}"
+            else:
+                url += f"?from={offset}"
+        if isinstance(field, str) and field:
+            if "?" in url:
+                url += f"&field={field}"
+            else:
+                url += f"?field={field}"
+        if deleted is True:
+            if "?" in url:
+                url += "&status=deleted"
+            else:
+                url += "?status=deleted"
         if not self.vapp:
             response = requests.get(url, allow_redirects=follow, **self._kwargs(**kwargs))
         else:
@@ -252,14 +276,45 @@ class Portal:
             response.raise_for_status()
         return response
 
-    def get_metadata(self, object_id: str, raw: bool = False,
-                     database: bool = False, raise_exception: bool = True) -> Optional[dict]:
+    def get_metadata(self, object_id: str, raw: bool = False, database: bool = False,
+                     limit: Optional[int] = None, offset: Optional[int] = None,
+                     field: Optional[str] = None, deleted: bool = False,
+                     raise_exception: bool = True) -> Optional[dict]:
+        if not isinstance(object_id, str):
+            return None
         if isinstance(raw, bool) and raw:
             add_on = "frame=raw" + ("&datastore=database" if isinstance(database, bool) and database else "")
         elif database:
             add_on = "datastore=database"
         else:
             add_on = ""
+        if isinstance(limit, int) and (limit >= 0):
+            if add_on:
+                add_on += f"&limit={limit}"
+            else:
+                add_on += f"limit={limit}"
+        if isinstance(offset, int) and (offset >= 0):
+            if add_on:
+                add_on += f"&from={offset}"
+            else:
+                add_on += f"from={offset}"
+        if isinstance(field, int) and field:
+            if add_on:
+                add_on += f"&field={field}"
+            else:
+                add_on += f"field={field}"
+        if deleted is True:
+            if add_on:
+                add_on += "&status=deleted"
+            else:
+                add_on += "status=deleted"
+        if (question_mark := object_id.find("?")) > 0:
+            query_string = object_id[question_mark + 1:]
+            object_id = object_id[:question_mark]
+            if add_on:
+                add_on += f"&{query_string}"
+            else:
+                add_on += query_string
         if raise_exception:
             return get_metadata(obj_id=object_id, vapp=self.vapp, key=self.key, add_on=add_on)
         else:
