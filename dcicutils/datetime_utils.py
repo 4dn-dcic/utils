@@ -217,11 +217,12 @@ def format_datetime(value: datetime,
         if utc is True:
             tz = timezone.utc
         elif not isinstance(tz, timezone):
-            tz = get_local_timezone()
             if tz is True:
                 notz = False
+                tz = get_local_timezone()
             elif tz is False:
                 notz = True
+            tz = get_local_timezone()
         if noseconds is True:
             ms = False
         value = value.astimezone(tz)
