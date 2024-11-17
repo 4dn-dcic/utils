@@ -6,6 +6,12 @@ dcicutils
 Change Log
 ----------
 
+8.16.4
+======
+* dmichaels / 2024-11-17
+* Very minor fix in datetime_utils.parse_datetime_string.
+
+
 8.16.3
 ======
 * dmichaels / 2024-11-08

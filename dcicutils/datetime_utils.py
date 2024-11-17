@@ -53,7 +53,10 @@ def parse_datetime_string(value: str) -> Optional[datetime]:
     if tz_hours < 0 or tz_minutes < 0:
         tz_hours, tz_minutes = get_local_timezone_hours_minutes()
     try:
-        dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+        try:
+            dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S.%f")
         tz = timezone(timedelta(hours=tz_hours, minutes=tz_minutes))
         return dt.replace(tzinfo=tz)
     except Exception:
