@@ -53,7 +53,10 @@ def parse_datetime_string(value: str) -> Optional[datetime]:
     if tz_hours < 0 or tz_minutes < 0:
         tz_hours, tz_minutes = get_local_timezone_hours_minutes()
     try:
-        dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+        try:
+            dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S.%f")
         tz = timezone(timedelta(hours=tz_hours, minutes=tz_minutes))
         return dt.replace(tzinfo=tz)
     except Exception:
@@ -214,11 +217,12 @@ def format_datetime(value: datetime,
         if utc is True:
             tz = timezone.utc
         elif not isinstance(tz, timezone):
-            tz = get_local_timezone()
             if tz is True:
                 notz = False
+                tz = get_local_timezone()
             elif tz is False:
                 notz = True
+            tz = get_local_timezone()
         if noseconds is True:
             ms = False
         value = value.astimezone(tz)
