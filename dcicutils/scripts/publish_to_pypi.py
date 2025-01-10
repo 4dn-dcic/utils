@@ -223,7 +223,7 @@ def verify_not_already_published(package_name: str, package_version: str) -> boo
         response = requests.get(url).json()["releases"]
     except Exception:
         WARNING_PRINT(f"Cannot determine if this package ({package_name} {package_version})"
-                      f" already been published; ASSUMING NOT.")
+                      f" has already been published or not; ASSUMING NOT.")
         return True
     if response.get(package_version):
         ERROR_PRINT(f"Package {package_name} {package_version} has already been published to PyPi.")
