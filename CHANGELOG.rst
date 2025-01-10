@@ -6,7 +6,7 @@ dcicutils
 Change Log
 ----------
 
-8.16.5
+8.16.6
 ======
 * dmichaels / 2025-01-10
 * Fix to dcicutils/scripts/publish_to_pypy.py script. They (pypi) changed their API so this returns
