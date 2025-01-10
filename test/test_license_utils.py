@@ -759,13 +759,13 @@ def test_validate_simple_license_file():
 
             # Test that with no analysis argument, problems get sent out as warnings
             LicenseFileParser.validate_simple_license_file(filename='LICENSE.txt')
-            assert license_warnings == ["The copyright year, '2020', should have '2024' at the end."]
+            assert license_warnings == ["The copyright year, '2020', should have '2025' at the end."]
 
             # Test that with an analysis argument, problems get summarized to that object
             analysis = LicenseAnalysis()
             license_warnings = []
             LicenseFileParser.validate_simple_license_file(filename='LICENSE.txt', analysis=analysis)
-            assert analysis.miscellaneous == ["The copyright year, '2020', should have '2024' at the end."]
+            assert analysis.miscellaneous == ["The copyright year, '2020', should have '2025' at the end."]
             assert license_warnings == []
 
 
