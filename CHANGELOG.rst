@@ -6,6 +6,15 @@ dcicutils
 Change Log
 ----------
 
+8.16.5
+======
+* dmichaels / 2025-01-10
+* Fix to dcicutils/scripts/publish_to_pypy.py script. They (pypi) changed their API so this returns
+  HTTP 200 even if the package version does NOT exist: https://pypi.org/project/{package_name}/{package_version}
+  So without this fix this script thinks the version to publish already exists even when it does not.
+  Changed to use this instead: https://pypi.org/pypi/{package_name}/json which returns JSON for ALL versions.
+
+
 8.16.4
 ======
 * dmichaels / 2024-11-17
