@@ -31,15 +31,22 @@ class RowReader(abc.ABC):
         self.open()
 
     def __iter__(self) -> Iterator:
+        header = self._iter_header()
         for row in self.rows:
             self.row_number += 1
             if self.is_comment_row(row):
                 continue
             if self.is_terminating_row(row):
                 break
-            if len(self.header) < len(row):  # Row values beyond what there are headers for are ignored.
+            if len(header) < len(row):  # Row values beyond what there are headers for are ignored.
                 self._warning_extra_values.append(self.row_number)
-            yield {column: self.cell_value(value) for column, value in zip(self.header, row)}
+            yield self._iter_mapper({column: self.cell_value(value) for column, value in zip(header, row)})
+
+    def _iter_header(self) -> List[str]:
+        return self.header
+
+    def _iter_mapper(self, row: dict) -> List[str]:
+        return row
 
     def _define_header(self, header: List[Optional[Any]]) -> None:
         self.header = []
