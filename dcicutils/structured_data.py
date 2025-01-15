@@ -59,7 +59,7 @@ class StructuredDataSet:
                  progress: Optional[Callable] = None,
                  validator_hook: Optional[Callable] = None,
                  validator_sheet_hook: Optional[Callable] = None,
-                 row_reader_mapper: Optional[Callable] = None,
+                 excel_class: Optional[Excel] = None,
                  debug_sleep: Optional[str] = None) -> None:
         self._progress = progress if callable(progress) else None
         self._data = {}
@@ -80,7 +80,7 @@ class StructuredDataSet:
         self._merge = True if merge is True else False  # New merge functionality (2024-05-25)
         self._validator_hook = validator_hook if callable(validator_hook) else None
         self._validator_sheet_hook = validator_sheet_hook if callable(validator_sheet_hook) else None
-        self._row_reader_mapper = row_reader_mapper if callable(row_reader_mapper) else None
+        self._excel_class = excel_class if excel_class is not None and issubclass(excel_class, Excel) else Excel
         self._debug_sleep = None
         if debug_sleep:
             try:
@@ -306,7 +306,7 @@ class StructuredDataSet:
     def _load_excel_file(self, file: str) -> None:
         def get_counts() -> Tuple[int, int]:
             nonlocal file
-            excel = Excel(file)
+            excel = self._excel_class(file)
             nrows = 0
             for sheet_name in excel.sheet_names:
                 for row in excel.sheet_reader(sheet_name):
@@ -316,7 +316,8 @@ class StructuredDataSet:
             nrows, nsheets = get_counts()
             self._progress({PROGRESS.LOAD_START: PROGRESS.NOW(),
                             PROGRESS.LOAD_COUNT_SHEETS: nsheets, PROGRESS.LOAD_COUNT_ROWS: nrows})
-        excel = Excel(file)  # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
+        excel = self._excel_class(file)
+        # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
             self._load_reader(excel.sheet_reader(sheet_name), type_name=Schema.type_name(sheet_name))
@@ -376,10 +377,7 @@ class StructuredDataSet:
         schema = None
         noschema = False
         structured_row_template = None
-        sheet_name = reader.sheet_name if self._row_reader_mapper and hasattr(reader, "sheet_name") else None
         for row in reader:
-            if self._row_reader_mapper and (not isinstance(row := self._row_reader_mapper(row, sheet_name), dict)):
-                continue
             self._nrows += 1
             if self._debug_sleep:
                 time.sleep(float(self._debug_sleep))

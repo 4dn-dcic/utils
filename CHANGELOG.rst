@@ -9,9 +9,9 @@ Change Log
 8.17.0
 ======
 * dmichaels / 2025-01-14
-* Added hook to structured_data.StructuredDataSet for a custom row mapper;
-  this was initially to support special/more-intuitive columns for
-  QC values in the submission spreadsheet for smaht-submitr.
+* Added hook to structured_data.StructuredDataSet to allow a custom Excel class
+  to be use, so a custom column mapping can be provided; this was initially to support
+  special/more-intuitive columns for QC values in the submission spreadsheet for smaht-submitr.
 
 8.16.6
 ======
