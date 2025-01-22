@@ -8,10 +8,12 @@ Change Log
 
 8.17.0
 ======
-* dmichaels / 2025-01-14
+* dmichaels / 2025-01-14 / branch: dmichaels-structured-data-row-mapper-hook-20250114 / PR-324
 * Added hook to structured_data.StructuredDataSet to allow a custom Excel class
   to be use, so a custom column mapping can be provided; this was initially to support
   special/more-intuitive columns for QC values in the submission spreadsheet for smaht-submitr.
+* Added hook to structured_data.StructuredDataSet to allow multiple sheets associated with
+  the same type (via a new data_readers.Excel.effective_sheet_name function).
 
 8.16.6
 ======

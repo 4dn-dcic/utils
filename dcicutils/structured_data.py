@@ -320,7 +320,16 @@ class StructuredDataSet:
         # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
-            self._load_reader(excel.sheet_reader(sheet_name), type_name=Schema.type_name(sheet_name))
+            # This effective_sheet_name function added 2025-01-21 to allow sheets whose sheet names are
+            # other than simply the name of the type, but which do contain that type somehow; i.e. e.g.
+            # specifically where the sheet name is like "DSA:ExternalQualityMetric" where the "DSA"
+            # part is purely informational, and the "ExternalQualityMetric" is the type name; so we
+            # now can have multiple sheets of the same type (impossible before as sheet names need
+            # to be unique); this is simply a mechanism to allow the user to partition/organize their
+            # sheets with some data/rows for a given type split across multiple actual sheets.
+            type_name = Schema.type_name(excel.effective_sheet_name(sheet_name))
+            self._load_reader(excel.sheet_reader(sheet_name), type_name=type_name)
+            # self._load_reader(excel.sheet_reader(sheet_name), type_name=Schema.type_name(sheet_name))
             if self._validator_sheet_hook and self.data.get(sheet_name):
                 self._validator_sheet_hook(self, sheet_name, self.data[sheet_name])
         # TODO: Do we really need progress reporting for the below?

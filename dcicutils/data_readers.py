@@ -184,6 +184,9 @@ class Excel:
     def sheet_reader(self, sheet_name: str) -> ExcelSheetReader:
         return self._reader_class(self, sheet_name=sheet_name, workbook=self._workbook)
 
+    def effective_sheet_name(self, sheet_name: str) -> str:
+        return sheet_name
+
     def open(self) -> None:
         if self._workbook is None:
             import warnings
