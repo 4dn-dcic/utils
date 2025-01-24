@@ -327,9 +327,9 @@ class StructuredDataSet:
             # now can have multiple sheets of the same type (impossible before as sheet names need
             # to be unique); this is simply a mechanism to allow the user to partition/organize their
             # sheets with some data/rows for a given type split across multiple actual sheets.
-            type_name = Schema.type_name(excel.effective_sheet_name(sheet_name))
+            effective_sheet_name = excel.effective_sheet_name(sheet_name)
+            type_name = Schema.type_name(effective_sheet_name)
             self._load_reader(excel.sheet_reader(sheet_name), type_name=type_name)
-            # self._load_reader(excel.sheet_reader(sheet_name), type_name=Schema.type_name(sheet_name))
             if self._validator_sheet_hook and self.data.get(sheet_name):
                 self._validator_sheet_hook(self, sheet_name, self.data[sheet_name])
         # TODO: Do we really need progress reporting for the below?
