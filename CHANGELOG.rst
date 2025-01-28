@@ -15,6 +15,7 @@ Change Log
 * Added hook to structured_data.StructuredDataSet to allow multiple sheets associated with
   the same type (via a new data_readers.Excel.effective_sheet_name function).
 
+
 8.16.6
 ======
 * dmichaels / 2025-01-10

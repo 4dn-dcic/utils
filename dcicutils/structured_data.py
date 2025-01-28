@@ -322,7 +322,7 @@ class StructuredDataSet:
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
             # This effective_sheet_name function added 2025-01-21 to allow sheets whose sheet names are
             # other than simply the name of the type, but which do contain that type somehow; i.e. e.g.
-            # specifically where the sheet name is like "DSA:ExternalQualityMetric" where the "DSA"
+            # specifically where the sheet name is like "DSA_ExternalQualityMetric" where the "DSA"
             # part is purely informational, and the "ExternalQualityMetric" is the type name; so we
             # now can have multiple sheets of the same type (impossible before as sheet names need
             # to be unique); this is simply a mechanism to allow the user to partition/organize their
