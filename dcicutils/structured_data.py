@@ -59,6 +59,7 @@ class StructuredDataSet:
                  progress: Optional[Callable] = None,
                  validator_hook: Optional[Callable] = None,
                  validator_sheet_hook: Optional[Callable] = None,
+                 excel_class: Optional[Excel] = None,
                  debug_sleep: Optional[str] = None) -> None:
         self._progress = progress if callable(progress) else None
         self._data = {}
@@ -79,6 +80,7 @@ class StructuredDataSet:
         self._merge = True if merge is True else False  # New merge functionality (2024-05-25)
         self._validator_hook = validator_hook if callable(validator_hook) else None
         self._validator_sheet_hook = validator_sheet_hook if callable(validator_sheet_hook) else None
+        self._excel_class = excel_class if excel_class is not None and issubclass(excel_class, Excel) else Excel
         self._debug_sleep = None
         if debug_sleep:
             try:
@@ -304,7 +306,7 @@ class StructuredDataSet:
     def _load_excel_file(self, file: str) -> None:
         def get_counts() -> Tuple[int, int]:
             nonlocal file
-            excel = Excel(file)
+            excel = self._excel_class(file)
             nrows = 0
             for sheet_name in excel.sheet_names:
                 for row in excel.sheet_reader(sheet_name):
@@ -314,10 +316,20 @@ class StructuredDataSet:
             nrows, nsheets = get_counts()
             self._progress({PROGRESS.LOAD_START: PROGRESS.NOW(),
                             PROGRESS.LOAD_COUNT_SHEETS: nsheets, PROGRESS.LOAD_COUNT_ROWS: nrows})
-        excel = Excel(file)  # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
+        excel = self._excel_class(file)
+        # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
         order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
         for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
-            self._load_reader(excel.sheet_reader(sheet_name), type_name=Schema.type_name(sheet_name))
+            # This effective_sheet_name function added 2025-01-21 to allow sheets whose sheet names are
+            # other than simply the name of the type, but which do contain that type somehow; i.e. e.g.
+            # specifically where the sheet name is like "DSA_ExternalQualityMetric" where the "DSA"
+            # part is purely informational, and the "ExternalQualityMetric" is the type name; so we
+            # now can have multiple sheets of the same type (impossible before as sheet names need
+            # to be unique); this is simply a mechanism to allow the user to partition/organize their
+            # sheets with some data/rows for a given type split across multiple actual sheets.
+            effective_sheet_name = excel.effective_sheet_name(sheet_name)
+            type_name = Schema.type_name(effective_sheet_name)
+            self._load_reader(excel.sheet_reader(sheet_name), type_name=type_name)
             if self._validator_sheet_hook and self.data.get(sheet_name):
                 self._validator_sheet_hook(self, sheet_name, self.data[sheet_name])
         # TODO: Do we really need progress reporting for the below?

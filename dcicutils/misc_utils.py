@@ -1088,7 +1088,10 @@ def to_number(value: str,
         if (dot_index := value.rfind(".")) >= 0:
             if value_fraction := value[dot_index + 1:].strip():
                 if not value_fraction.isdigit():
-                    return fallback
+                    try:
+                        value_fraction = float(value_fraction)
+                    except Exception:
+                        return fallback
             if not (value := value[:dot_index].strip()):
                 if not value_fraction:
                     return fallback
