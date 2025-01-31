@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+8.18.0
+======
+* dmichaels / 2025-01-30 / branch: dmichaels-20250130-no-raw-portal-get-for-submitr / PR-???
+  - Change structured_data.py to not use raw=True for portal_utils get calls; normal users
+    to not have permission for this; came up WRT use of smaht-submitr.
+
+
 8.17.0
 ======
 * dmichaels / 2025-01-14 / branch: dmichaels-structured-data-row-mapper-hook-20250114 / PR-324

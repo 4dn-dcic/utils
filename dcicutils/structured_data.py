@@ -242,7 +242,7 @@ class StructuredDataSet:
                 for portal_object in self.data[type_name]:
                     portal_object = PortalObject(portal_object, portal=self.portal, type=type_name)
                     existing_object, identifying_path, nlookups = (
-                        portal_object.lookup(raw=True, ref_lookup_strategy=self._ref_lookup_strategy))
+                        portal_object.lookup(raw=False, ref_lookup_strategy=self._ref_lookup_strategy))
                     if existing_object:
                         object_diffs, nlookups_compare = portal_object.compare(
                             existing_object, consider_refs=True, resolved_refs=refs)
@@ -459,7 +459,7 @@ class StructuredDataSet:
         just returns the given object. Note that the given object may be CHANGED in place.
         """
         for identifying_path in self._portal.get_identifying_paths(portal_object, portal_type):
-            if existing_portal_object := self._portal.get_metadata(identifying_path, raw=True, raise_exception=False):
+            if existing_portal_object := self._portal.get_metadata(identifying_path, raw=False, raise_exception=False):
                 return merge_objects(existing_portal_object, portal_object, primitive_lists=True)
         return portal_object
 
@@ -981,7 +981,7 @@ class Portal(PortalBase):
 
     def ref_lookup_uncached(self, object_name: str) -> Optional[dict]:
         try:
-            result = super().get_metadata(object_name, raw=True)
+            result = super().get_metadata(object_name, raw=False)
             self._ref_lookup_found_count += 1
             return result
         except Exception as e:
