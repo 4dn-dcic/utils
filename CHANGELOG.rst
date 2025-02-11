@@ -6,6 +6,14 @@ dcicutils
 Change Log
 ----------
 
+8.18.0
+======
+* dmichaels / 2025-02-11 / branch: dmichaels-20250211-submitr-custom-excel / PR-325
+  - Support for qc_values pseudo-columns in smaht-submitr (and multiple sheet with same type).
+    This is encapsulated in custom_excel.py, here because it is needed not only
+    within smaht-submitr but also within smaht-portal (ingestion_processor.py).
+
+
 8.17.0
 ======
 * dmichaels / 2025-01-14 / branch: dmichaels-structured-data-row-mapper-hook-20250114 / PR-324

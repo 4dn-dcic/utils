@@ -1,0 +1,79 @@
+{
+    "version": "1.0.0",
+    "sheet_mappings": {
+        "ExternalQualityMetric": "external_quality_metric",
+        "AnotherTypeForCustomColumnMappingsHere": "another_custom_column_mappings_here"
+    },
+    "column_mappings": {
+        "external_quality_metric": {
+            "total_raw_reads_sequenced": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Total Raw Reads Sequenced",
+                "qc_values#.tooltip": "# of reads (150bp)"
+            },
+            "total_raw_bases_sequenced": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Total Raw Bases Sequenced",
+                "qc_values#.tooltip": null
+            },
+            "prefiltering_number_of_consensus_molecules": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Pre-filtering # of Consensus Molecules",
+                "qc_values#.tooltip": "Number of DNA molecules identified"
+            },
+            "prefiltering_genome_coverage": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:float}",
+                "qc_values#.key": "Pre-filtering Genome Coverage",
+                "qc_values#.tooltip": null
+            },
+            "prefiltering_number_of_reads_per_consensus_molecule": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Pre-filtering Number of Reads per Consensus Molecule",
+                "qc_values#.tooltip": null
+            },
+            "postfiltering_number_of_consensus_molecules": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Post-filtering Number of Consensus Molecules",
+                "qc_values#.tooltip": null
+            },
+            "fraction_prefiltering_molecules_passing_filters": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:float}",
+                "qc_values#.key": "Fraction of Pre-filtering Consensus Molecules that Pass Filters",
+                "qc_values#.tooltip": null
+            },
+            "number_postfiltering_consensus_base_pairs": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Number of Final Post-filtering Consensus Interrogated Base Pairs",
+                "qc_values#.tooltip": "After applying all filters for variant calling, e.e. Mapping quality, Low complexity regions, a4s2 duplex reconstruction criteria, etc."
+            },
+            "somatic_snv_count_by_molecule": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Somatic SNV Count by Molecule",
+                "qc_values#.tooltip": null
+            },
+            "snv_mutation_burden_by_molecule": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:float}",
+                "qc_values#.key": "Somatic SNV Mutation Burden by Molecule",
+                "qc_values#.tooltip": "Detected somatic mutation / final consensus interrogated base pairs"
+            }
+        },
+        "another_custom_column_mappings_here": {
+            "your_custom_column_name": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value}",
+                "qc_values#.key": "Your key for this column mapping",
+                "qc_values#.tooltip": "Your tooltip text for this column mapping"
+            }
+        }
+    }
+}
