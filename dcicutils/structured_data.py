@@ -105,11 +105,13 @@ class StructuredDataSet:
              ref_lookup_strategy: Optional[Callable] = None,
              ref_lookup_nocache: bool = False,
              norefs: bool = False, merge: bool = False,
+             excel_class: Optional[Excel] = None,
              progress: Optional[Callable] = None,
              debug_sleep: Optional[str] = None) -> StructuredDataSet:
         return StructuredDataSet(file=file, portal=portal, schemas=schemas, autoadd=autoadd, order=order, prune=prune,
                                  remove_empty_objects_from_lists=remove_empty_objects_from_lists,
                                  ref_lookup_strategy=ref_lookup_strategy, ref_lookup_nocache=ref_lookup_nocache,
+                                 excel_class=excel_class,
                                  norefs=norefs, merge=merge, progress=progress, debug_sleep=debug_sleep)
 
     def validate(self, force: bool = False) -> None:
