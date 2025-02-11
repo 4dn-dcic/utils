@@ -8,7 +8,7 @@ Change Log
 
 8.18.0
 ======
-* dmichaels / 2025-02-11 / branch: dmichaels-20250211-submitr-custom-excel / PR-325
+* dmichaels / 2025-02-11 / branch: dmichaels-20250211-submitr-custom-excel / PR-326
   - Support for qc_values pseudo-columns in smaht-submitr (and multiple sheet with same type).
     This is encapsulated in custom_excel.py, here because it is needed not only
     within smaht-submitr but also within smaht-portal (ingestion_processor.py).
