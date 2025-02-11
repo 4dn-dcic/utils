@@ -87,9 +87,13 @@ COLUMN_NAME_SEPARATOR = "."
 
 class CustomExcel(Excel):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._custom_column_mappings = CustomExcel._get_custom_column_mappings()
+
     def sheet_reader(self, sheet_name: str) -> ExcelSheetReader:
         return CustomExcelSheetReader(self, sheet_name=sheet_name, workbook=self._workbook,
-                                      custom_column_mappings=CustomExcel._get_custom_column_mappings())
+                                      custom_column_mappings=self._custom_column_mappings)
 
     def effective_sheet_name(self, sheet_name: str) -> str:
         if (underscore := sheet_name.find("_")) > 1:
