@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+8.18.1
+======
+* dmichaels / 2025-02-28 / branch: dmichaels-20250228-correct-submitr-config-path / PR-327
+  - Corrected branch to smaht-submitr config dcicutils/submitr/custom_excel.py to master branch; i.e.:
+    https://raw.githubusercontent.com/smaht-dac/submitr/refs/heads/master/submitr/config/custom_column_mappings.json
+
+
 8.18.0
 ======
 * dmichaels / 2025-02-11 / branch: dmichaels-20250211-submitr-custom-excel / PR-326
