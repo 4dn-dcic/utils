@@ -76,7 +76,7 @@ from dcicutils.misc_utils import to_boolean, to_float, to_integer
 # the same (portal) type; see comments below near the ExcelSheetName class definition.
 
 CUSTOM_COLUMN_MAPPINGS_BASE_URL = "https://raw.githubusercontent.com/smaht-dac/submitr/refs/heads"
-CUSTOM_COLUMN_MAPPINGS_BRANCH = "dmichaels-custom-column-mappings-20250115"
+CUSTOM_COLUMN_MAPPINGS_BRANCH = "master"
 CUSTOM_COLUMN_MAPPINGS_PATH = "submitr/config/custom_column_mappings.json"
 CUSTOM_COLUMN_MAPPINGS_URL = f"{CUSTOM_COLUMN_MAPPINGS_BASE_URL}/{CUSTOM_COLUMN_MAPPINGS_BRANCH}/{CUSTOM_COLUMN_MAPPINGS_PATH}"  # noqa
 CUSTOM_COLUMN_MAPPINGS_LOCAL = False
