@@ -472,6 +472,19 @@ class Portal:
         return super_type_map_flattened
 
     @lru_cache(maxsize=100)
+    def get_schema_super_type_names(self, schema_name: str, include_schema_name: bool = False) -> List[str]:
+        if isinstance(schema_name, str) and (schema_name := self.schema_name(schema_name)):
+            if isinstance(super_type_map := self.get_schemas_super_type_map(), dict):
+                super_types = set()
+                for super_type_name in super_type_map:
+                    if schema_name in super_type_map[super_type_name]:
+                        super_types.add(super_type_name)
+                if (include_schema_name is True) and super_types and self.get_schema(schema_name):
+                    super_types.add(schema_name)
+                return list(super_types)
+        return []
+
+    @lru_cache(maxsize=100)
     def get_schema_subtype_names(self, type_name: str) -> List[str]:
         if not (schemas_super_type_map := self.get_schemas_super_type_map()):
             return []
