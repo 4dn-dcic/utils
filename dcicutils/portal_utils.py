@@ -479,9 +479,10 @@ class Portal:
                 for super_type_name in super_type_map:
                     if schema_name in super_type_map[super_type_name]:
                         super_types.add(super_type_name)
+        super_types = list(super_types)
         if (include_schema_name is True) and self.get_schema(schema_name):
             super_types.insert(0, schema_name)
-        return list(super_types)
+        return super_types
 
     @lru_cache(maxsize=100)
     def get_schema_subtype_names(self, type_name: str) -> List[str]:
