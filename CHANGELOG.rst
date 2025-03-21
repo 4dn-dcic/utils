@@ -6,6 +6,12 @@ dcicutils
 Change Log
 ----------
 
+8.18.3
+======
+* dmichaels / 2025-03-05 / branch: dmichaels-20250305-add-portal-get-schema-super-types / PR-328
+  - Added method portal_utils.get_schema_super_type_names (for use by smaht-submitr).
+
+
 8.18.1
 ======
 * dmichaels / 2025-02-28 / branch: dmichaels-20250228-correct-submitr-config-path / PR-327
