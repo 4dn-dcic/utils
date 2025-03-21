@@ -157,14 +157,16 @@ class CustomExcelSheetReader(ExcelSheetReader):
                     if isinstance(found_custom_column_mappings := custom_column_mappings.get(sheet_name), dict):
                         return found_custom_column_mappings
                     if (effective_sheet_name := CustomExcel.effective_sheet_name(sheet_name)) != sheet_name:
-                        if isinstance(found_custom_column_mappings := custom_column_mappings.get(effective_sheet_name), dict):
+                        if isinstance(found_custom_column_mappings :=
+                                      custom_column_mappings.get(effective_sheet_name), dict):
                             return found_custom_column_mappings
                 return None
             custom_column_mappings = kwargs[ARGUMENT_NAME_CUSTOM_COLUMN_MAPPINGS]
             del kwargs[ARGUMENT_NAME_CUSTOM_COLUMN_MAPPINGS]
             if not (isinstance(custom_column_mappings, dict) and
                     isinstance(sheet_name := kwargs.get(ARGUMENT_NAME_SHEET_NAME, None), str) and
-                    isinstance(custom_column_mappings := lookup_custom_column_mappings(custom_column_mappings, sheet_name), dict)):
+                    isinstance(custom_column_mappings :=
+                               lookup_custom_column_mappings(custom_column_mappings, sheet_name), dict)):
                 custom_column_mappings = None
             self._custom_column_mappings = custom_column_mappings
         super().__init__(*args, **kwargs)
