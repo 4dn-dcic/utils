@@ -95,7 +95,8 @@ class CustomExcel(Excel):
         return CustomExcelSheetReader(self, sheet_name=sheet_name, workbook=self._workbook,
                                       custom_column_mappings=self._custom_column_mappings)
 
-    def effective_sheet_name(self, sheet_name: str) -> str:
+    @staticmethod
+    def effective_sheet_name(sheet_name: str) -> str:
         if (underscore := sheet_name.find("_")) > 1:
             return sheet_name[underscore + 1:]
         return sheet_name
@@ -151,11 +152,19 @@ class CustomExcelSheetReader(ExcelSheetReader):
         ARGUMENT_NAME_CUSTOM_COLUMN_MAPPINGS = "custom_column_mappings"
         self._custom_column_mappings = None
         if ARGUMENT_NAME_CUSTOM_COLUMN_MAPPINGS in kwargs:
+            def lookup_custom_column_mappings(custom_column_mappings: dict, sheet_name: str) -> Optional[dict]:
+                if isinstance(custom_column_mappings, dict) and isinstance(sheet_name, str):
+                    if isinstance(found_custom_column_mappings := custom_column_mappings.get(sheet_name), dict):
+                        return found_custom_column_mappings
+                    if (effective_sheet_name := CustomExcel.effective_sheet_name(sheet_name)) != sheet_name:
+                        if isinstance(found_custom_column_mappings := custom_column_mappings.get(effective_sheet_name), dict):
+                            return found_custom_column_mappings
+                return None
             custom_column_mappings = kwargs[ARGUMENT_NAME_CUSTOM_COLUMN_MAPPINGS]
             del kwargs[ARGUMENT_NAME_CUSTOM_COLUMN_MAPPINGS]
             if not (isinstance(custom_column_mappings, dict) and
                     isinstance(sheet_name := kwargs.get(ARGUMENT_NAME_SHEET_NAME, None), str) and
-                    isinstance(custom_column_mappings := custom_column_mappings.get(sheet_name), dict)):
+                    isinstance(custom_column_mappings := lookup_custom_column_mappings(custom_column_mappings, sheet_name), dict)):
                 custom_column_mappings = None
             self._custom_column_mappings = custom_column_mappings
         super().__init__(*args, **kwargs)
