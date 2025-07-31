@@ -115,7 +115,8 @@ class CustomExcel(Excel):
             if not custom_column_mappings:
                 # Fallback to the actual config file in this package.
                 try:
-                    file = os.path.join(os.path.dirname(__file__), "config", "custom_column_mappings.json")
+                    #file = os.path.join(os.path.dirname(__file__), "config", "custom_column_mappings.json")
+                    file = os.path.join("submitr", "config", "custom_column_mappings.json")
                     with io.open(file, "r") as f:
                         custom_column_mappings = json.load(f)
                 except Exception:
@@ -260,7 +261,7 @@ class CustomExcelSheetReader(ExcelSheetReader):
 
     @staticmethod
     def _parse_value_specifier(value_specifier: Optional[Any], value: Optional[Any]) -> Optional[Any]:
-        if value is not None:
+        if value:
             if isinstance(value_specifier, str) and (value_specifier := value_specifier.replace(" ", "")):
                 if value_specifier.startswith("{value"):
                     if (value_specifier[len(value_specifier) - 1] == "}"):
