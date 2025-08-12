@@ -1,11 +1,11 @@
 {
-    "version": "1.0.0",
+    "version": "2.0.0",
     "sheet_mappings": {
-        "ExternalQualityMetric": "external_quality_metric",
-        "AnotherTypeForCustomColumnMappingsHere": "another_custom_column_mappings_here"
+        "DuplexSeq_ExternalQualityMetric": "duplexseq_external_quality_metric",
+        "DSA_ExternalQualityMetric": "dsa_external_quality_metric"
     },
     "column_mappings": {
-        "external_quality_metric": {
+        "duplexseq_external_quality_metric": {
             "total_raw_reads_sequenced": {
                 "qc_values#.derived_from": "{name}",
                 "qc_values#.value": "{value:integer}",
@@ -52,7 +52,43 @@
                 "qc_values#.derived_from": "{name}",
                 "qc_values#.value": "{value:integer}",
                 "qc_values#.key": "Number of Final Post-filtering Consensus Interrogated Base Pairs",
-                "qc_values#.tooltip": "After applying all filters for variant calling, e.e. Mapping quality, Low complexity regions, a4s2 duplex reconstruction criteria, etc."
+                "qc_values#.tooltip": "After applying all filters for variant calling, e.g. Mapping quality, Low complexity regions, a4s2 duplex reconstruction criteria, etc."
+            },
+            "genome_coverage_1x": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:float}",
+                "qc_values#.key": "Fraction of Genome Coverage at Specific Depths Post-filtering >=1X",
+                "qc_values#.tooltip": null
+            },
+            "genome_coverage_2x": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:float}",
+                "qc_values#.key": "Fraction of Genome Coverage at Specific Depths Post-filtering >=2X",
+                "qc_values#.tooltip": "Genomic coverage of a4s2 duplexes (%). To estimate the bias introduced by genomic region"
+            },
+            "genome_coverage_3x": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:float}",
+                "qc_values#.key": "Fraction of Genome Coverage at Specific Depths Post-filtering >=3X",
+                "qc_values#.tooltip": null
+            },
+            "genome_coverage_4x": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:float}",
+                "qc_values#.key": "Fraction of Genome Coverage at Specific Depths Post-filtering >=4X",
+                "qc_values#.tooltip": null
+            },
+            "germline_homozygous_snv_count_by_molecule": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Germline Homozygous SNV Count by Molecule",
+                "qc_values#.tooltip": null
+            },
+            "germline_heterozygous_snv_count_by_molecule": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Germline Heterozygous SNV Count by Molecule",
+                "qc_values#.tooltip": null
             },
             "somatic_snv_count_by_molecule": {
                 "qc_values#.derived_from": "{name}",
@@ -60,19 +96,175 @@
                 "qc_values#.key": "Somatic SNV Count by Molecule",
                 "qc_values#.tooltip": null
             },
+            "snv_detection_rate_by_molecule": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:float}",
+                "qc_values#.key": "SNV Detection Rate by Molecule",
+                "qc_values#.tooltip": "Detected germline mutations / total germline mutations"
+            },
             "snv_mutation_burden_by_molecule": {
                 "qc_values#.derived_from": "{name}",
                 "qc_values#.value": "{value:float}",
                 "qc_values#.key": "Somatic SNV Mutation Burden by Molecule",
                 "qc_values#.tooltip": "Detected somatic mutation / final consensus interrogated base pairs"
+            },
+            "germline_homozygous_snv_count_by_allele": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Germline Homozygous SNV Count by Allele",
+                "qc_values#.tooltip": "null"
+            },
+            "germline_heterozygous_snv_count_by_allele": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Germline Heterozygous SNV Count by Allele",
+                "qc_values#.tooltip": "null"
+            },
+            "somatic_snv_count_by_allele": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Somatic SNV Count by Allele",
+                "qc_values#.tooltip": null
+            },
+            "snv_mutation_burden_by_allele": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:float}",
+                "qc_values#.key": "Somatic SNV Mutation Burden by Allele",
+                "qc_values#.tooltip": "Detected somatic mutation / final consensus interrogated base pairs"
+            },
+            "germline_indel_count_by_molecule": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Germline Indel Count by Molecule",
+                "qc_values#.tooltip": null
+            },
+            "somatic_indel_count_by_molecule": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Somatic Indel Count by Molecule",
+                "qc_values#.tooltip": null
+            },
+            "indel_mutation_burden_by_molecule": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Somatic Indel Mutation Burden by Molecule",
+                "qc_values#.tooltip": "Detected somatic indels / detection rate (i.e. detected somatic indels/ detected germline indels * total germline indels)"
+            },
+            "germline_indel_count_by_allele": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Germline Indel Count by Allele",
+                "qc_values#.tooltip": null
+            },
+            "somatic_indel_count_by_allele": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:integer}",
+                "qc_values#.key": "Somatic Indel Count by Allele",
+                "qc_values#.tooltip": null
+            },
+            "indel_mutation_burden_by_allele": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value:float}",
+                "qc_values#.key": "Somatic Indel Mutation Burden by Allele",
+                "qc_values#.tooltip": null
             }
         },
-        "another_custom_column_mappings_here": {
-            "your_custom_column_name": {
+        "dsa_external_quality_metric": {
+            "contig_l50": {
                 "qc_values#.derived_from": "{name}",
-                "qc_values#.value": "{value}",
-                "qc_values#.key": "Your key for this column mapping",
-                "qc_values#.tooltip": "Your tooltip text for this column mapping"
+                "qc_values#.value": "{value: integer}",
+                "qc_values#.key": "Contig L50",
+                "qc_values#.tooltip": "L50 of contigs: the count of the smallest number of contigs whose total length makes up 50% of the assembly size"
+            },
+            "contig_n50": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: integer}",
+                "qc_values#.key": "Contig N50",
+                "qc_values#.tooltip": "N50 of contigs: the sequence length of the shortest contig at 50% of the total assembly length (bp)"
+            },
+            "gaps_between_scaffolds": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: integer}",
+                "qc_values#.key": "Gaps Between Scaffolds",
+                "qc_values#.tooltip": "Number of gaps between scaffolds"
+            },
+            "gc_content": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: float}",
+                "qc_values#.key": "GC Content",
+                "qc_values#.tooltip": "GC content of assembly excluding N (%)"
+            },
+            "largest_contig_size": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: integer}",
+                "qc_values#.key": "Largest Contig Size",
+                "qc_values#.tooltip": "Size of the largest contig in the assembly (bp)"
+            },
+            "number_of_contigs": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: integer}",
+                "qc_values#.key": "Number of Contigs",
+                "qc_values#.tooltip": "Number of contigs in the assembly"
+            },
+            "number_of_scaffolds": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: integer}",
+                "qc_values#.key": "Number of Scaffolds",
+                "qc_values#.tooltip": "Number of scaffolds in the assembly"
+            },
+            "percent_single_copy": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: float}",
+                "qc_values#.key": "Percent Single Copy",
+                "qc_values#.tooltip": "Percentage of highly conserved genes with a single copy present in the assembly (BUSCO)"
+            },
+            "percent_multi_copy": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: float}",
+                "qc_values#.key": "Percent Multiple Copy",
+                "qc_values#.tooltip": "Percentage of highly conserved genes with multiple copies present in the assembly (BUSCO)"
+            },
+            "percent_fragmented": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: float}",
+                "qc_values#.key": "Percent Fragmented",
+                "qc_values#.tooltip": "Percentage of highly conserved genes with fragmented representation in the assembly (BUSCO)"
+            },
+            "percent_missing": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: float}",
+                "qc_values#.key": "Percent Missing",
+                "qc_values#.tooltip": "Percentage of highly conserved genes that are missing from the assembly (BUSCO)"
+            },
+            "quality_value": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: float}",
+                "qc_values#.key": "Quality Value",
+                "qc_values#.tooltip": "Consensus quality value (QV) of the assembly (from Merqury)"
+            },
+            "scaffold_l50": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: integer}",
+                "qc_values#.key": "Contig L50",
+                "qc_values#.tooltip": "L50 of scaffolds: the count of the smallest number of scaffolds whose total length makes up 50% of the assembly size"
+            },
+            "scaffold_n50": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: integer}",
+                "qc_values#.key": "Scaffold N50",
+                "qc_values#.tooltip": "N50 of scaffolds: the sequence length of the shortest scaffold at 50% of the total assembly length (bp)"
+            },
+            "total_ungapped_length": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: integer}",
+                "qc_values#.key": "Total Ungapped Length",
+                "qc_values#.tooltip": "Total ungapped length of the assembly (bp)"
+            },
+            "number_of_chromosomes": {
+                "qc_values#.derived_from": "{name}",
+                "qc_values#.value": "{value: integer}",
+                "qc_values#.key": "Number of Chromosomes",
+                "qc_values#.tooltip": "Number of chromosomes in the assembly"
             }
         }
     }
