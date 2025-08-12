@@ -116,7 +116,8 @@ class CustomExcel(Excel):
                 # Fallback to the actual config file in this package.
                 try:
                     # file = os.path.join(os.path.dirname(__file__), "config", "custom_column_mappings.json")
-                    file = os.path.join("submitr", "config", "custom_column_mappings.json") # for testing locally in submitr
+                    file = os.path.join("submitr", "config", "custom_column_mappings.json")
+                    # for testing locally in submitr
                     with io.open(file, "r") as f:
                         custom_column_mappings = json.load(f)
                 except Exception:
