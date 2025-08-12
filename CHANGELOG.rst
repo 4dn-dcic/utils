@@ -6,6 +6,14 @@ dcicutils
 Change Log
 ----------
 
+8.18.4
+======
+* sarahgonicholson / 2025-08-12 / branch: sn_update_eqm_config / PR-329
+  - Update the config file `submitr/config/custom_column_mappings.json` to include properties for DSA as well as DuplexSeq ExternalQualityMetric items
+  - Fix handling of empty properties in ExternalQualityMetric spreadsheets
+  - Update the handling of `CUSTOM_COLUMN_MAPPINGS_LOCAL` to use the local version of `custom_column_mappings` in `submitr` (rather than in `dcicutils/submitr`) when set to `True` to help with testing
+
+
 8.18.3
 ======
 * dmichaels / 2025-03-05 / branch: dmichaels-20250305-add-portal-get-schema-super-types / PR-328
