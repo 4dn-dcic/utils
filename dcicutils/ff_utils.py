@@ -1079,7 +1079,7 @@ def get_schema_names(key=None, ff_env=None, allow_abstract=False) -> Dict[str, s
 def _get_es_url(auth=None, healthpage=None) -> str:
     if not (es_url := os.environ.get("ES_HOST_LOCAL", None)):
         if not (healthpage or auth):
-            raise ValueError("If ES_HOST_LOCAL is not set, healthpage or auth must be provided to get ES URL from health page.")
+            raise ValueError("If ES_HOST_LOCAL is not set, healthpage or auth must be provided to get ES URL.")
         es_url = healthpage.get('elasticsearch') or get_health_page(key=auth)['elasticsearch']
     return es_url
 
