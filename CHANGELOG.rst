@@ -6,6 +6,12 @@ dcicutils
 Change Log
 ----------
 
+8.18.4
+======
+* ajs / 2025-09-30 / branch: ajs_upd_es_metadata_fxns_250925 / PR-330
+  - Updated ff_utils.get_es_metadata and ff_utils.expand_es_metadata to work locally through aws-proxy.
+
+
 8.18.3
 ======
 * dmichaels / 2025-03-05 / branch: dmichaels-20250305-add-portal-get-schema-super-types / PR-328
