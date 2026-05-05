@@ -2,17 +2,46 @@ from copy import deepcopy
 import io
 import json
 import os
-from requests import get as requests_get
 from typing import Any, List, Optional
 from dcicutils.data_readers import Excel, ExcelSheetReader
 from dcicutils.misc_utils import to_boolean, to_float, to_integer
 
-# This module implements a custom Excel spreadsheet class which support "custom column mappings",
-# meaning that, and a very low/early level in processing, the columns/values in the spreadsheet
-# can be redefined/remapped to different columns/values. The mapping is defined by a JSON config
-# file (by default in config/custom_column_mappings.json). It can be thought of as a virtual
-# preprocessing step on the spreadsheet. This was first implemented to support the simplified QC
-# columns/values. For EXAMPLE, so the spreadsheet author can specify single columns like this:
+# This module implements a custom Excel spreadsheet class which supports "custom column mappings",
+# meaning that, at a very low/early level in processing, the columns/values in the spreadsheet
+# can be redefined/remapped to different columns/values.
+#
+# The mapping config is fetched live from the portal via:
+#
+#   GET /search/?type=GenericQcConfig&tags=external_quality_metrics
+#
+# Each GenericQcConfig item returned carries the complete ready-to-use config in its "body"
+# field, which already has the exact structure this module expects:
+#
+#   {
+#     "sheet_mappings": {
+#       "DuplexSeq_ExternalQualityMetric": "duplexseq_external_quality_metric",
+#       "DSA_ExternalQualityMetric":       "dsa_external_quality_metric"
+#     },
+#     "column_mappings": {
+#       "duplexseq_external_quality_metric": {
+#         "total_raw_reads_sequenced": {
+#           "qc_values#.derived_from": "{name}",
+#           "qc_values#.value":        "{value:integer}",
+#           "qc_values#.key":          "Total Raw Reads Sequenced",
+#           "qc_values#.tooltip":      "# of reads (150bp)"
+#         },
+#         ...
+#       },
+#       ...
+#     }
+#   }
+#
+# If multiple GenericQcConfig items are returned the one with the highest "version"
+# (integer-parsed) is used.  If the portal query fails or returns nothing, the bundled
+# local JSON file (config/custom_column_mappings.json) is used as a fallback.
+#
+# The mapping can be thought of as a virtual preprocessing step on the spreadsheet.
+# For EXAMPLE, so the spreadsheet author can specify single columns like this:
 #
 #   total_raw_reads_sequenced: 11870183
 #   total_raw_bases_sequenced: 44928835584
@@ -28,68 +57,55 @@ from dcicutils.misc_utils import to_boolean, to_float, to_integer
 #   qc_values#1.key:          Total Raw Bases Sequenced
 #   qc_values#1.tooltip:      None
 #
-# The relevant portion of the controlling config file (config/custom_column_mappings.json)
-# for the above example looks something like this:
-#
-#   "sheet_mappings": {
-#       "ExternalQualityMetric": "external_quality_metric"
-#   },
-#   "column_mappings": {
-#       "external_quality_metric": {
-#           "total_raw_reads_sequenced": {
-#               "qc_values#.derived_from": "{name}",
-#               "qc_values#.value": "{value:integer}",
-#               "qc_values#.key": "Total Raw Reads Sequenced",
-#               "qc_values#.tooltip": "# of reads (150bp)"
-#           },
-#           "total_raw_bases_sequenced": {
-#               "qc_values#.derived_from": "{name}",
-#               "qc_values#.value": "{value:integer}",
-#               "qc_values#.key": "Total Raw Bases Sequenced",
-#               "qc_values#.tooltip": null
-#           },
-#           "et cetera": "..."
-#       }
-#   }
-#
-# This says that for the ExternalQualityMetric sheet (only) the mappings with the config file
-# section column_mappings.external_quality_metric will be applied. The "qc_values#" portion of
-# the mapped columns names will be expanded to "qc_values#0" for total_raw_reads_sequenced items,
-# and to "qc_values#1" for the total_raw_bases_sequenced items, and so on. This will be based on
-# the ACTUAL columns present in the sheet; so if total_raw_reads_sequenced were not present in
-# the sheet, then the total_raw_bases_sequenced items would be expanded to "qc_values#0".
-# Note the special "{name}" and "{value}" values ("macros") for the target (synthetic) properties;
-# these will be evaluated (here) to the name of the original property name and value, respectively.
-#
-# Since the (first) actual use-case of this is in fact for these qc_values, and since these have
-# effectively untyped values (i.e. the ExternalQualityMetric schema specifies all primitive types
-# as possible/acceptable types for qc_values.value), we also allow a ":TYPE" suffix for the
-# special "{value}" macro, so that a specific primitive type may be specified, e.g. "{value:integer}"
-# will evaluate the original property value as an integer (if it cannot be converted to an integer
-# then whatever its value is, will be passed on through as a string).
-#
 # The hook for this is to pass the CustomExcel type to StructuredDataSet in submission.py.
-# Note that the config file is fetched from GitHub, with a fallback to config/custom_column_mappings.json.
 #
 # ALSO ...
 # This CustomExcel class also handles multiple sheets within a spreadsheet representing
 # the same (portal) type; see comments below near the ExcelSheetName class definition.
 
-CUSTOM_COLUMN_MAPPINGS_BASE_URL = "https://raw.githubusercontent.com/smaht-dac/submitr/refs/heads"
-CUSTOM_COLUMN_MAPPINGS_BRANCH = "master"
-CUSTOM_COLUMN_MAPPINGS_PATH = "submitr/config/custom_column_mappings.json"
-CUSTOM_COLUMN_MAPPINGS_URL = f"{CUSTOM_COLUMN_MAPPINGS_BASE_URL}/{CUSTOM_COLUMN_MAPPINGS_BRANCH}/{CUSTOM_COLUMN_MAPPINGS_PATH}"  # noqa
-CUSTOM_COLUMN_MAPPINGS_LOCAL = False
+CUSTOM_COLUMN_MAPPINGS_LOCAL_CONFIG = os.path.join(
+    os.path.dirname(__file__), "config", "custom_column_mappings.json"
+)
 
 COLUMN_NAME_ARRAY_SUFFIX_CHAR = "#"
 COLUMN_NAME_SEPARATOR = "."
 
+# The portal search used to retrieve EQM column-mapping configs.
+GENERIC_QC_CONFIG_SEARCH = "search/?type=GenericQcConfig&tags=external_quality_metrics"
+
+
+def _get_most_recent_config_version(items: list) -> Optional[dict]:
+    """Return the GenericQcConfig item with the highest integer version number."""
+    def parse_version(item):
+        try:
+            return int(item.get("version", 0))
+        except (ValueError, TypeError):
+            return 0
+    return max(items, key=parse_version, default=None)
+
 
 class CustomExcel(Excel):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, portal=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self._custom_column_mappings = CustomExcel._get_custom_column_mappings()
+        self._custom_column_mappings = CustomExcel._get_custom_column_mappings(portal=portal)
+
+    @classmethod
+    def with_portal(cls, portal):
+        """Return a subclass of CustomExcel with portal baked in.
+
+        Use this when passing excel_class to StructuredDataSet, which requires
+        a real class (it calls issubclass() on the argument internally):
+
+            excel_class=CustomExcel.with_portal(portal)
+        """
+        class _CustomExcelWithPortal(cls):
+            def __init__(self, *args, **kwargs):
+                kwargs.setdefault("portal", portal)
+                super().__init__(*args, **kwargs)
+        _CustomExcelWithPortal.__name__ = "CustomExcel"
+        _CustomExcelWithPortal.__qualname__ = "CustomExcel"
+        return _CustomExcelWithPortal
 
     def sheet_reader(self, sheet_name: str) -> ExcelSheetReader:
         return CustomExcelSheetReader(self, sheet_name=sheet_name, workbook=self._workbook,
@@ -102,47 +118,62 @@ class CustomExcel(Excel):
         return sheet_name
 
     @staticmethod
-    def _get_custom_column_mappings() -> Optional[dict]:
+    def _get_custom_column_mappings(portal=None) -> Optional[dict]:
 
-        def fetch_custom_column_mappings():
-            custom_column_mappings = None
-            if CUSTOM_COLUMN_MAPPINGS_LOCAL is not True:
-                # Fetch config file directly from GitHub (yes this repo is public).
-                try:
-                    custom_column_mappings = requests_get(CUSTOM_COLUMN_MAPPINGS_URL).json()
-                except Exception:
-                    pass
-            if not custom_column_mappings:
-                # Fallback to the actual config file in this package.
-                try:
-                    file = os.path.join(os.path.dirname(__file__), "config", "custom_column_mappings.json")
-                    with io.open(file, "r") as f:
-                        custom_column_mappings = json.load(f)
-                except Exception:
-                    custom_column_mappings = None
-            if not isinstance(custom_column_mappings, dict):
-                custom_column_mappings = {}
-            return custom_column_mappings
+        def fetch_from_portal(portal) -> Optional[dict]:
+            """Query the portal for GenericQcConfig items. The most recent item's
+            "body" field is the complete ready-to-use config dict."""
+            if portal is None:
+                return None
+            try:
+                results = portal.get_metadata(GENERIC_QC_CONFIG_SEARCH)
+                if not isinstance(results, dict):
+                    return None
+                items = results.get("@graph", [])
+                if not items:
+                    return None
+                item = _get_most_recent_config_version(items)
+                if item is None:
+                    return None
+                body = item.get("body")
+                if not isinstance(body, dict):
+                    return None
+                return body
+            except Exception:
+                return None
 
-        def post_process_custom_column_mappings(custom_column_mappings: dict) -> Optional[dict]:
-            if isinstance(column_mappings := custom_column_mappings.get("column_mappings"), dict):
-                if isinstance(sheet_mappings := custom_column_mappings.get("sheet_mappings"), dict):
-                    for sheet_name in list(sheet_mappings.keys()):
-                        if isinstance(sheet_mappings[sheet_name], str):
-                            if isinstance(column_mappings.get(sheet_mappings[sheet_name]), dict):
-                                sheet_mappings[sheet_name] = column_mappings.get(sheet_mappings[sheet_name])
-                            else:
-                                del sheet_mappings[sheet_name]
-                        elif not isinstance(sheet_mappings[sheet_name], dict):
-                            del sheet_mappings[sheet_name]
-                return sheet_mappings
-            return None
+        def fetch_from_local_json() -> Optional[dict]:
+            """Fall back to the bundled static JSON config."""
+            try:
+                with io.open(CUSTOM_COLUMN_MAPPINGS_LOCAL_CONFIG, "r") as f:
+                    return json.load(f)
+            except Exception:
+                return None
 
-        if not (custom_column_mappings := fetch_custom_column_mappings()):
+        def post_process(raw_config: dict) -> Optional[dict]:
+            """Resolve sheet_mappings string references into the actual column-mapping dicts."""
+            if not isinstance(raw_config, dict):
+                return None
+            column_mappings = raw_config.get("column_mappings")
+            sheet_mappings = raw_config.get("sheet_mappings")
+            if not isinstance(column_mappings, dict) or not isinstance(sheet_mappings, dict):
+                return None
+            for sheet_name in list(sheet_mappings.keys()):
+                mapping_key = sheet_mappings[sheet_name]
+                if isinstance(mapping_key, str):
+                    resolved = column_mappings.get(mapping_key)
+                    if isinstance(resolved, dict):
+                        sheet_mappings[sheet_name] = resolved
+                    else:
+                        del sheet_mappings[sheet_name]
+                elif not isinstance(mapping_key, dict):
+                    del sheet_mappings[sheet_name]
+            return sheet_mappings if sheet_mappings else None
+
+        raw_config = fetch_from_portal(portal) or fetch_from_local_json()
+        if not raw_config:
             return None
-        if not (custom_column_mappings := post_process_custom_column_mappings(custom_column_mappings)):
-            return None
-        return custom_column_mappings
+        return post_process(raw_config)
 
 
 class CustomExcelSheetReader(ExcelSheetReader):
@@ -154,12 +185,11 @@ class CustomExcelSheetReader(ExcelSheetReader):
         if ARGUMENT_NAME_CUSTOM_COLUMN_MAPPINGS in kwargs:
             def lookup_custom_column_mappings(custom_column_mappings: dict, sheet_name: str) -> Optional[dict]:
                 if isinstance(custom_column_mappings, dict) and isinstance(sheet_name, str):
-                    if isinstance(found_custom_column_mappings := custom_column_mappings.get(sheet_name), dict):
-                        return found_custom_column_mappings
-                    if (effective_sheet_name := CustomExcel.effective_sheet_name(sheet_name)) != sheet_name:
-                        if isinstance(found_custom_column_mappings :=
-                                      custom_column_mappings.get(effective_sheet_name), dict):
-                            return found_custom_column_mappings
+                    if isinstance(found := custom_column_mappings.get(sheet_name), dict):
+                        return found
+                    if (effective := CustomExcel.effective_sheet_name(sheet_name)) != sheet_name:
+                        if isinstance(found := custom_column_mappings.get(effective), dict):
+                            return found
                 return None
             custom_column_mappings = kwargs[ARGUMENT_NAME_CUSTOM_COLUMN_MAPPINGS]
             del kwargs[ARGUMENT_NAME_CUSTOM_COLUMN_MAPPINGS]
@@ -174,58 +204,38 @@ class CustomExcelSheetReader(ExcelSheetReader):
     def _define_header(self, header: List[Optional[Any]]) -> None:
 
         def fixup_custom_column_mappings(custom_column_mappings: dict, actual_column_names: List[str]) -> dict:
-
-            # This fixes up the custom column mappings config for this particular sheet based
-            # on the actual (header) column names, i.e. e.g. in particular for the array
-            # specifiers like mapping "qc_values#.value" to qc_values#0.value".
-
-            def fixup_custom_array_column_mappings(custom_column_mappings: dict) -> None:
-
-                def get_simple_array_column_name_component(column_name: str) -> Optional[str]:
-                    if isinstance(column_name, str):
-                        if column_name_components := column_name.split(COLUMN_NAME_SEPARATOR):
-                            if (suffix := column_name_components[0].find(COLUMN_NAME_ARRAY_SUFFIX_CHAR)) > 0:
-                                if (suffix + 1) == len(column_name_components[0]):
-                                    return column_name_components[0][:suffix]
-                    return None
-
-                synthetic_array_column_names = {}
-                for column_name in custom_column_mappings:
-                    for synthetic_column_name in list(custom_column_mappings[column_name].keys()):
-                        synthetic_array_column_name = get_simple_array_column_name_component(synthetic_column_name)
-                        if synthetic_array_column_name:
-                            if synthetic_array_column_name not in synthetic_array_column_names:
-                                synthetic_array_column_names[synthetic_array_column_name] = \
-                                    {"index": 0, "columns": [column_name]}
-                            elif (column_name not in
-                                  synthetic_array_column_names[synthetic_array_column_name]["columns"]):
-                                synthetic_array_column_names[synthetic_array_column_name]["index"] += 1
-                                synthetic_array_column_names[synthetic_array_column_name]["columns"].append(column_name)
-                            synthetic_array_column_index = \
-                                synthetic_array_column_names[synthetic_array_column_name]["index"]
-                            synthetic_array_column_name = synthetic_column_name.replace(
-                                f"{synthetic_array_column_name}#",
-                                f"{synthetic_array_column_name}#{synthetic_array_column_index}")
-                            custom_column_mappings[column_name][synthetic_array_column_name] = \
-                                custom_column_mappings[column_name][synthetic_column_name]
-                            del custom_column_mappings[column_name][synthetic_column_name]
-
+            # Array indices (the N in qc_values#N.key) are intentionally left unassigned here.
+            # They are assigned dynamically per-row in _iter_mapper so that only non-empty
+            # columns receive an index, producing a compact 0-based array with no gaps.
             custom_column_mappings = deepcopy(custom_column_mappings)
             for custom_column_name in list(custom_column_mappings.keys()):
                 if custom_column_name not in actual_column_names:
                     del custom_column_mappings[custom_column_name]
-            fixup_custom_array_column_mappings(custom_column_mappings)
             return custom_column_mappings
 
         super()._define_header(header)
         if self._custom_column_mappings:
             self._custom_column_mappings = fixup_custom_column_mappings(self._custom_column_mappings, self.header)
             self._original_header = self.header
+            # Build an expanded header that _StructuredRowTemplate will use to register
+            # set_value functions.  Each source column that has a mapping contributes N
+            # synthetic entries (one per mapped column in the sheet), with consecutive
+            # numeric indices.  This is the *maximum* possible index range; _iter_mapper
+            # will only populate the slots that correspond to non-empty source values, so
+            # the actual array in any given row will be shorter — but every index it might
+            # emit must be pre-registered here or structured_data silently drops the value.
             self.header = []
+            index = 0
             for column_name in header:
                 if column_name in self._custom_column_mappings:
-                    synthetic_column_names = list(self._custom_column_mappings[column_name].keys())
-                    self.header += synthetic_column_names
+                    for synthetic_key in self._custom_column_mappings[column_name]:
+                        array_name, _, rest = synthetic_key.partition(COLUMN_NAME_ARRAY_SUFFIX_CHAR)
+                        if rest:  # bare placeholder: "qc_values#.key" -> "qc_values#<index>.key"
+                            self.header.append(
+                                f"{array_name}{COLUMN_NAME_ARRAY_SUFFIX_CHAR}{index}{COLUMN_NAME_SEPARATOR}{rest.lstrip(COLUMN_NAME_SEPARATOR)}")
+                        else:
+                            self.header.append(synthetic_key)
+                    index += 1
                 else:
                     self.header.append(column_name)
 
@@ -238,24 +248,45 @@ class CustomExcelSheetReader(ExcelSheetReader):
         if self._custom_column_mappings:
             synthetic_columns = {}
             columns_to_delete = []
+            # Track per-array-name indices so each non-empty column gets the next
+            # available slot (e.g. qc_values#0, qc_values#1, ...).  Indices are
+            # assigned here at row-processing time rather than statically at header
+            # time so that empty columns are simply skipped and leave no gap.
+            array_indices: dict = {}
             for column_name in row:
-                if column_name in self._custom_column_mappings:
-                    column_mapping = self._custom_column_mappings[column_name]
-                    for synthetic_column_name in column_mapping:
-                        synthetic_column_value = column_mapping[synthetic_column_name]
-                        if synthetic_column_value == "{name}":
-                            synthetic_columns[synthetic_column_name] = column_name
-                        elif (column_value := self._parse_value_specifier(synthetic_column_value,
-                                                                          row[column_name])) is not None:
-                            synthetic_columns[synthetic_column_name] = column_value
-                        else:
-                            synthetic_columns[synthetic_column_name] = synthetic_column_value
-                    columns_to_delete.append(column_name)
-            if columns_to_delete:
-                for column_to_delete in columns_to_delete:
-                    del row[column_to_delete]
-            if synthetic_columns:
-                row.update(synthetic_columns)
+                if column_name not in self._custom_column_mappings:
+                    continue
+                columns_to_delete.append(column_name)
+                if not row[column_name]:
+                    continue
+                column_mapping = self._custom_column_mappings[column_name]
+                # Determine the array name (e.g. "qc_values") used by this mapping
+                # group and assign it the next sequential index for this row.
+                array_name = None
+                for synthetic_column_name in column_mapping:
+                    prefix, _, _ = synthetic_column_name.partition(COLUMN_NAME_ARRAY_SUFFIX_CHAR)
+                    if _ and prefix:
+                        array_name = prefix
+                        break
+                if array_name is not None:
+                    index = array_indices.get(array_name, 0)
+                    array_indices[array_name] = index + 1
+                for synthetic_column_name, synthetic_column_value in column_mapping.items():
+                    # Replace bare "array_name#" placeholder with the assigned index.
+                    if array_name is not None:
+                        synthetic_column_name = synthetic_column_name.replace(
+                            f"{array_name}{COLUMN_NAME_ARRAY_SUFFIX_CHAR}",
+                            f"{array_name}{COLUMN_NAME_ARRAY_SUFFIX_CHAR}{index}", 1)
+                    if synthetic_column_value == "{name}":
+                        synthetic_columns[synthetic_column_name] = column_name
+                    elif (column_value := self._parse_value_specifier(synthetic_column_value,
+                                                                      row[column_name])) is not None:
+                        synthetic_columns[synthetic_column_name] = column_value
+                    else:
+                        synthetic_columns[synthetic_column_name] = synthetic_column_value
+            for column_to_delete in columns_to_delete:
+                del row[column_to_delete]
+            row.update(synthetic_columns)
         return row
 
     @staticmethod
@@ -280,7 +311,7 @@ class CustomExcelSheetReader(ExcelSheetReader):
 
 
 # This ExcelSheetName class is used to represent an Excel sheet name; it is simply a str type with an
-# additional "original" property. The value of this will be given string with any prefix preceeding an
+# additional "original" property. The value of this will be given string with any prefix preceding an
 # underscore removed; and the "original" property will evaluate to the original/given string. This is
 # used to support the use of sheet names of the form "XYZ_TypeName", where "XYZ" is an arbitrary string
 # and "TypeName" is the virtual name of the sheet, which will be used by StructuredDataSet/etc, and which
@@ -288,11 +319,6 @@ class CustomExcelSheetReader(ExcelSheetReader):
 # multiple sheets within a spreadsheet of the same (portal object) type; since sheet names must be unique,
 # this would otherwise not be possible; this provides a way for a spreadsheet to partition items/rows of
 # a particular fixed type across multiple sheets.
-#
-# If this requirement was known at the beginning (or if we had more foresight) we would not support this
-# feature this way; we would build it in from the start; this mechanism here merely provides a hook for
-# this feature with minimal disruption (the only real tricky part being to make sure the original sheet
-# name is reported in error messages); doing is this was minimizes risk of disruption.
 #
 class ExcelSheetName(str):
     def __new__(cls, value: str):
