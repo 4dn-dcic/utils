@@ -232,7 +232,9 @@ class CustomExcelSheetReader(ExcelSheetReader):
                         array_name, _, rest = synthetic_key.partition(COLUMN_NAME_ARRAY_SUFFIX_CHAR)
                         if rest:  # bare placeholder: "qc_values#.key" -> "qc_values#<index>.key"
                             self.header.append(
-                                f"{array_name}{COLUMN_NAME_ARRAY_SUFFIX_CHAR}{index}{COLUMN_NAME_SEPARATOR}{rest.lstrip(COLUMN_NAME_SEPARATOR)}")
+                                f"{array_name}{COLUMN_NAME_ARRAY_SUFFIX_CHAR}{index}"
+                                f"{COLUMN_NAME_SEPARATOR}{rest.lstrip(COLUMN_NAME_SEPARATOR)}"
+                                )
                         else:
                             self.header.append(synthetic_key)
                     index += 1
