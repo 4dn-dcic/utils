@@ -896,12 +896,9 @@ def _get_es_metadata(uuids, es_client, filters, sources, chunk_size, auth):
     used to create the generator.
     Should NOT be used directly
     """
-    def get_es_host_local() -> Optional[str]:
-        return os.environ.get("ES_HOST_LOCAL", None)
     health = get_health_page(key=auth)
     if es_client is None:
-        if not (es_url := get_es_host_local()):
-            es_url = health['elasticsearch']
+        es_url = _get_es_url(healthpage=health)
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
     namespace_star = health.get('namespace', '') + '*'
     # match all given uuids to _id fields
@@ -1079,6 +1076,14 @@ def get_schema_names(key=None, ff_env=None, allow_abstract=False) -> Dict[str, s
     }
 
 
+def _get_es_url(auth=None, healthpage=None) -> str:
+    if not (es_url := os.environ.get("ES_HOST_LOCAL", None)):
+        if not (healthpage or auth):
+            raise ValueError("If ES_HOST_LOCAL is not set, healthpage or auth must be provided to get ES URL.")
+        es_url = healthpage.get('elasticsearch') or get_health_page(key=auth)['elasticsearch']
+    return es_url
+
+
 def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_pc_wfr=False, ignore_field=None,
                        use_generator=False, es_client=None):
     """
@@ -1126,9 +1131,9 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
         return my_dict
 
     auth = get_authentication_with_server(key, ff_env)
-    es_url = None
-    if es_client is None:  # set up an es client if none is provided
-        es_url = get_health_page(key=auth)['elasticsearch']
+    es_url = _get_es_url(auth=auth)
+
+    if es_client is None:
         es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
 
     # creates a dictionary of schema names to collection names
@@ -1156,7 +1161,7 @@ def expand_es_metadata(uuid_list, key=None, ff_env=None, store_frame='raw', add_
             if es_url:
                 es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
             else:  # recreate client and try again - if we fail here, exception should propagate
-                es_url = get_health_page(key=auth)['elasticsearch']
+                es_url = _get_es_url(auth=auth)
                 es_client = es_utils.create_es_client(es_url, use_aws_auth=True)
 
             current_page = get_es_metadata(uuid_list, es_client=es_client, chunk_size=chunk,
