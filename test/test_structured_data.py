@@ -1065,7 +1065,7 @@ def _pytest_kwargs(kwargs: List[dict]) -> List[dict]:
                 {
                     "indigo": ["abc", "def", "ghi", "123456890"],
                     "juliet": [[[0], [12, 34], [5], [67, 8, 90]], [[123]]],
-                    "alfa": {"bravo": {"foo": 123}}
+                    "alfa": {"bravo": '{"foo": 123}'}
                 },
                 {
                     "indigo": ["prufrock", "j.", "alfred"],
@@ -1074,11 +1074,27 @@ def _pytest_kwargs(kwargs: List[dict]) -> List[dict]:
                 }
              ]
         },
-        "expected_errors": [{'src': {'type': 'SomeTypeFour', 'row': 1},
-                             'error': "Validation error at '$.alfa.bravo': {'foo': 123} is not of type 'string'"},
-                            {'src': {'type': 'SomeTypeFour', 'row': 2},
+        "expected_errors": [{'src': {'type': 'SomeTypeFour', 'row': 2},
                              'error': "Validation error at '$.alfa.bravo': "
                                       "{'charlie': {'delta': 'hellocharlie'}} is not of type 'string'"}]  # noqa
+    },
+    # ----------------------------------------------------------------------------------------------
+    # Verify that string values resembling JSON arrays/objects (e.g. '[0]', '[10, 50]') are stored
+    # as literal strings and not parsed into Python lists when the schema type is string.
+    {
+        "rows": [
+            "alfa.bravo",
+            "[0]",
+            "[10, 50]",
+        ],
+        "as_file_name": "some_type_four.tsv",
+        "schemas": [_load_json_from_file("some_type_four.json")],
+        "expected": {
+            "SomeTypeFour": [
+                {"alfa": {"bravo": "[0]"}},
+                {"alfa": {"bravo": "[10, 50]"}},
+            ]
+        }
     },
     # ----------------------------------------------------------------------------------------------
     {
