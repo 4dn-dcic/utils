@@ -30,7 +30,7 @@ def test_unpack_zip_file_to_temporary_directory_rejects_path_traversal():
         zip_path = os.path.join(work_dir, "evil.zip")
         _make_zip_with_member(zip_path, "../../../tmp/dcicutils_zip_slip_poc.txt", b"pwned")
         with pytest.raises(ValueError):
-            with unpack_zip_file_to_temporary_directory(zip_path) as _tmp_dir:
+            with unpack_zip_file_to_temporary_directory(zip_path):
                 pass
         # The malicious path must never have landed on disk anywhere.
         assert not os.path.exists("/tmp/dcicutils_zip_slip_poc.txt")
@@ -41,7 +41,7 @@ def test_unpack_zip_file_to_temporary_directory_rejects_absolute_path():
         zip_path = os.path.join(work_dir, "evil_abs.zip")
         _make_zip_with_member(zip_path, "/tmp/dcicutils_zip_slip_abs_poc.txt", b"pwned")
         with pytest.raises(ValueError):
-            with unpack_zip_file_to_temporary_directory(zip_path) as _tmp_dir:
+            with unpack_zip_file_to_temporary_directory(zip_path):
                 pass
         assert not os.path.exists("/tmp/dcicutils_zip_slip_abs_poc.txt")
 
@@ -64,7 +64,7 @@ def test_unpack_tar_file_to_temporary_directory_rejects_path_traversal():
         tar_path = os.path.join(work_dir, "evil.tar")
         _make_tar_with_member(tar_path, "../../../tmp/dcicutils_tar_slip_poc.txt", b"pwned")
         with pytest.raises(ValueError):
-            with unpack_tar_file_to_temporary_directory(tar_path) as _tmp_dir:
+            with unpack_tar_file_to_temporary_directory(tar_path):
                 pass
         assert not os.path.exists("/tmp/dcicutils_tar_slip_poc.txt")
 
