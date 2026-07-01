@@ -348,6 +348,28 @@ def test_unified_authentication_unit():
             ff_utils.unified_authentication(None, None)
 
 
+def test_unified_authenticator_authentication_error_redacts_auth_in_message():
+    # A malformed-but-truthy auth (e.g. a misspelled 'key' field) reaches AuthenticationError with
+    # the caller's actual credential material. That credential must never appear in the exception's
+    # message text (which tends to end up in logs/Sentry/Foursight check output), even though the
+    # original value must still be available programmatically via the .auth attribute.
+    ts = TestScenarios
+    bad_auth = ts.some_badly_formed_auth_dict
+    assert ts.some_auth_key in bad_auth.values() and ts.some_auth_secret in bad_auth.values()
+
+    with mock.patch.object(s3_utils, "s3Utils") as MockS3Utils:
+        MockS3Utils.side_effect = AssertionError("s3Utils() should not be used for this locally-checkable auth.")
+        try:
+            ff_utils.unified_authentication(bad_auth, ts.foo_env)
+            raise AssertionError("Expected an AuthenticationError to be raised.")
+        except ff_utils.UnifiedAuthenticator.AuthenticationError as exc:
+            message = str(exc)
+            assert ts.some_auth_key not in message
+            assert ts.some_auth_secret not in message
+            # The original (unredacted) auth remains available on the exception for legitimate use.
+            assert exc.auth == bad_auth
+
+
 # Integration tests
 
 @pytest.mark.integratedx

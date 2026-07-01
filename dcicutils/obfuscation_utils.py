@@ -42,7 +42,8 @@ _SENSITIVE_KEY_NAMES_REGEX = re.compile(
 def should_obfuscate(key: str, value: Any = None) -> bool:
     """
     Returns True if the given key looks as if it represents a sensitive value.
-    Just sees if it contains "secret" or "password" or "crypt" some obvious variants,
+    Just sees if it contains "secret", "password", "crypt", "token", "authorization",
+    "api_key", "access_key", "bearer", "jwt", "private_key", or some obvious variants,
     case-insensitive; i.e. whatever is in the _SENSITIVE_KEY_NAMES_REGEX list
     containing regular expressions; add more to if/when needed.
 
