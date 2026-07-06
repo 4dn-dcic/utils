@@ -6,6 +6,19 @@ dcicutils
 Change Log
 ----------
 
+8.18.5
+======
+* willronchetti / 2026-07-06 / branch: fm/dcic-pypi-fix-6v
+  - Removed the obsolete/unused verify_not_already_published_obsolete_no_longer_works_20250110
+    function from scripts/publish_to_pypi.py; the current verify_not_already_published already
+    uses the PyPi JSON API (https://pypi.org/pypi/{package}/json) instead of the old
+    https://pypi.org/project/{package}/{version}/ page check, which was prone to false positives
+    since PyPi returns HTTP 200 for that URL even when the version does not exist.
+  - Added unit test coverage (test/test_publish_to_pypi.py) for verify_not_already_published:
+    version already published, version not yet published, package with no PyPi presence at all,
+    and PyPi request failure.
+
+
 8.18.4
 ======
 * ajs / 2025-09-30 / branch: ajs_upd_es_metadata_fxns_250925 / PR-330

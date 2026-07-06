@@ -231,20 +231,6 @@ def verify_not_already_published(package_name: str, package_version: str) -> boo
     return True
 
 
-def verify_not_already_published_obsolete_no_longer_works_20250110(package_name: str, package_version: str) -> bool:
-    """
-    If the given package and version has not already been published to PyPi then returns True,
-    otherwise prints an error message and returns False.
-    """
-    url = f"{PYPI_BASE_URL}/project/{package_name}/{package_version}/"
-    DEBUG_PRINT(f"curl {url}")
-    response = requests.get(url)
-    if response.status_code == 200:
-        ERROR_PRINT(f"Package {package_name} {package_version} has already been published to PyPi.")
-        return False
-    return True
-
-
 def get_untracked_files() -> list:
     """
     Returns a list of untracked files for the current git repo; empty list if no untracked changes.
