@@ -370,6 +370,18 @@ def test_unified_authenticator_authentication_error_redacts_auth_in_message():
             assert exc.auth == bad_auth
 
 
+@pytest.mark.parametrize("auth, secrets", [
+    (("key-value", "secret-value"), ("key-value", "secret-value")),
+    (["key-value", "secret-value"], ("key-value", "secret-value")),
+    ("opaque-credential", ("opaque-credential",)),
+])
+def test_unified_authenticator_authentication_error_redacts_other_auth_shapes(auth, secrets):
+    exc = ff_utils.UnifiedAuthenticator.AuthenticationError("Invalid authentication.", auth, "test-env")
+
+    assert all(secret not in str(exc) for secret in secrets)
+    assert exc.auth == auth
+
+
 # Integration tests
 
 @pytest.mark.integratedx

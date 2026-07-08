@@ -23,6 +23,14 @@ def _make_tar_with_member(tar_path: str, member_name: str, content: bytes = b"da
         tf.addfile(info, io.BytesIO(content))
 
 
+def _make_tar_with_symlink(tar_path: str, member_name: str, link_target: str) -> None:
+    with tarfile.open(tar_path, "w") as tf:
+        info = tarfile.TarInfo(name=member_name)
+        info.type = tarfile.SYMTYPE
+        info.linkname = link_target
+        tf.addfile(info)
+
+
 def test_unpack_zip_file_to_temporary_directory_rejects_path_traversal():
     # Zip Slip: a malicious archive entry named with ../ segments must not be extracted
     # outside of the target directory, even though zipfile.extractall would otherwise allow it.
@@ -67,6 +75,15 @@ def test_unpack_tar_file_to_temporary_directory_rejects_path_traversal():
             with unpack_tar_file_to_temporary_directory(tar_path):
                 pass
         assert not os.path.exists("/tmp/dcicutils_tar_slip_poc.txt")
+
+
+def test_unpack_tar_file_to_temporary_directory_rejects_escaping_symlink():
+    with temporary_directory() as work_dir:
+        tar_path = os.path.join(work_dir, "evil_symlink.tar")
+        _make_tar_with_symlink(tar_path, "escape", "../../../tmp")
+        with pytest.raises(tarfile.FilterError):
+            with unpack_tar_file_to_temporary_directory(tar_path):
+                pass
 
 
 def test_unpack_tar_file_to_temporary_directory_extracts_benign_archive():
