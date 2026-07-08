@@ -6,6 +6,13 @@ dcicutils
 Change Log
 ----------
 
+8.18.5
+======
+* willronchetti / 2026-07-08 / branch: fm/dcic-oidc-9x
+  - Migrated GitHub Actions AWS authentication for CI tests from long-lived access key secrets
+    to OIDC via aws-actions/configure-aws-credentials and AWS_OIDC_ROLE_ARN.
+
+
 8.18.4
 ======
 * ajs / 2025-09-30 / branch: ajs_upd_es_metadata_fxns_250925 / PR-330
