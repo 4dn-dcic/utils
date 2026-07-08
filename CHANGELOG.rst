@@ -6,7 +6,7 @@ dcicutils
 Change Log
 ----------
 
-8.18.5
+8.18.6
 ======
 * willronchetti / 2026-07-06 / branch: fm/dcic-pypi-fix-6v
   - Removed the obsolete/unused verify_not_already_published_obsolete_no_longer_works_20250110
@@ -17,6 +17,12 @@ Change Log
   - Added unit test coverage (test/test_publish_to_pypi.py) for verify_not_already_published:
     version already published, version not yet published, package with no PyPi presence at all,
     and PyPi request failure.
+
+8.18.5
+======
+* willronchetti / 2026-07-08 / branch: fm/dcic-oidc-9x
+  - Migrated GitHub Actions AWS authentication for CI tests from long-lived access key secrets
+    to OIDC via aws-actions/configure-aws-credentials and AWS_OIDC_ROLE_ARN.
 
 
 8.18.4
