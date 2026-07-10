@@ -6,6 +6,18 @@ dcicutils
 Change Log
 ----------
 
+8.18.8
+======
+* willronchetti / 2026-07-10 / branch: fm/dcic-pubci-9m
+  - Added an automatic tag-and-publish-to-PyPI `publish` job to `.github/workflows/main.yml`,
+    gated on a successful `build` and a push to `master`. Determines the version from
+    `poetry version -s`, independently checks for an existing git tag and an existing PyPI
+    release (via the PyPI JSON API), tags only if the tag is missing, and publishes only if
+    the version is not yet on PyPI - so the job self-heals if tagging succeeds but a later
+    step fails. `main-publish.yml`'s tag-triggered workflow remains for manual/
+    `workflow_dispatch` publishing only, since GitHub Actions does not start a new workflow
+    run from a tag pushed with the default `GITHUB_TOKEN`.
+
 8.18.7
 ======
 * wrr / 2026-07-01 / branch: fm/sec-fix-util1 / PR-332
