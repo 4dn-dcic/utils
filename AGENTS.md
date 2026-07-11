@@ -1,41 +1,88 @@
 # Project agent memory
 
-This file is the project's committed home for project-intrinsic agent knowledge: build, test, release, architecture, and sharp-edge notes that should travel with the code.
+This is the committed guide to durable, project-intrinsic knowledge. Prefer the
+authoritative files named below over copying details into this document.
 
-- Add durable project-specific notes here as they are discovered through real work.
+## Repository map and public boundaries
 
-## Automatic tag-and-publish-on-master release workflow
+- `dcicutils/` is one flat, pip-installable utility package; `pyproject.toml` is the
+  authority for supported Python versions, dependencies, package metadata, and console
+  entry points. There is intentionally little exported from `dcicutils/__init__.py`:
+  consumers import the utility modules directly, so module-level names can be public API.
+- General-purpose, dependency-light helpers live in modules such as `misc_utils.py`,
+  `lang_utils.py`, `datetime_utils.py`, `file_utils.py`, `data_utils.py`, and
+  `schema_utils.py`. Portal-facing APIs are primarily `ff_utils.py` (request/auth and
+  metadata functions), `portal_utils.py` (the higher-level `Portal` wrapper),
+  `portal_object_utils.py`, `structured_data.py`, and `submitr/`.
+- Integration modules are grouped by the system named in the file: AWS (`s3_utils.py`,
+  `ecs_utils.py`, `ecr_utils.py`, `cloudformation_utils.py`, `secrets_utils.py`, etc.),
+  search (`es_utils.py`, `opensearch_utils.py`), Redis, Docker, and deployment utilities.
+  Keep network, credentials, and service assumptions at those boundaries; use
+  `ff_mocks.py` and test fixtures rather than live services in unit tests.
+- `dcicutils/scripts/` backs the installed commands declared in `pyproject.toml`.
+  `docs/source/` is the Sphinx documentation source; `license_policies/` and
+  `kibana/` are packaged data/configuration. Top-level `scripts/` contains repository
+  maintenance helpers, not installed library API.
 
-`.github/workflows/main.yml`'s `publish` job (`needs: build`, runs only on `push` to
-`master`) reads the version from `pyproject.toml` (`poetry version -s`) and checks both for
-its git tag and for an existing PyPI release. It creates the tag if missing and publishes
-only if PyPI does not already have the version, all **in the same job run**. It deliberately
-does not rely on `.github/workflows/main-publish.yml`'s tag-triggered `on: push: tags`
-event, because GitHub Actions does not start a new workflow run from a tag pushed using the
-default `GITHUB_TOKEN` (anti-recursion rule) - `main-publish.yml` remains only for manual/
-`workflow_dispatch` publishing.
+## Configuration and compatibility
 
-The "Create and push tag" step is gated on the tag-existence check (`exists == 'false'`) -
-tag once per version. The "Publish to PyPI" step instead uses the independently checked
-`pypi_exists == 'false'` condition. Its curl request treats only HTTP 200 (present) and 404
-(absent) as valid; any other status fails the job closed. This split preserves recovery from
-a tag-exists-but-never-published state, while avoiding a failing duplicate-upload attempt on
-later merges. `dcicutils/scripts/publish_to_pypi.py` itself also independently verifies the
-version isn't already published and refuses a dirty checkout, as defense-in-depth.
+- `env_utils.py` is the supported environment-name/configuration facade. It dispatches
+  between orchestrated configuration and compatibility behavior in
+  `env_utils_legacy.py`; `env_base.py`, `env_manager.py`, and `common.py` define the
+  underlying configuration vocabulary. Do not call the internal `EnvUtils` class as a
+  consumer API or casually remove legacy dispatch: downstream Fourfront/CGAP users rely
+  on both modes. The orchestrated and legacy compatibility suites under `test/` are the
+  executable contract.
+- Environment-backed integrations may require AWS credentials, `GLOBAL_ENV_BUCKET`, or
+  `S3_ENCRYPT_KEY`; see `.github/workflows/main.yml`, `docs/source/getting_started.rst`,
+  and the relevant module tests. Tests and static CI use `NO_SERVER_FIXTURES` and
+  `USE_SAMPLE_ENVUTILS` where appropriate to avoid accidental server configuration.
+- Preserve backward-compatible imports and signatures unless a breaking release is
+  explicitly intended. Search for deprecation/legacy comments and corresponding tests
+  before moving symbols. In particular, portal authentication accepts several historical
+  forms, environment naming spans Beanstalk and orchestrated deployments, and
+  `qa_utils.py` retains compatibility exports whose supported home is `qa_checkers.py`.
+- Elasticsearch is deliberately pinned in `pyproject.toml` for portal compatibility.
+  Treat changes to Elasticsearch/OpenSearch, Pyramid, boto, Redis, and urllib/request
+  dependencies as integration changes, not routine upgrades.
 
-Unlike snovault (which vendors this same job), this repo IS `dcicutils`, so `make
-publish-for-ga` invokes `python -m dcicutils.scripts.publish_to_pypi --noconfirm` directly
-against the checked-out source - no separate "install dcicutils" step is needed. The
-`publish` job's "Install Deps" step mirrors `main-publish.yml`'s: `make configure` (installs
-poetry) plus `pip install requests toml` (the modules `publish_to_pypi.py` imports outside
-of poetry's venv). The workflow asserts `git diff --exit-code` right after that install step
-so a future dependency-install change that dirties the tree fails loud with the filename,
-even though no known step currently does so here.
+## Development and tests
 
-The workflow-level `permissions:` block in `main.yml` stays `id-token: write` / `contents:
-read` (needed by the `build` job's AWS OIDC auth); `contents: write` (needed to push the
-tag) is scoped to the `publish` job only, since a job-level `permissions:` block replaces
-rather than merges with the workflow-level one.
+- Bootstrap with `make build` (it installs the repository-pinned Poetry and runs
+  `poetry install`). Run one focused test with `poetry run pytest test/test_<module>.py`
+  or a node id while iterating.
+- `Makefile` is the command authority: `make test-units` is the normal local suite,
+  `make test-static` runs static-marker tests plus flake8, `make test-integrations`
+  selects integration markers, and `make test-for-ga` mirrors the main CI QA command.
+  `make test-all` deliberately includes tests likely to fail in ordinary environments;
+  `direct_es_query` requires VPC access. Redis-backed tests expect `redis-server` at the
+  path configured in `pyproject.toml`.
+- Tests mirror modules under `test/test_*.py`; shared helpers/fixtures are in
+  `test/helpers.py` and `test/fixtures/`, service recordings in `test/recordings/`, and
+  large structured-data samples in `test/data_files/`. Pytest markers and exclusions are
+  defined in `pyproject.toml`. Add regression tests beside the affected module and avoid
+  refreshing recordings unless the external contract intentionally changed.
+- `.github/workflows/main.yml` tests Python 3.11 and 3.12 with Redis and AWS OIDC;
+  `.github/workflows/static-checks.yml` runs the static/lint lane. The declared package
+  compatibility range is broader than the CI matrix, so avoid syntax or APIs outside
+  the range in `pyproject.toml`. Note that the convenience `make lint` target reports
+  failures without failing the command; use `make test-static` or direct
+  `poetry run flake8 ...` for a gating check.
+
+## Release workflow
+
+- The version in `pyproject.toml` is the release source of truth. After CI succeeds on a
+  push to `master`, `.github/workflows/main.yml` creates the matching tag if absent and
+  publishes only if that version is absent from PyPI. Those are independent checks so a
+  tag-exists-but-unpublished run can recover; unexpected PyPI HTTP responses fail closed.
+- Tagging and publishing must remain in that same `publish` job: a tag pushed with the
+  default `GITHUB_TOKEN` does not trigger another workflow. Consequently
+  `.github/workflows/main-publish.yml` is only a manual/fallback publishing path.
+  `dcicutils/scripts/publish_to_pypi.py` also rejects dirty trees and duplicate versions.
+- This repository invokes its checkout directly through `make publish-for-ga`; unlike
+  repositories that vendor this workflow, it must not install a separate `dcicutils`.
+  Keep tag write permission scoped to the publish job because job-level GitHub Actions
+  permissions replace, rather than merge with, workflow-level AWS OIDC permissions.
 
 ## Maintaining this file
 
