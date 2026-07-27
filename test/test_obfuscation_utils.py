@@ -25,6 +25,20 @@ def test_should_obfuscate() -> None:
     assert_should_obfuscate_with_different_cases("crypt_key_id", False)
     assert_should_obfuscate_with_different_cases("not_a_s3cret_foo", False)
 
+    # Common HTTP auth credential key shapes that must be redacted (previously silently NOT matched).
+    assert_should_obfuscate_with_different_cases("token", True)
+    assert_should_obfuscate_with_different_cases("access_token", True)
+    assert_should_obfuscate_with_different_cases("authorization", True)
+    assert_should_obfuscate_with_different_cases("Authorization", True)
+    assert_should_obfuscate_with_different_cases("api_key", True)
+    assert_should_obfuscate_with_different_cases("apikey", True)
+    assert_should_obfuscate_with_different_cases("access_key", True)
+    assert_should_obfuscate_with_different_cases("accesskey", True)
+    assert_should_obfuscate_with_different_cases("bearer", True)
+    assert_should_obfuscate_with_different_cases("jwt", True)
+    assert_should_obfuscate_with_different_cases("private_key", True)
+    assert_should_obfuscate_with_different_cases("privatekey", True)
+
     # Edge cases that are really soft errors...
     assert should_obfuscate(None) is False  # NoQA - Argument is not intended, but function returns False
     assert should_obfuscate(17) is False    # NoQA - ditto
@@ -172,3 +186,25 @@ def test_obfuscate_json_with_tuple():
     x = obfuscate_json(d, obfuscated="<REDACTED>")
     assert x == o
     assert d == d_copy
+
+
+def test_obfuscate_json_with_http_auth_credential_shapes():
+    # End-to-end: a realistic log/trace payload carrying common HTTP auth credential shapes
+    # (as would flow through trace_utils.Trace's TRACE_REDACT) must have all of them scrubbed.
+    d = {
+        "url": "https://example.com/api",
+        "headers": {"Authorization": "Bearer abc123.def456.ghi789", "Content-Type": "application/json"},
+        "api_key": "live_sk_1234567890",
+        "access_token": "ya29.live-access-token-value",
+        "private_key": "-----BEGIN PRIVATE KEY-----abc-----END PRIVATE KEY-----",
+    }
+    d_copy = copy.deepcopy(d)
+    x = obfuscate_json(d, obfuscated="<REDACTED>")
+    assert x == {
+        "url": "https://example.com/api",
+        "headers": {"Authorization": "<REDACTED>", "Content-Type": "application/json"},
+        "api_key": "<REDACTED>",
+        "access_token": "<REDACTED>",
+        "private_key": "<REDACTED>",
+    }
+    assert d == d_copy  # original not mutated

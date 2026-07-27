@@ -1338,10 +1338,28 @@ class UnifiedAuthenticator:
 
     class AuthenticationError(Exception):
 
+        @staticmethod
+        def _redact_auth(auth: Optional[AnyAuthData]) -> Optional[AnyAuthData]:
+            # auth is often the caller's actual (key, secret) credential; it must never be interpolated
+            # verbatim into an exception message, since that message tends to end up in logs
+            # (CloudWatch, Sentry, Foursight check output, bare `print(exc)`/`logger.exception`, etc.)
+            # Note this redacts ALL dict values (not just ones matching an "is this sensitive" key-name
+            # heuristic like obfuscate_json uses elsewhere), since the whole auth argument is, by
+            # definition, credential material -- including whichever value the caller put under an
+            # unexpected/misspelled key, which is exactly the malformed-auth case that reaches here.
+            if isinstance(auth, dict):
+                return {key: "<REDACTED>" for key in auth}
+            elif isinstance(auth, (tuple, list)) and len(auth) == 2:
+                return type(auth)(("<REDACTED>", "<REDACTED>"))
+            elif auth is None:
+                return None
+            else:
+                return f"<REDACTED {type(auth).__name__}>"
+
         def __init__(self, message: str, auth: Optional[AnyAuthData], ff_env: Optional[PortalEnvName]):
             self.auth = auth
             self.ff_env = ff_env
-            super().__init__(f"{message} You gave auth={auth}, ff_env={ff_env}")
+            super().__init__(f"{message} You gave auth={self._redact_auth(auth)}, ff_env={ff_env}")
 
     @classmethod
     def unified_authentication(cls, auth: Optional[AnyAuthDict] = None,

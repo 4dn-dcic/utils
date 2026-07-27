@@ -12,9 +12,11 @@ on:
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-permissions: #Needed for OIDC authentication
+
+permissions:
   id-token: write
-  contents: read   
+  contents: read
+
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
@@ -25,7 +27,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        python_version: [3.9, 3.11, 3.12]
+        python_version: [3.11, 3.12]
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -49,7 +51,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
           aws-region: us-east-1
-      
       - name: QA
         env:
           S3_ENCRYPT_KEY: ${{ secrets.S3_ENCRYPT_KEY }}
@@ -60,7 +61,69 @@ jobs:
       - name: Coveralls
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        if: ${{ matrix.python_version == '3.9' }}
+        if: ${{ matrix.python_version == '3.11' }}
         run: |
           pip install coveralls
           poetry run coveralls --service=github
+
+  # Tags and publishes the version declared in pyproject.toml after a successful test run on
+  # master. Runs in the same job as the tag push (rather than relying on main-publish.yml's
+  # tag-triggered `on: push: tags` event) because GitHub Actions does not start a new workflow
+  # run from a push made with the default GITHUB_TOKEN. The tag-push step is gated on the
+  # tag-existence check (only tag once per version). The publish step is independently gated
+  # on whether the version exists on PyPI, so it can self-heal if a prior run tagged
+  # successfully but crashed before publishing without failing for an already-published version.
+  publish:
+    name: Tag and Publish to PyPI
+    needs: build
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.11
+
+      - name: Install Deps
+        run: |
+          make configure
+          pip install requests toml
+
+      - name: Assert clean release checkout
+        run: git diff --exit-code
+
+      - name: Determine version and check for existing tag and PyPI release
+        id: version
+        run: |
+          VERSION=$(poetry version -s)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if git ls-remote --tags origin "refs/tags/$VERSION" | grep -q "refs/tags/$VERSION$"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          PYPI_STATUS=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            "https://pypi.org/pypi/dcicutils/${VERSION}/json")
+          case "$PYPI_STATUS" in
+            200) echo "pypi_exists=true" >> "$GITHUB_OUTPUT" ;;
+            404) echo "pypi_exists=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "Unexpected PyPI status ${PYPI_STATUS} for ${VERSION}" >&2; exit 1 ;;
+          esac
+
+      - name: Create and push tag
+        if: ${{ steps.version.outputs.exists == 'false' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.version.outputs.version }}"
+          git push origin "${{ steps.version.outputs.version }}"
+
+      - name: Publish to PyPI
+        if: ${{ steps.version.outputs.pypi_exists == 'false' }}
+        env:
+          PYPI_USER: ${{ secrets.PYPI_USER }}
+          PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: |
+          make publish-for-ga

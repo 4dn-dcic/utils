@@ -6,6 +6,43 @@ dcicutils
 Change Log
 ----------
 
+8.18.8
+======
+* willronchetti / 2026-07-10 / branch: fm/dcic-pubci-9m
+  - Added an automatic tag-and-publish-to-PyPI `publish` job to `.github/workflows/main.yml`,
+    gated on a successful `build` and a push to `master`. Determines the version from
+    `poetry version -s`, independently checks for an existing git tag and an existing PyPI
+    release (via the PyPI JSON API), tags only if the tag is missing, and publishes only if
+    the version is not yet on PyPI - so the job self-heals if tagging succeeds but a later
+    step fails. `main-publish.yml`'s tag-triggered workflow remains for manual/
+    `workflow_dispatch` publishing only, since GitHub Actions does not start a new workflow
+    run from a tag pushed with the default `GITHUB_TOKEN`.
+
+8.18.7
+======
+* wrr / 2026-07-01 / branch: fm/sec-fix-util1 / PR-332
+  - Fixed Zip Slip/Tar Slip path traversal in zip_utils.py archive extraction.
+  - Redacted credentials from AuthenticationError exception messages in ff_utils.py.
+  - Expanded credential-redaction regex in obfuscation_utils.py to cover token/api_key/authorization/bearer/jwt/private_key.
+
+
+8.18.6
+======
+* willronchetti / 2026-07-06 / branch: fm/dcic-pypi-fix-6v
+  - Removed the obsolete/unused verify_not_already_published_obsolete_no_longer_works_20250110
+    function from scripts/publish_to_pypi.py; the current verify_not_already_published already
+    uses the PyPi JSON API (https://pypi.org/pypi/{package}/json) instead of the old
+    https://pypi.org/project/{package}/{version}/ page check, which was prone to false positives
+    since PyPi returns HTTP 200 for that URL even when the version does not exist.
+  - Added unit test coverage (test/test_publish_to_pypi.py) for verify_not_already_published:
+    version already published, version not yet published, package with no PyPi presence at all,
+    and PyPi request failure.
+
+8.18.5
+======
+* willronchetti / 2026-07-08 / branch: fm/dcic-oidc-9x
+  - Migrated GitHub Actions AWS authentication for CI tests from long-lived access key secrets
+    to OIDC via aws-actions/configure-aws-credentials and AWS_OIDC_ROLE_ARN.
 8.18.4
 ======
 * ajs / 2025-09-30 / branch: ajs_upd_es_metadata_fxns_250925 / PR-330

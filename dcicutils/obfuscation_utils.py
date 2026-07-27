@@ -10,16 +10,30 @@ from typing import Optional, Any, Union
 
 # The _SENSITIVE_KEY_NAMES_REGEX regex defines key names representing sensitive values, case-insensitive.
 # Note the below 'crypt(?!_key_id$)' regex matches any thing with 'crypt' except for 'crypt_key_id'.
+#
+# NOTE: token/authoriz(e|ation)/api(_)?key/access(_)?key/bearer/jwt/private(_)?key were added because,
+# without them, this (and callers like trace_utils.Trace's TRACE_REDACT logic, which exists specifically
+# to keep credentials out of logs) would silently fail to redact common credential shapes such as an
+# "Authorization: Bearer <token>" header, an "api_key", or an "access_token" -- letting live secrets
+# leak into logs/traces even though the obfuscation machinery is in place and believed to be protecting
+# against exactly that.
 _SENSITIVE_KEY_NAMES_REGEX = re.compile(
     r"""
     .*(
-        password       |
-        passwd         |
-        secret         |
-        secrt          |
-        scret          |
-        session.*token |
-        session.*id    |
+        password          |
+        passwd            |
+        secret            |
+        secrt             |
+        scret             |
+        session.*token    |
+        session.*id       |
+        token             |
+        authoriz(e|ation) |
+        api.?key          |
+        access.?key       |
+        bearer            |
+        jwt               |
+        private.?key      |
         crypt(?!_key_id$)
     ).*
     """, re.VERBOSE | re.IGNORECASE)
@@ -28,7 +42,8 @@ _SENSITIVE_KEY_NAMES_REGEX = re.compile(
 def should_obfuscate(key: str, value: Any = None) -> bool:
     """
     Returns True if the given key looks as if it represents a sensitive value.
-    Just sees if it contains "secret" or "password" or "crypt" some obvious variants,
+    Just sees if it contains "secret", "password", "crypt", "token", "authorization",
+    "api_key", "access_key", "bearer", "jwt", "private_key", or some obvious variants,
     case-insensitive; i.e. whatever is in the _SENSITIVE_KEY_NAMES_REGEX list
     containing regular expressions; add more to if/when needed.
 

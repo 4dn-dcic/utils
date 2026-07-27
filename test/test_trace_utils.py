@@ -147,7 +147,7 @@ def test_trace_redact():
                 return x
 
             d = {"AWS_ACCESS_KEY_ID": "FOO", "AWS_SECRET_KEY": "BAR"}
-            d_obfuscated = {"AWS_ACCESS_KEY_ID": "FOO", "AWS_SECRET_KEY": "<REDACTED>"}
+            d_obfuscated = {"AWS_ACCESS_KEY_ID": "<REDACTED>", "AWS_SECRET_KEY": "<REDACTED>"}
 
             assert fn_1(d) == d
             assert printed.lines == [

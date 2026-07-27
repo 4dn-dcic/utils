@@ -9,10 +9,22 @@ from typing import List, Optional
 import zipfile
 
 
+def _assert_within_directory(member_path: str, target_directory: str) -> None:
+    # Guards against "zip slip"/"tar slip" path traversal, where a malicious archive
+    # entry (e.g. named "../../etc/cron.d/evil" or with an absolute path) would
+    # otherwise be extracted outside of the intended target directory.
+    target_directory = os.path.realpath(target_directory)
+    resolved_path = os.path.realpath(os.path.join(target_directory, member_path))
+    if os.path.commonpath([target_directory, resolved_path]) != target_directory:
+        raise ValueError(f"Refusing to extract archive member outside of target directory: {member_path}")
+
+
 @contextmanager
 def unpack_zip_file_to_temporary_directory(file: str) -> str:
     with temporary_directory() as tmp_directory_name:
         with zipfile.ZipFile(file, "r") as zipf:
+            for member in zipf.namelist():
+                _assert_within_directory(member, tmp_directory_name)
             zipf.extractall(tmp_directory_name)
         yield tmp_directory_name
 
@@ -21,7 +33,11 @@ def unpack_zip_file_to_temporary_directory(file: str) -> str:
 def unpack_tar_file_to_temporary_directory(file: str) -> str:
     with temporary_directory() as tmp_directory_name:
         with tarfile.open(file, "r") as tarf:
-            tarf.extractall(tmp_directory_name)
+            for member in tarf.getmembers():
+                _assert_within_directory(member.name, tmp_directory_name)
+            # The "data" filter (PEP 706) additionally rejects unsafe member types/permissions
+            # (e.g. device files, symlinks escaping the target, setuid bits) on extraction.
+            tarf.extractall(tmp_directory_name, filter="data")
         yield tmp_directory_name
 
 
