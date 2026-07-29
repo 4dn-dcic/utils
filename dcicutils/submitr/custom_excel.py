@@ -84,6 +84,20 @@ def _get_most_recent_config_version(items: list) -> Optional[dict]:
     return max(items, key=parse_version, default=None)
 
 
+def _array_name_of(synthetic_column_name: str) -> Optional[str]:
+    """Return the array name for a synthetic column key that carries an array placeholder,
+    or None for a plain/scalar key. The COLUMN_NAME_ARRAY_SUFFIX_CHAR ("#") marks where a
+    numeric array index will be inserted, e.g. "qc_values#.value" and the bare "qc_values#"
+    both have array name "qc_values". This single definition is used by both the header
+    registration (_define_header) and the per-row expansion (_iter_mapper) so that they
+    always agree on which keys are array elements."""
+    if isinstance(synthetic_column_name, str):
+        prefix, separator, _ = synthetic_column_name.partition(COLUMN_NAME_ARRAY_SUFFIX_CHAR)
+        if separator and prefix:
+            return prefix
+    return None
+
+
 class CustomExcel(Excel):
 
     def __init__(self, *args, portal=None, **kwargs):
@@ -201,6 +215,39 @@ class CustomExcelSheetReader(ExcelSheetReader):
             self._custom_column_mappings = custom_column_mappings
         super().__init__(*args, **kwargs)
 
+    @staticmethod
+    def _expand_array_indices(column_mapping: dict, array_indices: dict) -> List[tuple]:
+        # Assign concrete numeric array indices to a single source column's synthetic keys
+        # using a shared per-array-name numbering scheme. This is the one place the index of
+        # any synthetic array column is chosen; _define_header and _iter_mapper both call it
+        # so that the registered header and the per-row output can never disagree.
+        #
+        # - array_indices maps array-name -> next index to assign; it is updated in place so
+        #   that successive source columns referencing the same array-name get consecutive
+        #   indices (qc_values#0, qc_values#1, ...).
+        # - Within THIS source column every key that references a given array-name shares that
+        #   column's single index for that array-name (they are fields of one array element);
+        #   a column that references several array-names advances each of them once.
+        # - Scalar (non-array) keys are returned unchanged.
+        #
+        # Returns a list of (concrete_synthetic_column_name, template_value) preserving the
+        # mapping's key order.
+        assigned = {}  # array-name -> index chosen for this source column
+        expanded = []
+        for synthetic_column_name, template_value in column_mapping.items():
+            array_name = _array_name_of(synthetic_column_name)
+            if array_name is None:
+                expanded.append((synthetic_column_name, template_value))
+                continue
+            if array_name not in assigned:
+                assigned[array_name] = array_indices.get(array_name, 0)
+                array_indices[array_name] = assigned[array_name] + 1
+            concrete_name = synthetic_column_name.replace(
+                f"{array_name}{COLUMN_NAME_ARRAY_SUFFIX_CHAR}",
+                f"{array_name}{COLUMN_NAME_ARRAY_SUFFIX_CHAR}{assigned[array_name]}", 1)
+            expanded.append((concrete_name, template_value))
+        return expanded
+
     def _define_header(self, header: List[Optional[Any]]) -> None:
 
         def fixup_custom_column_mappings(custom_column_mappings: dict, actual_column_names: List[str]) -> dict:
@@ -217,27 +264,20 @@ class CustomExcelSheetReader(ExcelSheetReader):
         if self._custom_column_mappings:
             self._custom_column_mappings = fixup_custom_column_mappings(self._custom_column_mappings, self.header)
             self._original_header = self.header
-            # Build an expanded header that _StructuredRowTemplate will use to register
-            # set_value functions.  Each source column that has a mapping contributes N
-            # synthetic entries (one per mapped column in the sheet), with consecutive
-            # numeric indices.  This is the *maximum* possible index range; _iter_mapper
-            # will only populate the slots that correspond to non-empty source values, so
-            # the actual array in any given row will be shorter — but every index it might
-            # emit must be pre-registered here or structured_data silently drops the value.
+            # Register the *maximum* set of synthetic columns _iter_mapper could emit, using the
+            # exact same per-array-name numbering (via _expand_array_indices). Every mapped source
+            # column present in the sheet contributes one array element per array-name it uses, so
+            # each array-name is registered contiguously as qc_values#0..qc_values#(N-1). At row
+            # time empty cells are skipped, so the emitted indices are always a prefix of these;
+            # every index a row can emit is therefore pre-registered here, which is required or
+            # structured_data would silently drop the value (see _StructuredRowTemplate.set_value).
             self.header = []
-            index = 0
+            array_indices: dict = {}
             for column_name in header:
                 if column_name in self._custom_column_mappings:
-                    for synthetic_key in self._custom_column_mappings[column_name]:
-                        array_name, _, rest = synthetic_key.partition(COLUMN_NAME_ARRAY_SUFFIX_CHAR)
-                        if rest:  # bare placeholder: "qc_values#.key" -> "qc_values#<index>.key"
-                            self.header.append(
-                                f"{array_name}{COLUMN_NAME_ARRAY_SUFFIX_CHAR}{index}"
-                                f"{COLUMN_NAME_SEPARATOR}{rest.lstrip(COLUMN_NAME_SEPARATOR)}"
-                                )
-                        else:
-                            self.header.append(synthetic_key)
-                    index += 1
+                    for concrete_name, _ in self._expand_array_indices(
+                            self._custom_column_mappings[column_name], array_indices):
+                        self.header.append(concrete_name)
                 else:
                     self.header.append(column_name)
 
@@ -250,10 +290,11 @@ class CustomExcelSheetReader(ExcelSheetReader):
         if self._custom_column_mappings:
             synthetic_columns = {}
             columns_to_delete = []
-            # Track per-array-name indices so each non-empty column gets the next
-            # available slot (e.g. qc_values#0, qc_values#1, ...).  Indices are
-            # assigned here at row-processing time rather than statically at header
-            # time so that empty columns are simply skipped and leave no gap.
+            # Assign array indices with the SAME per-array-name scheme used to register the
+            # header (via _expand_array_indices), but only for non-empty source cells, so each
+            # array ends up a compact 0-based list with no gaps. Because empty columns are
+            # skipped, the indices emitted here are always a prefix of those registered in
+            # _define_header, guaranteeing every emitted synthetic column is pre-registered.
             array_indices: dict = {}
             for column_name in row:
                 if column_name not in self._custom_column_mappings:
@@ -262,23 +303,8 @@ class CustomExcelSheetReader(ExcelSheetReader):
                 if not row[column_name]:
                     continue
                 column_mapping = self._custom_column_mappings[column_name]
-                # Determine the array name (e.g. "qc_values") used by this mapping
-                # group and assign it the next sequential index for this row.
-                array_name = None
-                for synthetic_column_name in column_mapping:
-                    prefix, _, _ = synthetic_column_name.partition(COLUMN_NAME_ARRAY_SUFFIX_CHAR)
-                    if _ and prefix:
-                        array_name = prefix
-                        break
-                if array_name is not None:
-                    index = array_indices.get(array_name, 0)
-                    array_indices[array_name] = index + 1
-                for synthetic_column_name, synthetic_column_value in column_mapping.items():
-                    # Replace bare "array_name#" placeholder with the assigned index.
-                    if array_name is not None:
-                        synthetic_column_name = synthetic_column_name.replace(
-                            f"{array_name}{COLUMN_NAME_ARRAY_SUFFIX_CHAR}",
-                            f"{array_name}{COLUMN_NAME_ARRAY_SUFFIX_CHAR}{index}", 1)
+                for synthetic_column_name, synthetic_column_value in self._expand_array_indices(
+                        column_mapping, array_indices):
                     if synthetic_column_value == "{name}":
                         synthetic_columns[synthetic_column_name] = column_name
                     elif (column_value := self._parse_value_specifier(synthetic_column_value,
