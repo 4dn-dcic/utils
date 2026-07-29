@@ -65,6 +65,12 @@ PyYAML = "^6.0.1"
 requests = "^2.27.1"
 rfc3986 = "^1.4.0"
 shortuuid = "^1.0.13"
+# dcicutils (deployment_utils, project_utils) and pinned pyramid 1.10.8 import
+# pkg_resources at module load. setuptools 82 removed the pkg_resources module,
+# so this is capped below 82 to keep imports working; see the regression test
+# test/acceptance/test_pkg_resources.py. Do not raise the ceiling without first
+# migrating those pkg_resources uses.
+setuptools = ">=70.3,<82"
 structlog = "^19.2.0"
 toml = ">=0.10.1,<1"
 tqdm = "^4.66.2"
