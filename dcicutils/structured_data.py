@@ -619,6 +619,7 @@ class _StructuredRowTemplate:
 
             original_data = data
             json_value = None
+            is_schema_string = typeinfo is not None and typeinfo.get("type") == "string"
             if isinstance(path[-1], int) and (json_value := load_json_if(value, is_array=True)):
                 path = right_trim(path, remove=lambda value: isinstance(value, int))
             for i, p in enumerate(path[:-1]):
@@ -631,7 +632,8 @@ class _StructuredRowTemplate:
                     values = [mapv(value, src) for value in values]
                 merge_objects(data, values)
             else:
-                if json_value or (json_value := load_json_if(value, is_array=True, is_object=True)):
+                if json_value or (not is_schema_string and
+                                  (json_value := load_json_if(value, is_array=True, is_object=True))):
                     data[p] = json_value
                 else:
                     if isinstance(p, str) and (not isinstance(data, dict) or p not in data):
