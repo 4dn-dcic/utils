@@ -6,6 +6,22 @@ dcicutils
 Change Log
 ----------
 
+
+8.19.0
+======
+* ajs/wrr/sn 2026-07-29 / branch: sn_refactor_custom_excel
+  - Refactored CustomExcel column-mapping config to fetch live from the portal
+    (GenericQcConfig search) instead of GitHub, with local JSON fallback.
+  - Fixed [0]-style string values being incorrectly converted into arrays in
+    structured_data.py.
+  - Added test/test_custom_excel.py (previously untested module) and expanded
+    test_structured_data.py coverage.
+  - Pinned setuptools<82 to keep pkg_resources-dependent imports (pyramid) working;
+    added a regression test.
+  - Bumped boto3/botocore to ^1.43.58, tightened Python requirement to >=3.10,<3.13,
+    and updated Poetry to 1.8.5.
+  - Updated GitHub Actions OIDC credentials in the main workflow.
+
 8.18.8
 ======
 * willronchetti / 2026-07-10 / branch: fm/dcic-pubci-9m
