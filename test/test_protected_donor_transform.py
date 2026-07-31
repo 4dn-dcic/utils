@@ -20,7 +20,9 @@ def _write_workbook(path, sheets):
     workbook.save(path)
 
 
-def _load(path, excel_class=CustomExcel):
+def _load(path, excel_class=None):
+    if excel_class is None:
+        excel_class = CustomExcel.with_portal(None, transform_protected_donor=True)
     return StructuredDataSet(file=str(path), portal=None, excel_class=excel_class).data
 
 
@@ -151,7 +153,7 @@ def test_protected_donor_transform_can_save_transformed_workbook(tmp_path):
         "Demographic": [["submitted_id", "donor"], ["ABC_DEMOGRAPHIC_0001", "ABC_DONOR_0001"]],
     })
 
-    data = _load(path, excel_class=CustomExcel.with_portal(None, transformed_workbook_path=str(output)))
+    data = _load(path, excel_class=CustomExcel.with_portal(None, transform_protected_donor=True, transformed_workbook_path=str(output)))
     saved_data = _load(output, excel_class=CustomExcel.with_portal(None, transform_protected_donor=False))
 
     assert output.exists()
@@ -165,7 +167,7 @@ def test_protected_donor_transform_rejects_output_path_same_as_input(tmp_path):
     _write_workbook(path, {"Donor": [["submitted_id"], ["ABC_DONOR_0001"]]})
 
     with pytest.raises(ValueError, match="must differ from input"):
-        _load(path, excel_class=CustomExcel.with_portal(None, transformed_workbook_path=str(path)))
+        _load(path, excel_class=CustomExcel.with_portal(None, transform_protected_donor=True, transformed_workbook_path=str(path)))
 
 
 def test_protected_donor_transform_rejects_existing_output_path(tmp_path):
@@ -175,7 +177,7 @@ def test_protected_donor_transform_rejects_existing_output_path(tmp_path):
     output.write_text("do not overwrite")
 
     with pytest.raises(ValueError, match="already exists"):
-        _load(path, excel_class=CustomExcel.with_portal(None, transformed_workbook_path=str(output)))
+        _load(path, excel_class=CustomExcel.with_portal(None, transform_protected_donor=True, transformed_workbook_path=str(output)))
 
 
 def test_protected_donor_transform_rejects_reusing_output_for_different_input(tmp_path):
@@ -185,9 +187,9 @@ def test_protected_donor_transform_rejects_reusing_output_for_different_input(tm
     _write_workbook(path1, {"Donor": [["submitted_id"], ["ABC_DONOR_0001"]]})
     _write_workbook(path2, {"Donor": [["submitted_id"], ["ABC_DONOR_0002"]]})
 
-    _load(path1, excel_class=CustomExcel.with_portal(None, transformed_workbook_path=str(output)))
+    _load(path1, excel_class=CustomExcel.with_portal(None, transform_protected_donor=True, transformed_workbook_path=str(output)))
     with pytest.raises(ValueError, match="already exists"):
-        _load(path2, excel_class=CustomExcel.with_portal(None, transformed_workbook_path=str(output)))
+        _load(path2, excel_class=CustomExcel.with_portal(None, transform_protected_donor=True, transformed_workbook_path=str(output)))
 
 
 def test_protected_donor_transform_does_not_save_when_no_transform_occurs(tmp_path):
@@ -195,7 +197,7 @@ def test_protected_donor_transform_does_not_save_when_no_transform_occurs(tmp_pa
     output = tmp_path / "not_created.xlsx"
     _write_workbook(path, {"Tissue": [["submitted_id", "donor"], ["ABC_TISSUE_0001", "ABC_DONOR_0001"]]})
 
-    _load(path, excel_class=CustomExcel.with_portal(None, transformed_workbook_path=str(output)))
+    _load(path, excel_class=CustomExcel.with_portal(None, transform_protected_donor=True, transformed_workbook_path=str(output)))
 
     assert not output.exists()
 

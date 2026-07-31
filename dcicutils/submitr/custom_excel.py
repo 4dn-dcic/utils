@@ -103,9 +103,9 @@ class CustomExcel(Excel):
 
     _saved_transformed_workbook_path_pairs = set()
 
-    def __init__(self, *args, portal=None, transform_protected_donor: bool = True,
+    def __init__(self, *args, portal=None, transform_protected_donor: bool = False,
                  transformed_workbook_path: Optional[str] = None, **kwargs):
-        self._transform_protected_donor = transform_protected_donor is not False
+        self._transform_protected_donor = bool(transform_protected_donor)
         self._transformed_workbook_path = transformed_workbook_path
         super().__init__(*args, **kwargs)
         if self._transform_protected_donor:
