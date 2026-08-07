@@ -8,8 +8,6 @@ from dcicutils.redis_utils import (
 
 # RedisException is re-exported here on purpose: consumers of the session token API
 # (notably Snovault) import it from this module and must not need redis.exceptions.
-__all__ = ['SESSION_TOKEN_COOKIE', 'make_session_token', 'RedisSessionToken', 'RedisException']
-
 
 log = structlog.getLogger(__name__)
 

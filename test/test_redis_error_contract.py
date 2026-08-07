@@ -107,6 +107,9 @@ class TestRedisBaseErrorContract:
         handle.hgetall.return_value = {b'foo': b'bar'}
         handle.hget.return_value = b'bar'
         handle.dbsize.return_value = 7
+        handle.hset.return_value = 1
+        handle.expire.return_value = True
+        handle.info.return_value = {'redis_version': '7.0.0'}
         rd = RedisBase(handle)
         assert rd.set('key', 'value') is True
         assert rd.get('key') == 'hello'
@@ -114,7 +117,14 @@ class TestRedisBaseErrorContract:
         assert rd.ttl('key') == 300
         assert rd.hgetall('key') == {'foo': 'bar'}
         assert rd.hget('key', 'foo') == 'bar'
+        assert rd.hset('key', 'foo', 'bar') == 1
+        assert rd.hset_multiple('key', {'foo': 'bar'}) == 1
         assert rd.dbsize() == 7
+        assert rd.info() == {'redis_version': '7.0.0'}
+        # set_expiration must still pass gt=True through to the driver
+        assert rd.set_expiration('key', 60) is True
+        assert handle.expire.call_args.args == ('key', 60)
+        assert handle.expire.call_args.kwargs == {'gt': True}
 
     def test_get_of_missing_key_still_returns_none(self):
         handle = mock.MagicMock()
