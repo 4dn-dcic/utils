@@ -2,8 +2,12 @@ import secrets
 import datetime
 import structlog
 import jwt
-from dcicutils.redis_utils import RedisBase, RedisException
+from dcicutils.redis_utils import (
+    RedisBase, RedisException, REDIS_DRIVER_EXCEPTIONS, translate_redis_exceptions,
+)
 
+# RedisException is re-exported here on purpose: consumers of the session token API
+# (notably Snovault) import it from this module and must not need redis.exceptions.
 
 log = structlog.getLogger(__name__)
 
@@ -88,13 +92,16 @@ class RedisSessionToken:
         return self.email
 
     @classmethod
+    @translate_redis_exceptions
     def from_redis(cls, *, redis_handler: RedisBase, namespace: str, token: str):
         """ Builds a RedisSessionToken from an existing record - allows extracting JWT
             given a session token internally.
         :param redis_handler: handle to Redis API
         :param namespace: namespace to search under
         :param token: value of the token
-        :return: A RedisSessionToken object built from an existing record in Redis
+        :return: A RedisSessionToken object built from an existing record in Redis,
+                 or None if no such record exists
+        :raises RedisException: if Redis cannot be reached or reports a failure
         """
         redis_key = f'{namespace}:session:{token}'
         redis_entry = redis_handler.get(redis_key)
@@ -116,34 +123,44 @@ class RedisSessionToken:
         return jwt.decode(self.jwt, secret, audience=audience, leeway=leeway,
                           options={'verify_signature': True}, algorithms=algorithms)
 
+    @translate_redis_exceptions
     def store_session_token(self, *, redis_handler: RedisBase) -> bool:
         """ Stores the created session token object as an hset in Redis
         :param redis_handler: handle to Redis API
-        :return: True if successful, raise Exception otherwise
+        :return: True if successful
+        :raises RedisException: if Redis cannot be reached or reports a failure
         """
         try:
             redis_handler.set(self.redis_key, f'{self.jwt}:{self.email or ""}', exp=self.expiration)
-        except Exception as e:
+        except (RedisException, *REDIS_DRIVER_EXCEPTIONS) as e:
+            # A raw driver exception can only reach here if the caller passed something other than
+            # a RedisBase; either way the enclosing decorator normalizes it to RedisException.
             log.error(str(e))
-            raise RedisException()
+            raise
         return True
 
+    @translate_redis_exceptions
     def validate_session_token(self, *, redis_handler: RedisBase) -> bool:
         """ Validates the given session token against that stored in redis
         :param redis_handler: handle to Redis API
-        :return: True if token matches that in Redis and is not expired
+        :return: True if token matches that in Redis and is not expired, False if no such
+                 token is stored - note that an unreachable Redis raises rather than
+                 returning False, so callers can distinguish absence from failure
+        :raises RedisException: if Redis cannot be reached or reports a failure
         """
         redis_token = redis_handler.get(self.redis_key)
         if not redis_token:
             return False  # if it doesn't exist it's not valid
         return True  # if it does exist it must be valid since we always send with TTL
 
+    @translate_redis_exceptions
     def update_session_token(self, *, redis_handler: RedisBase, jwt: str, email: str) -> bool:
         """ Refreshes the session token, jwt (if different) and expiration stored in Redis
         :param redis_handler: handle to Redis API
         :param jwt: jwt of user
         :param email: email of user
-        :return: True if successful, raise Exception otherwise
+        :return: True if successful
+        :raises RedisException: if Redis cannot be reached or reports a failure
         """
         # remove old token
         self.delete_session_token(redis_handler=redis_handler)
@@ -155,9 +172,11 @@ class RedisSessionToken:
         self.email = email
         return self.store_session_token(redis_handler=redis_handler)
 
+    @translate_redis_exceptions
     def delete_session_token(self, *, redis_handler: RedisBase) -> bool:
         """ Deletes the session token from redis, effectively logging out
         :param redis_handler: handle to Redis API
-        :return: True if successful, False otherwise
+        :return: True if a token was removed, False if there was nothing to remove
+        :raises RedisException: if Redis cannot be reached or reports a failure
         """
         return 1 == redis_handler.delete(self.redis_key)
