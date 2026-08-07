@@ -7,6 +7,31 @@ Change Log
 ----------
 
 
+8.20.0
+======
+* willronchetti / 2026-08-07 / branch: fm/dcicutils-redis-error-contract-4w
+  - Made ``RedisException`` the canonical error contract for every public Redis operation.
+    ``create_redis_client``, all ``RedisBase`` methods, and all ``RedisSessionToken``
+    operations (``from_redis``, ``store_session_token``, ``validate_session_token``,
+    ``update_session_token``, ``delete_session_token``) now translate redis driver
+    failures - ``redis.exceptions.RedisError`` and ``redis.exceptions.RedisClusterException``
+    and their subclasses - into ``RedisException``, chaining the original as ``__cause__``.
+    Consumers such as Snovault no longer need to import ``redis.exceptions``.
+  - Added the public ``dcicutils.redis_utils.translate_redis_exceptions`` decorator and
+    ``REDIS_DRIVER_EXCEPTIONS`` tuple used to implement this.
+  - Behavior change: ``RedisSessionToken.store_session_token`` previously caught *any*
+    ``Exception`` and re-raised a bare ``RedisException``. It now translates only redis
+    driver failures, so programmer errors (``TypeError``, ``AttributeError``, ...) propagate
+    unchanged instead of being masked. Absence and unreachability also stay distinct:
+    ``validate_session_token`` still returns ``False`` for a missing token but raises
+    ``RedisException`` when Redis cannot be reached.
+  - ``RedisException`` remains importable from both ``dcicutils.redis_utils`` and
+    ``dcicutils.redis_tools``; no signatures or return values changed.
+  - Added ``test/test_redis_error_contract.py``, which injects representative driver
+    connection/timeout/response failures into every affected public operation. These tests
+    use mocks and do not require a running redis-server.
+
+
 8.19.0
 ======
 * ajs/wrr/sn 2026-07-29 / branch: sn_refactor_custom_excel

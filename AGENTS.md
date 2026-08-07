@@ -14,6 +14,10 @@ authoritative files named below over copying details into this document.
   `schema_utils.py`. Portal-facing APIs are primarily `ff_utils.py` (request/auth and
   metadata functions), `portal_utils.py` (the higher-level `Portal` wrapper),
   `portal_object_utils.py`, `structured_data.py`, and `submitr/`.
+- `redis_utils.py` owns the public Redis error contract: every public operation there and in
+  `redis_tools.py` is wrapped in `translate_redis_exceptions`, so driver failures surface as
+  `RedisException` and consumers (notably Snovault) never import `redis.exceptions`. Any new
+  `RedisBase` method must carry that decorator; `test/test_redis_error_contract.py` enforces it.
 - Integration modules are grouped by the system named in the file: AWS (`s3_utils.py`,
   `ecs_utils.py`, `ecr_utils.py`, `cloudformation_utils.py`, `secrets_utils.py`, etc.),
   search (`es_utils.py`, `opensearch_utils.py`), Redis, Docker, and deployment utilities.
