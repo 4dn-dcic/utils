@@ -5,6 +5,7 @@ import os
 from typing import Any, List, Optional
 from dcicutils.data_readers import Excel, ExcelSheetReader
 from dcicutils.misc_utils import to_boolean, to_float, to_integer
+from dcicutils.submitr.donor_transformer import ProtectedDonorWorkbookTransformer
 
 # This module implements a custom Excel spreadsheet class which supports "custom column mappings",
 # meaning that, at a very low/early level in processing, the columns/values in the spreadsheet
@@ -100,26 +101,59 @@ def _array_name_of(synthetic_column_name: str) -> Optional[str]:
 
 class CustomExcel(Excel):
 
-    def __init__(self, *args, portal=None, **kwargs):
+    _saved_transformed_workbook_path_pairs = set()
+
+    def __init__(self, *args, portal=None, transform_protected_donor: bool = False,
+                 transformed_workbook_path: Optional[str] = None, **kwargs):
+        self._transform_protected_donor = bool(transform_protected_donor)
+        self._transformed_workbook_path = transformed_workbook_path
         super().__init__(*args, **kwargs)
+        if self._transform_protected_donor:
+            transformed = ProtectedDonorWorkbookTransformer(
+                effective_sheet_name=self.effective_sheet_name
+            ).transform(self._workbook, portal=portal)
+            self.sheet_names = [sheet_name for sheet_name in self._workbook.sheetnames
+                                if not self.is_hidden_sheet(self._workbook[sheet_name])]
+            if transformed and self._transformed_workbook_path:
+                self._save_transformed_workbook(self._transformed_workbook_path)
         self._custom_column_mappings = CustomExcel._get_custom_column_mappings(portal=portal)
 
     @classmethod
-    def with_portal(cls, portal):
-        """Return a subclass of CustomExcel with portal baked in.
+    def with_portal(cls, portal, **options):
+        """Return CustomExcel with the portal and worker options baked in.
 
-        Use this when passing excel_class to StructuredDataSet, which requires
-        a real class (it calls issubclass() on the argument internally):
-
-            excel_class=CustomExcel.with_portal(portal)
+        The submitr worker should pass ``transform_protected_donor=True`` when
+        ProtectedDonor conversion is part of its upload flow.  This keeps the
+        conversion opt-in for existing StructuredDataSet callers.
         """
         class _CustomExcelWithPortal(cls):
             def __init__(self, *args, **kwargs):
                 kwargs.setdefault("portal", portal)
+                for key, value in options.items():
+                    kwargs.setdefault(key, value)
                 super().__init__(*args, **kwargs)
         _CustomExcelWithPortal.__name__ = "CustomExcel"
         _CustomExcelWithPortal.__qualname__ = "CustomExcel"
         return _CustomExcelWithPortal
+
+    def _save_transformed_workbook(self, path: str) -> None:
+        path = os.path.abspath(os.path.expanduser(path))
+        input_path = os.path.abspath(os.path.expanduser(self._file)) if self._file else None
+        if not path.lower().endswith(".xlsx"):
+            raise ValueError(f"Transformed workbook output path must end with .xlsx: {path}")
+        if input_path and path == input_path:
+            raise ValueError(f"Transformed workbook output path must differ from input workbook path: {path}")
+        directory = os.path.dirname(path)
+        if not os.path.isdir(directory):
+            raise ValueError(f"Directory for transformed workbook output does not exist: {directory}")
+        path_pair = (input_path, path)
+        if os.path.exists(path) and path_pair not in CustomExcel._saved_transformed_workbook_path_pairs:
+            raise ValueError(f"Transformed workbook output path already exists: {path}")
+        try:
+            self._workbook.save(path)
+            CustomExcel._saved_transformed_workbook_path_pairs.add(path_pair)
+        except Exception as error:
+            raise ValueError(f"Cannot save transformed workbook to {path}: {error}") from error
 
     def sheet_reader(self, sheet_name: str) -> ExcelSheetReader:
         return CustomExcelSheetReader(self, sheet_name=sheet_name, workbook=self._workbook,
