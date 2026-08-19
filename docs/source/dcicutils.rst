@@ -393,6 +393,18 @@ structured_data
    :members:
 
 
+submitr donor_transformer
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: dcicutils.submitr.donor_transformer
+   :members:
+
+The submitr worker should opt in through ``CustomExcel.with_portal`` with
+``transform_protected_donor=True``.  The transformer analyzes workbook rows and
+performs portal lookups before ``StructuredDataSet`` parses the workbook; the
+structured-data reader itself remains generic.
+
+
 task_utils
 ^^^^^^^^^^
 
