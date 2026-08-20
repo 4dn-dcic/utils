@@ -393,7 +393,7 @@ structured_data
    :members:
 
 
-submitr donor_transformer
+submitr.donor_transformer
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. automodule:: dcicutils.submitr.donor_transformer
