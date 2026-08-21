@@ -103,9 +103,11 @@ def _array_name_of(synthetic_column_name: str) -> Optional[str]:
 class CustomExcel(Excel):
 
     def __init__(self, *args, portal=None, transform_protected_donor: bool = False,
-                 transformed_workbook_path: Optional[str] = None, **kwargs):
+                 transformed_workbook_path: Optional[str] = None,
+                 allow_existing_staging_path: bool = False, **kwargs):
         self._transform_protected_donor = bool(transform_protected_donor)
         self._transformed_workbook_path = transformed_workbook_path
+        self._allow_existing_staging_path = bool(allow_existing_staging_path)
         super().__init__(*args, **kwargs)
         if self._transform_protected_donor:
             transformed = ProtectedDonorWorkbookTransformer(
@@ -114,7 +116,10 @@ class CustomExcel(Excel):
             self.sheet_names = [sheet_name for sheet_name in self._workbook.sheetnames
                                 if not self.is_hidden_sheet(self._workbook[sheet_name])]
             if transformed and self._transformed_workbook_path:
-                self._save_transformed_workbook(self._transformed_workbook_path)
+                self._save_transformed_workbook(
+                    self._transformed_workbook_path,
+                    allow_existing_staging_path=self._allow_existing_staging_path,
+                )
         self._custom_column_mappings = CustomExcel._get_custom_column_mappings(portal=portal)
 
     @classmethod
@@ -123,7 +128,9 @@ class CustomExcel(Excel):
 
         The submitr worker should pass ``transform_protected_donor=True`` when
         ProtectedDonor conversion is part of its upload flow.  This keeps the
-        conversion opt-in for existing StructuredDataSet callers.
+        conversion opt-in for existing StructuredDataSet callers.  A submitr caller
+        that pre-creates the transformed output may also pass
+        ``allow_existing_staging_path=True``.
         """
         class _CustomExcelWithPortal(cls):
             def __init__(self, *args, **kwargs):
@@ -135,14 +142,19 @@ class CustomExcel(Excel):
         _CustomExcelWithPortal.__qualname__ = "CustomExcel"
         return _CustomExcelWithPortal
 
-    def _save_transformed_workbook(self, path: str, overwrite: bool = False) -> None:
+    def _save_transformed_workbook(self, path: str, overwrite: bool = False,
+                                   allow_existing_staging_path: bool = False) -> None:
         """Save the transformed workbook without clobbering an existing file.
 
         ``overwrite`` is intentionally explicit and applies only to this call.  When it is
         true, the completed temporary workbook atomically replaces ``path``; this is for a
         caller that has already validated the transformed workbook.  The default is safe for
-        ordinary conversion and leaves an existing target untouched.
+        ordinary conversion and leaves an existing target untouched.  The narrower
+        ``allow_existing_staging_path`` option is for a path the caller pre-created as its
+        owned temporary staging file; it also replaces that path atomically.
         """
+        if overwrite and allow_existing_staging_path:
+            raise ValueError("Choose either overwrite or allow_existing_staging_path, not both.")
         path = os.path.abspath(os.path.expanduser(path))
         input_path = os.path.abspath(os.path.expanduser(self._file)) if self._file else None
         if not path.lower().endswith(".xlsx"):
@@ -152,7 +164,7 @@ class CustomExcel(Excel):
         directory = os.path.dirname(path)
         if not os.path.isdir(directory):
             raise ValueError(f"Directory for transformed workbook output does not exist: {directory}")
-        if os.path.exists(path) and not overwrite:
+        if os.path.exists(path) and not (overwrite or allow_existing_staging_path):
             raise ValueError(f"Transformed workbook output path already exists: {path}")
 
         temporary_path = None
@@ -162,7 +174,7 @@ class CustomExcel(Excel):
             )
             os.close(temporary_fd)
             self._workbook.save(temporary_path)
-            if not overwrite and os.path.exists(path):
+            if not (overwrite or allow_existing_staging_path) and os.path.exists(path):
                 raise ValueError(f"Transformed workbook output path already exists: {path}")
             os.replace(temporary_path, path)
             temporary_path = None

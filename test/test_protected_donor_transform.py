@@ -1,5 +1,7 @@
 import openpyxl
+import os
 import pytest
+import tempfile
 
 from dcicutils.structured_data import StructuredDataSet
 from dcicutils.submitr.custom_excel import CustomExcel
@@ -182,6 +184,27 @@ def test_save_transformed_workbook_protects_existing_target(tmp_path):
         excel._save_transformed_workbook(str(target))
 
     assert target.read_bytes() == original
+
+
+def test_save_transformed_workbook_allows_owned_staging_path(tmp_path):
+    input_path = tmp_path / "input.xlsx"
+    _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "Demographic": [["donor"], ["A_DONOR_1"]],
+    }).save(input_path)
+    temporary_fd, staging_path = tempfile.mkstemp(dir=tmp_path, suffix=".xlsx")
+    os.close(temporary_fd)
+    with open(staging_path, "wb") as staging_file:
+        staging_file.write(b"submitr-owned placeholder")
+
+    CustomExcel(
+        file=str(input_path),
+        transform_protected_donor=True,
+        transformed_workbook_path=staging_path,
+        allow_existing_staging_path=True,
+    )
+
+    assert openpyxl.load_workbook(staging_path)["Donor"]["A1"].value == "submitted_id"
 
 
 def test_save_transformed_workbook_repeated_save_requires_explicit_overwrite(tmp_path):
