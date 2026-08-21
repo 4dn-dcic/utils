@@ -21,6 +21,12 @@ def _workbook(sheets):
     return workbook
 
 
+def _custom_excel(tmp_path):
+    input_path = tmp_path / "input.xlsx"
+    _workbook({"Donor": [["submitted_id"], ["A_DONOR_1"]]}).save(input_path)
+    return CustomExcel(file=str(input_path))
+
+
 def test_analysis_uses_only_actual_rows_and_the_five_protected_sheets():
     workbook = _workbook({
         "Donor": [["submitted_id"], ["A_DONOR_1"]],
@@ -141,6 +147,74 @@ def test_custom_excel_opt_in_integrates_transform_before_structured_data(tmp_pat
 
     assert data["ProtectedDonor"][0]["submitted_id"] == "A_PROTECTED-DONOR_1"
     assert data["Demographic"][0]["donor"] == "A_PROTECTED-DONOR_1"
+
+
+def test_custom_excel_transform_preserves_custom_column_mapping(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        CustomExcel,
+        "_get_custom_column_mappings",
+        staticmethod(lambda portal=None: {
+            "Demographic": {"donor": {"mapped_donor": "{value}"}}
+        }),
+    )
+    path = tmp_path / "donor.xlsx"
+    _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "Demographic": [["donor"], ["A_DONOR_1"]],
+    }).save(path)
+
+    data = StructuredDataSet(
+        file=str(path),
+        portal=None,
+        excel_class=CustomExcel.with_portal(None, transform_protected_donor=True),
+    ).data
+
+    assert data["Demographic"] == [{"mapped_donor": "A_PROTECTED-DONOR_1"}]
+
+
+def test_save_transformed_workbook_protects_existing_target(tmp_path):
+    excel = _custom_excel(tmp_path)
+    target = tmp_path / "transformed.xlsx"
+    original = b"do not replace"
+    target.write_bytes(original)
+
+    with pytest.raises(ValueError, match="already exists"):
+        excel._save_transformed_workbook(str(target))
+
+    assert target.read_bytes() == original
+
+
+def test_save_transformed_workbook_repeated_save_requires_explicit_overwrite(tmp_path):
+    excel = _custom_excel(tmp_path)
+    target = tmp_path / "transformed.xlsx"
+
+    excel._save_transformed_workbook(str(target))
+    original = target.read_bytes()
+    with pytest.raises(ValueError, match="already exists"):
+        excel._save_transformed_workbook(str(target))
+    assert target.read_bytes() == original
+
+    excel._workbook["Donor"]["A1"] = "changed"
+    excel._save_transformed_workbook(str(target), overwrite=True)
+    assert openpyxl.load_workbook(target)["Donor"]["A1"].value == "changed"
+
+
+def test_failed_save_does_not_damage_existing_target(tmp_path, monkeypatch):
+    excel = _custom_excel(tmp_path)
+    target = tmp_path / "transformed.xlsx"
+    original = b"keep this file"
+    target.write_bytes(original)
+
+    def fail_save(path):
+        with open(path, "wb") as temporary_file:
+            temporary_file.write(b"partial workbook")
+        raise OSError("simulated save failure")
+
+    monkeypatch.setattr(excel._workbook, "save", fail_save)
+    with pytest.raises(ValueError, match="Cannot save transformed workbook"):
+        excel._save_transformed_workbook(str(target), overwrite=True)
+
+    assert target.read_bytes() == original
 
 
 def test_hidden_and_unlisted_sheets_are_not_transformed():

@@ -2,6 +2,7 @@ from copy import deepcopy
 import io
 import json
 import os
+import tempfile
 from typing import Any, List, Optional
 from dcicutils.data_readers import Excel, ExcelSheetReader
 from dcicutils.misc_utils import to_boolean, to_float, to_integer
@@ -101,8 +102,6 @@ def _array_name_of(synthetic_column_name: str) -> Optional[str]:
 
 class CustomExcel(Excel):
 
-    _saved_transformed_workbook_path_pairs = set()
-
     def __init__(self, *args, portal=None, transform_protected_donor: bool = False,
                  transformed_workbook_path: Optional[str] = None, **kwargs):
         self._transform_protected_donor = bool(transform_protected_donor)
@@ -136,7 +135,14 @@ class CustomExcel(Excel):
         _CustomExcelWithPortal.__qualname__ = "CustomExcel"
         return _CustomExcelWithPortal
 
-    def _save_transformed_workbook(self, path: str) -> None:
+    def _save_transformed_workbook(self, path: str, overwrite: bool = False) -> None:
+        """Save the transformed workbook without clobbering an existing file.
+
+        ``overwrite`` is intentionally explicit and applies only to this call.  When it is
+        true, the completed temporary workbook atomically replaces ``path``; this is for a
+        caller that has already validated the transformed workbook.  The default is safe for
+        ordinary conversion and leaves an existing target untouched.
+        """
         path = os.path.abspath(os.path.expanduser(path))
         input_path = os.path.abspath(os.path.expanduser(self._file)) if self._file else None
         if not path.lower().endswith(".xlsx"):
@@ -146,14 +152,28 @@ class CustomExcel(Excel):
         directory = os.path.dirname(path)
         if not os.path.isdir(directory):
             raise ValueError(f"Directory for transformed workbook output does not exist: {directory}")
-        path_pair = (input_path, path)
-        if os.path.exists(path) and path_pair not in CustomExcel._saved_transformed_workbook_path_pairs:
+        if os.path.exists(path) and not overwrite:
             raise ValueError(f"Transformed workbook output path already exists: {path}")
+
+        temporary_path = None
         try:
-            self._workbook.save(path)
-            CustomExcel._saved_transformed_workbook_path_pairs.add(path_pair)
+            temporary_fd, temporary_path = tempfile.mkstemp(
+                dir=directory, prefix=f".{os.path.basename(path)}.", suffix=".xlsx"
+            )
+            os.close(temporary_fd)
+            self._workbook.save(temporary_path)
+            if not overwrite and os.path.exists(path):
+                raise ValueError(f"Transformed workbook output path already exists: {path}")
+            os.replace(temporary_path, path)
+            temporary_path = None
         except Exception as error:
             raise ValueError(f"Cannot save transformed workbook to {path}: {error}") from error
+        finally:
+            if temporary_path and os.path.exists(temporary_path):
+                try:
+                    os.unlink(temporary_path)
+                except OSError:
+                    pass
 
     def sheet_reader(self, sheet_name: str) -> ExcelSheetReader:
         return CustomExcelSheetReader(self, sheet_name=sheet_name, workbook=self._workbook,
