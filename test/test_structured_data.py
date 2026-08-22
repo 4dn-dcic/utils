@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 import inspect
 import json
+import openpyxl
 import os
 import pytest
 import re
@@ -1346,6 +1347,80 @@ def test_get_type_name_1():
     assert Schema.type_name("file_format.json") == "FileFormat"
     assert Schema.type_name("file_format.xls") == "FileFormat"
     assert Schema.type_name("File  Format") == "FileFormat"
+
+
+def test_json_order_uses_canonical_names_and_preserves_original_keys(tmp_path):
+    path = tmp_path / "metadata.json"
+    path.write_text(json.dumps({
+        "unknown_z": [{"value": "z"}],
+        "MedicalHistory": [{"value": "medical"}],
+        "unknown_a": [{"value": "a"}],
+        "Donor": [{"second": 2, "first": 1}],
+        "unknown_b": [{"value": "b"}],
+    }))
+    portal = Portal(testapp, schemas=[{"title": "Donor"}, {"title": "MedicalHistory"}])
+
+    data = StructuredDataSet(file=str(path), portal=portal,
+                             order=["donor", "medical_history"]).data
+
+    assert list(data) == ["Donor", "MedicalHistory", "unknown_z", "unknown_a", "unknown_b"]
+    assert list(data["Donor"][0]) == ["second", "first"]
+
+
+def test_json_order_keeps_canonical_key_collisions_stable(tmp_path):
+    path = tmp_path / "metadata.json"
+    path.write_text(json.dumps({
+        "FooBar": [{"value": "camel"}],
+        "foo_bar": [{"value": "snake"}],
+        "Donor": [{"value": "donor"}],
+    }))
+    portal = Portal(testapp, schemas=[{"title": "Donor"}])
+
+    data = StructuredDataSet(file=str(path), portal=portal,
+                             order=["donor", "foo_bar"]).data
+
+    assert list(data) == ["Donor", "FooBar", "foo_bar"]
+
+
+def test_json_without_order_preserves_input_key_order(tmp_path):
+    path = tmp_path / "metadata.json"
+    path.write_text(json.dumps({
+        "MedicalHistory": [{"second": 2, "first": 1}],
+        "Donor": [{"second": 2, "first": 1}],
+    }))
+    portal = Portal(testapp, schemas=[{"title": "Donor"}, {"title": "MedicalHistory"}])
+
+    data = StructuredDataSet(file=str(path), portal=portal).data
+
+    assert list(data) == ["MedicalHistory", "Donor"]
+    assert list(data["MedicalHistory"][0]) == ["second", "first"]
+
+
+def test_single_schema_json_behavior_is_unchanged_by_order(tmp_path):
+    path = tmp_path / "early_type.json"
+    path.write_text(json.dumps({"second": 2, "first": 1}))
+    portal = Portal(testapp, schemas=[{"title": "EarlyType"}])
+
+    data = StructuredDataSet(file=str(path), portal=portal,
+                             order=["other_type", "early_type"]).data
+
+    assert list(data) == ["EarlyType"]
+    assert list(data["EarlyType"][0]) == ["second", "first"]
+
+
+def test_workbook_order_uses_canonical_schema_names(tmp_path):
+    path = tmp_path / "metadata.xlsx"
+    workbook = openpyxl.Workbook()
+    workbook.remove(workbook.active)
+    for sheet_name in ["LateType", "unknown", "EarlyType"]:
+        sheet = workbook.create_sheet(sheet_name)
+        sheet.append(["value"])
+        sheet.append([sheet_name])
+    workbook.save(path)
+
+    data = StructuredDataSet(file=str(path), order=["early_type", "late_type"]).data
+
+    assert list(data) == ["EarlyType", "LateType", "Unknown"]
 
 
 def test_rationalize_column_name() -> None:

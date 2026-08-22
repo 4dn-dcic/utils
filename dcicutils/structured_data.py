@@ -305,6 +305,12 @@ class StructuredDataSet:
     def _load_csv_file(self, file: str) -> None:
         self._load_reader(CsvReader(file), type_name=Schema.type_name(file))
 
+    def _ordered_schema_names(self, schema_names: List[str]) -> List[str]:
+        if not self._order:
+            return schema_names
+        order = {Schema.type_name(key): index for index, key in enumerate(self._order)}
+        return sorted(schema_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize))
+
     def _load_excel_file(self, file: str) -> None:
         def get_counts() -> Tuple[int, int]:
             nonlocal file
@@ -320,8 +326,7 @@ class StructuredDataSet:
                             PROGRESS.LOAD_COUNT_SHEETS: nsheets, PROGRESS.LOAD_COUNT_ROWS: nrows})
         excel = self._excel_class(file)
         # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
-        order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
-        for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
+        for sheet_name in self._ordered_schema_names(excel.sheet_names):
             # This effective_sheet_name function added 2025-01-21 to allow sheets whose sheet names are
             # other than simply the name of the type, but which do contain that type somehow; i.e. e.g.
             # specifically where the sheet name is like "DSA_ExternalQualityMetric" where the "DSA"
@@ -378,7 +383,7 @@ class StructuredDataSet:
                 # Otherwise if the JSON file name does not look like a schema name then
                 # assume it a dictionary where each property is the name of a schema, and
                 # which (each property) contains a list of object of that schema type.
-                for schema_name in data:
+                for schema_name in self._ordered_schema_names(list(data)):
                     item = data[schema_name]
                     if self._merge:  # New merge functionality (2024-05-25)
                         item = self._merge_with_existing_portal_object(item, schema_name)
