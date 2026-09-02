@@ -7,8 +7,8 @@ Change Log
 ----------
 
 
-8.20.0
-======
+8.19.0.1b1
+==========
 * wrr / 2026-09-02 / branch: fm/dcicutils-okta-ini-config-7p
   - Added first-class Okta values to ``deployment_utils``: ``build_ini_file_from_template`` and
     ``build_ini_stream_from_template`` now accept ``okta_issuer``, ``okta_client``, ``okta_scopes``,
