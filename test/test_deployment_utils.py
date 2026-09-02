@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import inspect
 import io
 import json
 import os
@@ -1649,3 +1650,227 @@ def test_add_argparse_arguments():
     assert parser.parse_args([]) == argparse.Namespace()
     CreateMappingOnDeployManager.add_argparse_arguments(parser=parser)
     assert parser.parse_args([]) == argparse.Namespace(skip=False, wipe_es=False, strict=False)
+
+
+class TestOktaDeployer(IniFileManager):
+    TEMPLATE_DIR = os.path.join(_MY_DIR, "ini_files")
+    PYPROJECT_FILE_NAME = os.path.join(os.path.dirname(_MY_DIR), "pyproject.toml")
+    APP_KIND = 'smaht'
+    APP_ORCHESTRATED = True
+
+
+OKTA_TEMPLATE = '\n'.join([
+    "[app:app]",
+    "auth0.domain = ${AUTH0_DOMAIN}",
+    "auth0.client = ${AUTH0_CLIENT}",
+    "auth0.secret = ${AUTH0_SECRET}",
+    "auth0.allowed_connections = ${AUTH0_ALLOWED_CONNECTIONS}",
+    "okta.issuer = ${OKTA_ISSUER}",
+    "okta.client = ${OKTA_CLIENT}",
+    "okta.scopes = ${OKTA_SCOPES}",
+    "okta.require_email_verified = ${OKTA_REQUIRE_EMAIL_VERIFIED}",
+    "",
+])
+
+
+# Everything here is incidental to what the Okta tests are checking; it just keeps the builder from having to
+# consult EnvUtils or the environment for values these tests don't care about. The env_name has to agree with the
+# ambient ENV_NAME, which the builder cross-checks.
+_OKTA_BUILD_DEFAULTS = {
+    'env_name': os.environ.get('ENV_NAME', 'fourfront-mastertest'),
+    'env_bucket': 'test-env-bucket',
+    'env_ecosystem': 'main',
+    'data_set': 'test',
+    's3_bucket_org': 'testorg',
+    'es_server': 'es.example.com',
+    'higlass_server': 'hg.example.com',
+}
+
+
+def _build_okta_ini(**kwargs):
+    """
+    Renders OKTA_TEMPLATE with TestOktaDeployer and returns the resulting text.
+
+    All the machinery that reaches outside the process (the git/EB version probe, the distribution versions,
+    and the pyproject.toml read) is mocked out, since none of it is what these tests are about.
+    """
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with io.open("okta.ini", 'w') as fp:
+            fp.write(OKTA_TEMPLATE)
+        with mock.patch.object(IniFileManager, "get_app_version", return_value="v-okta-test"):
+            with mock.patch.object(deployment_utils_module, "toml") as mock_toml:
+                mock_toml.load.return_value = {'tool': {'poetry': {'version': MOCKED_PROJECT_VERSION}}}
+                with mock.patch.object(deployment_utils_module.pkg_resources, "get_distribution",
+                                       return_value=FakeDistribution()):
+                    output = StringIO()
+                    TestOktaDeployer.build_ini_stream_from_template("okta.ini", output,
+                                                                    **_OKTA_BUILD_DEFAULTS, **kwargs)
+                    return output.getvalue()
+
+
+def _okta_settings(rendered):
+    """Returns the okta.* settings of a rendered ini file as a dictionary."""
+    return {
+        key.strip(): value.strip()
+        for key, _, value in (line.partition('=') for line in rendered.splitlines())
+        if key.strip().startswith('okta.')
+    }
+
+
+def test_deployment_utils_okta_values_from_arguments():
+
+    settings = _okta_settings(_build_okta_ini(okta_issuer="https://example.okta.com/oauth2/default",
+                                              okta_client="0oaSAMPLECLIENT",
+                                              okta_scopes="openid email profile",
+                                              okta_require_email_verified=True))
+
+    assert settings == {
+        'okta.issuer': "https://example.okta.com/oauth2/default",
+        'okta.client': "0oaSAMPLECLIENT",
+        'okta.scopes': "openid email profile",
+        'okta.require_email_verified': "true",
+    }
+
+
+def test_deployment_utils_okta_values_from_environment():
+
+    with override_environ(ENCODED_OKTA_ISSUER="https://env.okta.com/oauth2/default",
+                          ENCODED_OKTA_CLIENT="0oaENVCLIENT",
+                          ENCODED_OKTA_SCOPES="openid email",
+                          ENCODED_OKTA_REQUIRE_EMAIL_VERIFIED="false"):
+        settings = _okta_settings(_build_okta_ini())
+
+    assert settings == {
+        'okta.issuer': "https://env.okta.com/oauth2/default",
+        'okta.client': "0oaENVCLIENT",
+        'okta.scopes': "openid email",
+        'okta.require_email_verified': "false",
+    }
+
+
+def test_deployment_utils_okta_arguments_take_precedence_over_environment():
+
+    with override_environ(ENCODED_OKTA_ISSUER="https://decoy.okta.com/oauth2/default",
+                          ENCODED_OKTA_CLIENT="0oaDECOYCLIENT",
+                          ENCODED_OKTA_SCOPES="openid",
+                          ENCODED_OKTA_REQUIRE_EMAIL_VERIFIED="true"):
+        settings = _okta_settings(_build_okta_ini(okta_issuer="https://explicit.okta.com/oauth2/default",
+                                                  okta_client="0oaEXPLICITCLIENT",
+                                                  okta_scopes="openid email profile",
+                                                  # An explicit False must not fall through to the environment.
+                                                  okta_require_email_verified=False))
+
+    assert settings == {
+        'okta.issuer': "https://explicit.okta.com/oauth2/default",
+        'okta.client': "0oaEXPLICITCLIENT",
+        'okta.scopes': "openid email profile",
+        'okta.require_email_verified': "false",
+    }
+
+
+def test_deployment_utils_okta_omitted_when_absent():
+
+    # With no Okta arguments and no ENCODED_OKTA_* environment variables, every okta.* line is omitted,
+    # so that the consuming application applies its own defaults (notably, requiring a verified email).
+    rendered = _build_okta_ini()
+
+    assert _okta_settings(rendered) == {}
+    assert 'okta' not in rendered
+
+    # The scopes value is empty rather than defaulted upstream, so the application chooses its own scopes,
+    # but a partial Okta configuration still doesn't silently disable the email verification requirement.
+    settings = _okta_settings(_build_okta_ini(okta_issuer="https://example.okta.com/oauth2/default",
+                                              okta_client="0oaSAMPLECLIENT"))
+    assert settings == {
+        'okta.issuer': "https://example.okta.com/oauth2/default",
+        'okta.client': "0oaSAMPLECLIENT",
+    }
+
+
+def test_deployment_utils_okta_require_email_verified_setting():
+
+    # Nothing supplied at all means "omit the line", not "false".
+    assert IniFileManager.okta_require_email_verified_setting() == ""
+    assert IniFileManager.okta_require_email_verified_setting(None) == ""
+
+    assert IniFileManager.okta_require_email_verified_setting(True) == "true"
+    assert IniFileManager.okta_require_email_verified_setting(False) == "false"
+
+    for spelling in ["true", "True", "TRUE", " true ", "t", "T"]:
+        assert IniFileManager.okta_require_email_verified_setting(spelling) == "true"
+    for spelling in ["false", "False", "FALSE", " false ", "f", "F"]:
+        assert IniFileManager.okta_require_email_verified_setting(spelling) == "false"
+
+    # An empty or unparseable value is treated as unspecified (omitted), never as a way to turn the check off.
+    for spelling in ["", "  ", "yes", "no", "0", "1", "maybe"]:
+        assert IniFileManager.okta_require_email_verified_setting(spelling) == ""
+
+    with override_environ(ENCODED_OKTA_REQUIRE_EMAIL_VERIFIED="false"):
+        assert IniFileManager.okta_require_email_verified_setting() == "false"
+        # An explicit argument wins over the environment variable, in both directions.
+        assert IniFileManager.okta_require_email_verified_setting(True) == "true"
+
+    with override_environ(ENCODED_OKTA_REQUIRE_EMAIL_VERIFIED="bogus"):
+        assert IniFileManager.okta_require_email_verified_setting() == ""
+
+
+def test_deployment_utils_okta_does_not_disturb_auth0():
+
+    auth0_values = {
+        'auth0_domain': "dummy-domain",
+        'auth0_client': "31415926535",
+        'auth0_secret': "piepipiepipiepi",
+        'auth0_allowed_connections': "github,google",
+    }
+    expected_auth0_lines = [
+        "auth0.domain = dummy-domain",
+        "auth0.client = 31415926535",
+        "auth0.secret = piepipiepipiepi",
+        "auth0.allowed_connections = github,google",
+    ]
+
+    without_okta = _build_okta_ini(**auth0_values)
+    with_okta = _build_okta_ini(okta_issuer="https://example.okta.com/oauth2/default",
+                                okta_client="0oaSAMPLECLIENT",
+                                okta_scopes="openid email profile",
+                                okta_require_email_verified=True,
+                                **auth0_values)
+
+    def auth0_lines(rendered):
+        return [line for line in rendered.splitlines() if line.startswith('auth0.')]
+
+    # The auth0 lines are byte-for-byte the same whether or not Okta values are supplied.
+    assert auth0_lines(without_okta) == expected_auth0_lines
+    assert auth0_lines(with_okta) == expected_auth0_lines
+
+
+def test_deployment_utils_okta_has_no_secret():
+
+    # Okta here is a public SPA using Authorization Code with PKCE, so there is deliberately no client secret.
+    for method in [IniFileManager.build_ini_file_from_template, IniFileManager.build_ini_stream_from_template]:
+        okta_params = [name for name in inspect.signature(method).parameters if name.startswith('okta')]
+        assert okta_params == ['okta_issuer', 'okta_client', 'okta_scopes', 'okta_require_email_verified']
+
+    secret_template = "[app:app]\nokta.secret = ${OKTA_SECRET}\nokta.client = ${OKTA_CLIENT}\n"
+    mfs = MockFileSystem()
+    with mfs.mock_exists_open_remove():
+        with io.open("okta_secret.ini", 'w') as fp:
+            fp.write(secret_template)
+        with mock.patch.object(IniFileManager, "get_app_version", return_value="v-okta-test"):
+            with mock.patch.object(deployment_utils_module, "toml") as mock_toml:
+                mock_toml.load.return_value = {'tool': {'poetry': {'version': MOCKED_PROJECT_VERSION}}}
+                with mock.patch.object(deployment_utils_module.pkg_resources, "get_distribution",
+                                       return_value=FakeDistribution()):
+                    output = StringIO()
+                    with override_environ(ENCODED_OKTA_SECRET="should-not-be-used",
+                                          ENCODED_OKTA_CLIENT="0oaSAMPLECLIENT"):
+                        TestOktaDeployer.build_ini_stream_from_template("okta_secret.ini", output,
+                                                                        **_OKTA_BUILD_DEFAULTS)
+                    rendered = output.getvalue()
+
+    # OKTA_CLIENT is bound, so it expands. OKTA_SECRET is not bound by anything deployment_utils does, so it is
+    # left in the output unexpanded, and in particular ENCODED_OKTA_SECRET is not picked up from the environment.
+    assert "okta.client = 0oaSAMPLECLIENT" in rendered
+    assert "okta.secret = ${OKTA_SECRET}" in rendered
+    assert 'should-not-be-used' not in rendered

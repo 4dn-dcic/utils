@@ -40,7 +40,7 @@ from .env_utils import (
     is_fourfront_env, is_cgap_env, is_stg_or_prd_env, is_test_env, is_hotseat_env,
     is_indexer_env, indexer_env_for_env, full_env_name,
 )
-from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ, file_contents
+from .misc_utils import PRINT, Retry, apply_dict_overrides, override_environ, file_contents, to_boolean
 from .env_base import EnvBase, s3Base
 
 
@@ -428,6 +428,8 @@ class IniFileManager:
                                      application_bucket_prefix=None, foursight_bucket_prefix=None,
                                      auth0_domain=None, auth0_client=None, auth0_secret=None,
                                      auth0_allowed_connections=None,
+                                     okta_issuer=None, okta_client=None, okta_scopes=None,
+                                     okta_require_email_verified=None,
                                      re_captcha_key=None, re_captcha_secret=None,
                                      redis_server=None,
                                      google_api_key=None,
@@ -469,6 +471,13 @@ class IniFileManager:
             auth0_client (str): A string identifying the auth0 client application.
             auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
             auth0_allowed_connections (str): A comma separated string of allowed connections that can be used via auth0.
+            okta_issuer (str): The Okta issuer (authorization server) URL to validate tokens against.
+            okta_client (str): The Okta client (application) id. This is a public SPA client, so it has no secret.
+            okta_scopes (str): A space separated string of OIDC scopes to request. Empty means the application
+              chooses its own default.
+            okta_require_email_verified (bool): Whether an Okta identity must have a verified email. If neither this
+              nor ENCODED_OKTA_REQUIRE_EMAIL_VERIFIED is given, the setting is omitted from the generated .ini file
+              so that the application's own (secure, true) default applies.
             re_captcha_key (str): key used for reCaptcha for throttling/detecting humans on login
             re_captcha_secret (str): secret used for reCaptcha
             redis_server (str): A server URL to a Redis cluster, for use with sessions
@@ -507,6 +516,10 @@ class IniFileManager:
                                                auth0_client=auth0_client,
                                                auth0_secret=auth0_secret,
                                                auth0_allowed_connections=auth0_allowed_connections,
+                                               okta_issuer=okta_issuer,
+                                               okta_client=okta_client,
+                                               okta_scopes=okta_scopes,
+                                               okta_require_email_verified=okta_require_email_verified,
                                                re_captcha_key=re_captcha_key,
                                                re_captcha_secret=re_captcha_secret,
                                                redis_server=redis_server,
@@ -570,6 +583,29 @@ class IniFileManager:
     PRD_DEFAULT_CREATE_MAPPING_ON_DEPLOY_STRICT = None
 
     @classmethod
+    def okta_require_email_verified_setting(cls, okta_require_email_verified=None):
+        """
+        Returns the string to bind to OKTA_REQUIRE_EMAIL_VERIFIED in an .ini template.
+
+        An explicit argument takes precedence over the ENCODED_OKTA_REQUIRE_EMAIL_VERIFIED environment variable.
+        The result is "true" or "false" if a boolean value was actually supplied, and otherwise the empty string.
+
+        The empty string is deliberate rather than accidental: an empty expansion makes cls.omittable drop the
+        assignment line from the generated .ini file entirely, so the consuming application falls back to its own
+        default, which is to require a verified email. An absent, empty, or unparseable value therefore cannot
+        turn that check off, and (unlike raising) it cannot break .ini generation at container startup either.
+        """
+        if okta_require_email_verified is None:
+            okta_require_email_verified = os.environ.get("ENCODED_OKTA_REQUIRE_EMAIL_VERIFIED")
+        if isinstance(okta_require_email_verified, str):
+            # to_boolean recognizes only true/t/false/f (case-insensitively), yielding None for anything else,
+            # so any other spelling is treated as "not specified" and omitted.
+            okta_require_email_verified = to_boolean(okta_require_email_verified, None)
+        if okta_require_email_verified is None:
+            return ""
+        return "true" if okta_require_email_verified else "false"
+
+    @classmethod
     def build_ini_stream_from_template(cls, template_file_name, init_file_stream, *,
                                        bs_env=None, bs_mirror_env=None, s3_bucket_org=None, s3_bucket_env=None,
                                        s3_encrypt_key_id=None, env_bucket=None, env_ecosystem=None, env_name=None,
@@ -580,6 +616,8 @@ class IniFileManager:
                                        application_bucket_prefix=None, foursight_bucket_prefix=None,
                                        auth0_domain=None, auth0_client=None, auth0_secret=None,
                                        auth0_allowed_connections=None,
+                                       okta_issuer=None, okta_client=None, okta_scopes=None,
+                                       okta_require_email_verified=None,
                                        re_captcha_key=None, re_captcha_secret=None,
                                        redis_server=None,
                                        google_api_key=None,
@@ -618,6 +656,13 @@ class IniFileManager:
             auth0_client (str): A string identifying the auth0 client application.
             auth0_secret (str): A string secret that is passed with the auth0_client to authenticate that client.
             auth0_allowed_connections (str): A comma separated string of allowed connections that can be used via auth0.
+            okta_issuer (str): The Okta issuer (authorization server) URL to validate tokens against.
+            okta_client (str): The Okta client (application) id. This is a public SPA client, so it has no secret.
+            okta_scopes (str): A space separated string of OIDC scopes to request. Empty means the application
+              chooses its own default.
+            okta_require_email_verified (bool): Whether an Okta identity must have a verified email. If neither this
+              nor ENCODED_OKTA_REQUIRE_EMAIL_VERIFIED is given, the setting is omitted from the generated .ini file
+              so that the application's own (secure, true) default applies.
             re_captcha_key (str): key used for reCaptcha for throttling/detecting humans on login
             re_captcha_secret (str): secret used for reCaptcha
             redis_server (str): A server URL to a Redis cluster, for use with sessions
@@ -695,6 +740,14 @@ class IniFileManager:
         auth0_client = auth0_client or os.environ.get("ENCODED_AUTH0_CLIENT", "")
         auth0_secret = auth0_secret or os.environ.get("ENCODED_AUTH0_SECRET", "")
         auth0_allowed_connections = auth0_allowed_connections or os.environ.get("ENCODED_AUTH0_ALLOWED_CONNECTIONS", "")
+
+        # Okta Configuration.
+        # Note that there is deliberately no Okta secret. The portal's Okta integration is a public SPA using the
+        # Authorization Code flow with PKCE, which has no client secret to configure or to leak into an .ini file.
+        okta_issuer = okta_issuer or os.environ.get("ENCODED_OKTA_ISSUER", "")
+        okta_client = okta_client or os.environ.get("ENCODED_OKTA_CLIENT", "")
+        okta_scopes = okta_scopes or os.environ.get("ENCODED_OKTA_SCOPES", "")
+        okta_require_email_verified = cls.okta_require_email_verified_setting(okta_require_email_verified)
 
         # reCatpcha Configuration
         re_captcha_key = re_captcha_key or os.environ.get('reCaptchaKey', '')
@@ -806,6 +859,10 @@ class IniFileManager:
             'AUTH0_CLIENT': auth0_client,
             'AUTH0_SECRET': auth0_secret,
             'AUTH0_ALLOWED_CONNECTIONS': auth0_allowed_connections,
+            'OKTA_ISSUER': okta_issuer,
+            'OKTA_CLIENT': okta_client,
+            'OKTA_SCOPES': okta_scopes,
+            'OKTA_REQUIRE_EMAIL_VERIFIED': okta_require_email_verified,
             'g.recaptcha.key': re_captcha_key,
             'g.recaptcha.secret': re_captcha_secret,
             'CREATE_MAPPING_SKIP': create_mapping_on_deploy_skip,
