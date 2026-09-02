@@ -7,6 +7,24 @@ Change Log
 ----------
 
 
+8.19.0.1b1
+==========
+* wrr / 2026-09-02 / branch: fm/dcicutils-okta-ini-config-7p
+  - Added first-class Okta values to ``deployment_utils``: ``build_ini_file_from_template`` and
+    ``build_ini_stream_from_template`` now accept ``okta_issuer``, ``okta_client``, ``okta_scopes``,
+    and ``okta_require_email_verified``, bound to the ``OKTA_ISSUER``, ``OKTA_CLIENT``, ``OKTA_SCOPES``,
+    and ``OKTA_REQUIRE_EMAIL_VERIFIED`` template substitutions. Each takes its value from the explicit
+    argument, else the corresponding ``ENCODED_OKTA_*`` environment variable, else a safe default,
+    matching the existing Auth0 precedence. This lets a portal container render Okta settings into
+    ``production.ini`` during its existing one-time startup configuration step, rather than having the
+    running application read Secrets Manager itself.
+  - ``OKTA_SCOPES`` defaults to empty so the consuming application picks its own scopes, and
+    ``OKTA_REQUIRE_EMAIL_VERIFIED`` is omitted from the generated file unless a boolean is actually
+    supplied, so that the application's secure default (require a verified email) applies. There is
+    deliberately no Okta secret: this is a public SPA using Authorization Code with PKCE.
+  - Existing callers, Auth0 values, and generated output are unchanged.
+
+
 8.19.0
 ======
 * ajs/wrr/sn 2026-07-29 / branch: sn_refactor_custom_excel
