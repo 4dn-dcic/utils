@@ -1480,7 +1480,6 @@ def _test_parse_structured_data(testapp,
     def assert_parse_structured_data():
 
         def call_parse_structured_data(file: str):
-            nonlocal portal, novalidate, autoadd, prune, remove_empty_objects_from_lists, debug
             if debug:
                 # import pdb ; pdb.set_trace()
                 pass
@@ -1488,7 +1487,7 @@ def _test_parse_structured_data(testapp,
                                          autoadd=autoadd, prune=True if prune is not False else False,
                                          remove_empty_objects_from_lists=remove_empty_objects_from_lists)
 
-        nonlocal file, expected, expected_errors, schemas, noschemas, debug
+        nonlocal file
         portal = Portal(testapp, schemas=schemas) if not noschemas else None  # But see mocked_schemas.
         if rows:
             if os.path.exists(file) or os.path.exists(os.path.join(TEST_FILES_DIR, file)):
@@ -1536,7 +1535,6 @@ def _test_parse_structured_data(testapp,
         def mocked_map_function_ref(self, typeinfo):  # noqa
             map_ref = real_map_function_ref(self, typeinfo)
             def mocked_map_ref(value, link_to, portal, src):  # noqa
-                nonlocal norefs, expected_refs, refs_actual
                 if not value:
                     refs_actual.add(ref := f"/{link_to}/<null>")
                     if norefs is True or (isinstance(norefs, list) and ref in norefs):
@@ -1544,7 +1542,6 @@ def _test_parse_structured_data(testapp,
                 return map_ref(value, src)
             return lambda value, src: mocked_map_ref(value, typeinfo.get("linkTo"), self._portal, src)
         def mocked_ref_exists(self, type_name, value, called_from_map_ref = False):  # noqa
-            nonlocal norefs, expected_refs, refs_actual
             refs_actual.add(ref := f"/{type_name}/{value}")
             if norefs is True or (isinstance(norefs, list) and ref in norefs):
                 return {"type": "dummy", "uuid": "dummy"}
@@ -1556,7 +1553,7 @@ def _test_parse_structured_data(testapp,
                 yield
 
     def run_this_function():
-        nonlocal expected_refs, noschemas, norefs, refs_actual
+        nonlocal refs_actual
         refs_actual = set()
         if noschemas:
             if norefs or expected_refs:

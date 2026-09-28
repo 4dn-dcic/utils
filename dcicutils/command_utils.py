@@ -423,7 +423,6 @@ class Question:
     def ask(self, question: Optional[str] = None) -> bool:
 
         def question_automatic(value: str) -> bool:
-            nonlocal self
             RARROW = "▶"
             LARROW = "◀"
             if yes_or_no(f"{RARROW}{RARROW}{RARROW}"

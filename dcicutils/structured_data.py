@@ -116,7 +116,6 @@ class StructuredDataSet:
 
     def validate(self, force: bool = False) -> None:
         def data_without_deleted_properties(data: dict) -> dict:
-            nonlocal self
             def isempty(value: Any) -> bool:  # noqa
                 if value == RowReader.CELL_DELETION_SENTINEL:
                     return True
@@ -313,7 +312,6 @@ class StructuredDataSet:
 
     def _load_excel_file(self, file: str) -> None:
         def get_counts() -> Tuple[int, int]:
-            nonlocal file
             excel = self._excel_class(file)
             nrows = 0
             for sheet_name in excel.sheet_names:
@@ -614,7 +612,7 @@ class _StructuredRowTemplate:
                                path: List[Union[str, int]], typeinfo: Optional[dict], mapv: Optional[Callable]) -> None:
 
             def set_value_backtrack_object(path_index: int, path_element: str) -> None:
-                nonlocal data, path, original_data
+                nonlocal data
                 backtrack_data = original_data
                 for j in range(path_index - 1):
                     if not isinstance(path[j], str):
@@ -749,7 +747,6 @@ class Schema(SchemaBase):
         allow_commas = typeinfo.get("allow_commas") is True
         allow_multiplier_suffix = typeinfo.get("allow_multiplier_suffix") is True
         def map_integer(value: str, src: Optional[str]) -> Any:  # noqa
-            nonlocal allow_commas, allow_multiplier_suffix
             return to_integer(value, fallback=value,
                               allow_commas=allow_commas,
                               allow_multiplier_suffix=allow_multiplier_suffix)
@@ -759,7 +756,6 @@ class Schema(SchemaBase):
         allow_commas = typeinfo.get("allow_commas") is True
         allow_multiplier_suffix = typeinfo.get("allow_multiplier_suffix") is True
         def map_number(value: str, src: Optional[str]) -> Any:  # noqa
-            nonlocal allow_commas, allow_multiplier_suffix
             return to_float(value, fallback=value,
                             allow_commas=allow_commas,
                             allow_multiplier_suffix=allow_multiplier_suffix)
@@ -786,7 +782,6 @@ class Schema(SchemaBase):
 
     def _map_function_ref(self, typeinfo: dict) -> Callable:
         def map_ref(value: str, link_to: str, portal: Optional[Portal], src: Optional[str]) -> Any:
-            nonlocal self, typeinfo
             if self._norefs:
                 # Here the caller has specified the (StructuredDataSet) norefs option
                 # which means we do not check for the existence of references at all.
@@ -1155,7 +1150,6 @@ class Portal(PortalBase):
         otherwise we could handle it generically here.
         """
         def is_possibly_valid(schema: dict, property_name: str, property_value: str) -> Optional[Callable]:  # noqa
-            nonlocal ref_validator
             if callable(ref_validator):
                 if (ref_validator_result := ref_validator(schema, property_name, property_value)) is False:
                     return False
