@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 import inspect
 import json
+import openpyxl
 import os
 import pytest
 import re
@@ -1348,6 +1349,80 @@ def test_get_type_name_1():
     assert Schema.type_name("File  Format") == "FileFormat"
 
 
+def test_json_order_uses_canonical_names_and_preserves_original_keys(tmp_path):
+    path = tmp_path / "metadata.json"
+    path.write_text(json.dumps({
+        "unknown_z": [{"value": "z"}],
+        "MedicalHistory": [{"value": "medical"}],
+        "unknown_a": [{"value": "a"}],
+        "Donor": [{"second": 2, "first": 1}],
+        "unknown_b": [{"value": "b"}],
+    }))
+    portal = Portal(testapp, schemas=[{"title": "Donor"}, {"title": "MedicalHistory"}])
+
+    data = StructuredDataSet(file=str(path), portal=portal,
+                             order=["donor", "medical_history"]).data
+
+    assert list(data) == ["Donor", "MedicalHistory", "unknown_z", "unknown_a", "unknown_b"]
+    assert list(data["Donor"][0]) == ["second", "first"]
+
+
+def test_json_order_keeps_canonical_key_collisions_stable(tmp_path):
+    path = tmp_path / "metadata.json"
+    path.write_text(json.dumps({
+        "FooBar": [{"value": "camel"}],
+        "foo_bar": [{"value": "snake"}],
+        "Donor": [{"value": "donor"}],
+    }))
+    portal = Portal(testapp, schemas=[{"title": "Donor"}])
+
+    data = StructuredDataSet(file=str(path), portal=portal,
+                             order=["donor", "foo_bar"]).data
+
+    assert list(data) == ["Donor", "FooBar", "foo_bar"]
+
+
+def test_json_without_order_preserves_input_key_order(tmp_path):
+    path = tmp_path / "metadata.json"
+    path.write_text(json.dumps({
+        "MedicalHistory": [{"second": 2, "first": 1}],
+        "Donor": [{"second": 2, "first": 1}],
+    }))
+    portal = Portal(testapp, schemas=[{"title": "Donor"}, {"title": "MedicalHistory"}])
+
+    data = StructuredDataSet(file=str(path), portal=portal).data
+
+    assert list(data) == ["MedicalHistory", "Donor"]
+    assert list(data["MedicalHistory"][0]) == ["second", "first"]
+
+
+def test_single_schema_json_behavior_is_unchanged_by_order(tmp_path):
+    path = tmp_path / "early_type.json"
+    path.write_text(json.dumps({"second": 2, "first": 1}))
+    portal = Portal(testapp, schemas=[{"title": "EarlyType"}])
+
+    data = StructuredDataSet(file=str(path), portal=portal,
+                             order=["other_type", "early_type"]).data
+
+    assert list(data) == ["EarlyType"]
+    assert list(data["EarlyType"][0]) == ["second", "first"]
+
+
+def test_workbook_order_uses_canonical_schema_names(tmp_path):
+    path = tmp_path / "metadata.xlsx"
+    workbook = openpyxl.Workbook()
+    workbook.remove(workbook.active)
+    for sheet_name in ["LateType", "unknown", "EarlyType"]:
+        sheet = workbook.create_sheet(sheet_name)
+        sheet.append(["value"])
+        sheet.append([sheet_name])
+    workbook.save(path)
+
+    data = StructuredDataSet(file=str(path), order=["early_type", "late_type"]).data
+
+    assert list(data) == ["EarlyType", "LateType", "Unknown"]
+
+
 def test_rationalize_column_name() -> None:
     _test_rationalize_column_name("abc#0#", "abc###", "abc#0##")
     _test_rationalize_column_name("abc.def.ghi", None, "abc.def.ghi")
@@ -1405,7 +1480,6 @@ def _test_parse_structured_data(testapp,
     def assert_parse_structured_data():
 
         def call_parse_structured_data(file: str):
-            nonlocal portal, novalidate, autoadd, prune, remove_empty_objects_from_lists, debug
             if debug:
                 # import pdb ; pdb.set_trace()
                 pass
@@ -1413,7 +1487,7 @@ def _test_parse_structured_data(testapp,
                                          autoadd=autoadd, prune=True if prune is not False else False,
                                          remove_empty_objects_from_lists=remove_empty_objects_from_lists)
 
-        nonlocal file, expected, expected_errors, schemas, noschemas, debug
+        nonlocal file
         portal = Portal(testapp, schemas=schemas) if not noschemas else None  # But see mocked_schemas.
         if rows:
             if os.path.exists(file) or os.path.exists(os.path.join(TEST_FILES_DIR, file)):
@@ -1461,7 +1535,6 @@ def _test_parse_structured_data(testapp,
         def mocked_map_function_ref(self, typeinfo):  # noqa
             map_ref = real_map_function_ref(self, typeinfo)
             def mocked_map_ref(value, link_to, portal, src):  # noqa
-                nonlocal norefs, expected_refs, refs_actual
                 if not value:
                     refs_actual.add(ref := f"/{link_to}/<null>")
                     if norefs is True or (isinstance(norefs, list) and ref in norefs):
@@ -1469,7 +1542,6 @@ def _test_parse_structured_data(testapp,
                 return map_ref(value, src)
             return lambda value, src: mocked_map_ref(value, typeinfo.get("linkTo"), self._portal, src)
         def mocked_ref_exists(self, type_name, value, called_from_map_ref = False):  # noqa
-            nonlocal norefs, expected_refs, refs_actual
             refs_actual.add(ref := f"/{type_name}/{value}")
             if norefs is True or (isinstance(norefs, list) and ref in norefs):
                 return {"type": "dummy", "uuid": "dummy"}
@@ -1481,7 +1553,7 @@ def _test_parse_structured_data(testapp,
                 yield
 
     def run_this_function():
-        nonlocal expected_refs, noschemas, norefs, refs_actual
+        nonlocal refs_actual
         refs_actual = set()
         if noschemas:
             if norefs or expected_refs:

@@ -2,9 +2,11 @@ from copy import deepcopy
 import io
 import json
 import os
+import tempfile
 from typing import Any, List, Optional
 from dcicutils.data_readers import Excel, ExcelSheetReader
 from dcicutils.misc_utils import to_boolean, to_float, to_integer
+from dcicutils.submitr.donor_transformer import ProtectedDonorWorkbookTransformer
 
 # This module implements a custom Excel spreadsheet class which supports "custom column mappings",
 # meaning that, at a very low/early level in processing, the columns/values in the spreadsheet
@@ -100,26 +102,90 @@ def _array_name_of(synthetic_column_name: str) -> Optional[str]:
 
 class CustomExcel(Excel):
 
-    def __init__(self, *args, portal=None, **kwargs):
+    def __init__(self, *args, portal=None, transform_protected_donor: bool = False,
+                 transformed_workbook_path: Optional[str] = None,
+                 allow_existing_staging_path: bool = False, **kwargs):
+        self._transform_protected_donor = bool(transform_protected_donor)
+        self._transformed_workbook_path = transformed_workbook_path
+        self._allow_existing_staging_path = bool(allow_existing_staging_path)
         super().__init__(*args, **kwargs)
+        if self._transform_protected_donor:
+            transformed = ProtectedDonorWorkbookTransformer(
+                effective_sheet_name=self.effective_sheet_name
+            ).transform(self._workbook, portal=portal)
+            self.sheet_names = [sheet_name for sheet_name in self._workbook.sheetnames
+                                if not self.is_hidden_sheet(self._workbook[sheet_name])]
+            if transformed and self._transformed_workbook_path:
+                self._save_transformed_workbook(
+                    self._transformed_workbook_path,
+                    allow_existing_staging_path=self._allow_existing_staging_path,
+                )
         self._custom_column_mappings = CustomExcel._get_custom_column_mappings(portal=portal)
 
     @classmethod
-    def with_portal(cls, portal):
-        """Return a subclass of CustomExcel with portal baked in.
+    def with_portal(cls, portal, **options):
+        """Return CustomExcel with the portal and worker options baked in.
 
-        Use this when passing excel_class to StructuredDataSet, which requires
-        a real class (it calls issubclass() on the argument internally):
-
-            excel_class=CustomExcel.with_portal(portal)
+        The submitr worker should pass ``transform_protected_donor=True`` when
+        ProtectedDonor conversion is part of its upload flow.  This keeps the
+        conversion opt-in for existing StructuredDataSet callers.  A submitr caller
+        that pre-creates the transformed output may also pass
+        ``allow_existing_staging_path=True``.
         """
         class _CustomExcelWithPortal(cls):
             def __init__(self, *args, **kwargs):
                 kwargs.setdefault("portal", portal)
+                for key, value in options.items():
+                    kwargs.setdefault(key, value)
                 super().__init__(*args, **kwargs)
         _CustomExcelWithPortal.__name__ = "CustomExcel"
         _CustomExcelWithPortal.__qualname__ = "CustomExcel"
         return _CustomExcelWithPortal
+
+    def _save_transformed_workbook(self, path: str, overwrite: bool = False,
+                                   allow_existing_staging_path: bool = False) -> None:
+        """Save the transformed workbook without clobbering an existing file.
+
+        ``overwrite`` is intentionally explicit and applies only to this call.  When it is
+        true, the completed temporary workbook atomically replaces ``path``; this is for a
+        caller that has already validated the transformed workbook.  The default is safe for
+        ordinary conversion and leaves an existing target untouched.  The narrower
+        ``allow_existing_staging_path`` option is for a path the caller pre-created as its
+        owned temporary staging file; it also replaces that path atomically.
+        """
+        if overwrite and allow_existing_staging_path:
+            raise ValueError("Choose either overwrite or allow_existing_staging_path, not both.")
+        path = os.path.abspath(os.path.expanduser(path))
+        input_path = os.path.abspath(os.path.expanduser(self._file)) if self._file else None
+        if not path.lower().endswith(".xlsx"):
+            raise ValueError(f"Transformed workbook output path must end with .xlsx: {path}")
+        if input_path and path == input_path:
+            raise ValueError(f"Transformed workbook output path must differ from input workbook path: {path}")
+        directory = os.path.dirname(path)
+        if not os.path.isdir(directory):
+            raise ValueError(f"Directory for transformed workbook output does not exist: {directory}")
+        if os.path.exists(path) and not (overwrite or allow_existing_staging_path):
+            raise ValueError(f"Transformed workbook output path already exists: {path}")
+
+        temporary_path = None
+        try:
+            temporary_fd, temporary_path = tempfile.mkstemp(
+                dir=directory, prefix=f".{os.path.basename(path)}.", suffix=".xlsx"
+            )
+            os.close(temporary_fd)
+            self._workbook.save(temporary_path)
+            if not (overwrite or allow_existing_staging_path) and os.path.exists(path):
+                raise ValueError(f"Transformed workbook output path already exists: {path}")
+            os.replace(temporary_path, path)
+            temporary_path = None
+        except Exception as error:
+            raise ValueError(f"Cannot save transformed workbook to {path}: {error}") from error
+        finally:
+            if temporary_path and os.path.exists(temporary_path):
+                try:
+                    os.unlink(temporary_path)
+                except OSError:
+                    pass
 
     def sheet_reader(self, sheet_name: str) -> ExcelSheetReader:
         return CustomExcelSheetReader(self, sheet_name=sheet_name, workbook=self._workbook,

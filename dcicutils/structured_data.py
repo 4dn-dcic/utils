@@ -116,7 +116,6 @@ class StructuredDataSet:
 
     def validate(self, force: bool = False) -> None:
         def data_without_deleted_properties(data: dict) -> dict:
-            nonlocal self
             def isempty(value: Any) -> bool:  # noqa
                 if value == RowReader.CELL_DELETION_SENTINEL:
                     return True
@@ -305,23 +304,28 @@ class StructuredDataSet:
     def _load_csv_file(self, file: str) -> None:
         self._load_reader(CsvReader(file), type_name=Schema.type_name(file))
 
+    def _ordered_schema_names(self, schema_names: List[str]) -> List[str]:
+        if not self._order:
+            return schema_names
+        order = {Schema.type_name(key): index for index, key in enumerate(self._order)}
+        return sorted(schema_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize))
+
     def _load_excel_file(self, file: str) -> None:
-        def get_counts() -> Tuple[int, int]:
-            nonlocal file
-            excel = self._excel_class(file)
+        def get_counts(excel: Excel) -> Tuple[int, int]:
             nrows = 0
             for sheet_name in excel.sheet_names:
                 for row in excel.sheet_reader(sheet_name):
                     nrows += 1
             return nrows, len(excel.sheet_names)
+        # Open the workbook once so that the progress counting pass and the parsing pass read the same
+        # instance; excel classes may have side effects on construction (e.g. CustomExcel workbook staging).
+        excel = self._excel_class(file)
         if self._progress:  # TODO: Move to _load_reader
-            nrows, nsheets = get_counts()
+            nrows, nsheets = get_counts(excel)
             self._progress({PROGRESS.LOAD_START: PROGRESS.NOW(),
                             PROGRESS.LOAD_COUNT_SHEETS: nsheets, PROGRESS.LOAD_COUNT_ROWS: nrows})
-        excel = self._excel_class(file)
         # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
-        order = {Schema.type_name(key): index for index, key in enumerate(self._order)} if self._order else {}
-        for sheet_name in sorted(excel.sheet_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize)):
+        for sheet_name in self._ordered_schema_names(excel.sheet_names):
             # This effective_sheet_name function added 2025-01-21 to allow sheets whose sheet names are
             # other than simply the name of the type, but which do contain that type somehow; i.e. e.g.
             # specifically where the sheet name is like "DSA_ExternalQualityMetric" where the "DSA"
@@ -378,7 +382,7 @@ class StructuredDataSet:
                 # Otherwise if the JSON file name does not look like a schema name then
                 # assume it a dictionary where each property is the name of a schema, and
                 # which (each property) contains a list of object of that schema type.
-                for schema_name in data:
+                for schema_name in self._ordered_schema_names(list(data)):
                     item = data[schema_name]
                     if self._merge:  # New merge functionality (2024-05-25)
                         item = self._merge_with_existing_portal_object(item, schema_name)
@@ -609,7 +613,7 @@ class _StructuredRowTemplate:
                                path: List[Union[str, int]], typeinfo: Optional[dict], mapv: Optional[Callable]) -> None:
 
             def set_value_backtrack_object(path_index: int, path_element: str) -> None:
-                nonlocal data, path, original_data
+                nonlocal data
                 backtrack_data = original_data
                 for j in range(path_index - 1):
                     if not isinstance(path[j], str):
@@ -744,7 +748,6 @@ class Schema(SchemaBase):
         allow_commas = typeinfo.get("allow_commas") is True
         allow_multiplier_suffix = typeinfo.get("allow_multiplier_suffix") is True
         def map_integer(value: str, src: Optional[str]) -> Any:  # noqa
-            nonlocal allow_commas, allow_multiplier_suffix
             return to_integer(value, fallback=value,
                               allow_commas=allow_commas,
                               allow_multiplier_suffix=allow_multiplier_suffix)
@@ -754,7 +757,6 @@ class Schema(SchemaBase):
         allow_commas = typeinfo.get("allow_commas") is True
         allow_multiplier_suffix = typeinfo.get("allow_multiplier_suffix") is True
         def map_number(value: str, src: Optional[str]) -> Any:  # noqa
-            nonlocal allow_commas, allow_multiplier_suffix
             return to_float(value, fallback=value,
                             allow_commas=allow_commas,
                             allow_multiplier_suffix=allow_multiplier_suffix)
@@ -781,7 +783,6 @@ class Schema(SchemaBase):
 
     def _map_function_ref(self, typeinfo: dict) -> Callable:
         def map_ref(value: str, link_to: str, portal: Optional[Portal], src: Optional[str]) -> Any:
-            nonlocal self, typeinfo
             if self._norefs:
                 # Here the caller has specified the (StructuredDataSet) norefs option
                 # which means we do not check for the existence of references at all.
@@ -1150,7 +1151,6 @@ class Portal(PortalBase):
         otherwise we could handle it generically here.
         """
         def is_possibly_valid(schema: dict, property_name: str, property_value: str) -> Optional[Callable]:  # noqa
-            nonlocal ref_validator
             if callable(ref_validator):
                 if (ref_validator_result := ref_validator(schema, property_name, property_value)) is False:
                     return False

@@ -150,7 +150,6 @@ def main():
     args = parser.parse_args()
 
     def usage(message: Optional[str] = None) -> None:
-        nonlocal parser
         _print(message) if isinstance(message, str) else None
         parser.print_help()
         sys.exit(1)
@@ -230,7 +229,6 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
                                 confirm: bool = False, verbose: bool = False,
                                 quiet: bool = False, debug: bool = False) -> None:
 
-        nonlocal update_function, update_action_name
         if not quiet:
             _print(f"Processing {update_action_name} file: {file}")
         if data := _read_json_from_file(file):
@@ -416,7 +414,6 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
 
     def loadxl(portal: Portal, inserts_directory: str, schema_names_to_load: dict):
 
-        nonlocal LoadGenWrapper, load_all_gen, loadxl_summary, verbose, debug
         nonlocal loadxl_total_item_count, loadxl_total_error_count
         progress_total = sum(schema_names_to_load.values()) * 2  # loadxl does two passes
         progress_bar = ProgressBar(progress_total, interrupt_exit=True) if not noprogress else None
