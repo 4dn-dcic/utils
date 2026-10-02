@@ -7,9 +7,11 @@ from dcicutils.structured_data import StructuredDataSet
 from dcicutils.submitr.custom_excel import CustomExcel
 from dcicutils.submitr.donor_transformer import (
     DonorReferenceKind,
+    ProtectedDonorLookupError,
     ProtectedDonorTransformError,
     ProtectedDonorWorkbookTransformer,
     analyze_protected_donors,
+    lookup_protected_donor,
 )
 
 
@@ -250,3 +252,291 @@ def test_hidden_and_unlisted_sheets_are_not_transformed():
 
     assert ProtectedDonorWorkbookTransformer().transform(workbook) is False
     assert "ProtectedDonor" not in workbook.sheetnames
+
+
+# --- Regression tests for PR review findings ---
+
+def _formatted_empty_rows(sheet, count):
+    # Formatted-but-empty cells extend max_row without the reader ever seeing data there.
+    for offset in range(1, count + 1):
+        sheet.cell(sheet.max_row + 1, 1).number_format = "@"
+    return sheet
+
+
+def _read_rows(path, sheet_name):
+    return StructuredDataSet(file=str(path), portal=None, norefs=True).data.get(sheet_name, [])
+
+
+def test_existing_protected_sheet_gains_headers_for_copied_fields():
+    workbook = _workbook({
+        "Donor": [["submitted_id", "external_id", "status"], ["A_DONOR_NEW", "ext-1", "released"]],
+        "ProtectedDonor": [["submitted_id"], ["A_PROTECTED-DONOR_OLD"]],
+        "FamilyHistory": [["donor"], ["A_DONOR_NEW"]],
+    })
+
+    ProtectedDonorWorkbookTransformer().transform(workbook)
+
+    protected = workbook["ProtectedDonor"]
+    headers = [cell.value for cell in protected[1]]
+    assert headers == ["submitted_id", "external_id", "status"]
+    assert [cell.value for cell in protected[2]] == ["A_PROTECTED-DONOR_OLD", None, None]
+    assert [cell.value for cell in protected[3]] == ["A_PROTECTED-DONOR_NEW", "ext-1", "in review"]
+
+
+def test_existing_protected_sheet_with_unsafe_extra_columns_is_rejected_unchanged():
+    workbook = _workbook({
+        "Donor": [["submitted_id", "external_id"], ["A_DONOR_NEW", "ext-1"]],
+        "ProtectedDonor": [["submitted_id", None, "orphan"], ["A_PROTECTED-DONOR_OLD", None, "stale"]],
+        "FamilyHistory": [["donor"], ["A_DONOR_NEW"]],
+    })
+
+    with pytest.raises(ProtectedDonorTransformError, match="columns cannot be added"):
+        ProtectedDonorWorkbookTransformer().transform(workbook)
+
+    assert workbook["ProtectedDonor"].max_row == 2
+    assert workbook["Donor"].max_column == 2
+    assert workbook["FamilyHistory"]["A2"].value == "A_DONOR_NEW"
+
+
+def test_generated_rows_are_appended_before_formatted_empty_rows_and_stay_visible(tmp_path):
+    workbook = _workbook({
+        "Donor": [["submitted_id", "status"], ["A_DONOR_1", "released"], ["A_DONOR_2", "released"]],
+        "ProtectedDonor": [["submitted_id", "status"], ["A_PROTECTED-DONOR_OLD", "in review"]],
+        "FamilyHistory": [["donor"], ["A_DONOR_1"], ["A_DONOR_2"]],
+    })
+    _formatted_empty_rows(workbook["ProtectedDonor"], 5)
+    assert workbook["ProtectedDonor"].max_row > 6
+
+    ProtectedDonorWorkbookTransformer().transform(workbook)
+
+    path = tmp_path / "out.xlsx"
+    workbook.save(path)
+    ids = [row["submitted_id"] for row in _read_rows(path, "ProtectedDonor")]
+    assert ids == ["A_PROTECTED-DONOR_OLD", "A_PROTECTED-DONOR_1", "A_PROTECTED-DONOR_2"]
+
+
+def test_content_after_the_empty_row_terminator_blocks_append_and_leaves_workbook_unchanged():
+    workbook = _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "ProtectedDonor": [["submitted_id"], ["A_PROTECTED-DONOR_OLD"], [None], ["A_PROTECTED-DONOR_STALE"]],
+        "FamilyHistory": [["donor"], ["A_DONOR_1"]],
+    })
+
+    with pytest.raises(ProtectedDonorTransformError, match="after its first empty row"):
+        ProtectedDonorWorkbookTransformer().transform(workbook)
+
+    assert workbook["ProtectedDonor"].max_row == 4
+    assert workbook["ProtectedDonor"]["A3"].value is None
+    assert workbook["FamilyHistory"]["A2"].value == "A_DONOR_1"
+    assert "protected_donor" not in [cell.value for cell in workbook["Donor"][1]]
+
+
+def test_references_after_the_empty_row_terminator_are_not_scanned():
+    workbook = _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"], [None], ["A_DONOR_STALE"]],
+        "Demographic": [["donor"], ["A_DONOR_1"], [None], ["not-an-id"], ["A_DONOR_STALE"]],
+    })
+
+    analysis = analyze_protected_donors(workbook)
+    assert set(analysis.references) == {"A_DONOR_1"}
+
+    assert ProtectedDonorWorkbookTransformer().transform(workbook) is True
+    assert workbook["Demographic"]["A2"].value == "A_PROTECTED-DONOR_1"
+    # Rows after the terminator are never ingested, so they are never rewritten either.
+    assert workbook["Demographic"]["A4"].value == "not-an-id"
+    assert workbook["Demographic"]["A5"].value == "A_DONOR_STALE"
+    assert workbook["Donor"].cell(4, 1).value == "A_DONOR_STALE"
+    assert workbook["Donor"].max_column == 2
+    assert workbook["Donor"].cell(4, 2).value is None
+
+
+class _TypedPortal:
+    """Portal stub answering typed ProtectedDonor lookups by identifier."""
+
+    def __init__(self, items=None, error=None):
+        self.items = items or {}
+        self.error = error
+        self.paths = []
+
+    def get_metadata(self, path, **kwargs):
+        self.paths.append(path)
+        if self.error:
+            raise self.error
+        prefix = "/ProtectedDonor/"
+        assert path.startswith(prefix)
+        if path[len(prefix):] in self.items:
+            return self.items[path[len(prefix):]]
+        raise Exception(f"Bad status code for GET request for https://portal{path}: 404. Reason: Not Found")
+
+
+UUID = "11111111-2222-3333-4444-555555555555"
+ACCESSION = "SMAPD1234567"
+
+
+@pytest.mark.parametrize("identifier", [UUID, ACCESSION])
+def test_uuid_and_accession_references_to_existing_protected_donors_are_accepted(identifier):
+    portal = _TypedPortal({identifier: {"uuid": UUID, "@type": ["ProtectedDonor", "Item"]}})
+    workbook = _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "Demographic": [["donor"], [identifier], ["A_DONOR_1"]],
+    })
+
+    analysis = ProtectedDonorWorkbookTransformer(portal=portal).analyze(workbook)
+    assert analysis.references[identifier] == DonorReferenceKind.PROTECTED_DONOR
+    assert not analysis.invalid_references
+
+    assert ProtectedDonorWorkbookTransformer(portal=portal).transform(workbook) is True
+    assert workbook["Demographic"]["A2"].value == identifier
+    assert workbook["Demographic"]["A3"].value == "A_PROTECTED-DONOR_1"
+
+
+def test_workbook_protected_donor_uuid_and_accession_are_resolved_without_the_portal():
+    workbook = _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_UNREFERENCED"]],
+        "ProtectedDonor": [["submitted_id", "uuid", "accession"], ["A_PROTECTED-DONOR_X", UUID, ACCESSION]],
+        "Demographic": [["donor"], [UUID], [ACCESSION]],
+    })
+
+    analysis = analyze_protected_donors(workbook)
+
+    assert analysis.protected_donor_ids == frozenset({UUID, ACCESSION})
+
+
+def test_identifier_resolving_to_a_different_type_is_not_a_protected_donor():
+    portal = _TypedPortal({UUID: {"uuid": UUID, "@type": ["Donor", "Item"]}})
+    workbook = _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "Demographic": [["donor"], [UUID]],
+    })
+
+    analysis = ProtectedDonorWorkbookTransformer(portal=portal).analyze(workbook)
+
+    assert analysis.references[UUID] == DonorReferenceKind.INVALID
+    with pytest.raises(ProtectedDonorTransformError, match="Invalid donor reference"):
+        ProtectedDonorWorkbookTransformer(portal=portal).transform(workbook)
+
+
+def test_unresolvable_identifier_without_portal_stays_invalid():
+    workbook = _workbook({"Demographic": [["donor"], [UUID]]})
+
+    assert analyze_protected_donors(workbook).references[UUID] == DonorReferenceKind.INVALID
+
+
+@pytest.mark.parametrize("error,kind", [
+    (Exception("Bad status code for GET request for https://p/x: 403. Reason: Forbidden"),
+     DonorReferenceKind.PERMISSION_DENIED),
+    (Exception("Bad status code for GET request for https://p/x: 401. Reason: Unauthorized"),
+     DonorReferenceKind.PERMISSION_DENIED),
+    (Exception("HTTPForbidden: no access"), DonorReferenceKind.PERMISSION_DENIED),
+    (Exception("Bad status code for GET request for https://p/404-404: 503. Reason: Unavailable"),
+     DonorReferenceKind.LOOKUP_FAILED),
+    (ConnectionError("connection refused"), DonorReferenceKind.LOOKUP_FAILED),
+    (TimeoutError("timed out"), DonorReferenceKind.LOOKUP_FAILED),
+])
+def test_lookup_failures_are_distinct_from_absence(error, kind):
+    portal = _TypedPortal(error=error)
+    workbook = _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "Demographic": [["donor"], ["A_PROTECTED-DONOR_PORTAL"]],
+    })
+
+    analysis = ProtectedDonorWorkbookTransformer(portal=portal).analyze(workbook)
+
+    assert analysis.references["A_PROTECTED-DONOR_PORTAL"] == kind
+    assert not analysis.missing_references
+    assert analysis.lookup_errors["A_PROTECTED-DONOR_PORTAL"]
+    with pytest.raises(ProtectedDonorLookupError, match="not known to be absent") as caught:
+        ProtectedDonorWorkbookTransformer(portal=portal).transform(workbook)
+    assert "absent from the workbook and portal" not in str(caught.value)
+    assert workbook["Demographic"]["A2"].value == "A_PROTECTED-DONOR_PORTAL"
+
+
+@pytest.mark.parametrize("portal", [
+    _TypedPortal(),
+    _TypedPortal(error=Exception("HTTPNotFound: /ProtectedDonor/x")),
+    _TypedPortal(items={"A_PROTECTED-DONOR_PORTAL": {"@type": ["HTTPNotFound", "Error"], "status": "error",
+                                                     "code": 404}}),
+])
+def test_definitive_not_found_is_reported_as_absent(portal):
+    workbook = _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "Demographic": [["donor"], ["A_PROTECTED-DONOR_PORTAL"]],
+    })
+
+    analysis = ProtectedDonorWorkbookTransformer(portal=portal).analyze(workbook)
+
+    assert analysis.references["A_PROTECTED-DONOR_PORTAL"] == DonorReferenceKind.MISSING
+    with pytest.raises(ProtectedDonorTransformError, match="absent from the workbook and portal") as caught:
+        ProtectedDonorWorkbookTransformer(portal=portal).transform(workbook)
+    assert not isinstance(caught.value, ProtectedDonorLookupError)
+
+
+def test_error_result_with_forbidden_type_is_a_permission_failure():
+    portal = _TypedPortal({"A_PROTECTED-DONOR_PORTAL": {"@type": ["HTTPForbidden", "Error"], "status": "error"}})
+    workbook = _workbook({"Demographic": [["donor"], ["A_PROTECTED-DONOR_PORTAL"]]})
+
+    analysis = ProtectedDonorWorkbookTransformer(portal=portal).analyze(workbook)
+
+    assert analysis.references["A_PROTECTED-DONOR_PORTAL"] == DonorReferenceKind.PERMISSION_DENIED
+
+
+def test_lookup_identifier_is_path_quoted():
+    portal = _TypedPortal({})
+    lookup_protected_donor(portal, "a/b?c")
+
+    assert portal.paths == ["/ProtectedDonor/a%2Fb%3Fc"]
+
+
+def _counting_excel_class(path, **options):
+    created = []
+
+    class _Counting(CustomExcel):
+        def __init__(self, *args, **kwargs):
+            created.append(self)
+            kwargs.setdefault("transform_protected_donor", True)
+            kwargs.setdefault("transformed_workbook_path", str(path))
+            super().__init__(*args, **kwargs)
+
+    return _Counting, created
+
+
+def test_progress_loading_does_not_save_during_the_counting_pass(tmp_path):
+    input_path = tmp_path / "in.xlsx"
+    _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "Demographic": [["donor"], ["A_DONOR_1"]],
+    }).save(input_path)
+    staged = tmp_path / "staged.xlsx"
+    excel_class, created = _counting_excel_class(staged)
+    progress = []
+
+    data = StructuredDataSet(file=str(input_path), portal=None, norefs=True,
+                             excel_class=excel_class, progress=progress.append).data
+
+    assert len(created) == 1
+    assert progress
+    assert data["Demographic"][0]["donor"] == "A_PROTECTED-DONOR_1"
+    assert [row["submitted_id"] for row in openpyxl_rows(staged, "ProtectedDonor")] == ["A_PROTECTED-DONOR_1"]
+
+
+def openpyxl_rows(path, sheet_name):
+    sheet = openpyxl.load_workbook(path)[sheet_name]
+    headers = [cell.value for cell in sheet[1]]
+    return [dict(zip(headers, row)) for row in sheet.iter_rows(min_row=2, values_only=True)]
+
+
+def test_repeated_construction_still_cannot_clobber_the_staged_path(tmp_path):
+    input_path = tmp_path / "in.xlsx"
+    _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "Demographic": [["donor"], ["A_DONOR_1"]],
+    }).save(input_path)
+    staged = tmp_path / "staged.xlsx"
+    kwargs = dict(file=str(input_path), transform_protected_donor=True, transformed_workbook_path=str(staged))
+
+    CustomExcel(**kwargs)
+    original = staged.read_bytes()
+    with pytest.raises(ValueError, match="already exists"):
+        CustomExcel(**kwargs)
+
+    assert staged.read_bytes() == original

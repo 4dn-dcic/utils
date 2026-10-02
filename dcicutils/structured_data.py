@@ -311,18 +311,19 @@ class StructuredDataSet:
         return sorted(schema_names, key=lambda key: order.get(Schema.type_name(key), sys.maxsize))
 
     def _load_excel_file(self, file: str) -> None:
-        def get_counts() -> Tuple[int, int]:
-            excel = self._excel_class(file)
+        def get_counts(excel: Excel) -> Tuple[int, int]:
             nrows = 0
             for sheet_name in excel.sheet_names:
                 for row in excel.sheet_reader(sheet_name):
                     nrows += 1
             return nrows, len(excel.sheet_names)
+        # Open the workbook once so that the progress counting pass and the parsing pass read the same
+        # instance; excel classes may have side effects on construction (e.g. CustomExcel workbook staging).
+        excel = self._excel_class(file)
         if self._progress:  # TODO: Move to _load_reader
-            nrows, nsheets = get_counts()
+            nrows, nsheets = get_counts(excel)
             self._progress({PROGRESS.LOAD_START: PROGRESS.NOW(),
                             PROGRESS.LOAD_COUNT_SHEETS: nsheets, PROGRESS.LOAD_COUNT_ROWS: nrows})
-        excel = self._excel_class(file)
         # Order the sheet names by any specified ordering (e.g. ala snovault.loadxl).
         for sheet_name in self._ordered_schema_names(excel.sheet_names):
             # This effective_sheet_name function added 2025-01-21 to allow sheets whose sheet names are
