@@ -78,12 +78,12 @@ class ProtectedDonorLookup:
 
 
 _ERROR_STATUS_PATTERNS = (
-    (re.compile(r"HTTPNotFound"), 404),
-    (re.compile(r"HTTPForbidden"), 403),
-    (re.compile(r"HTTPUnauthorized"), 401),
     (re.compile(r": (\d{3})\. Reason"), None),  # dcicutils.ff_utils request errors
     (re.compile(r"Bad response: (\d{3})"), None),  # webtest
     (re.compile(r"\b(\d{3}) (?:Client|Server) Error"), None),  # requests
+    (re.compile(r"HTTPNotFound"), 404),
+    (re.compile(r"HTTPForbidden"), 403),
+    (re.compile(r"HTTPUnauthorized"), 401),
 )
 
 
@@ -345,6 +345,11 @@ class ProtectedDonorWorkbookTransformer:
                 donor_id = self._normalized(sheet.cell(row_number, submitted_id_column).value)
                 if donor_id not in analysis.plain_donor_ids:
                     continue
+                if protected_column is None and self._has_content(sheet, min_col=len(headers) + 1):
+                    raise ProtectedDonorTransformError(
+                        f"Sheet {sheet.title!r} lacks a {PROTECTED_DONOR_COLUMN!r} column and has content "
+                        f"beyond its header columns, so the column cannot be added safely."
+                    )
                 expected = to_protected_donor_submitted_id(donor_id)
                 if protected_column is not None:
                     existing = self._normalized(sheet.cell(row_number, protected_column).value)
@@ -382,10 +387,10 @@ class ProtectedDonorWorkbookTransformer:
             submitted_id_column = self._column_index(headers, SUBMITTED_ID_COLUMN)
             if submitted_id_column is None:
                 continue
-            protected_column = self._ensure_column(sheet, headers, PROTECTED_DONOR_COLUMN)
             for row_number in self._logical_row_numbers(sheet):
                 donor_id = self._normalized(sheet.cell(row_number, submitted_id_column).value)
                 if donor_id in analysis.plain_donor_ids:
+                    protected_column = self._ensure_column(sheet, headers, PROTECTED_DONOR_COLUMN)
                     sheet.cell(row_number, protected_column).value = to_protected_donor_submitted_id(donor_id)
 
     def _rewrite_donor_links(self, workbook, analysis: ProtectedDonorAnalysis) -> None:

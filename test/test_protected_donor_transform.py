@@ -298,6 +298,39 @@ def test_existing_protected_sheet_with_unsafe_extra_columns_is_rejected_unchange
     assert workbook["FamilyHistory"]["A2"].value == "A_DONOR_NEW"
 
 
+@pytest.mark.parametrize("donor_rows", [
+    [["submitted_id", "external_id", None, "notes"], ["A_DONOR_NEW", "ext-1", None, "note"]],
+    [["submitted_id", "external_id"], ["A_DONOR_NEW", "ext-1", "stray"]],
+])
+def test_donor_sheet_with_content_beyond_headers_is_rejected_unchanged(donor_rows):
+    workbook = _workbook({
+        "Donor": donor_rows,
+        "FamilyHistory": [["donor"], ["A_DONOR_NEW"]],
+    })
+    before = {sheet.title: [list(row) for row in sheet.iter_rows(values_only=True)] for sheet in workbook}
+
+    with pytest.raises(ProtectedDonorTransformError, match="lacks a 'protected_donor' column and has content"):
+        ProtectedDonorWorkbookTransformer().transform(workbook)
+
+    assert workbook.sheetnames == ["Donor", "FamilyHistory"]
+    assert {sheet.title: [list(row) for row in sheet.iter_rows(values_only=True)] for sheet in workbook} == before
+
+
+def test_donor_sheet_without_transformed_rows_is_not_given_a_protected_donor_column():
+    workbook = _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_NEW"]],
+        "Other_Donor": [["submitted_id", "external_id", None, "notes"], ["A_DONOR_OTHER", "x", None, "note"]],
+        "FamilyHistory": [["donor"], ["A_DONOR_NEW"]],
+    })
+
+    assert ProtectedDonorWorkbookTransformer(
+        effective_sheet_name=lambda name: name.rpartition("_")[2]).transform(workbook) is True
+
+    assert workbook["Donor"].cell(1, 2).value == "protected_donor"
+    assert workbook["Donor"].cell(2, 2).value == "A_PROTECTED-DONOR_NEW"
+    assert [cell.value for cell in workbook["Other_Donor"][1]] == ["submitted_id", "external_id", None, "notes"]
+
+
 def test_generated_rows_are_appended_before_formatted_empty_rows_and_stay_visible(tmp_path):
     workbook = _workbook({
         "Donor": [["submitted_id", "status"], ["A_DONOR_1", "released"], ["A_DONOR_2", "released"]],
@@ -429,6 +462,9 @@ def test_unresolvable_identifier_without_portal_stays_invalid():
      DonorReferenceKind.PERMISSION_DENIED),
     (Exception("HTTPForbidden: no access"), DonorReferenceKind.PERMISSION_DENIED),
     (Exception("Bad status code for GET request for https://p/404-404: 503. Reason: Unavailable"),
+     DonorReferenceKind.LOOKUP_FAILED),
+    (Exception("Bad status code for GET request for https://p/x: 500. Reason: Internal Server Error - "
+               "{'@type': ['HTTPNotFound', 'Error'], 'detail': 'sub-lookup failed'}"),
      DonorReferenceKind.LOOKUP_FAILED),
     (ConnectionError("connection refused"), DonorReferenceKind.LOOKUP_FAILED),
     (TimeoutError("timed out"), DonorReferenceKind.LOOKUP_FAILED),
