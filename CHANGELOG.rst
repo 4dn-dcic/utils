@@ -7,6 +7,26 @@ Change Log
 ----------
 
 
+8.19.1
+======
+* aschroed / 2026-10-02 / branch: fm/utils-protected-donor-review-fixes / PR-339
+  - Added dcicutils/submitr/donor_transformer.py (ProtectedDonorWorkbookTransformer,
+    analyze_protected_donors) to selectively convert Donor references in the
+    Demographic, DeathCircumstances, FamilyHistory, MedicalHistory, and TissueCollection
+    sheets to ProtectedDonor, adding the corresponding ProtectedDonor rows. Only the
+    logical rows the workbook reader ingests (before the first empty row) are scanned and
+    appended; UUID/accession identifiers are resolved via the portal; permission and
+    lookup failures (ProtectedDonorLookupError) are distinguished from a definitive absence;
+    copied fields are preserved when an existing ProtectedDonor sheet lacks their headers.
+  - Added opt-in CustomExcel options transform_protected_donor, transformed_workbook_path,
+    and allow_existing_staging_path; CustomExcel.with_portal now accepts these options.
+    Transformed workbooks are saved atomically and never overwrite an existing path
+    (or the input workbook) unless the caller owns it as a staging path.
+  - StructuredDataSet now opens an Excel workbook once for both the progress-counting and
+    parsing passes, and applies the specified schema ordering to multi-schema JSON files.
+  - Removed unused nonlocal/global declarations flagged by pyflakes F824.
+
+
 8.19.0
 ======
 * ajs/wrr/sn 2026-07-29 / branch: sn_refactor_custom_excel
