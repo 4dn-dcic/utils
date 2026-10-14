@@ -876,7 +876,7 @@ class Schema(SchemaBase):
                     property_value = array_property_items
                     property_value_type = property_value.get("type")
                 typeinfo = self._create_typeinfo(array_property_items, parent_key=key)
-                if unique:
+                if unique and key in typeinfo:
                     typeinfo[key]["unique"] = True
                 result.update(typeinfo)
                 continue

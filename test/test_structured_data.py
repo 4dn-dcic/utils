@@ -1332,6 +1332,16 @@ def test_flatten_schema_1():
         assert schema_flattened_json == expected_schema_flattened_json
 
 
+def test_unique_array_of_objects_typeinfo():
+    schema = Schema({"properties": {
+        "static_content": {"type": "array", "uniqueItems": True, "items": {
+            "type": "object", "properties": {"location": {"type": "string"}, "content": {"type": "string"}}}},
+        "tags": {"type": "array", "uniqueItems": True, "items": {"type": "string"}}}})
+    assert schema._typeinfo["static_content#.location"]["type"] == "string"
+    assert schema._typeinfo["static_content#.content"]["type"] == "string"
+    assert schema._typeinfo["tags#"]["unique"] is True
+
+
 def test_portal_custom_schemas_1():
     schemas = [{"title": "Abc"}, {"title": "Def"}]
     portal = Portal(testapp, schemas=schemas)
