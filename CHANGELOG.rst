@@ -21,6 +21,13 @@ Change Log
   - Bumped boto3/botocore to ^1.43.58, tightened Python requirement to >=3.10,<3.13,
     and updated Poetry to 1.8.5.
   - Updated GitHub Actions OIDC credentials in the main workflow.
+* aschroed / branch: fm/protected-donor-dcicutils / PR-339
+  - Added dcicutils.submitr.donor_transformer for opt-in ProtectedDonor workbook analysis
+    and selective transformation of plain Donor references.
+  - Added CustomExcel transform_protected_donor and transformed_workbook_path options;
+    CustomExcel.with_portal now accepts additional default constructor options.
+  - StructuredDataSet now opens an Excel workbook once for progress counting and parsing,
+    and applies the configured schema order to multi-type JSON inputs.
 
 8.18.8
 ======
