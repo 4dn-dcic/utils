@@ -5,6 +5,7 @@ import os
 from typing import Any, List, Optional
 from dcicutils.data_readers import Excel, ExcelSheetReader
 from dcicutils.misc_utils import to_boolean, to_float, to_integer
+from dcicutils.portal_utils import Portal as PortalBase
 from dcicutils.submitr.donor_transformer import ProtectedDonorWorkbookTransformer
 
 # This module implements a custom Excel spreadsheet class which supports "custom column mappings",
@@ -101,8 +102,6 @@ def _array_name_of(synthetic_column_name: str) -> Optional[str]:
 
 class CustomExcel(Excel):
 
-    _saved_transformed_workbook_path_pairs = set()
-
     def __init__(self, *args, portal=None, transform_protected_donor: bool = False,
                  transformed_workbook_path: Optional[str] = None, **kwargs):
         self._transform_protected_donor = bool(transform_protected_donor)
@@ -110,7 +109,7 @@ class CustomExcel(Excel):
         super().__init__(*args, **kwargs)
         if self._transform_protected_donor:
             transformed = ProtectedDonorWorkbookTransformer(
-                effective_sheet_name=self.effective_sheet_name
+                effective_sheet_name=lambda name: PortalBase.schema_name(self.effective_sheet_name(name))
             ).transform(self._workbook, portal=portal)
             self.sheet_names = [sheet_name for sheet_name in self._workbook.sheetnames
                                 if not self.is_hidden_sheet(self._workbook[sheet_name])]
@@ -146,12 +145,10 @@ class CustomExcel(Excel):
         directory = os.path.dirname(path)
         if not os.path.isdir(directory):
             raise ValueError(f"Directory for transformed workbook output does not exist: {directory}")
-        path_pair = (input_path, path)
-        if os.path.exists(path) and path_pair not in CustomExcel._saved_transformed_workbook_path_pairs:
+        if os.path.exists(path):
             raise ValueError(f"Transformed workbook output path already exists: {path}")
         try:
             self._workbook.save(path)
-            CustomExcel._saved_transformed_workbook_path_pairs.add(path_pair)
         except Exception as error:
             raise ValueError(f"Cannot save transformed workbook to {path}: {error}") from error
 

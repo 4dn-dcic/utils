@@ -158,18 +158,8 @@ def test_prefixed_protected_item_sheet_uses_canonical_name():
     assert workbook["DSA_Demographic"]["A2"].value == "A_PROTECTED-DONOR_1"
 
 
-def test_accession_lookup_uses_portal_root_strategy():
-    class Portal:
-        _ref_lookup_strategy = object()
-
-        def __init__(self):
-            self.calls = []
-
-        def ref_exists(self, type_name, value):
-            self.calls.append((type_name, value))
-            return {"type": type_name, "uuid": "portal-uuid"}
-
-    portal = Portal()
+def test_accession_lookup_uses_portal_root_path():
+    portal = _TypedPortal({"SMAPD1234567": {"uuid": "portal-uuid", "@type": ["ProtectedDonor", "Item"]}})
     workbook = _workbook({
         "Donor": [["submitted_id"], ["A_DONOR_1"]],
         "Demographic": [["donor"], ["SMAPD1234567"]],
@@ -177,7 +167,52 @@ def test_accession_lookup_uses_portal_root_strategy():
 
     analysis = ProtectedDonorWorkbookTransformer(portal=portal).analyze(workbook)
     assert analysis.references["SMAPD1234567"] == DonorReferenceKind.PROTECTED_DONOR
-    assert portal.calls == [("ProtectedDonor", "SMAPD1234567")]
+    assert portal.paths == ["/SMAPD1234567"]
+
+
+@pytest.mark.parametrize("item", [{"uuid": "portal-uuid", "@type": ["Donor", "AbstractDonor", "Item"]},
+                                  {"uuid": "portal-uuid"}])
+def test_accession_of_a_non_protected_donor_item_is_not_a_protected_donor(item):
+    portal = _TypedPortal({"SMADO1234567": item})
+    workbook = _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "Demographic": [["donor"], ["SMADO1234567"]],
+    })
+
+    assert ProtectedDonorWorkbookTransformer(portal=portal).analyze(workbook).references["SMADO1234567"] == \
+        DonorReferenceKind.INVALID
+
+
+@pytest.mark.parametrize("error,kind", [
+    (Exception("HTTPForbidden: /SMAPD1234567"), DonorReferenceKind.PERMISSION_DENIED),
+    (Exception("Bad response: 500 Internal Server Error"), DonorReferenceKind.LOOKUP_FAILED),
+])
+def test_accession_lookup_failures_are_distinct_from_absence(error, kind):
+    portal = _TypedPortal(error=error)
+    workbook = _workbook({"Demographic": [["donor"], ["SMAPD1234567"]]})
+
+    assert ProtectedDonorWorkbookTransformer(portal=portal).analyze(workbook).references["SMAPD1234567"] == kind
+    with pytest.raises(ProtectedDonorLookupError, match="not known to be absent"):
+        ProtectedDonorWorkbookTransformer(portal=portal).transform(workbook)
+
+
+@pytest.mark.parametrize("title", ["demographic", "DSA_demographic", "Death Circumstances"])
+def test_custom_excel_matches_protected_item_sheets_as_the_reader_names_them(tmp_path, title):
+    path = tmp_path / "donor.xlsx"
+    _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        title: [["donor"], ["A_DONOR_1"]],
+    }).save(path)
+
+    data = StructuredDataSet(
+        file=str(path),
+        portal=None,
+        excel_class=CustomExcel.with_portal(None, transform_protected_donor=True),
+    ).data
+
+    assert data["ProtectedDonor"][0]["submitted_id"] == "A_PROTECTED-DONOR_1"
+    linked = [items[0]["donor"] for name, items in data.items() if name not in ("Donor", "ProtectedDonor")]
+    assert linked == ["A_PROTECTED-DONOR_1"]
 
 
 def test_hidden_and_unlisted_sheets_are_not_transformed():
@@ -300,8 +335,7 @@ class _TypedPortal:
         self.paths.append(path)
         if self.error:
             raise self.error
-        prefix = "/ProtectedDonor/"
-        assert path.startswith(prefix)
+        prefix = "/ProtectedDonor/" if path.startswith("/ProtectedDonor/") else "/"
         if path[len(prefix):] in self.items:
             return self.items[path[len(prefix):]]
         raise Exception(f"Bad status code for GET request for https://portal{path}: 404. Reason: Not Found")

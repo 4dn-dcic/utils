@@ -25,6 +25,7 @@ import openpyxl
 from openpyxl.worksheet.worksheet import Worksheet
 
 from dcicutils.misc_utils import right_trim
+from dcicutils.portal_utils import Portal as PortalBase
 
 
 DONOR_SHEET = "Donor"
@@ -116,34 +117,23 @@ def lookup_protected_donor(portal, identifier: str) -> ProtectedDonorLookup:
     (outage, timeout, malformed response) are reported distinctly so they are never mistaken for
     absence.  The lookup is made through the typed ``/ProtectedDonor/<identifier>`` path, so the
     portal itself enforces the item type; a returned ``@type`` is also checked when present.
+    Accessions are looked up at the root path, where a ProtectedDonor ``@type`` is required.
     """
     if portal is None:
         return ProtectedDonorLookup(LookupOutcome.ABSENT, "no portal available")
-    path = f"/{PROTECTED_DONOR_SHEET}/{quote(identifier, safe='')}"
-    # StructuredData Portal.ref_exists applies the shared lookup strategy, including
-    # root routing for accession identifiers. Prefer it over constructing a typed
-    # path so accession references do not become false misses.
-    ref_exists = getattr(portal, "ref_exists", None)
-    if callable(ref_exists):
-        try:
-            result = ref_exists(PROTECTED_DONOR_SHEET, identifier)
-        except (AttributeError, TypeError, ValueError):
-            result = None
-        except Exception as error:
-            return _lookup_from_status(_http_status_of(error), f"{type(error).__name__}: {error}")
-        if result:
-            return ProtectedDonorLookup(LookupOutcome.FOUND)
-        # A false ref_exists result is definitive for this portal API. If it is
-        # merely an incompatible lightweight stub, the metadata fallback below
-        # still provides the historical behavior.
-        if hasattr(portal, "_ref_lookup_strategy"):
-            return ProtectedDonorLookup(LookupOutcome.ABSENT, "not found")
-
+    # The portal resolves accessions only at the root path (see portal_utils.Portal._lookup_strategy),
+    # which does not enforce the item type; request the default frame there so @type can be checked.
+    by_accession = PortalBase._is_accession_id(identifier)
+    if by_accession:
+        path, raw = f"/{quote(identifier, safe='')}", False
+    else:
+        path, raw = f"/{PROTECTED_DONOR_SHEET}/{quote(identifier, safe='')}", True
     get_metadata = getattr(portal, "get_metadata", None)
+    ref_exists = getattr(portal, "ref_exists", None)
     try:
         if callable(get_metadata):
             try:
-                result = get_metadata(path, raw=True)
+                result = get_metadata(path, raw=raw)
             except TypeError as error:
                 if "keyword" not in str(error):
                     raise
@@ -162,7 +152,8 @@ def lookup_protected_donor(portal, identifier: str) -> ProtectedDonorLookup:
             code = result.get("code")
             status = code if isinstance(code, int) else _http_status_of(" ".join(map(str, types or [])))
             return _lookup_from_status(status, str(result.get("description") or result.get("title") or result))
-        if isinstance(types, list) and PROTECTED_DONOR_SHEET not in types:
+        if (isinstance(types, list) or (by_accession and callable(get_metadata))) and \
+                PROTECTED_DONOR_SHEET not in (types or []):
             return ProtectedDonorLookup(LookupOutcome.ABSENT, f"found item is not a {PROTECTED_DONOR_SHEET}")
     return ProtectedDonorLookup(LookupOutcome.FOUND)
 
