@@ -37,9 +37,14 @@ jobs:
         with:
           python-version: ${{ matrix.python_version }}
 
+
       - name: Install Deps
         run: |
-          sudo apt install redis-server
+          for i in 1 2 3; do
+            sudo apt-get update && sudo apt-get install -y redis-server && break
+            echo "apt failed, retrying..."
+            sleep 5
+          done
           sudo ln -s /usr/bin/redis-server /usr/local/bin/redis-server
           sudo ln -s /usr/bin/redis-cli /usr/local/bin/redis-cli
           make build

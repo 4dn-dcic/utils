@@ -159,8 +159,12 @@ def test_deployment_utils_build_ini_file_from_template():
         env_vars = dict(RDS_DB_NAME='snow_white', RDS_USERNAME='user', RDS_PASSWORD='my-secret',
                         RDS_HOSTNAME='unittest', RDS_PORT="6543")
 
+        # An IDENTITY exported in a developer's shell (needed locally for test setup) would otherwise conflict
+        # with the identity build_ini_stream_from_template wants to set, so remove it for this test.
+        # (Note that ENV_NAME must NOT be cleared here: the conflict-detection checks below rely on it.)
+
         # Establish our environment variables
-        with override_environ(**env_vars):
+        with override_environ(IDENTITY=None), override_environ(**env_vars):
 
             # Check that our abstraction is working. There is a bit of paranoia here,
             # but since we'll be dealing with deployment configurations, the idea is to be sure

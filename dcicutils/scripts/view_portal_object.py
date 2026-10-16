@@ -268,7 +268,6 @@ def _get_portal_object(portal: Portal, uuid: str,
                        verbose: bool = False, debug: bool = False) -> dict:
 
     def prune_data(data: dict) -> dict:
-        nonlocal ignore
         if not isinstance(ignore, list) or not ignore:
             return data
         return {key: value for key, value in data.items() if key not in ignore}
@@ -276,7 +275,6 @@ def _get_portal_object(portal: Portal, uuid: str,
     def get_metadata_for_individual_result_type(uuid: str) -> Optional[dict]:  # noqa
         # There can be a lot of individual results for which we may need to get the actual type,
         # so do this in a function we were can give verbose output feedback.
-        nonlocal portal, results_index, results_total, verbose
         if verbose:
             _print(f"Getting actual type for {results_type} result:"
                    f" {uuid} [{results_index} of {results_total}]", end="")
@@ -291,7 +289,6 @@ def _get_portal_object(portal: Portal, uuid: str,
         return None
 
     def get_metadata_types(path: str) -> Optional[dict]:
-        nonlocal portal, debug
         metadata_types = {}
         try:
             if verbose:
@@ -308,7 +305,6 @@ def _get_portal_object(portal: Portal, uuid: str,
         return metadata_types
 
     def write_insert_files(response: dict) -> None:
-        nonlocal insert_files, force
         output_directory = insert_files if isinstance(insert_files, str) else os.getcwd()
         for schema_name in response:
             schema_data = response[schema_name]
@@ -756,7 +752,6 @@ def _get_parent_schema_name(schema: dict) -> Optional[str]:
 
 def _print_schemas_tree(schemas: dict) -> None:
     def children_of(name: str) -> List[str]:
-        nonlocal schemas
         children = []
         if not (name is None or isinstance(name, str)):
             return children
@@ -767,7 +762,6 @@ def _print_schemas_tree(schemas: dict) -> None:
                 children.append(schema_name)
         return sorted(children)
     def name_of(name: str) -> str:  # noqa
-        nonlocal schemas
         if not (name is None or isinstance(name, str)):
             return name
         if (schema := schemas.get(name)) and schema.get("isAbstract") is True:
@@ -837,7 +831,6 @@ def _print(*args, **kwargs):
 
 
 def _print_output(value: str):
-    global _output_file
     if _output_file:
         _output_file.write(value)
         _output_file.write("\n")
@@ -848,7 +841,6 @@ def _print_output(value: str):
 
 
 def _exit(message: Optional[Union[str, int]] = None, status: Optional[int] = None) -> None:
-    global _output_file
     if isinstance(message, str):
         _print(f"ERROR: {message}")
     elif isinstance(message, int) and not isinstance(status, int):
