@@ -111,11 +111,18 @@ filterwarnings = [
     # TODO: These next two are about use of the Version class:
     "ignore:distutils Version classes are deprecated. Use packaging.version instead.:DeprecationWarning",
     "ignore:Setuptools is replacing distutils.:UserWarning",
-    # This is a pip-licenses problem (still present in 3.5.5):
-    "ignore:pkg_resources is deprecated as an API:DeprecationWarning",
-    "ignore:Boto3 will no longer support Python 3.7 starting December 13, 2023.*:",
+    # pkg_resources is imported by pinned pyramid 1.10.8 (and pip-licenses). setuptools 81+ raises this as a
+    # UserWarning rather than a DeprecationWarning, so match on message only.
+    "ignore:pkg_resources is deprecated as an API",
+    # Namespace packages (paste, sphinxcontrib) in third-party deps still use the old declare_namespace mechanism:
+    "ignore:Deprecated call to .pkg_resources.declare_namespace:DeprecationWarning",
+    # WebOb (via pinned pyramid 1.10.8) still imports the cgi module:
+    "ignore:'cgi' is deprecated and slated for removal:DeprecationWarning",
+    # pip-licenses 4.x uses prettytable constants that prettytable 3.x has deprecated:
+    "ignore:the '(ALL|FRAME|HEADER|NONE)' constant is deprecated:DeprecationWarning",
 ]
 markers = [
+    "last: run these tests last",
     "working: test should work",
     "integrated: an integration test",
     "integratedx: an excludable integration test, redundantly testing functionality also covered by a unit test",
