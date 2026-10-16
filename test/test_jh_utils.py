@@ -4,7 +4,6 @@ import os
 import datetime
 import pytest
 import re
-import urllib.parse
 
 from dcicutils import s3_utils, ff_utils
 from dcicutils.misc_utils import override_environ
@@ -46,11 +45,9 @@ def test_proper_initialization(integrated_ff):
     from dcicutils import jh_utils
     assert os.environ['FF_ACCESS_KEY'] == integrated_ff['ff_key']['key']
     assert os.environ['FF_ACCESS_SECRET'] == integrated_ff['ff_key']['secret']
-    # eliminate 'http://' from server name. This is just how urllib store passwords...
-    # auth_host = test_server[7:]
-    auth_host = urllib.parse.urlparse(test_server).hostname
-    auth_key = ((auth_host, '/'),)
-    basic_auth = jh_utils.AUTH_HANDLER.passwd.passwd[None][auth_key]
+    # Use the public lookup rather than urllib's internal passwd dict, whose key format changed
+    # (became scheme-aware) in a Python security release (e.g., 3.12.15).
+    basic_auth = jh_utils.AUTH_HANDLER.passwd.find_user_password(None, test_server)
     assert basic_auth == (os.environ['FF_ACCESS_KEY'], os.environ['FF_ACCESS_SECRET'])
 
 
