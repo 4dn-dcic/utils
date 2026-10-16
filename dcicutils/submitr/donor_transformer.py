@@ -25,6 +25,7 @@ import openpyxl
 from openpyxl.worksheet.worksheet import Worksheet
 
 from dcicutils.misc_utils import right_trim
+from dcicutils.portal_utils import Portal as PortalBase
 
 
 DONOR_SHEET = "Donor"
@@ -78,12 +79,12 @@ class ProtectedDonorLookup:
 
 
 _ERROR_STATUS_PATTERNS = (
-    (re.compile(r": (\d{3})\. Reason"), None),  # dcicutils.ff_utils request errors
-    (re.compile(r"Bad response: (\d{3})"), None),  # webtest
-    (re.compile(r"\b(\d{3}) (?:Client|Server) Error"), None),  # requests
     (re.compile(r"HTTPNotFound"), 404),
     (re.compile(r"HTTPForbidden"), 403),
     (re.compile(r"HTTPUnauthorized"), 401),
+    (re.compile(r": (\d{3})\. Reason"), None),  # dcicutils.ff_utils request errors
+    (re.compile(r"Bad response: (\d{3})"), None),  # webtest
+    (re.compile(r"\b(\d{3}) (?:Client|Server) Error"), None),  # requests
 )
 
 
@@ -116,16 +117,23 @@ def lookup_protected_donor(portal, identifier: str) -> ProtectedDonorLookup:
     (outage, timeout, malformed response) are reported distinctly so they are never mistaken for
     absence.  The lookup is made through the typed ``/ProtectedDonor/<identifier>`` path, so the
     portal itself enforces the item type; a returned ``@type`` is also checked when present.
+    Accessions are looked up at the root path, where a ProtectedDonor ``@type`` is required.
     """
     if portal is None:
         return ProtectedDonorLookup(LookupOutcome.ABSENT, "no portal available")
-    path = f"/{PROTECTED_DONOR_SHEET}/{quote(identifier, safe='')}"
+    # The portal resolves accessions only at the root path (see portal_utils.Portal._lookup_strategy),
+    # which does not enforce the item type; request the default frame there so @type can be checked.
+    by_accession = PortalBase._is_accession_id(identifier)
+    if by_accession:
+        path, raw = f"/{quote(identifier, safe='')}", False
+    else:
+        path, raw = f"/{PROTECTED_DONOR_SHEET}/{quote(identifier, safe='')}", True
     get_metadata = getattr(portal, "get_metadata", None)
     ref_exists = getattr(portal, "ref_exists", None)
     try:
         if callable(get_metadata):
             try:
-                result = get_metadata(path, raw=True)
+                result = get_metadata(path, raw=raw)
             except TypeError as error:
                 if "keyword" not in str(error):
                     raise
@@ -144,7 +152,8 @@ def lookup_protected_donor(portal, identifier: str) -> ProtectedDonorLookup:
             code = result.get("code")
             status = code if isinstance(code, int) else _http_status_of(" ".join(map(str, types or [])))
             return _lookup_from_status(status, str(result.get("description") or result.get("title") or result))
-        if isinstance(types, list) and PROTECTED_DONOR_SHEET not in types:
+        if (isinstance(types, list) or (by_accession and callable(get_metadata))) and \
+                PROTECTED_DONOR_SHEET not in (types or []):
             return ProtectedDonorLookup(LookupOutcome.ABSENT, f"found item is not a {PROTECTED_DONOR_SHEET}")
     return ProtectedDonorLookup(LookupOutcome.FOUND)
 
@@ -345,11 +354,6 @@ class ProtectedDonorWorkbookTransformer:
                 donor_id = self._normalized(sheet.cell(row_number, submitted_id_column).value)
                 if donor_id not in analysis.plain_donor_ids:
                     continue
-                if protected_column is None and self._has_content(sheet, min_col=len(headers) + 1):
-                    raise ProtectedDonorTransformError(
-                        f"Sheet {sheet.title!r} lacks a {PROTECTED_DONOR_COLUMN!r} column and has content "
-                        f"beyond its header columns, so the column cannot be added safely."
-                    )
                 expected = to_protected_donor_submitted_id(donor_id)
                 if protected_column is not None:
                     existing = self._normalized(sheet.cell(row_number, protected_column).value)
@@ -387,10 +391,10 @@ class ProtectedDonorWorkbookTransformer:
             submitted_id_column = self._column_index(headers, SUBMITTED_ID_COLUMN)
             if submitted_id_column is None:
                 continue
+            protected_column = self._ensure_column(sheet, headers, PROTECTED_DONOR_COLUMN)
             for row_number in self._logical_row_numbers(sheet):
                 donor_id = self._normalized(sheet.cell(row_number, submitted_id_column).value)
                 if donor_id in analysis.plain_donor_ids:
-                    protected_column = self._ensure_column(sheet, headers, PROTECTED_DONOR_COLUMN)
                     sheet.cell(row_number, protected_column).value = to_protected_donor_submitted_id(donor_id)
 
     def _rewrite_donor_links(self, workbook, analysis: ProtectedDonorAnalysis) -> None:

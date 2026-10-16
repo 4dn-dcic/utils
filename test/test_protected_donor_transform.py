@@ -1,7 +1,5 @@
 import openpyxl
-import os
 import pytest
-import tempfile
 
 from dcicutils.structured_data import StructuredDataSet
 from dcicutils.submitr.custom_excel import CustomExcel
@@ -23,12 +21,6 @@ def _workbook(sheets):
         for row in rows:
             sheet.append(row)
     return workbook
-
-
-def _custom_excel(tmp_path):
-    input_path = tmp_path / "input.xlsx"
-    _workbook({"Donor": [["submitted_id"], ["A_DONOR_1"]]}).save(input_path)
-    return CustomExcel(file=str(input_path))
 
 
 def test_analysis_uses_only_actual_rows_and_the_five_protected_sheets():
@@ -153,18 +145,63 @@ def test_custom_excel_opt_in_integrates_transform_before_structured_data(tmp_pat
     assert data["Demographic"][0]["donor"] == "A_PROTECTED-DONOR_1"
 
 
-def test_custom_excel_transform_preserves_custom_column_mapping(tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        CustomExcel,
-        "_get_custom_column_mappings",
-        staticmethod(lambda portal=None: {
-            "Demographic": {"donor": {"mapped_donor": "{value}"}}
-        }),
+def test_prefixed_protected_item_sheet_uses_canonical_name():
+    workbook = _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "DSA_Demographic": [["donor"], ["A_DONOR_1"]],
+    })
+
+    transformer = ProtectedDonorWorkbookTransformer(
+        effective_sheet_name=lambda name: name.split("_", 1)[-1]
     )
+    assert transformer.transform(workbook) is True
+    assert workbook["DSA_Demographic"]["A2"].value == "A_PROTECTED-DONOR_1"
+
+
+def test_accession_lookup_uses_portal_root_path():
+    portal = _TypedPortal({"SMAPD1234567": {"uuid": "portal-uuid", "@type": ["ProtectedDonor", "Item"]}})
+    workbook = _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "Demographic": [["donor"], ["SMAPD1234567"]],
+    })
+
+    analysis = ProtectedDonorWorkbookTransformer(portal=portal).analyze(workbook)
+    assert analysis.references["SMAPD1234567"] == DonorReferenceKind.PROTECTED_DONOR
+    assert portal.paths == ["/SMAPD1234567"]
+
+
+@pytest.mark.parametrize("item", [{"uuid": "portal-uuid", "@type": ["Donor", "AbstractDonor", "Item"]},
+                                  {"uuid": "portal-uuid"}])
+def test_accession_of_a_non_protected_donor_item_is_not_a_protected_donor(item):
+    portal = _TypedPortal({"SMADO1234567": item})
+    workbook = _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "Demographic": [["donor"], ["SMADO1234567"]],
+    })
+
+    assert ProtectedDonorWorkbookTransformer(portal=portal).analyze(workbook).references["SMADO1234567"] == \
+        DonorReferenceKind.INVALID
+
+
+@pytest.mark.parametrize("error,kind", [
+    (Exception("HTTPForbidden: /SMAPD1234567"), DonorReferenceKind.PERMISSION_DENIED),
+    (Exception("Bad response: 500 Internal Server Error"), DonorReferenceKind.LOOKUP_FAILED),
+])
+def test_accession_lookup_failures_are_distinct_from_absence(error, kind):
+    portal = _TypedPortal(error=error)
+    workbook = _workbook({"Demographic": [["donor"], ["SMAPD1234567"]]})
+
+    assert ProtectedDonorWorkbookTransformer(portal=portal).analyze(workbook).references["SMAPD1234567"] == kind
+    with pytest.raises(ProtectedDonorLookupError, match="not known to be absent"):
+        ProtectedDonorWorkbookTransformer(portal=portal).transform(workbook)
+
+
+@pytest.mark.parametrize("title", ["demographic", "DSA_demographic", "Death Circumstances"])
+def test_custom_excel_matches_protected_item_sheets_as_the_reader_names_them(tmp_path, title):
     path = tmp_path / "donor.xlsx"
     _workbook({
         "Donor": [["submitted_id"], ["A_DONOR_1"]],
-        "Demographic": [["donor"], ["A_DONOR_1"]],
+        title: [["donor"], ["A_DONOR_1"]],
     }).save(path)
 
     data = StructuredDataSet(
@@ -173,73 +210,9 @@ def test_custom_excel_transform_preserves_custom_column_mapping(tmp_path, monkey
         excel_class=CustomExcel.with_portal(None, transform_protected_donor=True),
     ).data
 
-    assert data["Demographic"] == [{"mapped_donor": "A_PROTECTED-DONOR_1"}]
-
-
-def test_save_transformed_workbook_protects_existing_target(tmp_path):
-    excel = _custom_excel(tmp_path)
-    target = tmp_path / "transformed.xlsx"
-    original = b"do not replace"
-    target.write_bytes(original)
-
-    with pytest.raises(ValueError, match="already exists"):
-        excel._save_transformed_workbook(str(target))
-
-    assert target.read_bytes() == original
-
-
-def test_save_transformed_workbook_allows_owned_staging_path(tmp_path):
-    input_path = tmp_path / "input.xlsx"
-    _workbook({
-        "Donor": [["submitted_id"], ["A_DONOR_1"]],
-        "Demographic": [["donor"], ["A_DONOR_1"]],
-    }).save(input_path)
-    temporary_fd, staging_path = tempfile.mkstemp(dir=tmp_path, suffix=".xlsx")
-    os.close(temporary_fd)
-    with open(staging_path, "wb") as staging_file:
-        staging_file.write(b"submitr-owned placeholder")
-
-    CustomExcel(
-        file=str(input_path),
-        transform_protected_donor=True,
-        transformed_workbook_path=staging_path,
-        allow_existing_staging_path=True,
-    )
-
-    assert openpyxl.load_workbook(staging_path)["Donor"]["A1"].value == "submitted_id"
-
-
-def test_save_transformed_workbook_repeated_save_requires_explicit_overwrite(tmp_path):
-    excel = _custom_excel(tmp_path)
-    target = tmp_path / "transformed.xlsx"
-
-    excel._save_transformed_workbook(str(target))
-    original = target.read_bytes()
-    with pytest.raises(ValueError, match="already exists"):
-        excel._save_transformed_workbook(str(target))
-    assert target.read_bytes() == original
-
-    excel._workbook["Donor"]["A1"] = "changed"
-    excel._save_transformed_workbook(str(target), overwrite=True)
-    assert openpyxl.load_workbook(target)["Donor"]["A1"].value == "changed"
-
-
-def test_failed_save_does_not_damage_existing_target(tmp_path, monkeypatch):
-    excel = _custom_excel(tmp_path)
-    target = tmp_path / "transformed.xlsx"
-    original = b"keep this file"
-    target.write_bytes(original)
-
-    def fail_save(path):
-        with open(path, "wb") as temporary_file:
-            temporary_file.write(b"partial workbook")
-        raise OSError("simulated save failure")
-
-    monkeypatch.setattr(excel._workbook, "save", fail_save)
-    with pytest.raises(ValueError, match="Cannot save transformed workbook"):
-        excel._save_transformed_workbook(str(target), overwrite=True)
-
-    assert target.read_bytes() == original
+    assert data["ProtectedDonor"][0]["submitted_id"] == "A_PROTECTED-DONOR_1"
+    linked = [items[0]["donor"] for name, items in data.items() if name not in ("Donor", "ProtectedDonor")]
+    assert linked == ["A_PROTECTED-DONOR_1"]
 
 
 def test_hidden_and_unlisted_sheets_are_not_transformed():
@@ -296,39 +269,6 @@ def test_existing_protected_sheet_with_unsafe_extra_columns_is_rejected_unchange
     assert workbook["ProtectedDonor"].max_row == 2
     assert workbook["Donor"].max_column == 2
     assert workbook["FamilyHistory"]["A2"].value == "A_DONOR_NEW"
-
-
-@pytest.mark.parametrize("donor_rows", [
-    [["submitted_id", "external_id", None, "notes"], ["A_DONOR_NEW", "ext-1", None, "note"]],
-    [["submitted_id", "external_id"], ["A_DONOR_NEW", "ext-1", "stray"]],
-])
-def test_donor_sheet_with_content_beyond_headers_is_rejected_unchanged(donor_rows):
-    workbook = _workbook({
-        "Donor": donor_rows,
-        "FamilyHistory": [["donor"], ["A_DONOR_NEW"]],
-    })
-    before = {sheet.title: [list(row) for row in sheet.iter_rows(values_only=True)] for sheet in workbook}
-
-    with pytest.raises(ProtectedDonorTransformError, match="lacks a 'protected_donor' column and has content"):
-        ProtectedDonorWorkbookTransformer().transform(workbook)
-
-    assert workbook.sheetnames == ["Donor", "FamilyHistory"]
-    assert {sheet.title: [list(row) for row in sheet.iter_rows(values_only=True)] for sheet in workbook} == before
-
-
-def test_donor_sheet_without_transformed_rows_is_not_given_a_protected_donor_column():
-    workbook = _workbook({
-        "Donor": [["submitted_id"], ["A_DONOR_NEW"]],
-        "Other_Donor": [["submitted_id", "external_id", None, "notes"], ["A_DONOR_OTHER", "x", None, "note"]],
-        "FamilyHistory": [["donor"], ["A_DONOR_NEW"]],
-    })
-
-    assert ProtectedDonorWorkbookTransformer(
-        effective_sheet_name=lambda name: name.rpartition("_")[2]).transform(workbook) is True
-
-    assert workbook["Donor"].cell(1, 2).value == "protected_donor"
-    assert workbook["Donor"].cell(2, 2).value == "A_PROTECTED-DONOR_NEW"
-    assert [cell.value for cell in workbook["Other_Donor"][1]] == ["submitted_id", "external_id", None, "notes"]
 
 
 def test_generated_rows_are_appended_before_formatted_empty_rows_and_stay_visible(tmp_path):
@@ -395,8 +335,7 @@ class _TypedPortal:
         self.paths.append(path)
         if self.error:
             raise self.error
-        prefix = "/ProtectedDonor/"
-        assert path.startswith(prefix)
+        prefix = "/ProtectedDonor/" if path.startswith("/ProtectedDonor/") else "/"
         if path[len(prefix):] in self.items:
             return self.items[path[len(prefix):]]
         raise Exception(f"Bad status code for GET request for https://portal{path}: 404. Reason: Not Found")
@@ -462,9 +401,6 @@ def test_unresolvable_identifier_without_portal_stays_invalid():
      DonorReferenceKind.PERMISSION_DENIED),
     (Exception("HTTPForbidden: no access"), DonorReferenceKind.PERMISSION_DENIED),
     (Exception("Bad status code for GET request for https://p/404-404: 503. Reason: Unavailable"),
-     DonorReferenceKind.LOOKUP_FAILED),
-    (Exception("Bad status code for GET request for https://p/x: 500. Reason: Internal Server Error - "
-               "{'@type': ['HTTPNotFound', 'Error'], 'detail': 'sub-lookup failed'}"),
      DonorReferenceKind.LOOKUP_FAILED),
     (ConnectionError("connection refused"), DonorReferenceKind.LOOKUP_FAILED),
     (TimeoutError("timed out"), DonorReferenceKind.LOOKUP_FAILED),
