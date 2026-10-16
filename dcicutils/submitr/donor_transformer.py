@@ -120,8 +120,26 @@ def lookup_protected_donor(portal, identifier: str) -> ProtectedDonorLookup:
     if portal is None:
         return ProtectedDonorLookup(LookupOutcome.ABSENT, "no portal available")
     path = f"/{PROTECTED_DONOR_SHEET}/{quote(identifier, safe='')}"
-    get_metadata = getattr(portal, "get_metadata", None)
+    # StructuredData Portal.ref_exists applies the shared lookup strategy, including
+    # root routing for accession identifiers. Prefer it over constructing a typed
+    # path so accession references do not become false misses.
     ref_exists = getattr(portal, "ref_exists", None)
+    if callable(ref_exists):
+        try:
+            result = ref_exists(PROTECTED_DONOR_SHEET, identifier)
+        except (AttributeError, TypeError, ValueError):
+            result = None
+        except Exception as error:
+            return _lookup_from_status(_http_status_of(error), f"{type(error).__name__}: {error}")
+        if result:
+            return ProtectedDonorLookup(LookupOutcome.FOUND)
+        # A false ref_exists result is definitive for this portal API. If it is
+        # merely an incompatible lightweight stub, the metadata fallback below
+        # still provides the historical behavior.
+        if hasattr(portal, "_ref_lookup_strategy"):
+            return ProtectedDonorLookup(LookupOutcome.ABSENT, "not found")
+
+    get_metadata = getattr(portal, "get_metadata", None)
     try:
         if callable(get_metadata):
             try:

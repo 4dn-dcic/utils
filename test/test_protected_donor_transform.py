@@ -145,6 +145,41 @@ def test_custom_excel_opt_in_integrates_transform_before_structured_data(tmp_pat
     assert data["Demographic"][0]["donor"] == "A_PROTECTED-DONOR_1"
 
 
+def test_prefixed_protected_item_sheet_uses_canonical_name():
+    workbook = _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "DSA_Demographic": [["donor"], ["A_DONOR_1"]],
+    })
+
+    transformer = ProtectedDonorWorkbookTransformer(
+        effective_sheet_name=lambda name: name.split("_", 1)[-1]
+    )
+    assert transformer.transform(workbook) is True
+    assert workbook["DSA_Demographic"]["A2"].value == "A_PROTECTED-DONOR_1"
+
+
+def test_accession_lookup_uses_portal_root_strategy():
+    class Portal:
+        _ref_lookup_strategy = object()
+
+        def __init__(self):
+            self.calls = []
+
+        def ref_exists(self, type_name, value):
+            self.calls.append((type_name, value))
+            return {"type": type_name, "uuid": "portal-uuid"}
+
+    portal = Portal()
+    workbook = _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "Demographic": [["donor"], ["SMAPD1234567"]],
+    })
+
+    analysis = ProtectedDonorWorkbookTransformer(portal=portal).analyze(workbook)
+    assert analysis.references["SMAPD1234567"] == DonorReferenceKind.PROTECTED_DONOR
+    assert portal.calls == [("ProtectedDonor", "SMAPD1234567")]
+
+
 def test_hidden_and_unlisted_sheets_are_not_transformed():
     workbook = _workbook({
         "Donor": [["submitted_id"], ["A_DONOR_1"]],
