@@ -512,3 +512,64 @@ def test_repeated_construction_still_cannot_clobber_the_staged_path(tmp_path):
         CustomExcel(**kwargs)
 
     assert staged.read_bytes() == original
+
+
+def _write_donor_input(path):
+    _workbook({
+        "Donor": [["submitted_id"], ["A_DONOR_1"]],
+        "Demographic": [["donor"], ["A_DONOR_1"]],
+    }).save(path)
+
+
+def test_owned_staging_path_is_replaced_when_existing_path_is_allowed(tmp_path):
+    input_path = tmp_path / "in.xlsx"
+    _write_donor_input(input_path)
+    staged = tmp_path / "staged.xlsx"
+    _workbook({"Stale": [["old"], ["content"]]}).save(staged)
+
+    excel = CustomExcel(file=str(input_path), transform_protected_donor=True,
+                        transformed_workbook_path=str(staged), allow_existing_staging_path=True)
+
+    assert "ProtectedDonor" in excel.sheet_names
+    assert "Stale" not in openpyxl.load_workbook(staged).sheetnames
+    assert [row["submitted_id"] for row in openpyxl_rows(staged, "ProtectedDonor")] == ["A_PROTECTED-DONOR_1"]
+    assert [row["donor"] for row in openpyxl_rows(staged, "Demographic")] == ["A_PROTECTED-DONOR_1"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["in.xlsx", "staged.xlsx"]
+
+
+def test_failed_save_to_owned_staging_path_keeps_existing_file_and_leaves_no_temporary(tmp_path, monkeypatch):
+    input_path = tmp_path / "in.xlsx"
+    _write_donor_input(input_path)
+    staged = tmp_path / "staged.xlsx"
+    _workbook({"Stale": [["old"], ["content"]]}).save(staged)
+    original = staged.read_bytes()
+
+    def failing_save(self, filename):
+        with open(filename, "wb") as stream:
+            stream.write(b"partial")
+        raise OSError("disk full")
+
+    monkeypatch.setattr(openpyxl.Workbook, "save", failing_save)
+    with pytest.raises(ValueError, match="Cannot save transformed workbook.*disk full"):
+        CustomExcel(file=str(input_path), transform_protected_donor=True,
+                    transformed_workbook_path=str(staged), allow_existing_staging_path=True)
+
+    assert staged.read_bytes() == original
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["in.xlsx", "staged.xlsx"]
+
+
+def test_construction_failure_does_not_raise_attribute_error_in_excel_del(tmp_path):
+    import gc
+    import sys
+
+    unraisable = []
+    previous_hook = sys.unraisablehook
+    sys.unraisablehook = unraisable.append
+    try:
+        with pytest.raises(TypeError):
+            CustomExcel(file=str(tmp_path / "in.xlsx"), unsupported_option=True)
+        gc.collect()
+    finally:
+        sys.unraisablehook = previous_hook
+
+    assert [repr(item.exc_value) for item in unraisable] == []

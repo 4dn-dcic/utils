@@ -20,8 +20,9 @@ Change Log
     copied fields are preserved when an existing ProtectedDonor sheet lacks their headers.
   - Added opt-in CustomExcel options transform_protected_donor, transformed_workbook_path,
     and allow_existing_staging_path; CustomExcel.with_portal now accepts these options.
-    Transformed workbooks are saved atomically and never overwrite an existing path
-    (or the input workbook) unless the caller owns it as a staging path.
+    Transformed workbooks are saved atomically and never overwrite the input workbook;
+    an existing output path is replaced only when allow_existing_staging_path indicates
+    the caller owns it as a staging path.
   - StructuredDataSet now opens an Excel workbook once for both the progress-counting and
     parsing passes, and applies the specified schema ordering to multi-schema JSON files.
   - Removed unused nonlocal/global declarations flagged by pyflakes F824.
