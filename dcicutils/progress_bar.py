@@ -229,7 +229,6 @@ class ProgressBar:
 
     def _define_interrupt_handler(self) -> None:
         def handle_interrupt(signum: int, frame: frame) -> None:  # noqa
-            nonlocal self
             def handle_secondary_interrupt(signum: int, frame: frame) -> None:  # noqa
                 print("\nEnter 'yes' or 'no' or CTRL-\\ to completely abort ...")
             self.disable()
@@ -262,10 +261,8 @@ class ProgressBar:
             self._interrupt_continue(self) if self._interrupt_continue else None
             self.enable()
         def restore_interrupt_handler() -> None:  # noqa
-            nonlocal self, previous_interrupt_handler
             set_interrupt_handler(previous_interrupt_handler)
         def set_interrupt_handler(interrupt_handler: Callable) -> Optional[Callable]:  # noqa
-            nonlocal self
             if callable(interrupt_handler) and (threading.current_thread() == threading.main_thread()):
                 return signal(SIGINT, interrupt_handler)
             return None
@@ -281,7 +278,7 @@ class ProgressBar:
         sys_stdout_write = sys.stdout.write
         last_text = None ; last_captured_output_text = None ; last_spin_change_time = None  # noqa
         def tidy_stdout_write(text: str) -> None:  # noqa
-            nonlocal self, sys_stdout_write, sentinel_internal, spina, spini, spinn
+            nonlocal spini
             nonlocal last_text, last_captured_output_text, last_spin_change_time
             def replace_first(value: str, match: str, replacement: str) -> str:  # noqa
                 return value[:i] + replacement + value[i + len(match):] if (i := value.find(match)) >= 0 else value
@@ -338,7 +335,6 @@ class ProgressBar:
                         self._captured_output_for_testing.append(captured_output_text)
                         last_captured_output_text = captured_output_text
         def restore_stdout_write() -> None:  # noqa
-            nonlocal sys_stdout_write
             if sys_stdout_write is not None:
                 sys.stdout.write = sys_stdout_write
         def ascii_spinners() -> list:  # noqa

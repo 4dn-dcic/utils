@@ -6,7 +6,6 @@ sleep = lambda: time.sleep(sleep_seconds) if sleep_seconds > 0 else None  # noqa
 
 
 def test_progress_bar_a():
-    global sleep
     total = 50
     description = "Working"
     bar = ProgressBar(total=total, description=description, capture_output_for_testing=True)
@@ -32,7 +31,6 @@ def test_progress_bar_a():
 def test_progress_bar_b():
 
     def run_single_task(bar: ProgressBar, total: int, task_number: int) -> None:
-        global sleep
         bar.reset(total=total, progress=0, description=f"Task-{task_number}")
         for i in range(total):
             bar.increment_progress(1) ; sleep()  # noqa
